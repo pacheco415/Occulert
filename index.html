@@ -27,8 +27,8 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 html{scroll-behavior:smooth;}
 :root{
-  --dark:#0a0e1a;--dark2:#0f1525;--dark3:#141c30;
-  --card:#161e32;--border:#1e2d4a;--border2:#243458;
+  --dark:#111827;--dark2:#1a2235;--dark3:#1f2d42;
+  --card:#1e2d45;--border:#2a3f5f;--border2:#344d72;
   --accent:#2563eb;--accent2:#3b82f6;--cyan:#06b6d4;
   --green:#10b981;--warn:#f59e0b;--danger:#ef4444;
   --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--white:#fff;
@@ -786,7 +786,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         <div class="dbs"><div class="dbs-val">2</div><div class="dbs-label">Off Duty</div></div>
       </div>
       <div class="db-th"><span>Driver</span><span>Route</span><span>EAR</span><span>Status</span></div>
-      <div class="db-row"><div class="di"><div class="dav">🧑</div><div><div class="dn">Driver One</div><div class="did">#DRV-001</div></div></div><div class="dc">SF→Oakland</div><div class="dc mo">0.34</div><div><span class="sb sb-ok">● Alert</span></div></div>
+      <div class="db-row"><div class="di"><div class="dav">🧑</div><div><div class="dn">J. Mitchell</div><div class="did">#DRV-001</div></div></div><div class="dc">SF→Oakland</div><div class="dc mo">0.34</div><div><span class="sb sb-ok">● Alert</span></div></div>
       <div class="db-row"><div class="di"><div class="dav">👩</div><div><div class="dn">M. Johnson</div><div class="did">#DRV-002</div></div></div><div class="dc">Oakland→SJ</div><div class="dc mo" style="color:var(--warn)">0.24</div><div><span class="sb sb-wa">▲ Drowsy</span></div></div>
       <div class="db-row"><div class="di"><div class="dav">👨</div><div><div class="dn">T. Williams</div><div class="did">#DRV-003</div></div></div><div class="dc">Daly City→SF</div><div class="dc mo">0.31</div><div><span class="sb sb-ok">● Alert</span></div></div>
       <div class="db-row"><div class="di"><div class="dav">🧑</div><div><div class="dn">K. Davis</div><div class="did">#DRV-004</div></div></div><div class="dc">SF→Fremont</div><div class="dc mo" style="color:var(--danger)">0.18</div><div><span class="sb sb-da">⚠ Alerted</span></div></div>
@@ -821,7 +821,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   <div class="blog-grid">
     <div class="blog-card">
       <div class="blog-img">
-        <img src="https://images.unsplash.com/photo-1504281519787-c573a6e83db8?w=400&q=80&auto=format&fit=crop" alt="Driver at night highway"/>
+        <img src="https://images.unsplash.com/photo-1543269865-cbf427effbad?w=400&q=80&auto=format&fit=crop" alt="Driver at night highway"/>
         <div class="blog-img-overlay"></div>
         <div class="blog-cat">Safety</div>
       </div>
@@ -833,7 +833,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     </div>
     <div class="blog-card">
       <div class="blog-img">
-        <img src="https://images.unsplash.com/photo-1562519776-b232b3fd463d?w=400&q=80&auto=format&fit=crop" alt="Coffee and tired driver"/>
+        <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&q=80&auto=format&fit=crop" alt="Coffee and tired driver"/>
         <div class="blog-img-overlay"></div>
         <div class="blog-cat">Tips</div>
       </div>
@@ -912,26 +912,35 @@ document.addEventListener('DOMContentLoaded',()=>{
     <button class="amount-btn">$25</button>
     <button class="amount-btn">Any Amount</button>
   </div>
-  <div class="donate-grid">
+  <div class="donate-grid" style="grid-template-columns:1fr 1fr;max-width:500px;margin:0 auto 24px;">
     <a href="https://cash.app/$Richp415" target="_blank" class="donate-card cashapp">
       <span class="dc-icon">💚</span><div class="dc-name">Cash App</div><div class="dc-handle">$Richp415</div>
     </a>
     <a href="https://venmo.com/Rich415" target="_blank" class="donate-card venmo">
       <span class="dc-icon">💙</span><div class="dc-name">Venmo</div><div class="dc-handle">@Rich415</div>
     </a>
-    <a href="#" class="donate-card paypal" onclick="alert('PayPal coming soon! Use Cash App $Richp415 or Venmo @Rich415 for now. Thank you!');return false;">
-      <span class="dc-icon">🔵</span><div class="dc-name">PayPal</div><div class="dc-handle blue">Coming Soon</div>
-    </a>
-    <a href="#" class="donate-card applepay" onclick="alert('Apple Pay: Send via Cash App $Richp415 or Venmo @Rich415. Thank you!');return false;">
-      <span class="dc-icon">🍎</span><div class="dc-name">Apple Pay</div><div class="dc-handle">Via Cash App</div>
-    </a>
-    <a href="#" class="donate-card zelle" onclick="alert('Zelle: Send to hello@occulert.com — Thank you for your support!');return false;">
-      <span class="dc-icon">💜</span><div class="dc-name">Zelle</div><div class="dc-handle">hello@occulert.com</div>
-    </a>
-    <a href="#" class="donate-card crypto" onclick="alert('Crypto wallet address coming soon! Follow @occulert on Instagram for updates.');return false;">
-      <span class="dc-icon">₿</span><div class="dc-name">Crypto / Bitcoin</div><div class="dc-handle blue">Coming Soon</div>
-    </a>
   </div>
+ 
+  <!-- INSTANT PAY BUTTONS -->
+  <div style="margin-bottom:24px;">
+    <p style="font-size:13px;color:var(--text3);margin-bottom:16px;letter-spacing:.5px;">Pay instantly with your device:</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <a href="https://cash.app/$Richp415" target="_blank" style="display:flex;align-items:center;gap:8px;padding:12px 22px;background:#000;border-radius:10px;text-decoration:none;transition:all .2s;border:1px solid rgba(255,255,255,.1);" onmouseover="this.style.background='#111'" onmouseout="this.style.background='#000'">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+        <span style="color:white;font-size:13px;font-weight:600;font-family:'Inter',sans-serif;">Apple Pay</span>
+      </a>
+      <a href="https://cash.app/$Richp415" target="_blank" style="display:flex;align-items:center;gap:8px;padding:12px 22px;background:#4285f4;border-radius:10px;text-decoration:none;transition:all .2s;" onmouseover="this.style.background='#3367d6'" onmouseout="this.style.background='#4285f4'">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+        <span style="color:white;font-size:13px;font-weight:600;font-family:'Inter',sans-serif;">Google Pay</span>
+      </a>
+      <a href="mailto:hello@occulert.com?subject=Donation - Other Payment Method&body=Hi Rich, I want to donate but need a different payment method. Please send me your Zelle/PayPal/Crypto details." style="display:flex;align-items:center;gap:8px;padding:12px 22px;background:var(--card);border:1px solid var(--border2);border-radius:10px;text-decoration:none;transition:all .15s;color:var(--text2);" onmouseover="this.style.borderColor='var(--accent)';this.style.color='white'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">
+        <span style="font-size:16px;">✉️</span>
+        <span style="font-size:13px;font-weight:600;font-family:'Inter',sans-serif;">Other Methods</span>
+      </a>
+    </div>
+    <p style="font-size:11px;color:var(--text3);margin-top:12px;">Apple Pay &amp; Google Pay send directly via Cash App. Tap "Other Methods" for Zelle, PayPal, Crypto, or Chime.</p>
+  </div>
+ 
   <p class="donate-note">Donations support an independent developer building free safety tools for drivers. Not tax-deductible. Thank you for keeping this free for everyone. 🙏</p>
 </div>
 </div>
