@@ -371,6 +371,16 @@ Home</a>
 
 <div class="perm-msg" id="permMsg">⚠ Camera permission required. Allow camera access when prompted, then tap START MONITORING.</div>
 
+<!-- CALIBRATION BAR -->
+<div id="calibration-bar" style="display:none;width:calc(100% - 32px);margin:0 16px 6px;background:rgba(0,229,255,0.07);border:1px solid rgba(0,229,255,0.3);border-radius:7px;padding:10px 14px;align-items:center;gap:12px;">
+  <div style="width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 0.8s ease-in-out infinite;flex-shrink:0;"></div>
+  <div style="flex:1;">
+    <div style="font-size:13px;font-weight:700;color:var(--accent);letter-spacing:1px;">CALIBRATING TO YOUR EYES</div>
+    <div style="font-size:10px;color:var(--dim);font-family:'Share Tech Mono',monospace;margin-top:2px;">Look straight at camera — keep eyes open for 5 seconds</div>
+  </div>
+  <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent);" id="calib-timer">5s</div>
+</div>
+
 <div class="dash-grid">
 <!-- LEFT COLUMN -->
 <div class="dash-left">
@@ -495,19 +505,138 @@ let currentFacingMode='user';
 let currentUser=null;
 let selectedRating=0;
 
-// FIX #1 + #2: Refined thresholds and no-face tracking
-const EAR_OPEN=0.30;    // Clearly open — reset closedFrames immediately
-const EAR_WARN=0.27;    // Starting to close
-const EAR_DANGER=0.22;  // Definitely closing
-let noFaceFrames=0;
-const NO_FACE_DANGER_THRESHOLD=90; // ~3 seconds at 30fps — trigger if face disappears
-
-// FIX #2: Danger threshold is now thresh*3 (not thresh*1.5)
-// So at default thresh=20: warn at 20 frames, danger at 60 frames (~2 seconds)
-
-// FIX #4: FPS throttle for detection (not for video display)
-const DETECTION_FPS=12; // 12 detections/sec — enough for drowsiness, saves battery
+// Detection FPS throttle
+const DETECTION_FPS=12;
 let lastDetectionTime=0;
+let noFaceFrames=0;
+const NO_FACE_DANGER_THRESHOLD=36; // ~3 sec at 12fps
+
+// ─────────────────────────────────────────────────
+// CALIBRATION SYSTEM
+// Samples EAR for 5 seconds on start, learns YOUR
+// personal baseline, then sets thresholds relative
+// to it. Fixes iPhone/Android differences and
+// glasses, face shape, lighting, etc.
+// ─────────────────────────────────────────────────
+let calibrating=false;
+let calibrationSamples=[];
+let calibrationDone=false;
+const CALIBRATION_DURATION_MS=5000; // 5 second calibration window
+const CALIBRATION_MIN_SAMPLES=30;   // need at least 30 good readings
+
+// These get overwritten by calibration; used as fallback only
+let EAR_OPEN=0.30;
+let EAR_WARN=0.25;
+let EAR_DANGER=0.20;
+
+function startCalibration(){
+  calibrating=true;
+  calibrationDone=false;
+  calibrationSamples=[];
+  showCalibrationUI(true);
+  addHistory('ok','🎯 Calibrating to your eyes — keep them open...');
+  setTimeout(finishCalibration, CALIBRATION_DURATION_MS);
+}
+
+function collectCalibrationSample(ear){
+  if(!calibrating||!calibrationDone===false)return;
+  // Only collect samples when ear is reasonable (not blinking)
+  if(ear>0.15&&ear<0.55) calibrationSamples.push(ear);
+}
+
+function finishCalibration(){
+  calibrating=false;
+  if(calibrationSamples.length<CALIBRATION_MIN_SAMPLES){
+    // Not enough data — keep defaults and warn
+    addHistory('w','⚠ Calibration incomplete — move to better lighting and try again');
+    showCalibrationUI(false);
+    calibrationDone=true;
+    return;
+  }
+  // Sort samples, take median as "open eye" baseline
+  const sorted=[...calibrationSamples].sort((a,b)=>a-b);
+  const median=sorted[Math.floor(sorted.length*0.5)];
+  const p25=sorted[Math.floor(sorted.length*0.25)]; // 25th percentile = partial close
+
+  // Set thresholds relative to personal baseline
+  // Open: anything above 85% of median
+  // Warn: anything below 75% of median
+  // Danger: anything below 60% of median
+  EAR_OPEN=median*0.85;
+  EAR_WARN=median*0.75;
+  EAR_DANGER=median*0.60;
+
+  // Save for this session
+  calibrationDone=true;
+  showCalibrationUI(false);
+  addHistory('ok',`✅ Calibrated — baseline EAR: ${median.toFixed(3)} | warn: ${EAR_WARN.toFixed(3)} | danger: ${EAR_DANGER.toFixed(3)}`);
+}
+
+function showCalibrationUI(show){
+  const el=document.getElementById('calibration-bar');
+  if(el) el.style.display=show?'flex':'none';
+}
+
+// ─────────────────────────────────────────────────
+// EAR SMOOTHING SYSTEM
+// Rolling average of last N readings.
+// Kills jitter from lighting changes and micro
+// head movements during driving.
+// ─────────────────────────────────────────────────
+const EAR_BUFFER_SIZE=6; // average over 6 frames (~0.5 sec at 12fps)
+let earBuffer=[];
+
+function smoothEAR(rawEar){
+  earBuffer.push(rawEar);
+  if(earBuffer.length>EAR_BUFFER_SIZE) earBuffer.shift();
+  // Weighted average: recent frames count more
+  let sum=0,weight=0;
+  earBuffer.forEach((v,i)=>{
+    const w=i+1; // weight 1,2,3...N
+    sum+=v*w;weight+=w;
+  });
+  return sum/weight;
+}
+
+// ─────────────────────────────────────────────────
+// HEAD TURN TOLERANCE SYSTEM
+// Detects when you're checking mirrors or blind
+// spots by measuring horizontal face angle.
+// Pauses alert accumulation for up to 2 seconds
+// when a head turn is detected.
+// ─────────────────────────────────────────────────
+// Nose tip = 1, left cheek = 234, right cheek = 454
+// Yaw (horizontal turn) approximated by comparing
+// nose tip x-position relative to face center
+const HEAD_TURN_THRESHOLD=0.12; // fraction of face width — covers typical mirror check
+const HEAD_TURN_PAUSE_MS=2000;  // pause alerts for 2 seconds after turn detected
+let lastHeadTurnTime=0;
+let headTurnActive=false;
+
+function detectHeadTurn(lm){
+  // Face horizontal span: left eye outer corner (33) to right eye outer corner (263)
+  const leftX=lm[33].x;
+  const rightX=lm[263].x;
+  const faceWidth=Math.abs(rightX-leftX);
+  const noseTip=lm[1].x;
+  const faceCenter=(leftX+rightX)/2;
+  // Normalized deviation of nose from center
+  const deviation=Math.abs(noseTip-faceCenter)/faceWidth;
+  const isTurned=deviation>HEAD_TURN_THRESHOLD;
+  if(isTurned){
+    lastHeadTurnTime=Date.now();
+    if(!headTurnActive){
+      headTurnActive=true;
+      // Don't log every turn — only first detection in a sequence
+    }
+  }else{
+    const elapsed=Date.now()-lastHeadTurnTime;
+    if(headTurnActive&&elapsed>HEAD_TURN_PAUSE_MS){
+      headTurnActive=false;
+    }
+  }
+  return isTurned||(Date.now()-lastHeadTurnTime<HEAD_TURN_PAUSE_MS);
+}
 
 // DOM
 const video=document.getElementById('video');
@@ -794,43 +923,42 @@ function calcEAR(lm,idx){
 }
 
 // ═══════════════════════════════════════════════════
-// FIX #4: THROTTLED DETECTION LOOP
-// Video display runs at native RAF speed.
-// Detection only runs at DETECTION_FPS.
+// THROTTLED DETECTION LOOP
 // ═══════════════════════════════════════════════════
 async function loop(){
   if(!running)return;
-
   const now=performance.now();
   const detectionInterval=1000/DETECTION_FPS;
 
-  // Always resize canvas to match video
   if(video.videoWidth>0){
     canvas.width=video.videoWidth;
     canvas.height=video.videoHeight;
   }
 
-  // Only run MediaPipe at throttled rate
   if(now-lastDetectionTime>=detectionInterval){
     lastDetectionTime=now;
     if(faceLoaded&&video.readyState>=2){
       await faceMesh.send({image:video});
     }
-
     const lm=lastResults?.multiFaceLandmarks?.[0];
     if(lm){
       noFaceFrames=0;
       ctx.clearRect(0,0,canvas.width,canvas.height);
       drawEye(lm,LEFT_EYE);
       drawEye(lm,RIGHT_EYE);
-      const ear=(calcEAR(lm,LEFT_EYE)+calcEAR(lm,RIGHT_EYE))/2;
-      updateEAR(ear);
+      const rawEar=(calcEAR(lm,LEFT_EYE)+calcEAR(lm,RIGHT_EYE))/2;
+      // Collect calibration sample if calibrating
+      if(calibrating) collectCalibrationSample(rawEar);
+      // Smooth the EAR value before using it
+      const ear=smoothEAR(rawEar);
+      // Check head turn before processing alert logic
+      const isTurned=detectHeadTurn(lm);
+      updateEAR(ear,isTurned);
     }else{
       ctx.clearRect(0,0,canvas.width,canvas.height);
       updateNoFace();
     }
   }
-
   animFrame=requestAnimationFrame(loop);
 }
 
@@ -849,43 +977,46 @@ function drawEye(lm,idx){
 }
 
 // ═══════════════════════════════════════════════════
-// FIX #1: CORRECTED closedFrames logic
-// FIX #2: Danger threshold = thresh * 3
+// CORE EAR UPDATE
+// Uses smoothed EAR + head-turn awareness
 // ═══════════════════════════════════════════════════
-function updateEAR(ear){
+function updateEAR(ear,isTurned){
   const pct=Math.min(100,(ear/0.5)*100);
-  const isOpen=ear>=EAR_OPEN;       // FIX #1: Use EAR_OPEN (0.30) not EAR_WARN
+  const isOpen=ear>=EAR_OPEN;
   const isWarn=ear<EAR_WARN;
   const isDanger=ear<EAR_DANGER;
 
-  // FIX #1: If clearly open, hard-reset closedFrames immediately
-  // Don't decrement slowly — one good open frame means eyes are open
   if(isOpen){
-    if(closedFrames>0){
-      closedFrames=0;
-      closedCount.textContent=0;
-    }
+    if(closedFrames>0){closedFrames=0;closedCount.textContent=0;}
     if(alertState!=='none') clearAlert();
   }else{
-    closedFrames++;
-    closedCount.textContent=closedFrames;
+    // HEAD TURN TOLERANCE: if person is checking mirrors,
+    // don't accumulate closed frames — they'll naturally squint/look away
+    if(!isTurned){
+      closedFrames++;
+      closedCount.textContent=closedFrames;
+    }
+    // If they were turning and just came back, decay frames slowly
+    else if(closedFrames>0){
+      closedFrames=Math.max(0,closedFrames-1);
+      closedCount.textContent=closedFrames;
+    }
   }
 
   eyeL.className='eye-dot'+(isDanger?' closed':isOpen?' open':'');
   eyeR.className='eye-dot'+(isDanger?' closed':isOpen?' open':'');
-
   earBar.style.width=pct+'%';
   earBar.style.background=isDanger?'#ff2244':isWarn?'#ffaa00':'#00ff88';
-
   const s=ear.toFixed(3);
   earDisplay.textContent=s;earValLabel.textContent=s;
   const cls=isDanger?'danger':isWarn?'warn':'';
   earDisplay.className='metric-val '+cls;earValLabel.className='ear-val '+cls;
 
+  // Don't fire alerts during calibration
+  if(calibrating||!calibrationDone)return;
+
   const now=Date.now();
   const coolMs=settings.cooldown*1000;
-
-  // FIX #2: Danger requires thresh*3 frames — much harder to trigger accidentally
   if(closedFrames>=settings.thresh*3&&now-lastAlertTime>coolMs){
     triggerAlert('danger');lastAlertTime=now;
   }else if(closedFrames>=settings.thresh&&alertState==='none'){
@@ -894,22 +1025,21 @@ function updateEAR(ear){
 }
 
 // ═══════════════════════════════════════════════════
-// FIX #2: No-face detection — treat sustained absence as drowsy
+// NO-FACE DETECTION
 // ═══════════════════════════════════════════════════
 function updateNoFace(){
   noFaceFrames++;
   earDisplay.textContent='--';earValLabel.textContent='--';
   earBar.style.width='0%';
   eyeL.className='eye-dot';eyeR.className='eye-dot';
-
-  // If face has been gone for ~3 seconds and we're running, that's a concern
   const now=Date.now();
   const coolMs=settings.cooldown*1000;
-  if(noFaceFrames>=NO_FACE_DANGER_THRESHOLD&&running&&now-lastAlertTime>coolMs){
+  // Only fire no-face alert if calibration is done and we're not mid-head-turn
+  if(noFaceFrames>=NO_FACE_DANGER_THRESHOLD&&running&&calibrationDone&&now-lastAlertTime>coolMs&&!headTurnActive){
     triggerAlert('warn');
     lastAlertTime=now;
     addHistory('w','⚠ Face not detected — head may be down');
-    noFaceFrames=0; // reset so it doesn't spam
+    noFaceFrames=0;
   }
 }
 
@@ -974,11 +1104,24 @@ async function startMonitoring(){
   noCam.style.display='none';
 
   running=true;closedFrames=0;noFaceFrames=0;lastDetectionTime=0;
+  earBuffer=[];headTurnActive=false;lastHeadTurnTime=0;
   startBtn.textContent='■ Stop Monitoring';startBtn.className='btn-primary stop';startBtn.disabled=false;
   statusBadge.className='status-badge active';statusBadge.textContent='ACTIVE';
   cameraWrap.className='camera-wrap active-border';
   addHistory('ok','▶ Monitoring started');
   loop();
+  // Start calibration after a 1 second warm-up
+  setTimeout(()=>{
+    if(running) startCalibration();
+    // Countdown timer display
+    let t=5;
+    const timerEl=document.getElementById('calib-timer');
+    const interval=setInterval(()=>{
+      t--;
+      if(timerEl) timerEl.textContent=t+'s';
+      if(t<=0) clearInterval(interval);
+    },1000);
+  },1000);
 }
 
 function stopMonitoring(){
@@ -987,6 +1130,8 @@ function stopMonitoring(){
   if(stream)stream.getTracks().forEach(t=>t.stop());
   stream=null;lastResults=null;
   closedFrames=0;noFaceFrames=0;
+  earBuffer=[];calibrating=false;calibrationDone=false;calibrationSamples=[];
+  headTurnActive=false;
   closedCount.textContent=0;
   video.srcObject=null;noCam.style.display='flex';
   ctx.clearRect(0,0,canvas.width,canvas.height);
