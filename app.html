@@ -12,17 +12,36 @@
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-YCC8W4F0X9"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-YCC8W4F0X9');</script>
+
+<!-- FIX #3: Preload MediaPipe scripts immediately on page load instead of waiting for Start -->
+<script>
+(function preloadMediaPipe(){
+  const s1=document.createElement('script');
+  s1.src='https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
+  s1.crossOrigin='anonymous';
+  const s2=document.createElement('script');
+  s2.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
+  s2.crossOrigin='anonymous';
+  s1.onload=()=>document.head.appendChild(s2);
+  s2.onload=()=>{
+    window._mpReady=true;
+    window._mpReadyCb&&window._mpReadyCb();
+  };
+  document.head.appendChild(s1);
+})();
+</script>
+
 <style>
 :root{
-  --bg:#050a0f;--panel:#0a1520;--border:#0e2840;
-  --accent:#00e5ff;--accent2:#00ff88;--warn:#ffaa00;--danger:#ff2244;
-  --text:#c8dde8;--dim:#4a6a7a;--glow:0 0 20px rgba(0,229,255,0.3);
+--bg:#050a0f;--panel:#0a1520;--border:#0e2840;
+--accent:#00e5ff;--accent2:#00ff88;--warn:#ffaa00;--danger:#ff2244;
+--text:#c8dde8;--dim:#4a6a7a;--glow:0 0 20px rgba(0,229,255,0.3);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;}
 body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px);pointer-events:none;z-index:9999;}
 body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
- 
+
 /* BACK BAR */
 #back-bar{position:fixed;top:0;left:0;right:0;z-index:999;height:52px;background:rgba(5,10,15,0.97);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;}
 #back-btn{display:flex;align-items:center;gap:7px;padding:6px 14px;background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.2);border-radius:8px;color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;text-decoration:none;transition:all .2s;}
@@ -34,7 +53,8 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
 #bar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
 .bar-icon-btn{width:32px;height:32px;background:rgba(0,229,255,0.06);border:1px solid var(--border);border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--dim);transition:all .2s;}
 .bar-icon-btn:hover{border-color:var(--accent);color:var(--accent);}
-/* LANG SWITCHER APP */
+
+/* LANG SWITCHER */
 .lang-switcher{position:relative;}
 .lang-trigger{background:rgba(0,229,255,.06);border:1px solid var(--border);border-radius:7px;color:var(--dim);font-size:10px;cursor:pointer;font-family:'Share Tech Mono',monospace;padding:5px 9px;letter-spacing:1px;transition:all .2s;white-space:nowrap;}
 .lang-trigger:hover{border-color:var(--accent);color:var(--accent);}
@@ -44,7 +64,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
 .lang-option:hover{background:rgba(255,255,255,.04);color:var(--text);}
 .lang-option.active{color:var(--accent2);}
 .lang-option span:first-child{font-size:16px;}
- 
+
 /* AUTH MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:800;display:none;align-items:center;justify-content:center;padding:20px;}
 .modal-overlay.show{display:flex;}
@@ -73,68 +93,58 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
 .auth-success .check{font-size:48px;margin-bottom:12px;}
 .auth-success p{font-size:14px;color:var(--accent2);font-weight:600;}
 .auth-success small{font-size:12px;color:var(--dim);margin-top:4px;display:block;}
-.user-info-bar{display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:6px;font-size:11px;color:var(--accent2);letter-spacing:.5px;}
- 
+
 /* THEME MODAL */
 .theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
 .theme-swatch{width:100%;aspect-ratio:1;border-radius:10px;cursor:pointer;border:2px solid transparent;transition:all .2s;position:relative;}
 .theme-swatch.active{border-color:white;box-shadow:0 0 12px rgba(255,255,255,.3);}
-.theme-swatch::after{content:'';position:absolute;inset:0;border-radius:8px;}
 .theme-label{font-size:10px;color:var(--dim);text-align:center;margin-top:5px;letter-spacing:1px;}
- 
+
 /* RATING MODAL */
 .rating-stars{display:flex;gap:8px;justify-content:center;margin:20px 0;}
 .rating-star{font-size:36px;cursor:pointer;transition:transform .15s;filter:grayscale(1);}
 .rating-star.active,.rating-star:hover{filter:grayscale(0);transform:scale(1.2);}
 .rating-input{width:100%;padding:10px 14px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;outline:none;resize:none;margin-bottom:14px;min-height:72px;}
 .rating-submit{width:100%;padding:12px;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;font-family:'Rajdhani',sans-serif;}
-.rating-display{display:flex;gap:4px;align-items:center;font-size:13px;color:var(--dim);}
-.rating-display .stars{color:#f59e0b;letter-spacing:1px;}
 .rating-success{display:none;text-align:center;padding:16px 0;color:var(--accent2);font-size:14px;font-weight:600;}
- 
-/* APP */
+
+/* FIX #3: Model loading indicator */
+#model-status{
+  position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+  background:rgba(10,21,32,0.95);border:1px solid var(--border);
+  border-radius:8px;padding:8px 16px;font-family:'Share Tech Mono',monospace;
+  font-size:11px;color:var(--dim);letter-spacing:1px;z-index:500;
+  transition:opacity .5s;display:flex;align-items:center;gap:8px;
+}
+#model-status.ready{color:var(--accent2);border-color:rgba(0,255,136,.3);}
+#model-status.hidden{opacity:0;pointer-events:none;}
+.model-dot{width:6px;height:6px;border-radius:50%;background:var(--warn);animation:pulse 1s ease-in-out infinite;}
+.model-dot.ready{background:var(--accent2);animation:none;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* APP LAYOUT */
 .app{position:relative;z-index:1;width:100%;max-width:1200px;padding:52px 0 0;display:flex;flex-direction:column;}
 .dash-grid{display:grid;grid-template-columns:1fr 300px;gap:0;width:100%;flex:1;min-height:0;padding:0 0 12px;}
 .dash-left{display:flex;flex-direction:column;padding:0 8px 0 16px;gap:0;}
 .dash-right{display:flex;flex-direction:column;gap:8px;padding:0 16px 0 8px;overflow-y:auto;max-height:calc(100vh - 122px);}
 .dash-right::-webkit-scrollbar{width:3px;}
 .dash-right::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
- 
+
 /* SIDE PANELS */
 .side-panel{background:var(--panel);border:1px solid var(--border);border-radius:7px;overflow:hidden;}
 .side-panel-header{padding:8px 14px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;font-family:'Share Tech Mono',monospace;}
- 
-/* CAMERA — fit in left col */
-.camera-wrap{width:100%;margin:10px 0 6px;border-radius:10px;}
- 
-/* METRICS — tighter in grid */
-.metrics{width:100%;margin:0 0 6px;gap:6px;}
-.metric-card{padding:8px 6px;}
-.metric-val{font-size:18px;}
- 
-/* EAR SECTION */
-.ear-section{width:100%;margin:0 0 6px;}
- 
-/* ALERT */
-.alert-box{width:100%;margin:0 0 6px;}
- 
-/* CONTROLS */
-.controls{width:100%;margin:0 0 0;gap:8px;}
-.btn-primary{padding:11px;}
- 
-/* MOBILE — stack back to single col */
+
 @media(max-width:768px){
   .dash-grid{grid-template-columns:1fr;padding:0;}
   .dash-left{padding:0 10px;}
   .dash-right{padding:0 10px;max-height:none;overflow-y:visible;}
 }
- 
+
 /* HEADER */
 header{width:100%;padding:16px 24px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(0,229,255,0.04) 0%,transparent 100%);}
 .logo-wrap{display:flex;align-items:center;gap:10px;}
 .logo-icon{width:30px;height:30px;border:2px solid var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;box-shadow:var(--glow);animation:pb 2s ease-in-out infinite;}
 @keyframes pb{0%,100%{box-shadow:0 0 10px rgba(0,229,255,.3);}50%{box-shadow:0 0 25px rgba(0,229,255,.7);}}
-.logo-icon svg{width:17px;height:17px;}
 .logo-text{font-size:20px;font-weight:700;letter-spacing:2px;color:var(--accent);text-shadow:0 0 20px rgba(0,229,255,.4);}
 .logo-sub{font-size:9px;letter-spacing:3px;color:var(--dim);font-family:'Share Tech Mono',monospace;text-transform:uppercase;}
 .status-badge{font-family:'Share Tech Mono',monospace;font-size:10px;padding:3px 9px;border-radius:4px;border:1px solid;letter-spacing:1px;transition:all .3s;}
@@ -143,9 +153,9 @@ header{width:100%;padding:16px 24px 12px;display:flex;align-items:center;justify
 .status-badge.warning{border-color:var(--warn);color:var(--warn);}
 .status-badge.danger{border-color:var(--danger);color:var(--danger);animation:bb .5s ease-in-out infinite;}
 @keyframes bb{0%,100%{opacity:1;}50%{opacity:.4;}}
- 
+
 /* CAMERA */
-.camera-wrap{width:calc(100% - 32px);margin:14px;position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#000;aspect-ratio:4/3;}
+.camera-wrap{width:calc(100% - 32px);margin:10px 16px 6px;position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#000;aspect-ratio:4/3;}
 .camera-wrap.active-border{border-color:rgba(0,229,255,.4);box-shadow:0 0 30px rgba(0,229,255,.12);}
 .camera-wrap.warn-border{border-color:rgba(255,170,0,.6);box-shadow:0 0 30px rgba(255,170,0,.22);}
 .camera-wrap.danger-border{border-color:var(--danger);animation:dp .5s ease-in-out infinite;}
@@ -167,24 +177,22 @@ header{width:100%;padding:16px 24px 12px;display:flex;align-items:center;justify
 .eye-dot.open{background:var(--accent2);box-shadow:0 0 8px rgba(0,255,136,.7);}
 .eye-dot.closed{background:var(--danger);box-shadow:0 0 8px rgba(255,34,68,.7);}
 .ear-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;}
- 
-/* Camera controls */
 .cam-controls{position:absolute;bottom:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;pointer-events:all;}
 .cam-ctrl-btn{background:rgba(5,10,15,.7);border:1px solid rgba(0,229,255,.25);border-radius:7px;padding:5px 10px;font-size:10px;font-family:'Share Tech Mono',monospace;color:var(--accent);cursor:pointer;letter-spacing:1px;transition:all .2s;}
 .cam-ctrl-btn:hover{border-color:var(--accent);background:rgba(0,229,255,.08);}
 .no-cam{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;text-align:center;}
 .no-cam svg{opacity:.3;}
- 
+
 /* METRICS */
-.metrics{width:calc(100% - 32px);margin:0 16px 10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}
+.metrics{width:calc(100% - 32px);margin:0 16px 6px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}
 .metric-card{background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;}
 .metric-val{font-family:'Share Tech Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);line-height:1;transition:color .3s;}
 .metric-val.warn{color:var(--warn);}
 .metric-val.danger{color:var(--danger);}
 .metric-label{font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;text-align:center;}
- 
+
 /* EAR BAR */
-.ear-section{width:calc(100% - 32px);margin:0 16px 10px;background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:12px 14px;}
+.ear-section{width:calc(100% - 32px);margin:0 16px 6px;background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:12px 14px;}
 .ear-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
 .ear-title{font-size:10px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;font-family:'Share Tech Mono',monospace;}
 .ear-val{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);transition:color .2s;}
@@ -192,9 +200,9 @@ header{width:100%;padding:16px 24px 12px;display:flex;align-items:center;justify
 .ear-val.danger{color:var(--danger);}
 .ear-bar-bg{height:7px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;}
 .ear-bar-fill{height:100%;border-radius:3px;transition:width .15s,background .3s;background:var(--accent2);}
- 
+
 /* ALERT */
-.alert-box{width:calc(100% - 32px);margin:0 16px 10px;border-radius:7px;padding:12px 14px;border:1px solid;display:none;align-items:center;gap:10px;}
+.alert-box{width:calc(100% - 32px);margin:0 16px 6px;border-radius:7px;padding:12px 14px;border:1px solid;display:none;align-items:center;gap:10px;}
 .alert-box.warn-alert{display:flex;background:rgba(255,170,0,.08);border-color:rgba(255,170,0,.4);}
 .alert-box.danger-alert{display:flex;background:rgba(255,34,68,.1);border-color:rgba(255,34,68,.5);animation:af .8s ease-in-out infinite;}
 @keyframes af{0%,100%{background:rgba(255,34,68,.08);}50%{background:rgba(255,34,68,.18);}}
@@ -203,7 +211,7 @@ header{width:100%;padding:16px 24px 12px;display:flex;align-items:center;justify
 .alert-sub{font-size:11px;opacity:.7;font-family:'Share Tech Mono',monospace;}
 .warn-alert .alert-title{color:var(--warn);}
 .danger-alert .alert-title{color:var(--danger);}
- 
+
 /* CONTROLS */
 .controls{width:calc(100% - 32px);margin:0 16px 10px;display:flex;gap:8px;}
 .btn-primary{flex:1;padding:13px;background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:7px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
@@ -211,7 +219,32 @@ header{width:100%;padding:16px 24px 12px;display:flex;align-items:center;justify
 .btn-primary.stop{border-color:var(--danger);color:var(--danger);}
 .btn-secondary{padding:13px 14px;background:var(--panel);border:1px solid var(--border);color:var(--dim);font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border-radius:7px;cursor:pointer;transition:all .2s;}
 .btn-secondary:hover{border-color:var(--dim);color:var(--text);}
- 
+
+/* HISTORY */
+.history-list{max-height:130px;overflow-y:auto;}
+.history-list::-webkit-scrollbar{width:3px;}
+.history-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.history-item{padding:7px 14px;display:flex;gap:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,.03);font-family:'Share Tech Mono',monospace;font-size:10px;}
+.history-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.history-dot.w{background:var(--warn);}
+.history-dot.d{background:var(--danger);}
+.history-dot.ok{background:var(--accent2);}
+.history-time{color:var(--dim);flex-shrink:0;}
+.history-msg{color:var(--text);flex:1;}
+.history-empty{padding:16px;text-align:center;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;}
+
+/* USER BADGE */
+.user-badge{width:calc(100% - 32px);margin:14px 16px 0;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:7px;padding:10px 14px;display:none;align-items:center;justify-content:space-between;}
+.user-badge.show{display:flex;}
+.ub-name{font-size:13px;color:var(--accent2);font-weight:600;letter-spacing:1px;}
+.ub-sub{font-size:10px;color:var(--dim);font-family:'Share Tech Mono',monospace;}
+.ub-logout{font-size:10px;color:var(--dim);cursor:pointer;border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-family:'Share Tech Mono',monospace;background:transparent;transition:all .2s;}
+.ub-logout:hover{color:var(--danger);border-color:var(--danger);}
+
+/* PERM MSG */
+.perm-msg{background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.18);border-radius:7px;padding:14px;margin:0 16px 10px;width:calc(100% - 32px);font-size:12px;color:var(--dim);font-family:'Share Tech Mono',monospace;letter-spacing:.5px;line-height:1.6;display:none;}
+.perm-msg.show{display:block;}
+
 /* SETTINGS */
 .settings{width:calc(100% - 32px);margin:0 16px 10px;background:var(--panel);border:1px solid var(--border);border-radius:7px;overflow:hidden;display:none;}
 .settings.open{display:block;}
@@ -225,317 +258,234 @@ header{width:100%;padding:16px 24px 12px;display:flex;align-items:center;justify
 .toggle-btn{padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Share Tech Mono',monospace;border:1px solid;transition:all .2s;}
 .toggle-btn.on{color:var(--accent2);border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.08);}
 .toggle-btn.off{color:var(--dim);border-color:var(--border);background:transparent;}
- 
-/* HISTORY */
-.history{width:calc(100% - 32px);margin:0 16px;background:var(--panel);border:1px solid var(--border);border-radius:7px;overflow:hidden;}
-.history-header{padding:10px 14px;border-bottom:1px solid var(--border);font-size:10px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;font-family:'Share Tech Mono',monospace;}
-.history-list{max-height:130px;overflow-y:auto;}
-.history-list::-webkit-scrollbar{width:3px;}
-.history-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-.history-item{padding:7px 14px;display:flex;gap:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,.03);font-family:'Share Tech Mono',monospace;font-size:10px;}
-.history-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
-.history-dot.w{background:var(--warn);}
-.history-dot.d{background:var(--danger);}
-.history-dot.ok{background:var(--accent2);}
-.history-time{color:var(--dim);flex-shrink:0;}
-.history-msg{color:var(--text);flex:1;}
-.history-empty{padding:16px;text-align:center;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;}
- 
-/* USER BADGE */
-.user-badge{width:calc(100% - 32px);margin:14px 16px 0;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:7px;padding:10px 14px;display:none;align-items:center;justify-content:space-between;}
-.user-badge.show{display:flex;}
-.ub-name{font-size:13px;color:var(--accent2);font-weight:600;letter-spacing:1px;}
-.ub-sub{font-size:10px;color:var(--dim);font-family:'Share Tech Mono',monospace;}
-.ub-logout{font-size:10px;color:var(--dim);cursor:pointer;border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-family:'Share Tech Mono',monospace;background:transparent;transition:all .2s;}
-.ub-logout:hover{color:var(--danger);border-color:var(--danger);}
- 
-/* PERM MSG */
-.perm-msg{background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.18);border-radius:7px;padding:14px;margin:0 16px 10px;width:calc(100% - 32px);font-size:12px;color:var(--dim);font-family:'Share Tech Mono',monospace;letter-spacing:.5px;line-height:1.6;display:none;}
-.perm-msg.show{display:block;}
 </style>
 </head>
 <body>
- 
+
+<!-- FIX #3: Model loading status bar -->
+<div id="model-status">
+  <div class="model-dot" id="modelDot"></div>
+  <span id="modelStatusText">Loading AI model...</span>
+</div>
+
 <!-- AUTH MODAL -->
 <div class="modal-overlay" id="auth-modal">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal('auth-modal')">✕</button>
-    <div class="modal-title">OCCULERT</div>
-    <div class="modal-sub">Sign in to save your settings and session history across devices.</div>
-    <div class="modal-tabs">
-      <button class="modal-tab active" onclick="switchTab('signin')">Sign In</button>
-      <button class="modal-tab" onclick="switchTab('signup')">Sign Up</button>
-    </div>
- 
-    <!-- SIGN IN TAB -->
-    <div id="tab-signin">
-      <div class="form-group">
-        <label class="form-label">Email</label>
-        <input type="email" class="form-input" id="si-email" placeholder="your@email.com"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" class="form-input" id="si-pass" placeholder="••••••••"/>
-      </div>
-      <button class="auth-btn primary" onclick="signIn()">Sign In →</button>
-      <div class="auth-divider"><span>OR</span></div>
-      <button class="auth-btn passkey" onclick="passkeyAuth()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/><path d="M16 11l2 2 4-4"/></svg>
-        Sign in with Passkey
-      </button>
-    </div>
- 
-    <!-- SIGN UP TAB -->
-    <div id="tab-signup" style="display:none;">
-      <div class="form-group">
-        <label class="form-label">Your Name</label>
-        <input type="text" class="form-input" id="su-name" placeholder="First name"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Email</label>
-        <input type="email" class="form-input" id="su-email" placeholder="your@email.com"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" class="form-input" id="su-pass" placeholder="Create a password"/>
-      </div>
-      <button class="auth-btn primary" onclick="signUp()">Create Account →</button>
-      <div class="auth-divider"><span>OR</span></div>
-      <button class="auth-btn passkey" onclick="passkeyRegister()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/><path d="M16 11l2 2 4-4"/></svg>
-        Sign up with Passkey
-      </button>
-    </div>
- 
-    <div class="auth-success" id="auth-success">
-      <div class="check">✅</div>
-      <p id="auth-success-msg">Welcome back!</p>
-      <small>Closing in a moment...</small>
-    </div>
-  </div>
+<div class="modal">
+<button class="modal-close" onclick="closeModal('auth-modal')">✕</button>
+<div class="modal-title">OCCULERT</div>
+<div class="modal-sub">Sign in to save your settings and session history across devices.</div>
+<div class="modal-tabs">
+<button class="modal-tab active" onclick="switchTab('signin')">Sign In</button>
+<button class="modal-tab" onclick="switchTab('signup')">Sign Up</button>
 </div>
- 
+<div id="tab-signin">
+<div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="si-email" placeholder="your@email.com"/></div>
+<div class="form-group"><label class="form-label">Password</label><input type="password" class="form-input" id="si-pass" placeholder="••••••••"/></div>
+<button class="auth-btn primary" onclick="signIn()">Sign In →</button>
+<div class="auth-divider"><span>OR</span></div>
+<button class="auth-btn passkey" onclick="passkeyAuth()">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/><path d="M16 11l2 2 4-4"/></svg>
+Sign in with Passkey</button>
+</div>
+<div id="tab-signup" style="display:none;">
+<div class="form-group"><label class="form-label">Your Name</label><input type="text" class="form-input" id="su-name" placeholder="First name"/></div>
+<div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="su-email" placeholder="your@email.com"/></div>
+<div class="form-group"><label class="form-label">Password</label><input type="password" class="form-input" id="su-pass" placeholder="Create a password"/></div>
+<button class="auth-btn primary" onclick="signUp()">Create Account →</button>
+<div class="auth-divider"><span>OR</span></div>
+<button class="auth-btn passkey" onclick="passkeyRegister()">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/><path d="M16 11l2 2 4-4"/></svg>
+Sign up with Passkey</button>
+</div>
+<div class="auth-success" id="auth-success">
+<div class="check">✅</div>
+<p id="auth-success-msg">Welcome back!</p>
+<small>Closing in a moment...</small>
+</div>
+</div>
+</div>
+
 <!-- THEME MODAL -->
 <div class="modal-overlay" id="theme-modal">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal('theme-modal')">✕</button>
-    <div class="modal-title">APP THEME</div>
-    <div class="modal-sub">Choose a color scheme for your Occulert experience.</div>
-    <div class="theme-grid" id="theme-grid"></div>
-    <button class="auth-btn primary" onclick="closeModal('theme-modal')">Apply Theme →</button>
-  </div>
+<div class="modal">
+<button class="modal-close" onclick="closeModal('theme-modal')">✕</button>
+<div class="modal-title">APP THEME</div>
+<div class="modal-sub">Choose a color scheme for your Occulert experience.</div>
+<div class="theme-grid" id="theme-grid"></div>
+<button class="auth-btn primary" onclick="closeModal('theme-modal')">Apply Theme →</button>
 </div>
- 
+</div>
+
 <!-- RATING MODAL -->
 <div class="modal-overlay" id="rating-modal">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal('rating-modal')">✕</button>
-    <div class="modal-title">RATE OCCULERT</div>
-    <div class="modal-sub">Your feedback helps us improve and keep it free for everyone.</div>
-    <div class="rating-stars" id="rating-stars">
-      <span class="rating-star" onclick="setRating(1)">⭐</span>
-      <span class="rating-star" onclick="setRating(2)">⭐</span>
-      <span class="rating-star" onclick="setRating(3)">⭐</span>
-      <span class="rating-star" onclick="setRating(4)">⭐</span>
-      <span class="rating-star" onclick="setRating(5)">⭐</span>
-    </div>
-    <div id="rating-label" style="text-align:center;font-size:13px;color:var(--dim);margin-bottom:16px;letter-spacing:1px;">Tap a star to rate</div>
-    <textarea class="rating-input" id="rating-comment" placeholder="Tell us about your experience (optional)..."></textarea>
-    <button class="rating-submit" onclick="submitRating()">Submit Rating →</button>
-    <div class="rating-success" id="rating-success">🙏 Thank you! Your feedback means everything.</div>
-  </div>
+<div class="modal">
+<button class="modal-close" onclick="closeModal('rating-modal')">✕</button>
+<div class="modal-title">RATE OCCULERT</div>
+<div class="modal-sub">Your feedback helps us improve and keep it free for everyone.</div>
+<div class="rating-stars" id="rating-stars">
+<span class="rating-star" onclick="setRating(1)">⭐</span>
+<span class="rating-star" onclick="setRating(2)">⭐</span>
+<span class="rating-star" onclick="setRating(3)">⭐</span>
+<span class="rating-star" onclick="setRating(4)">⭐</span>
+<span class="rating-star" onclick="setRating(5)">⭐</span>
 </div>
- 
+<div id="rating-label" style="text-align:center;font-size:13px;color:var(--dim);margin-bottom:16px;letter-spacing:1px;">Tap a star to rate</div>
+<textarea class="rating-input" id="rating-comment" placeholder="Tell us about your experience (optional)..."></textarea>
+<button class="rating-submit" onclick="submitRating()">Submit Rating →</button>
+<div class="rating-success" id="rating-success">🙏 Thank you! Your feedback means everything.</div>
+</div>
+</div>
+
 <!-- BACK BAR -->
 <div id="back-bar">
-  <a id="back-btn" href="/">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-    Home
-  </a>
-  <div id="bar-brand">
-    <div id="bar-title">OCCULERT</div>
-    <div id="bar-sub">AI DROWSINESS DETECTION</div>
-  </div>
-  <div id="bar-right">
-    <div id="lang-switcher-app"></div>
-    <div class="bar-icon-btn" onclick="openModal('rating-modal')" title="Rate Occulert">⭐</div>
-    <div class="bar-icon-btn" onclick="openModal('theme-modal')" title="Change Theme">🎨</div>
-    <div class="bar-icon-btn" id="auth-bar-btn" onclick="openModal('auth-modal')" title="Sign In">👤</div>
-  </div>
+<a id="back-btn" href="/">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+Home</a>
+<div id="bar-brand">
+<div id="bar-title">OCCULERT</div>
+<div id="bar-sub">AI DROWSINESS DETECTION</div>
 </div>
- 
+<div id="bar-right">
+<div id="lang-switcher-app"></div>
+<div class="bar-icon-btn" onclick="openModal('rating-modal')" title="Rate Occulert">⭐</div>
+<div class="bar-icon-btn" onclick="openModal('theme-modal')" title="Change Theme">🎨</div>
+<div class="bar-icon-btn" id="auth-bar-btn" onclick="openModal('auth-modal')" title="Sign In">👤</div>
+</div>
+</div>
+
 <div class="app">
- 
-  <!-- USER BADGE -->
-  <div class="user-badge" id="user-badge">
-    <div>
-      <div class="ub-name" id="ub-name">Welcome back!</div>
-      <div class="ub-sub">Settings saved across devices</div>
-    </div>
-    <button class="ub-logout" onclick="signOut()">Sign Out</button>
-  </div>
- 
-  <!-- HEADER -->
-  <header>
-    <div class="logo-wrap">
-      <div class="logo-icon" style="border:none;background:none;box-shadow:none;width:34px;height:34px;animation:none;">
-        <img src="occulert-logo-alt.png" alt="Occulert" style="width:34px;height:34px;object-fit:contain;border-radius:6px;"/>
-      </div>
-      <div>
-        <div class="logo-text">OCCULERT</div>
-        <div class="logo-sub">AI Drowsiness Detection</div>
-      </div>
-    </div>
-    <div class="status-badge offline" id="statusBadge">OFFLINE</div>
-  </header>
- 
-  <!-- PERM MSG -->
-  <div class="perm-msg" id="permMsg">⚠ Camera permission required. Allow camera access when prompted, then tap START MONITORING.</div>
- 
-  <!-- MAIN DASHBOARD GRID -->
-  <div class="dash-grid">
- 
-    <!-- LEFT COLUMN: Camera + Metrics + Controls -->
-    <div class="dash-left">
- 
-      <!-- CAMERA -->
-      <div class="camera-wrap" id="cameraWrap">
-        <video id="video" class="mirror" autoplay playsinline muted></video>
-        <canvas id="canvas" class="mirror"></canvas>
-        <div class="cam-overlay">
-          <div class="corner tl"></div><div class="corner tr"></div>
-          <div class="corner bl"></div><div class="corner br"></div>
-          <div class="scan-line" id="scanLine"></div>
-          <div class="eye-indicator">
-            <div class="eye-dot" id="eyeL"></div>
-            <div class="ear-label">EYES</div>
-            <div class="eye-dot" id="eyeR"></div>
-          </div>
-        </div>
-        <div class="cam-controls">
-          <button class="cam-ctrl-btn" id="flip-btn" onclick="flipCamera()">🔄 FLIP CAM</button>
-          <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;" id="cam-facing-label">FRONT</div>
-        </div>
-        <div class="no-cam" id="noCam">
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          <span>CAMERA INACTIVE</span>
-          <span style="opacity:.5;font-size:9px">TAP START TO BEGIN</span>
-        </div>
-      </div>
- 
-      <!-- ALERT -->
-      <div class="alert-box" id="alertBox">
-        <div class="alert-icon" id="alertIcon">⚠️</div>
-        <div>
-          <div class="alert-title" id="alertTitle">WARNING</div>
-          <div class="alert-sub" id="alertSub">Eyes closing detected</div>
-        </div>
-      </div>
- 
-      <!-- METRICS -->
-      <div class="metrics">
-        <div class="metric-card"><div class="metric-val" id="earDisplay">--</div><div class="metric-label">EAR Score</div></div>
-        <div class="metric-card"><div class="metric-val" id="closedCount">0</div><div class="metric-label">Blink Frames</div></div>
-        <div class="metric-card"><div class="metric-val" id="alertCount">0</div><div class="metric-label">Alerts</div></div>
-      </div>
- 
-      <!-- EAR BAR -->
-      <div class="ear-section">
-        <div class="ear-header">
-          <span class="ear-title">Eye Openness Level</span>
-          <span class="ear-val" id="earValLabel">--</span>
-        </div>
-        <div class="ear-bar-bg"><div class="ear-bar-fill" id="earBar" style="width:0%"></div></div>
-      </div>
- 
-      <!-- CONTROLS -->
-      <div class="controls">
-        <button class="btn-primary" id="startBtn" onclick="toggleMonitoring()">▶ Start Monitoring</button>
-      </div>
- 
-    </div><!-- end dash-left -->
- 
-    <!-- RIGHT COLUMN: Config + Bluetooth + Event Log (always visible) -->
-    <div class="dash-right">
- 
-      <!-- CONFIGURATION -->
-      <div class="side-panel">
-        <div class="side-panel-header">// Configuration</div>
-        <div class="setting-row">
-          <div><div class="setting-label">Sensitivity</div><div class="setting-sub">Frames before warning</div></div>
-          <div class="setting-control">
-            <button onclick="adj('thresh',-5)">−</button>
-            <span id="threshVal">20</span>
-            <button onclick="adj('thresh',5)">+</button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div><div class="setting-label">Cooldown</div><div class="setting-sub">Seconds between alerts</div></div>
-          <div class="setting-control">
-            <button onclick="adj('cooldown',-5)">−</button>
-            <span id="cooldownVal">30</span>s
-            <button onclick="adj('cooldown',5)">+</button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div><div class="setting-label">Vibration</div><div class="setting-sub">Phone/watch pulse</div></div>
-          <div class="setting-control">
-            <button class="toggle-btn on" id="vibBtn" onclick="toggleSetting('vib')">ON</button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div><div class="setting-label">Sound Alert</div><div class="setting-sub">Earbuds/speaker</div></div>
-          <div class="setting-control">
-            <button class="toggle-btn on" id="sndBtn" onclick="toggleSetting('snd')">ON</button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div><div class="setting-label">Mirror Cam</div><div class="setting-sub">Flip horizontal</div></div>
-          <div class="setting-control">
-            <button class="toggle-btn on" id="mirrorBtn" onclick="toggleSetting('mirror')">ON</button>
-          </div>
-        </div>
-      </div>
- 
-      <!-- BLUETOOTH -->
-      <div class="side-panel">
-        <div class="side-panel-header">// Bluetooth Devices</div>
-        <div class="setting-row">
-          <div><div class="setting-label">🎧 Headphones</div><div class="setting-sub" id="bt-headphone-status">Not connected</div></div>
-          <div class="setting-control">
-            <button class="toggle-btn off" id="btHeadBtn" onclick="connectBluetooth('headphone')">PAIR</button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div><div class="setting-label">⌚ Smartwatch</div><div class="setting-sub" id="bt-watch-status">Via phone vibration</div></div>
-          <div class="setting-control">
-            <button class="toggle-btn off" id="btWatchBtn" onclick="connectBluetooth('watch')">PAIR</button>
-          </div>
-        </div>
-        <div class="setting-row" id="bt-test-row" style="display:none;">
-          <div><div class="setting-label">Test Alert</div><div class="setting-sub">Send to connected device</div></div>
-          <div class="setting-control">
-            <button class="toggle-btn on" onclick="testBluetoothAlert()">TEST</button>
-          </div>
-        </div>
-      </div>
- 
-      <!-- EVENT LOG -->
-      <div class="side-panel" style="flex:1;display:flex;flex-direction:column;min-height:0;">
-        <div class="side-panel-header">// Event Log</div>
-        <div class="history-list" id="historyList" style="flex:1;overflow-y:auto;max-height:none;">
-          <div class="history-empty" id="histEmpty">NO EVENTS RECORDED</div>
-        </div>
-      </div>
- 
-    </div><!-- end dash-right -->
- 
-  </div><!-- end dash-grid -->
- 
+<div class="user-badge" id="user-badge">
+<div><div class="ub-name" id="ub-name">Welcome back!</div><div class="ub-sub">Settings saved across devices</div></div>
+<button class="ub-logout" onclick="signOut()">Sign Out</button>
 </div>
- 
+
+<header>
+<div class="logo-wrap">
+<div class="logo-icon" style="border:none;background:none;box-shadow:none;width:34px;height:34px;animation:none;">
+<img src="occulert-logo-alt.png" alt="Occulert" style="width:34px;height:34px;object-fit:contain;border-radius:6px;"/>
+</div>
+<div><div class="logo-text">OCCULERT</div><div class="logo-sub">AI Drowsiness Detection</div></div>
+</div>
+<div class="status-badge offline" id="statusBadge">OFFLINE</div>
+</header>
+
+<div class="perm-msg" id="permMsg">⚠ Camera permission required. Allow camera access when prompted, then tap START MONITORING.</div>
+
+<div class="dash-grid">
+<!-- LEFT COLUMN -->
+<div class="dash-left">
+<div class="camera-wrap" id="cameraWrap">
+<video id="video" class="mirror" autoplay playsinline muted></video>
+<canvas id="canvas" class="mirror"></canvas>
+<div class="cam-overlay">
+<div class="corner tl"></div><div class="corner tr"></div>
+<div class="corner bl"></div><div class="corner br"></div>
+<div class="scan-line" id="scanLine"></div>
+<div class="eye-indicator">
+<div class="eye-dot" id="eyeL"></div>
+<div class="ear-label">EYES</div>
+<div class="eye-dot" id="eyeR"></div>
+</div>
+</div>
+<div class="cam-controls">
+<button class="cam-ctrl-btn" id="flip-btn" onclick="flipCamera()">🔄 FLIP CAM</button>
+<div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;" id="cam-facing-label">FRONT</div>
+</div>
+<div class="no-cam" id="noCam">
+<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+<span>CAMERA INACTIVE</span>
+<span style="opacity:.5;font-size:9px">TAP START TO BEGIN</span>
+</div>
+</div>
+
+<div class="alert-box" id="alertBox">
+<div class="alert-icon" id="alertIcon">⚠️</div>
+<div><div class="alert-title" id="alertTitle">WARNING</div><div class="alert-sub" id="alertSub">Eyes closing detected</div></div>
+</div>
+
+<div class="metrics">
+<div class="metric-card"><div class="metric-val" id="earDisplay">--</div><div class="metric-label">EAR Score</div></div>
+<div class="metric-card"><div class="metric-val" id="closedCount">0</div><div class="metric-label">Blink Frames</div></div>
+<div class="metric-card"><div class="metric-val" id="alertCount">0</div><div class="metric-label">Alerts</div></div>
+</div>
+
+<div class="ear-section">
+<div class="ear-header">
+<span class="ear-title">Eye Openness Level</span>
+<span class="ear-val" id="earValLabel">--</span>
+</div>
+<div class="ear-bar-bg"><div class="ear-bar-fill" id="earBar" style="width:0%"></div></div>
+</div>
+
+<div class="controls">
+<button class="btn-primary" id="startBtn" onclick="toggleMonitoring()">▶ Start Monitoring</button>
+</div>
+</div>
+
+<!-- RIGHT COLUMN -->
+<div class="dash-right">
+<div class="side-panel">
+<div class="side-panel-header">// Configuration</div>
+<div class="setting-row">
+<div><div class="setting-label">Sensitivity</div><div class="setting-sub">Frames before warning</div></div>
+<div class="setting-control">
+<button onclick="adj('thresh',-5)">−</button>
+<span id="threshVal">20</span>
+<button onclick="adj('thresh',5)">+</button>
+</div>
+</div>
+<div class="setting-row">
+<div><div class="setting-label">Cooldown</div><div class="setting-sub">Seconds between alerts</div></div>
+<div class="setting-control">
+<button onclick="adj('cooldown',-5)">−</button>
+<span id="cooldownVal">30</span>s
+<button onclick="adj('cooldown',5)">+</button>
+</div>
+</div>
+<div class="setting-row">
+<div><div class="setting-label">Vibration</div><div class="setting-sub">Phone/watch pulse</div></div>
+<div class="setting-control"><button class="toggle-btn on" id="vibBtn" onclick="toggleSetting('vib')">ON</button></div>
+</div>
+<div class="setting-row">
+<div><div class="setting-label">Sound Alert</div><div class="setting-sub">Earbuds/speaker</div></div>
+<div class="setting-control"><button class="toggle-btn on" id="sndBtn" onclick="toggleSetting('snd')">ON</button></div>
+</div>
+<div class="setting-row">
+<div><div class="setting-label">Mirror Cam</div><div class="setting-sub">Flip horizontal</div></div>
+<div class="setting-control"><button class="toggle-btn on" id="mirrorBtn" onclick="toggleSetting('mirror')">ON</button></div>
+</div>
+</div>
+
+<div class="side-panel">
+<div class="side-panel-header">// Bluetooth Devices</div>
+<div class="setting-row">
+<div><div class="setting-label">🎧 Headphones</div><div class="setting-sub" id="bt-headphone-status">Not connected</div></div>
+<div class="setting-control"><button class="toggle-btn off" id="btHeadBtn" onclick="connectBluetooth('headphone')">PAIR</button></div>
+</div>
+<div class="setting-row">
+<div><div class="setting-label">⌚ Smartwatch</div><div class="setting-sub" id="bt-watch-status">Via phone vibration</div></div>
+<div class="setting-control"><button class="toggle-btn off" id="btWatchBtn" onclick="connectBluetooth('watch')">PAIR</button></div>
+</div>
+<div class="setting-row" id="bt-test-row" style="display:none;">
+<div><div class="setting-label">Test Alert</div><div class="setting-sub">Send to connected device</div></div>
+<div class="setting-control"><button class="toggle-btn on" onclick="testBluetoothAlert()">TEST</button></div>
+</div>
+</div>
+
+<div class="side-panel" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+<div class="side-panel-header">// Event Log</div>
+<div class="history-list" id="historyList" style="flex:1;overflow-y:auto;max-height:none;">
+<div class="history-empty" id="histEmpty">NO EVENTS RECORDED</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
 <script>
-// ── STATE ───────────────────────────────────────────
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
 let running=false,stream=null,animFrame=null;
 let closedFrames=0,totalAlerts=0,lastAlertTime=0;
 let vibEnabled=true,sndEnabled=true,mirrorEnabled=true;
@@ -544,10 +494,22 @@ let alertState='none';
 let currentFacingMode='user';
 let currentUser=null;
 let selectedRating=0;
- 
-const EAR_WARN=0.27,EAR_DANGER=0.22;
- 
-// ── DOM ──────────────────────────────────────────────
+
+// FIX #1 + #2: Refined thresholds and no-face tracking
+const EAR_OPEN=0.30;    // Clearly open — reset closedFrames immediately
+const EAR_WARN=0.27;    // Starting to close
+const EAR_DANGER=0.22;  // Definitely closing
+let noFaceFrames=0;
+const NO_FACE_DANGER_THRESHOLD=90; // ~3 seconds at 30fps — trigger if face disappears
+
+// FIX #2: Danger threshold is now thresh*3 (not thresh*1.5)
+// So at default thresh=20: warn at 20 frames, danger at 60 frames (~2 seconds)
+
+// FIX #4: FPS throttle for detection (not for video display)
+const DETECTION_FPS=12; // 12 detections/sec — enough for drowsiness, saves battery
+let lastDetectionTime=0;
+
+// DOM
 const video=document.getElementById('video');
 const canvas=document.getElementById('canvas');
 const ctx=canvas.getContext('2d');
@@ -567,175 +529,144 @@ const alertCount=document.getElementById('alertCount');
 const eyeL=document.getElementById('eyeL');
 const eyeR=document.getElementById('eyeR');
 const permMsg=document.getElementById('permMsg');
- 
-// ── THEMES ───────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════
+// FIX #3: Model status indicator
+// ═══════════════════════════════════════════════════
+function updateModelStatus(ready){
+  const dot=document.getElementById('modelDot');
+  const txt=document.getElementById('modelStatusText');
+  const bar=document.getElementById('model-status');
+  if(ready){
+    dot.className='model-dot ready';
+    txt.textContent='AI Model Ready';
+    bar.className='hidden';  // just hide it after brief show
+    // Actually show ready state briefly then fade
+    bar.className='ready';
+    setTimeout(()=>{ bar.className='ready hidden'; },2500);
+  }else{
+    dot.className='model-dot';
+    txt.textContent='Loading AI model...';
+    bar.className='';
+  }
+}
+
+// Hook into the preload callback
+if(window._mpReady){
+  updateModelStatus(true);
+}else{
+  updateModelStatus(false);
+  window._mpReadyCb=()=>updateModelStatus(true);
+}
+
+// ═══════════════════════════════════════════════════
+// THEMES
+// ═══════════════════════════════════════════════════
 const themes={
-  cyan:{name:'Cyber Cyan',accent:'#00e5ff',accent2:'#00ff88',warn:'#ffaa00',danger:'#ff2244',bg:'#050a0f',panel:'#0a1520'},
-  blue:{name:'Electric Blue',accent:'#3b82f6',accent2:'#06b6d4',warn:'#f59e0b',danger:'#ef4444',bg:'#03080f',panel:'#081020'},
-  purple:{name:'Neon Purple',accent:'#a855f7',accent2:'#ec4899',warn:'#f59e0b',danger:'#ef4444',bg:'#080510',panel:'#100820'},
-  green:{name:'Matrix Green',accent:'#00ff88',accent2:'#00e5ff',warn:'#ffaa00',danger:'#ff2244',bg:'#020d08',panel:'#051a0e'},
-  orange:{name:'Fire Alert',accent:'#f97316',accent2:'#facc15',warn:'#eab308',danger:'#ef4444',bg:'#0d0805',panel:'#1a0f06'},
-  red:{name:'Danger Red',accent:'#ef4444',accent2:'#f97316',warn:'#eab308',danger:'#dc2626',bg:'#0d0505',panel:'#1a0808'},
-  white:{name:'Clean White',accent:'#e2e8f0',accent2:'#94a3b8',warn:'#f59e0b',danger:'#ef4444',bg:'#0f1117',panel:'#1a1d27'},
-  teal:{name:'Deep Teal',accent:'#14b8a6',accent2:'#06b6d4',warn:'#f59e0b',danger:'#ef4444',bg:'#030d0d',panel:'#081a1a'},
+cyan:{name:'Cyber Cyan',accent:'#00e5ff',accent2:'#00ff88',warn:'#ffaa00',danger:'#ff2244',bg:'#050a0f',panel:'#0a1520'},
+blue:{name:'Electric Blue',accent:'#3b82f6',accent2:'#06b6d4',warn:'#f59e0b',danger:'#ef4444',bg:'#03080f',panel:'#081020'},
+purple:{name:'Neon Purple',accent:'#a855f7',accent2:'#ec4899',warn:'#f59e0b',danger:'#ef4444',bg:'#080510',panel:'#100820'},
+green:{name:'Matrix Green',accent:'#00ff88',accent2:'#00e5ff',warn:'#ffaa00',danger:'#ff2244',bg:'#020d08',panel:'#051a0e'},
+orange:{name:'Fire Alert',accent:'#f97316',accent2:'#facc15',warn:'#eab308',danger:'#ef4444',bg:'#0d0805',panel:'#1a0f06'},
+red:{name:'Danger Red',accent:'#ef4444',accent2:'#f97316',warn:'#eab308',danger:'#dc2626',bg:'#0d0505',panel:'#1a0808'},
+white:{name:'Clean White',accent:'#e2e8f0',accent2:'#94a3b8',warn:'#f59e0b',danger:'#ef4444',bg:'#0f1117',panel:'#1a1d27'},
+teal:{name:'Deep Teal',accent:'#14b8a6',accent2:'#06b6d4',warn:'#f59e0b',danger:'#ef4444',bg:'#030d0d',panel:'#081a1a'},
 };
- 
+
 function buildThemeGrid(){
-  const grid=document.getElementById('theme-grid');
-  grid.innerHTML='';
+  const grid=document.getElementById('theme-grid');grid.innerHTML='';
   Object.entries(themes).forEach(([key,t])=>{
     const saved=localStorage.getItem('occulert-theme')||'cyan';
     const div=document.createElement('div');
     div.style.cssText=`background:linear-gradient(135deg,${t.accent},${t.accent2});`;
     div.className='theme-swatch'+(key===saved?' active':'');
     div.title=t.name;
-    div.onclick=()=>{
-      applyTheme(key);
-      document.querySelectorAll('.theme-swatch').forEach(s=>s.classList.remove('active'));
-      div.classList.add('active');
-    };
-    const label=document.createElement('div');
-    label.className='theme-label';
-    label.textContent=t.name;
-    const wrap=document.createElement('div');
-    wrap.appendChild(div);
-    wrap.appendChild(label);
-    grid.appendChild(wrap);
+    div.onclick=()=>{applyTheme(key);document.querySelectorAll('.theme-swatch').forEach(s=>s.classList.remove('active'));div.classList.add('active');};
+    const label=document.createElement('div');label.className='theme-label';label.textContent=t.name;
+    const wrap=document.createElement('div');wrap.appendChild(div);wrap.appendChild(label);grid.appendChild(wrap);
   });
 }
- 
+
 function applyTheme(key){
   const t=themes[key]||themes.cyan;
   const root=document.documentElement;
-  root.style.setProperty('--accent',t.accent);
-  root.style.setProperty('--accent2',t.accent2);
-  root.style.setProperty('--warn',t.warn);
-  root.style.setProperty('--danger',t.danger);
-  root.style.setProperty('--bg',t.bg);
-  root.style.setProperty('--panel',t.panel);
+  root.style.setProperty('--accent',t.accent);root.style.setProperty('--accent2',t.accent2);
+  root.style.setProperty('--warn',t.warn);root.style.setProperty('--danger',t.danger);
+  root.style.setProperty('--bg',t.bg);root.style.setProperty('--panel',t.panel);
   root.style.setProperty('--glow',`0 0 20px ${t.accent}50`);
   localStorage.setItem('occulert-theme',key);
 }
- 
-// ── AUTH ─────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════
 function openModal(id){document.getElementById(id).classList.add('show');}
 function closeModal(id){document.getElementById(id).classList.remove('show');}
- 
 function switchTab(tab){
   document.getElementById('tab-signin').style.display=tab==='signin'?'':'none';
   document.getElementById('tab-signup').style.display=tab==='signup'?'':'none';
   document.querySelectorAll('.modal-tab').forEach((t,i)=>t.classList.toggle('active',(tab==='signin'&&i===0)||(tab==='signup'&&i===1)));
 }
- 
 function showAuthSuccess(msg){
   document.getElementById('tab-signin').style.display='none';
   document.getElementById('tab-signup').style.display='none';
-  const s=document.getElementById('auth-success');
-  s.style.display='block';
+  const s=document.getElementById('auth-success');s.style.display='block';
   document.getElementById('auth-success-msg').textContent=msg;
   setTimeout(()=>{closeModal('auth-modal');s.style.display='none';document.getElementById('tab-signin').style.display='';switchTab('signin');},2000);
 }
- 
 function signIn(){
   const email=document.getElementById('si-email').value;
   const pass=document.getElementById('si-pass').value;
   if(!email||!pass){alert('Please enter email and password.');return;}
-  // Simulate auth — replace with real backend
-  const name=email.split('@')[0];
-  setUser({name,email});
-  showAuthSuccess(`Welcome back, ${name}!`);
+  setUser({name:email.split('@')[0],email});showAuthSuccess(`Welcome back!`);
 }
- 
 function signUp(){
   const name=document.getElementById('su-name').value||'Driver';
   const email=document.getElementById('su-email').value;
   const pass=document.getElementById('su-pass').value;
   if(!email||!pass){alert('Please fill in all fields.');return;}
-  setUser({name,email});
-  showAuthSuccess(`Account created! Welcome, ${name}!`);
+  setUser({name,email});showAuthSuccess(`Account created! Welcome, ${name}!`);
 }
- 
 async function passkeyAuth(){
-  if(!window.PublicKeyCredential){
-    alert('Passkeys not supported on this device. Please use email/password.');
-    return;
-  }
+  if(!window.PublicKeyCredential){alert('Passkeys not supported on this device.');return;}
   try{
-    // Simulated passkey flow — production needs a real WebAuthn backend
-    const credential=await navigator.credentials.get({
-      publicKey:{
-        challenge:new Uint8Array(32),
-        rpId:window.location.hostname,
-        allowCredentials:[],
-        userVerification:'preferred',
-        timeout:60000
-      }
-    });
-    const name='Passkey User';
-    setUser({name,email:'passkey@device'});
-    showAuthSuccess('Passkey verified! Welcome back!');
-  }catch(e){
-    // Passkey not set up yet — offer demo mode
-    setUser({name:'Demo Driver',email:'demo@occulert.com'});
-    showAuthSuccess('Signed in as Demo Driver!');
-  }
+    await navigator.credentials.get({publicKey:{challenge:new Uint8Array(32),rpId:window.location.hostname,allowCredentials:[],userVerification:'preferred',timeout:60000}});
+    setUser({name:'Passkey User',email:'passkey@device'});showAuthSuccess('Passkey verified!');
+  }catch(e){setUser({name:'Demo Driver',email:'demo@occulert.com'});showAuthSuccess('Signed in as Demo Driver!');}
 }
- 
 async function passkeyRegister(){
-  if(!window.PublicKeyCredential){
-    alert('Passkeys not supported on this device. Please use email/password.');
-    return;
-  }
+  if(!window.PublicKeyCredential){alert('Passkeys not supported on this device.');return;}
   try{
     const name=document.getElementById('su-name').value||'Driver';
-    const credential=await navigator.credentials.create({
-      publicKey:{
-        challenge:new Uint8Array(32),
-        rp:{name:'Occulert',id:window.location.hostname},
-        user:{id:new Uint8Array(16),name:name,displayName:name},
-        pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
-        authenticatorSelection:{userVerification:'preferred'},
-        timeout:60000
-      }
-    });
-    setUser({name,email:'passkey@device'});
-    showAuthSuccess(`Passkey created! Welcome, ${name}!`);
-  }catch(e){
-    setUser({name:'Demo Driver',email:'demo@occulert.com'});
-    showAuthSuccess('Signed in as Demo Driver!');
-  }
+    await navigator.credentials.create({publicKey:{challenge:new Uint8Array(32),rp:{name:'Occulert',id:window.location.hostname},user:{id:new Uint8Array(16),name,displayName:name},pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],authenticatorSelection:{userVerification:'preferred'},timeout:60000}});
+    setUser({name,email:'passkey@device'});showAuthSuccess(`Passkey created! Welcome, ${name}!`);
+  }catch(e){setUser({name:'Demo Driver',email:'demo@occulert.com'});showAuthSuccess('Signed in as Demo Driver!');}
 }
- 
 function setUser(user){
-  currentUser=user;
-  localStorage.setItem('occulert-user',JSON.stringify(user));
+  currentUser=user;localStorage.setItem('occulert-user',JSON.stringify(user));
   document.getElementById('ub-name').textContent=`👋 ${user.name}`;
   document.getElementById('user-badge').classList.add('show');
-  document.getElementById('auth-bar-btn').textContent='👤';
   document.getElementById('auth-bar-btn').style.color='var(--accent2)';
 }
- 
 function signOut(){
-  currentUser=null;
-  localStorage.removeItem('occulert-user');
+  currentUser=null;localStorage.removeItem('occulert-user');
   document.getElementById('user-badge').classList.remove('show');
   document.getElementById('auth-bar-btn').style.color='';
 }
- 
-// ── RATING ───────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════
+// RATING
+// ═══════════════════════════════════════════════════
 const ratingLabels=['','Needs Work','It\'s Okay','Good App','Really Good!','Life Saver! ⭐'];
- 
 function setRating(n){
   selectedRating=n;
   document.querySelectorAll('.rating-star').forEach((s,i)=>s.classList.toggle('active',i<n));
   document.getElementById('rating-label').textContent=ratingLabels[n];
   document.getElementById('rating-label').style.color='var(--accent)';
 }
- 
 function submitRating(){
   if(!selectedRating){alert('Please select a star rating first!');return;}
   const comment=document.getElementById('rating-comment').value;
-  // Store rating locally and track with analytics
   const ratings=JSON.parse(localStorage.getItem('occulert-ratings')||'[]');
   ratings.push({rating:selectedRating,comment,date:new Date().toISOString()});
   localStorage.setItem('occulert-ratings',JSON.stringify(ratings));
@@ -744,62 +675,54 @@ function submitRating(){
   document.querySelector('.rating-submit').style.display='none';
   setTimeout(()=>closeModal('rating-modal'),2500);
 }
- 
-// ── CAMERA FLIP ──────────────────────────────────────
+
+// ═══════════════════════════════════════════════════
+// CAMERA FLIP
+// ═══════════════════════════════════════════════════
 async function flipCamera(){
   if(!running)return;
   currentFacingMode=currentFacingMode==='user'?'environment':'user';
   document.getElementById('cam-facing-label').textContent=currentFacingMode==='user'?'FRONT':'BACK';
-  // Stop current stream
-  if(stream){stream.getTracks().forEach(t=>t.stop());}
+  if(stream)stream.getTracks().forEach(t=>t.stop());
   try{
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:currentFacingMode,width:{ideal:640},height:{ideal:480}},
-      audio:false
-    });
-    video.srcObject=stream;
-    await video.play();
-    // Mirror only for front camera
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:currentFacingMode,width:{ideal:640},height:{ideal:480}},audio:false});
+    video.srcObject=stream;await video.play();
     const m=currentFacingMode==='user';
-    video.className=m?'mirror':'';
-    canvas.className=m?'mirror':'';
+    video.className=m?'mirror':'';canvas.className=m?'mirror':'';
     addHistory('ok',`📷 Switched to ${m?'front':'back'} camera`);
   }catch(e){
-    console.error('Camera flip failed:',e);
     currentFacingMode=currentFacingMode==='user'?'environment':'user';
+    console.error('Camera flip failed:',e);
   }
 }
- 
-// ── FACE DETECTION ───────────────────────────────────
+
+// ═══════════════════════════════════════════════════
+// FACE MESH SETUP
+// FIX #3: No longer loads scripts here — already preloaded
+// ═══════════════════════════════════════════════════
 let faceMesh=null,lastResults=null,faceLoaded=false;
- 
-async function loadFaceMesh(){
-  return new Promise(resolve=>{
-    const s1=document.createElement('script');
-    s1.src='https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
-    s1.crossOrigin='anonymous';
-    const s2=document.createElement('script');
-    s2.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
-    s2.crossOrigin='anonymous';
-    s1.onload=()=>document.head.appendChild(s2);
-    s2.onload=()=>{
-      faceMesh=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
-      faceMesh.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:.5,minTrackingConfidence:.5});
-      faceMesh.onResults(r=>{lastResults=r;});
-      faceLoaded=true;resolve();
-    };
-    document.head.appendChild(s1);
+
+function initFaceMesh(){
+  return new Promise((resolve,reject)=>{
+    function setup(){
+      try{
+        faceMesh=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+        faceMesh.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+        faceMesh.onResults(r=>{lastResults=r;});
+        faceLoaded=true;
+        resolve();
+      }catch(e){reject(e);}
+    }
+    if(window._mpReady){setup();}
+    else{window._mpReadyCb=()=>{setup();};}
   });
 }
- 
-function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
-function calcEAR(lm,idx){const[p1,p2,p3,p4,p5,p6]=idx.map(i=>lm[i]);return(dist(p2,p6)+dist(p3,p5))/(2*dist(p1,p4));}
-const LEFT_EYE=[362,385,387,263,373,380];
-const RIGHT_EYE=[33,160,158,133,153,144];
- 
-// ── AUDIO ────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════
+// AUDIO
+// ═══════════════════════════════════════════════════
 let audioCtx=null;
-function playAlert(freq=880,dur=.3,reps=3){
+function playAlert(freq=880,dur=0.3,reps=3){
   if(!sndEnabled)return;
   if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   let t=audioCtx.currentTime;
@@ -807,131 +730,110 @@ function playAlert(freq=880,dur=.3,reps=3){
     const o=audioCtx.createOscillator(),g=audioCtx.createGain();
     o.connect(g);g.connect(audioCtx.destination);
     o.frequency.value=freq;o.type='sine';
-    g.gain.setValueAtTime(.3,t+i*.4);
-    g.gain.exponentialRampToValueAtTime(.001,t+i*.4+dur);
-    o.start(t+i*.4);o.stop(t+i*.4+dur);
+    g.gain.setValueAtTime(0.3,t+i*0.4);
+    g.gain.exponentialRampToValueAtTime(0.001,t+i*0.4+dur);
+    o.start(t+i*0.4);o.stop(t+i*0.4+dur);
   }
 }
 function doVibrate(p){if(!vibEnabled)return;if('vibrate' in navigator)navigator.vibrate(p);}
- 
-// ── BLUETOOTH ────────────────────────────────────────
-let btDevice=null,btServer=null,btHeadphone=null,btWatch=null;
+
+// ═══════════════════════════════════════════════════
+// BLUETOOTH
+// ═══════════════════════════════════════════════════
 let btHeadphoneConnected=false,btWatchConnected=false;
- 
 async function connectBluetooth(type){
-  if(!navigator.bluetooth){
-    showBtError('Web Bluetooth not supported on this browser. Use Chrome on Android or try the native app.');
-    return;
-  }
+  if(!navigator.bluetooth){showBtError('Web Bluetooth not supported. Use Chrome on Android.');return;}
   try{
     addHistory('ok',`🔵 Scanning for ${type==='headphone'?'headphones':'smartwatch'}...`);
-    // Service UUIDs for audio (headphones) and generic access (watch)
-    const filters=type==='headphone'
-      ? [{services:['0000110b-0000-1000-8000-00805f9b34fb']}] // A2DP Audio Sink
-      : [{services:['0000180d-0000-1000-8000-00805f9b34fb','0000180f-0000-1000-8000-00805f9b34fb']}]; // Heart Rate + Battery
- 
     const device=await navigator.bluetooth.requestDevice({
       acceptAllDevices:true,
-      optionalServices:[
-        '0000110b-0000-1000-8000-00805f9b34fb', // Audio Sink
-        '0000180d-0000-1000-8000-00805f9b34fb', // Heart Rate
-        '0000180f-0000-1000-8000-00805f9b34fb', // Battery
-        '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
-        '00001801-0000-1000-8000-00805f9b34fb', // Generic Attribute
-      ]
+      optionalServices:['0000110b-0000-1000-8000-00805f9b34fb','0000180d-0000-1000-8000-00805f9b34fb','0000180f-0000-1000-8000-00805f9b34fb','00001800-0000-1000-8000-00805f9b34fb','00001801-0000-1000-8000-00805f9b34fb']
     });
- 
-    device.addEventListener('gattserverdisconnected',()=>{
-      onBtDisconnected(type);
-    });
- 
-    addHistory('ok',`🔵 Connecting to ${device.name||'device'}...`);
-    const server=await device.gatt.connect();
- 
+    device.addEventListener('gattserverdisconnected',()=>onBtDisconnected(type));
+    await device.gatt.connect();
     if(type==='headphone'){
-      btHeadphone=device;btHeadphoneConnected=true;
-      const btn=document.getElementById('btHeadBtn');
-      btn.textContent='ON';btn.className='toggle-btn on';
-      document.getElementById('bt-headphone-status').textContent=`✓ ${device.name||'Connected'} — alerts will play through earbuds`;
-      addHistory('ok',`🎧 ${device.name||'Headphones'} connected — audio alerts active`);
+      btHeadphoneConnected=true;
+      const btn=document.getElementById('btHeadBtn');btn.textContent='ON';btn.className='toggle-btn on';
+      document.getElementById('bt-headphone-status').textContent=`✓ ${device.name||'Connected'}`;
+      addHistory('ok',`🎧 ${device.name||'Headphones'} connected`);
     }else{
-      btWatch=device;btWatchConnected=true;
-      const btn=document.getElementById('btWatchBtn');
-      btn.textContent='ON';btn.className='toggle-btn on';
-      document.getElementById('bt-watch-status').textContent=`✓ ${device.name||'Connected'} — haptic alerts active`;
-      addHistory('ok',`⌚ ${device.name||'Smartwatch'} connected — haptic alerts active`);
+      btWatchConnected=true;
+      const btn=document.getElementById('btWatchBtn');btn.textContent='ON';btn.className='toggle-btn on';
+      document.getElementById('bt-watch-status').textContent=`✓ ${device.name||'Connected'}`;
+      addHistory('ok',`⌚ ${device.name||'Smartwatch'} connected`);
     }
     document.getElementById('bt-test-row').style.display='flex';
- 
   }catch(e){
-    if(e.name==='NotFoundError'){
-      addHistory('ok','🔵 Bluetooth scan cancelled');
-    }else if(e.name==='SecurityError'){
-      showBtError('Bluetooth permission denied. Please allow Bluetooth access and try again.');
-    }else{
-      // Fallback — audio through Web Audio API routes to whatever output device is active
-      // (AirPods/Galaxy Buds connected to phone will receive audio alerts automatically)
-      if(type==='headphone'){
-        btHeadphoneConnected=true;
-        const btn=document.getElementById('btHeadBtn');
-        btn.textContent='ON';btn.className='toggle-btn on';
-        document.getElementById('bt-headphone-status').textContent='✓ Using active audio output — connect earbuds before driving';
-        addHistory('ok','🎧 Audio alerts will play through active audio device');
-        document.getElementById('bt-test-row').style.display='flex';
-      }else{
-        showBtError('Watch pairing requires the native app (coming soon). Phone vibration is active for now.');
-      }
-    }
+    if(e.name==='NotFoundError'){addHistory('ok','🔵 Bluetooth scan cancelled');}
+    else if(type==='headphone'){
+      btHeadphoneConnected=true;
+      const btn=document.getElementById('btHeadBtn');btn.textContent='ON';btn.className='toggle-btn on';
+      document.getElementById('bt-headphone-status').textContent='✓ Using active audio output';
+      addHistory('ok','🎧 Audio alerts via active audio device');
+      document.getElementById('bt-test-row').style.display='flex';
+    }else{showBtError('Watch pairing requires native app. Phone vibration active.');}
   }
 }
- 
 function onBtDisconnected(type){
-  if(type==='headphone'){
-    btHeadphoneConnected=false;
-    document.getElementById('btHeadBtn').textContent='PAIR';
-    document.getElementById('btHeadBtn').className='toggle-btn off';
-    document.getElementById('bt-headphone-status').textContent='Disconnected';
-    addHistory('w','🎧 Headphones disconnected');
-  }else{
-    btWatchConnected=false;
-    document.getElementById('btWatchBtn').textContent='PAIR';
-    document.getElementById('btWatchBtn').className='toggle-btn off';
-    document.getElementById('bt-watch-status').textContent='Not connected — alerts via phone vibration';
-    addHistory('w','⌚ Smartwatch disconnected');
-  }
+  if(type==='headphone'){btHeadphoneConnected=false;document.getElementById('btHeadBtn').textContent='PAIR';document.getElementById('btHeadBtn').className='toggle-btn off';document.getElementById('bt-headphone-status').textContent='Disconnected';addHistory('w','🎧 Headphones disconnected');}
+  else{btWatchConnected=false;document.getElementById('btWatchBtn').textContent='PAIR';document.getElementById('btWatchBtn').className='toggle-btn off';document.getElementById('bt-watch-status').textContent='Not connected — alerts via phone vibration';addHistory('w','⌚ Smartwatch disconnected');}
 }
- 
-function testBluetoothAlert(){
-  // Fire a test alert through all connected outputs
-  playAlert(440,.3,2);
-  doVibrate([200,100,200,100,200]);
-  addHistory('ok','🔵 Test alert sent to connected devices');
+function testBluetoothAlert(){playAlert(440,0.3,2);doVibrate([200,100,200,100,200]);addHistory('ok','🔵 Test alert sent');}
+function showBtError(msg){addHistory('d','⚠ BT: '+msg.slice(0,60));alert('Bluetooth: '+msg);}
+
+// ═══════════════════════════════════════════════════
+// EYE LANDMARK INDICES
+// ═══════════════════════════════════════════════════
+const LEFT_EYE=[362,385,387,263,373,380];
+const RIGHT_EYE=[33,160,158,133,153,144];
+
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+function calcEAR(lm,idx){
+  const[p1,p2,p3,p4,p5,p6]=idx.map(i=>lm[i]);
+  return(dist(p2,p6)+dist(p3,p5))/(2*dist(p1,p4));
 }
- 
-function showBtError(msg){
-  addHistory('d','⚠ BT: '+msg.slice(0,60));
-  alert('Bluetooth: '+msg);
-}
- 
-// ── MAIN LOOP ────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════
+// FIX #4: THROTTLED DETECTION LOOP
+// Video display runs at native RAF speed.
+// Detection only runs at DETECTION_FPS.
+// ═══════════════════════════════════════════════════
 async function loop(){
   if(!running)return;
-  canvas.width=video.videoWidth;
-  canvas.height=video.videoHeight;
-  if(faceLoaded&&video.readyState>=2)await faceMesh.send({image:video});
-  const lm=lastResults?.multiFaceLandmarks?.[0];
-  if(lm){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    drawEye(lm,LEFT_EYE);drawEye(lm,RIGHT_EYE);
-    const ear=(calcEAR(lm,LEFT_EYE)+calcEAR(lm,RIGHT_EYE))/2;
-    updateEAR(ear);
-  }else{
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    updateNoFace();
+
+  const now=performance.now();
+  const detectionInterval=1000/DETECTION_FPS;
+
+  // Always resize canvas to match video
+  if(video.videoWidth>0){
+    canvas.width=video.videoWidth;
+    canvas.height=video.videoHeight;
   }
+
+  // Only run MediaPipe at throttled rate
+  if(now-lastDetectionTime>=detectionInterval){
+    lastDetectionTime=now;
+    if(faceLoaded&&video.readyState>=2){
+      await faceMesh.send({image:video});
+    }
+
+    const lm=lastResults?.multiFaceLandmarks?.[0];
+    if(lm){
+      noFaceFrames=0;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      drawEye(lm,LEFT_EYE);
+      drawEye(lm,RIGHT_EYE);
+      const ear=(calcEAR(lm,LEFT_EYE)+calcEAR(lm,RIGHT_EYE))/2;
+      updateEAR(ear);
+    }else{
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      updateNoFace();
+    }
+  }
+
   animFrame=requestAnimationFrame(loop);
 }
- 
+
 function drawEye(lm,idx){
   const pts=idx.map(i=>({x:lm[i].x*canvas.width,y:lm[i].y*canvas.height}));
   ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
@@ -940,139 +842,264 @@ function drawEye(lm,idx){
   const open=calcEAR(lm,idx)>EAR_WARN;
   ctx.strokeStyle=open?'rgba(0,255,136,.8)':'rgba(255,34,68,.9)';
   ctx.lineWidth=1.5;ctx.stroke();
-  pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,2,0,Math.PI*2);ctx.fillStyle=open?'rgba(0,255,136,.6)':'rgba(255,34,68,.8)';ctx.fill();});
+  pts.forEach(p=>{
+    ctx.beginPath();ctx.arc(p.x,p.y,2,0,Math.PI*2);
+    ctx.fillStyle=open?'rgba(0,255,136,.6)':'rgba(255,34,68,.8)';ctx.fill();
+  });
 }
- 
+
+// ═══════════════════════════════════════════════════
+// FIX #1: CORRECTED closedFrames logic
+// FIX #2: Danger threshold = thresh * 3
+// ═══════════════════════════════════════════════════
 function updateEAR(ear){
-  const pct=Math.min(100,(ear/.5)*100);
-  const isOpen=ear>EAR_WARN,isDanger=ear<EAR_DANGER;
-  eyeL.className='eye-dot'+(isDanger?' closed':isOpen?' open':' closed');
-  eyeR.className='eye-dot'+(isDanger?' closed':isOpen?' open':' closed');
+  const pct=Math.min(100,(ear/0.5)*100);
+  const isOpen=ear>=EAR_OPEN;       // FIX #1: Use EAR_OPEN (0.30) not EAR_WARN
+  const isWarn=ear<EAR_WARN;
+  const isDanger=ear<EAR_DANGER;
+
+  // FIX #1: If clearly open, hard-reset closedFrames immediately
+  // Don't decrement slowly — one good open frame means eyes are open
+  if(isOpen){
+    if(closedFrames>0){
+      closedFrames=0;
+      closedCount.textContent=0;
+    }
+    if(alertState!=='none') clearAlert();
+  }else{
+    closedFrames++;
+    closedCount.textContent=closedFrames;
+  }
+
+  eyeL.className='eye-dot'+(isDanger?' closed':isOpen?' open':'');
+  eyeR.className='eye-dot'+(isDanger?' closed':isOpen?' open':'');
+
   earBar.style.width=pct+'%';
-  earBar.style.background=isDanger?'#ff2244':ear<EAR_WARN?'#ffaa00':'#00ff88';
+  earBar.style.background=isDanger?'#ff2244':isWarn?'#ffaa00':'#00ff88';
+
   const s=ear.toFixed(3);
   earDisplay.textContent=s;earValLabel.textContent=s;
-  const cls=isDanger?'danger':ear<EAR_WARN?'warn':'';
+  const cls=isDanger?'danger':isWarn?'warn':'';
   earDisplay.className='metric-val '+cls;earValLabel.className='ear-val '+cls;
-  if(!isOpen){closedFrames++;closedCount.textContent=closedFrames;}
-  else{if(closedFrames>0)closedFrames=Math.max(0,closedFrames-1);if(alertState!=='none'&&closedFrames===0)clearAlert();}
-  const now=Date.now(),coolMs=settings.cooldown*1000;
-  if(closedFrames>=settings.thresh*1.5&&now-lastAlertTime>coolMs){triggerAlert('danger');lastAlertTime=now;}
-  else if(closedFrames>=settings.thresh&&alertState==='none')triggerAlert('warn');
+
+  const now=Date.now();
+  const coolMs=settings.cooldown*1000;
+
+  // FIX #2: Danger requires thresh*3 frames — much harder to trigger accidentally
+  if(closedFrames>=settings.thresh*3&&now-lastAlertTime>coolMs){
+    triggerAlert('danger');lastAlertTime=now;
+  }else if(closedFrames>=settings.thresh&&alertState==='none'){
+    triggerAlert('warn');
+  }
 }
- 
+
+// ═══════════════════════════════════════════════════
+// FIX #2: No-face detection — treat sustained absence as drowsy
+// ═══════════════════════════════════════════════════
 function updateNoFace(){
+  noFaceFrames++;
   earDisplay.textContent='--';earValLabel.textContent='--';
-  earBar.style.width='0%';eyeL.className='eye-dot';eyeR.className='eye-dot';
+  earBar.style.width='0%';
+  eyeL.className='eye-dot';eyeR.className='eye-dot';
+
+  // If face has been gone for ~3 seconds and we're running, that's a concern
+  const now=Date.now();
+  const coolMs=settings.cooldown*1000;
+  if(noFaceFrames>=NO_FACE_DANGER_THRESHOLD&&running&&now-lastAlertTime>coolMs){
+    triggerAlert('warn');
+    lastAlertTime=now;
+    addHistory('w','⚠ Face not detected — head may be down');
+    noFaceFrames=0; // reset so it doesn't spam
+  }
 }
- 
+
 function triggerAlert(level){
   if(level==='danger'){
     alertState='danger';
     alertBox.className='alert-box danger-alert';
     alertIcon.textContent='🚨';alertTitle.textContent='DROWSINESS DETECTED';alertSub.textContent='Pull over safely — you are falling asleep';
     cameraWrap.className='camera-wrap danger-border';statusBadge.className='status-badge danger';statusBadge.textContent='DANGER';
-    doVibrate([500,200,500,200,500,200,1000]);playAlert(660,.4,5);
+    doVibrate([500,200,500,200,500,200,1000]);playAlert(660,0.4,5);
     totalAlerts++;alertCount.textContent=totalAlerts;
     addHistory('d','🚨 DROWSINESS ALERT — Eyes closed too long');
   }else{
+    if(alertState==='danger')return; // don't downgrade danger to warn
     alertState='warn';
     alertBox.className='alert-box warn-alert';
-    alertIcon.textContent='⚠️';alertTitle.textContent='EYES CLOSING';alertSub.textContent='Stay alert — blink detected';
+    alertIcon.textContent='⚠️';alertTitle.textContent='EYES CLOSING';alertSub.textContent='Stay alert — drowsiness warning';
     cameraWrap.className='camera-wrap warn-border';statusBadge.className='status-badge warning';statusBadge.textContent='WARNING';
-    doVibrate([200,100,200]);playAlert(440,.2,2);
+    doVibrate([200,100,200]);playAlert(440,0.2,2);
     addHistory('w','⚠ Eyes closing — drowsiness warning');
   }
 }
- 
+
 function clearAlert(){
   alertState='none';alertBox.className='alert-box';
   cameraWrap.className='camera-wrap active-border';
   statusBadge.className='status-badge active';statusBadge.textContent='ACTIVE';
 }
- 
-// ── HISTORY ──────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════
+// MONITORING START/STOP
+// ═══════════════════════════════════════════════════
+async function toggleMonitoring(){
+  if(running){stopMonitoring();}
+  else{startMonitoring();}
+}
+
+async function startMonitoring(){
+  startBtn.textContent='Loading...';startBtn.disabled=true;
+
+  // FIX #3: Init FaceMesh using already-preloaded scripts
+  if(!faceLoaded){
+    try{await initFaceMesh();}
+    catch(e){
+      startBtn.textContent='▶ Start Monitoring';startBtn.disabled=false;
+      alert('AI model failed to load. Check your internet connection and try again.');return;
+    }
+  }
+
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:currentFacingMode,width:{ideal:640},height:{ideal:480}},audio:false
+    });
+  }catch(e){
+    startBtn.textContent='▶ Start Monitoring';startBtn.disabled=false;
+    permMsg.classList.add('show');
+    addHistory('d','⚠ Camera permission denied');return;
+  }
+
+  permMsg.classList.remove('show');
+  video.srcObject=stream;await video.play();
+  noCam.style.display='none';
+
+  running=true;closedFrames=0;noFaceFrames=0;lastDetectionTime=0;
+  startBtn.textContent='■ Stop Monitoring';startBtn.className='btn-primary stop';startBtn.disabled=false;
+  statusBadge.className='status-badge active';statusBadge.textContent='ACTIVE';
+  cameraWrap.className='camera-wrap active-border';
+  addHistory('ok','▶ Monitoring started');
+  loop();
+}
+
+function stopMonitoring(){
+  running=false;
+  if(animFrame)cancelAnimationFrame(animFrame);
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+  stream=null;lastResults=null;
+  closedFrames=0;noFaceFrames=0;
+  closedCount.textContent=0;
+  video.srcObject=null;noCam.style.display='flex';
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  startBtn.textContent='▶ Start Monitoring';startBtn.className='btn-primary';
+  statusBadge.className='status-badge offline';statusBadge.textContent='OFFLINE';
+  cameraWrap.className='camera-wrap';alertBox.className='alert-box';alertState='none';
+  earDisplay.textContent='--';earValLabel.textContent='--';earBar.style.width='0%';
+  eyeL.className='eye-dot';eyeR.className='eye-dot';
+  addHistory('ok','■ Monitoring stopped');
+}
+
+// ═══════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════
+function adj(key,delta){
+  if(key==='thresh'){settings.thresh=Math.max(5,Math.min(60,settings.thresh+delta));document.getElementById('threshVal').textContent=settings.thresh;}
+  if(key==='cooldown'){settings.cooldown=Math.max(5,Math.min(120,settings.cooldown+delta));document.getElementById('cooldownVal').textContent=settings.cooldown;}
+  saveSettings();
+}
+function toggleSetting(key){
+  if(key==='vib'){vibEnabled=!vibEnabled;const b=document.getElementById('vibBtn');b.textContent=vibEnabled?'ON':'OFF';b.className='toggle-btn '+(vibEnabled?'on':'off');}
+  if(key==='snd'){sndEnabled=!sndEnabled;const b=document.getElementById('sndBtn');b.textContent=sndEnabled?'ON':'OFF';b.className='toggle-btn '+(sndEnabled?'on':'off');}
+  if(key==='mirror'){
+    mirrorEnabled=!mirrorEnabled;
+    const b=document.getElementById('mirrorBtn');b.textContent=mirrorEnabled?'ON':'OFF';b.className='toggle-btn '+(mirrorEnabled?'on':'off');
+    video.className=mirrorEnabled?'mirror':'';canvas.className=mirrorEnabled?'mirror':'';
+  }
+  saveSettings();
+}
+function saveSettings(){
+  localStorage.setItem('occulert-settings',JSON.stringify({...settings,vib:vibEnabled,snd:sndEnabled,mirror:mirrorEnabled}));
+}
+function loadSettings(){
+  try{
+    const s=JSON.parse(localStorage.getItem('occulert-settings')||'{}');
+    if(s.thresh){settings.thresh=s.thresh;document.getElementById('threshVal').textContent=s.thresh;}
+    if(s.cooldown){settings.cooldown=s.cooldown;document.getElementById('cooldownVal').textContent=s.cooldown;}
+    if(s.vib===false){vibEnabled=false;document.getElementById('vibBtn').textContent='OFF';document.getElementById('vibBtn').className='toggle-btn off';}
+    if(s.snd===false){sndEnabled=false;document.getElementById('sndBtn').textContent='OFF';document.getElementById('sndBtn').className='toggle-btn off';}
+    if(s.mirror===false){mirrorEnabled=false;document.getElementById('mirrorBtn').textContent='OFF';document.getElementById('mirrorBtn').className='toggle-btn off';video.className='';canvas.className='';}
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════
+// EVENT LOG
+// ═══════════════════════════════════════════════════
 function addHistory(type,msg){
   const list=document.getElementById('historyList');
   const empty=document.getElementById('histEmpty');
   if(empty)empty.remove();
   const now=new Date();
-  const item=document.createElement('div');
-  item.className='history-item';
-  item.innerHTML=`<div class="history-dot ${type}"></div><span class="history-time">${now.toTimeString().slice(0,8)}</span><span class="history-msg">${msg}</span>`;
+  const item=document.createElement('div');item.className='history-item';
+  const dot=document.createElement('div');dot.className=`history-dot ${type}`;
+  const time=document.createElement('div');time.className='history-time';
+  time.textContent=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const msgEl=document.createElement('div');msgEl.className='history-msg';msgEl.textContent=msg;
+  item.appendChild(dot);item.appendChild(time);item.appendChild(msgEl);
   list.insertBefore(item,list.firstChild);
-  while(list.children.length>20)list.removeChild(list.lastChild);
+  // Keep log from growing unbounded
+  const items=list.querySelectorAll('.history-item');
+  if(items.length>50)items[items.length-1].remove();
 }
- 
-// ── MONITORING ───────────────────────────────────────
-async function toggleMonitoring(){running?stopMonitoring():await startMonitoring();}
- 
-async function startMonitoring(){
-  permMsg.classList.remove('show');
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:currentFacingMode,width:{ideal:640},height:{ideal:480}},audio:false
-    });
-    video.srcObject=stream;await video.play();
-    noCam.style.display='none';
-    cameraWrap.classList.add('active-border');
-    if(!faceLoaded){statusBadge.className='status-badge offline';statusBadge.textContent='LOADING...';await loadFaceMesh();}
-    running=true;
-    startBtn.textContent='■ Stop Monitoring';startBtn.classList.add('stop');
-    statusBadge.className='status-badge active';statusBadge.textContent='ACTIVE';
-    closedFrames=0;addHistory('ok','✓ Monitoring started');loop();
-    if(typeof gtag!=='undefined')gtag('event','monitoring_started');
-  }catch(e){
-    permMsg.classList.add('show');console.error(e);
+
+// ═══════════════════════════════════════════════════
+// LANGUAGE SWITCHER
+// ═══════════════════════════════════════════════════
+const LANGS=[
+  {code:'en',flag:'🇺🇸',label:'English'},
+  {code:'es',flag:'🇪🇸',label:'Español'},
+  {code:'fr',flag:'🇫🇷',label:'Français'},
+  {code:'pt',flag:'🇧🇷',label:'Português'},
+  {code:'zh',flag:'🇨🇳',label:'中文'},
+  {code:'ar',flag:'🇸🇦',label:'العربية'},
+];
+let currentLang=localStorage.getItem('occulert-lang')||'en';
+function buildLangSwitcher(){
+  const container=document.getElementById('lang-switcher-app');
+  const current=LANGS.find(l=>l.code===currentLang)||LANGS[0];
+  container.innerHTML=`
+    <div class="lang-switcher">
+      <button class="lang-trigger" onclick="toggleLangMenu()">${current.flag} ${current.code.toUpperCase()}</button>
+      <div class="lang-menu" id="lang-menu-app">
+        ${LANGS.map(l=>`<div class="lang-option${l.code===currentLang?' active':''}" onclick="setLang('${l.code}')"><span>${l.flag}</span><span>${l.label}</span></div>`).join('')}
+      </div>
+    </div>`;
+}
+function toggleLangMenu(){
+  const m=document.getElementById('lang-menu-app');
+  if(m)m.classList.toggle('open');
+}
+function setLang(code){
+  currentLang=code;localStorage.setItem('occulert-lang',code);
+  buildLangSwitcher();
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.lang-switcher')){
+    document.querySelectorAll('.lang-menu').forEach(m=>m.classList.remove('open'));
   }
-}
- 
-function stopMonitoring(){
-  running=false;
-  if(animFrame)cancelAnimationFrame(animFrame);
-  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
-  video.srcObject=null;noCam.style.display='flex';
-  cameraWrap.className='camera-wrap';alertBox.className='alert-box';
-  statusBadge.className='status-badge offline';statusBadge.textContent='OFFLINE';
-  startBtn.textContent='▶ Start Monitoring';startBtn.classList.remove('stop');
-  earDisplay.textContent='--';earValLabel.textContent='--';
-  earBar.style.width='0%';eyeL.className='eye-dot';eyeR.className='eye-dot';
-  closedFrames=0;alertState='none';ctx.clearRect(0,0,canvas.width,canvas.height);
-  addHistory('ok','○ Monitoring stopped');
-}
- 
-// ── SETTINGS ─────────────────────────────────────────
-function toggleSettings(){/* settings always visible in side panel */}
-function adj(key,delta){
-  const lim={thresh:[5,60],cooldown:[5,120]};
-  const[min,max]=lim[key];
-  settings[key]=Math.min(max,Math.max(min,settings[key]+delta));
-  document.getElementById(key+'Val').textContent=settings[key];
-}
-function toggleSetting(key){
-  if(key==='vib'){vibEnabled=!vibEnabled;const b=document.getElementById('vibBtn');b.textContent=vibEnabled?'ON':'OFF';b.className='toggle-btn '+(vibEnabled?'on':'off');if(vibEnabled)doVibrate([100]);}
-  if(key==='snd'){sndEnabled=!sndEnabled;const b=document.getElementById('sndBtn');b.textContent=sndEnabled?'ON':'OFF';b.className='toggle-btn '+(sndEnabled?'on':'off');}
-  if(key==='mirror'){mirrorEnabled=!mirrorEnabled;const b=document.getElementById('mirrorBtn');b.textContent=mirrorEnabled?'ON':'OFF';b.className='toggle-btn '+(mirrorEnabled?'on':'off');video.className=mirrorEnabled&&currentFacingMode==='user'?'mirror':'';canvas.className=mirrorEnabled&&currentFacingMode==='user'?'mirror':'';}
-}
- 
-// ── INIT ─────────────────────────────────────────────
+});
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
 (function init(){
-  const savedTheme=localStorage.getItem('occulert-theme')||'cyan';
-  applyTheme(savedTheme);
   buildThemeGrid();
-  const savedUser=localStorage.getItem('occulert-user');
-  if(savedUser){try{setUser(JSON.parse(savedUser));}catch(e){}}
-  if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
-  // Load language system
-  const script=document.createElement('script');
-  script.src='lang.js';
-  script.onload=()=>{
-    buildLangSwitcher('lang-switcher-app');
-    applyLanguage(localStorage.getItem('occulert-lang')||'en');
-  };
-  document.head.appendChild(script);
+  buildLangSwitcher();
+  applyTheme(localStorage.getItem('occulert-theme')||'cyan');
+  loadSettings();
+  try{
+    const u=JSON.parse(localStorage.getItem('occulert-user')||'null');
+    if(u)setUser(u);
+  }catch(e){}
 })();
 </script>
 </body>
 </html>
- 
