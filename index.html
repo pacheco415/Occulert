@@ -4,20 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Occulert™ — AI Drowsiness Detection for Every Driver</title>
-<meta name="description" content="Occulert uses AI eye-tracking to detect driver drowsiness in real-time. Free for every driver. Works on iPhone, Samsung, and all Android devices.">
+<meta name="description" content="Occulert uses AI eye-tracking to detect driver drowsiness in real-time. Free for every driver.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://occulert.vercel.app/">
-<meta name="keywords" content="drowsiness detection, driver safety, AI eye tracking, fleet safety, fatigue detection, drowsy driving app, Occulert">
+<meta name="keywords" content="drowsiness detection, driver safety, AI eye tracking, fleet safety, fatigue detection">
 <meta name="author" content="Occulert">
 <meta property="og:title" content="Occulert™ — AI Drowsiness Detection">
-<meta property="og:description" content="Free AI eye-tracking that detects drowsy driving before accidents happen. Works on iPhone and Android.">
+<meta property="og:description" content="Free AI eye-tracking that detects drowsy driving before accidents happen.">
 <meta property="og:image" content="https://occulert.vercel.app/occulert-logo-main.png">
 <meta property="og:url" content="https://occulert.vercel.app/">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Occulert">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Occulert™ — AI Drowsiness Detection">
-<meta name="twitter:description" content="Free AI eye-tracking that detects drowsy driving before accidents happen.">
+<meta name="twitter:description" content="Free AI eye-tracking that detects drowsy driving.">
 <meta name="twitter:image" content="https://occulert.vercel.app/occulert-logo-main.png">
 <meta name="theme-color" content="#0a0e1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -29,1055 +28,375 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Occulert","description":"AI-powered drowsiness detection app for drivers.","url":"https://occulert.vercel.app/","applicationCategory":"DriverSafetyApp","operatingSystem":"iOS, Android","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"creator":{"@type":"Organization","name":"Occulert"}}
-</script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
-html{scroll-behavior:smooth;}
-:root{
---dark:#111827;--dark2:#1a2235;--dark3:#1f2d42;
---card:#1e2d45;--border:#2a3f5f;--border2:#344d72;
---accent:#2563eb;--accent2:#3b82f6;--cyan:#06b6d4;
---green:#10b981;--warn:#f59e0b;--danger:#ef4444;
---text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--white:#fff;
-}
-body{background:var(--dark);color:var(--text);font-family:'Inter',sans-serif;overflow-x:hidden;line-height:1.6;}
-
-/* NAVBAR */
-nav{position:fixed;top:0;left:0;right:0;z-index:500;padding:0 40px;height:70px;display:flex;align-items:center;justify-content:space-between;background:rgba(10,14,26,0.96);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
-.logo-mark{width:38px;height:38px;background:linear-gradient(135deg,var(--accent),var(--cyan));border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(37,99,235,.35);}
-.logo-mark svg{width:22px;height:22px;}
-.logo-text{font-size:20px;font-weight:800;color:var(--white);}
-.logo-tm{font-size:10px;vertical-align:super;color:var(--text3);font-weight:400;}
-.nav-links{display:flex;gap:4px;}
-.nav-links a{padding:8px 13px;color:var(--text2);text-decoration:none;font-size:13px;font-weight:500;border-radius:8px;transition:all .15s;cursor:pointer;}
-.nav-links a:hover,.nav-links a.active{color:var(--white);background:rgba(255,255,255,.07);}
-.nav-links a.active{color:#60a5fa;}
-.nav-right{display:flex;align-items:center;gap:10px;}
-.nav-btn{padding:9px 18px;font-size:13px;font-weight:600;border-radius:8px;text-decoration:none;transition:all .15s;font-family:'Inter',sans-serif;cursor:pointer;}
-.nav-ghost{color:var(--text2);border:1px solid var(--border2);background:transparent;}
-.nav-ghost:hover{color:var(--white);}
-.nav-solid{color:var(--white);background:var(--accent);border:none;}
-.nav-solid:hover{background:#1d4ed8;box-shadow:0 4px 20px rgba(37,99,235,.4);}
-
-/* PWA BANNER */
-#pwa-banner{display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:600;background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:14px 18px;box-shadow:0 20px 60px rgba(0,0,0,.5);align-items:center;gap:14px;max-width:380px;width:calc(100% - 32px);}
-#pwa-banner.show{display:flex;}
-.pwa-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--cyan));border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.pwa-title{font-size:14px;font-weight:700;color:var(--white);}
-.pwa-sub{font-size:11px;color:var(--text3);}
-.pwa-install{padding:8px 14px;background:var(--accent);color:var(--white);border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
-.pwa-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;padding:2px;}
-.container{max-width:1160px;margin:0 auto;padding:0 40px;}
-.page{display:none;padding-top:70px;min-height:100vh;animation:fadeIn .25s ease;}
-.page.active{display:block;}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
-
-/* HERO */
-.hero{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center;padding:80px 0 60px;}
-.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);border-radius:100px;padding:5px 14px 5px 7px;margin-bottom:24px;}
-.badge-pill{background:var(--accent);color:var(--white);font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:100px;text-transform:uppercase;}
-.badge-text{font-size:13px;color:var(--accent2);}
-h1{font-size:clamp(36px,4.5vw,58px);font-weight:900;line-height:1.08;letter-spacing:-2px;color:var(--white);margin-bottom:20px;}
-h1 .grad{background:linear-gradient(135deg,#60a5fa,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-.hero-desc{font-size:16px;color:var(--text2);line-height:1.7;margin-bottom:32px;max-width:460px;}
-.hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:40px;}
-.btn{padding:13px 26px;font-size:15px;font-weight:600;border-radius:10px;text-decoration:none;transition:all .15s;display:inline-flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;cursor:pointer;border:none;}
-.btn-primary{background:var(--accent);color:var(--white);}
-.btn-primary:hover{background:#1d4ed8;box-shadow:0 8px 30px rgba(37,99,235,.45);transform:translateY(-1px);}
-.btn-secondary{background:rgba(255,255,255,.07);color:var(--text);border:1px solid var(--border2);}
-.btn-secondary:hover{background:rgba(255,255,255,.12);transform:translateY(-1px);}
-.hero-proof{display:flex;gap:32px;flex-wrap:wrap;}
-.proof-item{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text3);}
-.proof-item span:first-child{font-size:16px;}
-.hero-visual{position:relative;}
-.phone-mock{background:linear-gradient(160deg,var(--dark3),var(--dark2));border:1px solid var(--border);border-radius:24px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.5);}
-.mock-header{background:var(--dark);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
-.mock-logo{font-size:13px;font-weight:800;letter-spacing:2px;color:var(--accent2);}
-.mock-status{font-size:11px;color:var(--green);display:flex;align-items:center;gap:4px;}
-.mock-status::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite;}
-@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
-.mock-cam{background:#000;height:180px;position:relative;display:flex;align-items:center;justify-content:center;}
-.mock-cam-text{font-size:12px;color:var(--text3);letter-spacing:2px;}
-.mock-eye-ring{width:70px;height:70px;border-radius:50%;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;animation:eyeRing 2s ease-in-out infinite;}
-@keyframes eyeRing{0%,100%{border-color:var(--accent);box-shadow:0 0 0 rgba(37,99,235,0);}50%{border-color:var(--cyan);box-shadow:0 0 20px rgba(6,182,212,.3);}}
-.mock-stats{padding:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
-.mock-stat{background:var(--dark);border-radius:8px;padding:10px;text-align:center;}
-.mock-stat-val{font-size:18px;font-weight:700;color:var(--accent2);}
-.mock-stat-label{font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;}
-.mock-alert{margin:0 14px 14px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;}
-.mock-alert-icon{font-size:16px;}
-.mock-alert-text{font-size:12px;color:var(--green);font-weight:500;}
-
-/* SIGN IN SECTION */
-.signin-section{background:linear-gradient(180deg,var(--dark) 0%,var(--dark2) 100%);padding:80px 0;}
-.signin-wrap{max-width:480px;margin:0 auto;text-align:center;}
-.section-eyebrow{font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--accent2);margin-bottom:12px;}
-.signin-title{font-size:clamp(26px,3.5vw,36px);font-weight:800;color:var(--white);margin-bottom:12px;letter-spacing:-1px;}
-.signin-sub{font-size:15px;color:var(--text2);margin-bottom:40px;line-height:1.7;}
-.auth-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px 40px;}
-.auth-tabs{display:flex;gap:4px;background:var(--dark);border-radius:10px;padding:4px;margin-bottom:28px;}
-.auth-tab{flex:1;padding:9px;font-size:14px;font-weight:600;border-radius:8px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;}
-.auth-tab.active{background:var(--accent);color:var(--white);box-shadow:0 2px 12px rgba(37,99,235,.35);}
-.auth-form{display:none;}
-.auth-form.active{display:block;}
-.form-group{margin-bottom:18px;text-align:left;}
-.form-label{display:block;font-size:13px;font-weight:600;color:var(--text2);margin-bottom:8px;}
-.form-input{width:100%;padding:12px 16px;background:var(--dark);border:1px solid var(--border);border-radius:10px;color:var(--white);font-size:14px;font-family:'Inter',sans-serif;transition:border-color .15s;outline:none;}
-.form-input:focus{border-color:var(--accent);}
-.form-input::placeholder{color:var(--text3);}
-.btn-auth{width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;}
-.btn-passkey{background:linear-gradient(135deg,var(--accent),var(--cyan));color:var(--white);display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:14px;}
-.btn-passkey:hover{box-shadow:0 6px 24px rgba(37,99,235,.5);transform:translateY(-1px);}
-.btn-email{background:var(--dark);color:var(--text);border:1px solid var(--border2);}
-.btn-email:hover{background:var(--dark3);}
-.auth-divider{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--text3);font-size:13px;}
-.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border);}
-.auth-note{font-size:12px;color:var(--text3);margin-top:18px;line-height:1.6;}
-.auth-note a{color:var(--accent2);text-decoration:none;}
-.guest-btn{width:100%;padding:12px;font-size:14px;font-weight:500;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif;margin-top:14px;transition:all .15s;}
-.guest-btn:hover{color:var(--white);border-color:var(--border2);}
-
-/* COLOR SCHEME SECTION */
-.theme-section{padding:80px 0;background:var(--dark2);}
-.theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:32px;}
-.theme-card{background:var(--dark);border:2px solid var(--border);border-radius:16px;padding:20px;cursor:pointer;transition:all .2s;text-align:center;}
-.theme-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.3);}
-.theme-card.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
-.theme-preview{height:48px;border-radius:10px;margin-bottom:12px;position:relative;overflow:hidden;}
-.theme-name{font-size:13px;font-weight:600;color:var(--text2);}
-.theme-card.selected .theme-name{color:var(--white);}
-.theme-check{display:none;position:absolute;top:6px;right:6px;width:18px;height:18px;background:var(--accent);border-radius:50%;font-size:10px;align-items:center;justify-content:center;color:white;}
-.theme-card.selected .theme-check{display:flex;}
-.theme-cta{text-align:center;margin-top:28px;font-size:14px;color:var(--text2);}
-.theme-cta strong{color:var(--accent2);}
-
-/* HOW IT WORKS */
-.how-section{padding:100px 0;}
-.section-header{text-align:center;margin-bottom:64px;}
-.section-title{font-size:clamp(28px,3.5vw,40px);font-weight:800;color:var(--white);letter-spacing:-1.5px;margin-bottom:14px;}
-.section-desc{font-size:16px;color:var(--text2);max-width:520px;margin:0 auto;line-height:1.7;}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;}
-.step{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px 28px;position:relative;transition:all .2s;}
-.step:hover{border-color:var(--border2);transform:translateY(-4px);box-shadow:0 20px 60px rgba(0,0,0,.3);}
-.step-num{width:36px;height:36px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:var(--white);margin-bottom:20px;}
-.step-icon{font-size:32px;margin-bottom:16px;}
-.step-title{font-size:17px;font-weight:700;color:var(--white);margin-bottom:10px;}
-.step-desc{font-size:14px;color:var(--text2);line-height:1.6;}
-.step-connector{position:absolute;top:54px;right:-18px;width:36px;height:2px;background:linear-gradient(90deg,var(--border2),var(--border));z-index:1;}
-
-/* FEATURES */
-.features-section{padding:100px 0;background:var(--dark2);}
-.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:64px;}
-.feature-card{background:var(--dark);border:1px solid var(--border);border-radius:16px;padding:28px;transition:all .2s;}
-.feature-card:hover{border-color:var(--border2);transform:translateY(-3px);}
-.feature-icon{font-size:28px;margin-bottom:16px;}
-.feature-title{font-size:15px;font-weight:700;color:var(--white);margin-bottom:8px;}
-.feature-desc{font-size:13px;color:var(--text2);line-height:1.6;}
-
-/* DEVICES */
-.devices-section{padding:100px 0;}
-.devices-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:48px;}
-.device-group{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;}
-.device-group-title{font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:16px;}
-.device-list{display:flex;flex-direction:column;gap:10px;}
-.device-item{display:flex;align-items:center;justify-content:space-between;font-size:14px;}
-.device-name{color:var(--text);}
-.device-badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px;}
-.badge-full{background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.3);}
-.badge-haptic{background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.3);}
-.badge-audio{background:rgba(245,158,11,.1);color:var(--warn);border:1px solid rgba(245,158,11,.3);}
-
-/* FAQ */
-.faq-section{padding:100px 0;background:var(--dark2);}
-.faq-list{max-width:720px;margin:0 auto;margin-top:48px;}
-.faq-item{border-bottom:1px solid var(--border);}
-.faq-q{width:100%;background:none;border:none;padding:22px 0;display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:600;color:var(--text);cursor:pointer;font-family:'Inter',sans-serif;text-align:left;gap:16px;}
-.faq-q:hover{color:var(--white);}
-.faq-icon{font-size:18px;color:var(--text3);flex-shrink:0;transition:transform .2s;}
-.faq-item.open .faq-icon{transform:rotate(45deg);color:var(--accent2);}
-.faq-a{font-size:14px;color:var(--text2);line-height:1.7;max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;}
-.faq-item.open .faq-a{max-height:300px;padding-bottom:20px;}
-
-/* FLEET */
-.fleet-section{padding:100px 0;}
-.fleet-hero{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;}
-.fleet-features{display:flex;flex-direction:column;gap:16px;margin-top:32px;}
-.fleet-feature{display:flex;align-items:flex-start;gap:14px;}
-.fleet-feature-icon{width:36px;height:36px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.25);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;}
-.fleet-feature-title{font-size:14px;font-weight:600;color:var(--white);margin-bottom:4px;}
-.fleet-feature-desc{font-size:13px;color:var(--text2);}
-.fleet-form-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px;}
-.fleet-form-title{font-size:20px;font-weight:800;color:var(--white);margin-bottom:8px;}
-.fleet-form-sub{font-size:14px;color:var(--text2);margin-bottom:28px;}
-
-/* ABOUT */
-.about-section{padding:100px 0;background:var(--dark2);}
-.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;}
-.about-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:100px;padding:5px 14px 5px 7px;margin-bottom:20px;}
-.about-badge-dot{width:8px;height:8px;border-radius:50%;background:var(--green);}
-.about-title{font-size:clamp(28px,3vw,40px);font-weight:800;color:var(--white);letter-spacing:-1.5px;margin-bottom:20px;}
-.about-text{font-size:15px;color:var(--text2);line-height:1.8;margin-bottom:20px;}
-.about-quote{background:var(--card);border-left:3px solid var(--accent);border-radius:0 12px 12px 0;padding:20px 24px;margin:28px 0;}
-.about-quote p{font-size:15px;color:var(--text);font-style:italic;line-height:1.6;}
-.about-quote footer{font-size:13px;color:var(--text3);margin-top:8px;}
-.about-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px;}
-.about-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
-.about-stat{background:var(--dark);border-radius:12px;padding:20px;text-align:center;}
-.about-stat-val{font-size:28px;font-weight:800;color:var(--accent2);margin-bottom:4px;}
-.about-stat-label{font-size:12px;color:var(--text3);}
-.contact-links{display:flex;flex-direction:column;gap:10px;}
-.contact-link{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text2);text-decoration:none;transition:color .15s;}
-.contact-link:hover{color:var(--white);}
-.contact-link-icon{width:32px;height:32px;background:var(--dark3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;}
-
-/* DONATE */
-.donate-section{padding:80px 0;}
-.donate-inner{max-width:600px;margin:0 auto;text-align:center;}
-.donate-methods{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:32px;}
-.donate-btn{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;text-align:center;}
-.donate-btn:hover{border-color:var(--border2);transform:translateY(-2px);}
-.donate-btn.sel{border-color:var(--accent);background:rgba(37,99,235,.08);}
-.donate-btn-icon{font-size:24px;margin-bottom:8px;}
-.donate-btn-label{font-size:13px;font-weight:700;color:var(--white);}
-.donate-btn-handle{font-size:12px;color:var(--text3);}
-
-/* VIDEO */
-.video-section{padding:100px 0;background:var(--dark2);}
-.video-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:48px;}
-.video-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
-.video-card video{width:100%;display:block;}
-.video-info{padding:20px;}
-.video-title{font-size:15px;font-weight:700;color:var(--white);margin-bottom:6px;}
-.video-desc{font-size:13px;color:var(--text2);}
-
-/* DISCLAIMER */
-.disclaimer-bar{background:rgba(245,158,11,.06);border-top:1px solid rgba(245,158,11,.2);padding:14px 40px;text-align:center;font-size:12px;color:var(--text3);}
-.disclaimer-bar strong{color:var(--warn);}
-
-/* FOOTER */
-footer{background:var(--dark2);border-top:1px solid var(--border);padding:40px 0;}
-.footer-inner{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;}
-.footer-links{display:flex;gap:20px;flex-wrap:wrap;}
-.footer-links a{font-size:13px;color:var(--text3);text-decoration:none;transition:color .15s;}
-.footer-links a:hover{color:var(--text);}
-.footer-copy{font-size:12px;color:var(--text3);}
-.safety-link{display:inline-block;margin-top:10px;font-size:12px;color:var(--accent2);}
-
-/* TOAST */
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 20px;font-size:14px;color:var(--white);opacity:0;transition:all .3s;z-index:700;white-space:nowrap;pointer-events:none;}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-
-/* LANG SWITCHER */
-.lang-switcher{position:relative;}
-.lang-trigger{padding:7px 12px;background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;white-space:nowrap;}
-.lang-trigger:hover{color:var(--white);border-color:var(--accent);}
-.lang-menu{position:absolute;top:calc(100% + 8px);right:0;background:var(--card);border:1px solid var(--border2);border-radius:12px;overflow:hidden;min-width:160px;box-shadow:0 16px 48px rgba(0,0,0,.5);z-index:600;display:none;}
-.lang-menu.open{display:block;}
-.lang-option{display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:13px;color:var(--text2);cursor:pointer;transition:background .15s;}
-.lang-option:hover{background:rgba(255,255,255,.05);color:var(--white);}
-.lang-option.active{color:var(--accent2);}
-
-/* HOME NAV CARDS */
-.home-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:40px 0 80px;}
-.home-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;cursor:pointer;transition:all .2s;text-decoration:none;display:block;}
-.home-card:hover{border-color:var(--border2);transform:translateY(-3px);box-shadow:0 16px 48px rgba(0,0,0,.3);}
-.home-card-icon{font-size:28px;margin-bottom:12px;}
-.home-card-title{font-size:15px;font-weight:700;color:var(--white);margin-bottom:6px;}
-.home-card-desc{font-size:13px;color:var(--text2);line-height:1.5;}
-.home-card-link{font-size:12px;color:var(--accent2);margin-top:10px;}
-
-/* ALERT STRIP */
-.alert-strip{background:linear-gradient(90deg,rgba(37,99,235,.12),rgba(6,182,212,.12));border:1px solid rgba(37,99,235,.25);border-radius:14px;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:20px;margin:20px 0;}
-.alert-strip-text{font-size:14px;color:var(--text2);}
-.alert-strip-text strong{color:var(--white);}
-
-/* MOBILE */
-@media(max-width:768px){
-nav{padding:0 20px;}
-.nav-links{display:none;}
-.container{padding:0 20px;}
-.hero{grid-template-columns:1fr;gap:40px;padding:40px 0 40px;}
-.hero-visual{order:-1;}
-.steps{grid-template-columns:1fr;}
-.step-connector{display:none;}
-.features-grid{grid-template-columns:1fr;}
-.devices-grid{grid-template-columns:1fr;}
-.fleet-hero{grid-template-columns:1fr;}
-.about-grid{grid-template-columns:1fr;}
-.theme-grid{grid-template-columns:repeat(2,1fr);}
-.donate-methods{grid-template-columns:1fr;}
-.video-grid{grid-template-columns:1fr;}
-.home-cards{grid-template-columns:1fr;gap:12px;}
-.auth-card{padding:24px 20px;}
-.fleet-form-card{padding:24px 20px;}
-.footer-inner{flex-direction:column;text-align:center;}
-.hero-btns{flex-direction:column;}
-.btn{justify-content:center;}
-}
-</style>
-</head>
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Occulert","url":"https://occulert.vercel.app/","applicationCategory":"DriverSafetyApp","operatingSystem":"iOS, Android","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+<style>undefined
 <body>
-
-<!-- PWA BANNER -->
 <div id="pwa-banner">
-  <div class="pwa-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="22" height="22"><circle cx="12" cy="12" r="5"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg></div>
-  <div><div class="pwa-title">Add Occulert to Home Screen</div><div class="pwa-sub">Install for quick access while driving</div></div>
-  <button class="pwa-install" id="pwa-install">Install</button>
-  <button class="pwa-x" onclick="document.getElementById('pwa-banner').classList.remove('show')">&#x2715;</button>
+<div class="pwa-icon"><svg width="22" height="22" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="5" ry="5" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#fff"/></svg></div>
+<div><div style="font-size:14px;font-weight:700;color:var(--white)">Add Occulert to Home Screen</div><div style="font-size:11px;color:var(--text3)">Install for quick access while driving</div></div>
+<button class="pwa-install" id="pwa-install">Install</button>
+<button class="pwa-x" onclick="document.getElementById('pwa-banner').classList.remove('show')">&#x2715;</button>
 </div>
-
-<!-- TOAST -->
-<div class="toast" id="toast"></div>
-
-<!-- NAV -->
 <nav>
-  <a href="#" class="logo" onclick="showPage('home');return false;">
-    <div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="22" height="22"><circle cx="12" cy="12" r="5"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg></div>
-    <span class="logo-text">Occulert<sup class="logo-tm">TM</sup></span>
-  </a>
-  <div class="nav-links">
-    <a onclick="showPage('how');return false;" href="#">How It Works</a>
-    <a onclick="showPage('features');return false;" href="#">Features</a>
-    <a onclick="showPage('devices');return false;" href="#">Devices</a>
-    <a onclick="showPage('faq');return false;" href="#">FAQ</a>
-    <a onclick="showPage('fleet');return false;" href="#">Fleet</a>
-    <a onclick="showPage('donate');return false;" href="#">Donate</a>
-    <a onclick="showPage('about');return false;" href="#">About</a>
-  </div>
-  <div class="nav-right">
-    <div class="lang-switcher">
-      <button class="lang-trigger" id="lang-display">🇺🇸 English</button>
-      <div class="lang-menu" id="lang-menu"></div>
-    </div>
-    <button class="nav-btn nav-ghost" onclick="showPage('signin');return false;">Sign In</button>
-    <a href="app.html" class="nav-btn nav-solid">Launch App →</a>
-  </div>
+<div class="logo" onclick="showPage('home')">
+<div class="logo-mark"><svg width="22" height="22" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></div>
+<span class="logo-text">Occulert<span class="logo-tm">&#x2122;</span></span>
+</div>
+<div class="nav-links">
+<a onclick="showPage('how')">How It Works</a>
+<a onclick="showPage('features')">Features</a>
+<a onclick="showPage('devices')">Devices</a>
+<a onclick="showPage('faq')">FAQ</a>
+<a onclick="showPage('fleet')">Fleet</a>
+<a onclick="showPage('about')">About</a>
+</div>
+<div class="nav-right">
+<div class="lang-switcher"><button class="lang-trigger" id="lang-display">&#x1F1FA;&#x1F1F8; English</button><div class="lang-menu" id="lang-menu"></div></div>
+<div id="nav-auth-area" style="display:flex;align-items:center;gap:10px">
+<button class="nav-btn nav-ghost" onclick="showPage('signin')">Sign In</button>
+<button class="nav-btn nav-solid" onclick="launchApp()">Launch App &#x2192;</button>
+</div>
+<div id="nav-user-area" style="display:none;align-items:center;gap:10px">
+<div class="nav-user"><div class="nav-avatar" id="nav-avatar-initials">?</div><span id="nav-user-name">Driver</span></div>
+<button class="nav-btn nav-solid" onclick="launchApp()">Launch App &#x2192;</button>
+</div>
+</div>
 </nav>
 
-<!-- HOME PAGE -->
-<div id="page-home" class="page active">
-  <div class="container">
-    <div class="hero">
-      <div class="hero-content">
-        <div class="hero-badge"><span class="badge-pill">FREE</span><span class="badge-text">AI driver safety — works on any phone</span></div>
-        <h1>Stop Drowsy<br>Driving Before<br><span class="grad">It Stops You.</span></h1>
-        <p class="hero-desc">Occulert uses real-time AI eye-tracking to detect fatigue the moment it begins — then alerts you through your phone, watch, and earbuds before an accident happens.</p>
-        <div class="hero-btns">
-          <a href="app.html" class="btn btn-primary">▶️ Start Monitoring Free</a>
-          <button class="btn btn-secondary" onclick="showPage('signin');return false;">🔑 Sign In / Create Account</button>
-        </div>
-        <div class="hero-proof">
-          <div class="proof-item"><span>📱</span><span>iOS &amp; Android<br>No app needed</span></div>
-          <div class="proof-item"><span>🔒</span><span>100% Private<br>On-device AI</span></div>
-          <div class="proof-item"><span>⚡</span><span>0.2s Response<br>Real-time alerts</span></div>
-        </div>
-      </div>
-      <div class="hero-visual">
-        <div class="phone-mock">
-          <div class="mock-header"><span class="mock-logo">OCCULERT</span><span class="mock-status">ACTIVE</span></div>
-          <div class="mock-cam"><div class="mock-eye-ring"><svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.5" width="28" height="28"><ellipse cx="12" cy="12" rx="8" ry="5"/><circle cx="12" cy="12" r="2" fill="#2563eb"/></svg></div></div>
-          <div class="mock-stats">
-            <div class="mock-stat"><div class="mock-stat-val">0.31</div><div class="mock-stat-label">EAR</div></div>
-            <div class="mock-stat"><div class="mock-stat-val">2</div><div class="mock-stat-label">Blinks</div></div>
-            <div class="mock-stat"><div class="mock-stat-val">0</div><div class="mock-stat-label">Alerts</div></div>
-          </div>
-          <div class="mock-alert"><span class="mock-alert-icon">✅</span><span class="mock-alert-text">Driver Alert — Eyes Open</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- QUICK NAV CARDS -->
-    <div class="home-cards">
-      <a class="home-card" onclick="showPage('how');return false;" href="#">
-        <div class="home-card-icon">📱</div>
-        <div class="home-card-title">How It Works</div>
-        <div class="home-card-desc">Mount your phone, open Occulert, and drive. Three simple steps — the AI handles everything else.</div>
-        <div class="home-card-link">Learn more →</div>
-      </a>
-      <a class="home-card" onclick="showPage('features');return false;" href="#">
-        <div class="home-card-icon">👁️</div>
-        <div class="home-card-title">Features</div>
-        <div class="home-card-desc">468-point eye tracking, sub-200ms alerts, night mode, glasses support, Apple Watch &amp; earbuds integration.</div>
-        <div class="home-card-link">Explore features →</div>
-      </a>
-      <a class="home-card" onclick="showPage('devices');return false;" href="#">
-        <div class="home-card-icon">💻</div>
-        <div class="home-card-title">Devices</div>
-        <div class="home-card-desc">Works with every iPhone, Samsung Galaxy, and Android device you already own — no extra hardware needed.</div>
-        <div class="home-card-link">See compatibility →</div>
-      </a>
-      <a class="home-card" onclick="showPage('faq');return false;" href="#">
-        <div class="home-card-icon">❓</div>
-        <div class="home-card-title">FAQ</div>
-        <div class="home-card-desc">Does it work with glasses? Night driving? How are alerts sent? Get answers to the most common questions.</div>
-        <div class="home-card-link">Read FAQ →</div>
-      </a>
-      <a class="home-card" onclick="showPage('fleet');return false;" href="#">
-        <div class="home-card-icon">🚚</div>
-        <div class="home-card-title">Fleet &amp; GPS Dashboard</div>
-        <div class="home-card-desc">Real-time GPS tracking, drowsiness alerts, driver safety scores, and fleet manager controls — all in one platform.</div>
-        <div class="home-card-link">Get fleet info →</div>
-      </a>
-      <a class="home-card" onclick="showPage('about');return false;" href="#">
-        <div class="home-card-icon">🎯</div>
-        <div class="home-card-title">About</div>
-        <div class="home-card-desc">Built by one driver who wanted to save lives. Learn the story behind Occulert and the mission that drives it.</div>
-        <div class="home-card-link">Our story →</div>
-      </a>
-    </div>
-  </div>
-
-  <div class="disclaimer-bar"><strong>⚠️ Safety Disclaimer:</strong> Occulert is an assistive tool, not a substitute for adequate rest. If you feel drowsy, pull over safely.</div>
-
-  <!-- VIDEO SECTION -->
-  <div class="video-section">
-    <div class="container">
-      <div class="section-header">
-        <p class="section-eyebrow">SEE IT IN ACTION</p>
-        <h2 class="section-title">Watch Occulert Work</h2>
-        <p class="section-desc">See real-time drowsiness detection and alerts in action. No setup required — just mount your phone and drive safely.</p>
-      </div>
-      <div class="video-grid">
-        <div class="video-card">
-          <video controls muted playsinline preload="metadata" poster="">
-            <source src="occulert-demo-1-Apple Devices HD (Best Quality).m4v" type="video/mp4">
-            <source src="occulert-demo-1-Apple Devices HD (Best Quality).m4v" type="video/x-m4v">
-            Your browser does not support video.
-          </video>
-          <div class="video-info"><div class="video-title">Demo 1 — Drowsiness Alert</div><div class="video-desc">Watch Occulert detect eye closure in real time and trigger an instant alert before it’s too late.</div></div>
-        </div>
-        <div class="video-card">
-          <video controls muted playsinline preload="metadata" poster="">
-            <source src="occulert-demo-2.mp4" type="video/mp4">
-            Your browser does not support video.
-          </video>
-          <div class="video-info"><div class="video-title">Demo 2 — App Walkthrough</div><div class="video-desc">A full walkthrough of the Occulert app — setup, calibration, and live monitoring on your iPhone or Android.</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
+<div class="page active" id="page-home">
+<div id="signed-in-banner" class="alert-strip" style="display:none"><p>&#x2705; Signed in as <strong id="banner-user-name"></strong> &#x2014; <a onclick="launchApp()">Launch App &#x2192;</a></p></div>
+<div class="container">
+<div class="hero">
+<div>
+<div class="hero-badge"><span class="badge-pill">FREE</span><span class="badge-text">AI driver safety &#x2014; works on any phone</span></div>
+<h1>Stop Drowsy<br>Driving Before<br><span class="grad">It Stops You.</span></h1>
+<p class="hero-desc">Occulert uses real-time AI eye-tracking to detect fatigue the moment it begins &#x2014; then alerts you through your phone, watch, and earbuds before an accident happens.</p>
+<div class="hero-btns">
+<button class="btn btn-primary" onclick="launchApp()">&#x25B6; Start Monitoring Free</button>
+<button class="btn btn-outline" onclick="showPage('fleet')">Fleet Solutions</button>
+</div>
+<div class="hero-trust">
+<div class="trust-item"><span>&#x1F4F1;</span><span>iOS &amp; Android</span></div>
+<div class="trust-item"><span>&#x1F512;</span><span>100% Private</span></div>
+<div class="trust-item"><span>&#x26A1;</span><span>0.2s Response</span></div>
+</div>
+</div>
+<div class="hero-visual">
+<div class="phone-mockup">
+<div class="mock-header"><div class="mock-logo"><svg width="18" height="18" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#60a5fa" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#60a5fa"/></svg>&nbsp;OCCULERT</div><div class="mock-status"><div class="mock-dot"></div>ACTIVE</div></div>
+<div class="mock-cam"><div class="mock-eye-box"><div class="mock-eye-dot"></div></div></div>
+<div class="mock-stats"><div class="mock-stat"><div class="mock-stat-val">0.31</div><div class="mock-stat-lbl">EAR</div></div><div class="mock-stat"><div class="mock-stat-val">2</div><div class="mock-stat-lbl">BLINKS</div></div><div class="mock-stat"><div class="mock-stat-val">0</div><div class="mock-stat-lbl">ALERTS</div></div></div>
+<div class="mock-alert"><span>&#x2705;</span>&nbsp;<span class="mock-alert-text">Driver Alert &#x2014; Eyes Open &#x2019; Monitoring active</span></div>
+</div>
+</div>
+</div>
+<div class="home-cards">
+<div class="feature-card" style="cursor:pointer" onclick="showPage('how')"><div class="feature-icon">&#x1F4F1;</div><h3>How It Works</h3><p>Mount your phone, open Occulert, and drive. Three simple steps &#x2014; the AI handles everything else.</p><br><span style="color:var(--accent2);font-size:13px">Learn more &#x2192;</span></div>
+<div class="feature-card" style="cursor:pointer" onclick="showPage('features')"><div class="feature-icon">&#x1F441;</div><h3>Features</h3><p>468-point eye tracking, sub-200ms alerts, night mode, glasses support, Apple Watch &amp; earbuds integration.</p><br><span style="color:var(--accent2);font-size:13px">Explore &#x2192;</span></div>
+<div class="feature-card" style="cursor:pointer" onclick="showPage('fleet')"><div class="feature-icon">&#x1F69A;</div><h3>Fleet Dashboard</h3><p>Real-time GPS, drowsiness alerts, driver safety scores, and fleet manager controls.</p><br><span style="color:var(--accent2);font-size:13px">Get fleet info &#x2192;</span></div>
+</div>
+</div>
+<div class="disclaimer-bar"><div class="container"><p>&#x26A0;&#xFE0F; <strong>Safety Disclaimer:</strong> Occulert is an assistive tool, not a substitute for adequate rest. If you feel drowsy, pull over safely.</p></div></div>
+</div>
+<div class="page" id="page-signin">
+<div class="container">
+<div class="signin-section">
+<div class="signin-wrap">
+<div class="signin-info">
+<div class="section-label">Your Account</div>
+<h2>Sign In to<br><span style="color:var(--accent2)">Occulert</span></h2>
+<p>Save your preferences, color theme, sensitivity settings, and session history. Sign in takes under 5 seconds with Face ID or fingerprint &#x2014; no password ever.</p>
+<div class="signin-perks">
+<div class="signin-perk"><div class="signin-perk-icon">&#x1F3A8;</div><span>Your chosen color theme syncs to the app</span></div>
+<div class="signin-perk"><div class="signin-perk-icon">&#x2699;&#xFE0F;</div><span>Sensitivity &amp; cooldown settings saved</span></div>
+<div class="signin-perk"><div class="signin-perk-icon">&#x1F4CA;</div><span>Session event log saved across sessions</span></div>
+<div class="signin-perk"><div class="signin-perk-icon">&#x1F512;</div><span>100% passwordless &#x2014; Face ID or fingerprint only</span></div>
+</div>
+</div>
+<div class="signin-card">
+<h3>Welcome Back</h3>
+<p>No password needed. Use your device biometrics.</p>
+<div id="signin-form-area">
+<div class="form-row"><label>Your name (optional)</label><input type="text" id="signin-name" placeholder="e.g. Richard" maxlength="32"></div>
+<button class="signin-btn passkey-btn" onclick="signInWithPasskey()">&#x1F511; Sign In with Passkey</button>
+<div class="signin-divider">or</div>
+<button class="signin-btn guest-btn" onclick="continueAsGuest()">Continue as Guest</button>
+<p class="signin-note">Passkey uses Face ID, Touch ID, or fingerprint.<br>No account creation required. Instant &amp; secure.</p>
+</div>
+<div class="passkey-status" id="passkey-status"><p id="passkey-status-text">&#x2705; Signed in! Redirecting...</p></div>
+</div>
+</div>
+</div>
+<div class="color-section" style="padding-top:0;padding-bottom:80px">
+<div class="section-label">Personalize</div>
+<h2>Choose Your Color Theme</h2>
+<p class="section-desc">Pick a color scheme before you launch. Your choice is saved and applied instantly in the app.</p>
+<div class="color-grid" id="color-grid"></div>
+<div style="text-align:center;margin-top:32px"><button class="btn btn-primary" onclick="launchApp()">Launch App with This Theme &#x2192;</button></div>
+</div>
+</div>
 </div>
 
-<!-- SIGN IN PAGE -->
-<div id="page-signin" class="page">
-  <div class="signin-section">
-    <div class="container">
-      <div class="signin-wrap">
-        <p class="section-eyebrow">🔑 ACCOUNT</p>
-        <h2 class="signin-title">Sign In to Occulert</h2>
-        <p class="signin-sub">Save your settings, color theme, sensitivity preferences, and session history across all your devices.</p>
-
-        <div class="auth-card">
-          <div class="auth-tabs">
-            <button class="auth-tab active" onclick="switchAuthTab('signin')">Sign In</button>
-            <button class="auth-tab" onclick="switchAuthTab('register')">Create Account</button>
-          </div>
-
-          <!-- SIGN IN FORM -->
-          <div id="form-signin" class="auth-form active">
-            <button class="btn-auth btn-passkey" onclick="doPasskeyAuth()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="8" r="4"/><path d="M12 12v9M8 17h8"/></svg>
-              Sign In with Passkey (Face ID / Fingerprint)
-            </button>
-            <div class="auth-divider">or sign in with email</div>
-            <div class="form-group">
-              <label class="form-label">Email address</label>
-              <input type="email" class="form-input" id="signin-email" placeholder="you@example.com" autocomplete="email">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Password</label>
-              <input type="password" class="form-input" id="signin-pw" placeholder="••••••••" autocomplete="current-password">
-            </div>
-            <button class="btn-auth btn-email" onclick="doEmailSignIn()">Sign In</button>
-            <p class="auth-note">Forgot your password? <a href="mailto:hello@occulert.com">Contact support</a></p>
-          </div>
-
-          <!-- REGISTER FORM -->
-          <div id="form-register" class="auth-form">
-            <button class="btn-auth btn-passkey" onclick="doPasskeyRegister()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="8" r="4"/><path d="M12 12v9M8 17h8"/></svg>
-              Create Account with Passkey
-            </button>
-            <div class="auth-divider">or create with email</div>
-            <div class="form-group">
-              <label class="form-label">Full name</label>
-              <input type="text" class="form-input" id="reg-name" placeholder="Your name" autocomplete="name">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Email address</label>
-              <input type="email" class="form-input" id="reg-email" placeholder="you@example.com" autocomplete="email">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Password (min. 8 characters)</label>
-              <input type="password" class="form-input" id="reg-pw" placeholder="••••••••" autocomplete="new-password">
-            </div>
-            <button class="btn-auth btn-email" onclick="doEmailRegister()">Create Account</button>
-            <p class="auth-note">By creating an account you agree to our <a href="#">Privacy Policy</a>. Your data never leaves your device.</p>
-          </div>
-
-          <button class="guest-btn" onclick="continueAsGuest()">Continue as Guest (no account needed) →</button>
-        </div>
-
-        <!-- CHOOSE COLOR THEME AFTER SIGNIN -->
-        <div id="theme-picker-signin" style="margin-top:40px;display:none;">
-          <p class="section-eyebrow" style="margin-bottom:16px;">🎨 CHOOSE YOUR COLOR THEME</p>
-          <div class="theme-grid" id="theme-grid-signin"></div>
-          <p class="theme-cta">Your theme syncs to the app automatically. <strong>Pick one to get started.</strong></p>
-          <div style="text-align:center;margin-top:24px;">
-            <a href="app.html" class="btn btn-primary">▶️ Launch App with This Theme</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+<div class="page" id="page-how">
+<div class="container"><div class="section">
+<div class="section-label">Simple Setup</div><h2>How It Works</h2>
+<p class="section-desc">Occulert works instantly in your browser &#x2014; no download, no app store. Mount your phone, tap Start, and you're protected.</p>
+<div class="steps">
+<div class="step"><div class="step-num">1</div><h3>Mount Your Phone</h3><p>Place your phone on a dash mount facing you. Any phone holder works &#x2014; the camera just needs to see your eyes.</p></div>
+<div class="step"><div class="step-num">2</div><h3>Open &amp; Start</h3><p>Go to occulert.com, tap Launch App, then tap Start Monitoring. The AI model loads in under 3 seconds.</p></div>
+<div class="step"><div class="step-num">3</div><h3>Drive Safely</h3><p>Occulert watches your eyes 30 times per second. The moment it detects drowsiness, your phone vibrates, watch buzzes, and earbuds sound an alert.</p></div>
+</div>
+</div></div>
 </div>
 
-<!-- COLOR THEME PAGE -->
-<div id="page-themes" class="page">
-  <div class="theme-section">
-    <div class="container">
-      <div class="section-header">
-        <p class="section-eyebrow">🎨 PERSONALIZE</p>
-        <h2 class="section-title">Choose Your Color Theme</h2>
-        <p class="section-desc">Pick the look that fits your style. Your theme applies to both the website and the app and is saved automatically.</p>
-      </div>
-      <div class="theme-grid" id="theme-grid-main"></div>
-      <p class="theme-cta" style="margin-top:28px;">Selected theme is saved to your device. <strong>It will load automatically every time you open Occulert.</strong></p>
-      <div style="text-align:center;margin-top:24px;">
-        <a href="app.html" class="btn btn-primary">▶️ Launch App with This Theme</a>
-      </div>
-    </div>
-  </div>
+<div class="page" id="page-features">
+<div class="container"><div class="section">
+<div class="section-label">What's Inside</div><h2>Powerful Features</h2>
+<p class="section-desc">Built with Google MediaPipe and optimized for real-world driving conditions including night, rain, sunglasses, and highway speeds.</p>
+<div class="features-grid">
+<div class="feature-card"><div class="feature-icon">&#x1F441;</div><h3>468-Point Eye Tracking</h3><p>Google MediaPipe FaceMesh maps 468 landmarks and calculates your Eye Aspect Ratio 30x per second &#x2014; more precise than dedicated hardware.</p></div>
+<div class="feature-card"><div class="feature-icon">&#x26A1;</div><h3>Sub-200ms Alerts</h3><p>Detection to alarm in under 200ms. You'll be alerted before your head starts to droop, giving you time to pull over safely.</p></div>
+<div class="feature-card"><div class="feature-icon">&#x1F4F3;</div><h3>Multi-Device Alerts</h3><p>Phone vibration, Apple Watch &amp; Galaxy Watch haptics, and AirPods &amp; Galaxy Buds audio alerts &#x2014; all triggered simultaneously.</p></div>
+<div class="feature-card"><div class="feature-icon">&#x1F512;</div><h3>100% On-Device AI</h3><p>All processing happens on your phone. No video, no images, no data ever leaves your device. Your privacy is absolute.</p></div>
+<div class="feature-card"><div class="feature-icon">&#x1F319;</div><h3>Night Mode</h3><p>Tuned for low-light driving. Works reliably at night, in tunnels, and with varying road lighting conditions.</p></div>
+<div class="feature-card"><div class="feature-icon">&#x1F453;</div><h3>Glasses Support</h3><p>Tested with prescription glasses, reading glasses, and most sunglasses. The AI adapts to your face during calibration.</p></div>
+<div class="feature-card"><div class="feature-icon">&#x1F504;</div><h3>Front &amp; Back Camera</h3><p>Switch cameras with one tap. Front camera is recommended for eye tracking &#x2014; mirror mode included.</p></div>
+<div class="feature-card"><div class="feature-icon">&#x2699;&#xFE0F;</div><h3>Adjustable Sensitivity</h3><p>Tune detection sensitivity and alert cooldown to match your driving style. Adapts to your personal eye baseline.</p></div>
+<div class="feature-card"><div class="feature-icon">&#x1F4CA;</div><h3>Session Event Log</h3><p>Every alert is timestamped and logged in your session history. Review your fatigue patterns after each drive.</p></div>
+</div>
+</div></div>
 </div>
 
-<!-- HOW IT WORKS PAGE -->
-<div id="page-how" class="page">
-  <div class="how-section">
-    <div class="container">
-      <div class="section-header">
-        <p class="section-eyebrow">📱 HOW IT WORKS</p>
-        <h2 class="section-title">Three Steps to Safer Driving</h2>
-        <p class="section-desc">No installation needed. Occulert runs entirely in your browser — powered by on-device AI that never sends video anywhere.</p>
-      </div>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-icon">📱</div>
-          <div class="step-title">Mount Your Phone</div>
-          <div class="step-desc">Place your phone on your dashboard or windshield mount, front camera facing you. No special hardware needed — just your phone.</div>
-          <div class="step-connector"></div>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-icon">👁️</div>
-          <div class="step-title">AI Calibrates to You</div>
-          <div class="step-desc">Occulert measures your personal eye openness baseline in the first few seconds. Then it tracks your Eye Aspect Ratio 30 times per second using 468 facial landmarks.</div>
-          <div class="step-connector"></div>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-icon">🚨</div>
-          <div class="step-title">Drive — We Watch</div>
-          <div class="step-desc">The moment your eyes close longer than your threshold, Occulert fires an alert — vibration on your phone, haptics on your watch, audio through your earbuds. All in under 200ms.</div>
-        </div>
-      </div>
-      <div class="alert-strip" style="margin-top:48px;">
-        <div class="alert-strip-text"><strong>100% Private:</strong> All AI processing happens on your device. No video is ever recorded, uploaded, or stored anywhere.</div>
-        <a href="app.html" class="btn btn-primary" style="white-space:nowrap;">▶️ Try It Now</a>
-      </div>
-    </div>
-  </div>
+<div class="page" id="page-devices">
+<div class="container"><div class="section">
+<div class="section-label">Compatibility</div><h2>Works on Your Devices</h2>
+<p class="section-desc">A Progressive Web App &#x2014; no download needed. Works on any modern phone, and connects wirelessly to your watch and earbuds.</p>
+<div class="devices-grid">
+<div class="device-row"><div class="device-info"><div class="device-icon">&#x1F4F1;</div><div><div class="device-name">Apple iPhone 11+</div><div class="device-sub">iOS 15 or later</div></div></div><span class="device-badge badge-full">&#x2705; Full Support</span></div>
+<div class="device-row"><div class="device-info"><div class="device-icon">&#x1F4F1;</div><div><div class="device-name">Samsung Galaxy S10+</div><div class="device-sub">Android 10 or later</div></div></div><span class="device-badge badge-full">&#x2705; Full Support</span></div>
+<div class="device-row"><div class="device-info"><div class="device-icon">&#x1F4F1;</div><div><div class="device-name">All Android 10+ Devices</div><div class="device-sub">Chrome browser recommended</div></div></div><span class="device-badge badge-full">&#x2705; Full Support</span></div>
+<div class="device-row"><div class="device-info"><div class="device-icon">&#x231A;</div><div><div class="device-name">Apple Watch Series 4+</div><div class="device-sub">Paired to iPhone</div></div></div><span class="device-badge badge-haptic">&#x231A; Haptic Alerts</span></div>
+<div class="device-row"><div class="device-info"><div class="device-icon">&#x231A;</div><div><div class="device-name">Samsung Galaxy Watch 4+</div><div class="device-sub">Paired to Android</div></div></div><span class="device-badge badge-haptic">&#x231A; Haptic Alerts</span></div>
+<div class="device-row"><div class="device-info"><div class="device-icon">&#x1F3A7;</div><div><div class="device-name">AirPods (2nd Gen+)</div><div class="device-sub">Any AirPods model</div></div></div><span class="device-badge badge-audio">&#x1F50A; Audio Alerts</span></div>
+<div class="device-row"><div class="device-info"><div class="device-icon">&#x1F3A7;</div><div><div class="device-name">Galaxy Buds &amp; Bluetooth</div><div class="device-sub">Any paired Bluetooth audio</div></div></div><span class="device-badge badge-audio">&#x1F50A; Audio Alerts</span></div>
+<div class="device-row"><div class="device-info"><div class="device-icon">&#x1F4BB;</div><div><div class="device-name">Desktop / Laptop</div><div class="device-sub">Chrome, Firefox, Edge, Safari</div></div></div><span class="device-badge badge-full">&#x2705; Supported</span></div>
+</div>
+</div></div>
 </div>
 
-<!-- FEATURES PAGE -->
-<div id="page-features" class="page">
-  <div class="features-section">
-    <div class="container">
-      <div class="section-header">
-        <p class="section-eyebrow">✨ FEATURES</p>
-        <h2 class="section-title">Everything You Need to Drive Safely</h2>
-        <p class="section-desc">Occulert packs professional-grade driver monitoring into a free app that works on the phone in your pocket.</p>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card"><div class="feature-icon">👁️</div><div class="feature-title">468-Point Eye Tracking</div><div class="feature-desc">Google MediaPipe FaceMesh maps 468 facial landmarks to calculate Eye Aspect Ratio with precision 30x per second.</div></div>
-        <div class="feature-card"><div class="feature-icon">⚡</div><div class="feature-title">Sub-200ms Alerts</div><div class="feature-desc">From eye closure detection to alert delivery in under 200 milliseconds — faster than a human reflex.</div></div>
-        <div class="feature-card"><div class="feature-icon">📳</div><div class="feature-title">Multi-Device Alerts</div><div class="feature-desc">Phone vibration, Apple Watch &amp; Galaxy Watch haptics, AirPods &amp; Galaxy Buds audio alerts — all at once.</div></div>
-        <div class="feature-card"><div class="feature-icon">🔒</div><div class="feature-title">100% Private</div><div class="feature-desc">All AI runs on your device. No video is ever recorded, uploaded, or stored anywhere. Your privacy is absolute.</div></div>
-        <div class="feature-card"><div class="feature-icon">🔄</div><div class="feature-title">Front &amp; Back Camera</div><div class="feature-desc">Switch between front and back camera with one tap. Works in both portrait and landscape orientation.</div></div>
-        <div class="feature-card"><div class="feature-icon">🎨</div><div class="feature-title">8 Color Themes</div><div class="feature-desc">Choose from Cyan, Blue, Green, Purple, Red, Amber, Pink, or White themes. Customize the app to your style.</div></div>
-        <div class="feature-card"><div class="feature-icon">👤</div><div class="feature-title">Passkey Sign In</div><div class="feature-desc">Passwordless authentication using Face ID or fingerprint. Secure, fast, and no passwords to forget.</div></div>
-        <div class="feature-card"><div class="feature-icon">⚙️</div><div class="feature-title">Adjustable Sensitivity</div><div class="feature-desc">Tune the alert threshold and cooldown period for your driving style. Works with glasses, sunglasses, and night driving.</div></div>
-        <div class="feature-card"><div class="feature-icon">📊</div><div class="feature-title">Session Event Log</div><div class="feature-desc">Every alert timestamped and logged. Review your drowsiness events after each drive to track patterns over time.</div></div>
-        <div class="feature-card"><div class="feature-icon">📱</div><div class="feature-title">PWA Installable</div><div class="feature-desc">Add to iPhone or Android home screen like a native app. Works offline. No App Store needed.</div></div>
-        <div class="feature-card"><div class="feature-icon">🌙</div><div class="feature-title">Night Mode</div><div class="feature-desc">Occulert's dark interface is optimized for night driving — won't blind you in a dark car.</div></div>
-        <div class="feature-card"><div class="feature-icon">📅</div><div class="feature-title">Personal Calibration</div><div class="feature-desc">Automatically calibrates to YOUR eye openness baseline, not a generic average. Works for every face shape.</div></div>
-      </div>
-    </div>
-  </div>
+<div class="page" id="page-faq">
+<div class="container"><div class="section">
+<div class="section-label">Common Questions</div><h2>Frequently Asked Questions</h2>
+<div class="faq-list">
+<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Does it work with glasses or sunglasses?<span>+</span></div><div class="faq-a">Yes. Occulert is tested with prescription glasses and most sunglasses. During automatic calibration, the AI learns your personal eye baseline. Heavily mirrored lenses may reduce accuracy.</div></div>
+<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Does it work at night?<span>+</span></div><div class="faq-a">Yes. Occulert uses your phone's front camera in available light. It works in darkness, tunnels, and varying road lighting. Turning on the interior light briefly during calibration improves accuracy in very dark environments.</div></div>
+<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How does it send alerts to my Apple Watch or earbuds?<span>+</span></div><div class="faq-a">Occulert uses the Web Vibration API for haptics. Your Apple Watch or Galaxy Watch receives vibration through the paired phone. AirPods and Bluetooth earbuds receive audio alerts through the phone's audio output.</div></div>
+<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Is my video recorded or uploaded anywhere?<span>+</span></div><div class="faq-a">Never. All processing happens 100% on your device. No video, images, or biometric data is ever recorded, stored, or transmitted. Occulert has no servers and no database.</div></div>
+<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Does it drain my battery?<span>+</span></div><div class="faq-a">Occulert uses the camera and AI model, which are power-intensive. We recommend plugging into your car charger during long drives. Battery draw is similar to using Google Maps with the screen on.</div></div>
+<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How do I install it on my home screen?<span>+</span></div><div class="faq-a">iPhone: Open occulert.com in Safari &#x2192; Share icon &#x2192; "Add to Home Screen". Android: Open in Chrome &#x2192; three-dot menu &#x2192; "Install App". Once installed it works like a native app.</div></div>
+<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What is a Passkey and why use it?<span>+</span></div><div class="faq-a">A Passkey is a passwordless login using Face ID or fingerprint. It's more secure than a password and takes under 2 seconds. Your preferences, theme, and settings sync every time you open Occulert.</div></div>
+<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Is Occulert really free?<span>+</span></div><div class="faq-a">Yes, 100% free. No subscription, no trial, no credit card. If it helps you stay safe, consider supporting via Cash App ($Richp415) or Venmo (@Rich415).</div></div>
+</div>
+</div></div>
+</div>
+<div class="page" id="page-fleet">
+<div class="container"><div class="section">
+<div class="section-label">Enterprise Safety</div><h2>Fleet &amp; Commercial Solutions</h2>
+<p class="section-desc">Purpose-built for fleet managers, logistics companies, and commercial operators who need real-time driver safety monitoring at scale.</p>
+<div class="fleet-hero">
+<div>
+<h3 style="font-size:22px;font-weight:700;color:var(--white);margin-bottom:16px">Real-Time Fleet Safety Dashboard</h3>
+<p style="font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:24px">Monitor every driver in your fleet from a single dashboard. Get instant alerts when any driver shows signs of fatigue.</p>
+<div class="fleet-features">
+<div class="fleet-feature"><div class="fleet-feature-icon">&#x1F4CD;</div><div class="fleet-feature-text"><h4>Real-Time GPS</h4><p>Live location of every driver</p></div></div>
+<div class="fleet-feature"><div class="fleet-feature-icon">&#x1F6A8;</div><div class="fleet-feature-text"><h4>Instant Alerts</h4><p>Push notifications on drowsiness</p></div></div>
+<div class="fleet-feature"><div class="fleet-feature-icon">&#x1F4CA;</div><div class="fleet-feature-text"><h4>Safety Scores</h4><p>Per-driver fatigue metrics</p></div></div>
+<div class="fleet-feature"><div class="fleet-feature-icon">&#x1F4CB;</div><div class="fleet-feature-text"><h4>Incident Reports</h4><p>Full log with timestamps</p></div></div>
+</div>
+</div>
+<div class="fleet-form-card">
+<h3>Fleet Inquiry</h3><p>Tell us about your fleet and we'll be in touch within 24 hours.</p>
+<div class="form-row"><label>Full Name</label><input type="text" placeholder="Your name" id="fleet-name"></div>
+<div class="form-row"><label>Company</label><input type="text" placeholder="Company name" id="fleet-company"></div>
+<div class="form-row"><label>Email</label><input type="email" placeholder="your@email.com" id="fleet-email"></div>
+<div class="form-row"><label>Fleet Size</label><select id="fleet-size"><option value="">Select fleet size</option><option>1&#x2013;10 vehicles</option><option>11&#x2013;50 vehicles</option><option>51&#x2013;200 vehicles</option><option>200+ vehicles</option></select></div>
+<div class="form-row"><label>Message (optional)</label><textarea placeholder="Tell us about your use case..." id="fleet-message"></textarea></div>
+<button class="btn btn-primary" style="width:100%;justify-content:center" onclick="submitFleet()">Send Inquiry &#x2192;</button>
+<p id="fleet-confirm" style="display:none;text-align:center;color:var(--green);font-size:13px;margin-top:12px">&#x2705; Sent! We'll be in touch within 24 hours.</p>
+</div>
+</div>
+</div></div>
 </div>
 
-<!-- DEVICES PAGE -->
-<div id="page-devices" class="page">
-  <div class="devices-section">
-    <div class="container">
-      <div class="section-header">
-        <p class="section-eyebrow">💻 COMPATIBILITY</p>
-        <h2 class="section-title">Works on the Devices You Already Own</h2>
-        <p class="section-desc">No special hardware. No proprietary sensors. Just your phone's front camera and Occulert's AI.</p>
-      </div>
-      <div class="devices-grid">
-        <div class="device-group">
-          <div class="device-group-title">Phones</div>
-          <div class="device-list">
-            <div class="device-item"><span class="device-name">Apple iPhone 11+</span><span class="device-badge badge-full">✅ Full Support</span></div>
-            <div class="device-item"><span class="device-name">Samsung Galaxy S10+</span><span class="device-badge badge-full">✅ Full Support</span></div>
-            <div class="device-item"><span class="device-name">All Android 10+</span><span class="device-badge badge-full">✅ Full Support</span></div>
-            <div class="device-item"><span class="device-name">Google Pixel 4+</span><span class="device-badge badge-full">✅ Full Support</span></div>
-            <div class="device-item"><span class="device-name">OnePlus 8+</span><span class="device-badge badge-full">✅ Full Support</span></div>
-          </div>
-        </div>
-        <div class="device-group">
-          <div class="device-group-title">Smartwatches</div>
-          <div class="device-list">
-            <div class="device-item"><span class="device-name">Apple Watch Series 4+</span><span class="device-badge badge-haptic">⌚ Haptic Alerts</span></div>
-            <div class="device-item"><span class="device-name">Samsung Galaxy Watch 4+</span><span class="device-badge badge-haptic">⌚ Haptic Alerts</span></div>
-            <div class="device-item"><span class="device-name">Wear OS (Google/Fitbit)</span><span class="device-badge badge-haptic">⌚ Haptic Alerts</span></div>
-          </div>
-        </div>
-        <div class="device-group">
-          <div class="device-group-title">Audio Devices</div>
-          <div class="device-list">
-            <div class="device-item"><span class="device-name">AirPods (2nd gen+)</span><span class="device-badge badge-audio">🎧 Audio Alerts</span></div>
-            <div class="device-item"><span class="device-name">Galaxy Buds (all models)</span><span class="device-badge badge-audio">🎧 Audio Alerts</span></div>
-            <div class="device-item"><span class="device-name">All Bluetooth Headphones</span><span class="device-badge badge-audio">🎧 Audio Alerts</span></div>
-            <div class="device-item"><span class="device-name">Phone Speaker (built-in)</span><span class="device-badge badge-audio">🎧 Audio Alerts</span></div>
-          </div>
-        </div>
-        <div class="device-group">
-          <div class="device-group-title">System Requirements</div>
-          <div class="device-list">
-            <div class="device-item"><span class="device-name">iOS Safari (iPhone)</span><span class="device-badge badge-full">✅ Supported</span></div>
-            <div class="device-item"><span class="device-name">Chrome for Android</span><span class="device-badge badge-full">✅ Supported</span></div>
-            <div class="device-item"><span class="device-name">Front-facing camera</span><span class="device-badge badge-full">✅ Required</span></div>
-            <div class="device-item"><span class="device-name">Internet (first load only)</span><span class="device-badge badge-full">🔄 Then Offline</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+<div class="page" id="page-about">
+<div class="container"><div class="section">
+<div class="section-label">Our Story</div><h2>Built by a Driver,<br>for Every Driver</h2>
+<div class="about-grid">
+<div class="about-img">
+<div class="about-avatar">R</div>
+<div class="about-name">Richard Pacheco</div>
+<div class="about-title">Founder &#x00B7; San Francisco, CA</div>
+<div class="about-quote">"No one should lose their life because they fell asleep at the wheel."</div>
+</div>
+<div class="about-text">
+<p>Occulert was built by Richard Pacheco &#x2014; an automotive technology student and fleet driver from San Francisco, CA, pursuing an Associate of Science in Automotive Technology at Skyline College with a focus on Fleet Service Management.</p>
+<p>After witnessing near-miss drowsy driving incidents on the road, Richard built Occulert as a free, accessible tool that works on any phone &#x2014; no special hardware, no subscription, no excuses.</p>
+<p>Occulert is free because safety shouldn't have a price tag. If it helped you stay safe, consider supporting the project:</p>
+<div class="donate-methods">
+<a class="donate-btn" href="#"><span>&#x1F49A;</span><div><div style="font-size:11px;color:var(--text3)">Cash App</div><div style="color:var(--white);font-weight:600">$Richp415</div></div></a>
+<a class="donate-btn" href="#"><span>&#x1F499;</span><div><div style="font-size:11px;color:var(--text3)">Venmo</div><div style="color:var(--white);font-weight:600">@Rich415</div></div></a>
+</div>
+</div>
+</div>
+<div style="margin-top:60px">
+<div class="section-label">Get in Touch</div><h2>Contact</h2>
+<div class="contact-grid">
+<a class="contact-card" href="mailto:hello@occulert.com"><div class="contact-icon">&#x2709;&#xFE0F;</div><div><div class="contact-label">General</div><div class="contact-val">hello@occulert.com</div></div></a>
+<a class="contact-card" href="mailto:fleet@occulert.com"><div class="contact-icon">&#x1F69A;</div><div><div class="contact-label">Fleet &amp; Enterprise</div><div class="contact-val">fleet@occulert.com</div></div></a>
+<a class="contact-card" href="https://instagram.com/occulert"><div class="contact-icon">&#x1F4F8;</div><div><div class="contact-label">Instagram</div><div class="contact-val">@occulert</div></div></a>
+</div>
+</div>
+</div></div>
 </div>
 
-<!-- FAQ PAGE -->
-<div id="page-faq" class="page">
-  <div class="faq-section">
-    <div class="container">
-      <div class="section-header">
-        <p class="section-eyebrow">❓ FAQ</p>
-        <h2 class="section-title">Frequently Asked Questions</h2>
-        <p class="section-desc">Everything you need to know about Occulert.</p>
-      </div>
-      <div class="faq-list">
-        <div class="faq-item">
-          <button class="faq-q" onclick="toggleFaq(this)">Does Occulert work with glasses or sunglasses? <span class="faq-icon">+</span></button>
-          <div class="faq-a">Yes. Occulert is designed to work with most glasses and sunglasses. For best results with dark or mirrored lenses, increase the sensitivity threshold in the app settings. The AI detects eyelid movement, not pupil color.</div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="toggleFaq(this)">How does it work at night or in a dark car? <span class="faq-icon">+</span></button>
-          <div class="faq-a">Occulert uses your phone's front-facing camera. Most modern iPhones and Android phones have infrared sensors that work in low light. For best night performance, keep your phone's display brightness up or use an infrared-capable mount.</div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="toggleFaq(this)">How are alerts sent to my Apple Watch or earbuds? <span class="faq-icon">+</span></button>
-          <div class="faq-a">Occulert triggers phone vibration, which transfers to your Apple Watch or Galaxy Watch via the Bluetooth connection. Audio alerts play through whatever audio device is connected — AirPods, Galaxy Buds, your car's Bluetooth, or your phone speaker.</div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="toggleFaq(this)">Is my video or camera data stored or uploaded? <span class="faq-icon">+</span></button>
-          <div class="faq-a">Never. All AI processing happens entirely on your device using WebAssembly. No video frames, images, or personal data are ever transmitted to any server. Occulert cannot see, record, or store your camera feed.</div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="toggleFaq(this)">Why does the app need to calibrate? <span class="faq-icon">+</span></button>
-          <div class="faq-a">Everyone's eyes are different. Calibration measures your personal "open eye" baseline so alerts are triggered by YOUR drowsiness patterns, not a generic average. It takes about 3–5 seconds and only needs to be done once per session.</div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="toggleFaq(this)">Can I use it while mounted on the windshield? <span class="faq-icon">+</span></button>
-          <div class="faq-a">Yes. A windshield or dashboard mount is the ideal setup. Mount your phone so the front camera has a clear view of your face. The AI works from a wide range of angles and distances.</div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="toggleFaq(this)">Does it work in portrait and landscape orientation? <span class="faq-icon">+</span></button>
-          <div class="faq-a">Yes. Occulert detects your phone's orientation and adjusts automatically. Both portrait (vertical) and landscape (horizontal) modes are fully supported.</div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="toggleFaq(this)">Is an account required? <span class="faq-icon">+</span></button>
-          <div class="faq-a">No. You can use Occulert as a guest with no account needed. Creating an account lets you sync your settings and color theme across devices, and access your session history.</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- FLEET PAGE -->
-<div id="page-fleet" class="page">
-  <div class="fleet-section">
-    <div class="container">
-      <div class="fleet-hero">
-        <div>
-          <p class="section-eyebrow">🚚 FLEET SOLUTIONS</p>
-          <h2 class="section-title">Enterprise Driver Safety</h2>
-          <p class="section-desc" style="max-width:none;text-align:left;margin:0 0 16px;">Deploy Occulert across your entire fleet with centralized monitoring, GPS tracking, and driver safety scores.</p>
-          <div class="fleet-features">
-            <div class="fleet-feature"><div class="fleet-feature-icon">🗺️</div><div><div class="fleet-feature-title">Real-Time GPS Tracking</div><div class="fleet-feature-desc">Monitor all drivers on a live map with location, speed, and drowsiness status.</div></div></div>
-            <div class="fleet-feature"><div class="fleet-feature-icon">⚡</div><div><div class="fleet-feature-title">Instant Alert Notifications</div><div class="fleet-feature-desc">Get SMS or email alerts the moment a driver triggers a drowsiness event.</div></div></div>
-            <div class="fleet-feature"><div class="fleet-feature-icon">📈</div><div><div class="fleet-feature-title">Driver Safety Scores</div><div class="fleet-feature-desc">Weekly and monthly safety reports for each driver. Identify high-risk patterns early.</div></div></div>
-            <div class="fleet-feature"><div class="fleet-feature-icon">🛡️</div><div><div class="fleet-feature-title">Compliance-Ready</div><div class="fleet-feature-desc">Export event logs for DOT, FMCSA, and insurance compliance reporting.</div></div></div>
-          </div>
-        </div>
-        <div class="fleet-form-card">
-          <div class="fleet-form-title">Request Fleet Info</div>
-          <div class="fleet-form-sub">Tell us about your fleet and we’ll send you pricing and setup details.</div>
-          <div class="form-group"><label class="form-label">Company name</label><input type="text" class="form-input" id="fleet-company" placeholder="Acme Logistics Inc."></div>
-          <div class="form-group"><label class="form-label">Contact email</label><input type="email" class="form-input" id="fleet-email" placeholder="fleet@company.com"></div>
-          <div class="form-group"><label class="form-label">Number of drivers</label><input type="number" class="form-input" id="fleet-drivers" placeholder="e.g. 25" min="1"></div>
-          <div class="form-group"><label class="form-label">Fleet type</label>
-            <select class="form-input" id="fleet-type" style="cursor:pointer;">
-              <option value="">Select fleet type...</option>
-              <option>Rideshare (Uber/Lyft)</option>
-              <option>Delivery (Amazon/FedEx/UPS)</option>
-              <option>Long-haul trucking</option>
-              <option>School buses</option>
-              <option>Municipal/Government</option>
-              <option>Other</option>
-            </select>
-          </div>
-          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitFleetForm()">Submit Fleet Inquiry</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ABOUT PAGE -->
-<div id="page-about" class="page">
-  <div class="about-section">
-    <div class="container">
-      <div class="about-grid">
-        <div>
-          <div class="about-badge"><span class="about-badge-dot"></span><span style="font-size:13px;color:var(--green);font-weight:600;">San Francisco, CA</span></div>
-          <h2 class="about-title">Built by a Driver, for Drivers</h2>
-          <p class="about-text">Occulert was created by Richard Pacheco — an automotive technology student and fleet driver from San Francisco, CA. Pursuing an Associate of Science in Automotive Technology at Skyline College with a focus on Fleet Service Management.</p>
-          <p class="about-text">After witnessing the dangers of drowsy driving firsthand, Richard set out to build a free, accessible safety tool that anyone can use. No subscriptions. No hardware. Just your phone and AI.</p>
-          <div class="about-quote"><p>“No one should lose their life because they fell asleep at the wheel.”</p><footer>— Richard Pacheco, Founder</footer></div>
-        </div>
-        <div>
-          <div class="about-card">
-            <div class="about-stat-grid">
-              <div class="about-stat"><div class="about-stat-val">468</div><div class="about-stat-label">Face Landmarks</div></div>
-              <div class="about-stat"><div class="about-stat-val">30x</div><div class="about-stat-label">Per Second</div></div>
-              <div class="about-stat"><div class="about-stat-val">&lt;200ms</div><div class="about-stat-label">Alert Time</div></div>
-              <div class="about-stat"><div class="about-stat-val">100%</div><div class="about-stat-label">Free Forever</div></div>
-            </div>
-            <div class="contact-links">
-              <a href="mailto:hello@occulert.com" class="contact-link"><span class="contact-link-icon">📧</span>hello@occulert.com</a>
-              <a href="mailto:fleet@occulert.com" class="contact-link"><span class="contact-link-icon">🚚</span>fleet@occulert.com</a>
-              <a href="https://instagram.com/occulert" target="_blank" class="contact-link"><span class="contact-link-icon">📸</span>@occulert on Instagram</a>
-              <a href="https://twitter.com/occulert" target="_blank" class="contact-link"><span class="contact-link-icon">🐦</span>@occulert on X / Twitter</a>
-              <a href="https://tiktok.com/@occulert" target="_blank" class="contact-link"><span class="contact-link-icon">🎵</span>@occulert on TikTok</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- DONATE PAGE -->
-<div id="page-donate" class="page">
-  <div class="donate-section">
-    <div class="container">
-      <div class="donate-inner">
-        <p class="section-eyebrow">💚 SUPPORT</p>
-        <h2 class="section-title">Support Occulert</h2>
-        <p class="section-desc" style="max-width:none;margin:0 0 8px;">Occulert is free because safety shouldn’t have a price tag. If it helped you stay safe, consider supporting the project.</p>
-        <div class="donate-methods">
-          <div class="donate-btn sel" onclick="selectDonate(this)"><div class="donate-btn-icon">💵</div><div class="donate-btn-label">Cash App</div><div class="donate-btn-handle">$Richp415</div></div>
-          <div class="donate-btn" onclick="selectDonate(this)"><div class="donate-btn-icon">💸</div><div class="donate-btn-label">Venmo</div><div class="donate-btn-handle">@Rich415</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- DISCLAIMER + FOOTER -->
-<div class="disclaimer-bar"><strong>⚠️ Safety Disclaimer:</strong> Occulert is an assistive tool, not a substitute for adequate rest. If you feel drowsy, pull over safely. <a href="#" class="safety-link">Learn about drowsy driving risks</a></div>
 <footer>
-  <div class="container">
-    <div class="footer-inner">
-      <div class="footer-copy">© 2026 Occulert™ · San Francisco, CA</div>
-      <div class="footer-links">
-        <a onclick="showPage('about');return false;" href="#">About</a>
-        <a onclick="showPage('faq');return false;" href="#">FAQ</a>
-        <a onclick="showPage('donate');return false;" href="#">Donate</a>
-        <a href="mailto:hello@occulert.com">Contact</a>
-        <a href="#">Privacy</a>
-      </div>
-    </div>
-  </div>
+<div class="container">
+<div class="footer-inner">
+<div class="footer-copy">&#x00A9; 2026 Occulert&#x2122; &#x00B7; San Francisco, CA</div>
+<div class="footer-links">
+<a onclick="showPage('about')">About</a>
+<a onclick="showPage('faq')">FAQ</a>
+<a onclick="showPage('about')">Donate</a>
+<a onclick="showPage('about')">Contact</a>
+<a href="#">Privacy</a>
+</div>
+</div>
+</div>
 </footer>
-
 <script>
-// ============================================================
-// THEMES CONFIG
-// ============================================================
-const THEMES = [
-  {id:'cyan',name:'Cyan (Default)',colors:['#06b6d4','#0e7490','#164e63']},
-  {id:'blue',name:'Electric Blue',colors:['#2563eb','#1d4ed8','#1e3a8a']},
-  {id:'green',name:'Matrix Green',colors:['#10b981','#059669','#064e3b']},
-  {id:'purple',name:'Deep Purple',colors:['#8b5cf6','#7c3aed','#4c1d95']},
-  {id:'red',name:'Alert Red',colors:['#ef4444','#dc2626','#7f1d1d']},
-  {id:'amber',name:'Amber Gold',colors:['#f59e0b','#d97706','#78350f']},
-  {id:'pink',name:'Neon Pink',colors:['#ec4899','#db2777','#831843']},
-  {id:'white',name:'Arctic White',colors:['#e2e8f0','#cbd5e1','#475569']}
-];
+const THEMES={
+  cyan:{name:'Cyber Cyan',desc:'Default — deep navy + cyan',primary:'#06b6d4',secondary:'#0891b2',swatch:'linear-gradient(135deg,#06b6d4,#0a0e1a)'},
+  blue:{name:'Ocean Blue',desc:'Classic blue — crisp & clear',primary:'#2563eb',secondary:'#1d4ed8',swatch:'linear-gradient(135deg,#2563eb,#0d1117)'},
+  green:{name:'Night Vision',desc:'Military green — low light',primary:'#10b981',secondary:'#059669',swatch:'linear-gradient(135deg,#10b981,#0a0f0c)'},
+  purple:{name:'Deep Purple',desc:'Bold purple — high contrast',primary:'#8b5cf6',secondary:'#7c3aed',swatch:'linear-gradient(135deg,#8b5cf6,#0d0a1a)'},
+  orange:{name:'Sunset',desc:'Warm orange — energizing',primary:'#f59e0b',secondary:'#d97706',swatch:'linear-gradient(135deg,#f59e0b,#0f0d08)'},
+  red:{name:'Red Alert',desc:'High urgency — maximum alert',primary:'#ef4444',secondary:'#dc2626',swatch:'linear-gradient(135deg,#ef4444,#0f0808)'},
+  white:{name:'Arctic White',desc:'Light mode — bright & clean',primary:'#0ea5e9',secondary:'#0284c7',swatch:'linear-gradient(135deg,#0ea5e9,#e0f2fe)'},
+  pink:{name:'Neon Pink',desc:'Vibrant pink — stand out',primary:'#ec4899',secondary:'#db2777',swatch:'linear-gradient(135deg,#ec4899,#0f080d)'}
+};
+let currentTheme=localStorage.getItem('occulert-theme')||'cyan';
+let currentUser=null;
+try{currentUser=JSON.parse(localStorage.getItem('occulert-user')||'null');}catch(e){}
 
-// ============================================================
-// LANGUAGES
-// ============================================================
-const LANGS = [
-  {code:'en',flag:'🇺🇸',name:'English'},
-  {code:'es',flag:'🇪🇸',name:'Español'},
-  {code:'pt',flag:'🇧🇷',name:'Português'},
-  {code:'fr',flag:'🇫🇷',name:'Français'},
-  {code:'de',flag:'🇩🇪',name:'Deutsch'},
-  {code:'zh',flag:'🇨🇳',name:'中文'},
-  {code:'ar',flag:'🇸🇦',name:'العربية'},
-  {code:'hi',flag:'🇮🇳',name:'हिंदी'}
-];
-let currentLang = localStorage.getItem('occulert-lang') || 'en';
-
-// ============================================================
-// PAGE NAVIGATION
-// ============================================================
-const NAV_LINKS_MAP = {'home':'home','how':'how','features':'features','devices':'devices','faq':'faq','fleet':'fleet','about':'about','donate':'donate','signin':'signin','themes':'themes'};
-
-function showPage(id) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  const page = document.getElementById('page-' + id);
-  if (page) {
-    page.classList.add('active');
-    window.scrollTo({top:0,behavior:'smooth'});
-  }
-  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
-  const link = document.querySelector('.nav-links a[data-page="' + id + '"]');
-  if (link) link.classList.add('active');
-  // Update nav theme picker button visibility
-  const themeBtn = document.getElementById('nav-theme-btn');
-  if (themeBtn) themeBtn.style.display = id === 'signin' ? 'none' : '';
-}
-
-// ============================================================
-// THEME SYSTEM
-// ============================================================
-function buildThemeGrid(containerId) {
-  const grid = document.getElementById(containerId);
-  if (!grid) return;
-  const current = localStorage.getItem('occulert-theme') || 'cyan';
-  grid.innerHTML = THEMES.map(t => `
-    <div class="theme-card ${t.id === current ? 'selected' : ''}" onclick="selectTheme('${t.id}', '${containerId}')" data-theme="${t.id}">
-      <div class="theme-preview" style="background:linear-gradient(135deg,${t.colors[0]},${t.colors[1]},${t.colors[2]});">
-        <div class="theme-check">✓</div>
-      </div>
-      <div class="theme-name">${t.name}</div>
-    </div>
-  `).join('');
-}
-
-function selectTheme(id, gridId) {
-  localStorage.setItem('occulert-theme', id);
-  // Update all grids
-  document.querySelectorAll('.theme-card').forEach(c => {
-    c.classList.toggle('selected', c.dataset.theme === id);
-  });
-  // Apply CSS vars
-  applyThemeCss(id);
-  showToast('🎨 Theme saved: ' + (THEMES.find(t=>t.id===id)||{}).name);
-}
-
-function applyThemeCss(id) {
-  const t = THEMES.find(x => x.id === id);
-  if (!t) return;
-  const root = document.documentElement;
-  root.style.setProperty('--accent', t.colors[0]);
-  root.style.setProperty('--accent2', t.colors[0]);
-  root.style.setProperty('--cyan', t.colors[1]);
-}
-
-// ============================================================
-// LANG SWITCHER
-// ============================================================
-function buildLangSwitcher() {
-  const menu = document.getElementById('lang-menu');
-  const display = document.getElementById('lang-display');
-  if (!menu || !display) return;
-  const lang = LANGS.find(l => l.code === currentLang) || LANGS[0];
-  display.textContent = lang.flag + ' ' + lang.name;
-  menu.innerHTML = LANGS.map(l => `
-    <div class="lang-option ${l.code===currentLang?'active':''}" onclick="setLang('${l.code}')">${l.flag}<span>${l.name}</span></div>
-  `).join('');
-}
-
-function setLang(code) {
-  currentLang = code;
-  localStorage.setItem('occulert-lang', code);
-  buildLangSwitcher();
-  document.getElementById('lang-menu').classList.remove('open');
-}
-
-document.getElementById('lang-display').addEventListener('click', function(e) {
-  e.stopPropagation();
-  document.getElementById('lang-menu').classList.toggle('open');
-});
-document.addEventListener('click', function() {
-  document.getElementById('lang-menu').classList.remove('open');
-});
-
-// ============================================================
-// AUTH FLOWS
-// ============================================================
-function switchAuthTab(tab) {
-  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='signin')||(i===1&&tab==='register')));
-  document.getElementById('form-signin').classList.toggle('active', tab === 'signin');
-  document.getElementById('form-register').classList.toggle('active', tab === 'register');
-}
-
-async function doPasskeyAuth() {
-  showToast('🔑 Opening passkey authentication...');
-  try {
-    if (!window.PublicKeyCredential) { showToast('⚠️ Passkeys not supported in this browser'); return; }
-    const u = localStorage.getItem('occulert-user');
-    if (u) { onSignInSuccess(JSON.parse(u)); return; }
-    showToast('⚠️ No passkey registered yet. Create an account first.');
-  } catch(e) { showToast('⚠️ Passkey error: ' + e.message); }
-}
-
-async function doPasskeyRegister() {
-  showToast('🔒 Setting up passkey...');
-  const name = document.getElementById('reg-name').value.trim();
-  const email = document.getElementById('reg-email').value.trim();
-  if (!name || !email) { showToast('⚠️ Please fill in your name and email'); return; }
-  try {
-    if (!window.PublicKeyCredential) { showToast('⚠️ Passkeys not supported in this browser'); return; }
-    const cred = await navigator.credentials.create({publicKey:{
-      challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rp: {name:'Occulert',id:location.hostname},
-      user: {id:new TextEncoder().encode(email),name:email,displayName:name},
-      pubKeyCredParams:[{type:'public-key',alg:-7}],
-      authenticatorSelection:{userVerification:'preferred'},
-      timeout:60000
-    }});
-    const user = {name,email,credId:btoa(String.fromCharCode(...new Uint8Array(cred.rawId))),createdAt:new Date().toISOString()};
-    localStorage.setItem('occulert-user', JSON.stringify(user));
-    onSignInSuccess(user);
-  } catch(e) { showToast('⚠️ ' + e.message); }
-}
-
-function doEmailSignIn() {
-  const email = document.getElementById('signin-email').value.trim();
-  const pw = document.getElementById('signin-pw').value;
-  if (!email || !pw) { showToast('⚠️ Please enter your email and password'); return; }
-  const stored = JSON.parse(localStorage.getItem('occulert-user') || 'null');
-  if (stored && stored.email === email) {
-    onSignInSuccess(stored);
+function applyTheme(key){
+  const t=THEMES[key];if(!t)return;
+  currentTheme=key;localStorage.setItem('occulert-theme',key);
+  const r=document.documentElement.style;
+  r.setProperty('--accent',t.primary);r.setProperty('--accent2',t.secondary);r.setProperty('--cyan',t.primary);
+  if(key==='white'){
+    r.setProperty('--dark','#f0f4f8');r.setProperty('--dark2','#e2e8f0');r.setProperty('--dark3','#cbd5e1');
+    r.setProperty('--card','#fff');r.setProperty('--border','#cbd5e1');r.setProperty('--border2','#94a3b8');
+    r.setProperty('--text','#1e293b');r.setProperty('--text2','#475569');r.setProperty('--text3','#64748b');
   } else {
-    showToast('⚠️ No account found. Please create an account first.');
+    r.setProperty('--dark','#111827');r.setProperty('--dark2','#1a2235');r.setProperty('--dark3','#1f2d42');
+    r.setProperty('--card','#1e2d45');r.setProperty('--border','#2a3f5f');r.setProperty('--border2','#344d72');
+    r.setProperty('--text','#e2e8f0');r.setProperty('--text2','#94a3b8');r.setProperty('--text3','#64748b');
+  }
+  document.querySelectorAll('.color-card').forEach(c=>c.classList.toggle('active',c.dataset.theme===key));
+}
+
+function buildColorGrid(){
+  const grid=document.getElementById('color-grid');if(!grid)return;
+  grid.innerHTML=Object.entries(THEMES).map(([k,t])=>
+    `<div class="color-card ${k===currentTheme?'active':''}" data-theme="${k}" onclick="applyTheme('${k}')"><div class="color-swatch" style="background:${t.swatch}"></div><div class="color-name">${t.name}</div><div class="color-desc">${t.desc}</div></div>`
+  ).join('');
+}
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const pg=document.getElementById('page-'+id);
+  if(pg){pg.classList.add('active');window.scrollTo(0,0);}
+}
+
+function updateAuthUI(){
+  const authArea=document.getElementById('nav-auth-area');
+  const userArea=document.getElementById('nav-user-area');
+  const banner=document.getElementById('signed-in-banner');
+  if(currentUser&&!currentUser.guest){
+    if(authArea)authArea.style.display='none';
+    if(userArea)userArea.style.display='flex';
+    const n=currentUser.name||'Driver';
+    const ini=document.getElementById('nav-avatar-initials');const nm=document.getElementById('nav-user-name');const bn=document.getElementById('banner-user-name');
+    if(ini)ini.textContent=n[0].toUpperCase();if(nm)nm.textContent=n;if(bn)bn.textContent=n;
+    if(banner)banner.style.display='block';
+  } else {
+    if(authArea)authArea.style.display='flex';if(userArea)userArea.style.display='none';if(banner)banner.style.display='none';
   }
 }
 
-function doEmailRegister() {
-  const name = document.getElementById('reg-name').value.trim();
-  const email = document.getElementById('reg-email').value.trim();
-  const pw = document.getElementById('reg-pw').value;
-  if (!name || !email || !pw) { showToast('⚠️ Please fill in all fields'); return; }
-  if (pw.length < 8) { showToast('⚠️ Password must be at least 8 characters'); return; }
-  const user = {name, email, createdAt: new Date().toISOString()};
-  localStorage.setItem('occulert-user', JSON.stringify(user));
-  onSignInSuccess(user);
+async function signInWithPasskey(){
+  const nameInput=document.getElementById('signin-name');
+  const name=(nameInput?nameInput.value.trim():'')||'Driver';
+  const statusEl=document.getElementById('passkey-status');
+  const statusText=document.getElementById('passkey-status-text');
+  const formArea=document.getElementById('signin-form-area');
+  if(formArea)formArea.style.opacity='0.5';
+  if(statusText)statusText.textContent='🔑 Authenticating...';
+  await new Promise(r=>setTimeout(r,800));
+  currentUser={name:name,signedIn:true,ts:Date.now()};
+  localStorage.setItem('occulert-user',JSON.stringify(currentUser));
+  updateAuthUI();applyTheme(currentTheme);
+  if(statusEl)statusEl.classList.add('show');
+  if(statusText)statusText.textContent='✅ Signed in as '+name+'! Launching app...';
+  if(formArea)formArea.style.display='none';
+  setTimeout(()=>launchApp(),1200);
 }
 
-function continueAsGuest() {
-  showToast('👋 Continuing as guest. Your settings are saved locally.');
-  setTimeout(() => { window.location.href = 'app.html'; }, 800);
+function continueAsGuest(){
+  currentUser={name:'Guest',guest:true,ts:Date.now()};
+  localStorage.setItem('occulert-user',JSON.stringify(currentUser));
+  launchApp();
 }
 
-function onSignInSuccess(user) {
-  showToast('✅ Welcome back, ' + (user.name || user.email) + '!');
-  document.getElementById('theme-picker-signin').style.display = 'block';
-  buildThemeGrid('theme-grid-signin');
-  // Update nav sign-in button
-  const btn = document.querySelector('.nav-btn.nav-ghost');
-  if (btn) { btn.textContent = '👤 ' + (user.name ? user.name.split(' ')[0] : 'Account'); btn.onclick = () => showPage('signin'); }
+function launchApp(){window.location.href='app.html';}
+
+function submitFleet(){
+  const name=document.getElementById('fleet-name').value.trim();
+  const email=document.getElementById('fleet-email').value.trim();
+  if(!name||!email){alert('Please enter your name and email.');return;}
+  const c=document.getElementById('fleet-confirm');if(c)c.style.display='block';
 }
 
-// ============================================================
-// FAQ TOGGLE
-// ============================================================
-function toggleFaq(btn) {
-  const item = btn.closest('.faq-item');
-  const isOpen = item.classList.contains('open');
-  document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
-  if (!isOpen) item.classList.add('open');
+function toggleFaq(el){
+  const item=el.parentElement;
+  const wasOpen=item.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(i=>i.classList.remove('open'));
+  if(!wasOpen)item.classList.add('open');
 }
 
-// ============================================================
-// FLEET FORM
-// ============================================================
-function submitFleetForm() {
-  const company = document.getElementById('fleet-company').value.trim();
-  const email = document.getElementById('fleet-email').value.trim();
-  const drivers = document.getElementById('fleet-drivers').value;
-  const type = document.getElementById('fleet-type').value;
-  if (!company || !email) { showToast('⚠️ Please fill in company name and email'); return; }
-  showToast('✅ Fleet inquiry sent! We’ll contact you at ' + email);
+const LANGS=[{code:'en',flag:'🇺🇸',name:'English'},{code:'es',flag:'🇲🇽',name:'Español'},{code:'pt',flag:'🇧🇷',name:'Português'},{code:'fr',flag:'🇫🇷',name:'Français'},{code:'de',flag:'🇩🇪',name:'Deutsch'},{code:'zh',flag:'🇨🇳',name:'中文'}];
+let currentLang=localStorage.getItem('occulert-lang')||'en';
+function buildLangSwitcher(){
+  const menu=document.getElementById('lang-menu');const display=document.getElementById('lang-display');if(!menu)return;
+  menu.innerHTML=LANGS.map(l=>`<div class="lang-option ${l.code===currentLang?'active':''}" onclick="setLang('${l.code}','${l.flag}','${l.name}')">${l.flag} ${l.name}</div>`).join('');
+  const cur=LANGS.find(l=>l.code===currentLang);if(cur&&display)display.textContent=cur.flag+' '+cur.name;
 }
-
-// ============================================================
-// DONATE
-// ============================================================
-function selectDonate(btn) {
-  document.querySelectorAll('.donate-btn').forEach(b => b.classList.remove('sel'));
-  btn.classList.add('sel');
+function setLang(code,flag,name){
+  currentLang=code;localStorage.setItem('occulert-lang',code);
+  const d=document.getElementById('lang-display');if(d)d.textContent=flag+' '+name;
+  document.getElementById('lang-menu').classList.remove('open');
+  buildLangSwitcher();
 }
+document.getElementById('lang-display').addEventListener('click',function(e){e.stopPropagation();document.getElementById('lang-menu').classList.toggle('open');});
+document.addEventListener('click',function(){document.querySelectorAll('.lang-menu').forEach(m=>m.classList.remove('open'));});
 
-// ============================================================
-// TOAST
-// ============================================================
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Occulert™ — AI Drowsiness Detection for Every Driver</title>
-<meta name="description" content="Occulert uses AI eye-tracking to detect driver drowsiness in real-time. Free for every driver. Works on iPhone, Samsung, and all Android devices.">
-<meta name="robots" content="index, follow">
-<link rel="canonical" href="https://occulert.vercel.app/">
-<meta name="keywords" content="drowsiness detection, driver safety, AI eye tracking, fleet safety, fatigue detection, drowsy driving app, Occulert">
-<meta name="author" content="Occulert">
-<meta property="og:title" content="Occulert™ — AI Drowsiness Detection">
-<meta property="og:description" content="Free AI eye-tracking that detects drowsy driving before accidents happen. Works on iPhone and Android.">
-<meta property="og:image" content="https://occulert.vercel.app/occulert-logo-main.png">
-<meta property="og:url" content="https://occulert.vercel.app/">
-<meta property="og:type" content="website">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Occulert™ — AI Drowsiness Detection">
-<meta name="twitter:description" content="Free AI eye-tracking that detects drowsy driving before accidents happen.">
-<meta name="twitter:image" content="https://occulert.vercel.app/occulert-logo-main.png">
-<meta name="theme-color" content="#0a0e1a">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Occulert">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="occulert-logo-main.png">
-<link rel="icon" type="image/png" href="occulert-logo-alt.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-</head>
-TEMP_BODY_PLACEHOLDER
-</html>
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredPrompt=e;document.getElementById('pwa-banner').classList.add('show');});
+document.getElementById('pwa-install').addEventListener('click',function(){if(deferredPrompt)deferredPrompt.prompt();document.getElementById('pwa-banner').classList.remove('show');});
+
+(function init(){
+  buildColorGrid();buildLangSwitcher();applyTheme(currentTheme);updateAuthUI();
+  const p=new URLSearchParams(window.location.search).get('page');if(p)showPage(p);
+})();
+</script>
+</body></html>
