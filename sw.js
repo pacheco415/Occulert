@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v3';
+const CACHE = 'occulert-v4';
 const ASSETS = ['/', '/index.html', '/app.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
@@ -25,7 +25,17 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
+  // Cache-first for other assets
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('/')))
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      });
+    })
   );
 });
