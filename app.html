@@ -12,1248 +12,889 @@
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-YCC8W4F0X9"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-YCC8W4F0X9');</script>
-<!-- Preload MediaPipe immediately -->
+<!-- Preload MediaPipe -->
 <script>
 (function preloadMediaPipe(){
   const s1=document.createElement('script');
-  s1.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
-  s1.crossOrigin='anonymous';
-  document.head.appendChild(s1);
+  s1.src='https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
+  s1.crossOrigin='anonymous';document.head.appendChild(s1);
   const s2=document.createElement('script');
-  s2.src='https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
-  s2.crossOrigin='anonymous';
-  document.head.appendChild(s2);
+  s2.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
+  s2.crossOrigin='anonymous';document.head.appendChild(s2);
 })();
 </script>
+</head>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{height:100%;overflow:hidden;}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 :root{
-  --accent:#00e5ff;--accent2:#00b8d4;--accent-rgb:0,229,255;
-  --bg:#050a0f;--bg2:#0a1118;--bg3:#0f1923;
-  --card:#0d1520;--border:rgba(0,229,255,0.12);--border2:rgba(0,229,255,0.22);
-  --text:#c8d8e8;--text2:#7a9bb5;--text3:#456070;
-  --green:#00ff88;--warn:#ffaa00;--danger:#ff3355;--dim:#334455;
-  --panel-w:320px;
+  --bg:#050a0f;--bg2:#0a1520;--bg3:#0f1e2e;
+  --accent:#00e5ff;--accent2:#00b8cc;--accent-dim:rgba(0,229,255,.12);
+  --dim:#1a3a4a;--dim2:#234560;
+  --green:#00ff88;--warn:#ffaa00;--danger:#ff3344;
+  --text:#c8e8f0;--text2:#7aa8b8;--text3:#4a7a8a;
+  --white:#fff;--font:'Rajdhani',sans-serif;--mono:'Share Tech Mono',monospace;
 }
+html,body{height:100%;overflow:hidden;background:var(--bg);}
+body{display:flex;flex-direction:column;font-family:var(--font);color:var(--text);letter-spacing:.5px;}
 
-/* FONT */
-body{font-family:'Rajdhani',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
-
-/* TOPBAR */
-.topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0;z-index:100;}
+/* TOP BAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:52px;background:var(--bg2);border-bottom:1px solid var(--dim);flex-shrink:0;z-index:100;}
 .topbar-left{display:flex;align-items:center;gap:12px;}
-.back-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(0,229,255,0.06);border:1px solid var(--border);border-radius:7px;color:var(--text2);font-size:13px;font-weight:600;text-decoration:none;letter-spacing:0.5px;transition:all .15s;font-family:'Rajdhani',sans-serif;}
-.back-btn:hover{background:rgba(0,229,255,0.12);color:var(--accent);}
-.topbar-title{font-size:15px;font-weight:700;letter-spacing:3px;color:var(--text2);text-transform:uppercase;}
-.topbar-sub{font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;}
+.home-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg3);border:1px solid var(--dim);border-radius:8px;text-decoration:none;color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:var(--font);}
+.home-btn:hover{border-color:var(--accent2);color:var(--accent);}
+.topbar-title{display:flex;flex-direction:column;}
+.topbar-name{font-size:15px;font-weight:700;color:var(--white);letter-spacing:2px;}
+.topbar-sub{font-size:10px;color:var(--text3);letter-spacing:3px;text-transform:uppercase;}
 .topbar-right{display:flex;align-items:center;gap:8px;}
-.topbar-btn{width:36px;height:36px;background:var(--card);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .15s;position:relative;}
-.topbar-btn:hover{border-color:var(--border2);background:var(--bg3);}
-
-/* STATUS BADGE */
-.status-badge{font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid;letter-spacing:1px;text-transform:uppercase;}
-.status-badge.offline{border-color:var(--dim);color:var(--dim);}
-.status-badge.active{border-color:var(--accent2);color:var(--accent2);box-shadow:0 0 10px rgba(0,229,255,0.2);}
+.topbar-btn{width:38px;height:38px;border-radius:8px;background:var(--bg3);border:1px solid var(--dim);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .15s;position:relative;}
+.topbar-btn:hover{border-color:var(--accent2);background:var(--accent-dim);}
+.status-badge{padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;font-family:var(--mono);letter-spacing:2px;border:1px solid;text-transform:uppercase;}
+.status-badge.online{border-color:var(--green);color:var(--green);box-shadow:0 0 10px rgba(0,255,136,.3);}
+.status-badge.offline{border-color:var(--dim);color:var(--dim2);}
 .status-badge.warning{border-color:var(--warn);color:var(--warn);}
-.status-badge.danger{border-color:var(--danger);color:var(--danger);animation:blink .5s ease-in-out infinite;}
-@keyframes blink{0%,100%{opacity:1;}50%{opacity:.4;}}
+.status-badge.danger{border-color:var(--danger);color:var(--danger);animation:bb .5s ease-in-out infinite;}
+@keyframes bb{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* USER PILL */
+.user-pill{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--bg3);border:1px solid var(--dim);border-radius:8px;font-size:12px;color:var(--text2);cursor:pointer;}
+.user-pill:hover{border-color:var(--accent2);color:var(--accent);}
+.user-avatar{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#000;}
 
 /* MAIN LAYOUT */
-.main-layout{flex:1;display:flex;overflow:hidden;}
-
-/* CAMERA PANEL */
-.camera-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
-
-/* HEADER BAR (inside camera panel) */
-.app-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;}
-.app-logo-area{display:flex;align-items:center;gap:10px;}
-.app-logo-img{width:34px;height:34px;border-radius:8px;}
-.app-logo-text{font-size:18px;font-weight:700;letter-spacing:3px;color:var(--accent);text-transform:uppercase;}
-.app-logo-sub{font-size:9px;letter-spacing:2px;color:var(--text3);}
-.camera-wrap{flex:1;margin:10px 16px 6px;position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--border);}
-.camera-wrap.active-border{border-color:rgba(0,229,255,0.4);box-shadow:0 0 30px rgba(0,229,255,0.1);}
-.camera-wrap.warn-border{border-color:rgba(255,170,0,0.6);box-shadow:0 0 30px rgba(255,170,0,.2);}
-.camera-wrap.danger-border{border-color:var(--danger);box-shadow:0 0 30px rgba(255,51,85,.3);animation:dp .5s ease-in-out infinite;}
-@keyframes dp{0%,100%{box-shadow:0 0 30px rgba(255,51,85,.3);}50%{box-shadow:0 0 60px rgba(255,51,85,.7);}}
-#video{width:100%;height:100%;object-fit:cover;display:block;}
+.app-body{display:flex;flex:1;overflow:hidden;}
+.cam-panel{flex:1;position:relative;background:#000;display:flex;flex-direction:column;}
+.camera-wrap{flex:1;position:relative;overflow:hidden;margin:10px 16px 6px;}
+.camera-wrap.active-border{box-shadow:0 0 0 2px rgba(0,229,255,.4),0 0 30px rgba(0,229,255,.12);}
+.camera-wrap.warn-border{box-shadow:0 0 0 2px rgba(255,170,0,.6),0 0 30px rgba(255,170,0,.22);}
+.camera-wrap.danger-border{box-shadow:0 0 0 2px var(--danger),0 0 30px rgba(255,51,68,.3);animation:dp .5s ease-in-out infinite;}
+@keyframes dp{0%,100%{box-shadow:0 0 0 2px var(--danger),0 0 30px rgba(255,51,68,.3);}50%{box-shadow:0 0 0 3px var(--danger),0 0 60px rgba(255,51,68,.7);}}
+#video{width:100%;height:100%;object-fit:cover;display:block;border-radius:10px;}
 #video.mirror{transform:scaleX(-1);}
-#canvas{position:absolute;top:0;left:0;width:100%;height:100%;}
+#canvas{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:10px;}
 #canvas.mirror{transform:scaleX(-1);}
-.cam-overlay{position:absolute;inset:0;pointer-events:none;}
-
-/* Corner brackets */
+.cam-overlay{position:absolute;inset:0;pointer-events:none;border-radius:10px;}
 .corner{position:absolute;width:18px;height:18px;border-color:var(--accent);border-style:solid;}
 .corner.tl{top:8px;left:8px;border-width:2px 0 0 2px;}
 .corner.tr{top:8px;right:8px;border-width:2px 2px 0 0;}
 .corner.bl{bottom:8px;left:8px;border-width:0 0 2px 2px;}
 .corner.br{bottom:8px;right:8px;border-width:0 2px 2px 0;}
+.cam-status-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;pointer-events:none;}
+.cam-icon{font-size:40px;opacity:.3;}
+.cam-inactive-text{font-size:13px;font-family:var(--mono);color:var(--text3);letter-spacing:3px;text-transform:uppercase;}
+.cam-sub-text{font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:2px;}
+.cam-eye-label{position:absolute;top:12px;right:12px;font-size:11px;font-family:var(--mono);color:var(--text3);letter-spacing:2px;display:flex;align-items:center;gap:6px;}
+.cam-eye-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);}
+.cam-eye-dot.active{background:var(--green);box-shadow:0 0 8px var(--green);}
+.cam-label-side{position:absolute;bottom:12px;right:12px;font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:2px;}
 
-/* Camera labels */
-.cam-label{position:absolute;top:12px;left:50%;transform:translateX(-50%);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--accent2);display:flex;align-items:center;gap:6px;}
-.cam-label::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.5s infinite;}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(0.8);}}
-.cam-side-label{position:absolute;bottom:12px;right:12px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--text3);}
-.cam-inactive-msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
-.cam-inactive-icon{font-size:48px;opacity:.25;}
-.cam-inactive-text{font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:3px;color:var(--text3);}
+/* CAM CONTROLS */
+.cam-controls{display:flex;align-items:center;justify-content:space-between;padding:6px 16px;flex-shrink:0;}
+.flip-btn{display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--bg3);border:1px solid var(--dim);border-radius:8px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--font);transition:all .15s;letter-spacing:1px;}
+.flip-btn:hover{border-color:var(--accent2);color:var(--accent);}
+.model-status{display:flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--text2);}
+.model-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);}
+.model-dot.ready{background:var(--green);box-shadow:0 0 8px var(--green);}
+.model-dot.loading{background:var(--warn);animation:bb .8s infinite;}
 
-/* CALIBRATION OVERLAY */
-.calibration-overlay{position:absolute;inset:0;background:rgba(5,10,15,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:20;backdrop-filter:blur(4px);}
-.calibration-title{font-size:16px;font-weight:700;letter-spacing:3px;color:var(--accent);text-transform:uppercase;}
-.calibration-progress-wrap{width:200px;background:var(--bg3);border-radius:4px;height:6px;overflow:hidden;}
-.calibration-progress{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width .3s ease;}
-.calibration-tip{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:1.5px;text-align:center;max-width:260px;line-height:1.6;}
+/* METRICS */
+.metrics-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:6px 16px;flex-shrink:0;}
+.metric-box{background:var(--bg3);border:1px solid var(--dim);border-radius:8px;padding:10px 12px;text-align:center;}
+.metric-val{font-size:22px;font-weight:700;font-family:var(--mono);color:var(--white);line-height:1;}
+.metric-val.warn{color:var(--warn);}
+.metric-val.danger{color:var(--danger);}
+.metric-lbl{font-size:9px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-top:4px;}
 
-/* CAMERA CONTROLS */
-.camera-controls{padding:0 16px 8px;display:flex;align-items:center;gap:8px;}
-.ctrl-btn{padding:7px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:12px;font-weight:600;letter-spacing:1px;cursor:pointer;font-family:'Rajdhani',sans-serif;transition:all .15s;display:flex;align-items:center;gap:6px;text-transform:uppercase;}
-.ctrl-btn:hover{border-color:var(--border2);color:var(--accent);}
-.ctrl-btn.active{background:rgba(0,229,255,0.08);border-color:var(--accent2);color:var(--accent);}
+/* EAR BAR */
+.ear-bar-wrap{padding:6px 16px;flex-shrink:0;}
+.ear-bar-label{display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:6px;}
+.ear-bar-track{height:6px;background:var(--dim);border-radius:3px;overflow:hidden;}
+.ear-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--danger),var(--warn),var(--green));transition:width .15s ease;}
 
-/* STATS BAR */
-.stats-bar{margin:0 16px 8px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
-.stat-block{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center;}
-.stat-val{font-family:'Share Tech Mono',monospace;font-size:22px;font-weight:700;color:var(--accent2);line-height:1;}
-.stat-label{font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-top:4px;}
-.stat-block.warn-stat .stat-val{color:var(--warn);}
-.stat-block.danger-stat .stat-val{color:var(--danger);}
+/* START BTN */
+.start-wrap{padding:8px 16px 12px;flex-shrink:0;}
+.start-btn{width:100%;padding:16px;background:var(--bg3);border:1px solid var(--dim2);border-radius:10px;font-size:15px;font-weight:700;color:var(--text);cursor:pointer;font-family:var(--font);letter-spacing:2px;text-transform:uppercase;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px;}
+.start-btn.running{background:rgba(255,51,68,.1);border-color:var(--danger);color:var(--danger);}
+.start-btn:not(.running):hover{border-color:var(--accent);background:var(--accent-dim);color:var(--accent);}
 
-/* EYE OPENNESS GAUGE */
-.gauge-wrap{margin:0 16px 8px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
-.gauge-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-.gauge-label{font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;}
-.gauge-val{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text2);}
-.gauge-track{background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;}
-.gauge-fill{height:100%;border-radius:4px;transition:width .1s ease, background .3s;}
+/* SIDEBAR */
+.sidebar{width:300px;flex-shrink:0;background:var(--bg2);border-left:1px solid var(--dim);overflow-y:auto;display:flex;flex-direction:column;gap:0;}
+.sidebar::-webkit-scrollbar{width:4px;}
+.sidebar::-webkit-scrollbar-track{background:transparent;}
+.sidebar::-webkit-scrollbar-thumb{background:var(--dim);}
+.sidebar-section{border-bottom:1px solid var(--dim);padding:16px;}
+.sidebar-title{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--text3);font-family:var(--mono);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.sidebar-title::before{content:'//';opacity:.4;}
 
-/* START BUTTON */
-.start-btn{margin:0 16px 10px;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;color:var(--text2);font-size:14px;font-weight:700;letter-spacing:3px;cursor:pointer;font-family:'Rajdhani',sans-serif;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s;}
-.start-btn:hover{border-color:var(--accent2);color:var(--accent);}
-.start-btn.monitoring{background:rgba(0,229,255,0.06);border-color:var(--accent);color:var(--accent);box-shadow:0 0 20px rgba(0,229,255,.1);}
-.start-btn.monitoring:hover{background:rgba(255,51,85,0.06);border-color:var(--danger);color:var(--danger);}
+/* TOGGLE ROW */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.toggle-row:last-child{margin-bottom:0;}
+.toggle-info h4{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;}
+.toggle-info p{font-size:11px;color:var(--text3);}
+.toggle{width:46px;height:24px;border-radius:12px;background:var(--dim);border:1px solid var(--dim2);cursor:pointer;position:relative;transition:all .2s;flex-shrink:0;}
+.toggle.on{background:rgba(0,229,255,.15);border-color:var(--accent2);}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--text3);transition:all .2s;}
+.toggle.on::after{left:25px;background:var(--accent);}
 
-/* RIGHT PANEL */
-.right-panel{width:var(--panel-w);background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;}
-.panel-section{border-bottom:1px solid var(--border);padding:14px 16px;}
-.panel-title{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:14px;}
-
-/* CONFIG CONTROLS */
-.config-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-.config-row:last-child{margin-bottom:0;}
-.config-info{display:flex;flex-direction:column;}
-.config-name{font-size:13px;font-weight:600;color:var(--text);letter-spacing:.5px;}
-.config-sub{font-size:11px;color:var(--text3);}
-.config-ctrl{display:flex;align-items:center;gap:8px;}
-.num-ctrl{display:flex;align-items:center;gap:6px;}
-.num-btn{width:26px;height:26px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:'Rajdhani',sans-serif;line-height:1;}
-.num-btn:hover{border-color:var(--border2);color:var(--accent);}
-.num-val{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text);min-width:36px;text-align:center;}
-
-/* TOGGLE */
-.toggle{width:42px;height:22px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;cursor:pointer;position:relative;transition:all .2s;}
-.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--text3);transition:all .2s;}
-.toggle.on{background:rgba(0,229,255,0.15);border-color:var(--accent2);}
-.toggle.on::after{left:calc(100% - 18px);background:var(--accent);}
+/* COUNTER ROW */
+.counter-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.counter-row:last-child{margin-bottom:0;}
+.counter-info h4{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;}
+.counter-info p{font-size:11px;color:var(--text3);}
+.counter{display:flex;align-items:center;gap:8px;}
+.counter-btn{width:28px;height:28px;border-radius:6px;background:var(--bg3);border:1px solid var(--dim2);color:var(--text2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:var(--mono);}
+.counter-btn:hover{border-color:var(--accent2);color:var(--accent);}
+.counter-val{font-size:16px;font-weight:700;font-family:var(--mono);color:var(--white);min-width:40px;text-align:center;}
 
 /* BLUETOOTH */
-.bt-device{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.bt-device:last-child{margin-bottom:0;}
+.bt-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.bt-row:last-child{margin-bottom:0;}
 .bt-info{display:flex;align-items:center;gap:8px;}
 .bt-icon{font-size:18px;}
-.bt-name{font-size:12px;font-weight:600;color:var(--text);}
-.bt-status{font-size:10px;color:var(--text3);}
-.bt-btn{padding:4px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--text3);cursor:pointer;font-family:'Share Tech Mono',monospace;transition:all .15s;text-transform:uppercase;}
-.bt-btn:hover{border-color:var(--accent2);color:var(--accent);}
-.bt-btn.connected{border-color:var(--green);color:var(--green);}
+.bt-name{font-size:13px;font-weight:600;color:var(--text);}
+.bt-sub{font-size:11px;color:var(--text3);margin-top:1px;}
+.bt-pair-btn{padding:5px 12px;background:var(--bg3);border:1px solid var(--dim2);border-radius:6px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--mono);letter-spacing:1px;transition:all .15s;}
+.bt-pair-btn:hover{border-color:var(--accent2);color:var(--accent);}
+.bt-pair-btn.connected{border-color:var(--green);color:var(--green);}
 
 /* EVENT LOG */
-.event-log{flex:1;overflow-y:auto;min-height:80px;max-height:220px;}
-.event-item{padding:8px 0;border-bottom:1px solid rgba(0,229,255,0.05);display:flex;align-items:flex-start;gap:8px;font-size:12px;}
-.event-item:last-child{border-bottom:none;}
-.event-icon{font-size:13px;flex-shrink:0;margin-top:1px;}
-.event-time{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text3);flex-shrink:0;margin-top:2px;}
-.event-msg{color:var(--text2);line-height:1.4;}
-.event-empty{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:2px;text-align:center;padding:20px 0;}
+.event-log{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;}
+.event-log::-webkit-scrollbar{width:3px;}
+.event-log::-webkit-scrollbar-thumb{background:var(--dim);}
+.event-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;}
+.event-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+.event-text{color:var(--text2);line-height:1.4;}
+.event-time{color:var(--text3);font-size:10px;font-family:var(--mono);}
+.log-empty{font-size:12px;color:var(--text3);font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;}
 
-/* THEME PICKER (in-app) */
-.theme-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
-.theme-dot{width:100%;aspect-ratio:1;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:all .15s;position:relative;}
-.theme-dot.active{border-color:#fff;box-shadow:0 0 0 1px #fff;}
-.theme-dot-check{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;display:none;}
-.theme-dot.active .theme-dot-check{display:flex;}
+/* CALIB OVERLAY */
+.calib-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);z-index:800;align-items:center;justify-content:center;}
+.calib-overlay.show{display:flex;}
+.calib-box{background:var(--bg2);border:1px solid var(--dim2);border-radius:16px;padding:32px;max-width:360px;width:90%;text-align:center;}
+.calib-title{font-size:20px;font-weight:700;color:var(--white);letter-spacing:2px;margin-bottom:8px;}
+.calib-sub{font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.6;}
+.calib-progress{height:4px;background:var(--dim);border-radius:2px;overflow:hidden;margin-bottom:16px;}
+.calib-fill{height:100%;background:var(--accent);transition:width .2s ease;width:0%;}
+.calib-status{font-size:13px;font-family:var(--mono);color:var(--text2);margin-bottom:16px;}
+.calib-face{font-size:48px;animation:facePulse 1s ease-in-out infinite;}
+@keyframes facePulse{0%,100%{transform:scale(1);}50%{transform:scale(1.05);}}
 
-/* MODALS */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);display:none;}
-.modal-overlay.open{display:flex;}
-.modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:360px;width:calc(100% - 32px);max-height:80vh;overflow-y:auto;}
-.modal-title{font-size:16px;font-weight:700;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:6px;}
-.modal-sub{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.5;}
-.modal-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;width:28px;height:28px;border-radius:6px;}
-.modal-close:hover{background:var(--bg3);color:var(--text);}
-.modal-relative{position:relative;}
-.modal-input{width:100%;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;margin-bottom:12px;outline:none;transition:border-color .15s;}
-.modal-input:focus{border-color:var(--accent2);}
-.modal-btn{width:100%;padding:12px;background:var(--accent);border:none;border-radius:8px;color:#000;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:'Rajdhani',sans-serif;text-transform:uppercase;transition:all .15s;margin-bottom:8px;}
-.modal-btn:hover{background:var(--accent2);box-shadow:0 4px 20px rgba(0,229,255,.3);}
-.modal-btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2);}
-.modal-btn-ghost:hover{border-color:var(--border2);background:var(--bg3);color:var(--text);}
-.modal-note{font-size:11px;color:var(--text3);text-align:center;line-height:1.5;}
-.modal-divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--text3);font-size:11px;}
-.modal-divider::before,.modal-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+/* ALERT OVERLAY */
+.alert-overlay{display:none;position:fixed;inset:0;background:rgba(255,51,68,.12);z-index:700;pointer-events:none;align-items:center;justify-content:center;animation:alertFlash .4s ease;}
+.alert-overlay.show{display:flex;}
+@keyframes alertFlash{0%{opacity:0;}50%{opacity:1;}100%{opacity:0;}}
+.alert-msg{text-align:center;}
+.alert-icon{font-size:64px;}
+.alert-text{font-size:28px;font-weight:700;color:var(--white);font-family:var(--font);letter-spacing:3px;text-shadow:0 0 20px var(--danger);}
 
-/* ALERT FLASH */
-.alert-flash{position:fixed;inset:0;pointer-events:none;z-index:300;opacity:0;background:rgba(255,51,85,0.08);border:3px solid rgba(255,51,85,0.6);border-radius:0;transition:opacity .15s;}
-.alert-flash.show{opacity:1;}
+/* THEME PANEL */
+.theme-panel{display:none;position:fixed;top:60px;right:16px;background:var(--bg2);border:1px solid var(--dim2);border-radius:12px;padding:16px;z-index:500;min-width:200px;box-shadow:0 16px 48px rgba(0,0,0,.6);}
+.theme-panel.show{display:block;}
+.theme-panel h4{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--text3);font-family:var(--mono);margin-bottom:12px;}
+.theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.theme-chip{padding:8px 10px;background:var(--bg3);border:1px solid var(--dim);border-radius:8px;cursor:pointer;text-align:center;transition:all .15s;}
+.theme-chip:hover{border-color:var(--accent2);}
+.theme-chip.active{border-color:var(--accent);}
+.theme-swatch{width:100%;height:24px;border-radius:4px;margin-bottom:6px;}
+.theme-chip-name{font-size:11px;color:var(--text2);}
+
+/* LANG PANEL */
+.lang-panel{display:none;position:absolute;top:100%;right:0;background:var(--bg2);border:1px solid var(--dim2);border-radius:10px;overflow:hidden;min-width:150px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:600;margin-top:4px;}
+.lang-panel.show{display:block;}
+.lang-opt{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:13px;color:var(--text2);cursor:pointer;font-family:var(--font);}
+.lang-opt:hover{background:var(--accent-dim);color:var(--accent);}
+.lang-opt.active{color:var(--accent);}
+.lang-wrap{position:relative;}
+.lang-btn{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg3);border:1px solid var(--dim);border-radius:8px;font-size:12px;color:var(--text2);cursor:pointer;font-family:var(--font);}
+.lang-btn:hover{border-color:var(--accent2);color:var(--accent);}
 
 /* TOAST */
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:10px 18px;font-size:13px;color:var(--text);opacity:0;transition:all .3s;z-index:400;white-space:nowrap;pointer-events:none;font-family:'Rajdhani',sans-serif;letter-spacing:.5px;}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--dim2);border-radius:10px;padding:10px 18px;font-size:13px;font-family:var(--mono);color:var(--text);z-index:900;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;}
 
-/* LANG SWITCHER */
-.lang-menu{position:absolute;top:calc(100% + 6px);right:0;background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:150px;box-shadow:0 16px 48px rgba(0,0,0,.6);z-index:150;display:none;}
-.lang-menu.open{display:block;}
-.lang-opt{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:13px;color:var(--text2);cursor:pointer;transition:background .15s;font-family:'Rajdhani',sans-serif;}
-.lang-opt:hover{background:rgba(255,255,255,.04);color:var(--text);}
-.lang-opt.active{color:var(--accent);}
-
-/* ACCOUNT PANEL */
-.account-info{display:flex;flex-direction:column;gap:6px;}
-.account-name{font-size:14px;font-weight:700;color:var(--text);}
-.account-email{font-size:11px;color:var(--text3);}
-.account-actions{display:flex;gap:8px;margin-top:10px;}
-.account-btn{flex:1;padding:7px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;font-family:'Rajdhani',sans-serif;text-align:center;letter-spacing:1px;text-transform:uppercase;transition:all .15s;}
-.account-btn:hover{border-color:var(--border2);color:var(--text);}
-
-/* MOBILE */
-@media(max-width:640px){
-  :root{--panel-w:100%;}
-  .main-layout{flex-direction:column;}
-  .right-panel{width:100%;border-left:none;border-top:1px solid var(--border);max-height:50vh;}
-  .topbar-title{display:none;}
-  .camera-wrap{margin:8px 12px 6px;}
-  .stats-bar{margin:0 12px 6px;}
-  .gauge-wrap{margin:0 12px 6px;}
-  .start-btn{margin:0 12px 8px;}
-  .camera-controls{padding:0 12px 6px;}
+/* RESPONSIVE */
+@media(max-width:768px){
+  .sidebar{display:none;}
+  .topbar{padding:0 12px;}
+  .cam-controls,.metrics-bar,.start-wrap,.ear-bar-wrap{padding-left:12px;padding-right:12px;}
 }
 </style>
-</head>
 <body>
+<!-- Calibration Overlay -->
+<div class="calib-overlay" id="calib-overlay">
+<div class="calib-box">
+<div class="calib-face" id="calib-face">&#x1F440;</div>
+<div class="calib-title">CALIBRATING</div>
+<div class="calib-sub" id="calib-sub">Keep your eyes open and look straight at the camera. Hold still for 3 seconds.</div>
+<div class="calib-progress"><div class="calib-fill" id="calib-fill"></div></div>
+<div class="calib-status" id="calib-status">Collecting baseline...</div>
+</div>
+</div>
 
-<!-- ALERT FLASH -->
-<div class="alert-flash" id="alert-flash"></div>
+<!-- Alert Overlay -->
+<div class="alert-overlay" id="alert-overlay">
+<div class="alert-msg"><div class="alert-icon">&#x26A0;&#xFE0F;</div><div class="alert-text">DROWSINESS ALERT</div></div>
+</div>
 
-<!-- TOAST -->
+<!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<!-- LANG MENU MODAL -->
-<div id="lang-menu" class="lang-menu"></div>
-
-<!-- ACCOUNT MODAL -->
-<div class="modal-overlay" id="modal-account">
-  <div class="modal modal-relative">
-    <button class="modal-close" onclick="closeModal('modal-account')">&times;</button>
-    <div id="account-logged-out">
-      <div class="modal-title">🔑 Sign In</div>
-      <div class="modal-sub">Sign in to sync your settings and view session history across all devices.</div>
-      <button class="modal-btn" onclick="doPasskeyAuth()">🔑 Sign In with Passkey</button>
-      <div class="modal-divider">or</div>
-      <input type="email" class="modal-input" id="app-signin-email" placeholder="Email address" autocomplete="email">
-      <input type="password" class="modal-input" id="app-signin-pw" placeholder="Password" autocomplete="current-password">
-      <button class="modal-btn modal-btn-ghost" onclick="doEmailSignIn()">Sign In with Email</button>
-      <p class="modal-note">No account? <a href="index.html#signin" style="color:var(--accent);">Create one on the main site</a>.</p>
-    </div>
-    <div id="account-logged-in" style="display:none;">
-      <div class="modal-title">👤 Account</div>
-      <div class="account-info">
-        <div class="account-name" id="acct-name">--</div>
-        <div class="account-email" id="acct-email">--</div>
-      </div>
-      <div class="account-actions">
-        <button class="account-btn" onclick="viewSessionHistory()">Session History</button>
-        <button class="account-btn" onclick="signOut()">Sign Out</button>
-      </div>
-    </div>
-  </div>
+<!-- Theme Panel -->
+<div class="theme-panel" id="theme-panel">
+<h4>Color Theme</h4>
+<div class="theme-grid" id="theme-grid"></div>
 </div>
 
-<!-- THEME MODAL -->
-<div class="modal-overlay" id="modal-theme">
-  <div class="modal modal-relative">
-    <button class="modal-close" onclick="closeModal('modal-theme')">&times;</button>
-    <div class="modal-title">🎨 Color Theme</div>
-    <div class="modal-sub">Choose your app color scheme. Saved automatically.</div>
-    <div class="theme-row" id="modal-theme-grid"></div>
-    <div style="margin-top:14px;">
-      <div id="modal-theme-labels" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:10px;color:var(--text3);margin-top:4px;font-family:'Share Tech Mono',monospace;letter-spacing:.5px;"></div>
-    </div>
-  </div>
-</div>
-
-<!-- SESSION HISTORY MODAL -->
-<div class="modal-overlay" id="modal-history">
-  <div class="modal modal-relative">
-    <button class="modal-close" onclick="closeModal('modal-history')">&times;</button>
-    <div class="modal-title">📊 Session History</div>
-    <div class="modal-sub">Your recent drowsiness events.</div>
-    <div id="history-list" style="max-height:300px;overflow-y:auto;"></div>
-    <button class="modal-btn modal-btn-ghost" style="margin-top:12px;" onclick="clearHistory()">Clear History</button>
-  </div>
-</div>
-
-<!-- MAIN APP -->
+<!-- Top Bar -->
 <div class="topbar">
-  <div class="topbar-left">
-    <a href="index.html" class="back-btn">← Home</a>
-    <div>
-      <div class="topbar-title">OCCULERT</div>
-      <div class="topbar-sub">AI DROWSINESS DETECTION</div>
-    </div>
-  </div>
-  <div class="topbar-right">
-    <div style="position:relative;">
-      <div class="topbar-btn" id="lang-btn" onclick="toggleLangMenu(this)" title="Language">🇺🇸</div>
-    </div>
-    <div class="topbar-btn" id="theme-btn" onclick="openModal('modal-theme')" title="Color Theme">🎨</div>
-    <div class="topbar-btn" id="account-btn" onclick="openModal('modal-account')" title="Account">👤</div>
-    <div class="status-badge offline" id="status-badge">OFFLINE</div>
-  </div>
+<div class="topbar-left">
+<a href="index.html" class="home-btn">&#x2190; Home</a>
+<div class="topbar-title">
+<div class="topbar-name">OCCULERT</div>
+<div class="topbar-sub">AI Drowsiness Detection</div>
+</div>
+</div>
+<div class="topbar-right">
+<div class="lang-wrap">
+<div class="lang-btn" id="lang-btn" onclick="toggleLangPanel()"><span id="lang-flag">&#x1F1FA;&#x1F1F8;</span>&nbsp;<span id="lang-name">EN</span></div>
+<div class="lang-panel" id="lang-panel"></div>
+</div>
+<div class="topbar-btn" onclick="toggleThemePanel()" title="Color Theme">&#x1F3A8;</div>
+<div class="user-pill" id="user-pill" onclick="window.location.href='index.html?page=signin'">
+<div class="user-avatar" id="user-avatar-initials">?</div>
+<span id="user-name-label">Sign In</span>
+</div>
+<div class="status-badge offline" id="status-badge">OFFLINE</div>
+</div>
 </div>
 
-<div class="main-layout">
-  <!-- CAMERA PANEL -->
-  <div class="camera-panel">
-    <div class="app-header">
-      <div class="app-logo-area">
-        <img src="occulert-logo.png" alt="Occulert" class="app-logo-img" onerror="this.style.display='none'">
-        <div>
-          <div class="app-logo-text">OCCULERT</div>
-          <div class="app-logo-sub">AI DROWSINESS DETECTION</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="camera-wrap" id="camera-wrap">
-      <video id="video" autoplay playsinline muted class="mirror"></video>
-      <canvas id="canvas" class="mirror"></canvas>
-      <div class="cam-overlay">
-        <div class="corner tl"></div>
-        <div class="corner tr"></div>
-        <div class="corner bl"></div>
-        <div class="corner br"></div>
-      </div>
-      <div class="cam-label" id="cam-label" style="display:none;">● EYES</div>
-      <div class="cam-side-label" id="cam-side-label">FRONT</div>
-      <div class="cam-inactive-msg" id="cam-inactive">
-        <div class="cam-inactive-icon">📷</div>
-        <div class="cam-inactive-text">CAMERA INACTIVE</div>
-        <div style="font-size:10px;letter-spacing:2px;color:var(--text3);font-family:'Share Tech Mono',monospace;">TAP START TO BEGIN</div>
-      </div>
-      <!-- Calibration overlay -->
-      <div class="calibration-overlay" id="calibration-overlay" style="display:none;">
-        <div class="calibration-title">CALIBRATING...</div>
-        <div class="calibration-tip">Keep your eyes open naturally.<br>Look straight at the camera.</div>
-        <div class="calibration-progress-wrap">
-          <div class="calibration-progress" id="cal-progress" style="width:0%"></div>
-        </div>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent2);" id="cal-count">0 / 40</div>
-      </div>
-    </div>
-
-    <div class="camera-controls">
-      <button class="ctrl-btn" id="flip-btn" onclick="flipCamera()">🔄 FLIP CAM</button>
-      <button class="ctrl-btn" id="mirror-btn" onclick="toggleMirror()">↔ MIRROR</button>
-      <div style="flex:1;"></div>
-      <div class="cam-side-label" id="face-status" style="position:static;font-size:11px;"></div>
-    </div>
-
-    <div class="stats-bar">
-      <div class="stat-block" id="ear-block"><div class="stat-val" id="ear-display">--</div><div class="stat-label">EAR SCORE</div></div>
-      <div class="stat-block" id="blink-block"><div class="stat-val" id="blink-display">0</div><div class="stat-label">BLINK FRAMES</div></div>
-      <div class="stat-block" id="alert-block"><div class="stat-val" id="alert-display">0</div><div class="stat-label">ALERTS</div></div>
-    </div>
-
-    <div class="gauge-wrap">
-      <div class="gauge-header">
-        <span class="gauge-label">EYE OPENNESS LEVEL</span>
-        <span class="gauge-val" id="gauge-pct">--</span>
-      </div>
-      <div class="gauge-track">
-        <div class="gauge-fill" id="gauge-fill" style="width:0%;background:var(--accent);"></div>
-      </div>
-    </div>
-
-    <button class="start-btn" id="start-btn" onclick="toggleMonitoring()">► START MONITORING</button>
-  </div>
-
-  <!-- RIGHT PANEL -->
-  <div class="right-panel">
-    <!-- CONFIGURATION -->
-    <div class="panel-section">
-      <div class="panel-title">// CONFIGURATION</div>
-      <div class="config-row">
-        <div class="config-info"><div class="config-name">Sensitivity</div><div class="config-sub">Frames before warning</div></div>
-        <div class="num-ctrl">
-          <button class="num-btn" onclick="adjustConfig('sensitivity',-1)">-</button>
-          <span class="num-val" id="val-sensitivity">20</span>
-          <button class="num-btn" onclick="adjustConfig('sensitivity',1)">+</button>
-        </div>
-      </div>
-      <div class="config-row">
-        <div class="config-info"><div class="config-name">Cooldown</div><div class="config-sub">Seconds between alerts</div></div>
-        <div class="num-ctrl">
-          <button class="num-btn" onclick="adjustConfig('cooldown',-5)">-</button>
-          <span class="num-val" id="val-cooldown">30 s</span>
-          <button class="num-btn" onclick="adjustConfig('cooldown',5)">+</button>
-        </div>
-      </div>
-      <div class="config-row">
-        <div class="config-info"><div class="config-name">Vibration</div><div class="config-sub">Phone/watch pulse</div></div>
-        <div class="toggle on" id="tog-vibration" onclick="toggleSetting('vibration')"></div>
-      </div>
-      <div class="config-row">
-        <div class="config-info"><div class="config-name">Sound Alert</div><div class="config-sub">Earbuds/speaker</div></div>
-        <div class="toggle on" id="tog-sound" onclick="toggleSetting('sound')"></div>
-      </div>
-      <div class="config-row">
-        <div class="config-info"><div class="config-name">Mirror Cam</div><div class="config-sub">Flip horizontal</div></div>
-        <div class="toggle on" id="tog-mirror" onclick="toggleSetting('mirror')"></div>
-      </div>
-    </div>
-
-    <!-- BLUETOOTH DEVICES -->
-    <div class="panel-section">
-      <div class="panel-title">// BLUETOOTH DEVICES</div>
-      <div class="bt-device">
-        <div class="bt-info"><span class="bt-icon">🎧</span><div><div class="bt-name">Headphones</div><div class="bt-status" id="bt-headphones-status">Not connected</div></div></div>
-        <button class="bt-btn" id="bt-headphones-btn" onclick="pairBluetooth('headphones')">PAIR</button>
-      </div>
-      <div class="bt-device">
-        <div class="bt-info"><span class="bt-icon">⌚</span><div><div class="bt-name">Smartwatch</div><div class="bt-status" id="bt-watch-status">Via phone vibration</div></div></div>
-        <button class="bt-btn" id="bt-watch-btn" onclick="pairBluetooth('watch')">PAIR</button>
-      </div>
-    </div>
-
-    <!-- THEME (in-panel shortcut) -->
-    <div class="panel-section">
-      <div class="panel-title">// COLOR THEME</div>
-      <div class="theme-row" id="panel-theme-row"></div>
-    </div>
-
-    <!-- EVENT LOG -->
-    <div class="panel-section" style="flex:1;border-bottom:none;">
-      <div class="panel-title">// EVENT LOG</div>
-      <div class="event-log" id="event-log">
-        <div class="event-empty" id="event-empty">NO EVENTS RECORDED</div>
-      </div>
-    </div>
-  </div>
+<!-- App Body -->
+<div class="app-body">
+<div class="cam-panel">
+<div class="camera-wrap" id="camera-wrap">
+<div class="cam-status-overlay" id="cam-status-overlay">
+<div class="cam-icon">&#x1F4F7;</div>
+<div class="cam-inactive-text">Camera Inactive</div>
+<div class="cam-sub-text">Tap Start to Begin</div>
+</div>
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
+<div class="cam-overlay">
+<div class="corner tl"></div><div class="corner tr"></div>
+<div class="corner bl"></div><div class="corner br"></div>
+</div>
+<div class="cam-eye-label"><div class="cam-eye-dot" id="eye-dot"></div><span id="eyes-label">EYES</span></div>
+<div class="cam-label-side" id="cam-side-label">FRONT</div>
 </div>
 
+<div class="cam-controls">
+<button class="flip-btn" onclick="flipCamera()">&#x1F504; FLIP CAM</button>
+<div class="model-status"><div class="model-dot" id="model-dot"></div><span id="model-label">Loading AI Model...</span></div>
+</div>
+
+<div class="metrics-bar">
+<div class="metric-box"><div class="metric-val" id="ear-val">--</div><div class="metric-lbl">EAR Score</div></div>
+<div class="metric-box"><div class="metric-val" id="blink-val">0</div><div class="metric-lbl">Blink Frames</div></div>
+<div class="metric-box"><div class="metric-val" id="alert-val">0</div><div class="metric-lbl">Alerts</div></div>
+</div>
+
+<div class="ear-bar-wrap">
+<div class="ear-bar-label"><span>EYE OPENNESS LEVEL</span><span id="ear-pct">--</span></div>
+<div class="ear-bar-track"><div class="ear-bar-fill" id="ear-bar" style="width:75%"></div></div>
+</div>
+
+<div class="start-wrap">
+<button class="start-btn" id="start-btn" onclick="toggleMonitoring()">&#x25B6; START MONITORING</button>
+</div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar">
+<div class="sidebar-section">
+<div class="sidebar-title">Configuration</div>
+<div class="counter-row">
+<div class="counter-info"><h4>Sensitivity</h4><p>Frames before warning</p></div>
+<div class="counter">
+<button class="counter-btn" onclick="adjustSetting('sensitivity',-1)">&#x2212;</button>
+<div class="counter-val" id="sensitivity-val">20</div>
+<button class="counter-btn" onclick="adjustSetting('sensitivity',1)">+</button>
+</div>
+</div>
+<div class="counter-row">
+<div class="counter-info"><h4>Cooldown</h4><p>Seconds between alerts</p></div>
+<div class="counter">
+<button class="counter-btn" onclick="adjustSetting('cooldown',-5)">&#x2212;</button>
+<div class="counter-val" id="cooldown-val">30s</div>
+<button class="counter-btn" onclick="adjustSetting('cooldown',5)">+</button>
+</div>
+</div>
+<div class="toggle-row">
+<div class="toggle-info"><h4>Vibration</h4><p>Phone/watch pulse</p></div>
+<div class="toggle on" id="toggle-vibration" onclick="toggleSetting('vibration')"></div>
+</div>
+<div class="toggle-row">
+<div class="toggle-info"><h4>Sound Alert</h4><p>Earbuds/speaker</p></div>
+<div class="toggle on" id="toggle-sound" onclick="toggleSetting('sound')"></div>
+</div>
+<div class="toggle-row">
+<div class="toggle-info"><h4>Mirror Cam</h4><p>Flip horizontal</p></div>
+<div class="toggle on" id="toggle-mirror" onclick="toggleSetting('mirror')"></div>
+</div>
+</div>
+
+<div class="sidebar-section">
+<div class="sidebar-title">Bluetooth Devices</div>
+<div class="bt-row">
+<div class="bt-info"><div class="bt-icon">&#x1F3A7;</div><div><div class="bt-name">Headphones</div><div class="bt-sub" id="bt-headphone-status">Not connected</div></div></div>
+<button class="bt-pair-btn" id="bt-headphone-btn" onclick="pairBluetooth('headphone')">PAIR</button>
+</div>
+<div class="bt-row">
+<div class="bt-info"><div class="bt-icon">&#x231A;</div><div><div class="bt-name">Smartwatch</div><div class="bt-sub" id="bt-watch-status">Via phone vibration</div></div></div>
+<button class="bt-pair-btn" id="bt-watch-btn" onclick="pairBluetooth('watch')">PAIR</button>
+</div>
+</div>
+
+<div class="sidebar-section" style="flex:1">
+<div class="sidebar-title">Event Log</div>
+<div class="event-log" id="event-log">
+<div class="log-empty" id="log-empty">No events recorded</div>
+</div>
+</div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 <script>
 // ============================================================
-// THEMES
+// OCCULERT APP.HTML — AI Drowsiness Detection
+// Changes: removed sign-in from app, removed rating modal,
+// theme read from localStorage (set on index.html),
+// improved detection, bug fixes, better UX
 // ============================================================
-const THEMES = [
-  {id:'cyan',  name:'Cyan',    a:'#00e5ff', b:'#00b8d4', c:'#0097a7'},
-  {id:'blue',  name:'Blue',    a:'#2979ff', b:'#1565c0', c:'#0d47a1'},
-  {id:'green', name:'Green',   a:'#00ff88', b:'#00c853', c:'#00701a'},
-  {id:'purple',name:'Purple',  a:'#d500f9', b:'#aa00ff', c:'#7b00bc'},
-  {id:'red',   name:'Red',     a:'#ff3355', b:'#d50000', c:'#9b0000'},
-  {id:'amber', name:'Amber',   a:'#ffab00', b:'#ff6d00', c:'#c43e00'},
-  {id:'pink',  name:'Pink',    a:'#f50057', b:'#c51162', c:'#880e4f'},
-  {id:'white', name:'White',   a:'#e0e8f0', b:'#b0bec5', c:'#607d8b'}
-];
 
-const LANGS = [
-  {code:'en',flag:'🇺🇸',name:'English'},
-  {code:'es',flag:'🇪🇸',name:'Español'},
-  {code:'pt',flag:'🇧🇷',name:'Português'},
-  {code:'fr',flag:'🇫🇷',name:'Français'},
-  {code:'de',flag:'🇩🇪',name:'Deutsch'},
-  {code:'zh',flag:'🇨🇳',name:'中文'},
-  {code:'ar',flag:'🇸🇦',name:'العربية'},
-  {code:'hi',flag:'🇮🇳',name:'हिंदी'}
-];
-
-// ============================================================
-// STATE
-// ============================================================
-let isMonitoring = false;
-let animFrame = null;
-let stream = null;
-let faceMesh = null;
-let mpCamera = null;
-let currentFacingMode = 'user';
-let mirrorMode = true;
-let alertCount = 0;
-let blinkFrames = 0;
-let lastAlertTime = 0;
-let EAR_OPEN = 0.28, EAR_WARN = 0.22, EAR_DANGER = 0.18;
-let earBuffer = [];
-let calibrationSamples = [];
-let calibrating = false;
-let calibrationDone = false;
-let noFaceFrames = 0;
-let currentLang = localStorage.getItem('occulert-lang') || 'en';
-
-const CFG = {
-  sensitivity: parseInt(localStorage.getItem('cfg-sensitivity') || '20'),
-  cooldown: parseInt(localStorage.getItem('cfg-cooldown') || '30'),
-  vibration: localStorage.getItem('cfg-vibration') !== 'false',
-  sound: localStorage.getItem('cfg-sound') !== 'false',
-  mirror: localStorage.getItem('cfg-mirror') !== 'false'
+// ---- THEMES (mirror of index.html) ----
+const THEMES={
+  cyan:{name:'Cyber Cyan',primary:'#00e5ff',secondary:'#00b8cc',swatch:'linear-gradient(135deg,#00e5ff,#0a0e1a)'},
+  blue:{name:'Ocean Blue',primary:'#2563eb',secondary:'#1d4ed8',swatch:'linear-gradient(135deg,#2563eb,#0d1117)'},
+  green:{name:'Night Vision',primary:'#00ff88',secondary:'#00cc6a',swatch:'linear-gradient(135deg,#00ff88,#0a0f0c)'},
+  purple:{name:'Deep Purple',primary:'#8b5cf6',secondary:'#7c3aed',swatch:'linear-gradient(135deg,#8b5cf6,#0d0a1a)'},
+  orange:{name:'Sunset',primary:'#f59e0b',secondary:'#d97706',swatch:'linear-gradient(135deg,#f59e0b,#0f0d08)'},
+  red:{name:'Red Alert',primary:'#ff3344',secondary:'#cc2233',swatch:'linear-gradient(135deg,#ff3344,#0f0808)'},
+  white:{name:'Arctic White',primary:'#0ea5e9',secondary:'#0284c7',swatch:'linear-gradient(135deg,#0ea5e9,#e0f2fe)'},
+  pink:{name:'Neon Pink',primary:'#ec4899',secondary:'#db2777',swatch:'linear-gradient(135deg,#ec4899,#0f080d)'}
 };
 
-// EAR calculation using 6 key eye landmarks
-const L_EYE = [33,160,158,133,153,144];
-const R_EYE = [362,385,387,263,373,380];
+// ---- STATE ----
+let isRunning=false, faceMesh=null, camera=null, animFrame=null;
+let currentFacing='user', mirrorMode=true;
+let blinkFrames=0, alertCount=0;
+let lastAlertTime=0, alertCooldown=30000;
+let sensitivity=20, closedFrames=0;
+let EAR_OPEN=0.25, EAR_WARN=0.20, EAR_DANGER=0.15;
+let calibrating=false, calibrationDone=false;
+let calibrationSamples=[], calibSampleTarget=60;
+let earHistory=[], EAR_SMOOTH_WINDOW=5;
+let modelReady=false;
+let settings={vibration:true,sound:true,mirror:true};
+let currentTheme=localStorage.getItem('occulert-theme')||'cyan';
+let currentLang=localStorage.getItem('occulert-lang')||'en';
+let currentUser=null;
+try{currentUser=JSON.parse(localStorage.getItem('occulert-user')||'null');}catch(e){}
 
-function dist(a,b){return Math.hypot(a.x-b.x, a.y-b.y);}
-function calcEAR(lm,pts){
-  const p = pts.map(i=>lm[i]);
-  const h = dist(p[0],p[3]);
-  if(h < 1e-6) return 0;
-  return (dist(p[1],p[5]) + dist(p[2],p[4])) / (2*h);
+// EYE LANDMARK INDICES (MediaPipe FaceMesh)
+const LEFT_EYE=[362,385,387,263,373,380];
+const RIGHT_EYE=[33,160,158,133,153,144];
+
+// ---- DOM REFS ----
+const video=document.getElementById('video');
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const startBtn=document.getElementById('start-btn');
+const statusBadge=document.getElementById('status-badge');
+const camWrap=document.getElementById('camera-wrap');
+const camOverlay=document.getElementById('cam-status-overlay');
+const earVal=document.getElementById('ear-val');
+const blinkVal=document.getElementById('blink-val');
+const alertValEl=document.getElementById('alert-val');
+const earBar=document.getElementById('ear-bar');
+const earPct=document.getElementById('ear-pct');
+const eyeDot=document.getElementById('eye-dot');
+const eyesLabel=document.getElementById('eyes-label');
+const modelDot=document.getElementById('model-dot');
+const modelLabel=document.getElementById('model-label');
+const calibOverlay=document.getElementById('calib-overlay');
+const calibFill=document.getElementById('calib-fill');
+const calibStatus=document.getElementById('calib-status');
+const alertOverlay=document.getElementById('alert-overlay');
+const eventLog=document.getElementById('event-log');
+const logEmpty=document.getElementById('log-empty');
+
+// ---- THEME ----
+function applyTheme(key){
+  const t=THEMES[key]||THEMES.cyan;
+  currentTheme=key;
+  localStorage.setItem('occulert-theme',key);
+  const r=document.documentElement.style;
+  r.setProperty('--accent',t.primary);
+  r.setProperty('--accent2',t.secondary);
+  r.setProperty('--accent-dim','rgba('+hexToRgb(t.primary)+',0.12)');
+  if(key==='white'){
+    r.setProperty('--bg','#f0f4f8');r.setProperty('--bg2','#e2e8f0');r.setProperty('--bg3','#cbd5e1');
+    r.setProperty('--text','#1e293b');r.setProperty('--text2','#475569');r.setProperty('--text3','#64748b');
+    r.setProperty('--dim','#94a3b8');r.setProperty('--dim2','#64748b');
+  } else {
+    r.setProperty('--bg','#050a0f');r.setProperty('--bg2','#0a1520');r.setProperty('--bg3','#0f1e2e');
+    r.setProperty('--text','#c8e8f0');r.setProperty('--text2','#7aa8b8');r.setProperty('--text3','#4a7a8a');
+    r.setProperty('--dim','#1a3a4a');r.setProperty('--dim2','#234560');
+  }
+  document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.theme===key));
 }
-
-// EAR smoothing buffer
-function smoothEAR(raw){
-  earBuffer.push(raw);
-  if(earBuffer.length > 5) earBuffer.shift();
-  return earBuffer.reduce((a,b)=>a+b,0)/earBuffer.length;
-}
-
-// Head turn detection
-function detectHeadTurn(lm){
-  const noseTip = lm[1];
-  const leftEar = lm[234];
-  const rightEar = lm[454];
-  const faceWidth = dist(leftEar,rightEar);
-  const noseCenterOffset = Math.abs(noseTip.x - (leftEar.x + rightEar.x)/2);
-  return faceWidth > 0 && (noseCenterOffset/faceWidth) > 0.22;
-}
-
-// ============================================================
-// THEME SYSTEM
-// ============================================================
-function applyTheme(id){
-  const t = THEMES.find(x=>x.id===id) || THEMES[0];
-  const r = document.documentElement;
-  r.style.setProperty('--accent', t.a);
-  r.style.setProperty('--accent2', t.b);
-  r.style.setProperty('--accent-rgb', hexToRgb(t.a));
-  r.style.setProperty('--border', 'rgba('+hexToRgb(t.a)+',0.12)');
-  r.style.setProperty('--border2', 'rgba('+hexToRgb(t.a)+',0.25)');
-  localStorage.setItem('occulert-theme', id);
-  document.querySelectorAll('.theme-dot, .theme-card').forEach(d=>{
-    d.classList.toggle('active', d.dataset.theme===id);
-  });
-}
-
 function hexToRgb(hex){
-  const r=/^#?([a-fd]{2})([a-fd]{2})([a-fd]{2})$/i.exec(hex.replace(/^#?([da-f])([da-f])([da-f])$/i, (_,r,g,b)=>'#'+r+r+g+g+b+b));
-  return r?parseInt(r[1],16)+','+parseInt(r[2],16)+','+parseInt(r[3],16):'0,229,255';
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return r+','+g+','+b;
 }
-
 function buildThemeGrid(){
-  const current = localStorage.getItem('occulert-theme')||'cyan';
-  const grid = document.getElementById('modal-theme-grid');
-  const labels = document.getElementById('modal-theme-labels');
-  const panel = document.getElementById('panel-theme-row');
-  if(grid){
-    grid.innerHTML = THEMES.map(t=>`<div class="theme-dot ${t.id===current?'active':''}" data-theme="${t.id}" onclick="applyTheme('${t.id}')" style="background:linear-gradient(135deg,${t.a},${t.b});" title="${t.name}"><div class="theme-dot-check">✓</div></div>`).join('');
-  }
-  if(labels){
-    labels.innerHTML = THEMES.map(t=>`<div>${t.name}</div>`).join('');
-  }
-  if(panel){
-    panel.innerHTML = THEMES.map(t=>`<div class="theme-dot ${t.id===current?'active':''}" data-theme="${t.id}" onclick="applyTheme('${t.id}')" style="background:linear-gradient(135deg,${t.a},${t.b});" title="${t.name}"><div class="theme-dot-check">✓</div></div>`).join('');
-  }
+  const grid=document.getElementById('theme-grid');if(!grid)return;
+  grid.innerHTML=Object.entries(THEMES).map(([k,t])=>
+    `<div class="theme-chip ${k===currentTheme?'active':''}" data-theme="${k}" onclick="applyTheme('${k}');buildThemeGrid()"><div class="theme-swatch" style="background:${t.swatch}"></div><div class="theme-chip-name">${t.name}</div></div>`
+  ).join('');
+}
+function toggleThemePanel(){
+  const p=document.getElementById('theme-panel');
+  p.classList.toggle('show');
 }
 
-// ============================================================
-// LANG
-// ============================================================
-function buildLangMenu(){
-  const menu = document.getElementById('lang-menu');
-  if(!menu) return;
-  menu.innerHTML = LANGS.map(l=>`<div class="lang-opt ${l.code===currentLang?'active':''}" onclick="setLang('${l.code}')">${l.flag} ${l.name}</div>`).join('');
-}
-
-function setLang(code){
-  currentLang=code;
-  localStorage.setItem('occulert-lang',code);
-  const lang = LANGS.find(l=>l.code===code)||LANGS[0];
-  document.getElementById('lang-btn').textContent = lang.flag;
-  buildLangMenu();
-  document.getElementById('lang-menu').classList.remove('open');
-}
-
-function toggleLangMenu(btn){
-  const menu = document.getElementById('lang-menu');
-  // Position below the button
-  const rect = btn.getBoundingClientRect();
-  menu.style.top = (rect.bottom+4)+'px';
-  menu.style.right = (window.innerWidth-rect.right)+'px';
-  menu.style.position = 'fixed';
-  menu.classList.toggle('open');
-}
-
-document.addEventListener('click', function(e){
-  if(!e.target.closest('#lang-btn') && !e.target.closest('#lang-menu')){
-    document.getElementById('lang-menu').classList.remove('open');
-  }
-});
-
-// ============================================================
-// MODAL SYSTEM
-// ============================================================
-function openModal(id){ document.getElementById(id).classList.add('open'); }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(m=>{
-  m.addEventListener('click', function(e){ if(e.target===this) this.classList.remove('open'); });
-});
-
-// ============================================================
-// AUTH
-// ============================================================
-function updateAccountUI(){
-  const u = JSON.parse(localStorage.getItem('occulert-user')||'null');
-  const loggedOut = document.getElementById('account-logged-out');
-  const loggedIn = document.getElementById('account-logged-in');
-  if(u){
-    loggedOut.style.display='none';
-    loggedIn.style.display='block';
-    const nameEl = document.getElementById('acct-name');
-    const emailEl = document.getElementById('acct-email');
-    if(nameEl) nameEl.textContent = u.name || 'Driver';
-    if(emailEl) emailEl.textContent = u.email || '';
-    // Update account button icon
-    const btn = document.getElementById('account-btn');
-    if(btn) btn.textContent = '👤';
+// ---- AUTH UI ----
+function updateAuthUI(){
+  const pill=document.getElementById('user-pill');
+  const avatar=document.getElementById('user-avatar-initials');
+  const nameLabel=document.getElementById('user-name-label');
+  if(currentUser&&currentUser.name){
+    const n=currentUser.name;
+    if(avatar)avatar.textContent=n[0].toUpperCase();
+    if(nameLabel)nameLabel.textContent=n;
+    if(pill)pill.title='Signed in as '+n;
   } else {
-    loggedOut.style.display='block';
-    loggedIn.style.display='none';
+    if(avatar)avatar.textContent='?';
+    if(nameLabel)nameLabel.textContent='Sign In';
   }
 }
 
-async function doPasskeyAuth(){
-  showToast('🔑 Opening passkey authentication...');
-  try {
-    if(!window.PublicKeyCredential){ showToast('⚠️ Passkeys not supported in this browser'); return; }
-    const u = localStorage.getItem('occulert-user');
-    if(u){ 
-      const user = JSON.parse(u);
-      showToast('✅ Welcome back, '+(user.name||user.email)+'!');
-      updateAccountUI();
-      return;
-    }
-    showToast('⚠️ No passkey registered. Sign in from the main site first.');
-  } catch(e){ showToast('⚠️ '+e.message); }
+// ---- LANG ----
+const LANGS=[
+  {code:'en',flag:'🇺🇸',abbr:'EN',name:'English'},
+  {code:'es',flag:'🇲🇽',abbr:'ES',name:'Español'},
+  {code:'pt',flag:'🇧🇷',abbr:'PT',name:'Português'},
+  {code:'fr',flag:'🇫🇷',abbr:'FR',name:'Français'},
+  {code:'de',flag:'🇩🇪',abbr:'DE',name:'Deutsch'},
+  {code:'zh',flag:'🇨🇳',abbr:'ZH',name:'中文'}
+];
+function buildLangPanel(){
+  const panel=document.getElementById('lang-panel');if(!panel)return;
+  panel.innerHTML=LANGS.map(l=>
+    `<div class="lang-opt ${l.code===currentLang?'active':''}" onclick="setLang('${l.code}','${l.flag}','${l.abbr}')">${l.flag} ${l.name}</div>`
+  ).join('');
+}
+function setLang(code,flag,abbr){
+  currentLang=code;localStorage.setItem('occulert-lang',code);
+  document.getElementById('lang-flag').textContent=flag;
+  document.getElementById('lang-name').textContent=abbr;
+  document.getElementById('lang-panel').classList.remove('show');
+  buildLangPanel();
+}
+function toggleLangPanel(){
+  document.getElementById('lang-panel').classList.toggle('show');
 }
 
-function doEmailSignIn(){
-  const email = document.getElementById('app-signin-email').value.trim();
-  const pw = document.getElementById('app-signin-pw').value;
-  if(!email||!pw){ showToast('⚠️ Please enter email and password'); return; }
-  const stored = JSON.parse(localStorage.getItem('occulert-user')||'null');
-  if(stored && stored.email===email){
-    showToast('✅ Welcome back, '+(stored.name||email)+'!');
-    updateAccountUI();
-    closeModal('modal-account');
-  } else {
-    showToast('⚠️ No account found. Create one on the main site.');
-  }
-}
-
-function signOut(){
-  localStorage.removeItem('occulert-user');
-  updateAccountUI();
-  closeModal('modal-account');
-  showToast('👋 Signed out');
-}
-
-// ============================================================
-// CONFIG CONTROLS
-// ============================================================
-function adjustConfig(key, delta){
-  const limits = {sensitivity:[5,60,1], cooldown:[5,120,5]};
-  const [min,max] = limits[key]||[1,100,1];
-  CFG[key] = Math.max(min, Math.min(max, CFG[key]+delta));
-  localStorage.setItem('cfg-'+key, CFG[key]);
-  const el = document.getElementById('val-'+key);
-  if(el) el.textContent = key==='cooldown' ? CFG[key]+' s' : CFG[key];
-}
-
-function toggleSetting(key){
-  CFG[key] = !CFG[key];
-  localStorage.setItem('cfg-'+key, CFG[key]);
-  const el = document.getElementById('tog-'+key);
-  if(el) el.classList.toggle('on', CFG[key]);
-  if(key==='mirror') updateMirror();
-}
-
+// ---- SETTINGS ----
 function loadSettings(){
-  document.getElementById('val-sensitivity').textContent = CFG.sensitivity;
-  document.getElementById('val-cooldown').textContent = CFG.cooldown+' s';
-  document.getElementById('tog-vibration').classList.toggle('on', CFG.vibration);
-  document.getElementById('tog-sound').classList.toggle('on', CFG.sound);
-  document.getElementById('tog-mirror').classList.toggle('on', CFG.mirror);
-  mirrorMode = CFG.mirror;
-  updateMirror();
+  const s=JSON.parse(localStorage.getItem('occulert-settings')||'{}');
+  settings.vibration = s.vibration!==undefined ? s.vibration : true;
+  settings.sound = s.sound!==undefined ? s.sound : true;
+  settings.mirror = s.mirror!==undefined ? s.mirror : true;
+  sensitivity = parseInt(s.sensitivity)||20;
+  alertCooldown = (parseInt(s.cooldown)||30)*1000;
+  document.getElementById('sensitivity-val').textContent = sensitivity;
+  document.getElementById('cooldown-val').textContent = (alertCooldown/1000)+'s';
+  ['vibration','sound','mirror'].forEach(k=>{
+    const el=document.getElementById('toggle-'+k);
+    if(el) el.classList.toggle('on',settings[k]);
+  });
+  if(settings.mirror){ video.classList.add('mirror'); canvas.classList.add('mirror'); }
+}
+function saveSettings(){
+  localStorage.setItem('occulert-settings',JSON.stringify({
+    vibration:settings.vibration, sound:settings.sound, mirror:settings.mirror,
+    sensitivity:sensitivity, cooldown:alertCooldown/1000
+  }));
+}
+function toggleSetting(key){
+  settings[key]=!settings[key];
+  const el=document.getElementById('toggle-'+key);
+  if(el)el.classList.toggle('on',settings[key]);
+  if(key==='mirror'){
+    video.classList.toggle('mirror',settings.mirror);
+    canvas.classList.toggle('mirror',settings.mirror);
+  }
+  saveSettings();
+  showToast(key.charAt(0).toUpperCase()+key.slice(1)+' '+(settings[key]?'ON':'OFF'));
+}
+function adjustSetting(key,delta){
+  if(key==='sensitivity'){
+    sensitivity=Math.max(5,Math.min(60,sensitivity+delta));
+    document.getElementById('sensitivity-val').textContent=sensitivity;
+  } else if(key==='cooldown'){
+    const secs=Math.max(5,Math.min(120,alertCooldown/1000+delta));
+    alertCooldown=secs*1000;
+    document.getElementById('cooldown-val').textContent=secs+'s';
+  }
+  saveSettings();
 }
 
-// ============================================================
-// CAMERA
-// ============================================================
+// ---- EAR CALCULATION ----
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+function calcEAR(landmarks,idx){
+  const p=idx.map(i=>landmarks[i]);
+  const v1=dist(p[1],p[5]),v2=dist(p[2],p[4]);
+  const h=dist(p[0],p[3]);
+  return h===0?0:(v1+v2)/(2*h);
+}
+function smoothEAR(raw){
+  earHistory.push(raw);
+  if(earHistory.length>EAR_SMOOTH_WINDOW)earHistory.shift();
+  return earHistory.reduce((a,b)=>a+b,0)/earHistory.length;
+}
+
+// ---- HEAD TURN DETECTION ----
+function detectHeadTurn(lm){
+  const noseTip=lm[4];
+  const leftCheek=lm[234];
+  const rightCheek=lm[454];
+  const faceW=Math.abs(rightCheek.x-leftCheek.x);
+  if(faceW<0.01)return false;
+  const noseOffset=(noseTip.x-(leftCheek.x+rightCheek.x)/2)/faceW;
+  return Math.abs(noseOffset)>0.35;
+}
+
+// ---- DRAW EYE ----
+function drawEye(lm,idx,color){
+  const pts=idx.map(i=>({x:lm[i].x*canvas.width,y:lm[i].y*canvas.height}));
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+  pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.closePath();
+  ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle=color.replace('1)','0.1)');ctx.fill();
+}
+
+// ---- UPDATE UI WITH EAR ----
+function updateEAR(ear,isTurned){
+  const pct=Math.min(100,Math.max(0,(ear/EAR_OPEN)*100));
+  earBar.style.width=pct+'%';
+  earPct.textContent=Math.round(pct)+'%';
+  earVal.textContent=ear.toFixed(3);
+
+  let eyeColor='rgba(0,229,255,1)';
+  earVal.className='metric-val';
+
+  if(isTurned){
+    camWrap.className='camera-wrap';
+    eyeDot.classList.remove('active');
+    eyesLabel.textContent='TURNED';
+    return;
+  }
+  eyeDot.classList.add('active');
+  eyesLabel.textContent='EYES';
+
+  if(ear>=EAR_OPEN){
+    camWrap.className='camera-wrap active-border';
+    eyeColor='rgba(0,255,136,1)';
+    closedFrames=0;
+  } else if(ear>=EAR_WARN){
+    camWrap.className='camera-wrap warn-border';
+    eyeColor='rgba(255,170,0,1)';
+    earVal.classList.add('warn');
+    closedFrames++;
+  } else {
+    camWrap.className='camera-wrap danger-border';
+    eyeColor='rgba(255,51,68,1)';
+    earVal.classList.add('danger');
+    closedFrames++;
+    blinkFrames++;
+    blinkVal.textContent=blinkFrames;
+  }
+
+  drawEye(null,null,eyeColor); // color passed through onResults
+
+  if(closedFrames>=sensitivity){
+    const now=Date.now();
+    if(now-lastAlertTime>alertCooldown){
+      triggerAlert();
+      lastAlertTime=now;
+      closedFrames=0;
+    }
+  }
+}
+function updateNoFace(){
+  camWrap.className='camera-wrap';
+  eyeDot.classList.remove('active');
+  eyesLabel.textContent='NO FACE';
+  earVal.textContent='--';
+  earBar.style.width='0%';
+  earPct.textContent='--';
+  closedFrames=0;
+  earHistory=[];
+}
+
+// ---- TRIGGER ALERT ----
+function triggerAlert(){
+  alertCount++;
+  alertValEl.textContent=alertCount;
+  alertValEl.classList.add('danger');
+  // Vibration
+  if(settings.vibration&&navigator.vibrate){navigator.vibrate([500,200,500,200,500]);}
+  // Sound
+  if(settings.sound){playAlertSound();}
+  // Visual flash
+  alertOverlay.classList.add('show');
+  setTimeout(()=>alertOverlay.classList.remove('show'),600);
+  addHistory('danger','⚠️ Drowsiness alert triggered');
+  gtag('event','drowsiness_alert',{alert_count:alertCount});
+}
+function playAlertSound(){
+  try{
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=ac.createOscillator();const gain=ac.createGain();
+    osc.connect(gain);gain.connect(ac.destination);
+    osc.type='square';osc.frequency.setValueAtTime(880,ac.currentTime);
+    osc.frequency.setValueAtTime(660,ac.currentTime+0.15);
+    gain.gain.setValueAtTime(0.4,ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.5);
+    osc.start(ac.currentTime);osc.stop(ac.currentTime+0.5);
+  }catch(e){}
+}
+
+// ---- HISTORY ----
+function addHistory(type,msg){
+  if(logEmpty)logEmpty.style.display='none';
+  const now=new Date();
+  const timeStr=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
+  const icons={ok:'✅',danger:'⚠️',warn:'🟡',info:'ℹ️'};
+  const item=document.createElement('div');
+  item.className='event-item';
+  item.innerHTML=`<span class="event-icon">${icons[type]||'ℹ️'}</span><div><div class="event-text">${msg}</div><div class="event-time">${timeStr}</div></div>`;
+  eventLog.insertBefore(item,eventLog.firstChild);
+  // Keep max 50 events
+  while(eventLog.children.length>51){eventLog.removeChild(eventLog.lastChild);}
+}
+
+// ---- TOAST ----
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+// ---- CAMERA ----
 async function startCamera(){
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:currentFacingMode,width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30}},
-      audio:false
-    });
-    const video = document.getElementById('video');
-    video.srcObject = stream;
-    await video.play();
-    document.getElementById('cam-inactive').style.display='none';
-    document.getElementById('cam-label').style.display='flex';
+  try{
+    const constraints={video:{facingMode:currentFacing,width:{ideal:640},height:{ideal:480}},audio:false};
+    const stream=await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject=stream;
+    await new Promise(r=>{video.onloadedmetadata=r;});
+    canvas.width=video.videoWidth||640;
+    canvas.height=video.videoHeight||480;
+    camOverlay.style.display='none';
+    statusBadge.className='status-badge online';
+    statusBadge.textContent='ACTIVE';
     return true;
-  } catch(err){
-    addEvent('w', '⚠ Camera: '+err.message);
-    showToast('⚠️ Camera error: '+err.message);
-    stopMonitoring();
+  }catch(e){
+    addHistory('warn','❌ Camera error: '+e.message);
+    statusBadge.className='status-badge offline';
+    statusBadge.textContent='CAM ERROR';
+    showToast('Camera access denied. Please allow camera.');
     return false;
   }
 }
-
 function stopCamera(){
-  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
-  const video = document.getElementById('video');
-  video.srcObject = null;
-  document.getElementById('cam-inactive').style.display='flex';
-  document.getElementById('cam-label').style.display='none';
-}
-
-async function flipCamera(){
-  currentFacingMode = currentFacingMode==='user'?'environment':'user';
-  document.getElementById('cam-side-label').textContent = currentFacingMode==='user'?'FRONT':'BACK';
-  if(isMonitoring){
-    if(mpCamera){mpCamera.stop();mpCamera=null;}
-    if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
-    await startCamera();
-    initMediaPipe();
-  }
-  addEvent('i', '🔄 Switched to '+(currentFacingMode==='user'?'front':'back')+' camera');
-}
-
-function updateMirror(){
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
-  video.classList.toggle('mirror', mirrorMode);
-  canvas.classList.toggle('mirror', mirrorMode);
-}
-
-function toggleMirror(){
-  mirrorMode = !mirrorMode;
-  document.getElementById('tog-mirror').classList.toggle('on', mirrorMode);
-  CFG.mirror = mirrorMode;
-  localStorage.setItem('cfg-mirror', mirrorMode);
-  updateMirror();
-}
-
-// ============================================================
-// MEDIAPIPE INTEGRATION
-// ============================================================
-function initMediaPipe(){
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-
-  if(typeof FaceMesh === 'undefined'){
-    showToast('⚠️ AI model loading... please wait');
-    setTimeout(initMediaPipe, 1500);
-    return;
-  }
-
-  faceMesh = new FaceMesh({locateFile:(f)=>'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/'+f});
-  faceMesh.setOptions({
-    maxNumFaces:1,
-    refineLandmarks:true,
-    minDetectionConfidence:0.5,
-    minTrackingConfidence:0.5
-  });
-  faceMesh.onResults(onFaceMeshResults);
-
-  mpCamera = new Camera(video, {
-    onFrame: async()=>{
-      if(!isMonitoring) return;
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      await faceMesh.send({image:video});
-    },
-    width:1280, height:720
-  });
-  mpCamera.start();
-}
-
-// ============================================================
-// CALIBRATION
-// ============================================================
-const CAL_TARGET = 40;
-
-function startCalibration(){
-  calibrationSamples = [];
-  calibrating = true;
-  calibrationDone = false;
-  earBuffer = [];
-  document.getElementById('calibration-overlay').style.display='flex';
-  document.getElementById('cal-progress').style.width='0%';
-  document.getElementById('cal-count').textContent='0 / '+CAL_TARGET;
-}
-
-function collectCalibrationSample(rawEar){
-  if(rawEar < 0.05) return; // blink or bad frame
-  calibrationSamples.push(rawEar);
-  const pct = Math.round((calibrationSamples.length/CAL_TARGET)*100);
-  document.getElementById('cal-progress').style.width=pct+'%';
-  document.getElementById('cal-count').textContent=calibrationSamples.length+' / '+CAL_TARGET;
-
-  if(calibrationSamples.length >= CAL_TARGET){
-    finishCalibration();
-  }
-}
-
-function finishCalibration(){
-  calibrating = false;
-  document.getElementById('calibration-overlay').style.display='none';
-
-  if(calibrationSamples.length < 15){
-    addEvent('w', '⚠ Calibration incomplete – move to better lighting');
-    showToast('⚠️ Calibration incomplete. Try better lighting.');
-    calibrationDone = true;
-    return;
-  }
-
-  const sorted = [...calibrationSamples].sort((a,b)=>a-b);
-  const median = sorted[Math.floor(sorted.length*0.5)];
-  const p25 = sorted[Math.floor(sorted.length*0.25)];
-
-  EAR_OPEN = median * 0.85;
-  EAR_WARN = median * 0.75;
-  EAR_DANGER = median * 0.60;
-
-  calibrationDone = true;
-  addEvent('ok', '✅ Calibrated – baseline EAR: '+median.toFixed(3)+' | warn: '+EAR_WARN.toFixed(3)+' | danger: '+EAR_DANGER.toFixed(3));
-  showToast('✅ Calibration complete! Monitoring now active.');
-}
-
-// ============================================================
-// FACE MESH RESULTS HANDLER
-// ============================================================
-function onFaceMeshResults(results){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
+  if(video.srcObject){video.srcObject.getTracks().forEach(t=>t.stop());video.srcObject=null;}
+  if(camera){try{camera.stop();}catch(e){}}
+  camera=null;
+  camOverlay.style.display='flex';
   ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  if(!results.multiFaceLandmarks || results.multiFaceLandmarks.length===0){
-    noFaceFrames++;
-    if(noFaceFrames > 30) updateNoFace();
-    return;
-  }
-
-  noFaceFrames = 0;
-  const lm = results.multiFaceLandmarks[0];
-
-  // Draw eye landmarks
-  drawEye(lm, L_EYE);
-  drawEye(lm, R_EYE);
-
-  const leftEAR = calcEAR(lm, L_EYE);
-  const rightEAR = calcEAR(lm, R_EYE);
-  const rawEar = (leftEAR+rightEAR)/2;
-
-  // Collect calibration sample
-  if(calibrating){
-    collectCalibrationSample(rawEar);
-  }
-
-  // Smooth the EAR
-  const ear = smoothEAR(rawEar);
-
-  // Head turn detection
-  const isTurned = detectHeadTurn(lm);
-  updateEAR(ear, isTurned);
+}
+function flipCamera(){
+  currentFacing=currentFacing==='user'?'environment':'user';
+  document.getElementById('cam-side-label').textContent=currentFacing==='user'?'FRONT':'REAR';
+  if(isRunning){stopCamera();startCamera().then(ok=>{if(ok&&faceMesh)initCameraUtils();});}
 }
 
-function drawEye(lm, pts){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const points = pts.map(i=>({x:lm[i].x*canvas.width, y:lm[i].y*canvas.height}));
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  points.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
-  ctx.closePath();
-  ctx.strokeStyle='rgba(0,229,255,0.7)';
-  ctx.lineWidth=1.5;
-  ctx.stroke();
-  ctx.fillStyle='rgba(0,229,255,0.05)';
-  ctx.fill();
+// ---- CALIBRATION ----
+function startCalibration(){
+  calibrating=true;calibrationDone=false;
+  calibrationSamples=[];calibFill.style.width='0%';
+  calibStatus.textContent='Keep eyes open, look straight ahead...';
+  calibOverlay.classList.add('show');
+  addHistory('info','🔍 Calibration started');
+}
+function collectCalibrationSample(ear){
+  if(ear<0.1||ear>0.5)return;
+  calibrationSamples.push(ear);
+  const pct=Math.min(100,(calibrationSamples.length/calibSampleTarget)*100);
+  calibFill.style.width=pct+'%';
+  calibStatus.textContent=`Sampling... ${calibrationSamples.length}/${calibSampleTarget}`;
+  if(calibrationSamples.length>=calibSampleTarget){finishCalibration();}
+}
+function finishCalibration(){
+  if(calibrationSamples.length<20){
+    addHistory('warn','⚠ Calibration incomplete — move to better lighting');
+    calibOverlay.classList.remove('show');calibrating=false;calibrationDone=true;return;
+  }
+  const sorted=[...calibrationSamples].sort((a,b)=>a-b);
+  const median=sorted[Math.floor(sorted.length*0.5)];
+  EAR_OPEN=median*0.85;EAR_WARN=median*0.75;EAR_DANGER=median*0.60;
+  calibrating=false;calibrationDone=true;
+  calibOverlay.classList.remove('show');
+  addHistory('ok',`✅ Calibrated — baseline EAR: ${median.toFixed(3)} | warn: ${EAR_WARN.toFixed(3)}`);
+  showToast('Calibration complete!');
 }
 
-// ============================================================
-// EAR ALERT LOGIC
-// ============================================================
-function updateEAR(ear, isTurned){
-  // Update display
-  const earEl = document.getElementById('ear-display');
-  if(earEl) earEl.textContent = ear.toFixed(3);
-
-  // Update gauge
-  const pct = calibrationDone ? Math.min(100,Math.round((ear/EAR_OPEN)*100)) : Math.min(100,Math.round((ear/0.35)*100));
-  const gaugeEl = document.getElementById('gauge-fill');
-  const pctEl = document.getElementById('gauge-pct');
-  if(gaugeEl){
-    let color;
-    if(pct>75) color='var(--green)';
-    else if(pct>45) color='var(--warn)';
-    else color='var(--danger)';
-    gaugeEl.style.width=pct+'%';
-    gaugeEl.style.background=color;
+// ---- FACE MESH ----
+function onResults(results){
+  if(!isRunning)return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!results.multiFaceLandmarks||!results.multiFaceLandmarks.length){
+    updateNoFace();return;
   }
-  if(pctEl) pctEl.textContent=pct+'%';
+  const lm=results.multiFaceLandmarks[0];
+  const rawEar=(calcEAR(lm,LEFT_EYE)+calcEAR(lm,RIGHT_EYE))/2;
+  const ear=smoothEAR(rawEar);
+  const isTurned=detectHeadTurn(lm);
 
-  // Update face status
-  const faceStatus = document.getElementById('face-status');
-  if(faceStatus) faceStatus.textContent = isTurned ? 'EYES OFF ROAD' : '';
+  if(calibrating){collectCalibrationSample(rawEar);}
 
-  // Stat block coloring
-  const earBlock = document.getElementById('ear-block');
-  if(earBlock){
-    earBlock.classList.toggle('warn-stat', ear < EAR_WARN && ear >= EAR_DANGER);
-    earBlock.classList.toggle('danger-stat', ear < EAR_DANGER);
-  }
-
-  // Camera wrap border
-  const camWrap = document.getElementById('camera-wrap');
-  camWrap.classList.remove('active-border','warn-border','danger-border');
-  if(ear > EAR_OPEN) camWrap.classList.add('active-border');
-  else if(ear >= EAR_WARN) camWrap.classList.add('warn-border');
-  else if(ear < EAR_DANGER) camWrap.classList.add('danger-border');
-
-  // Status badge
-  const badge = document.getElementById('status-badge');
-  if(!calibrationDone || isTurned) {
-    badge.className='status-badge warning';
-    badge.textContent = isTurned ? 'HEAD TURNED' : 'CALIBRATING';
-    return;
-  }
-
-  // Blink counting
-  if(ear < EAR_WARN){
-    blinkFrames++;
-    document.getElementById('blink-display').textContent = blinkFrames;
+  // Draw eye overlays
+  const eyeColor=ear>=EAR_OPEN?'rgba(0,255,136,1)':ear>=EAR_WARN?'rgba(255,170,0,1)':'rgba(255,51,68,1)';
+  drawEye(lm,LEFT_EYE,eyeColor);
+  drawEye(lm,RIGHT_EYE,eyeColor);
+  updateEAR(ear,isTurned);
+}
+function initCameraUtils(){
+  if(!window.FaceMesh){setTimeout(()=>initCameraUtils(),500);return;}
+  faceMesh=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+  faceMesh.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+  faceMesh.onResults(onResults);
+  if(window.Camera){
+    camera=new Camera(video,{
+      onFrame:async()=>{if(isRunning&&faceMesh){try{await faceMesh.send({image:video});}catch(e){}}},
+      width:640,height:480
+    });
+    camera.start();
   } else {
-    blinkFrames = Math.max(0, blinkFrames-1);
+    // Fallback: manual RAF loop
+    async function loop(){if(!isRunning)return;if(faceMesh){try{await faceMesh.send({image:video});}catch(e){}}animFrame=requestAnimationFrame(loop);}
+    loop();
   }
-
-  // Alert triggering
-  const now = Date.now();
-  if(ear < EAR_DANGER && blinkFrames >= CFG.sensitivity){
-    if(now - lastAlertTime > CFG.cooldown*1000){
-      triggerAlert(ear);
-      lastAlertTime = now;
-      blinkFrames = 0;
-    }
-    badge.className='status-badge danger';
-    badge.textContent='DROWSY!';
-  } else if(ear < EAR_WARN){
-    badge.className='status-badge warning';
-    badge.textContent='WARNING';
-  } else {
-    badge.className='status-badge active';
-    badge.textContent='ACTIVE';
-  }
+  modelDot.className='model-dot ready';modelLabel.textContent='AI Model Ready';
+  modelReady=true;
 }
 
-function updateNoFace(){
-  const earEl = document.getElementById('ear-display');
-  if(earEl) earEl.textContent='--';
-  const badge = document.getElementById('status-badge');
-  badge.className='status-badge offline';
-  badge.textContent='NO FACE';
-  document.getElementById('gauge-fill').style.width='0%';
-  document.getElementById('gauge-pct').textContent='--';
-  const camWrap = document.getElementById('camera-wrap');
-  camWrap.classList.remove('active-border','warn-border','danger-border');
-}
-
-// ============================================================
-// ALERT
-// ============================================================
-function triggerAlert(ear){
-  alertCount++;
-  document.getElementById('alert-display').textContent = alertCount;
-  document.getElementById('alert-block').classList.add('danger-stat');
-
-  // Flash screen
-  const flash = document.getElementById('alert-flash');
-  flash.classList.add('show');
-  setTimeout(()=>flash.classList.remove('show'), 400);
-
-  // Vibration
-  if(CFG.vibration && navigator.vibrate){
-    navigator.vibrate([300,100,300,100,500]);
-  }
-
-  // Sound
-  if(CFG.sound){
-    try {
-      const ctx = new (window.AudioContext||window.webkitAudioContext)();
-      const gainNode = ctx.createGain();
-      gainNode.gain.setValueAtTime(0.6, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+1.2);
-      gainNode.connect(ctx.destination);
-      [440,880,440].forEach((freq,i)=>{
-        const osc = ctx.createOscillator();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime+(i*0.15));
-        osc.connect(gainNode);
-        osc.start(ctx.currentTime+(i*0.15));
-        osc.stop(ctx.currentTime+(i*0.15)+0.35);
-      });
-    } catch(e){}
-  }
-
-  addEvent('!', '🚨 DROWSINESS ALERT — EAR: '+ear.toFixed(3));
-  showToast('🚨 DROWSINESS DETECTED — WAKE UP!');
-
-  // Save to session history
-  const history = JSON.parse(localStorage.getItem('occulert-history')||'[]');
-  history.unshift({ts:new Date().toISOString(),ear:ear.toFixed(3),count:alertCount});
-  if(history.length > 100) history.length = 100;
-  localStorage.setItem('occulert-history', JSON.stringify(history));
-}
-
-// ============================================================
-// MONITORING TOGGLE
-// ============================================================
+// ---- TOGGLE MONITORING ----
 async function toggleMonitoring(){
-  if(isMonitoring){ stopMonitoring(); } else { await startMonitoring(); }
-}
-
-async function startMonitoring(){
-  const btn = document.getElementById('start-btn');
-  btn.textContent = 'STARTING...';
-  btn.disabled = true;
-
-  const ok = await startCamera();
-  if(!ok){ btn.textContent = '► START MONITORING'; btn.disabled=false; return; }
-
-  isMonitoring = true;
-  alertCount = 0;
-  blinkFrames = 0;
-  earBuffer = [];
-  noFaceFrames = 0;
-  document.getElementById('alert-display').textContent='0';
-  document.getElementById('blink-display').textContent='0';
-  document.getElementById('alert-block').classList.remove('danger-stat');
-
-  btn.classList.add('monitoring');
-  btn.textContent = '◼ STOP MONITORING';
-  btn.disabled = false;
-
-  document.getElementById('status-badge').className='status-badge warning';
-  document.getElementById('status-badge').textContent='CALIBRATING';
-
-  addEvent('ok', '► Monitoring started');
-  startCalibration();
-  initMediaPipe();
-}
-
-function stopMonitoring(){
-  isMonitoring = false;
-  calibrating = false;
-  calibrationDone = false;
-  earBuffer = [];
-  noFaceFrames = 0;
-
-  if(mpCamera){mpCamera.stop();mpCamera=null;}
-  if(faceMesh){faceMesh.close();faceMesh=null;}
-  stopCamera();
-
-  document.getElementById('calibration-overlay').style.display='none';
-  document.getElementById('gauge-fill').style.width='0%';
-  document.getElementById('gauge-pct').textContent='--';
-  document.getElementById('ear-display').textContent='--';
-
-  const btn = document.getElementById('start-btn');
-  btn.classList.remove('monitoring');
-  btn.textContent = '► START MONITORING';
-  btn.disabled = false;
-
-  document.getElementById('status-badge').className='status-badge offline';
-  document.getElementById('status-badge').textContent='OFFLINE';
-
-  const camWrap = document.getElementById('camera-wrap');
-  camWrap.classList.remove('active-border','warn-border','danger-border');
-
-  addEvent('i', '◼ Monitoring stopped');
-}
-
-// ============================================================
-// BLUETOOTH
-// ============================================================
-async function pairBluetooth(type){
-  const btn = document.getElementById('bt-'+type+'-btn');
-  const status = document.getElementById('bt-'+type+'-status');
-  if(!navigator.bluetooth){ showToast('⚠️ Bluetooth not available in this browser'); return; }
-  try {
-    btn.textContent='PAIRING...';
-    const device = await navigator.bluetooth.requestDevice({acceptAllDevices:true});
-    btn.textContent='CONN';
-    btn.classList.add('connected');
-    if(status) status.textContent = 'Connected: '+device.name;
-    addEvent('bt', '🔵 Paired: '+device.name);
-    showToast('✅ Paired: '+device.name);
-  } catch(e){
-    btn.textContent='PAIR';
-    if(e.name!=='NotFoundError') showToast('⚠️ Bluetooth: '+e.message);
-  }
-}
-
-// ============================================================
-// EVENT LOG
-// ============================================================
-let eventLog = [];
-function addEvent(type, msg){
-  const time = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-  const icons = {ok:'✅',w:'⚠️','!':'🚨',i:'ℹ️',bt:'🔵'};
-  const icon = icons[type]||'•';
-  eventLog.unshift({icon,time,msg});
-  if(eventLog.length>50) eventLog.length=50;
-  renderEventLog();
-}
-
-function renderEventLog(){
-  const container = document.getElementById('event-log');
-  const empty = document.getElementById('event-empty');
-  if(eventLog.length===0){
-    if(empty) empty.style.display='block';
-    return;
-  }
-  if(empty) empty.style.display='none';
-  const frag = document.createDocumentFragment();
-  eventLog.slice(0,20).forEach(e=>{
-    const div = document.createElement('div');
-    div.className='event-item';
-    div.innerHTML=`<span class="event-icon">${e.icon}</span><span class="event-time">${e.time}</span><span class="event-msg">${e.msg}</span>`;
-    frag.appendChild(div);
-  });
-  container.innerHTML='';
-  container.appendChild(frag);
-}
-
-// ============================================================
-// SESSION HISTORY
-// ============================================================
-function viewSessionHistory(){
-  const history = JSON.parse(localStorage.getItem('occulert-history')||'[]');
-  const container = document.getElementById('history-list');
-  if(history.length===0){
-    container.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px;">No session history yet.</div>';
+  if(isRunning){
+    // STOP
+    isRunning=false;
+    if(camera){try{camera.stop();}catch(e){}}
+    if(animFrame){cancelAnimationFrame(animFrame);animFrame=null;}
+    stopCamera();
+    startBtn.textContent='▶ START MONITORING';
+    startBtn.classList.remove('running');
+    statusBadge.className='status-badge offline';
+    statusBadge.textContent='OFFLINE';
+    earVal.textContent='--';blinkVal.textContent='0';
+    earBar.style.width='0%';earPct.textContent='--';
+    earHistory=[];closedFrames=0;
+    camWrap.className='camera-wrap';
+    eyeDot.classList.remove('active');eyesLabel.textContent='EYES';
+    addHistory('info','⏹️ Session stopped');
+    gtag('event','session_stop',{alerts:alertCount});
   } else {
-    container.innerHTML = history.map(h=>`
-      <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-size:13px;color:var(--text);">🚨 Alert #${h.count} — EAR: ${h.ear}</div>
-          <div style="font-size:11px;color:var(--text3);">${new Date(h.ts).toLocaleString()}</div>
-        </div>
-      </div>
-    `).join('');
-  }
-  openModal('modal-history');
-  closeModal('modal-account');
-}
-
-function clearHistory(){
-  localStorage.removeItem('occulert-history');
-  document.getElementById('history-list').innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px;">History cleared.</div>';
-  showToast('✅ Session history cleared');
-}
-
-// ============================================================
-// TOAST
-// ============================================================
-function showToast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(t._timer);
-  t._timer = setTimeout(()=>t.classList.remove('show'), 2800);
-}
-
-// ============================================================
-// PREVENT SCREEN SLEEP
-// ============================================================
-let wakeLock = null;
-async function requestWakeLock(){
-  try {
-    if('wakeLock' in navigator){
-      wakeLock = await navigator.wakeLock.request('screen');
-      addEvent('i', '💡 Screen wake lock active');
+    // START
+    startBtn.textContent='Starting...';
+    startBtn.disabled=true;
+    const ok=await startCamera();
+    startBtn.disabled=false;
+    if(!ok){startBtn.textContent='▶ START MONITORING';return;}
+    isRunning=true;
+    blinkFrames=0;alertCount=0;closedFrames=0;earHistory=[];
+    blinkVal.textContent='0';alertValEl.textContent='0';
+    alertValEl.classList.remove('danger');
+    startBtn.textContent='⏹ STOP MONITORING';
+    startBtn.classList.add('running');
+    if(!calibrationDone){startCalibration();}
+    if(!modelReady){
+      modelDot.className='model-dot loading';modelLabel.textContent='Loading AI Model...';
+      addHistory('info','🚀 Loading AI model...');
     }
-  } catch(e){}
+    initCameraUtils();
+    addHistory('ok','🟢 Monitoring started');
+    gtag('event','session_start');
+  }
 }
 
-document.addEventListener('visibilitychange', async()=>{
-  if(document.visibilityState==='visible' && isMonitoring) await requestWakeLock();
+// ---- BLUETOOTH ----
+async function pairBluetooth(type){
+  if(!navigator.bluetooth){showToast('Bluetooth not supported in this browser');return;}
+  try{
+    showToast('Searching for '+type+'...');
+    const device=await navigator.bluetooth.requestDevice({acceptAllDevices:true});
+    const btn=document.getElementById('bt-'+type+'-btn');
+    const sub=document.getElementById('bt-'+type+'-status');
+    if(btn){btn.textContent='CONNECTED';btn.classList.add('connected');}
+    if(sub)sub.textContent=device.name||'Connected';
+    addHistory('ok','📶 '+device.name+' connected');
+    showToast(device.name+' connected!');
+  }catch(e){
+    if(e.name!=='NotFoundError'){showToast('Bluetooth pairing failed');}
+  }
+}
+
+// ---- CLOSE PANELS ON OUTSIDE CLICK ----
+document.addEventListener('click',function(e){
+  if(!e.target.closest('#theme-panel')&&!e.target.closest('[onclick="toggleThemePanel()"]')){
+    document.getElementById('theme-panel').classList.remove('show');
+  }
+  if(!e.target.closest('.lang-wrap')){
+    document.querySelectorAll('.lang-panel').forEach(p=>p.classList.remove('show'));
+  }
 });
 
-// ============================================================
-// AI MODEL STATUS
-// ============================================================
-function checkAIModel(){
-  const isReady = typeof FaceMesh !== 'undefined';
-  const statusEl = document.getElementById('ai-status-wrap');
-  if(statusEl) statusEl.style.display = isReady ? 'none' : 'flex';
-  return isReady;
-}
+// ---- HANDLE PAGE VISIBILITY (pause when tab hidden) ----
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden&&isRunning){
+    addHistory('warn','👁 App backgrounded — monitoring paused');
+  }
+});
 
-// ============================================================
-// INIT
-// ============================================================
+// ---- INIT ----
 (function init(){
-  loadSettings();
+  applyTheme(currentTheme);
   buildThemeGrid();
-  applyTheme(localStorage.getItem('occulert-theme')||'cyan');
-  buildLangMenu();
-  const lang = LANGS.find(l=>l.code===currentLang)||LANGS[0];
-  document.getElementById('lang-btn').textContent = lang.flag;
-  updateAccountUI();
-
-  // AI model status indicator
-  let checks = 0;
-  const modelCheck = setInterval(()=>{
-    checks++;
-    if(typeof FaceMesh !== 'undefined'){
-      clearInterval(modelCheck);
-      addEvent('ok', '✅ AI model loaded');
-    } else if(checks > 20){
-      clearInterval(modelCheck);
-      addEvent('w', '⚠ AI model load timeout – check your connection');
+  buildLangPanel();
+  loadSettings();
+  updateAuthUI();
+  // Set lang display
+  const cur=LANGS.find(l=>l.code===currentLang);
+  if(cur){
+    document.getElementById('lang-flag').textContent=cur.flag;
+    document.getElementById('lang-name').textContent=cur.abbr;
+  }
+  // Preload model check
+  setTimeout(()=>{
+    if(window.FaceMesh){
+      modelDot.className='model-dot ready';modelLabel.textContent='AI Model Ready';modelReady=true;
     }
-  }, 500);
-
-  // Wake lock on start
-  requestWakeLock();
+  },3000);
 })();
 </script>
-<!-- AI MODEL STATUS (bottom of page, shown until model loads) -->
-<div id="ai-status-wrap" style="position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:8px;z-index:50;">
-  <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite;"></div>
-  <span style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--accent2);">● AI Model Ready</span>
-</div>
 </body>
 </html>
