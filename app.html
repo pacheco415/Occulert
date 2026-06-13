@@ -9,1242 +9,1251 @@
 <meta name="apple-mobile-web-app-title" content="Occulert"/>
 <link rel="manifest" href="manifest.json"/>
 <link rel="icon" type="image/png" href="occulert-logo-alt.png"/>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-YCC8W4F0X9"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-YCC8W4F0X9');</script>
-
-<!-- FIX #3: Preload MediaPipe scripts immediately on page load instead of waiting for Start -->
+<!-- Preload MediaPipe immediately -->
 <script>
 (function preloadMediaPipe(){
   const s1=document.createElement('script');
-  s1.src='https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
+  s1.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
   s1.crossOrigin='anonymous';
-  const s2=document.createElement('script');
-  s2.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
-  s2.crossOrigin='anonymous';
-  s1.onload=()=>document.head.appendChild(s2);
-  s2.onload=()=>{
-    window._mpReady=true;
-    window._mpReadyCb&&window._mpReadyCb();
-  };
   document.head.appendChild(s1);
+  const s2=document.createElement('script');
+  s2.src='https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
+  s2.crossOrigin='anonymous';
+  document.head.appendChild(s2);
 })();
 </script>
-
 <style>
-:root{
---bg:#050a0f;--panel:#0a1520;--border:#0e2840;
---accent:#00e5ff;--accent2:#00ff88;--warn:#ffaa00;--danger:#ff2244;
---text:#c8dde8;--dim:#4a6a7a;--glow:0 0 20px rgba(0,229,255,0.3);
-}
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;}
-body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px);pointer-events:none;z-index:9999;}
-body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
-
-/* BACK BAR */
-#back-bar{position:fixed;top:0;left:0;right:0;z-index:999;height:52px;background:rgba(5,10,15,0.97);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;}
-#back-btn{display:flex;align-items:center;gap:7px;padding:6px 14px;background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.2);border-radius:8px;color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;text-decoration:none;transition:all .2s;}
-#back-btn:hover{background:rgba(0,229,255,0.12);border-color:rgba(0,229,255,0.4);}
-#back-btn svg{width:13px;height:13px;}
-#bar-brand{display:flex;align-items:center;gap:7px;}
-#bar-title{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--accent);letter-spacing:2px;font-weight:600;}
-#bar-sub{font-size:9px;color:var(--dim);letter-spacing:1px;}
-#bar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
-.bar-icon-btn{width:32px;height:32px;background:rgba(0,229,255,0.06);border:1px solid var(--border);border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--dim);transition:all .2s;}
-.bar-icon-btn:hover{border-color:var(--accent);color:var(--accent);}
-
-/* LANG SWITCHER */
-.lang-switcher{position:relative;}
-.lang-trigger{background:rgba(0,229,255,.06);border:1px solid var(--border);border-radius:7px;color:var(--dim);font-size:10px;cursor:pointer;font-family:'Share Tech Mono',monospace;padding:5px 9px;letter-spacing:1px;transition:all .2s;white-space:nowrap;}
-.lang-trigger:hover{border-color:var(--accent);color:var(--accent);}
-.lang-menu{position:absolute;top:calc(100% + 8px);right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:150px;box-shadow:0 16px 40px rgba(0,0,0,.6);z-index:700;display:none;}
-.lang-menu.open{display:block;}
-.lang-option{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:12px;color:var(--dim);cursor:pointer;transition:background .15s;font-family:'Share Tech Mono',monospace;}
-.lang-option:hover{background:rgba(255,255,255,.04);color:var(--text);}
-.lang-option.active{color:var(--accent2);}
-.lang-option span:first-child{font-size:16px;}
-
-/* AUTH MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:800;display:none;align-items:center;justify-content:center;padding:20px;}
-.modal-overlay.show{display:flex;}
-.modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width:400px;position:relative;}
-.modal-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--dim);cursor:pointer;font-size:20px;line-height:1;}
-.modal-close:hover{color:var(--text);}
-.modal-title{font-size:22px;font-weight:700;color:var(--accent);letter-spacing:2px;margin-bottom:6px;font-family:'Share Tech Mono',monospace;}
-.modal-sub{font-size:13px;color:var(--dim);margin-bottom:28px;line-height:1.5;}
-.modal-tabs{display:flex;gap:0;margin-bottom:24px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-.modal-tab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;letter-spacing:1px;cursor:pointer;transition:all .15s;border:none;font-family:'Rajdhani',sans-serif;color:var(--dim);background:transparent;}
-.modal-tab.active{background:var(--accent);color:#000;}
-.form-group{margin-bottom:16px;}
-.form-label{font-size:11px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-bottom:6px;display:block;}
-.form-input{width:100%;padding:12px 16px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-family:'Rajdhani',sans-serif;outline:none;transition:border-color .15s;}
-.form-input:focus{border-color:var(--accent);}
-.form-input::placeholder{color:var(--dim);}
-.auth-btn{width:100%;padding:13px;font-size:15px;font-weight:700;letter-spacing:2px;border-radius:8px;border:none;cursor:pointer;font-family:'Rajdhani',sans-serif;transition:all .15s;margin-bottom:12px;}
-.auth-btn.primary{background:linear-gradient(135deg,var(--accent),#0066ff);color:#000;}
-.auth-btn.primary:hover{box-shadow:0 0 24px rgba(0,229,255,.4);transform:translateY(-1px);}
-.auth-btn.passkey{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.3);color:var(--accent2);display:flex;align-items:center;justify-content:center;gap:10px;}
-.auth-btn.passkey:hover{background:rgba(0,255,136,.12);border-color:rgba(0,255,136,.5);}
-.auth-divider{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
-.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border);}
-.auth-divider span{font-size:11px;color:var(--dim);letter-spacing:1px;}
-.auth-success{display:none;text-align:center;padding:20px 0;}
-.auth-success .check{font-size:48px;margin-bottom:12px;}
-.auth-success p{font-size:14px;color:var(--accent2);font-weight:600;}
-.auth-success small{font-size:12px;color:var(--dim);margin-top:4px;display:block;}
-
-/* THEME MODAL */
-.theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
-.theme-swatch{width:100%;aspect-ratio:1;border-radius:10px;cursor:pointer;border:2px solid transparent;transition:all .2s;position:relative;}
-.theme-swatch.active{border-color:white;box-shadow:0 0 12px rgba(255,255,255,.3);}
-.theme-label{font-size:10px;color:var(--dim);text-align:center;margin-top:5px;letter-spacing:1px;}
-
-/* RATING MODAL */
-.rating-stars{display:flex;gap:8px;justify-content:center;margin:20px 0;}
-.rating-star{font-size:36px;cursor:pointer;transition:transform .15s;filter:grayscale(1);}
-.rating-star.active,.rating-star:hover{filter:grayscale(0);transform:scale(1.2);}
-.rating-input{width:100%;padding:10px 14px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;outline:none;resize:none;margin-bottom:14px;min-height:72px;}
-.rating-submit{width:100%;padding:12px;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;font-family:'Rajdhani',sans-serif;}
-.rating-success{display:none;text-align:center;padding:16px 0;color:var(--accent2);font-size:14px;font-weight:600;}
-
-/* FIX #3: Model loading indicator */
-#model-status{
-  position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
-  background:rgba(10,21,32,0.95);border:1px solid var(--border);
-  border-radius:8px;padding:8px 16px;font-family:'Share Tech Mono',monospace;
-  font-size:11px;color:var(--dim);letter-spacing:1px;z-index:500;
-  transition:opacity .5s;display:flex;align-items:center;gap:8px;
-}
-#model-status.ready{color:var(--accent2);border-color:rgba(0,255,136,.3);}
-#model-status.hidden{opacity:0;pointer-events:none;}
-.model-dot{width:6px;height:6px;border-radius:50%;background:var(--warn);animation:pulse 1s ease-in-out infinite;}
-.model-dot.ready{background:var(--accent2);animation:none;}
-@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
-
-/* APP LAYOUT */
-.app{position:relative;z-index:1;width:100%;max-width:1200px;padding:52px 0 0;display:flex;flex-direction:column;}
-.dash-grid{display:grid;grid-template-columns:1fr 300px;gap:0;width:100%;flex:1;min-height:0;padding:0 0 12px;}
-.dash-left{display:flex;flex-direction:column;padding:0 8px 0 16px;gap:0;}
-.dash-right{display:flex;flex-direction:column;gap:8px;padding:0 16px 0 8px;overflow-y:auto;max-height:calc(100vh - 122px);}
-.dash-right::-webkit-scrollbar{width:3px;}
-.dash-right::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-
-/* SIDE PANELS */
-.side-panel{background:var(--panel);border:1px solid var(--border);border-radius:7px;overflow:hidden;}
-.side-panel-header{padding:8px 14px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;font-family:'Share Tech Mono',monospace;}
-
-@media(max-width:768px){
-  .dash-grid{grid-template-columns:1fr;padding:0;}
-  .dash-left{padding:0 10px;}
-  .dash-right{padding:0 10px;max-height:none;overflow-y:visible;}
+html,body{height:100%;overflow:hidden;}
+:root{
+  --accent:#00e5ff;--accent2:#00b8d4;--accent-rgb:0,229,255;
+  --bg:#050a0f;--bg2:#0a1118;--bg3:#0f1923;
+  --card:#0d1520;--border:rgba(0,229,255,0.12);--border2:rgba(0,229,255,0.22);
+  --text:#c8d8e8;--text2:#7a9bb5;--text3:#456070;
+  --green:#00ff88;--warn:#ffaa00;--danger:#ff3355;--dim:#334455;
+  --panel-w:320px;
 }
 
-/* HEADER */
-header{width:100%;padding:16px 24px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(0,229,255,0.04) 0%,transparent 100%);}
-.logo-wrap{display:flex;align-items:center;gap:10px;}
-.logo-icon{width:30px;height:30px;border:2px solid var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;box-shadow:var(--glow);animation:pb 2s ease-in-out infinite;}
-@keyframes pb{0%,100%{box-shadow:0 0 10px rgba(0,229,255,.3);}50%{box-shadow:0 0 25px rgba(0,229,255,.7);}}
-.logo-text{font-size:20px;font-weight:700;letter-spacing:2px;color:var(--accent);text-shadow:0 0 20px rgba(0,229,255,.4);}
-.logo-sub{font-size:9px;letter-spacing:3px;color:var(--dim);font-family:'Share Tech Mono',monospace;text-transform:uppercase;}
-.status-badge{font-family:'Share Tech Mono',monospace;font-size:10px;padding:3px 9px;border-radius:4px;border:1px solid;letter-spacing:1px;transition:all .3s;}
+/* FONT */
+body{font-family:'Rajdhani',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
+
+/* TOPBAR */
+.topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0;z-index:100;}
+.topbar-left{display:flex;align-items:center;gap:12px;}
+.back-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(0,229,255,0.06);border:1px solid var(--border);border-radius:7px;color:var(--text2);font-size:13px;font-weight:600;text-decoration:none;letter-spacing:0.5px;transition:all .15s;font-family:'Rajdhani',sans-serif;}
+.back-btn:hover{background:rgba(0,229,255,0.12);color:var(--accent);}
+.topbar-title{font-size:15px;font-weight:700;letter-spacing:3px;color:var(--text2);text-transform:uppercase;}
+.topbar-sub{font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;}
+.topbar-right{display:flex;align-items:center;gap:8px;}
+.topbar-btn{width:36px;height:36px;background:var(--card);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .15s;position:relative;}
+.topbar-btn:hover{border-color:var(--border2);background:var(--bg3);}
+
+/* STATUS BADGE */
+.status-badge{font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid;letter-spacing:1px;text-transform:uppercase;}
 .status-badge.offline{border-color:var(--dim);color:var(--dim);}
-.status-badge.active{border-color:var(--accent2);color:var(--accent2);box-shadow:0 0 10px rgba(0,255,136,.3);}
+.status-badge.active{border-color:var(--accent2);color:var(--accent2);box-shadow:0 0 10px rgba(0,229,255,0.2);}
 .status-badge.warning{border-color:var(--warn);color:var(--warn);}
-.status-badge.danger{border-color:var(--danger);color:var(--danger);animation:bb .5s ease-in-out infinite;}
-@keyframes bb{0%,100%{opacity:1;}50%{opacity:.4;}}
+.status-badge.danger{border-color:var(--danger);color:var(--danger);animation:blink .5s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.4;}}
 
-/* CAMERA */
-.camera-wrap{width:calc(100% - 32px);margin:10px 16px 6px;position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#000;aspect-ratio:4/3;}
-.camera-wrap.active-border{border-color:rgba(0,229,255,.4);box-shadow:0 0 30px rgba(0,229,255,.12);}
-.camera-wrap.warn-border{border-color:rgba(255,170,0,.6);box-shadow:0 0 30px rgba(255,170,0,.22);}
-.camera-wrap.danger-border{border-color:var(--danger);animation:dp .5s ease-in-out infinite;}
-@keyframes dp{0%,100%{box-shadow:0 0 30px rgba(255,34,68,.3);}50%{box-shadow:0 0 60px rgba(255,34,68,.7);}}
+/* MAIN LAYOUT */
+.main-layout{flex:1;display:flex;overflow:hidden;}
+
+/* CAMERA PANEL */
+.camera-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+
+/* HEADER BAR (inside camera panel) */
+.app-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;}
+.app-logo-area{display:flex;align-items:center;gap:10px;}
+.app-logo-img{width:34px;height:34px;border-radius:8px;}
+.app-logo-text{font-size:18px;font-weight:700;letter-spacing:3px;color:var(--accent);text-transform:uppercase;}
+.app-logo-sub{font-size:9px;letter-spacing:2px;color:var(--text3);}
+.camera-wrap{flex:1;margin:10px 16px 6px;position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--border);}
+.camera-wrap.active-border{border-color:rgba(0,229,255,0.4);box-shadow:0 0 30px rgba(0,229,255,0.1);}
+.camera-wrap.warn-border{border-color:rgba(255,170,0,0.6);box-shadow:0 0 30px rgba(255,170,0,.2);}
+.camera-wrap.danger-border{border-color:var(--danger);box-shadow:0 0 30px rgba(255,51,85,.3);animation:dp .5s ease-in-out infinite;}
+@keyframes dp{0%,100%{box-shadow:0 0 30px rgba(255,51,85,.3);}50%{box-shadow:0 0 60px rgba(255,51,85,.7);}}
 #video{width:100%;height:100%;object-fit:cover;display:block;}
 #video.mirror{transform:scaleX(-1);}
 #canvas{position:absolute;top:0;left:0;width:100%;height:100%;}
 #canvas.mirror{transform:scaleX(-1);}
 .cam-overlay{position:absolute;inset:0;pointer-events:none;}
+
+/* Corner brackets */
 .corner{position:absolute;width:18px;height:18px;border-color:var(--accent);border-style:solid;}
 .corner.tl{top:8px;left:8px;border-width:2px 0 0 2px;}
 .corner.tr{top:8px;right:8px;border-width:2px 2px 0 0;}
 .corner.bl{bottom:8px;left:8px;border-width:0 0 2px 2px;}
 .corner.br{bottom:8px;right:8px;border-width:0 2px 2px 0;}
-.scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;animation:scan 3s ease-in-out infinite;}
-@keyframes scan{0%{top:0%;opacity:0;}10%{opacity:.6;}90%{opacity:.6;}100%{top:100%;opacity:0;}}
-.eye-indicator{position:absolute;top:10px;right:10px;display:flex;gap:5px;align-items:center;}
-.eye-dot{width:7px;height:7px;border-radius:50%;background:var(--dim);transition:background .2s,box-shadow .2s;}
-.eye-dot.open{background:var(--accent2);box-shadow:0 0 8px rgba(0,255,136,.7);}
-.eye-dot.closed{background:var(--danger);box-shadow:0 0 8px rgba(255,34,68,.7);}
-.ear-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;}
-.cam-controls{position:absolute;bottom:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;pointer-events:all;}
-.cam-ctrl-btn{background:rgba(5,10,15,.7);border:1px solid rgba(0,229,255,.25);border-radius:7px;padding:5px 10px;font-size:10px;font-family:'Share Tech Mono',monospace;color:var(--accent);cursor:pointer;letter-spacing:1px;transition:all .2s;}
-.cam-ctrl-btn:hover{border-color:var(--accent);background:rgba(0,229,255,.08);}
-.no-cam{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;text-align:center;}
-.no-cam svg{opacity:.3;}
 
-/* METRICS */
-.metrics{width:calc(100% - 32px);margin:0 16px 6px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}
-.metric-card{background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;}
-.metric-val{font-family:'Share Tech Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);line-height:1;transition:color .3s;}
-.metric-val.warn{color:var(--warn);}
-.metric-val.danger{color:var(--danger);}
-.metric-label{font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;text-align:center;}
+/* Camera labels */
+.cam-label{position:absolute;top:12px;left:50%;transform:translateX(-50%);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--accent2);display:flex;align-items:center;gap:6px;}
+.cam-label::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(0.8);}}
+.cam-side-label{position:absolute;bottom:12px;right:12px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--text3);}
+.cam-inactive-msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
+.cam-inactive-icon{font-size:48px;opacity:.25;}
+.cam-inactive-text{font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:3px;color:var(--text3);}
 
-/* EAR BAR */
-.ear-section{width:calc(100% - 32px);margin:0 16px 6px;background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:12px 14px;}
-.ear-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-.ear-title{font-size:10px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;font-family:'Share Tech Mono',monospace;}
-.ear-val{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);transition:color .2s;}
-.ear-val.warn{color:var(--warn);}
-.ear-val.danger{color:var(--danger);}
-.ear-bar-bg{height:7px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;}
-.ear-bar-fill{height:100%;border-radius:3px;transition:width .15s,background .3s;background:var(--accent2);}
+/* CALIBRATION OVERLAY */
+.calibration-overlay{position:absolute;inset:0;background:rgba(5,10,15,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:20;backdrop-filter:blur(4px);}
+.calibration-title{font-size:16px;font-weight:700;letter-spacing:3px;color:var(--accent);text-transform:uppercase;}
+.calibration-progress-wrap{width:200px;background:var(--bg3);border-radius:4px;height:6px;overflow:hidden;}
+.calibration-progress{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width .3s ease;}
+.calibration-tip{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:1.5px;text-align:center;max-width:260px;line-height:1.6;}
 
-/* ALERT */
-.alert-box{width:calc(100% - 32px);margin:0 16px 6px;border-radius:7px;padding:12px 14px;border:1px solid;display:none;align-items:center;gap:10px;}
-.alert-box.warn-alert{display:flex;background:rgba(255,170,0,.08);border-color:rgba(255,170,0,.4);}
-.alert-box.danger-alert{display:flex;background:rgba(255,34,68,.1);border-color:rgba(255,34,68,.5);animation:af .8s ease-in-out infinite;}
-@keyframes af{0%,100%{background:rgba(255,34,68,.08);}50%{background:rgba(255,34,68,.18);}}
-.alert-icon{font-size:22px;flex-shrink:0;}
-.alert-title{font-size:15px;font-weight:700;letter-spacing:1px;}
-.alert-sub{font-size:11px;opacity:.7;font-family:'Share Tech Mono',monospace;}
-.warn-alert .alert-title{color:var(--warn);}
-.danger-alert .alert-title{color:var(--danger);}
+/* CAMERA CONTROLS */
+.camera-controls{padding:0 16px 8px;display:flex;align-items:center;gap:8px;}
+.ctrl-btn{padding:7px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:12px;font-weight:600;letter-spacing:1px;cursor:pointer;font-family:'Rajdhani',sans-serif;transition:all .15s;display:flex;align-items:center;gap:6px;text-transform:uppercase;}
+.ctrl-btn:hover{border-color:var(--border2);color:var(--accent);}
+.ctrl-btn.active{background:rgba(0,229,255,0.08);border-color:var(--accent2);color:var(--accent);}
 
-/* CONTROLS */
-.controls{width:calc(100% - 32px);margin:0 16px 10px;display:flex;gap:8px;}
-.btn-primary{flex:1;padding:13px;background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:7px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
-.btn-primary:hover{box-shadow:0 0 20px rgba(0,229,255,.3);}
-.btn-primary.stop{border-color:var(--danger);color:var(--danger);}
-.btn-secondary{padding:13px 14px;background:var(--panel);border:1px solid var(--border);color:var(--dim);font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border-radius:7px;cursor:pointer;transition:all .2s;}
-.btn-secondary:hover{border-color:var(--dim);color:var(--text);}
+/* STATS BAR */
+.stats-bar{margin:0 16px 8px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.stat-block{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center;}
+.stat-val{font-family:'Share Tech Mono',monospace;font-size:22px;font-weight:700;color:var(--accent2);line-height:1;}
+.stat-label{font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-top:4px;}
+.stat-block.warn-stat .stat-val{color:var(--warn);}
+.stat-block.danger-stat .stat-val{color:var(--danger);}
 
-/* HISTORY */
-.history-list{max-height:130px;overflow-y:auto;}
-.history-list::-webkit-scrollbar{width:3px;}
-.history-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-.history-item{padding:7px 14px;display:flex;gap:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,.03);font-family:'Share Tech Mono',monospace;font-size:10px;}
-.history-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
-.history-dot.w{background:var(--warn);}
-.history-dot.d{background:var(--danger);}
-.history-dot.ok{background:var(--accent2);}
-.history-time{color:var(--dim);flex-shrink:0;}
-.history-msg{color:var(--text);flex:1;}
-.history-empty{padding:16px;text-align:center;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;}
+/* EYE OPENNESS GAUGE */
+.gauge-wrap{margin:0 16px 8px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
+.gauge-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.gauge-label{font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;}
+.gauge-val{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text2);}
+.gauge-track{background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;}
+.gauge-fill{height:100%;border-radius:4px;transition:width .1s ease, background .3s;}
 
-/* USER BADGE */
-.user-badge{width:calc(100% - 32px);margin:14px 16px 0;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:7px;padding:10px 14px;display:none;align-items:center;justify-content:space-between;}
-.user-badge.show{display:flex;}
-.ub-name{font-size:13px;color:var(--accent2);font-weight:600;letter-spacing:1px;}
-.ub-sub{font-size:10px;color:var(--dim);font-family:'Share Tech Mono',monospace;}
-.ub-logout{font-size:10px;color:var(--dim);cursor:pointer;border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-family:'Share Tech Mono',monospace;background:transparent;transition:all .2s;}
-.ub-logout:hover{color:var(--danger);border-color:var(--danger);}
+/* START BUTTON */
+.start-btn{margin:0 16px 10px;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;color:var(--text2);font-size:14px;font-weight:700;letter-spacing:3px;cursor:pointer;font-family:'Rajdhani',sans-serif;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s;}
+.start-btn:hover{border-color:var(--accent2);color:var(--accent);}
+.start-btn.monitoring{background:rgba(0,229,255,0.06);border-color:var(--accent);color:var(--accent);box-shadow:0 0 20px rgba(0,229,255,.1);}
+.start-btn.monitoring:hover{background:rgba(255,51,85,0.06);border-color:var(--danger);color:var(--danger);}
 
-/* PERM MSG */
-.perm-msg{background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.18);border-radius:7px;padding:14px;margin:0 16px 10px;width:calc(100% - 32px);font-size:12px;color:var(--dim);font-family:'Share Tech Mono',monospace;letter-spacing:.5px;line-height:1.6;display:none;}
-.perm-msg.show{display:block;}
+/* RIGHT PANEL */
+.right-panel{width:var(--panel-w);background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;}
+.panel-section{border-bottom:1px solid var(--border);padding:14px 16px;}
+.panel-title{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:14px;}
 
-/* SETTINGS */
-.settings{width:calc(100% - 32px);margin:0 16px 10px;background:var(--panel);border:1px solid var(--border);border-radius:7px;overflow:hidden;display:none;}
-.settings.open{display:block;}
-.settings-header{padding:10px 14px;border-bottom:1px solid var(--border);font-size:10px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;font-family:'Share Tech Mono',monospace;}
-.setting-row{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.03);}
-.setting-label{font-size:13px;color:var(--text);}
-.setting-sub{font-size:10px;color:var(--dim);margin-top:1px;font-family:'Share Tech Mono',monospace;}
-.setting-control{display:flex;align-items:center;gap:7px;font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);}
-.setting-control button{width:24px;height:24px;background:var(--border);border:1px solid var(--dim);color:var(--text);border-radius:4px;cursor:pointer;font-size:15px;line-height:1;transition:all .2s;}
-.setting-control button:hover{background:rgba(0,229,255,.1);border-color:var(--accent);}
-.toggle-btn{padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Share Tech Mono',monospace;border:1px solid;transition:all .2s;}
-.toggle-btn.on{color:var(--accent2);border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.08);}
-.toggle-btn.off{color:var(--dim);border-color:var(--border);background:transparent;}
+/* CONFIG CONTROLS */
+.config-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.config-row:last-child{margin-bottom:0;}
+.config-info{display:flex;flex-direction:column;}
+.config-name{font-size:13px;font-weight:600;color:var(--text);letter-spacing:.5px;}
+.config-sub{font-size:11px;color:var(--text3);}
+.config-ctrl{display:flex;align-items:center;gap:8px;}
+.num-ctrl{display:flex;align-items:center;gap:6px;}
+.num-btn{width:26px;height:26px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:'Rajdhani',sans-serif;line-height:1;}
+.num-btn:hover{border-color:var(--border2);color:var(--accent);}
+.num-val{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text);min-width:36px;text-align:center;}
+
+/* TOGGLE */
+.toggle{width:42px;height:22px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;cursor:pointer;position:relative;transition:all .2s;}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--text3);transition:all .2s;}
+.toggle.on{background:rgba(0,229,255,0.15);border-color:var(--accent2);}
+.toggle.on::after{left:calc(100% - 18px);background:var(--accent);}
+
+/* BLUETOOTH */
+.bt-device{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.bt-device:last-child{margin-bottom:0;}
+.bt-info{display:flex;align-items:center;gap:8px;}
+.bt-icon{font-size:18px;}
+.bt-name{font-size:12px;font-weight:600;color:var(--text);}
+.bt-status{font-size:10px;color:var(--text3);}
+.bt-btn{padding:4px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--text3);cursor:pointer;font-family:'Share Tech Mono',monospace;transition:all .15s;text-transform:uppercase;}
+.bt-btn:hover{border-color:var(--accent2);color:var(--accent);}
+.bt-btn.connected{border-color:var(--green);color:var(--green);}
+
+/* EVENT LOG */
+.event-log{flex:1;overflow-y:auto;min-height:80px;max-height:220px;}
+.event-item{padding:8px 0;border-bottom:1px solid rgba(0,229,255,0.05);display:flex;align-items:flex-start;gap:8px;font-size:12px;}
+.event-item:last-child{border-bottom:none;}
+.event-icon{font-size:13px;flex-shrink:0;margin-top:1px;}
+.event-time{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text3);flex-shrink:0;margin-top:2px;}
+.event-msg{color:var(--text2);line-height:1.4;}
+.event-empty{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:2px;text-align:center;padding:20px 0;}
+
+/* THEME PICKER (in-app) */
+.theme-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.theme-dot{width:100%;aspect-ratio:1;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:all .15s;position:relative;}
+.theme-dot.active{border-color:#fff;box-shadow:0 0 0 1px #fff;}
+.theme-dot-check{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;display:none;}
+.theme-dot.active .theme-dot-check{display:flex;}
+
+/* MODALS */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);display:none;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:360px;width:calc(100% - 32px);max-height:80vh;overflow-y:auto;}
+.modal-title{font-size:16px;font-weight:700;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:6px;}
+.modal-sub{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.5;}
+.modal-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;width:28px;height:28px;border-radius:6px;}
+.modal-close:hover{background:var(--bg3);color:var(--text);}
+.modal-relative{position:relative;}
+.modal-input{width:100%;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;margin-bottom:12px;outline:none;transition:border-color .15s;}
+.modal-input:focus{border-color:var(--accent2);}
+.modal-btn{width:100%;padding:12px;background:var(--accent);border:none;border-radius:8px;color:#000;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:'Rajdhani',sans-serif;text-transform:uppercase;transition:all .15s;margin-bottom:8px;}
+.modal-btn:hover{background:var(--accent2);box-shadow:0 4px 20px rgba(0,229,255,.3);}
+.modal-btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2);}
+.modal-btn-ghost:hover{border-color:var(--border2);background:var(--bg3);color:var(--text);}
+.modal-note{font-size:11px;color:var(--text3);text-align:center;line-height:1.5;}
+.modal-divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--text3);font-size:11px;}
+.modal-divider::before,.modal-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ALERT FLASH */
+.alert-flash{position:fixed;inset:0;pointer-events:none;z-index:300;opacity:0;background:rgba(255,51,85,0.08);border:3px solid rgba(255,51,85,0.6);border-radius:0;transition:opacity .15s;}
+.alert-flash.show{opacity:1;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:10px 18px;font-size:13px;color:var(--text);opacity:0;transition:all .3s;z-index:400;white-space:nowrap;pointer-events:none;font-family:'Rajdhani',sans-serif;letter-spacing:.5px;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* LANG SWITCHER */
+.lang-menu{position:absolute;top:calc(100% + 6px);right:0;background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:150px;box-shadow:0 16px 48px rgba(0,0,0,.6);z-index:150;display:none;}
+.lang-menu.open{display:block;}
+.lang-opt{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:13px;color:var(--text2);cursor:pointer;transition:background .15s;font-family:'Rajdhani',sans-serif;}
+.lang-opt:hover{background:rgba(255,255,255,.04);color:var(--text);}
+.lang-opt.active{color:var(--accent);}
+
+/* ACCOUNT PANEL */
+.account-info{display:flex;flex-direction:column;gap:6px;}
+.account-name{font-size:14px;font-weight:700;color:var(--text);}
+.account-email{font-size:11px;color:var(--text3);}
+.account-actions{display:flex;gap:8px;margin-top:10px;}
+.account-btn{flex:1;padding:7px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;font-family:'Rajdhani',sans-serif;text-align:center;letter-spacing:1px;text-transform:uppercase;transition:all .15s;}
+.account-btn:hover{border-color:var(--border2);color:var(--text);}
+
+/* MOBILE */
+@media(max-width:640px){
+  :root{--panel-w:100%;}
+  .main-layout{flex-direction:column;}
+  .right-panel{width:100%;border-left:none;border-top:1px solid var(--border);max-height:50vh;}
+  .topbar-title{display:none;}
+  .camera-wrap{margin:8px 12px 6px;}
+  .stats-bar{margin:0 12px 6px;}
+  .gauge-wrap{margin:0 12px 6px;}
+  .start-btn{margin:0 12px 8px;}
+  .camera-controls{padding:0 12px 6px;}
+}
 </style>
 </head>
 <body>
 
-<!-- FIX #3: Model loading status bar -->
-<div id="model-status">
-  <div class="model-dot" id="modelDot"></div>
-  <span id="modelStatusText">Loading AI model...</span>
-</div>
+<!-- ALERT FLASH -->
+<div class="alert-flash" id="alert-flash"></div>
 
-<!-- AUTH MODAL -->
-<div class="modal-overlay" id="auth-modal">
-<div class="modal">
-<button class="modal-close" onclick="closeModal('auth-modal')">✕</button>
-<div class="modal-title">OCCULERT</div>
-<div class="modal-sub">Sign in to save your settings and session history across devices.</div>
-<div class="modal-tabs">
-<button class="modal-tab active" onclick="switchTab('signin')">Sign In</button>
-<button class="modal-tab" onclick="switchTab('signup')">Sign Up</button>
-</div>
-<div id="tab-signin">
-<div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="si-email" placeholder="your@email.com"/></div>
-<div class="form-group"><label class="form-label">Password</label><input type="password" class="form-input" id="si-pass" placeholder="••••••••"/></div>
-<button class="auth-btn primary" onclick="signIn()">Sign In →</button>
-<div class="auth-divider"><span>OR</span></div>
-<button class="auth-btn passkey" onclick="passkeyAuth()">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/><path d="M16 11l2 2 4-4"/></svg>
-Sign in with Passkey</button>
-</div>
-<div id="tab-signup" style="display:none;">
-<div class="form-group"><label class="form-label">Your Name</label><input type="text" class="form-input" id="su-name" placeholder="First name"/></div>
-<div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="su-email" placeholder="your@email.com"/></div>
-<div class="form-group"><label class="form-label">Password</label><input type="password" class="form-input" id="su-pass" placeholder="Create a password"/></div>
-<button class="auth-btn primary" onclick="signUp()">Create Account →</button>
-<div class="auth-divider"><span>OR</span></div>
-<button class="auth-btn passkey" onclick="passkeyRegister()">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/><path d="M16 11l2 2 4-4"/></svg>
-Sign up with Passkey</button>
-</div>
-<div class="auth-success" id="auth-success">
-<div class="check">✅</div>
-<p id="auth-success-msg">Welcome back!</p>
-<small>Closing in a moment...</small>
-</div>
-</div>
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- LANG MENU MODAL -->
+<div id="lang-menu" class="lang-menu"></div>
+
+<!-- ACCOUNT MODAL -->
+<div class="modal-overlay" id="modal-account">
+  <div class="modal modal-relative">
+    <button class="modal-close" onclick="closeModal('modal-account')">&times;</button>
+    <div id="account-logged-out">
+      <div class="modal-title">🔑 Sign In</div>
+      <div class="modal-sub">Sign in to sync your settings and view session history across all devices.</div>
+      <button class="modal-btn" onclick="doPasskeyAuth()">🔑 Sign In with Passkey</button>
+      <div class="modal-divider">or</div>
+      <input type="email" class="modal-input" id="app-signin-email" placeholder="Email address" autocomplete="email">
+      <input type="password" class="modal-input" id="app-signin-pw" placeholder="Password" autocomplete="current-password">
+      <button class="modal-btn modal-btn-ghost" onclick="doEmailSignIn()">Sign In with Email</button>
+      <p class="modal-note">No account? <a href="index.html#signin" style="color:var(--accent);">Create one on the main site</a>.</p>
+    </div>
+    <div id="account-logged-in" style="display:none;">
+      <div class="modal-title">👤 Account</div>
+      <div class="account-info">
+        <div class="account-name" id="acct-name">--</div>
+        <div class="account-email" id="acct-email">--</div>
+      </div>
+      <div class="account-actions">
+        <button class="account-btn" onclick="viewSessionHistory()">Session History</button>
+        <button class="account-btn" onclick="signOut()">Sign Out</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- THEME MODAL -->
-<div class="modal-overlay" id="theme-modal">
-<div class="modal">
-<button class="modal-close" onclick="closeModal('theme-modal')">✕</button>
-<div class="modal-title">APP THEME</div>
-<div class="modal-sub">Choose a color scheme for your Occulert experience.</div>
-<div class="theme-grid" id="theme-grid"></div>
-<button class="auth-btn primary" onclick="closeModal('theme-modal')">Apply Theme →</button>
-</div>
-</div>
-
-<!-- RATING MODAL -->
-<div class="modal-overlay" id="rating-modal">
-<div class="modal">
-<button class="modal-close" onclick="closeModal('rating-modal')">✕</button>
-<div class="modal-title">RATE OCCULERT</div>
-<div class="modal-sub">Your feedback helps us improve and keep it free for everyone.</div>
-<div class="rating-stars" id="rating-stars">
-<span class="rating-star" onclick="setRating(1)">⭐</span>
-<span class="rating-star" onclick="setRating(2)">⭐</span>
-<span class="rating-star" onclick="setRating(3)">⭐</span>
-<span class="rating-star" onclick="setRating(4)">⭐</span>
-<span class="rating-star" onclick="setRating(5)">⭐</span>
-</div>
-<div id="rating-label" style="text-align:center;font-size:13px;color:var(--dim);margin-bottom:16px;letter-spacing:1px;">Tap a star to rate</div>
-<textarea class="rating-input" id="rating-comment" placeholder="Tell us about your experience (optional)..."></textarea>
-<button class="rating-submit" onclick="submitRating()">Submit Rating →</button>
-<div class="rating-success" id="rating-success">🙏 Thank you! Your feedback means everything.</div>
-</div>
-</div>
-
-<!-- BACK BAR -->
-<div id="back-bar">
-<a id="back-btn" href="/">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-Home</a>
-<div id="bar-brand">
-<div id="bar-title">OCCULERT</div>
-<div id="bar-sub">AI DROWSINESS DETECTION</div>
-</div>
-<div id="bar-right">
-<div id="lang-switcher-app"></div>
-<div class="bar-icon-btn" onclick="openModal('rating-modal')" title="Rate Occulert">⭐</div>
-<div class="bar-icon-btn" onclick="openModal('theme-modal')" title="Change Theme">🎨</div>
-<div class="bar-icon-btn" id="auth-bar-btn" onclick="openModal('auth-modal')" title="Sign In">👤</div>
-</div>
-</div>
-
-<div class="app">
-<div class="user-badge" id="user-badge">
-<div><div class="ub-name" id="ub-name">Welcome back!</div><div class="ub-sub">Settings saved across devices</div></div>
-<button class="ub-logout" onclick="signOut()">Sign Out</button>
-</div>
-
-<header>
-<div class="logo-wrap">
-<div class="logo-icon" style="border:none;background:none;box-shadow:none;width:34px;height:34px;animation:none;">
-<img src="occulert-logo-alt.png" alt="Occulert" style="width:34px;height:34px;object-fit:contain;border-radius:6px;"/>
-</div>
-<div><div class="logo-text">OCCULERT</div><div class="logo-sub">AI Drowsiness Detection</div></div>
-</div>
-<div class="status-badge offline" id="statusBadge">OFFLINE</div>
-</header>
-
-<div class="perm-msg" id="permMsg">⚠ Camera permission required. Allow camera access when prompted, then tap START MONITORING.</div>
-
-<!-- CALIBRATION BAR -->
-<div id="calibration-bar" style="display:none;width:calc(100% - 32px);margin:0 16px 6px;background:rgba(0,229,255,0.07);border:1px solid rgba(0,229,255,0.3);border-radius:7px;padding:10px 14px;align-items:center;gap:12px;">
-  <div style="width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 0.8s ease-in-out infinite;flex-shrink:0;"></div>
-  <div style="flex:1;">
-    <div style="font-size:13px;font-weight:700;color:var(--accent);letter-spacing:1px;">CALIBRATING TO YOUR EYES</div>
-    <div style="font-size:10px;color:var(--dim);font-family:'Share Tech Mono',monospace;margin-top:2px;">Look straight at camera — keep eyes open for 5 seconds</div>
+<div class="modal-overlay" id="modal-theme">
+  <div class="modal modal-relative">
+    <button class="modal-close" onclick="closeModal('modal-theme')">&times;</button>
+    <div class="modal-title">🎨 Color Theme</div>
+    <div class="modal-sub">Choose your app color scheme. Saved automatically.</div>
+    <div class="theme-row" id="modal-theme-grid"></div>
+    <div style="margin-top:14px;">
+      <div id="modal-theme-labels" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:10px;color:var(--text3);margin-top:4px;font-family:'Share Tech Mono',monospace;letter-spacing:.5px;"></div>
+    </div>
   </div>
-  <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent);" id="calib-timer">5s</div>
 </div>
 
-<div class="dash-grid">
-<!-- LEFT COLUMN -->
-<div class="dash-left">
-<div class="camera-wrap" id="cameraWrap">
-<video id="video" class="mirror" autoplay playsinline muted></video>
-<canvas id="canvas" class="mirror"></canvas>
-<div class="cam-overlay">
-<div class="corner tl"></div><div class="corner tr"></div>
-<div class="corner bl"></div><div class="corner br"></div>
-<div class="scan-line" id="scanLine"></div>
-<div class="eye-indicator">
-<div class="eye-dot" id="eyeL"></div>
-<div class="ear-label">EYES</div>
-<div class="eye-dot" id="eyeR"></div>
-</div>
-</div>
-<div class="cam-controls">
-<button class="cam-ctrl-btn" id="flip-btn" onclick="flipCamera()">🔄 FLIP CAM</button>
-<div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;" id="cam-facing-label">FRONT</div>
-</div>
-<div class="no-cam" id="noCam">
-<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-<span>CAMERA INACTIVE</span>
-<span style="opacity:.5;font-size:9px">TAP START TO BEGIN</span>
-</div>
+<!-- SESSION HISTORY MODAL -->
+<div class="modal-overlay" id="modal-history">
+  <div class="modal modal-relative">
+    <button class="modal-close" onclick="closeModal('modal-history')">&times;</button>
+    <div class="modal-title">📊 Session History</div>
+    <div class="modal-sub">Your recent drowsiness events.</div>
+    <div id="history-list" style="max-height:300px;overflow-y:auto;"></div>
+    <button class="modal-btn modal-btn-ghost" style="margin-top:12px;" onclick="clearHistory()">Clear History</button>
+  </div>
 </div>
 
-<div class="alert-box" id="alertBox">
-<div class="alert-icon" id="alertIcon">⚠️</div>
-<div><div class="alert-title" id="alertTitle">WARNING</div><div class="alert-sub" id="alertSub">Eyes closing detected</div></div>
+<!-- MAIN APP -->
+<div class="topbar">
+  <div class="topbar-left">
+    <a href="index.html" class="back-btn">← Home</a>
+    <div>
+      <div class="topbar-title">OCCULERT</div>
+      <div class="topbar-sub">AI DROWSINESS DETECTION</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div style="position:relative;">
+      <div class="topbar-btn" id="lang-btn" onclick="toggleLangMenu(this)" title="Language">🇺🇸</div>
+    </div>
+    <div class="topbar-btn" id="theme-btn" onclick="openModal('modal-theme')" title="Color Theme">🎨</div>
+    <div class="topbar-btn" id="account-btn" onclick="openModal('modal-account')" title="Account">👤</div>
+    <div class="status-badge offline" id="status-badge">OFFLINE</div>
+  </div>
 </div>
 
-<div class="metrics">
-<div class="metric-card"><div class="metric-val" id="earDisplay">--</div><div class="metric-label">EAR Score</div></div>
-<div class="metric-card"><div class="metric-val" id="closedCount">0</div><div class="metric-label">Blink Frames</div></div>
-<div class="metric-card"><div class="metric-val" id="alertCount">0</div><div class="metric-label">Alerts</div></div>
-</div>
+<div class="main-layout">
+  <!-- CAMERA PANEL -->
+  <div class="camera-panel">
+    <div class="app-header">
+      <div class="app-logo-area">
+        <img src="occulert-logo.png" alt="Occulert" class="app-logo-img" onerror="this.style.display='none'">
+        <div>
+          <div class="app-logo-text">OCCULERT</div>
+          <div class="app-logo-sub">AI DROWSINESS DETECTION</div>
+        </div>
+      </div>
+    </div>
 
-<div class="ear-section">
-<div class="ear-header">
-<span class="ear-title">Eye Openness Level</span>
-<span class="ear-val" id="earValLabel">--</span>
-</div>
-<div class="ear-bar-bg"><div class="ear-bar-fill" id="earBar" style="width:0%"></div></div>
-</div>
+    <div class="camera-wrap" id="camera-wrap">
+      <video id="video" autoplay playsinline muted class="mirror"></video>
+      <canvas id="canvas" class="mirror"></canvas>
+      <div class="cam-overlay">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+      </div>
+      <div class="cam-label" id="cam-label" style="display:none;">● EYES</div>
+      <div class="cam-side-label" id="cam-side-label">FRONT</div>
+      <div class="cam-inactive-msg" id="cam-inactive">
+        <div class="cam-inactive-icon">📷</div>
+        <div class="cam-inactive-text">CAMERA INACTIVE</div>
+        <div style="font-size:10px;letter-spacing:2px;color:var(--text3);font-family:'Share Tech Mono',monospace;">TAP START TO BEGIN</div>
+      </div>
+      <!-- Calibration overlay -->
+      <div class="calibration-overlay" id="calibration-overlay" style="display:none;">
+        <div class="calibration-title">CALIBRATING...</div>
+        <div class="calibration-tip">Keep your eyes open naturally.<br>Look straight at the camera.</div>
+        <div class="calibration-progress-wrap">
+          <div class="calibration-progress" id="cal-progress" style="width:0%"></div>
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent2);" id="cal-count">0 / 40</div>
+      </div>
+    </div>
 
-<div class="controls">
-<button class="btn-primary" id="startBtn" onclick="toggleMonitoring()">▶ Start Monitoring</button>
-</div>
-</div>
+    <div class="camera-controls">
+      <button class="ctrl-btn" id="flip-btn" onclick="flipCamera()">🔄 FLIP CAM</button>
+      <button class="ctrl-btn" id="mirror-btn" onclick="toggleMirror()">↔ MIRROR</button>
+      <div style="flex:1;"></div>
+      <div class="cam-side-label" id="face-status" style="position:static;font-size:11px;"></div>
+    </div>
 
-<!-- RIGHT COLUMN -->
-<div class="dash-right">
-<div class="side-panel">
-<div class="side-panel-header">// Configuration</div>
-<div class="setting-row">
-<div><div class="setting-label">Sensitivity</div><div class="setting-sub">Frames before warning</div></div>
-<div class="setting-control">
-<button onclick="adj('thresh',-5)">−</button>
-<span id="threshVal">20</span>
-<button onclick="adj('thresh',5)">+</button>
-</div>
-</div>
-<div class="setting-row">
-<div><div class="setting-label">Cooldown</div><div class="setting-sub">Seconds between alerts</div></div>
-<div class="setting-control">
-<button onclick="adj('cooldown',-5)">−</button>
-<span id="cooldownVal">30</span>s
-<button onclick="adj('cooldown',5)">+</button>
-</div>
-</div>
-<div class="setting-row">
-<div><div class="setting-label">Vibration</div><div class="setting-sub">Phone/watch pulse</div></div>
-<div class="setting-control"><button class="toggle-btn on" id="vibBtn" onclick="toggleSetting('vib')">ON</button></div>
-</div>
-<div class="setting-row">
-<div><div class="setting-label">Sound Alert</div><div class="setting-sub">Earbuds/speaker</div></div>
-<div class="setting-control"><button class="toggle-btn on" id="sndBtn" onclick="toggleSetting('snd')">ON</button></div>
-</div>
-<div class="setting-row">
-<div><div class="setting-label">Mirror Cam</div><div class="setting-sub">Flip horizontal</div></div>
-<div class="setting-control"><button class="toggle-btn on" id="mirrorBtn" onclick="toggleSetting('mirror')">ON</button></div>
-</div>
-</div>
+    <div class="stats-bar">
+      <div class="stat-block" id="ear-block"><div class="stat-val" id="ear-display">--</div><div class="stat-label">EAR SCORE</div></div>
+      <div class="stat-block" id="blink-block"><div class="stat-val" id="blink-display">0</div><div class="stat-label">BLINK FRAMES</div></div>
+      <div class="stat-block" id="alert-block"><div class="stat-val" id="alert-display">0</div><div class="stat-label">ALERTS</div></div>
+    </div>
 
-<div class="side-panel">
-<div class="side-panel-header">// Bluetooth Devices</div>
-<div class="setting-row">
-<div><div class="setting-label">🎧 Headphones</div><div class="setting-sub" id="bt-headphone-status">Not connected</div></div>
-<div class="setting-control"><button class="toggle-btn off" id="btHeadBtn" onclick="connectBluetooth('headphone')">PAIR</button></div>
-</div>
-<div class="setting-row">
-<div><div class="setting-label">⌚ Smartwatch</div><div class="setting-sub" id="bt-watch-status">Via phone vibration</div></div>
-<div class="setting-control"><button class="toggle-btn off" id="btWatchBtn" onclick="connectBluetooth('watch')">PAIR</button></div>
-</div>
-<div class="setting-row" id="bt-test-row" style="display:none;">
-<div><div class="setting-label">Test Alert</div><div class="setting-sub">Send to connected device</div></div>
-<div class="setting-control"><button class="toggle-btn on" onclick="testBluetoothAlert()">TEST</button></div>
-</div>
-</div>
+    <div class="gauge-wrap">
+      <div class="gauge-header">
+        <span class="gauge-label">EYE OPENNESS LEVEL</span>
+        <span class="gauge-val" id="gauge-pct">--</span>
+      </div>
+      <div class="gauge-track">
+        <div class="gauge-fill" id="gauge-fill" style="width:0%;background:var(--accent);"></div>
+      </div>
+    </div>
 
-<div class="side-panel" style="flex:1;display:flex;flex-direction:column;min-height:0;">
-<div class="side-panel-header">// Event Log</div>
-<div class="history-list" id="historyList" style="flex:1;overflow-y:auto;max-height:none;">
-<div class="history-empty" id="histEmpty">NO EVENTS RECORDED</div>
-</div>
-</div>
-</div>
-</div>
+    <button class="start-btn" id="start-btn" onclick="toggleMonitoring()">► START MONITORING</button>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <!-- CONFIGURATION -->
+    <div class="panel-section">
+      <div class="panel-title">// CONFIGURATION</div>
+      <div class="config-row">
+        <div class="config-info"><div class="config-name">Sensitivity</div><div class="config-sub">Frames before warning</div></div>
+        <div class="num-ctrl">
+          <button class="num-btn" onclick="adjustConfig('sensitivity',-1)">-</button>
+          <span class="num-val" id="val-sensitivity">20</span>
+          <button class="num-btn" onclick="adjustConfig('sensitivity',1)">+</button>
+        </div>
+      </div>
+      <div class="config-row">
+        <div class="config-info"><div class="config-name">Cooldown</div><div class="config-sub">Seconds between alerts</div></div>
+        <div class="num-ctrl">
+          <button class="num-btn" onclick="adjustConfig('cooldown',-5)">-</button>
+          <span class="num-val" id="val-cooldown">30 s</span>
+          <button class="num-btn" onclick="adjustConfig('cooldown',5)">+</button>
+        </div>
+      </div>
+      <div class="config-row">
+        <div class="config-info"><div class="config-name">Vibration</div><div class="config-sub">Phone/watch pulse</div></div>
+        <div class="toggle on" id="tog-vibration" onclick="toggleSetting('vibration')"></div>
+      </div>
+      <div class="config-row">
+        <div class="config-info"><div class="config-name">Sound Alert</div><div class="config-sub">Earbuds/speaker</div></div>
+        <div class="toggle on" id="tog-sound" onclick="toggleSetting('sound')"></div>
+      </div>
+      <div class="config-row">
+        <div class="config-info"><div class="config-name">Mirror Cam</div><div class="config-sub">Flip horizontal</div></div>
+        <div class="toggle on" id="tog-mirror" onclick="toggleSetting('mirror')"></div>
+      </div>
+    </div>
+
+    <!-- BLUETOOTH DEVICES -->
+    <div class="panel-section">
+      <div class="panel-title">// BLUETOOTH DEVICES</div>
+      <div class="bt-device">
+        <div class="bt-info"><span class="bt-icon">🎧</span><div><div class="bt-name">Headphones</div><div class="bt-status" id="bt-headphones-status">Not connected</div></div></div>
+        <button class="bt-btn" id="bt-headphones-btn" onclick="pairBluetooth('headphones')">PAIR</button>
+      </div>
+      <div class="bt-device">
+        <div class="bt-info"><span class="bt-icon">⌚</span><div><div class="bt-name">Smartwatch</div><div class="bt-status" id="bt-watch-status">Via phone vibration</div></div></div>
+        <button class="bt-btn" id="bt-watch-btn" onclick="pairBluetooth('watch')">PAIR</button>
+      </div>
+    </div>
+
+    <!-- THEME (in-panel shortcut) -->
+    <div class="panel-section">
+      <div class="panel-title">// COLOR THEME</div>
+      <div class="theme-row" id="panel-theme-row"></div>
+    </div>
+
+    <!-- EVENT LOG -->
+    <div class="panel-section" style="flex:1;border-bottom:none;">
+      <div class="panel-title">// EVENT LOG</div>
+      <div class="event-log" id="event-log">
+        <div class="event-empty" id="event-empty">NO EVENTS RECORDED</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════
-let running=false,stream=null,animFrame=null;
-let closedFrames=0,totalAlerts=0,lastAlertTime=0;
-let vibEnabled=true,sndEnabled=true,mirrorEnabled=true;
-let settings={thresh:20,cooldown:30};
-let alertState='none';
-let currentFacingMode='user';
-let currentUser=null;
-let selectedRating=0;
-
-// Detection FPS throttle
-const DETECTION_FPS=12;
-let lastDetectionTime=0;
-let noFaceFrames=0;
-const NO_FACE_DANGER_THRESHOLD=36; // ~3 sec at 12fps
-
-// ─────────────────────────────────────────────────
-// CALIBRATION SYSTEM
-// Samples EAR for 5 seconds on start, learns YOUR
-// personal baseline, then sets thresholds relative
-// to it. Fixes iPhone/Android differences and
-// glasses, face shape, lighting, etc.
-// ─────────────────────────────────────────────────
-let calibrating=false;
-let calibrationSamples=[];
-let calibrationDone=false;
-const CALIBRATION_DURATION_MS=5000; // 5 second calibration window
-const CALIBRATION_MIN_SAMPLES=30;   // need at least 30 good readings
-
-// These get overwritten by calibration; used as fallback only
-let EAR_OPEN=0.30;
-let EAR_WARN=0.25;
-let EAR_DANGER=0.20;
-
-function startCalibration(){
-  calibrating=true;
-  calibrationDone=false;
-  calibrationSamples=[];
-  showCalibrationUI(true);
-  addHistory('ok','🎯 Calibrating to your eyes — keep them open...');
-  setTimeout(finishCalibration, CALIBRATION_DURATION_MS);
-}
-
-function collectCalibrationSample(ear){
-  if(!calibrating||!calibrationDone===false)return;
-  // Only collect samples when ear is reasonable (not blinking)
-  if(ear>0.15&&ear<0.55) calibrationSamples.push(ear);
-}
-
-function finishCalibration(){
-  calibrating=false;
-  if(calibrationSamples.length<CALIBRATION_MIN_SAMPLES){
-    // Not enough data — keep defaults and warn
-    addHistory('w','⚠ Calibration incomplete — move to better lighting and try again');
-    showCalibrationUI(false);
-    calibrationDone=true;
-    return;
-  }
-  // Sort samples, take median as "open eye" baseline
-  const sorted=[...calibrationSamples].sort((a,b)=>a-b);
-  const median=sorted[Math.floor(sorted.length*0.5)];
-  const p25=sorted[Math.floor(sorted.length*0.25)]; // 25th percentile = partial close
-
-  // Set thresholds relative to personal baseline
-  // Open: anything above 85% of median
-  // Warn: anything below 75% of median
-  // Danger: anything below 60% of median
-  EAR_OPEN=median*0.85;
-  EAR_WARN=median*0.75;
-  EAR_DANGER=median*0.60;
-
-  // Save for this session
-  calibrationDone=true;
-  showCalibrationUI(false);
-  addHistory('ok',`✅ Calibrated — baseline EAR: ${median.toFixed(3)} | warn: ${EAR_WARN.toFixed(3)} | danger: ${EAR_DANGER.toFixed(3)}`);
-}
-
-function showCalibrationUI(show){
-  const el=document.getElementById('calibration-bar');
-  if(el) el.style.display=show?'flex':'none';
-}
-
-// ─────────────────────────────────────────────────
-// EAR SMOOTHING SYSTEM
-// Rolling average of last N readings.
-// Kills jitter from lighting changes and micro
-// head movements during driving.
-// ─────────────────────────────────────────────────
-const EAR_BUFFER_SIZE=6; // average over 6 frames (~0.5 sec at 12fps)
-let earBuffer=[];
-
-function smoothEAR(rawEar){
-  earBuffer.push(rawEar);
-  if(earBuffer.length>EAR_BUFFER_SIZE) earBuffer.shift();
-  // Weighted average: recent frames count more
-  let sum=0,weight=0;
-  earBuffer.forEach((v,i)=>{
-    const w=i+1; // weight 1,2,3...N
-    sum+=v*w;weight+=w;
-  });
-  return sum/weight;
-}
-
-// ─────────────────────────────────────────────────
-// HEAD TURN TOLERANCE SYSTEM
-// Detects when you're checking mirrors or blind
-// spots by measuring horizontal face angle.
-// Pauses alert accumulation for up to 2 seconds
-// when a head turn is detected.
-// ─────────────────────────────────────────────────
-// Nose tip = 1, left cheek = 234, right cheek = 454
-// Yaw (horizontal turn) approximated by comparing
-// nose tip x-position relative to face center
-const HEAD_TURN_THRESHOLD=0.12; // fraction of face width — covers typical mirror check
-const HEAD_TURN_PAUSE_MS=2000;  // pause alerts for 2 seconds after turn detected
-let lastHeadTurnTime=0;
-let headTurnActive=false;
-
-function detectHeadTurn(lm){
-  // Face horizontal span: left eye outer corner (33) to right eye outer corner (263)
-  const leftX=lm[33].x;
-  const rightX=lm[263].x;
-  const faceWidth=Math.abs(rightX-leftX);
-  const noseTip=lm[1].x;
-  const faceCenter=(leftX+rightX)/2;
-  // Normalized deviation of nose from center
-  const deviation=Math.abs(noseTip-faceCenter)/faceWidth;
-  const isTurned=deviation>HEAD_TURN_THRESHOLD;
-  if(isTurned){
-    lastHeadTurnTime=Date.now();
-    if(!headTurnActive){
-      headTurnActive=true;
-      // Don't log every turn — only first detection in a sequence
-    }
-  }else{
-    const elapsed=Date.now()-lastHeadTurnTime;
-    if(headTurnActive&&elapsed>HEAD_TURN_PAUSE_MS){
-      headTurnActive=false;
-    }
-  }
-  return isTurned||(Date.now()-lastHeadTurnTime<HEAD_TURN_PAUSE_MS);
-}
-
-// DOM
-const video=document.getElementById('video');
-const canvas=document.getElementById('canvas');
-const ctx=canvas.getContext('2d');
-const startBtn=document.getElementById('startBtn');
-const noCam=document.getElementById('noCam');
-const statusBadge=document.getElementById('statusBadge');
-const cameraWrap=document.getElementById('cameraWrap');
-const alertBox=document.getElementById('alertBox');
-const alertTitle=document.getElementById('alertTitle');
-const alertSub=document.getElementById('alertSub');
-const alertIcon=document.getElementById('alertIcon');
-const earDisplay=document.getElementById('earDisplay');
-const earValLabel=document.getElementById('earValLabel');
-const earBar=document.getElementById('earBar');
-const closedCount=document.getElementById('closedCount');
-const alertCount=document.getElementById('alertCount');
-const eyeL=document.getElementById('eyeL');
-const eyeR=document.getElementById('eyeR');
-const permMsg=document.getElementById('permMsg');
-
-// ═══════════════════════════════════════════════════
-// FIX #3: Model status indicator
-// ═══════════════════════════════════════════════════
-function updateModelStatus(ready){
-  const dot=document.getElementById('modelDot');
-  const txt=document.getElementById('modelStatusText');
-  const bar=document.getElementById('model-status');
-  if(ready){
-    dot.className='model-dot ready';
-    txt.textContent='AI Model Ready';
-    bar.className='hidden';  // just hide it after brief show
-    // Actually show ready state briefly then fade
-    bar.className='ready';
-    setTimeout(()=>{ bar.className='ready hidden'; },2500);
-  }else{
-    dot.className='model-dot';
-    txt.textContent='Loading AI model...';
-    bar.className='';
-  }
-}
-
-// Hook into the preload callback
-if(window._mpReady){
-  updateModelStatus(true);
-}else{
-  updateModelStatus(false);
-  window._mpReadyCb=()=>updateModelStatus(true);
-}
-
-// ═══════════════════════════════════════════════════
+// ============================================================
 // THEMES
-// ═══════════════════════════════════════════════════
-const themes={
-cyan:{name:'Cyber Cyan',accent:'#00e5ff',accent2:'#00ff88',warn:'#ffaa00',danger:'#ff2244',bg:'#050a0f',panel:'#0a1520'},
-blue:{name:'Electric Blue',accent:'#3b82f6',accent2:'#06b6d4',warn:'#f59e0b',danger:'#ef4444',bg:'#03080f',panel:'#081020'},
-purple:{name:'Neon Purple',accent:'#a855f7',accent2:'#ec4899',warn:'#f59e0b',danger:'#ef4444',bg:'#080510',panel:'#100820'},
-green:{name:'Matrix Green',accent:'#00ff88',accent2:'#00e5ff',warn:'#ffaa00',danger:'#ff2244',bg:'#020d08',panel:'#051a0e'},
-orange:{name:'Fire Alert',accent:'#f97316',accent2:'#facc15',warn:'#eab308',danger:'#ef4444',bg:'#0d0805',panel:'#1a0f06'},
-red:{name:'Danger Red',accent:'#ef4444',accent2:'#f97316',warn:'#eab308',danger:'#dc2626',bg:'#0d0505',panel:'#1a0808'},
-white:{name:'Clean White',accent:'#e2e8f0',accent2:'#94a3b8',warn:'#f59e0b',danger:'#ef4444',bg:'#0f1117',panel:'#1a1d27'},
-teal:{name:'Deep Teal',accent:'#14b8a6',accent2:'#06b6d4',warn:'#f59e0b',danger:'#ef4444',bg:'#030d0d',panel:'#081a1a'},
+// ============================================================
+const THEMES = [
+  {id:'cyan',  name:'Cyan',    a:'#00e5ff', b:'#00b8d4', c:'#0097a7'},
+  {id:'blue',  name:'Blue',    a:'#2979ff', b:'#1565c0', c:'#0d47a1'},
+  {id:'green', name:'Green',   a:'#00ff88', b:'#00c853', c:'#00701a'},
+  {id:'purple',name:'Purple',  a:'#d500f9', b:'#aa00ff', c:'#7b00bc'},
+  {id:'red',   name:'Red',     a:'#ff3355', b:'#d50000', c:'#9b0000'},
+  {id:'amber', name:'Amber',   a:'#ffab00', b:'#ff6d00', c:'#c43e00'},
+  {id:'pink',  name:'Pink',    a:'#f50057', b:'#c51162', c:'#880e4f'},
+  {id:'white', name:'White',   a:'#e0e8f0', b:'#b0bec5', c:'#607d8b'}
+];
+
+const LANGS = [
+  {code:'en',flag:'🇺🇸',name:'English'},
+  {code:'es',flag:'🇪🇸',name:'Español'},
+  {code:'pt',flag:'🇧🇷',name:'Português'},
+  {code:'fr',flag:'🇫🇷',name:'Français'},
+  {code:'de',flag:'🇩🇪',name:'Deutsch'},
+  {code:'zh',flag:'🇨🇳',name:'中文'},
+  {code:'ar',flag:'🇸🇦',name:'العربية'},
+  {code:'hi',flag:'🇮🇳',name:'हिंदी'}
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let isMonitoring = false;
+let animFrame = null;
+let stream = null;
+let faceMesh = null;
+let mpCamera = null;
+let currentFacingMode = 'user';
+let mirrorMode = true;
+let alertCount = 0;
+let blinkFrames = 0;
+let lastAlertTime = 0;
+let EAR_OPEN = 0.28, EAR_WARN = 0.22, EAR_DANGER = 0.18;
+let earBuffer = [];
+let calibrationSamples = [];
+let calibrating = false;
+let calibrationDone = false;
+let noFaceFrames = 0;
+let currentLang = localStorage.getItem('occulert-lang') || 'en';
+
+const CFG = {
+  sensitivity: parseInt(localStorage.getItem('cfg-sensitivity') || '20'),
+  cooldown: parseInt(localStorage.getItem('cfg-cooldown') || '30'),
+  vibration: localStorage.getItem('cfg-vibration') !== 'false',
+  sound: localStorage.getItem('cfg-sound') !== 'false',
+  mirror: localStorage.getItem('cfg-mirror') !== 'false'
 };
 
+// EAR calculation using 6 key eye landmarks
+const L_EYE = [33,160,158,133,153,144];
+const R_EYE = [362,385,387,263,373,380];
+
+function dist(a,b){return Math.hypot(a.x-b.x, a.y-b.y);}
+function calcEAR(lm,pts){
+  const p = pts.map(i=>lm[i]);
+  const h = dist(p[0],p[3]);
+  if(h < 1e-6) return 0;
+  return (dist(p[1],p[5]) + dist(p[2],p[4])) / (2*h);
+}
+
+// EAR smoothing buffer
+function smoothEAR(raw){
+  earBuffer.push(raw);
+  if(earBuffer.length > 5) earBuffer.shift();
+  return earBuffer.reduce((a,b)=>a+b,0)/earBuffer.length;
+}
+
+// Head turn detection
+function detectHeadTurn(lm){
+  const noseTip = lm[1];
+  const leftEar = lm[234];
+  const rightEar = lm[454];
+  const faceWidth = dist(leftEar,rightEar);
+  const noseCenterOffset = Math.abs(noseTip.x - (leftEar.x + rightEar.x)/2);
+  return faceWidth > 0 && (noseCenterOffset/faceWidth) > 0.22;
+}
+
+// ============================================================
+// THEME SYSTEM
+// ============================================================
+function applyTheme(id){
+  const t = THEMES.find(x=>x.id===id) || THEMES[0];
+  const r = document.documentElement;
+  r.style.setProperty('--accent', t.a);
+  r.style.setProperty('--accent2', t.b);
+  r.style.setProperty('--accent-rgb', hexToRgb(t.a));
+  r.style.setProperty('--border', 'rgba('+hexToRgb(t.a)+',0.12)');
+  r.style.setProperty('--border2', 'rgba('+hexToRgb(t.a)+',0.25)');
+  localStorage.setItem('occulert-theme', id);
+  document.querySelectorAll('.theme-dot, .theme-card').forEach(d=>{
+    d.classList.toggle('active', d.dataset.theme===id);
+  });
+}
+
+function hexToRgb(hex){
+  const r=/^#?([a-fd]{2})([a-fd]{2})([a-fd]{2})$/i.exec(hex.replace(/^#?([da-f])([da-f])([da-f])$/i, (_,r,g,b)=>'#'+r+r+g+g+b+b));
+  return r?parseInt(r[1],16)+','+parseInt(r[2],16)+','+parseInt(r[3],16):'0,229,255';
+}
+
 function buildThemeGrid(){
-  const grid=document.getElementById('theme-grid');grid.innerHTML='';
-  Object.entries(themes).forEach(([key,t])=>{
-    const saved=localStorage.getItem('occulert-theme')||'cyan';
-    const div=document.createElement('div');
-    div.style.cssText=`background:linear-gradient(135deg,${t.accent},${t.accent2});`;
-    div.className='theme-swatch'+(key===saved?' active':'');
-    div.title=t.name;
-    div.onclick=()=>{applyTheme(key);document.querySelectorAll('.theme-swatch').forEach(s=>s.classList.remove('active'));div.classList.add('active');};
-    const label=document.createElement('div');label.className='theme-label';label.textContent=t.name;
-    const wrap=document.createElement('div');wrap.appendChild(div);wrap.appendChild(label);grid.appendChild(wrap);
-  });
-}
-
-function applyTheme(key){
-  const t=themes[key]||themes.cyan;
-  const root=document.documentElement;
-  root.style.setProperty('--accent',t.accent);root.style.setProperty('--accent2',t.accent2);
-  root.style.setProperty('--warn',t.warn);root.style.setProperty('--danger',t.danger);
-  root.style.setProperty('--bg',t.bg);root.style.setProperty('--panel',t.panel);
-  root.style.setProperty('--glow',`0 0 20px ${t.accent}50`);
-  localStorage.setItem('occulert-theme',key);
-}
-
-// ═══════════════════════════════════════════════════
-// AUTH
-// ═══════════════════════════════════════════════════
-function openModal(id){document.getElementById(id).classList.add('show');}
-function closeModal(id){document.getElementById(id).classList.remove('show');}
-function switchTab(tab){
-  document.getElementById('tab-signin').style.display=tab==='signin'?'':'none';
-  document.getElementById('tab-signup').style.display=tab==='signup'?'':'none';
-  document.querySelectorAll('.modal-tab').forEach((t,i)=>t.classList.toggle('active',(tab==='signin'&&i===0)||(tab==='signup'&&i===1)));
-}
-function showAuthSuccess(msg){
-  document.getElementById('tab-signin').style.display='none';
-  document.getElementById('tab-signup').style.display='none';
-  const s=document.getElementById('auth-success');s.style.display='block';
-  document.getElementById('auth-success-msg').textContent=msg;
-  setTimeout(()=>{closeModal('auth-modal');s.style.display='none';document.getElementById('tab-signin').style.display='';switchTab('signin');},2000);
-}
-function signIn(){
-  const email=document.getElementById('si-email').value;
-  const pass=document.getElementById('si-pass').value;
-  if(!email||!pass){alert('Please enter email and password.');return;}
-  setUser({name:email.split('@')[0],email});showAuthSuccess(`Welcome back!`);
-}
-function signUp(){
-  const name=document.getElementById('su-name').value||'Driver';
-  const email=document.getElementById('su-email').value;
-  const pass=document.getElementById('su-pass').value;
-  if(!email||!pass){alert('Please fill in all fields.');return;}
-  setUser({name,email});showAuthSuccess(`Account created! Welcome, ${name}!`);
-}
-async function passkeyAuth(){
-  if(!window.PublicKeyCredential){alert('Passkeys not supported on this device.');return;}
-  try{
-    await navigator.credentials.get({publicKey:{challenge:new Uint8Array(32),rpId:window.location.hostname,allowCredentials:[],userVerification:'preferred',timeout:60000}});
-    setUser({name:'Passkey User',email:'passkey@device'});showAuthSuccess('Passkey verified!');
-  }catch(e){setUser({name:'Demo Driver',email:'demo@occulert.com'});showAuthSuccess('Signed in as Demo Driver!');}
-}
-async function passkeyRegister(){
-  if(!window.PublicKeyCredential){alert('Passkeys not supported on this device.');return;}
-  try{
-    const name=document.getElementById('su-name').value||'Driver';
-    await navigator.credentials.create({publicKey:{challenge:new Uint8Array(32),rp:{name:'Occulert',id:window.location.hostname},user:{id:new Uint8Array(16),name,displayName:name},pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],authenticatorSelection:{userVerification:'preferred'},timeout:60000}});
-    setUser({name,email:'passkey@device'});showAuthSuccess(`Passkey created! Welcome, ${name}!`);
-  }catch(e){setUser({name:'Demo Driver',email:'demo@occulert.com'});showAuthSuccess('Signed in as Demo Driver!');}
-}
-function setUser(user){
-  currentUser=user;localStorage.setItem('occulert-user',JSON.stringify(user));
-  document.getElementById('ub-name').textContent=`👋 ${user.name}`;
-  document.getElementById('user-badge').classList.add('show');
-  document.getElementById('auth-bar-btn').style.color='var(--accent2)';
-}
-function signOut(){
-  currentUser=null;localStorage.removeItem('occulert-user');
-  document.getElementById('user-badge').classList.remove('show');
-  document.getElementById('auth-bar-btn').style.color='';
-}
-
-// ═══════════════════════════════════════════════════
-// RATING
-// ═══════════════════════════════════════════════════
-const ratingLabels=['','Needs Work','It\'s Okay','Good App','Really Good!','Life Saver! ⭐'];
-function setRating(n){
-  selectedRating=n;
-  document.querySelectorAll('.rating-star').forEach((s,i)=>s.classList.toggle('active',i<n));
-  document.getElementById('rating-label').textContent=ratingLabels[n];
-  document.getElementById('rating-label').style.color='var(--accent)';
-}
-function submitRating(){
-  if(!selectedRating){alert('Please select a star rating first!');return;}
-  const comment=document.getElementById('rating-comment').value;
-  const ratings=JSON.parse(localStorage.getItem('occulert-ratings')||'[]');
-  ratings.push({rating:selectedRating,comment,date:new Date().toISOString()});
-  localStorage.setItem('occulert-ratings',JSON.stringify(ratings));
-  if(typeof gtag!=='undefined')gtag('event','app_rating',{rating:selectedRating});
-  document.getElementById('rating-success').style.display='block';
-  document.querySelector('.rating-submit').style.display='none';
-  setTimeout(()=>closeModal('rating-modal'),2500);
-}
-
-// ═══════════════════════════════════════════════════
-// CAMERA FLIP
-// ═══════════════════════════════════════════════════
-async function flipCamera(){
-  if(!running)return;
-  currentFacingMode=currentFacingMode==='user'?'environment':'user';
-  document.getElementById('cam-facing-label').textContent=currentFacingMode==='user'?'FRONT':'BACK';
-  if(stream)stream.getTracks().forEach(t=>t.stop());
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:currentFacingMode,width:{ideal:640},height:{ideal:480}},audio:false});
-    video.srcObject=stream;await video.play();
-    const m=currentFacingMode==='user';
-    video.className=m?'mirror':'';canvas.className=m?'mirror':'';
-    addHistory('ok',`📷 Switched to ${m?'front':'back'} camera`);
-  }catch(e){
-    currentFacingMode=currentFacingMode==='user'?'environment':'user';
-    console.error('Camera flip failed:',e);
+  const current = localStorage.getItem('occulert-theme')||'cyan';
+  const grid = document.getElementById('modal-theme-grid');
+  const labels = document.getElementById('modal-theme-labels');
+  const panel = document.getElementById('panel-theme-row');
+  if(grid){
+    grid.innerHTML = THEMES.map(t=>`<div class="theme-dot ${t.id===current?'active':''}" data-theme="${t.id}" onclick="applyTheme('${t.id}')" style="background:linear-gradient(135deg,${t.a},${t.b});" title="${t.name}"><div class="theme-dot-check">✓</div></div>`).join('');
+  }
+  if(labels){
+    labels.innerHTML = THEMES.map(t=>`<div>${t.name}</div>`).join('');
+  }
+  if(panel){
+    panel.innerHTML = THEMES.map(t=>`<div class="theme-dot ${t.id===current?'active':''}" data-theme="${t.id}" onclick="applyTheme('${t.id}')" style="background:linear-gradient(135deg,${t.a},${t.b});" title="${t.name}"><div class="theme-dot-check">✓</div></div>`).join('');
   }
 }
 
-// ═══════════════════════════════════════════════════
-// FACE MESH SETUP
-// FIX #3: No longer loads scripts here — already preloaded
-// ═══════════════════════════════════════════════════
-let faceMesh=null,lastResults=null,faceLoaded=false;
-
-function initFaceMesh(){
-  return new Promise((resolve,reject)=>{
-    function setup(){
-      try{
-        faceMesh=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
-        faceMesh.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
-        faceMesh.onResults(r=>{lastResults=r;});
-        faceLoaded=true;
-        resolve();
-      }catch(e){reject(e);}
-    }
-    if(window._mpReady){setup();}
-    else{window._mpReadyCb=()=>{setup();};}
-  });
+// ============================================================
+// LANG
+// ============================================================
+function buildLangMenu(){
+  const menu = document.getElementById('lang-menu');
+  if(!menu) return;
+  menu.innerHTML = LANGS.map(l=>`<div class="lang-opt ${l.code===currentLang?'active':''}" onclick="setLang('${l.code}')">${l.flag} ${l.name}</div>`).join('');
 }
 
-// ═══════════════════════════════════════════════════
-// AUDIO
-// ═══════════════════════════════════════════════════
-let audioCtx=null;
-function playAlert(freq=880,dur=0.3,reps=3){
-  if(!sndEnabled)return;
-  if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  let t=audioCtx.currentTime;
-  for(let i=0;i<reps;i++){
-    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
-    o.connect(g);g.connect(audioCtx.destination);
-    o.frequency.value=freq;o.type='sine';
-    g.gain.setValueAtTime(0.3,t+i*0.4);
-    g.gain.exponentialRampToValueAtTime(0.001,t+i*0.4+dur);
-    o.start(t+i*0.4);o.stop(t+i*0.4+dur);
-  }
-}
-function doVibrate(p){if(!vibEnabled)return;if('vibrate' in navigator)navigator.vibrate(p);}
-
-// ═══════════════════════════════════════════════════
-// BLUETOOTH
-// ═══════════════════════════════════════════════════
-let btHeadphoneConnected=false,btWatchConnected=false;
-async function connectBluetooth(type){
-  if(!navigator.bluetooth){showBtError('Web Bluetooth not supported. Use Chrome on Android.');return;}
-  try{
-    addHistory('ok',`🔵 Scanning for ${type==='headphone'?'headphones':'smartwatch'}...`);
-    const device=await navigator.bluetooth.requestDevice({
-      acceptAllDevices:true,
-      optionalServices:['0000110b-0000-1000-8000-00805f9b34fb','0000180d-0000-1000-8000-00805f9b34fb','0000180f-0000-1000-8000-00805f9b34fb','00001800-0000-1000-8000-00805f9b34fb','00001801-0000-1000-8000-00805f9b34fb']
-    });
-    device.addEventListener('gattserverdisconnected',()=>onBtDisconnected(type));
-    await device.gatt.connect();
-    if(type==='headphone'){
-      btHeadphoneConnected=true;
-      const btn=document.getElementById('btHeadBtn');btn.textContent='ON';btn.className='toggle-btn on';
-      document.getElementById('bt-headphone-status').textContent=`✓ ${device.name||'Connected'}`;
-      addHistory('ok',`🎧 ${device.name||'Headphones'} connected`);
-    }else{
-      btWatchConnected=true;
-      const btn=document.getElementById('btWatchBtn');btn.textContent='ON';btn.className='toggle-btn on';
-      document.getElementById('bt-watch-status').textContent=`✓ ${device.name||'Connected'}`;
-      addHistory('ok',`⌚ ${device.name||'Smartwatch'} connected`);
-    }
-    document.getElementById('bt-test-row').style.display='flex';
-  }catch(e){
-    if(e.name==='NotFoundError'){addHistory('ok','🔵 Bluetooth scan cancelled');}
-    else if(type==='headphone'){
-      btHeadphoneConnected=true;
-      const btn=document.getElementById('btHeadBtn');btn.textContent='ON';btn.className='toggle-btn on';
-      document.getElementById('bt-headphone-status').textContent='✓ Using active audio output';
-      addHistory('ok','🎧 Audio alerts via active audio device');
-      document.getElementById('bt-test-row').style.display='flex';
-    }else{showBtError('Watch pairing requires native app. Phone vibration active.');}
-  }
-}
-function onBtDisconnected(type){
-  if(type==='headphone'){btHeadphoneConnected=false;document.getElementById('btHeadBtn').textContent='PAIR';document.getElementById('btHeadBtn').className='toggle-btn off';document.getElementById('bt-headphone-status').textContent='Disconnected';addHistory('w','🎧 Headphones disconnected');}
-  else{btWatchConnected=false;document.getElementById('btWatchBtn').textContent='PAIR';document.getElementById('btWatchBtn').className='toggle-btn off';document.getElementById('bt-watch-status').textContent='Not connected — alerts via phone vibration';addHistory('w','⌚ Smartwatch disconnected');}
-}
-function testBluetoothAlert(){playAlert(440,0.3,2);doVibrate([200,100,200,100,200]);addHistory('ok','🔵 Test alert sent');}
-function showBtError(msg){addHistory('d','⚠ BT: '+msg.slice(0,60));alert('Bluetooth: '+msg);}
-
-// ═══════════════════════════════════════════════════
-// EYE LANDMARK INDICES
-// ═══════════════════════════════════════════════════
-const LEFT_EYE=[362,385,387,263,373,380];
-const RIGHT_EYE=[33,160,158,133,153,144];
-
-function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
-function calcEAR(lm,idx){
-  const[p1,p2,p3,p4,p5,p6]=idx.map(i=>lm[i]);
-  return(dist(p2,p6)+dist(p3,p5))/(2*dist(p1,p4));
-}
-
-// ═══════════════════════════════════════════════════
-// THROTTLED DETECTION LOOP
-// ═══════════════════════════════════════════════════
-async function loop(){
-  if(!running)return;
-  const now=performance.now();
-  const detectionInterval=1000/DETECTION_FPS;
-
-  if(video.videoWidth>0){
-    canvas.width=video.videoWidth;
-    canvas.height=video.videoHeight;
-  }
-
-  if(now-lastDetectionTime>=detectionInterval){
-    lastDetectionTime=now;
-    if(faceLoaded&&video.readyState>=2){
-      await faceMesh.send({image:video});
-    }
-    const lm=lastResults?.multiFaceLandmarks?.[0];
-    if(lm){
-      noFaceFrames=0;
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      drawEye(lm,LEFT_EYE);
-      drawEye(lm,RIGHT_EYE);
-      const rawEar=(calcEAR(lm,LEFT_EYE)+calcEAR(lm,RIGHT_EYE))/2;
-      // Collect calibration sample if calibrating
-      if(calibrating) collectCalibrationSample(rawEar);
-      // Smooth the EAR value before using it
-      const ear=smoothEAR(rawEar);
-      // Check head turn before processing alert logic
-      const isTurned=detectHeadTurn(lm);
-      updateEAR(ear,isTurned);
-    }else{
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      updateNoFace();
-    }
-  }
-  animFrame=requestAnimationFrame(loop);
-}
-
-function drawEye(lm,idx){
-  const pts=idx.map(i=>({x:lm[i].x*canvas.width,y:lm[i].y*canvas.height}));
-  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
-  pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
-  ctx.closePath();
-  const open=calcEAR(lm,idx)>EAR_WARN;
-  ctx.strokeStyle=open?'rgba(0,255,136,.8)':'rgba(255,34,68,.9)';
-  ctx.lineWidth=1.5;ctx.stroke();
-  pts.forEach(p=>{
-    ctx.beginPath();ctx.arc(p.x,p.y,2,0,Math.PI*2);
-    ctx.fillStyle=open?'rgba(0,255,136,.6)':'rgba(255,34,68,.8)';ctx.fill();
-  });
-}
-
-// ═══════════════════════════════════════════════════
-// CORE EAR UPDATE
-// Uses smoothed EAR + head-turn awareness
-// ═══════════════════════════════════════════════════
-function updateEAR(ear,isTurned){
-  const pct=Math.min(100,(ear/0.5)*100);
-  const isOpen=ear>=EAR_OPEN;
-  const isWarn=ear<EAR_WARN;
-  const isDanger=ear<EAR_DANGER;
-
-  if(isOpen){
-    if(closedFrames>0){closedFrames=0;closedCount.textContent=0;}
-    if(alertState!=='none') clearAlert();
-  }else{
-    // HEAD TURN TOLERANCE: if person is checking mirrors,
-    // don't accumulate closed frames — they'll naturally squint/look away
-    if(!isTurned){
-      closedFrames++;
-      closedCount.textContent=closedFrames;
-    }
-    // If they were turning and just came back, decay frames slowly
-    else if(closedFrames>0){
-      closedFrames=Math.max(0,closedFrames-1);
-      closedCount.textContent=closedFrames;
-    }
-  }
-
-  eyeL.className='eye-dot'+(isDanger?' closed':isOpen?' open':'');
-  eyeR.className='eye-dot'+(isDanger?' closed':isOpen?' open':'');
-  earBar.style.width=pct+'%';
-  earBar.style.background=isDanger?'#ff2244':isWarn?'#ffaa00':'#00ff88';
-  const s=ear.toFixed(3);
-  earDisplay.textContent=s;earValLabel.textContent=s;
-  const cls=isDanger?'danger':isWarn?'warn':'';
-  earDisplay.className='metric-val '+cls;earValLabel.className='ear-val '+cls;
-
-  // Don't fire alerts during calibration
-  if(calibrating||!calibrationDone)return;
-
-  const now=Date.now();
-  const coolMs=settings.cooldown*1000;
-  if(closedFrames>=settings.thresh*3&&now-lastAlertTime>coolMs){
-    triggerAlert('danger');lastAlertTime=now;
-  }else if(closedFrames>=settings.thresh&&alertState==='none'){
-    triggerAlert('warn');
-  }
-}
-
-// ═══════════════════════════════════════════════════
-// NO-FACE DETECTION
-// ═══════════════════════════════════════════════════
-function updateNoFace(){
-  noFaceFrames++;
-  earDisplay.textContent='--';earValLabel.textContent='--';
-  earBar.style.width='0%';
-  eyeL.className='eye-dot';eyeR.className='eye-dot';
-  const now=Date.now();
-  const coolMs=settings.cooldown*1000;
-  // Only fire no-face alert if calibration is done and we're not mid-head-turn
-  if(noFaceFrames>=NO_FACE_DANGER_THRESHOLD&&running&&calibrationDone&&now-lastAlertTime>coolMs&&!headTurnActive){
-    triggerAlert('warn');
-    lastAlertTime=now;
-    addHistory('w','⚠ Face not detected — head may be down');
-    noFaceFrames=0;
-  }
-}
-
-function triggerAlert(level){
-  if(level==='danger'){
-    alertState='danger';
-    alertBox.className='alert-box danger-alert';
-    alertIcon.textContent='🚨';alertTitle.textContent='DROWSINESS DETECTED';alertSub.textContent='Pull over safely — you are falling asleep';
-    cameraWrap.className='camera-wrap danger-border';statusBadge.className='status-badge danger';statusBadge.textContent='DANGER';
-    doVibrate([500,200,500,200,500,200,1000]);playAlert(660,0.4,5);
-    totalAlerts++;alertCount.textContent=totalAlerts;
-    addHistory('d','🚨 DROWSINESS ALERT — Eyes closed too long');
-  }else{
-    if(alertState==='danger')return; // don't downgrade danger to warn
-    alertState='warn';
-    alertBox.className='alert-box warn-alert';
-    alertIcon.textContent='⚠️';alertTitle.textContent='EYES CLOSING';alertSub.textContent='Stay alert — drowsiness warning';
-    cameraWrap.className='camera-wrap warn-border';statusBadge.className='status-badge warning';statusBadge.textContent='WARNING';
-    doVibrate([200,100,200]);playAlert(440,0.2,2);
-    addHistory('w','⚠ Eyes closing — drowsiness warning');
-  }
-}
-
-function clearAlert(){
-  alertState='none';alertBox.className='alert-box';
-  cameraWrap.className='camera-wrap active-border';
-  statusBadge.className='status-badge active';statusBadge.textContent='ACTIVE';
-}
-
-// ═══════════════════════════════════════════════════
-// MONITORING START/STOP
-// ═══════════════════════════════════════════════════
-async function toggleMonitoring(){
-  if(running){stopMonitoring();}
-  else{startMonitoring();}
-}
-
-async function startMonitoring(){
-  startBtn.textContent='Loading...';startBtn.disabled=true;
-
-  // FIX #3: Init FaceMesh using already-preloaded scripts
-  if(!faceLoaded){
-    try{await initFaceMesh();}
-    catch(e){
-      startBtn.textContent='▶ Start Monitoring';startBtn.disabled=false;
-      alert('AI model failed to load. Check your internet connection and try again.');return;
-    }
-  }
-
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:currentFacingMode,width:{ideal:640},height:{ideal:480}},audio:false
-    });
-  }catch(e){
-    startBtn.textContent='▶ Start Monitoring';startBtn.disabled=false;
-    permMsg.classList.add('show');
-    addHistory('d','⚠ Camera permission denied');return;
-  }
-
-  permMsg.classList.remove('show');
-  video.srcObject=stream;await video.play();
-  noCam.style.display='none';
-
-  running=true;closedFrames=0;noFaceFrames=0;lastDetectionTime=0;
-  earBuffer=[];headTurnActive=false;lastHeadTurnTime=0;
-  startBtn.textContent='■ Stop Monitoring';startBtn.className='btn-primary stop';startBtn.disabled=false;
-  statusBadge.className='status-badge active';statusBadge.textContent='ACTIVE';
-  cameraWrap.className='camera-wrap active-border';
-  addHistory('ok','▶ Monitoring started');
-  loop();
-  // Start calibration after a 1 second warm-up
-  setTimeout(()=>{
-    if(running) startCalibration();
-    // Countdown timer display
-    let t=5;
-    const timerEl=document.getElementById('calib-timer');
-    const interval=setInterval(()=>{
-      t--;
-      if(timerEl) timerEl.textContent=t+'s';
-      if(t<=0) clearInterval(interval);
-    },1000);
-  },1000);
-}
-
-function stopMonitoring(){
-  running=false;
-  if(animFrame)cancelAnimationFrame(animFrame);
-  if(stream)stream.getTracks().forEach(t=>t.stop());
-  stream=null;lastResults=null;
-  closedFrames=0;noFaceFrames=0;
-  earBuffer=[];calibrating=false;calibrationDone=false;calibrationSamples=[];
-  headTurnActive=false;
-  closedCount.textContent=0;
-  video.srcObject=null;noCam.style.display='flex';
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  startBtn.textContent='▶ Start Monitoring';startBtn.className='btn-primary';
-  statusBadge.className='status-badge offline';statusBadge.textContent='OFFLINE';
-  cameraWrap.className='camera-wrap';alertBox.className='alert-box';alertState='none';
-  earDisplay.textContent='--';earValLabel.textContent='--';earBar.style.width='0%';
-  eyeL.className='eye-dot';eyeR.className='eye-dot';
-  addHistory('ok','■ Monitoring stopped');
-}
-
-// ═══════════════════════════════════════════════════
-// SETTINGS
-// ═══════════════════════════════════════════════════
-function adj(key,delta){
-  if(key==='thresh'){settings.thresh=Math.max(5,Math.min(60,settings.thresh+delta));document.getElementById('threshVal').textContent=settings.thresh;}
-  if(key==='cooldown'){settings.cooldown=Math.max(5,Math.min(120,settings.cooldown+delta));document.getElementById('cooldownVal').textContent=settings.cooldown;}
-  saveSettings();
-}
-function toggleSetting(key){
-  if(key==='vib'){vibEnabled=!vibEnabled;const b=document.getElementById('vibBtn');b.textContent=vibEnabled?'ON':'OFF';b.className='toggle-btn '+(vibEnabled?'on':'off');}
-  if(key==='snd'){sndEnabled=!sndEnabled;const b=document.getElementById('sndBtn');b.textContent=sndEnabled?'ON':'OFF';b.className='toggle-btn '+(sndEnabled?'on':'off');}
-  if(key==='mirror'){
-    mirrorEnabled=!mirrorEnabled;
-    const b=document.getElementById('mirrorBtn');b.textContent=mirrorEnabled?'ON':'OFF';b.className='toggle-btn '+(mirrorEnabled?'on':'off');
-    video.className=mirrorEnabled?'mirror':'';canvas.className=mirrorEnabled?'mirror':'';
-  }
-  saveSettings();
-}
-function saveSettings(){
-  localStorage.setItem('occulert-settings',JSON.stringify({...settings,vib:vibEnabled,snd:sndEnabled,mirror:mirrorEnabled}));
-}
-function loadSettings(){
-  try{
-    const s=JSON.parse(localStorage.getItem('occulert-settings')||'{}');
-    if(s.thresh){settings.thresh=s.thresh;document.getElementById('threshVal').textContent=s.thresh;}
-    if(s.cooldown){settings.cooldown=s.cooldown;document.getElementById('cooldownVal').textContent=s.cooldown;}
-    if(s.vib===false){vibEnabled=false;document.getElementById('vibBtn').textContent='OFF';document.getElementById('vibBtn').className='toggle-btn off';}
-    if(s.snd===false){sndEnabled=false;document.getElementById('sndBtn').textContent='OFF';document.getElementById('sndBtn').className='toggle-btn off';}
-    if(s.mirror===false){mirrorEnabled=false;document.getElementById('mirrorBtn').textContent='OFF';document.getElementById('mirrorBtn').className='toggle-btn off';video.className='';canvas.className='';}
-  }catch(e){}
-}
-
-// ═══════════════════════════════════════════════════
-// EVENT LOG
-// ═══════════════════════════════════════════════════
-function addHistory(type,msg){
-  const list=document.getElementById('historyList');
-  const empty=document.getElementById('histEmpty');
-  if(empty)empty.remove();
-  const now=new Date();
-  const item=document.createElement('div');item.className='history-item';
-  const dot=document.createElement('div');dot.className=`history-dot ${type}`;
-  const time=document.createElement('div');time.className='history-time';
-  time.textContent=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  const msgEl=document.createElement('div');msgEl.className='history-msg';msgEl.textContent=msg;
-  item.appendChild(dot);item.appendChild(time);item.appendChild(msgEl);
-  list.insertBefore(item,list.firstChild);
-  // Keep log from growing unbounded
-  const items=list.querySelectorAll('.history-item');
-  if(items.length>50)items[items.length-1].remove();
-}
-
-// ═══════════════════════════════════════════════════
-// LANGUAGE SWITCHER
-// ═══════════════════════════════════════════════════
-const LANGS=[
-  {code:'en',flag:'🇺🇸',label:'English'},
-  {code:'es',flag:'🇪🇸',label:'Español'},
-  {code:'fr',flag:'🇫🇷',label:'Français'},
-  {code:'pt',flag:'🇧🇷',label:'Português'},
-  {code:'zh',flag:'🇨🇳',label:'中文'},
-  {code:'ar',flag:'🇸🇦',label:'العربية'},
-];
-let currentLang=localStorage.getItem('occulert-lang')||'en';
-function buildLangSwitcher(){
-  const container=document.getElementById('lang-switcher-app');
-  const current=LANGS.find(l=>l.code===currentLang)||LANGS[0];
-  container.innerHTML=`
-    <div class="lang-switcher">
-      <button class="lang-trigger" onclick="toggleLangMenu()">${current.flag} ${current.code.toUpperCase()}</button>
-      <div class="lang-menu" id="lang-menu-app">
-        ${LANGS.map(l=>`<div class="lang-option${l.code===currentLang?' active':''}" onclick="setLang('${l.code}')"><span>${l.flag}</span><span>${l.label}</span></div>`).join('')}
-      </div>
-    </div>`;
-}
-function toggleLangMenu(){
-  const m=document.getElementById('lang-menu-app');
-  if(m)m.classList.toggle('open');
-}
 function setLang(code){
-  currentLang=code;localStorage.setItem('occulert-lang',code);
-  buildLangSwitcher();
+  currentLang=code;
+  localStorage.setItem('occulert-lang',code);
+  const lang = LANGS.find(l=>l.code===code)||LANGS[0];
+  document.getElementById('lang-btn').textContent = lang.flag;
+  buildLangMenu();
+  document.getElementById('lang-menu').classList.remove('open');
 }
-document.addEventListener('click',e=>{
-  if(!e.target.closest('.lang-switcher')){
-    document.querySelectorAll('.lang-menu').forEach(m=>m.classList.remove('open'));
+
+function toggleLangMenu(btn){
+  const menu = document.getElementById('lang-menu');
+  // Position below the button
+  const rect = btn.getBoundingClientRect();
+  menu.style.top = (rect.bottom+4)+'px';
+  menu.style.right = (window.innerWidth-rect.right)+'px';
+  menu.style.position = 'fixed';
+  menu.classList.toggle('open');
+}
+
+document.addEventListener('click', function(e){
+  if(!e.target.closest('#lang-btn') && !e.target.closest('#lang-menu')){
+    document.getElementById('lang-menu').classList.remove('open');
   }
 });
 
-// ═══════════════════════════════════════════════════
+// ============================================================
+// MODAL SYSTEM
+// ============================================================
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click', function(e){ if(e.target===this) this.classList.remove('open'); });
+});
+
+// ============================================================
+// AUTH
+// ============================================================
+function updateAccountUI(){
+  const u = JSON.parse(localStorage.getItem('occulert-user')||'null');
+  const loggedOut = document.getElementById('account-logged-out');
+  const loggedIn = document.getElementById('account-logged-in');
+  if(u){
+    loggedOut.style.display='none';
+    loggedIn.style.display='block';
+    const nameEl = document.getElementById('acct-name');
+    const emailEl = document.getElementById('acct-email');
+    if(nameEl) nameEl.textContent = u.name || 'Driver';
+    if(emailEl) emailEl.textContent = u.email || '';
+    // Update account button icon
+    const btn = document.getElementById('account-btn');
+    if(btn) btn.textContent = '👤';
+  } else {
+    loggedOut.style.display='block';
+    loggedIn.style.display='none';
+  }
+}
+
+async function doPasskeyAuth(){
+  showToast('🔑 Opening passkey authentication...');
+  try {
+    if(!window.PublicKeyCredential){ showToast('⚠️ Passkeys not supported in this browser'); return; }
+    const u = localStorage.getItem('occulert-user');
+    if(u){ 
+      const user = JSON.parse(u);
+      showToast('✅ Welcome back, '+(user.name||user.email)+'!');
+      updateAccountUI();
+      return;
+    }
+    showToast('⚠️ No passkey registered. Sign in from the main site first.');
+  } catch(e){ showToast('⚠️ '+e.message); }
+}
+
+function doEmailSignIn(){
+  const email = document.getElementById('app-signin-email').value.trim();
+  const pw = document.getElementById('app-signin-pw').value;
+  if(!email||!pw){ showToast('⚠️ Please enter email and password'); return; }
+  const stored = JSON.parse(localStorage.getItem('occulert-user')||'null');
+  if(stored && stored.email===email){
+    showToast('✅ Welcome back, '+(stored.name||email)+'!');
+    updateAccountUI();
+    closeModal('modal-account');
+  } else {
+    showToast('⚠️ No account found. Create one on the main site.');
+  }
+}
+
+function signOut(){
+  localStorage.removeItem('occulert-user');
+  updateAccountUI();
+  closeModal('modal-account');
+  showToast('👋 Signed out');
+}
+
+// ============================================================
+// CONFIG CONTROLS
+// ============================================================
+function adjustConfig(key, delta){
+  const limits = {sensitivity:[5,60,1], cooldown:[5,120,5]};
+  const [min,max] = limits[key]||[1,100,1];
+  CFG[key] = Math.max(min, Math.min(max, CFG[key]+delta));
+  localStorage.setItem('cfg-'+key, CFG[key]);
+  const el = document.getElementById('val-'+key);
+  if(el) el.textContent = key==='cooldown' ? CFG[key]+' s' : CFG[key];
+}
+
+function toggleSetting(key){
+  CFG[key] = !CFG[key];
+  localStorage.setItem('cfg-'+key, CFG[key]);
+  const el = document.getElementById('tog-'+key);
+  if(el) el.classList.toggle('on', CFG[key]);
+  if(key==='mirror') updateMirror();
+}
+
+function loadSettings(){
+  document.getElementById('val-sensitivity').textContent = CFG.sensitivity;
+  document.getElementById('val-cooldown').textContent = CFG.cooldown+' s';
+  document.getElementById('tog-vibration').classList.toggle('on', CFG.vibration);
+  document.getElementById('tog-sound').classList.toggle('on', CFG.sound);
+  document.getElementById('tog-mirror').classList.toggle('on', CFG.mirror);
+  mirrorMode = CFG.mirror;
+  updateMirror();
+}
+
+// ============================================================
+// CAMERA
+// ============================================================
+async function startCamera(){
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:currentFacingMode,width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30}},
+      audio:false
+    });
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    await video.play();
+    document.getElementById('cam-inactive').style.display='none';
+    document.getElementById('cam-label').style.display='flex';
+    return true;
+  } catch(err){
+    addEvent('w', '⚠ Camera: '+err.message);
+    showToast('⚠️ Camera error: '+err.message);
+    stopMonitoring();
+    return false;
+  }
+}
+
+function stopCamera(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  const video = document.getElementById('video');
+  video.srcObject = null;
+  document.getElementById('cam-inactive').style.display='flex';
+  document.getElementById('cam-label').style.display='none';
+}
+
+async function flipCamera(){
+  currentFacingMode = currentFacingMode==='user'?'environment':'user';
+  document.getElementById('cam-side-label').textContent = currentFacingMode==='user'?'FRONT':'BACK';
+  if(isMonitoring){
+    if(mpCamera){mpCamera.stop();mpCamera=null;}
+    if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+    await startCamera();
+    initMediaPipe();
+  }
+  addEvent('i', '🔄 Switched to '+(currentFacingMode==='user'?'front':'back')+' camera');
+}
+
+function updateMirror(){
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  video.classList.toggle('mirror', mirrorMode);
+  canvas.classList.toggle('mirror', mirrorMode);
+}
+
+function toggleMirror(){
+  mirrorMode = !mirrorMode;
+  document.getElementById('tog-mirror').classList.toggle('on', mirrorMode);
+  CFG.mirror = mirrorMode;
+  localStorage.setItem('cfg-mirror', mirrorMode);
+  updateMirror();
+}
+
+// ============================================================
+// MEDIAPIPE INTEGRATION
+// ============================================================
+function initMediaPipe(){
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  if(typeof FaceMesh === 'undefined'){
+    showToast('⚠️ AI model loading... please wait');
+    setTimeout(initMediaPipe, 1500);
+    return;
+  }
+
+  faceMesh = new FaceMesh({locateFile:(f)=>'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/'+f});
+  faceMesh.setOptions({
+    maxNumFaces:1,
+    refineLandmarks:true,
+    minDetectionConfidence:0.5,
+    minTrackingConfidence:0.5
+  });
+  faceMesh.onResults(onFaceMeshResults);
+
+  mpCamera = new Camera(video, {
+    onFrame: async()=>{
+      if(!isMonitoring) return;
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      await faceMesh.send({image:video});
+    },
+    width:1280, height:720
+  });
+  mpCamera.start();
+}
+
+// ============================================================
+// CALIBRATION
+// ============================================================
+const CAL_TARGET = 40;
+
+function startCalibration(){
+  calibrationSamples = [];
+  calibrating = true;
+  calibrationDone = false;
+  earBuffer = [];
+  document.getElementById('calibration-overlay').style.display='flex';
+  document.getElementById('cal-progress').style.width='0%';
+  document.getElementById('cal-count').textContent='0 / '+CAL_TARGET;
+}
+
+function collectCalibrationSample(rawEar){
+  if(rawEar < 0.05) return; // blink or bad frame
+  calibrationSamples.push(rawEar);
+  const pct = Math.round((calibrationSamples.length/CAL_TARGET)*100);
+  document.getElementById('cal-progress').style.width=pct+'%';
+  document.getElementById('cal-count').textContent=calibrationSamples.length+' / '+CAL_TARGET;
+
+  if(calibrationSamples.length >= CAL_TARGET){
+    finishCalibration();
+  }
+}
+
+function finishCalibration(){
+  calibrating = false;
+  document.getElementById('calibration-overlay').style.display='none';
+
+  if(calibrationSamples.length < 15){
+    addEvent('w', '⚠ Calibration incomplete – move to better lighting');
+    showToast('⚠️ Calibration incomplete. Try better lighting.');
+    calibrationDone = true;
+    return;
+  }
+
+  const sorted = [...calibrationSamples].sort((a,b)=>a-b);
+  const median = sorted[Math.floor(sorted.length*0.5)];
+  const p25 = sorted[Math.floor(sorted.length*0.25)];
+
+  EAR_OPEN = median * 0.85;
+  EAR_WARN = median * 0.75;
+  EAR_DANGER = median * 0.60;
+
+  calibrationDone = true;
+  addEvent('ok', '✅ Calibrated – baseline EAR: '+median.toFixed(3)+' | warn: '+EAR_WARN.toFixed(3)+' | danger: '+EAR_DANGER.toFixed(3));
+  showToast('✅ Calibration complete! Monitoring now active.');
+}
+
+// ============================================================
+// FACE MESH RESULTS HANDLER
+// ============================================================
+function onFaceMeshResults(results){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(!results.multiFaceLandmarks || results.multiFaceLandmarks.length===0){
+    noFaceFrames++;
+    if(noFaceFrames > 30) updateNoFace();
+    return;
+  }
+
+  noFaceFrames = 0;
+  const lm = results.multiFaceLandmarks[0];
+
+  // Draw eye landmarks
+  drawEye(lm, L_EYE);
+  drawEye(lm, R_EYE);
+
+  const leftEAR = calcEAR(lm, L_EYE);
+  const rightEAR = calcEAR(lm, R_EYE);
+  const rawEar = (leftEAR+rightEAR)/2;
+
+  // Collect calibration sample
+  if(calibrating){
+    collectCalibrationSample(rawEar);
+  }
+
+  // Smooth the EAR
+  const ear = smoothEAR(rawEar);
+
+  // Head turn detection
+  const isTurned = detectHeadTurn(lm);
+  updateEAR(ear, isTurned);
+}
+
+function drawEye(lm, pts){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const points = pts.map(i=>({x:lm[i].x*canvas.width, y:lm[i].y*canvas.height}));
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  points.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.closePath();
+  ctx.strokeStyle='rgba(0,229,255,0.7)';
+  ctx.lineWidth=1.5;
+  ctx.stroke();
+  ctx.fillStyle='rgba(0,229,255,0.05)';
+  ctx.fill();
+}
+
+// ============================================================
+// EAR ALERT LOGIC
+// ============================================================
+function updateEAR(ear, isTurned){
+  // Update display
+  const earEl = document.getElementById('ear-display');
+  if(earEl) earEl.textContent = ear.toFixed(3);
+
+  // Update gauge
+  const pct = calibrationDone ? Math.min(100,Math.round((ear/EAR_OPEN)*100)) : Math.min(100,Math.round((ear/0.35)*100));
+  const gaugeEl = document.getElementById('gauge-fill');
+  const pctEl = document.getElementById('gauge-pct');
+  if(gaugeEl){
+    let color;
+    if(pct>75) color='var(--green)';
+    else if(pct>45) color='var(--warn)';
+    else color='var(--danger)';
+    gaugeEl.style.width=pct+'%';
+    gaugeEl.style.background=color;
+  }
+  if(pctEl) pctEl.textContent=pct+'%';
+
+  // Update face status
+  const faceStatus = document.getElementById('face-status');
+  if(faceStatus) faceStatus.textContent = isTurned ? 'EYES OFF ROAD' : '';
+
+  // Stat block coloring
+  const earBlock = document.getElementById('ear-block');
+  if(earBlock){
+    earBlock.classList.toggle('warn-stat', ear < EAR_WARN && ear >= EAR_DANGER);
+    earBlock.classList.toggle('danger-stat', ear < EAR_DANGER);
+  }
+
+  // Camera wrap border
+  const camWrap = document.getElementById('camera-wrap');
+  camWrap.classList.remove('active-border','warn-border','danger-border');
+  if(ear > EAR_OPEN) camWrap.classList.add('active-border');
+  else if(ear >= EAR_WARN) camWrap.classList.add('warn-border');
+  else if(ear < EAR_DANGER) camWrap.classList.add('danger-border');
+
+  // Status badge
+  const badge = document.getElementById('status-badge');
+  if(!calibrationDone || isTurned) {
+    badge.className='status-badge warning';
+    badge.textContent = isTurned ? 'HEAD TURNED' : 'CALIBRATING';
+    return;
+  }
+
+  // Blink counting
+  if(ear < EAR_WARN){
+    blinkFrames++;
+    document.getElementById('blink-display').textContent = blinkFrames;
+  } else {
+    blinkFrames = Math.max(0, blinkFrames-1);
+  }
+
+  // Alert triggering
+  const now = Date.now();
+  if(ear < EAR_DANGER && blinkFrames >= CFG.sensitivity){
+    if(now - lastAlertTime > CFG.cooldown*1000){
+      triggerAlert(ear);
+      lastAlertTime = now;
+      blinkFrames = 0;
+    }
+    badge.className='status-badge danger';
+    badge.textContent='DROWSY!';
+  } else if(ear < EAR_WARN){
+    badge.className='status-badge warning';
+    badge.textContent='WARNING';
+  } else {
+    badge.className='status-badge active';
+    badge.textContent='ACTIVE';
+  }
+}
+
+function updateNoFace(){
+  const earEl = document.getElementById('ear-display');
+  if(earEl) earEl.textContent='--';
+  const badge = document.getElementById('status-badge');
+  badge.className='status-badge offline';
+  badge.textContent='NO FACE';
+  document.getElementById('gauge-fill').style.width='0%';
+  document.getElementById('gauge-pct').textContent='--';
+  const camWrap = document.getElementById('camera-wrap');
+  camWrap.classList.remove('active-border','warn-border','danger-border');
+}
+
+// ============================================================
+// ALERT
+// ============================================================
+function triggerAlert(ear){
+  alertCount++;
+  document.getElementById('alert-display').textContent = alertCount;
+  document.getElementById('alert-block').classList.add('danger-stat');
+
+  // Flash screen
+  const flash = document.getElementById('alert-flash');
+  flash.classList.add('show');
+  setTimeout(()=>flash.classList.remove('show'), 400);
+
+  // Vibration
+  if(CFG.vibration && navigator.vibrate){
+    navigator.vibrate([300,100,300,100,500]);
+  }
+
+  // Sound
+  if(CFG.sound){
+    try {
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const gainNode = ctx.createGain();
+      gainNode.gain.setValueAtTime(0.6, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+1.2);
+      gainNode.connect(ctx.destination);
+      [440,880,440].forEach((freq,i)=>{
+        const osc = ctx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime+(i*0.15));
+        osc.connect(gainNode);
+        osc.start(ctx.currentTime+(i*0.15));
+        osc.stop(ctx.currentTime+(i*0.15)+0.35);
+      });
+    } catch(e){}
+  }
+
+  addEvent('!', '🚨 DROWSINESS ALERT — EAR: '+ear.toFixed(3));
+  showToast('🚨 DROWSINESS DETECTED — WAKE UP!');
+
+  // Save to session history
+  const history = JSON.parse(localStorage.getItem('occulert-history')||'[]');
+  history.unshift({ts:new Date().toISOString(),ear:ear.toFixed(3),count:alertCount});
+  if(history.length > 100) history.length = 100;
+  localStorage.setItem('occulert-history', JSON.stringify(history));
+}
+
+// ============================================================
+// MONITORING TOGGLE
+// ============================================================
+async function toggleMonitoring(){
+  if(isMonitoring){ stopMonitoring(); } else { await startMonitoring(); }
+}
+
+async function startMonitoring(){
+  const btn = document.getElementById('start-btn');
+  btn.textContent = 'STARTING...';
+  btn.disabled = true;
+
+  const ok = await startCamera();
+  if(!ok){ btn.textContent = '► START MONITORING'; btn.disabled=false; return; }
+
+  isMonitoring = true;
+  alertCount = 0;
+  blinkFrames = 0;
+  earBuffer = [];
+  noFaceFrames = 0;
+  document.getElementById('alert-display').textContent='0';
+  document.getElementById('blink-display').textContent='0';
+  document.getElementById('alert-block').classList.remove('danger-stat');
+
+  btn.classList.add('monitoring');
+  btn.textContent = '◼ STOP MONITORING';
+  btn.disabled = false;
+
+  document.getElementById('status-badge').className='status-badge warning';
+  document.getElementById('status-badge').textContent='CALIBRATING';
+
+  addEvent('ok', '► Monitoring started');
+  startCalibration();
+  initMediaPipe();
+}
+
+function stopMonitoring(){
+  isMonitoring = false;
+  calibrating = false;
+  calibrationDone = false;
+  earBuffer = [];
+  noFaceFrames = 0;
+
+  if(mpCamera){mpCamera.stop();mpCamera=null;}
+  if(faceMesh){faceMesh.close();faceMesh=null;}
+  stopCamera();
+
+  document.getElementById('calibration-overlay').style.display='none';
+  document.getElementById('gauge-fill').style.width='0%';
+  document.getElementById('gauge-pct').textContent='--';
+  document.getElementById('ear-display').textContent='--';
+
+  const btn = document.getElementById('start-btn');
+  btn.classList.remove('monitoring');
+  btn.textContent = '► START MONITORING';
+  btn.disabled = false;
+
+  document.getElementById('status-badge').className='status-badge offline';
+  document.getElementById('status-badge').textContent='OFFLINE';
+
+  const camWrap = document.getElementById('camera-wrap');
+  camWrap.classList.remove('active-border','warn-border','danger-border');
+
+  addEvent('i', '◼ Monitoring stopped');
+}
+
+// ============================================================
+// BLUETOOTH
+// ============================================================
+async function pairBluetooth(type){
+  const btn = document.getElementById('bt-'+type+'-btn');
+  const status = document.getElementById('bt-'+type+'-status');
+  if(!navigator.bluetooth){ showToast('⚠️ Bluetooth not available in this browser'); return; }
+  try {
+    btn.textContent='PAIRING...';
+    const device = await navigator.bluetooth.requestDevice({acceptAllDevices:true});
+    btn.textContent='CONN';
+    btn.classList.add('connected');
+    if(status) status.textContent = 'Connected: '+device.name;
+    addEvent('bt', '🔵 Paired: '+device.name);
+    showToast('✅ Paired: '+device.name);
+  } catch(e){
+    btn.textContent='PAIR';
+    if(e.name!=='NotFoundError') showToast('⚠️ Bluetooth: '+e.message);
+  }
+}
+
+// ============================================================
+// EVENT LOG
+// ============================================================
+let eventLog = [];
+function addEvent(type, msg){
+  const time = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  const icons = {ok:'✅',w:'⚠️','!':'🚨',i:'ℹ️',bt:'🔵'};
+  const icon = icons[type]||'•';
+  eventLog.unshift({icon,time,msg});
+  if(eventLog.length>50) eventLog.length=50;
+  renderEventLog();
+}
+
+function renderEventLog(){
+  const container = document.getElementById('event-log');
+  const empty = document.getElementById('event-empty');
+  if(eventLog.length===0){
+    if(empty) empty.style.display='block';
+    return;
+  }
+  if(empty) empty.style.display='none';
+  const frag = document.createDocumentFragment();
+  eventLog.slice(0,20).forEach(e=>{
+    const div = document.createElement('div');
+    div.className='event-item';
+    div.innerHTML=`<span class="event-icon">${e.icon}</span><span class="event-time">${e.time}</span><span class="event-msg">${e.msg}</span>`;
+    frag.appendChild(div);
+  });
+  container.innerHTML='';
+  container.appendChild(frag);
+}
+
+// ============================================================
+// SESSION HISTORY
+// ============================================================
+function viewSessionHistory(){
+  const history = JSON.parse(localStorage.getItem('occulert-history')||'[]');
+  const container = document.getElementById('history-list');
+  if(history.length===0){
+    container.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px;">No session history yet.</div>';
+  } else {
+    container.innerHTML = history.map(h=>`
+      <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:13px;color:var(--text);">🚨 Alert #${h.count} — EAR: ${h.ear}</div>
+          <div style="font-size:11px;color:var(--text3);">${new Date(h.ts).toLocaleString()}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+  openModal('modal-history');
+  closeModal('modal-account');
+}
+
+function clearHistory(){
+  localStorage.removeItem('occulert-history');
+  document.getElementById('history-list').innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px;">History cleared.</div>';
+  showToast('✅ Session history cleared');
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2800);
+}
+
+// ============================================================
+// PREVENT SCREEN SLEEP
+// ============================================================
+let wakeLock = null;
+async function requestWakeLock(){
+  try {
+    if('wakeLock' in navigator){
+      wakeLock = await navigator.wakeLock.request('screen');
+      addEvent('i', '💡 Screen wake lock active');
+    }
+  } catch(e){}
+}
+
+document.addEventListener('visibilitychange', async()=>{
+  if(document.visibilityState==='visible' && isMonitoring) await requestWakeLock();
+});
+
+// ============================================================
+// AI MODEL STATUS
+// ============================================================
+function checkAIModel(){
+  const isReady = typeof FaceMesh !== 'undefined';
+  const statusEl = document.getElementById('ai-status-wrap');
+  if(statusEl) statusEl.style.display = isReady ? 'none' : 'flex';
+  return isReady;
+}
+
+// ============================================================
 // INIT
-// ═══════════════════════════════════════════════════
+// ============================================================
 (function init(){
-  buildThemeGrid();
-  buildLangSwitcher();
-  applyTheme(localStorage.getItem('occulert-theme')||'cyan');
   loadSettings();
-  try{
-    const u=JSON.parse(localStorage.getItem('occulert-user')||'null');
-    if(u)setUser(u);
-  }catch(e){}
+  buildThemeGrid();
+  applyTheme(localStorage.getItem('occulert-theme')||'cyan');
+  buildLangMenu();
+  const lang = LANGS.find(l=>l.code===currentLang)||LANGS[0];
+  document.getElementById('lang-btn').textContent = lang.flag;
+  updateAccountUI();
+
+  // AI model status indicator
+  let checks = 0;
+  const modelCheck = setInterval(()=>{
+    checks++;
+    if(typeof FaceMesh !== 'undefined'){
+      clearInterval(modelCheck);
+      addEvent('ok', '✅ AI model loaded');
+    } else if(checks > 20){
+      clearInterval(modelCheck);
+      addEvent('w', '⚠ AI model load timeout – check your connection');
+    }
+  }, 500);
+
+  // Wake lock on start
+  requestWakeLock();
 })();
 </script>
+<!-- AI MODEL STATUS (bottom of page, shown until model loads) -->
+<div id="ai-status-wrap" style="position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:8px;z-index:50;">
+  <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite;"></div>
+  <span style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--accent2);">● AI Model Ready</span>
+</div>
 </body>
 </html>
