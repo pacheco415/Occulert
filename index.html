@@ -130,14 +130,14 @@ function toggleFaq(el){
 
 // Language (text only, no emoji to avoid encoding issues)
 const LANGS=[
-  {code:'en',flag:'EN',name:'English'},
-  {code:'es',flag:'ES',name:'Espanol'},
-  {code:'pt',flag:'PT',name:'Portugues'},
-  {code:'fr',flag:'FR',name:'Francais'},
-  {code:'de',flag:'DE',name:'Deutsch'},
-  {code:'zh',flag:'ZH',name:'Chinese'},
-  {code:'ja',flag:'JA',name:'Japanese'},
-  {code:'ar',flag:'AR',name:'Arabic'}
+  {code:'en',flag:'🇺🇸',name:'English'},
+  {code:'es',flag:'🇪🇸',name:'Español'},
+  {code:'pt',flag:'🇵🇹',name:'Português'},
+  {code:'fr',flag:'🇫🇷',name:'Français'},
+  {code:'de',flag:'🇩🇪',name:'Deutsch'},
+  {code:'zh',flag:'🇨🇳',name:'中文'},
+  {code:'ja',flag:'🇯🇵',name:'日本語'},
+  {code:'ar',flag:'🇸🇦',name:'عربي'}
 ];
 function buildLangSwitcher(){
   const menu=document.getElementById('lang-menu');
@@ -147,7 +147,7 @@ function buildLangSwitcher(){
     `<div class="lang-option ${l.code===currentLang?'active':''}" onclick="setLang('${l.code}','${l.flag}','${l.name}')">${l.flag} — ${l.name}</div>`
   ).join('');
   const cur=LANGS.find(l=>l.code===currentLang);
-  if(cur&&display)display.textContent=cur.flag;
+  if(cur&&display)display.textContent=cur.flag+' '+cur.code.toUpperCase();
 }
 function setLang(code,flag,name){
   currentLang=code;localStorage.setItem('occulert-lang',code);
