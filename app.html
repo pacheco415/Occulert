@@ -306,7 +306,7 @@ white-space:nowrap;
         <div class="theme-grid" id="theme-grid"></div>
       </div>
     </div>
-    <div class="topbar-btn" onclick="showHelp()" title="Help" style="font-size:14px;font-weight:700;font-family:var(--mono);">?</div>
+    <div class="topbar-btn" onclick="showHelp()" title="Help">❓</div>
     <div class="user-pill" id="user-pill" onclick="goSignIn()">
       <div class="user-avatar" id="user-avatar-initials">?</div>
       <span id="user-name-label">Sign In</span>
@@ -829,7 +829,7 @@ function initFaceMesh(){
       faceMesh.send({image:warmup}).then(function(){
         faceMeshReady=true;faceMeshLoading=false;
         modelDot.className='model-dot ready';modelLabel.textContent='AI Model Ready';
-        addLog('ok','✅ AI model loaded successfully');
+        addLog('ok','AI model loaded successfully');
       }).catch(function(){
         faceMeshReady=true;faceMeshLoading=false;
         modelDot.className='model-dot ready';modelLabel.textContent='AI Model Ready';
@@ -911,11 +911,11 @@ async function requestCameraPermission(){
 function startCalibration(){
   calibrating=true;calibrationDone=false;calibrationSamples=[];
   calibFill.style.width='0%';calibStatus.textContent='Sampling... 0/'+calibSampleTarget;
-  calibOverlay.classList.add('show');addLog('info','🔬 Calibration started');
+  calibOverlay.classList.add('show');addLog('info','Calibration started');
 }
 function skipCalibration(){
   calibrating=false;calibrationDone=true;calibOverlay.classList.remove('show');
-  addLog('info','⏭ Calibration skipped — using defaults');
+  addLog('info','Calibration skipped — using defaults');
 }
 function collectCalibrationSample(ear){
   if(ear<0.05||ear>0.55)return;
@@ -928,7 +928,7 @@ function collectCalibrationSample(ear){
 function finishCalibration(){
   if(calibrationSamples.length<20){
     calibOverlay.classList.remove('show');calibrating=false;calibrationDone=true;
-    addLog('warn','⚠️ Calibration incomplete — poor lighting?');return;
+    addLog('warn','Calibration incomplete — poor lighting?');return;
   }
   var sorted=[...calibrationSamples].sort(function(a,b){return a-b;});
   var top=sorted.slice(Math.floor(sorted.length/2));
@@ -1023,7 +1023,7 @@ async function toggleMonitoring(){
     startLoop();
     if(!calibrationDone)startCalibration();
     startSession();
-    addLog('ok','🟢 Monitoring started');
+    addLog('ok','Monitoring started');
     if(typeof gtag!=='undefined')gtag('event','session_start');
   }
 }
@@ -1058,7 +1058,7 @@ document.addEventListener('click',function(e){
 
 // --- PAGE VISIBILITY ---
 document.addEventListener('visibilitychange',function(){
-  if(document.hidden&&isRunning)addLog('warn','🔕 App backgrounded — monitoring paused');
+  if(document.hidden&&isRunning)addLog('warn','App backgrounded — monitoring paused');
 });
 
 // --- KEEP SCREEN AWAKE (Wake Lock API) ---
