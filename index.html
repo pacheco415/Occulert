@@ -3,7 +3,7 @@
 <nav>
 <div class="logo" onclick="showPage('home')"><div class="logo-mark"><svg width="22" height="22" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></div><span class="logo-text">Occulert<sup style="font-size:10px;color:var(--text3)">TM</sup></span></div>
 <div class="nav-links"><a onclick="showPage('how')">How It Works</a><a onclick="showPage('features')">Features</a><a onclick="showPage('devices')">Devices</a><a onclick="showPage('faq')">FAQ</a><a onclick="showPage('fleet')">Fleet</a><a onclick="showPage('about')">About</a></div>
-<div class="nav-right"><div class="lang-switcher"><button class="lang-trigger" id="lang-display">&#127482;&#127480; EN</button><div class="lang-menu" id="lang-menu"></div></div>
+<div class="nav-right"><div class="lang-switcher"><button class="lang-trigger" id="lang-display" onclick="toggleLangMenu()">&#127482;&#127480; EN</button><div class="lang-menu" id="lang-menu"></div></div>
 <div id="nav-auth-area" style="display:flex;align-items:center;gap:10px"><button class="nav-btn nav-ghost" onclick="showPage('signin')">Sign In</button><button class="nav-btn nav-solid" onclick="launchApp()">Launch App &#8594;</button></div>
 <div id="nav-user-area" style="display:none;align-items:center;gap:10px"><div class="nav-user"><div class="nav-avatar" id="nav-avatar-initials">?</div><span id="nav-user-name">Driver</span></div><button class="nav-btn nav-solid" onclick="launchApp()">Launch App &#8594;</button></div>
 </div></nav>
