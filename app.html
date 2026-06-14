@@ -12,7 +12,7 @@
 .lang-switcher{position:relative;display:inline-flex;align-items:center}.lang-trigger{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#c8e8f0;padding:5px 10px;border-radius:6px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px}.lang-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;background:#0d1f2d;border:1px solid rgba(255,255,255,.15);border-radius:8px;min-width:160px;z-index:100;overflow:hidden}.lang-menu.open{display:block}.lang-option{padding:8px 14px;cursor:pointer;font-size:13px;color:#c8e8f0;display:flex;align-items:center;gap:8px}.lang-option:hover,.lang-option.active{background:rgba(0,200,255,.12);color:#00c8ff}</style>
 </head>
 <body>
-<div class="top"><div><div class="brand">OCCULERT</div><a href="/fleet-dashboard.html">Fleet dashboard →</a></div><div class="lang-switcher"><button class="lang-trigger" id="lang-display" onclick="toggleLangMenu()">🇺🇸 EN</button><div class="lang-menu" id="lang-menu"></div></div><div class="status" id="status">OFFLINE</div></div>
+<div class="top"><div><div class="brand">OCCULERT</div><a href="/fleet-dashboard.html">Fleet dashboard →</a></div><div class="status" id="status">OFFLINE</div><div class="lang-switcher" style="position:relative;margin-left:10px"><button class="lang-trigger" id="lang-display" onclick="toggleLangMenu()">🇺🇸 EN</button><div class="lang-menu" id="lang-menu" style="right:0;left:auto"></div></div></div>
 <div class="app"><div class="camera"><video id="video" autoplay playsinline muted></video><canvas id="canvas"></canvas><div class="overlay" id="overlay"><div><h2>AI Fatigue Monitoring</h2><p class="small">Eye tracking + head-nod detection + fleet-ready session scoring.<br>Video stays on this device.</p></div></div><div class="alertScreen" id="alertScreen"><div><h1>DROWSY ALERT</h1><p>Pull over safely</p></div></div></div>
 <aside class="panel"><button class="btn primary" id="startBtn">START MONITORING</button><div class="grid"><div class="card"><div class="label">Fatigue</div><div class="value" id="fatigue">0</div><div class="bar"><div class="fill" id="fatigueFill"></div></div></div><div class="card"><div class="label">Confidence</div><div class="value" id="confidence">0%</div><div class="bar"><div class="fill" id="confidenceFill"></div></div></div><div class="card"><div class="label">EAR</div><div class="value" id="ear">--</div></div><div class="card"><div class="label">Head Nod</div><div class="value" id="nods">0</div></div></div><div class="card"><div class="label">Risk State</div><div class="value" id="risk">SAFE</div><p class="metric-note">Weighted score uses eye closure, tracking confidence, head movement, recovery, and repeated alerts.</p></div><div class="grid"><div class="card"><div class="label">Alerts</div><div class="value" id="alerts">0</div></div><div class="card"><div class="label">Fleet Sync</div><div class="value" id="sync">ON</div></div></div><div class="card"><div class="label">Session Report</div><div class="report" id="report"></div></div><div class="card"><div class="label">Event Log</div><div id="log"></div></div></aside></div>
 <script>
@@ -55,7 +55,7 @@ function applyAppTranslations(lang){
   const t=APP_T[lang]||APP_T['en'];
   const s=(sel,key)=>{const e=document.querySelector(sel);if(e&&t[key]!==undefined)e.textContent=t[key];};
   const sa=(sel,key)=>{document.querySelectorAll(sel).forEach((e,i)=>{if(t[key]!==undefined)e.textContent=t[key];});};
-  s('#startBtn',running?'stop':'start');
+  s('#startBtn',running?t.stop:t.start);
   // Labels
   const labels=document.querySelectorAll('.label');
   const labelKeys=['fatigue','confidence','ear','headnod','risk','alerts','fleetsync','report','eventlog'];
@@ -69,6 +69,9 @@ function applyAppTranslations(lang){
   // Risk state if it shows SAFE
   const riskEl=document.getElementById('risk');if(riskEl&&(riskEl.textContent==='SAFE'||Object.values(APP_T).some(tt=>tt.safe===riskEl?.textContent)))riskEl.textContent=t.safe;
   // RTL for Arabic
+  // Metric note (risk state description)
+  const metricNote=document.querySelector('.metric-note');
+  if(metricNote){const riskNote={en:'Weighted score uses eye closure, tracking confidence, head movement, recovery, and repeated alerts.',es:'Puntuación ponderada: cierre de ojos, confianza, movimiento de cabeza, recuperación y alertas.',pt:'Pontuação ponderada: fechamento dos olhos, confiança, movimento da cabeça, recuperação e alertas.',fr:'Score pondéré: fermeture des yeux, confiance, mouvement de tête, récupération et alertes répétées.',de:'Gewichteter Score: Augenschluss, Vertrauen, Kopfbewegung, Erholung und wiederholte Warnungen.',zh:'加权分数：眼盛闭合、追踪置信度、头部运动、恢复和重复警报。',ja:'加重スコア：目の閉合、追跡信頼度、頭の動き、回復、繰り返し警告。',ar:'نتيجة موزونة: غلق العين، الثقة، حركة الرأس، التعافي والتنبيهات.'};metricNote.textContent=riskNote[lang]||riskNote['en'];}
   document.documentElement.dir=(lang==='ar')?'rtl':'ltr';
   document.documentElement.lang=lang;
 }
