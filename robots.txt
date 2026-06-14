@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://occulert.vercel.app/sitemap.xml
+Sitemap: https://occulert.com/sitemap.xml
