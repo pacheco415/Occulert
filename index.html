@@ -175,11 +175,80 @@ function buildLangSwitcher(){
   const cur=LANGS.find(l=>l.code===currentLang);
   if(cur&&display)display.textContent=cur.flag+' '+cur.code.toUpperCase();
 }
+const TRANSLATIONS={
+en:{nav_how:'How It Works',nav_features:'Features',nav_devices:'Devices',nav_faq:'FAQ',nav_fleet:'Fleet',nav_about:'About',nav_signin:'Sign In',nav_launch:'Launch App →',hero_badge:'AI driver safety — works on any phone',hero_h1:'Stop Drowsy\nDriving Before',hero_grad:'It Stops You.',hero_desc:'Occulert uses real-time AI eye-tracking to detect fatigue the moment it begins — then alerts you through your phone, watch, and earbuds before an accident happens.',hero_cta:'▶ Start Monitoring Free',hero_fleet:'Fleet Solutions',hero_stat1:'iOS & Android',hero_stat2:'100% Private',hero_stat3:'0.2s Response',how_h2:'How It Works',features_h2:'Powerful Features',devices_h2:'Works on Your Devices',faq_h2:'Frequently Asked Questions',fleet_h2:'Fleet & Commercial Solutions',about_h2:'Built by a Driver, for Every Driver',signin_h2:'Sign In to Occulert',signin_passkey:'🔑 Sign In with Passkey',signin_guest:'Continue as Guest'},
+es:{nav_how:'Cómo funciona',nav_features:'Características',nav_devices:'Dispositivos',nav_faq:'Preguntas',nav_fleet:'Flota',nav_about:'Nosotros',nav_signin:'Iniciar sesión',nav_launch:'Abrir App →',hero_badge:'Seguridad vial con IA — funciona en cualquier teléfono',hero_h1:'Para la conducción\nsomnoliente antes',hero_grad:'de que te detenga.',hero_desc:'Occulert usa IA de seguimiento ocular en tiempo real para detectar la fatiga en el momento en que comienza — luego te alerta a través de tu teléfono, reloj y auriculares antes de que ocurra un accidente.',hero_cta:'▶ Empezar gratis',hero_fleet:'Soluciones de flota',hero_stat1:'iOS & Android',hero_stat2:'100% privado',hero_stat3:'Respuesta 0.2s',how_h2:'Cómo funciona',features_h2:'Funciones potentes',devices_h2:'Funciona en tus dispositivos',faq_h2:'Preguntas frecuentes',fleet_h2:'Soluciones de flota y comerciales',about_h2:'Creado por un conductor, para cada conductor',signin_h2:'Iniciar sesión en Occulert',signin_passkey:'🔑 Iniciar con passkey',signin_guest:'Continuar como invitado'},
+pt:{nav_how:'Como funciona',nav_features:'Recursos',nav_devices:'Dispositivos',nav_faq:'Perguntas',nav_fleet:'Frota',nav_about:'Sobre',nav_signin:'Entrar',nav_launch:'Abrir App →',hero_badge:'Segurança ao volante com IA — funciona em qualquer celular',hero_h1:'Pare de dirigir\ncom sono antes',hero_grad:'que te pare.',hero_desc:'Occulert usa rastreamento ocular em tempo real com IA para detectar a fadiga no momento em que começa — alertando você pelo celular, relógio e fones antes de um acidente.',hero_cta:'▶ Começar gratuitamente',hero_fleet:'Soluções de frota',hero_stat1:'iOS & Android',hero_stat2:'100% privado',hero_stat3:'Resposta 0.2s',how_h2:'Como funciona',features_h2:'Recursos poderosos',devices_h2:'Funciona nos seus dispositivos',faq_h2:'Perguntas frequentes',fleet_h2:'Soluções de frota e comerciais',about_h2:'Criado por um motorista, para cada motorista',signin_h2:'Entrar na Occulert',signin_passkey:'🔑 Entrar com chave de acesso',signin_guest:'Continuar como convidado'},
+fr:{nav_how:'Comment ça marche',nav_features:'Fonctionnalités',nav_devices:'Appareils',nav_faq:'FAQ',nav_fleet:'Flotte',nav_about:'À propos',nav_signin:'Connexion',nav_launch:'Ouvrir App →',hero_badge:"Sécurité routière par IA — fonctionne sur n'importe quel téléphone",hero_h1:'Arrêtez la conduite\nsomnolente avant',hero_grad:"qu'elle vous arrête.",hero_desc:"Occulert utilise le suivi oculaire en temps réel par IA pour détecter la fatigue dès qu'elle commence — puis vous alerte via votre téléphone, montre et écouteurs avant un accident.",hero_cta:'▶ Commencer gratuitement',hero_fleet:'Solutions flotte',hero_stat1:'iOS & Android',hero_stat2:'100% privé',hero_stat3:'Réponse 0.2s',how_h2:'Comment ça marche',features_h2:'Fonctionnalités puissantes',devices_h2:'Fonctionne sur vos appareils',faq_h2:'Questions fréquentes',fleet_h2:'Solutions flotte et commerciales',about_h2:'Créé par un conducteur, pour chaque conducteur',signin_h2:'Connexion à Occulert',signin_passkey:'🔑 Se connecter avec une clé',signin_guest:'Continuer en tant qu’invité'},
+de:{nav_how:'So funktioniert es',nav_features:'Funktionen',nav_devices:'Geräte',nav_faq:'FAQ',nav_fleet:'Flotte',nav_about:'Über uns',nav_signin:'Anmelden',nav_launch:'App starten →',hero_badge:'KI-Fahrsicherheit — funktioniert auf jedem Telefon',hero_h1:'Schläfriges Fahren\nstoppen bevor es',hero_grad:'dich stoppt.',hero_desc:'Occulert verwendet KI-Echtzeit-Augenverfolgung, um Ermüdung im Moment des Einsetzens zu erkennen — und warnt Sie über Telefon, Uhr und Ohrhörer, bevor ein Unfall passiert.',hero_cta:'▶ Kostenlos starten',hero_fleet:'Flottenlösungen',hero_stat1:'iOS & Android',hero_stat2:'100% privat',hero_stat3:'0,2s Reaktion',how_h2:'So funktioniert es',features_h2:'Leistungsstarke Funktionen',devices_h2:'Funktioniert auf Ihren Geräten',faq_h2:'Häufig gestellte Fragen',fleet_h2:'Flotten- und Geschäftslösungen',about_h2:'Über Occulert',signin_h2:'Bei Occulert anmelden',signin_passkey:'🔑 Mit Passkey anmelden',signin_guest:'Als Gast fortfahren'},
+zh:{nav_how:'工作原理',nav_features:'功能特点',nav_devices:'适用设备',nav_faq:'常见问题',nav_fleet:'车队管理',nav_about:'关于我们',nav_signin:'登录',nav_launch:'打开应用 →',hero_badge:'AI驾驶安全 — 适用任何手机',hero_h1:'在疲劳驾驶
+危及你之前',hero_grad:'阿止它。',hero_desc:'Occulert 使用实时AI眼部追踪技术，在疲劳产生的瞬间即可检测到——然后通过手机、手表和耳机在事故发生前发出警报。',hero_cta:'▶ 免费开始监测',hero_fleet:'车队解决方案',hero_stat1:'iOS & Android',hero_stat2:'隐私保护100%',hero_stat3:'0.2秒响应',how_h2:'工作原理',features_h2:'强大功能',devices_h2:'适用您的设备',faq_h2:'常见问题',fleet_h2:'车队与商业解决方案',about_h2:'由司机创建，为每一位司机',signin_h2:'登录Occulert',signin_passkey:'🔑 使用通行密鑰登录',signin_guest:'以访客身份继续'},
+ja:{nav_how:'仕組み',nav_features:'機能',nav_devices:'デバイス',nav_faq:'よくある質問',nav_fleet:'フリート',nav_about:'会社概要',nav_signin:'ログイン',nav_launch:'アプリを起動 →',hero_badge:'AIドライバー安全 — あらゆるスマホに対応',hero_h1:'眠気運転を
+危険になる前に',hero_grad:'止めよう。',hero_desc:'OcculertはリアルタイムAI視線追跡を使用して疲労を即座に検出——事故が起きる前にスマホ、時計、イヤホンを通じて警告します。',hero_cta:'▶ 無料でモニタリング開始',hero_fleet:'フリートソリューション',hero_stat1:'iOS & Android',hero_stat2:'完全プライベート',hero_stat3:'0.2秒応答',how_h2:'仕組み',features_h2:'強力な機能',devices_h2:'あなたのデバイスで動作',faq_h2:'よくある質問',fleet_h2:'フリート・業務ソリューション',about_h2:'Occulertについて',signin_h2:'Occulertにログイン',signin_passkey:'🔑 パスキーでログイン',signin_guest:'ゲストとして続ける'},
+ar:{nav_how:'كيف يعمل',nav_features:'المميزات',nav_devices:'الأجهزة',nav_faq:'الأسئلة',nav_fleet:'الأسطول',nav_about:'حولنا',nav_signin:'تسجيل الدخول',nav_launch:'فتح التطبيق →',hero_badge:'سلامة السائق بالذكاء الاصطناعي — يعمل على أي هاتف',hero_h1:'أوقف القيادة
+النعسانة قبل',hero_grad:'أن توقفك.',hero_desc:'يستخدم Occulert تتبع العين بالذكاء الاصطناعي في الوقت الفعلي لاكتشاف التعب لحظة بدءه — ثم يُنبّهك عبر هاتفك وساعتك وسماعاتك قبل وقوع أي حادث.',hero_cta:'▶ ابدأ المراقبة مجاناً',hero_fleet:'حلول الأسطول',hero_stat1:'iOS & Android',hero_stat2:'خصوصية 100%',hero_stat3:'استجابة 0.2 ث',how_h2:'كيف يعمل',features_h2:'ميزات قوية',devices_h2:'يعمل على أجهزتك',faq_h2:'الأسئلة الشائعة',fleet_h2:'حلول الأسطول والتجارية',about_h2:'حول Occulert',signin_h2:'تسجيل الدخول إلى Occulert',signin_passkey:'🔑 تسجيل بمفتاح المرور',signin_guest:'المتابعة كضيف'}
+};
+function applyTranslations(lang){
+  const t=TRANSLATIONS[lang]||TRANSLATIONS['en'];
+  // Nav links (by order)
+  const navLinks=document.querySelectorAll('nav a');
+  const navKeys=['nav_how','nav_features','nav_devices','nav_faq','nav_fleet','nav_about'];
+  navLinks.forEach((a,i)=>{if(navKeys[i]&&t[navKeys[i]])a.textContent=t[navKeys[i]];});
+  // Nav buttons
+  const navGhost=document.querySelector('nav .nav-ghost');
+  if(navGhost)navGhost.textContent=t.nav_signin||navGhost.textContent;
+  document.querySelectorAll('nav .nav-solid').forEach(b=>{
+    if(b.textContent.trim().startsWith('Launch')||b.textContent.trim().includes('App'))b.textContent=t.nav_launch||b.textContent;
+  });
+  // Hero badge
+  const badge=document.querySelector('.badge-text');
+  if(badge)badge.textContent=t.hero_badge||badge.textContent;
+  // H1 text nodes
+  const h1=document.querySelector('h1');
+  if(h1&&t.hero_h1){
+    const lines=t.hero_h1.split('\n');
+    const textNodes=Array.from(h1.childNodes).filter(n=>n.nodeType===3);
+    textNodes.forEach((n,i)=>{if(lines[i]!==undefined)n.textContent=lines[i]+(i<textNodes.length-1?'\n':'');});
+  }
+  // Hero grad span
+  const grad=document.querySelector('h1 .grad');
+  if(grad)grad.textContent=t.hero_grad||grad.textContent;
+  // Hero desc
+  const desc=document.querySelector('.hero-desc');
+  if(desc)desc.textContent=t.hero_desc||desc.textContent;
+  // Hero CTA buttons
+  const btnPrimary=document.querySelector('#page-home .btn-primary');
+  if(btnPrimary)btnPrimary.textContent=t.hero_cta||btnPrimary.textContent;
+  const btnOutline=document.querySelector('#page-home .btn-outline');
+  if(btnOutline)btnOutline.textContent=t.hero_fleet||btnOutline.textContent;
+  // Hero stats
+  const stats=document.querySelectorAll('#page-home .hero-stats span');
+  if(stats[0])stats[0].textContent=t.hero_stat1||stats[0].textContent;
+  if(stats[1])stats[1].textContent=t.hero_stat2||stats[1].textContent;
+  if(stats[2])stats[2].textContent=t.hero_stat3||stats[2].textContent;
+  // Section H2 headings
+  const secH2={how:t.how_h2,features:t.features_h2,devices:t.devices_h2,faq:t.faq_h2,fleet:t.fleet_h2,about:t.about_h2};
+  Object.entries(secH2).forEach(([k,v])=>{
+    const h=document.querySelector('#page-'+k+' h2');
+    if(h&&v)h.textContent=v;
+  });
+  // Sign in page
+  const signinH2=document.querySelector('#page-signin h2');
+  if(signinH2)signinH2.textContent=t.signin_h2||signinH2.textContent;
+  const passkeyBtn=document.querySelector('#page-signin .passkey-btn');
+  if(passkeyBtn)passkeyBtn.textContent=t.signin_passkey||passkeyBtn.textContent;
+  const guestBtn=document.querySelector('#page-signin .guest-btn');
+  if(guestBtn)guestBtn.textContent=t.signin_guest||guestBtn.textContent;
+  // RTL for Arabic
+  document.documentElement.dir=(lang==='ar')?'rtl':'ltr';
+  document.documentElement.lang=lang;
+}
 function setLang(code,flag,name){
   currentLang=code;localStorage.setItem('occulert-lang',code);
-  const d=document.getElementById('lang-display');if(d)d.textContent=flag;
+  const d=document.getElementById('lang-display');if(d)d.textContent=flag+' '+code.toUpperCase();
   const m=document.getElementById('lang-menu');if(m)m.classList.remove('open');
   buildLangSwitcher();
+  applyTranslations(code);
 }
 function toggleLangMenu(){
   const m=document.getElementById('lang-menu');if(m)m.classList.toggle('open');
@@ -209,6 +278,7 @@ if(pwaDismiss)pwaDismiss.addEventListener('click',function(){
 (function init(){
   buildColorGrid();
   buildLangSwitcher();
+  applyTranslations(currentLang);
   applyTheme(currentTheme);
   updateAuthUI();
   // Handle URL params: ?page=xxx or ?signin=1 (legacy)
