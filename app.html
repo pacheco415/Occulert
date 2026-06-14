@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-<title>Occulert™ — AI Drowsiness Detection</title>
+<title>Occulertâ¢ â AI Drowsiness Detection</title>
 <meta name="theme-color" content="#050a0f"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -261,13 +261,13 @@ white-space:nowrap;
 <!-- ALERT FLASH -->
 <div class="alert-overlay" id="alert-overlay">
   <div class="alert-center">
-    <div class="alert-txt">⚠️ DROWSY ALERT</div>
+    <div class="alert-txt">â ï¸ DROWSY ALERT</div>
     <div class="alert-sub">PULL OVER SAFELY</div>
   </div>
 </div>
 
 <!-- ALERT BANNER (hidden by default, slides in on alert) -->
-<div class="alert-banner" id="alert-banner">⚠️ Drowsiness Detected — Pull Over Safely</div>
+<div class="alert-banner" id="alert-banner">â ï¸ Drowsiness Detected â Pull Over Safely</div>
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
@@ -275,9 +275,9 @@ white-space:nowrap;
 <!-- PERMISSIONS MODAL -->
 <div class="perm-modal" id="perm-modal">
   <div class="perm-card">
-    <div class="perm-icon">📷</div>
+    <div class="perm-icon">ð·</div>
     <div class="perm-title">Camera Access Needed</div>
-    <div class="perm-desc">Occulert uses your camera to monitor eye openness in real time. Your video stays completely on-device — nothing is ever uploaded.</div>
+    <div class="perm-desc">Occulert uses your camera to monitor eye openness in real time. Your video stays completely on-device â nothing is ever uploaded.</div>
     <button class="perm-btn" onclick="requestCameraPermission()">Allow Camera Access</button>
     <span class="perm-skip" onclick="document.getElementById('perm-modal').classList.remove('show')">Not now</span>
   </div>
@@ -286,7 +286,7 @@ white-space:nowrap;
 <!-- TOP BAR -->
 <div class="topbar">
   <div class="topbar-left">
-    <a href="/" class="home-btn">← Home</a>
+    <a href="/" class="home-btn">â Home</a>
     <div class="topbar-title">
       <div class="topbar-name">OCCULERT</div>
       <div class="topbar-sub">AI DROWSINESS DETECTION</div>
@@ -300,7 +300,7 @@ white-space:nowrap;
       <div class="lang-panel" id="lang-panel"></div>
     </div>
     <div class="theme-panel-wrap">
-      <div class="topbar-btn" onclick="toggleThemePanel()" title="Color Theme">🎨</div>
+      <div class="topbar-btn" onclick="toggleThemePanel()" title="Color Theme">ð¨</div>
       <div class="theme-panel" id="theme-panel">
         <div class="section-title" style="margin-bottom:10px;">COLOR THEME</div>
         <div class="theme-grid" id="theme-grid"></div>
@@ -340,7 +340,7 @@ white-space:nowrap;
         </div>
       </div>
       <div class="cam-status-overlay" id="cam-status-overlay">
-        <div class="cam-icon">📷</div>
+        <div class="cam-icon">ð·</div>
         <div class="cam-inactive-text">CAMERA INACTIVE</div>
         <div class="cam-sub-text">Tap Start to Begin</div>
       </div>
@@ -356,7 +356,7 @@ white-space:nowrap;
     </div>
 
     <div class="cam-controls">
-      <button class="flip-btn" onclick="flipCamera()">🔄 FLIP CAM</button>
+      <button class="flip-btn" onclick="flipCamera()">ð FLIP CAM</button>
       <div class="model-status">
         <div class="model-dot loading" id="model-dot"></div>
         <span id="model-label">Loading AI Model...</span>
@@ -390,7 +390,7 @@ white-space:nowrap;
 
     <div class="drowsy-level-wrap" id="drowsy-wrap">
       <div class="drowsy-level-label">
-        <span>⚠️ DROWSINESS ACCUMULATING</span>
+        <span>â ï¸ DROWSINESS ACCUMULATING</span>
         <span id="drowsy-pct">0%</span>
       </div>
       <div class="drowsy-level-track">
@@ -399,7 +399,7 @@ white-space:nowrap;
     </div>
 
     <div class="start-wrap">
-      <button class="start-btn" id="start-btn" onclick="toggleMonitoring()">▶ START MONITORING</button>
+      <button class="start-btn" id="start-btn" onclick="toggleMonitoring()">â¶ START MONITORING</button>
     </div>
   </div>
 
@@ -414,7 +414,7 @@ white-space:nowrap;
           <div class="setting-desc">Closed frames before alert</div>
         </div>
         <div class="adjust-ctrl">
-          <button class="adj-btn" onclick="adjustSetting('sensitivity',-5)">−</button>
+          <button class="adj-btn" onclick="adjustSetting('sensitivity',-5)">â</button>
           <div class="adj-val" id="sensitivity-val">20</div>
           <button class="adj-btn" onclick="adjustSetting('sensitivity',5)">+</button>
         </div>
@@ -425,7 +425,7 @@ white-space:nowrap;
           <div class="setting-desc">Seconds between alerts</div>
         </div>
         <div class="adjust-ctrl">
-          <button class="adj-btn" onclick="adjustSetting('cooldown',-5)">−</button>
+          <button class="adj-btn" onclick="adjustSetting('cooldown',-5)">â</button>
           <div class="adj-val" id="cooldown-val">30s</div>
           <button class="adj-btn" onclick="adjustSetting('cooldown',5)">+</button>
         </div>
@@ -466,7 +466,7 @@ white-space:nowrap;
     <div class="sidebar-section">
       <div class="section-title">BLUETOOTH DEVICES</div>
       <div class="bt-device" id="bt-headphones-device">
-        <div class="bt-icon">🎧</div>
+        <div class="bt-icon">ð§</div>
         <div class="bt-info">
           <div class="bt-name">Headphones</div>
           <div class="bt-status" id="bt-headphones-status">Not connected</div>
@@ -474,7 +474,7 @@ white-space:nowrap;
         <button class="bt-btn" id="bt-headphones-btn" onclick="pairBluetooth('headphones')">PAIR</button>
       </div>
       <div class="bt-device" id="bt-smartwatch-device">
-        <div class="bt-icon">⌚</div>
+        <div class="bt-icon">â</div>
         <div class="bt-info">
           <div class="bt-name">Smartwatch</div>
           <div class="bt-status" id="bt-smartwatch-status">Via phone vibration</div>
@@ -595,8 +595,8 @@ function applyTheme(key){
 function buildThemeGrid(){
   var grid=document.getElementById('theme-grid');if(!grid)return;
   grid.innerHTML=Object.keys(THEMES).map(function(k){
-    var t=THEMES[k];
-    return '<div class="theme-chip'+(k===currentTheme?' active':'')+'" data-theme="'+k+'" onclick="applyTheme(''+k+'');buildThemeGrid()"><div class="theme-swatch" style="background:'+t.swatch+'"></div><div class="theme-chip-name">'+t.name+'</div></div>';
+    var t=THEMES[k];var active=(k===currentTheme)?' active':'';
+    return '<div class="theme-chip'+active+'" data-theme="'+k+'" onclick="applyTheme(\x27'+k+'\x27);buildThemeGrid()"><div class="theme-swatch" style="background:'+t.swatch+'"></div><div class="theme-chip-name">'+t.name+'</div></div>';
   }).join('');
 }
 function toggleThemePanel(){document.getElementById('theme-panel').classList.toggle('show');}
@@ -611,7 +611,7 @@ function updateAuthUI(){
     if(avatar)avatar.textContent=n[0].toUpperCase();
     if(nameLabel)nameLabel.textContent=n;
   }else{
-    if(avatar)avatar.textContent='👤';
+    if(avatar)avatar.textContent='ð¤';
     if(nameLabel)nameLabel.textContent='Sign In';
   }
 }
@@ -630,7 +630,8 @@ var LANGS=[
 function buildLangPanel(){
   var panel=document.getElementById('lang-panel');if(!panel)return;
   panel.innerHTML=LANGS.map(function(l){
-    return '<div class="lang-opt'+(l.code===currentLang?' active':'')+'" onclick="setLang(''+l.code+'',''+l.display+'')">'+l.display+' — '+l.name+'</div>';
+    var active=(l.code===currentLang)?' active':'';
+    return '<div class="lang-opt'+active+'" onclick="setLang(\x27'+l.code+'\x27,\x27'+l.display+'\x27)">'+l.display+' \u2014 '+l.name+'</div>';
   }).join('');
 }
 function setLang(code,display){
@@ -828,15 +829,15 @@ function initFaceMesh(){
       faceMesh.send({image:warmup}).then(function(){
         faceMeshReady=true;faceMeshLoading=false;
         modelDot.className='model-dot ready';modelLabel.textContent='AI Model Ready';
-        addLog('ok','✅ AI model loaded successfully');
+        addLog('ok','â AI model loaded successfully');
       }).catch(function(){
         faceMeshReady=true;faceMeshLoading=false;
         modelDot.className='model-dot ready';modelLabel.textContent='AI Model Ready';
       });
     }catch(e){
       faceMeshLoading=false;
-      modelDot.className='model-dot error';modelLabel.textContent='Model error — retrying...';
-      addLog('warn','⚠️ Model error: '+e.message);
+      modelDot.className='model-dot error';modelLabel.textContent='Model error â retrying...';
+      addLog('warn','â ï¸ Model error: '+e.message);
       setTimeout(initFaceMesh,3000);
     }
   }
@@ -880,9 +881,9 @@ async function startCamera(){
     statusBadge.className='status-badge online';statusBadge.textContent='ACTIVE';
     return true;
   }catch(e){
-    addLog('warn','⚠️ Camera: '+e.message);
+    addLog('warn','â ï¸ Camera: '+e.message);
     statusBadge.className='status-badge offline';statusBadge.textContent='CAM ERROR';
-    showToast('Camera denied — please allow camera access');
+    showToast('Camera denied â please allow camera access');
     return false;
   }
 }
@@ -910,11 +911,11 @@ async function requestCameraPermission(){
 function startCalibration(){
   calibrating=true;calibrationDone=false;calibrationSamples=[];
   calibFill.style.width='0%';calibStatus.textContent='Sampling... 0/'+calibSampleTarget;
-  calibOverlay.classList.add('show');addLog('info','🔬 Calibration started');
+  calibOverlay.classList.add('show');addLog('info','ð¬ Calibration started');
 }
 function skipCalibration(){
   calibrating=false;calibrationDone=true;calibOverlay.classList.remove('show');
-  addLog('info','⏭ Calibration skipped — using defaults');
+  addLog('info','â­ Calibration skipped â using defaults');
 }
 function collectCalibrationSample(ear){
   if(ear<0.05||ear>0.55)return;
@@ -927,14 +928,14 @@ function collectCalibrationSample(ear){
 function finishCalibration(){
   if(calibrationSamples.length<20){
     calibOverlay.classList.remove('show');calibrating=false;calibrationDone=true;
-    addLog('warn','⚠️ Calibration incomplete — poor lighting?');return;
+    addLog('warn','â ï¸ Calibration incomplete â poor lighting?');return;
   }
   var sorted=[...calibrationSamples].sort(function(a,b){return a-b;});
   var top=sorted.slice(Math.floor(sorted.length/2));
   var base=top.reduce(function(a,b){return a+b;},0)/top.length;
   EAR_OPEN=Math.max(0.18,base*0.85);EAR_WARN=Math.max(0.14,base*0.72);EAR_DANGER=Math.max(0.10,base*0.58);
   calibrating=false;calibrationDone=true;calibOverlay.classList.remove('show');
-  addLog('ok','✅ Calibrated — baseline: '+base.toFixed(3)+' | open: '+EAR_OPEN.toFixed(3));
+  addLog('ok','â Calibrated â baseline: '+base.toFixed(3)+' | open: '+EAR_OPEN.toFixed(3));
   showToast('Calibration complete!');
 }
 
@@ -945,7 +946,7 @@ function triggerAlert(){
   if(settings.sound)playAlertSound();
   alertOverlay.classList.add('show');setTimeout(function(){alertOverlay.classList.remove('show');},900);
   alertBanner.classList.add('show');setTimeout(function(){alertBanner.classList.remove('show');},3500);
-  addLog('danger','⚠️ Drowsiness alert #'+alertCount);
+  addLog('danger','â ï¸ Drowsiness alert #'+alertCount);
   if(typeof gtag!=='undefined')gtag('event','drowsiness_alert',{alert_count:alertCount});
 }
 function playAlertSound(){
@@ -987,9 +988,9 @@ function addLog(type,msg){
   if(logEmpty)logEmpty.style.display='none';
   var now=new Date();
   var ts=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
-  var icons={ok:'✅',danger:'⚠️',warn:'🟡',info:'ℹ️'};
+  var icons={ok:'â',danger:'â ï¸',warn:'ð¡',info:'â¹ï¸'};
   var item=document.createElement('div');item.className='event-item';
-  item.innerHTML='<span class="event-icon">'+(icons[type]||'ℹ️')+'</span><div><div class="event-text">'+msg+'</div><div class="event-time">'+ts+'</div></div>';
+  item.innerHTML='<span class="event-icon">'+(icons[type]||'â¹ï¸')+'</span><div><div class="event-text">'+msg+'</div><div class="event-time">'+ts+'</div></div>';
   eventLog.insertBefore(item,eventLog.firstChild);
   while(eventLog.children.length>51)eventLog.removeChild(eventLog.lastChild);
 }
@@ -1004,25 +1005,25 @@ function showToast(msg){
 async function toggleMonitoring(){
   if(isRunning){
     isRunning=false;stopCamera();stopSession();
-    startBtn.textContent='▶ START MONITORING';startBtn.classList.remove('running');
+    startBtn.textContent='â¶ START MONITORING';startBtn.classList.remove('running');
     statusBadge.className='status-badge offline';statusBadge.textContent='OFFLINE';
     resetUI();blinkValEl.textContent='0';
-    addLog('info','ℹ️ Session ended — '+alertCount+' alert(s), '+blinkEvents+' blink(s)');
+    addLog('info','â¹ï¸ Session ended â '+alertCount+' alert(s), '+blinkEvents+' blink(s)');
     if(typeof gtag!=='undefined')gtag('event','session_stop',{alerts:alertCount,blinks:blinkEvents});
   }else{
     var perm=await checkCamPermission();
     if(perm==='denied'){document.getElementById('perm-modal').classList.add('show');return;}
     startBtn.textContent='Starting...';startBtn.disabled=true;
     var ok=await startCamera();startBtn.disabled=false;
-    if(!ok){startBtn.textContent='▶ START MONITORING';return;}
+    if(!ok){startBtn.textContent='â¶ START MONITORING';return;}
     isRunning=true;blinkEvents=0;alertCount=0;closedFrames=0;inBlink=false;earHistory=[];
     blinkValEl.textContent='0';alertValEl.textContent='0';alertValEl.classList.remove('danger');
-    startBtn.textContent='⏹ STOP MONITORING';startBtn.classList.add('running');
+    startBtn.textContent='â¹ STOP MONITORING';startBtn.classList.add('running');
     faceGuide.classList.add('show');
     startLoop();
     if(!calibrationDone)startCalibration();
     startSession();
-    addLog('ok','🟢 Monitoring started');
+    addLog('ok','ð¢ Monitoring started');
     if(typeof gtag!=='undefined')gtag('event','session_start');
   }
 }
@@ -1042,7 +1043,7 @@ async function pairBluetooth(type){
     if(btn){btn.textContent='PAIRED';btn.classList.add('connected');}
     if(sub)sub.textContent=dev.name||'Connected';
     if(card)card.classList.add('connected');
-    addLog('ok','🔷 '+(dev.name||type)+' connected');showToast((dev.name||type)+' paired!');
+    addLog('ok','ð· '+(dev.name||type)+' connected');showToast((dev.name||type)+' paired!');
   }catch(e){if(e.name!=='NotFoundError')showToast('Bluetooth pairing failed');}
 }
 
@@ -1057,7 +1058,7 @@ document.addEventListener('click',function(e){
 
 // --- PAGE VISIBILITY ---
 document.addEventListener('visibilitychange',function(){
-  if(document.hidden&&isRunning)addLog('warn','🔕 App backgrounded — monitoring paused');
+  if(document.hidden&&isRunning)addLog('warn','ð App backgrounded â monitoring paused');
 });
 
 // --- KEEP SCREEN AWAKE (Wake Lock API) ---
