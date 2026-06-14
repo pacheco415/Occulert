@@ -9,10 +9,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#050a0f;color:#c8e8f0;font-family:Inter,Arial,sans-serif;overflow:hidden}.top{height:58px;background:#0a1520;border-bottom:1px solid #1a3a4a;display:flex;align-items:center;justify-content:space-between;padding:0 16px}.brand{font-weight:900;color:#fff;letter-spacing:2px}.top a{color:#7aa8b8;text-decoration:none;font-size:12px}.status{font-family:monospace;font-size:12px;border:1px solid #234560;border-radius:999px;padding:7px 10px;color:#7aa8b8}.status.on{color:#00ff88;border-color:#00ff88}.status.alert{color:#ff3344;border-color:#ff3344;animation:pulse .7s infinite}@keyframes pulse{50%{opacity:.45}}.app{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 58px)}.camera{position:relative;background:#000;margin:14px;border-radius:14px;overflow:hidden;border:1px solid #1a3a4a}video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}canvas{pointer-events:none}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.55);text-align:center;padding:20px}.overlay.hide{display:none}.panel{background:#0a1520;border-left:1px solid #1a3a4a;padding:16px;overflow:auto}.btn{width:100%;padding:15px;border-radius:12px;border:1px solid #234560;background:#0f1e2e;color:#c8e8f0;font-weight:900;letter-spacing:1px;margin-bottom:12px}.btn.primary{background:#00e5ff;color:#001014}.btn.stop{background:rgba(255,51,68,.15);border-color:#ff3344;color:#ff3344}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}.card{background:#0f1e2e;border:1px solid #1a3a4a;border-radius:14px;padding:14px;margin-bottom:12px}.label{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#4a7a8a}.value{font-size:28px;font-weight:900;color:#fff;font-family:monospace}.bar{height:10px;background:#1a3a4a;border-radius:99px;overflow:hidden;margin-top:8px}.fill{height:100%;width:0%;background:linear-gradient(90deg,#00ff88,#ffaa00,#ff3344);transition:width .15s}.event{font-size:12px;border-bottom:1px solid #1a3a4a;padding:9px 0;color:#7aa8b8}.alertScreen{position:absolute;inset:0;background:rgba(255,51,68,.72);display:none;place-items:center;z-index:4;text-align:center}.alertScreen.show{display:grid}.alertScreen h1{font-size:48px;color:#fff;margin:0}.safe{color:#00ff88}.warn{color:#ffaa00}.danger{color:#ff3344}.small{font-size:12px;color:#7aa8b8;line-height:1.5}.report{white-space:pre-wrap;font-family:monospace;font-size:12px;background:#050a0f;border:1px solid #1a3a4a;border-radius:12px;padding:12px;color:#c8e8f0;display:none}.metric-note{font-size:11px;color:#4a7a8a;margin-top:6px}@media(max-width:820px){.app{grid-template-columns:1fr}.panel{position:absolute;bottom:0;left:0;right:0;height:46vh;border-left:0;border-top:1px solid #1a3a4a}.camera{height:54vh;margin:10px}.top{height:54px}.app{height:calc(100vh - 54px)}.value{font-size:24px}}
-</style>
+.lang-switcher{position:relative;display:inline-flex;align-items:center}.lang-trigger{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#c8e8f0;padding:5px 10px;border-radius:6px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px}.lang-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;background:#0d1f2d;border:1px solid rgba(255,255,255,.15);border-radius:8px;min-width:160px;z-index:100;overflow:hidden}.lang-menu.open{display:block}.lang-option{padding:8px 14px;cursor:pointer;font-size:13px;color:#c8e8f0;display:flex;align-items:center;gap:8px}.lang-option:hover,.lang-option.active{background:rgba(0,200,255,.12);color:#00c8ff}</style>
 </head>
 <body>
-<div class="top"><div><div class="brand">OCCULERT</div><a href="/fleet-dashboard.html">Fleet dashboard →</a></div><div class="status" id="status">OFFLINE</div></div>
+<div class="top"><div><div class="brand">OCCULERT</div><a href="/fleet-dashboard.html">Fleet dashboard →</a></div><div class="lang-switcher"><button class="lang-trigger" id="lang-display" onclick="toggleLangMenu()">🇺🇸 EN</button><div class="lang-menu" id="lang-menu"></div></div><div class="status" id="status">OFFLINE</div></div>
 <div class="app"><div class="camera"><video id="video" autoplay playsinline muted></video><canvas id="canvas"></canvas><div class="overlay" id="overlay"><div><h2>AI Fatigue Monitoring</h2><p class="small">Eye tracking + head-nod detection + fleet-ready session scoring.<br>Video stays on this device.</p></div></div><div class="alertScreen" id="alertScreen"><div><h1>DROWSY ALERT</h1><p>Pull over safely</p></div></div></div>
 <aside class="panel"><button class="btn primary" id="startBtn">START MONITORING</button><div class="grid"><div class="card"><div class="label">Fatigue</div><div class="value" id="fatigue">0</div><div class="bar"><div class="fill" id="fatigueFill"></div></div></div><div class="card"><div class="label">Confidence</div><div class="value" id="confidence">0%</div><div class="bar"><div class="fill" id="confidenceFill"></div></div></div><div class="card"><div class="label">EAR</div><div class="value" id="ear">--</div></div><div class="card"><div class="label">Head Nod</div><div class="value" id="nods">0</div></div></div><div class="card"><div class="label">Risk State</div><div class="value" id="risk">SAFE</div><p class="metric-note">Weighted score uses eye closure, tracking confidence, head movement, recovery, and repeated alerts.</p></div><div class="grid"><div class="card"><div class="label">Alerts</div><div class="value" id="alerts">0</div></div><div class="card"><div class="label">Fleet Sync</div><div class="value" id="sync">ON</div></div></div><div class="card"><div class="label">Session Report</div><div class="report" id="report"></div></div><div class="card"><div class="label">Event Log</div><div id="log"></div></div></aside></div>
 <script>
@@ -38,6 +38,58 @@ async function loop(ts){if(!running)return;raf=requestAnimationFrame(loop);if(ts
 async function start(){try{if(!faceMesh)await initModel();stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});video.srcObject=stream;await video.play();running=true;sessionStart=Date.now();fatigue=0;confidence=0;alerts=0;headNods=0;maxFatigue=0;fatigueSamples=[];noseYHistory=[];alertsEl.textContent='0';nodsEl.textContent='0';overlay.classList.add('hide');startBtn.textContent='STOP MONITORING';startBtn.className='btn stop';log('Monitoring started');raf=requestAnimationFrame(loop)}catch(e){log('Camera error: '+e.message)}}
 function stop(){running=false;if(raf)cancelAnimationFrame(raf);if(stream)stream.getTracks().forEach(t=>t.stop());overlay.classList.remove('hide');startBtn.textContent='START MONITORING';startBtn.className='btn primary';render();let p=fleetPayload(),mins=((Date.now()-sessionStart)/60000).toFixed(1);reportEl.style.display='block';reportEl.textContent=`Duration: ${mins} min\nAlerts: ${alerts}\nHead Nods: ${headNods}\nAverage Fatigue: ${p.avgFatigue}\nMax Fatigue: ${p.maxFatigue}\nSafety Score: ${p.safetyScore}/100\nFleet Ready JSON: ${JSON.stringify(p)}`;try{localStorage.setItem('occulert-last-report',reportEl.textContent)}catch(e){}log('Session ended')}
 startBtn.onclick=()=>running?stop():start();
+
+const APP_LANGS=[{code:'en',flag:'🇺🇸',name:'English'},{code:'es',flag:'🇪🇸',name:'Español'},{code:'pt',flag:'🇵🇹',name:'Português'},{code:'fr',flag:'🇫🇷',name:'Français'},{code:'de',flag:'🇩🇪',name:'Deutsch'},{code:'zh',flag:'🇨🇳',name:'中文'},{code:'ja',flag:'🇯🇵',name:'日本語'},{code:'ar',flag:'🇸🇦',name:'عربي'}];
+let appLang=localStorage.getItem('occulert-lang')||'en';
+const APP_T={
+en:{start:'START MONITORING',stop:'STOP MONITORING',fatigue:'Fatigue',confidence:'Confidence',ear:'EAR',headnod:'Head Nod',risk:'Risk State',alerts:'Alerts',fleetsync:'Fleet Sync',report:'Session Report',eventlog:'Event Log',safe:'SAFE',fleet_link:'Fleet dashboard →',offline:'OFFLINE',cam_title:'AI Fatigue Monitoring',cam_desc:'Eye tracking + head-nod detection + fleet-ready session scoring.',cam_desc2:'Video stays on this device.'},
+es:{start:'INICIAR MONITOREO',stop:'DETENER MONITOREO',fatigue:'Fatiga',confidence:'Confianza',ear:'EAR',headnod:'Cabeceo',risk:'Estado de riesgo',alerts:'Alertas',fleetsync:'Sincronización',report:'Informe de sesión',eventlog:'Registro de eventos',safe:'SEGURO',fleet_link:'Panel de flota →',offline:'DESCONECTADO',cam_title:'Monitoreo de fatiga IA',cam_desc:'Seguimiento ocular + detección de cabeceo + puntuación de sesión.',cam_desc2:'El video permanece en este dispositivo.'},
+pt:{start:'INICIAR MONITORAMENTO',stop:'PARAR MONITORAMENTO',fatigue:'Fadiga',confidence:'Confiança',ear:'EAR',headnod:'Cabeceio',risk:'Estado de risco',alerts:'Alertas',fleetsync:'Sincronização',report:'Relatório da sessão',eventlog:'Registro de eventos',safe:'SEGURO',fleet_link:'Painel de frota →',offline:'OFFLINE',cam_title:'Monitoramento de fadiga IA',cam_desc:'Rastreamento ocular + detecção de cabeceio + pontuação de sessão.',cam_desc2:'O vídeo fica neste dispositivo.'},
+fr:{start:'DÉMARRER SURVEILLANCE',stop:'ARRÊTER SURVEILLANCE',fatigue:'Fatigue',confidence:'Confiance',ear:'EAR',headnod:'Hochement',risk:'État de risque',alerts:'Alertes',fleetsync:'Synchronisation',report:'Rapport de session',eventlog:'Journal d'événements',safe:'SÉCURISÉ',fleet_link:'Tableau de bord →',offline:'HORS LIGNE',cam_title:'Surveillance fatigue IA',cam_desc:'Suivi oculaire + détection de hochement + score de session.',cam_desc2:'La vidéo reste sur cet appareil.'},
+de:{start:'ÜBERWACHUNG STARTEN',stop:'ÜBERWACHUNG STOPPEN',fatigue:'Ermüdung',confidence:'Vertrauen',ear:'EAR',headnod:'Kopfnicken',risk:'Risikozustand',alerts:'Warnungen',fleetsync:'Flottensynch.',report:'Sitzungsbericht',eventlog:'Ereignisprotokoll',safe:'SICHER',fleet_link:'Flottenübersicht →',offline:'OFFLINE',cam_title:'KI-Müdigkeitsüberwachung',cam_desc:'Augenverfolgung + Kopfnicken-Erkennung + Flotten-Scoring.',cam_desc2:'Video bleibt auf diesem Gerät.'},
+zh:{start:'开始监测',stop:'停止监测',fatigue:'疲劳度',confidence:'置信度',ear:'EAR',headnod:'点头',risk:'风险状态',alerts:'警报',fleetsync:'车队同步',report:'会话报告',eventlog:'事件日志',safe:'安全',fleet_link:'车队仪表板 →',offline:'离线',cam_title:'AI疲劳监测',cam_desc:'眼部追踪 + 点头检测 + 车队就绪评分。',cam_desc2:'视频保留在本设备上。'},
+ja:{start:'監視開始',stop:'監視停止',fatigue:'疲労度',confidence:'信頼度',ear:'EAR',headnod:'頭の揺れ',risk:'リスク状態',alerts:'アラート',fleetsync:'フリート同期',report:'セッションレポート',eventlog:'イベントログ',safe:'安全',fleet_link:'フリートダッシュボード →',offline:'オフライン',cam_title:'AI疲労監視',cam_desc:'視線追跡 + 頭の揺れ検出 + フリート対応スコアリング。',cam_desc2:'動画はこのデバイスに保持されます。'},
+ar:{start:'بدء المراقبة',stop:'إيقاف المراقبة',fatigue:'الإرهاق',confidence:'الثقة',ear:'EAR',headnod:'إيماءة الرأس',risk:'حالة الخطر',alerts:'تنبيهات',fleetsync:'مزامنة الأسطول',report:'تقرير الجلسة',eventlog:'سجل الأحداث',safe:'آمن',fleet_link:'لوحة الأسطول →',offline:'غير متصل',cam_title:'مراقبة الإرهاق بالذكاء الاصطناعي',cam_desc:'تتبع العين + كشف إيماءة الرأس + تسجيل الجلسة.',cam_desc2:'يبقى الفيديو على هذا الجهاز.'}
+};
+function applyAppTranslations(lang){
+  const t=APP_T[lang]||APP_T['en'];
+  const s=(sel,key)=>{const e=document.querySelector(sel);if(e&&t[key]!==undefined)e.textContent=t[key];};
+  const sa=(sel,key)=>{document.querySelectorAll(sel).forEach((e,i)=>{if(t[key]!==undefined)e.textContent=t[key];});};
+  s('#startBtn',running?'stop':'start');
+  // Labels
+  const labels=document.querySelectorAll('.label');
+  const labelKeys=['fatigue','confidence','ear','headnod','risk','alerts','fleetsync','report','eventlog'];
+  labels.forEach((l,i)=>{if(labelKeys[i]&&t[labelKeys[i]])l.textContent=t[labelKeys[i]];});
+  // Camera overlay
+  const camH2=document.querySelector('.camera h2');if(camH2)camH2.textContent=t.cam_title;
+  const camPs=document.querySelectorAll('.camera p');if(camPs[0])camPs[0].textContent=t.cam_desc;if(camPs[1])camPs[1].textContent=t.cam_desc2;
+  // Topbar
+  const fleetLink=document.querySelector('.top a');if(fleetLink)fleetLink.textContent=t.fleet_link;
+  const statusEl=document.getElementById('status');if(statusEl&&statusEl.textContent==='OFFLINE'||statusEl?.textContent==='ONLINE'||Object.values(APP_T).some(tt=>tt.offline===statusEl?.textContent))statusEl.textContent=running?'ONLINE':t.offline;
+  // Risk state if it shows SAFE
+  const riskEl=document.getElementById('risk');if(riskEl&&(riskEl.textContent==='SAFE'||Object.values(APP_T).some(tt=>tt.safe===riskEl?.textContent)))riskEl.textContent=t.safe;
+  // RTL for Arabic
+  document.documentElement.dir=(lang==='ar')?'rtl':'ltr';
+  document.documentElement.lang=lang;
+}
+function buildAppLangSwitcher(){
+  const menu=document.getElementById('lang-menu');if(!menu)return;
+  menu.innerHTML=APP_LANGS.map(l=>`<div class="lang-option ${l.code===appLang?'active':''}" onclick="setAppLang('${l.code}','${l.flag}','${l.name}')">${l.flag} ${l.name}</div>`).join('');
+  const d=document.getElementById('lang-display');if(d){const cur=APP_LANGS.find(l=>l.code===appLang)||APP_LANGS[0];d.textContent=cur.flag+' '+appLang.toUpperCase();}
+}
+function setAppLang(code,flag,name){
+  appLang=code;localStorage.setItem('occulert-lang',code);
+  const d=document.getElementById('lang-display');if(d)d.textContent=flag+' '+code.toUpperCase();
+  const m=document.getElementById('lang-menu');if(m)m.classList.remove('open');
+  buildAppLangSwitcher();
+  applyAppTranslations(code);
+}
+function toggleLangMenu(){
+  const m=document.getElementById('lang-menu');if(m)m.classList.toggle('open');
+}
+document.addEventListener('click',function(e){if(!e.target.closest('.lang-switcher')){document.querySelectorAll('.lang-menu').forEach(m=>m.classList.remove('open'));}});
+buildAppLangSwitcher();
+applyAppTranslations(appLang);
 </script>
 </body>
 </html>
