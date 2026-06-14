@@ -55,7 +55,7 @@ function applyAppTranslations(lang){
   const t=APP_T[lang]||APP_T['en'];
   const s=(sel,key)=>{const e=document.querySelector(sel);if(e&&t[key]!==undefined)e.textContent=t[key];};
   const sa=(sel,key)=>{document.querySelectorAll(sel).forEach((e,i)=>{if(t[key]!==undefined)e.textContent=t[key];});};
-  s('#startBtn',running?t.stop:t.start);
+  s('#startBtn',running?'stop':'start');
   // Labels
   const labels=document.querySelectorAll('.label');
   const labelKeys=['fatigue','confidence','ear','headnod','risk','alerts','fleetsync','report','eventlog'];
