@@ -74,8 +74,6 @@ occulert/
 Occulert is free because safety shouldn't have a price tag. If it helped you, consider supporting:
  
 - **GoFundMe:** [Support Occulert](https://gofund.me/bc4aab056)
-- **Cash App:** [$Richp415](https://cash.app/$Richp415)
-- **Venmo:** [@Rich415](https://venmo.com/Rich415)
 ---
  
 ## 👤 About
