@@ -3,6 +3,8 @@
 var db=null, ready=null;
 function saveLocal(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function readLocal(k,f){try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(f));}catch(e){return f;}}
+function cleanId(v,prefix){var s=String(v||'').trim().replace(/[^a-zA-Z0-9_-]/g,'-').slice(0,80);return s||((prefix||'id')+'-'+Date.now());}
+function uid(prefix){return cleanId((prefix||'id')+'-'+Date.now()+'-'+Math.floor(Math.random()*100000),prefix)}
 async function init(){
   if(ready)return ready;
   ready=new Promise(function(resolve){
@@ -19,32 +21,46 @@ async function init(){
 async function writeDoc(col,id,data){
   var ok=await init();
   if(!ok||!db)return false;
-  try{await db.collection(col).doc(id).set(data,{merge:true});return true;}catch(e){console.warn('Firestore write failed',e);return false;}
+  try{await db.collection(col).doc(cleanId(id,col)).set(data,{merge:true});return true;}catch(e){console.warn('Firestore write failed',e);return false;}
 }
 window.OcculertSync={
   init:init,
   saveLiveSession:async function(data){
     data.updatedAt=data.updatedAt||new Date().toISOString();
+    data.driverId=cleanId(data.driverId||'local-driver','driver');
     saveLocal('occulert-live-session',data);
     var h=readLocal('occulert-session-history',[]);
     if(h.length&&h[0].driverId===data.driverId)h[0]=data;else h.unshift(data);
     saveLocal('occulert-session-history',h.slice(0,50));
-    await writeDoc('liveSessions',data.driverId||'local-driver',data);
+    data.cloudSynced=await writeDoc('liveSessions',data.driverId,data);
+    saveLocal('occulert-live-session',data);
     return data;
   },
   saveSessionHistory:async function(data){
     data.savedAt=data.savedAt||new Date().toISOString();
-    await writeDoc('sessionHistory',(data.driverId||'local-driver')+'-'+Date.now(),data);
+    data.driverId=cleanId(data.driverId||'local-driver','driver');
+    data.sessionId=data.sessionId||uid('session');
+    var h=readLocal('occulert-session-history',[]);
+    if(!h.find(function(x){return x.sessionId===data.sessionId;}))h.unshift(data);
+    saveLocal('occulert-session-history',h.slice(0,100));
+    data.cloudSynced=await writeDoc('sessionHistory',data.sessionId,data);
     return data;
   },
   savePilotLead:async function(lead){
     lead.createdAt=lead.createdAt||new Date().toISOString();
-    var leads=readLocal('occulert-pilot-leads',[]);leads.unshift(lead);saveLocal('occulert-pilot-leads',leads.slice(0,100));
-    await writeDoc('pilotLeads','lead-'+Date.now(),lead);
+    lead.leadId=lead.leadId||uid('lead');
+    lead.status=lead.status||'new';
+    var leads=readLocal('occulert-pilot-leads',[]);
+    if(!leads.find(function(x){return x.leadId===lead.leadId;}))leads.unshift(lead);
+    saveLocal('occulert-pilot-leads',leads.slice(0,100));
+    lead.cloudSynced=await writeDoc('pilotLeads',lead.leadId,lead);
+    leads=readLocal('occulert-pilot-leads',[]).map(function(x){return x.leadId===lead.leadId?lead:x;});
+    saveLocal('occulert-pilot-leads',leads.slice(0,100));
     return lead;
   },
   getLiveSession:function(){return readLocal('occulert-live-session',null);},
   getSessionHistory:function(){return readLocal('occulert-session-history',[]);},
+  getPilotLeads:function(){return readLocal('occulert-pilot-leads',[]);},
   listenLiveSessions:async function(cb){
     var ok=await init();
     if(!ok||!db)return null;
