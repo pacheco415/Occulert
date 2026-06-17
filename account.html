@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Occulert Account Setup</title>
+  <meta name="description" content="Create a prototype Occulert driver or fleet manager profile.">
+  <meta name="theme-color" content="#0a0e1a">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#0a0e1a;color:#e2e8f0;font-family:Inter,Arial,sans-serif;line-height:1.6}.top{height:68px;background:#111827;border-bottom:1px solid #24324a;display:flex;align-items:center;justify-content:space-between;padding:0 24px}.brand{font-weight:900;color:#fff;letter-spacing:1px}.nav{display:flex;gap:10px;flex-wrap:wrap}.btn{border:1px solid #344d72;background:#1e2d45;color:#e2e8f0;border-radius:10px;padding:10px 14px;text-decoration:none;font-weight:800;font-size:13px;cursor:pointer}.btn.primary{background:#2563eb;border-color:#2563eb}.btn.green{background:#10b981;border-color:#10b981;color:#03140f}.wrap{max-width:1120px;margin:0 auto;padding:34px 24px}.hero{display:grid;grid-template-columns:1fr 420px;gap:26px;align-items:start}.card{background:#111827;border:1px solid #24324a;border-radius:22px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.28)}h1{font-size:40px;line-height:1.1;margin:0 0 12px;color:#fff}.muted{color:#94a3b8}.label{font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}.roles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}.role{border:2px solid #24324a;background:#0f172a;border-radius:18px;padding:18px;cursor:pointer;transition:.15s}.role:hover,.role.active{border-color:#3b82f6;transform:translateY(-1px)}.role strong{display:block;color:#fff;font-size:18px;margin-bottom:6px}.role span{font-size:13px;color:#94a3b8}.form{display:grid;gap:14px;margin-top:18px}.field label{display:block;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px}.field input,.field select{width:100%;background:#0f172a;border:1px solid #344d72;color:#e2e8f0;border-radius:12px;padding:13px 14px;font-size:15px}.note{border:1px solid #344d72;border-radius:14px;background:rgba(37,99,235,.08);padding:14px;color:#94a3b8;font-size:13px;margin-top:14px}.status{display:none;border-radius:14px;padding:14px;margin-top:14px;font-weight:800}.status.show{display:block}.status.good{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);color:#bbf7d0}.status.warn{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#fde68a}.profile{display:grid;gap:10px}.row{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid #24324a;padding:10px 0}.row span:first-child{color:#94a3b8}.row span:last-child{color:#fff;font-weight:800;text-align:right}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.pill{display:inline-flex;border-radius:999px;padding:6px 10px;background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.35);color:#93c5fd;font-size:12px;font-weight:800;margin-bottom:12px}.danger{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35);color:#fecaca}@media(max-width:860px){.hero,.roles{grid-template-columns:1fr}.nav{display:none}h1{font-size:32px}.wrap{padding:22px 16px}}
+  </style>
+</head>
+<body>
+  <div class="top"><div class="brand">Occulert Account</div><div class="nav"><a class="btn" href="/">Home</a><a class="btn" href="/app.html">Driver App</a><a class="btn" href="/fleet-dashboard.html">Fleet Dashboard</a></div></div>
+  <main class="wrap">
+    <section class="hero">
+      <div class="card">
+        <span class="pill">Prototype account system</span>
+        <h1>Set up your Occulert role</h1>
+        <p class="muted">Choose whether this device is being used by a driver or a fleet manager. This creates a local prototype profile so the app and dashboard can start behaving like a real SaaS product.</p>
+        <div class="roles">
+          <div class="role active" id="roleDriver" onclick="setRole('driver')"><strong>Driver</strong><span>Use the camera/GPS app, save trips, and send live fatigue data.</span></div>
+          <div class="role" id="roleFleet" onclick="setRole('fleet')"><strong>Fleet Manager</strong><span>View drivers, live GPS pins, risk states, and safety scores.</span></div>
+        </div>
+        <form class="form" onsubmit="saveProfile(event)">
+          <div class="field"><label>Name</label><input id="name" placeholder="Example: Richard Pacheco" required></div>
+          <div class="field"><label>Email</label><input id="email" type="email" placeholder="name@email.com"></div>
+          <div class="field"><label>Company / Fleet</label><input id="company" placeholder="Example: Occulert Pilot Fleet"></div>
+          <div class="field"><label>Fleet ID</label><input id="fleetId" placeholder="Example: OCCULERT-DEMO"></div>
+          <div class="field" id="vehicleField"><label>Vehicle / Route</label><input id="vehicle" placeholder="Example: Van 12 · Bay Area Route"></div>
+          <button class="btn green" type="submit">Save Profile</button>
+        </form>
+        <div class="note"><strong>Important:</strong> this is a prototype account layer using local browser storage. The next production step would be Firebase Auth with email login, permissions, and protected fleet dashboards.</div>
+        <div class="status" id="status"></div>
+      </div>
+      <aside class="card">
+        <div class="label">Current Profile</div>
+        <div class="profile" id="profileBox"></div>
+        <div class="actions"><a class="btn primary" id="goBtn" href="/app.html">Continue</a><button class="btn danger" onclick="clearProfile()">Clear Profile</button></div>
+      </aside>
+    </section>
+  </main>
+<script>
+let selectedRole='driver';
+function cleanFleet(v){return String(v||'OCCULERT-DEMO').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'-').slice(0,40)||'OCCULERT-DEMO'}
+function setRole(role){selectedRole=role;document.getElementById('roleDriver').classList.toggle('active',role==='driver');document.getElementById('roleFleet').classList.toggle('active',role==='fleet');document.getElementById('vehicleField').style.display=role==='driver'?'block':'none';document.getElementById('goBtn').href=role==='fleet'?'/fleet-dashboard.html':'/app.html'}
+function getProfile(){try{return JSON.parse(localStorage.getItem('occulert-profile')||'null')}catch(e){return null}}
+function saveProfile(e){e.preventDefault();let profile={role:selectedRole,name:document.getElementById('name').value.trim(),email:document.getElementById('email').value.trim(),company:document.getElementById('company').value.trim()||'Occulert Pilot Fleet',fleetId:cleanFleet(document.getElementById('fleetId').value),vehicle:document.getElementById('vehicle').value.trim(),savedAt:new Date().toISOString()};profile.driverId=localStorage.getItem('occulert-driver-id')||('D-'+Math.floor(Math.random()*900+100));localStorage.setItem('occulert-driver-id',profile.driverId);localStorage.setItem('occulert-profile',JSON.stringify(profile));localStorage.setItem('occulert-role',profile.role);localStorage.setItem('occulert-fleet-id',profile.fleetId);renderProfile();let s=document.getElementById('status');s.className='status show good';s.textContent='Profile saved. Continue to '+(profile.role==='fleet'?'Fleet Dashboard':'Driver App')+'.'}
+function clearProfile(){localStorage.removeItem('occulert-profile');localStorage.removeItem('occulert-role');localStorage.removeItem('occulert-fleet-id');renderProfile();let s=document.getElementById('status');s.className='status show warn';s.textContent='Profile cleared on this browser.'}
+function renderProfile(){let p=getProfile();let box=document.getElementById('profileBox');if(!p){box.innerHTML='<div class="note">No profile saved yet. Create one on the left.</div>';document.getElementById('goBtn').href='/app.html';return}setRole(p.role||'driver');['name','email','company','fleetId','vehicle'].forEach(id=>{let el=document.getElementById(id);if(el)el.value=p[id]||''});document.getElementById('goBtn').href=p.role==='fleet'?'/fleet-dashboard.html':'/app.html';box.innerHTML=`<div class="row"><span>Role</span><span>${p.role==='fleet'?'Fleet Manager':'Driver'}</span></div><div class="row"><span>Name</span><span>${p.name||'Not set'}</span></div><div class="row"><span>Company</span><span>${p.company||'Not set'}</span></div><div class="row"><span>Fleet ID</span><span>${p.fleetId||'OCCULERT-DEMO'}</span></div><div class="row"><span>Driver ID</span><span>${p.driverId||'local'}</span></div><div class="row"><span>Vehicle</span><span>${p.vehicle||'Not set'}</span></div>`}
+renderProfile();
+</script>
+</body>
+</html>
