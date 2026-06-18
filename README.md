@@ -1,97 +1,114 @@
 # 👁 Occulert™ — AI Drowsiness Detection
- 
+
 **Stop Drowsy Driving Before It Stops You.**
- 
-Occulert is a free, real-time AI drowsiness detection platform that uses your phone's front camera to track your eyes while driving. The moment it detects fatigue, it alerts you through your phone, smartwatch, and earbuds — before an accident can happen.
- 
-🌐 **Live at [occulert.com](https://occulert.com)**
- 
+
+Occulert is a prototype real-time AI drowsiness detection platform that uses your phone's front camera to estimate eye openness and fatigue patterns. When it detects warning signs, it can trigger phone-based alerts to help remind the driver to pull over safely.
+
+🌐 **Live at [occulert.com](https://www.occulert.com)**
+
 ---
- 
+
 ## ✨ Features
- 
-- 👁 **468-Point Eye Tracking** — Google MediaPipe FaceMesh calculates Eye Aspect Ratio 30x per second
-- ⚡ **Sub-Second Alerts** — Detection to alarm in under 200ms
-- 📳 **Multi-Device Alerts** — Phone vibration, Apple Watch / Galaxy Watch haptics, AirPods / Galaxy Buds audio
-- 🔒 **100% Private** — All AI runs on your device. No video recorded or uploaded. Ever.
-- 🔄 **Front & Back Camera** — Switch cameras with one tap
-- 🎨 **8 Color Themes** — Customize the app to your style
-- 👤 **Sign In with Passkey** — Passwordless auth using Face ID or fingerprint
-- ⚙️ **Adjustable Sensitivity** — Tune alerts for your driving style
-- 📊 **Session Event Log** — Every alert timestamped and logged
-- 📱 **PWA Installable** — Add to iPhone or Android home screen like a native app
+
+- 👁 **AI Eye Tracking** — Uses MediaPipe FaceMesh landmarks to estimate eye openness.
+- ⚡ **Fast Alerts** — Designed to warn quickly when signs of fatigue appear.
+- 🔒 **Privacy First** — Core camera processing is intended to run on device.
+- 📍 **Opt-In GPS** — Location tracking is off by default and only starts when enabled.
+- ☁️ **Opt-In Cloud Sync** — Fleet cloud sync is off by default and should only be used with secure Firebase rules/auth.
+- 📊 **Session Event Log** — Alerts and fatigue metrics can be saved locally in the browser.
+- 📱 **PWA Installable** — Add to iPhone or Android home screen like a native app.
+
 ---
- 
+
+## ⚠️ Safety Notice
+
+Occulert is an assistive prototype. It cannot guarantee crash prevention, driver alertness, emergency response, or legal compliance. Do not drive while tired. Do not interact with the app while actively driving. If you feel drowsy, pull over safely and rest.
+
+---
+
 ## 📱 Device Compatibility
- 
+
 | Device | Support |
 |---|---|
-| Apple iPhone (11+) | ✅ Full Support |
-| Samsung Galaxy (S10+) | ✅ Full Support |
-| All Android 10+ | ✅ Full Support |
-| Apple Watch (Series 4+) | ✅ Haptic Alerts |
-| Samsung Galaxy Watch (4+) | ✅ Haptic Alerts |
-| AirPods (2nd gen+) | ✅ Audio Alerts |
-| Galaxy Buds & all Bluetooth | ✅ Audio Alerts |
- 
+| iPhone Safari | ✅ Supported, keep screen unlocked |
+| Android Chrome | ✅ Supported |
+| Phone vibration | Device/browser dependent |
+| Wearables / earbuds | May work through paired-device behavior, not guaranteed |
+| GPS / fleet dashboard | Optional and consent-based |
+
 ---
- 
+
 ## 🚗 Who It's For
- 
+
 - Uber, Lyft, and rideshare drivers
 - Amazon, FedEx, and delivery drivers
 - Long-haul truck drivers
 - Everyday commuters
 - Fleet managers and commercial operators
+
 ---
- 
+
 ## 📁 File Structure
- 
-```
+
+```text
 occulert/
-├── index.html        # Landing page (occulert.com)
-├── app.html          # Drowsiness detection app
-├── manifest.json     # PWA manifest for home screen install
-├── sw.js             # Service worker for offline support
-├── occulert-logo.png # Brand logo
-└── README.md         # This file
+├── index.html              # Landing page
+├── app.html                # Driver monitoring app
+├── fleet-dashboard.html    # Prototype fleet dashboard
+├── session-history.html    # Local session history
+├── privacy.html            # Privacy policy
+├── safety.html             # Safety disclaimer
+├── manifest.json           # PWA manifest
+├── sw.js                   # Service worker
+├── firebase-config.js      # Firebase client config
+├── firebase-sync-v2.js     # Optional Firebase sync helper
+└── FIREBASE_SECURITY.md    # Firebase security checklist
 ```
- 
+
 ---
- 
+
 ## 🚀 How to Use
- 
-1. Go to **[occulert.com](https://occulert.com)** on your iPhone or Android
-2. Tap **Launch App**
-3. Mount your phone on your dashboard facing you
-4. Tap **Start Monitoring**
-5. Allow camera access
-6. Drive — Occulert watches your eyes automatically
+
+1. Go to **[occulert.com](https://www.occulert.com)** on your iPhone or Android.
+2. Tap **Launch App**.
+3. Mount your phone on your dashboard facing you.
+4. Tap **Start Monitoring**.
+5. Allow camera access.
+6. Keep the browser visible and screen unlocked.
+7. Only enable GPS/cloud sync if you intentionally want fleet/demo data saved.
+
 ---
- 
+
+## 🔐 Firebase / Fleet Security
+
+Before using Occulert with real drivers or fleet data, review `FIREBASE_SECURITY.md`. Do not leave Firestore open to public read/write. Use Firebase Auth, fleet-scoped data, and driver consent.
+
+---
+
 ## 💚 Support the Project
- 
-Occulert is free because safety shouldn't have a price tag. If it helped you, consider supporting:
- 
+
+Occulert is free because safety should be accessible. If it helped you, consider supporting:
+
 - **GoFundMe:** [Support Occulert](https://gofund.me/bc4aab056)
+
 ---
- 
+
 ## 👤 About
- 
-Built by **Richard Pacheco** — an automotive technology student and fleet driver from San Francisco, CA. Pursuing an Associate of Science in Automotive Technology at Skyline College with a focus on Fleet Service Management.
- 
+
+Built by **Richard Pacheco** — an automotive technology student and fleet driver from San Francisco, CA.
+
 > *"No one should lose their life because they fell asleep at the wheel."*
- 
+
 ---
- 
+
 ## 📬 Contact
- 
+
 - General: [hello@occulert.com](mailto:hello@occulert.com)
 - Fleet & Enterprise: [fleet@occulert.com](mailto:fleet@occulert.com)
 - Instagram: [@occulert](https://instagram.com/occulert)
 - X / Twitter: [@occulert](https://x.com/occulert)
 - TikTok: [@occulert](https://tiktok.com/@occulert)
+
 ---
- 
-© 2026 Occulert™ · All rights reserved · Trademark Pending · San Francisco, CA
- 
+
+© 2026 Occulert™ · All rights reserved · San Francisco, CA
