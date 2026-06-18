@@ -1,50 +1,64 @@
-const CACHE='occulert-v7';
-const STATIC=[
-    '/',
-    '/index.html',
-    '/app.html',
-    '/app-v2.html',
-    '/app-ai-v3.html',
-    '/manifest.json',
-    '/occulert-logo-alt.png',
-    '/occulert-logo.png',
-    '/occulert-logo-main.png'
-  ];
+const CACHE = 'occulert-v8';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/app.html',
+  '/manifest.json',
+  '/privacy.html',
+  '/safety.html',
+  '/fleet-dashboard.html',
+  '/session-history.html',
+  '/occulert-logo-alt.png',
+  '/occulert-logo.png',
+  '/occulert-logo-main.png'
+];
 
-self.addEventListener('install',e=>{
-    e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting()));
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(cache => Promise.allSettled(STATIC_ASSETS.map(url => cache.add(url))))
+      .then(() => self.skipWaiting())
+  );
 });
 
-self.addEventListener('activate',e=>{
-    e.waitUntil(
-          caches.keys()
-            .then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))
-            .then(()=>self.clients.claim())
-        );
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
 });
 
-self.addEventListener('fetch',e=>{
-    const req=e.request;
-    // Network-first for HTML navigation requests
-                        if(req.mode==='navigate'||req.url.match(/\.(html)$/)){
-                              e.respondWith(
-                                      fetch(req)
-                                        .then(r=>{
-                                                    if(r.ok){const c=r.clone();caches.open(CACHE).then(cache=>cache.put(req,c));}
-                                                    return r;
-                                        })
-                                        .catch(()=>caches.match(req))
-                                    );
-                              return;
-                        }
-    // Cache-first for static assets
-                        e.respondWith(
-                              caches.match(req).then(r=>r||fetch(req).then(res=>{
-                                      if(res.ok&&req.url.startsWith(self.location.origin)){
-                                                const c=res.clone();
-                                                caches.open(CACHE).then(cache=>cache.put(req,c));
-                                      }
-                                      return res;
-                              }))
-                            );
+self.addEventListener('fetch', event => {
+  const req = event.request;
+
+  if (req.method !== 'GET') return;
+
+  if (req.mode === 'navigate' || req.url.endsWith('.html')) {
+    event.respondWith(
+      fetch(req)
+        .then(res => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(cache => cache.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then(match => match || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(req).then(match => {
+      if (match) return match;
+      return fetch(req).then(res => {
+        if (res && res.ok && req.url.startsWith(self.location.origin)) {
+          const copy = res.clone();
+          caches.open(CACHE).then(cache => cache.put(req, copy));
+        }
+        return res;
+      });
+    })
+  );
 });
