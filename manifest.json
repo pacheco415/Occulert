@@ -1,7 +1,8 @@
 {
   "name": "Occulert - AI Drowsiness Detection",
   "short_name": "Occulert",
-  "description": "Occulert uses AI eye tracking to detect driver drowsiness and send instant alerts through phones, smartwatches, earbuds, and fleet dashboards.",
+  "description": "Occulert uses on-device AI eye tracking to help detect driver drowsiness and trigger phone alerts, with optional fleet dashboard features.",
+  "id": "/app.html",
   "start_url": "/app.html",
   "scope": "/",
   "display": "standalone",
@@ -34,12 +35,7 @@
       "purpose": "maskable"
     }
   ],
-  "categories": [
-    "health",
-    "lifestyle",
-    "utilities",
-    "productivity"
-  ],
+  "categories": ["health", "lifestyle", "utilities", "productivity"],
   "screenshots": [],
   "shortcuts": [
     {
@@ -51,8 +47,14 @@
     {
       "name": "Fleet Solutions",
       "short_name": "Fleet",
-      "url": "/?page=fleet",
+      "url": "/#fleet",
       "description": "Learn about Occulert fleet safety monitoring"
+    },
+    {
+      "name": "Safety Disclaimer",
+      "short_name": "Safety",
+      "url": "/safety.html",
+      "description": "Read Occulert safety limits and responsible-use guidance"
     }
   ]
 }
