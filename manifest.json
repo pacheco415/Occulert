@@ -42,19 +42,28 @@
       "name": "Start Monitoring",
       "short_name": "Monitor",
       "url": "/app.html",
-      "description": "Launch the Occulert drowsiness detection app"
+      "description": "Launch the Occulert drowsiness detection app",
+      "icons": [
+        { "src": "/occulert-logo-main.png", "sizes": "96x96", "type": "image/png" }
+      ]
     },
     {
       "name": "Fleet Solutions",
       "short_name": "Fleet",
       "url": "/#fleet",
-      "description": "Learn about Occulert fleet safety monitoring"
+      "description": "Learn about Occulert fleet safety monitoring",
+      "icons": [
+        { "src": "/occulert-logo-main.png", "sizes": "96x96", "type": "image/png" }
+      ]
     },
     {
       "name": "Safety Disclaimer",
       "short_name": "Safety",
       "url": "/safety.html",
-      "description": "Read Occulert safety limits and responsible-use guidance"
+      "description": "Read Occulert safety limits and responsible-use guidance",
+      "icons": [
+        { "src": "/occulert-logo-main.png", "sizes": "96x96", "type": "image/png" }
+      ]
     }
   ]
 }
