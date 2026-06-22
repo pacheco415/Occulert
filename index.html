@@ -49,7 +49,7 @@ h1{font-size:clamp(38px,5vw,64px);line-height:1.04;letter-spacing:-2px;color:var
 .hero p,.section-desc{font-size:17px;color:var(--text2);max-width:640px}.btns{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;border:none;border-radius:12px;padding:14px 24px;font-weight:800;cursor:pointer;transition:background .15s,transform .15s}.btn-primary{background:#2563eb;color:#fff}.btn-primary:hover{background:#1d4ed8}.btn-outline{border:1px solid var(--border2);color:var(--text);background:var(--install-bg)}.btn-outline:hover{border-color:#3b82f6}
 .trust{display:flex;gap:22px;flex-wrap:wrap;margin-top:28px;color:var(--text3);font-size:13px}
-.phone-wrap{position:relative;display:flex;justify-content:center;align-items:flex-start;gap:28px}
+.phone-wrap{position:relative;display:flex;justify-content:center;align-items:center;gap:28px}
 /* ===== iPhone 17 Pro Max ===== */
 /* Action button left */
 .phone-wrap::before{content:"";position:absolute;left:-4px;top:108px;width:3.5px;height:36px;background:linear-gradient(180deg,#c0c0c8,#a8a8b0,#c0c0c8);border-radius:2px 0 0 2px;box-shadow:-1px 0 4px rgba(0,0,0,.6);z-index:2}
@@ -84,15 +84,15 @@ h1{font-size:clamp(38px,5vw,64px);line-height:1.04;letter-spacing:-2px;color:var
 .phone-home{display:flex;justify-content:center;padding:8px 0 6px;background:#000}
 .phone-home-bar{width:124px;height:5px;background:rgba(255,255,255,.22);border-radius:99px}
 /* ===== Apple Watch Ultra 3 Mockup ===== */
-.watch-wrap{display:flex;flex-direction:column;align-items:center;flex-shrink:0;position:relative;margin-top:30px}
-.watch-band-top{width:52px;height:48px;background:linear-gradient(180deg,#1a1a1c,#2a2a2e,#3a3a3e);border-radius:5px 5px 0 0;position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+.watch-wrap{display:flex;flex-direction:column;align-items:center;flex-shrink:0;position:relative}
+.watch-band-top{width:56px;height:48px;background:linear-gradient(180deg,#1a1a1c,#2a2a2e,#3a3a3e);border-radius:5px 5px 0 0;position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
 .watch-band-top::before,.watch-band-top::after{content:"";position:absolute;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#111;border:1px solid #333}
 .watch-band-top::before{top:9px}.watch-band-top::after{top:23px}
-.watch-band-bottom{width:52px;height:48px;background:linear-gradient(180deg,#3a3a3e,#2a2a2e,#1a1a1c);border-radius:0 0 5px 5px;position:relative;box-shadow:inset 0 -1px 0 rgba(255,255,255,.05)}
+.watch-band-bottom{width:56px;height:48px;background:linear-gradient(180deg,#3a3a3e,#2a2a2e,#1a1a1c);border-radius:0 0 5px 5px;position:relative;box-shadow:inset 0 -1px 0 rgba(255,255,255,.05)}
 .watch-band-bottom::before,.watch-band-bottom::after{content:"";position:absolute;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#111;border:1px solid #333}
 .watch-band-bottom::before{bottom:9px}.watch-band-bottom::after{bottom:23px}
-.watch-case{position:relative;width:96px;height:106px}
-.watch-body{position:absolute;inset:0;background:linear-gradient(145deg,#4a4a52 0%,#6a6a72 18%,#3e3e45 50%,#58585f 80%,#4a4a52 100%);border-radius:28px;box-shadow:0 20px 60px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(255,255,255,.06)}
+.watch-case{position:relative;width:100px;height:112px}
+.watch-body{position:absolute;inset:0;background:linear-gradient(145deg,#4a4a52 0%,#6a6a72 18%,#3e3e45 50%,#58585f 80%,#4a4a52 100%);border-radius:30px;box-shadow:0 20px 60px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(255,255,255,.06)}
 .watch-body::before{content:"";position:absolute;inset:0;border-radius:28px;background:repeating-linear-gradient(0deg,rgba(255,255,255,.011) 0px,rgba(255,255,255,.011) 1px,transparent 1px,transparent 3px);pointer-events:none}
 /* Digital Crown - orange */
 .watch-crown{position:absolute;right:-9px;top:16px;width:10px;height:34px;background:linear-gradient(180deg,#e05c00,#f07020 30%,#e05c00 70%,#c04800);border-radius:4px;box-shadow:2px 0 6px rgba(0,0,0,.6),inset -1px 0 0 rgba(255,255,255,.15)}
@@ -101,7 +101,7 @@ h1{font-size:clamp(38px,5vw,64px);line-height:1.04;letter-spacing:-2px;color:var
 .watch-side-btn{position:absolute;right:-8px;top:60px;width:8px;height:18px;background:linear-gradient(180deg,#5a5a62,#4a4a52);border-radius:3px;box-shadow:2px 0 4px rgba(0,0,0,.5)}
 /* Action button - orange, Ultra 3 exclusive */
 .watch-action-btn{position:absolute;left:-9px;top:20px;width:10px;height:22px;background:linear-gradient(180deg,#e05c00,#f07020 40%,#e05c00);border-radius:4px;box-shadow:-2px 0 6px rgba(0,0,0,.6),inset 1px 0 0 rgba(255,255,255,.15)}
-.watch-screen-bezel{position:absolute;inset:5px;background:#000;border-radius:22px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.watch-screen-bezel{position:absolute;inset:5px;background:#000;border-radius:24px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
 .watch-screen{width:100%;height:100%;background:linear-gradient(145deg,#0a0e1a,#0a0a0a);display:flex;flex-direction:column;padding:8px 7px 6px;position:relative;overflow:hidden}
 .watch-time-row{display:flex;justify-content:space-between;align-items:flex-start}
 .watch-time{font-size:18px;font-weight:900;color:#fff;letter-spacing:-.5px;line-height:1}
@@ -114,8 +114,8 @@ h1{font-size:clamp(38px,5vw,64px);line-height:1.04;letter-spacing:-2px;color:var
 .watch-metric{background:rgba(255,255,255,.06);border-radius:7px;padding:4px 5px;text-align:center}
 .watch-metric-val{font-size:11px;font-weight:900;color:#fff;line-height:1;font-family:monospace}
 .watch-metric-lbl{font-size:5.5px;font-weight:700;color:#636366;letter-spacing:.06em;text-transform:uppercase;margin-top:1px}
-.watch-lug-top{position:absolute;left:50%;transform:translateX(-50%);top:-5px;width:60px;height:7px;background:linear-gradient(180deg,#5a5a62,#4a4a52);border-radius:4px 4px 0 0;box-shadow:0 -1px 0 rgba(255,255,255,.1)}
-.watch-lug-bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:-5px;width:60px;height:7px;background:linear-gradient(180deg,#4a4a52,#5a5a62);border-radius:0 0 4px 4px;box-shadow:0 1px 0 rgba(255,255,255,.08)}
+.watch-lug-top{position:absolute;left:50%;transform:translateX(-50%);top:-5px;width:62px;height:7px;background:linear-gradient(180deg,#5a5a62,#4a4a52);border-radius:4px 4px 0 0;box-shadow:0 -1px 0 rgba(255,255,255,.1)}
+.watch-lug-bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:-5px;width:62px;height:7px;background:linear-gradient(180deg,#4a4a52,#5a5a62);border-radius:0 0 4px 4px;box-shadow:0 1px 0 rgba(255,255,255,.08)}
 .watch-model-badge{font-size:7.5px;font-weight:800;color:rgba(255,255,255,.3);letter-spacing:.1em;text-transform:uppercase;margin-top:10px}
 .stats-row{display:flex;gap:0;border:1px solid var(--stats-border);border-radius:18px;overflow:hidden;margin-top:24px;background:var(--surface);grid-column:1/-1}.stat{flex:1;padding:28px 24px;text-align:center;border-right:1px solid var(--stats-border)}.stat:last-child{border-right:none}.stat-num{font-size:clamp(28px,3.5vw,42px);font-weight:900;color:var(--text);letter-spacing:-1.5px;line-height:1}.stat-label{font-size:13px;color:var(--text3);margin-top:6px;font-weight:500}
 .section-label{font-size:12px;text-transform:uppercase;letter-spacing:3px;color:#3b82f6;font-weight:800;margin-bottom:16px}.section-title{font-size:clamp(28px,3.5vw,44px);font-weight:900;letter-spacing:-1.5px;color:var(--text);margin-bottom:16px;line-height:1.08}
@@ -248,7 +248,7 @@ footer{background:var(--footer-bg);border-top:1px solid var(--border);padding:48
       </div>
     </div>
     <div class="footer-bottom">
-      <span>© 2025 Occulert. All rights reserved.</span>
+      <span>© 2026 Occulert. All rights reserved.</span>
       <span>Prototype — not a substitute for rest or safe driving practices</span>
     </div>
   </div>
