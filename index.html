@@ -49,74 +49,91 @@ h1{font-size:clamp(38px,5vw,64px);line-height:1.04;letter-spacing:-2px;color:var
 .hero p,.section-desc{font-size:17px;color:var(--text2);max-width:640px}.btns{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;border:none;border-radius:12px;padding:14px 24px;font-weight:800;cursor:pointer;transition:background .15s,transform .15s}.btn-primary{background:#2563eb;color:#fff}.btn-primary:hover{background:#1d4ed8}.btn-outline{border:1px solid var(--border2);color:var(--text);background:var(--install-bg)}.btn-outline:hover{border-color:#3b82f6}
 .trust{display:flex;gap:22px;flex-wrap:wrap;margin-top:28px;color:var(--text3);font-size:13px}
-.phone-wrap{position:relative;display:flex;justify-content:center;align-items:center;gap:28px}
-/* ===== iPhone 17 Pro Max ===== */
-/* Action button left */
-.phone-wrap::before{content:"";position:absolute;left:-4px;top:108px;width:3.5px;height:36px;background:linear-gradient(180deg,#c0c0c8,#a8a8b0,#c0c0c8);border-radius:2px 0 0 2px;box-shadow:-1px 0 4px rgba(0,0,0,.6);z-index:2}
-/* Volume up left */
-.phone-side-vol-up{position:absolute;left:-4px;top:156px;width:3.5px;height:56px;background:linear-gradient(180deg,#c0c0c8,#a8a8b0,#c0c0c8);border-radius:2px 0 0 2px;box-shadow:-1px 0 4px rgba(0,0,0,.6)}
-/* Volume down left */
-.phone-side-vol-dn{position:absolute;left:-4px;top:290px;width:3.5px;height:56px;background:linear-gradient(180deg,#c0c0c8,#a8a8b0,#c0c0c8);border-radius:2px 0 0 2px;box-shadow:-1px 0 4px rgba(0,0,0,.6)}
-.phone{background:linear-gradient(160deg,#2d2d30 0%,#3a3a3e 30%,#2d2d30 60%,#3a3a3e 100%);border:1.5px solid #4a4a52;border-radius:56px;padding:14px 11px 12px;box-shadow:0 60px 140px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.12),0 0 0 3px rgba(150,150,160,.06),inset 0 1px 0 rgba(255,255,255,.15),inset 0 -1px 0 rgba(255,255,255,.06);width:278px;position:relative;flex-shrink:0}
-/* Side / Power button right */
-.phone::before{content:"";position:absolute;right:-4px;top:200px;width:3.5px;height:80px;background:linear-gradient(180deg,#c0c0c8,#a8a8b0,#c0c0c8);border-radius:0 2px 2px 0;box-shadow:1px 0 4px rgba(0,0,0,.6)}
-/* Camera Control button right (iPhone 17 exclusive) */
-.phone::after{content:"";position:absolute;right:-4px;top:360px;width:3.5px;height:52px;background:linear-gradient(180deg,#c0c0c8,#a8a8b0,#c0c0c8);border-radius:0 2px 2px 0;box-shadow:1px 0 4px rgba(0,0,0,.6)}
-.phone-inner{background:#000;border-radius:46px;overflow:hidden;border:1px solid #1a1a1a;position:relative}
-.phone-titanium{position:absolute;inset:0;border-radius:56px;background:repeating-linear-gradient(92deg,rgba(255,255,255,.016) 0px,rgba(255,255,255,.016) 1px,transparent 1px,transparent 4px);pointer-events:none;z-index:1}
-/* Dynamic Island */
-.phone-island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:108px;height:32px;background:#000;border-radius:22px;z-index:10;display:flex;align-items:center;justify-content:flex-end;padding:0 11px;gap:5px;box-shadow:0 0 0 1.5px rgba(255,255,255,.09),0 2px 10px rgba(0,0,0,.9)}
-.phone-island-cam{width:9px;height:9px;border-radius:50%;background:#1a1a1a;border:1px solid #2a2a2a;position:relative}
-.phone-island-cam::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:4px;height:4px;border-radius:50%;background:#080808;box-shadow:0 0 0 1.5px rgba(100,180,255,.2)}
-.phone-camera-badge{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:8px;font-weight:800;color:rgba(255,255,255,.35);letter-spacing:.1em;text-transform:uppercase}
-.phone-statusbar{display:flex;justify-content:space-between;align-items:center;padding:18px 22px 6px;font-size:11px;font-weight:700;color:#fff;letter-spacing:.02em;height:56px}
-.phone-statusbar .sb-time{font-size:15px;font-weight:700;letter-spacing:0}
-.phone-statusbar .sb-icons{display:flex;align-items:center;gap:5px;font-size:10px}
-  .camera-view{background:#0a0a0a;height:260px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
-.face-outline{width:110px;height:120px;border:1.5px solid rgba(0,220,180,.55);border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:0 0 20px rgba(0,220,180,.12)}
-.eye-dots{display:flex;gap:28px;margin-top:-10px}
-.eye-dot{width:11px;height:11px;border-radius:50%;background:#00dcb4;box-shadow:0 0 6px rgba(0,220,180,.8)}
-.scan-line{position:absolute;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,rgba(0,220,180,.6),transparent);animation:scan 2.2s ease-in-out infinite}
-@keyframes scan{0%,100%{top:20%;opacity:.4}50%{top:80%;opacity:1}}
-.phone-panel{background:#0a0a0a;padding:14px 14px 18px;border-top:1px solid #1a1a1a}
-.phone-status{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:800;letter-spacing:.12em;margin-bottom:8px}.status-dot{width:7px;height:7px;border-radius:50%;background:#00ff88;box-shadow:0 0 8px rgba(0,255,136,.6);flex-shrink:0;animation:blink 1.8s ease-in-out infinite}@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
-.phone-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}.phone-metric{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:10px 12px}.pm-label{font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:#636366;font-weight:700}.pm-value{font-size:18px;font-weight:900;color:#fff;font-family:monospace;line-height:1.1}.pm-bar{height:3px;background:#2a2a2a;border-radius:99px;overflow:hidden;margin-top:5px}.pm-fill{height:100%;border-radius:99px}
-.phone-home{display:flex;justify-content:center;padding:8px 0 6px;background:#000}
-.phone-home-bar{width:124px;height:5px;background:rgba(255,255,255,.22);border-radius:99px}
-/* ===== Apple Watch Ultra 3 Mockup ===== */
-.watch-wrap{display:flex;flex-direction:column;align-items:center;flex-shrink:0;position:relative}
-.watch-band-top{width:56px;height:48px;background:linear-gradient(180deg,#1a1a1c,#2a2a2e,#3a3a3e);border-radius:5px 5px 0 0;position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
-.watch-band-top::before,.watch-band-top::after{content:"";position:absolute;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#111;border:1px solid #333}
-.watch-band-top::before{top:9px}.watch-band-top::after{top:23px}
-.watch-band-bottom{width:56px;height:48px;background:linear-gradient(180deg,#3a3a3e,#2a2a2e,#1a1a1c);border-radius:0 0 5px 5px;position:relative;box-shadow:inset 0 -1px 0 rgba(255,255,255,.05)}
-.watch-band-bottom::before,.watch-band-bottom::after{content:"";position:absolute;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#111;border:1px solid #333}
-.watch-band-bottom::before{bottom:9px}.watch-band-bottom::after{bottom:23px}
-.watch-case{position:relative;width:100px;height:112px}
-.watch-body{position:absolute;inset:0;background:linear-gradient(145deg,#4a4a52 0%,#6a6a72 18%,#3e3e45 50%,#58585f 80%,#4a4a52 100%);border-radius:30px;box-shadow:0 20px 60px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(255,255,255,.06)}
-.watch-body::before{content:"";position:absolute;inset:0;border-radius:28px;background:repeating-linear-gradient(0deg,rgba(255,255,255,.011) 0px,rgba(255,255,255,.011) 1px,transparent 1px,transparent 3px);pointer-events:none}
-/* Digital Crown - orange */
-.watch-crown{position:absolute;right:-9px;top:16px;width:10px;height:34px;background:linear-gradient(180deg,#e05c00,#f07020 30%,#e05c00 70%,#c04800);border-radius:4px;box-shadow:2px 0 6px rgba(0,0,0,.6),inset -1px 0 0 rgba(255,255,255,.15)}
-.watch-crown::before{content:"";position:absolute;top:5px;left:2px;right:2px;height:1px;background:rgba(255,255,255,.28);border-radius:1px;box-shadow:0 4px 0 rgba(255,255,255,.16),0 8px 0 rgba(255,255,255,.16),0 12px 0 rgba(255,255,255,.16),0 16px 0 rgba(255,255,255,.16),0 20px 0 rgba(255,255,255,.16)}
-/* Side button */
-.watch-side-btn{position:absolute;right:-8px;top:60px;width:8px;height:18px;background:linear-gradient(180deg,#5a5a62,#4a4a52);border-radius:3px;box-shadow:2px 0 4px rgba(0,0,0,.5)}
-/* Action button - orange, Ultra 3 exclusive */
-.watch-action-btn{position:absolute;left:-9px;top:20px;width:10px;height:22px;background:linear-gradient(180deg,#e05c00,#f07020 40%,#e05c00);border-radius:4px;box-shadow:-2px 0 6px rgba(0,0,0,.6),inset 1px 0 0 rgba(255,255,255,.15)}
-.watch-screen-bezel{position:absolute;inset:5px;background:#000;border-radius:24px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
-.watch-screen{width:100%;height:100%;background:linear-gradient(145deg,#0a0e1a,#0a0a0a);display:flex;flex-direction:column;padding:8px 7px 6px;position:relative;overflow:hidden}
-.watch-time-row{display:flex;justify-content:space-between;align-items:flex-start}
-.watch-time{font-size:18px;font-weight:900;color:#fff;letter-spacing:-.5px;line-height:1}
-.watch-date{font-size:7px;font-weight:700;color:#636366;letter-spacing:.06em;margin-top:2px;text-transform:uppercase}
-.watch-alert-pill{background:linear-gradient(90deg,rgba(0,255,136,.12),rgba(0,220,180,.08));border:1px solid rgba(0,255,136,.28);border-radius:99px;padding:3px 6px;display:flex;align-items:center;gap:3px;margin-top:4px}
-.watch-alert-dot{width:5px;height:5px;border-radius:50%;background:#00ff88;box-shadow:0 0 6px rgba(0,255,136,.8);animation:blink 1.8s ease-in-out infinite}
-.watch-alert-text{font-size:6.5px;font-weight:800;color:#00ff88;letter-spacing:.08em}
-.watch-eye-icon{font-size:17px;text-align:center;line-height:1;margin:3px 0 2px}
-.watch-metric-row{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:2px}
-.watch-metric{background:rgba(255,255,255,.06);border-radius:7px;padding:4px 5px;text-align:center}
-.watch-metric-val{font-size:11px;font-weight:900;color:#fff;line-height:1;font-family:monospace}
-.watch-metric-lbl{font-size:5.5px;font-weight:700;color:#636366;letter-spacing:.06em;text-transform:uppercase;margin-top:1px}
-.watch-lug-top{position:absolute;left:50%;transform:translateX(-50%);top:-5px;width:62px;height:7px;background:linear-gradient(180deg,#5a5a62,#4a4a52);border-radius:4px 4px 0 0;box-shadow:0 -1px 0 rgba(255,255,255,.1)}
-.watch-lug-bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:-5px;width:62px;height:7px;background:linear-gradient(180deg,#4a4a52,#5a5a62);border-radius:0 0 4px 4px;box-shadow:0 1px 0 rgba(255,255,255,.08)}
-.watch-model-badge{font-size:7.5px;font-weight:800;color:rgba(255,255,255,.3);letter-spacing:.1em;text-transform:uppercase;margin-top:10px}
+
+/* ======================================================
+   IPHONE 17 PRO MAX MOCKUP
+   ====================================================== */
+.phone-wrap{position:relative;display:flex;justify-content:center;align-items:center;gap:36px}
+.phone{
+  position:relative;width:260px;height:540px;border-radius:52px;
+  background:linear-gradient(160deg,#a8a8ac 0%,#c8c8cc 8%,#8e8e93 20%,#b4b4b8 35%,#7a7a7f 50%,#9e9ea3 65%,#c0c0c4 80%,#8e8e93 92%,#a8a8ac 100%);
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,0.12),inset 0 2px 4px rgba(255,255,255,0.25),inset 0 -2px 4px rgba(0,0,0,0.3),0 30px 80px rgba(0,0,0,0.7),0 8px 24px rgba(0,0,0,0.5),0 2px 6px rgba(0,0,0,0.4);
+  flex-shrink:0;
+}
+.phone-titanium{position:absolute;inset:0;border-radius:52px;background:repeating-linear-gradient(92deg,transparent 0px,rgba(255,255,255,0.04) 1px,transparent 2px,rgba(0,0,0,0.04) 3px,transparent 4px);pointer-events:none;z-index:2;}
+.phone::before{content:'';position:absolute;left:-4px;top:112px;width:4px;height:30px;background:linear-gradient(90deg,#6a6a70,#9e9ea3,#7a7a7f);border-radius:3px 0 0 3px;box-shadow:-2px 0 4px rgba(0,0,0,0.4);}
+.phone::after{content:'';position:absolute;right:-4px;top:164px;width:4px;height:90px;background:linear-gradient(270deg,#6a6a70,#b0b0b4,#8a8a8e,#9e9ea3,#7a7a7f);border-radius:0 3px 3px 0;box-shadow:2px 0 4px rgba(0,0,0,0.4);}
+.phone-side-vol-up{position:absolute;left:-4px;top:164px;width:4px;height:56px;background:linear-gradient(90deg,#6a6a70,#9e9ea3,#7a7a7f);border-radius:3px 0 0 3px;box-shadow:-2px 0 4px rgba(0,0,0,0.4);}
+.phone-side-vol-dn{position:absolute;left:-4px;top:232px;width:4px;height:56px;background:linear-gradient(90deg,#6a6a70,#9e9ea3,#7a7a7f);border-radius:3px 0 0 3px;box-shadow:-2px 0 4px rgba(0,0,0,0.4);}
+.phone-side-cam-ctrl{position:absolute;right:-4px;top:310px;width:4px;height:60px;background:linear-gradient(270deg,#5a5a5f,#8a8a8e,#6a6a70);border-radius:0 3px 3px 0;box-shadow:2px 0 4px rgba(0,0,0,0.4);}
+.phone-side-cam-ctrl::after{content:'';position:absolute;left:0;top:8px;right:0;bottom:8px;background:repeating-linear-gradient(180deg,transparent 0,transparent 3px,rgba(255,255,255,0.18) 3px,rgba(255,255,255,0.18) 4px);border-radius:0 2px 2px 0;}
+.phone-inner{position:absolute;inset:6px;border-radius:46px;background:#000;overflow:hidden;display:flex;flex-direction:column;}
+.phone-island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:96px;height:32px;background:#000;border-radius:20px;z-index:10;box-shadow:0 0 0 1.5px rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;}
+.phone-island-cam{width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#222,#111);border:1px solid rgba(255,255,255,0.07);box-shadow:0 0 0 2px rgba(255,255,255,0.03),inset 0 0 3px rgba(0,200,255,0.2);}
+.phone-statusbar{display:flex;justify-content:space-between;align-items:center;padding:10px 18px 0;font-size:11px;font-weight:600;color:#fff;z-index:5;flex-shrink:0;}
+.sb-time{font-size:12px;font-weight:700;letter-spacing:-0.3px}
+.sb-icons{display:flex;align-items:center;gap:5px;opacity:0.9}
+.camera-view{flex:1;position:relative;background:radial-gradient(ellipse at 50% 40%,#0a1a0e 0%,#050e07 40%,#020804 100%);display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:260px;}
+.camera-view::before{content:'';position:absolute;inset:0;background:linear-gradient(rgba(0,255,80,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,80,0.025) 1px,transparent 1px);background-size:30px 30px;}
+.scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,255,100,0.6),transparent);animation:scan 2.5s ease-in-out infinite;box-shadow:0 0 8px rgba(0,255,100,0.4);}
+@keyframes scan{0%{top:10%;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:90%;opacity:0}}
+.face-outline{width:130px;height:140px;border-radius:50%;border:2px solid rgba(0,255,100,0.65);box-shadow:0 0 20px rgba(0,255,100,0.15),inset 0 0 20px rgba(0,255,100,0.06);display:flex;align-items:center;justify-content:center;position:relative;}
+.face-outline::before,.face-outline::after{content:'';position:absolute;width:16px;height:16px;border-color:rgba(0,255,100,0.9);border-style:solid;}
+.face-outline::before{top:-2px;left:-2px;border-width:2px 0 0 2px;border-radius:3px 0 0 0}
+.face-outline::after{bottom:-2px;right:-2px;border-width:0 2px 2px 0;border-radius:0 0 3px 0}
+.eye-dots{display:flex;gap:30px;margin-top:-12px}
+.eye-dot{width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#00ff64,#00cc50);box-shadow:0 0 8px #00ff64,0 0 16px rgba(0,255,100,0.4);animation:blink 4s ease-in-out infinite;}
+.eye-dot:nth-child(2){animation-delay:0.1s}
+@keyframes blink{0%,90%,100%{transform:scaleY(1)}95%{transform:scaleY(0.1)}}
+.phone-panel{background:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(5,15,8,0.98) 18%,#050f08 100%);padding:14px 14px 18px;flex-shrink:0;}
+.phone-status{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#00ff64;box-shadow:0 0 6px #00ff64;animation:pulse-dot 1.5s ease-in-out infinite;}
+@keyframes pulse-dot{0%,100%{opacity:1;box-shadow:0 0 6px #00ff64}50%{opacity:0.6;box-shadow:0 0 12px #00ff64}}
+.phone-status span{font-size:9px;font-weight:700;letter-spacing:1.2px;color:#00ff64;text-transform:uppercase;}
+.phone-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.phone-metric{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;}
+.pm-label{font-size:7.5px;font-weight:700;letter-spacing:0.8px;color:rgba(255,255,255,0.45);text-transform:uppercase;margin-bottom:4px;}
+.pm-value{font-size:18px;font-weight:800;color:#fff;letter-spacing:-0.5px;line-height:1;}
+.pm-bar{height:2.5px;background:rgba(255,255,255,0.1);border-radius:99px;margin-top:6px;overflow:hidden;}
+.pm-fill{height:100%;border-radius:99px;}
+.phone-home{background:#000;padding:8px 0 6px;display:flex;justify-content:center;flex-shrink:0;}
+.phone-home-bar{width:96px;height:4px;background:rgba(255,255,255,0.22);border-radius:99px;}
+/* ======================================================
+   APPLE WATCH ULTRA 3 MOCKUP
+   ====================================================== */
+.watch-wrap{display:flex;flex-direction:column;align-items:center;flex-shrink:0;margin-top:20px;}
+.watch-band-top{width:64px;height:52px;background:linear-gradient(180deg,#1a1a1c 0%,#282828 30%,#1e1e20 70%,#141416 100%);border-radius:6px 6px 0 0;position:relative;box-shadow:inset -1px 0 0 rgba(255,255,255,0.06),inset 1px 0 0 rgba(255,255,255,0.06);}
+.watch-band-top::before{content:'';position:absolute;inset:4px 6px;background:repeating-linear-gradient(180deg,transparent 0,transparent 4px,rgba(255,255,255,0.04) 4px,rgba(255,255,255,0.04) 5px);}
+.watch-band-top::after{content:'';position:absolute;left:50%;top:12px;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:#0a0a0c;box-shadow:0 16px 0 #0a0a0c;}
+.watch-case{position:relative;width:148px;height:168px;background:linear-gradient(145deg,#6a6a72 0%,#8a8a92 10%,#5c5c64 20%,#7e7e86 30%,#4e4e56 45%,#6c6c74 55%,#8e8e96 70%,#5e5e66 85%,#7a7a82 100%);border-radius:38px;box-shadow:inset 0 2px 4px rgba(255,255,255,0.2),inset 0 -2px 4px rgba(0,0,0,0.35),inset -2px 0 4px rgba(0,0,0,0.2),inset 2px 0 4px rgba(255,255,255,0.1),0 20px 50px rgba(0,0,0,0.6),0 6px 16px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;}
+.watch-case::before{content:'';position:absolute;inset:0;border-radius:38px;background:repeating-linear-gradient(88deg,transparent 0,rgba(255,255,255,0.03) 1px,transparent 2px,rgba(0,0,0,0.03) 3px,transparent 4px);pointer-events:none;}
+.watch-case::after{content:'';position:absolute;inset:0;border-radius:38px;border:2.5px solid transparent;background:linear-gradient(#000,#000) padding-box,linear-gradient(145deg,rgba(255,255,255,0.35) 0%,rgba(255,255,255,0.05) 50%,rgba(255,255,255,0.2) 100%) border-box;pointer-events:none;}
+.watch-screen-bezel{width:132px;height:152px;border-radius:33px;background:#000;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,0.8);position:relative;z-index:2;}
+.watch-screen{width:100%;height:100%;background:radial-gradient(ellipse at 50% 30%,#0a1a0e,#030a06);display:flex;flex-direction:column;align-items:stretch;padding:14px 12px 12px;box-sizing:border-box;gap:6px;}
+.watch-time-row{display:flex;align-items:flex-start;gap:6px;}
+.watch-time{font-size:32px;font-weight:800;color:#fff;letter-spacing:-1.5px;line-height:1;}
+.watch-date{font-size:9px;font-weight:600;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.3px;margin-top:4px;line-height:1.3;}
+.watch-alert-pill{background:rgba(0,200,80,0.2);border:1px solid rgba(0,200,80,0.4);border-radius:20px;padding:4px 10px;display:flex;align-items:center;gap:5px;align-self:flex-start;}
+.watch-alert-dot{width:6px;height:6px;border-radius:50%;background:#00c850;box-shadow:0 0 5px #00c850;animation:pulse-dot 1.5s ease-in-out infinite;}
+.watch-alert-text{font-size:9px;font-weight:700;color:#00c850;letter-spacing:0.8px;text-transform:uppercase;}
+.watch-eye-icon{width:30px;height:20px;border:2px solid rgba(0,255,100,0.7);border-radius:50%;position:relative;align-self:center;box-shadow:0 0 8px rgba(0,255,100,0.3);}
+.watch-eye-icon::after{content:'';position:absolute;width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#00ff64,#00aa44);top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 6px rgba(0,255,100,0.6);}
+.watch-metric-row{display:flex;gap:6px;margin-top:auto;}
+.watch-metric{flex:1;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:7px 6px;text-align:center;}
+.watch-metric-val{font-size:16px;font-weight:800;color:#fff;letter-spacing:-0.5px;line-height:1;}
+.watch-metric-lbl{font-size:7px;font-weight:600;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.5px;margin-top:3px;}
+.watch-lug-top{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:70px;height:8px;background:linear-gradient(180deg,#8a8a92,#6a6a72,#5a5a62);border-radius:2px 2px 0 0;}
+.watch-lug-bottom{position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:70px;height:8px;background:linear-gradient(180deg,#5a5a62,#6a6a72,#8a8a92);border-radius:0 0 2px 2px;}
+.watch-body{position:absolute;inset:0;border-radius:38px;}
+.watch-crown{position:absolute;right:-12px;top:30px;width:12px;height:44px;background:linear-gradient(180deg,#e06000 0%,#f07820 15%,#c85000 30%,#d06800 45%,#e07020 60%,#b84800 75%,#d06000 90%,#e06800 100%);border-radius:6px;box-shadow:2px 0 6px rgba(0,0,0,0.5),inset -2px 0 4px rgba(255,255,255,0.1),0 0 0 1px rgba(0,0,0,0.3);overflow:hidden;}
+.watch-crown::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(180deg,transparent 0,transparent 3px,rgba(0,0,0,0.3) 3px,rgba(0,0,0,0.3) 4px);}
+.watch-crown::after{content:'';position:absolute;top:-10px;right:0;width:8px;height:10px;background:linear-gradient(145deg,#8a8a92,#5a5a62);border-radius:3px 3px 0 0;box-shadow:2px -1px 4px rgba(0,0,0,0.4);}
+.watch-side-btn{position:absolute;right:-10px;top:88px;width:10px;height:24px;background:linear-gradient(270deg,#5e5e66,#8e8e96,#6e6e76);border-radius:0 5px 5px 0;box-shadow:2px 0 5px rgba(0,0,0,0.5);}
+.watch-action-btn{position:absolute;left:-12px;top:40px;width:12px;height:30px;background:linear-gradient(90deg,#cc4400 0%,#e85800 20%,#ff6600 50%,#e85800 80%,#cc4400 100%);border-radius:6px 0 0 6px;box-shadow:-2px 0 6px rgba(0,0,0,0.5),inset 2px 0 4px rgba(255,150,0,0.2);}
+.watch-action-btn::before{content:'';position:absolute;top:50%;left:2px;transform:translateY(-50%);width:0;height:0;border-style:solid;border-width:4px 5px 4px 0;border-color:transparent rgba(255,255,255,0.7) transparent transparent;}
+.watch-band-bottom{width:64px;height:52px;background:linear-gradient(180deg,#141416 0%,#1e1e20 30%,#282828 70%,#1a1a1c 100%);border-radius:0 0 6px 6px;position:relative;box-shadow:inset -1px 0 0 rgba(255,255,255,0.06),inset 1px 0 0 rgba(255,255,255,0.06);}
+.watch-band-bottom::before{content:'';position:absolute;inset:4px 6px;background:repeating-linear-gradient(180deg,transparent 0,transparent 4px,rgba(255,255,255,0.04) 4px,rgba(255,255,255,0.04) 5px);}
+.watch-band-bottom::after{content:'';position:absolute;left:50%;bottom:14px;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:#0a0a0c;box-shadow:0 -16px 0 #0a0a0c;}
 .stats-row{display:flex;gap:0;border:1px solid var(--stats-border);border-radius:18px;overflow:hidden;margin-top:24px;background:var(--surface);grid-column:1/-1}.stat{flex:1;padding:28px 24px;text-align:center;border-right:1px solid var(--stats-border)}.stat:last-child{border-right:none}.stat-num{font-size:clamp(28px,3.5vw,42px);font-weight:900;color:var(--text);letter-spacing:-1.5px;line-height:1}.stat-label{font-size:13px;color:var(--text3);margin-top:6px;font-weight:500}
 .section-label{font-size:12px;text-transform:uppercase;letter-spacing:3px;color:#3b82f6;font-weight:800;margin-bottom:16px}.section-title{font-size:clamp(28px,3.5vw,44px);font-weight:900;letter-spacing:-1.5px;color:var(--text);margin-bottom:16px;line-height:1.08}
 .features{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:52px}.feature{background:var(--card-bg);border:1px solid var(--border);border-radius:20px;padding:32px;transition:border-color .2s,transform .2s}.feature:hover{border-color:var(--card-hover-border);transform:translateY(-3px)}.feature-icon{width:50px;height:50px;border-radius:14px;background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.25);display:flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:22px}.feature h3{font-size:18px;font-weight:800;color:var(--text);margin-bottom:10px}.feature p{font-size:14px;color:var(--text2);line-height:1.6}
@@ -169,54 +186,69 @@ footer{background:var(--footer-bg);border-top:1px solid var(--border);padding:48
 <div class="phone-titanium"></div>
 <div class="phone-side-vol-up"></div>
 <div class="phone-side-vol-dn"></div>
+<div class="phone-side-cam-ctrl"></div>
 <div class="phone-inner">
-<div class="phone-island"><div class="phone-island-cam"></div></div>
-<div class="phone-statusbar">
-<span class="sb-time">9:41</span>
-<span class="sb-icons">
-<svg width="16" height="12" viewBox="0 0 16 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="white" opacity=".4"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="white" opacity=".6"/><rect x="9" y="0" width="3" height="12" rx="1" fill="white" opacity=".8"/><rect x="13.5" y="0" width="2.5" height="12" rx="1" fill="white"/></svg>
-<svg width="16" height="12" viewBox="0 0 18 12" fill="none"><rect x="0" y="0" width="14" height="12" rx="3" stroke="white" stroke-width="1.2" opacity=".9"/><rect x="1.5" y="1.5" width="9" height="9" rx="1.5" fill="white"/><rect x="14.5" y="3.5" width="2.5" height="5" rx="1" fill="white" opacity=".5"/></svg>
-</span>
-</div>
-<div class="camera-view">
-<div class="face-outline"><div class="eye-dots"><div class="eye-dot"></div><div class="eye-dot"></div></div></div>
-<div class="scan-line"></div>
-</div>
-<div class="phone-panel">
-<div class="phone-status"><div class="status-dot"></div><span style="color:#00ff88">MONITORING ACTIVE</span></div>
-<div class="phone-metrics">
-<div class="phone-metric"><div class="pm-label">Fatigue Score</div><div class="pm-value">12</div><div class="pm-bar"><div class="pm-fill" style="width:12%;background:#00ff88"></div></div></div>
-<div class="phone-metric"><div class="pm-label">Confidence</div><div class="pm-value">94%</div><div class="pm-bar"><div class="pm-fill" style="width:94%;background:linear-gradient(90deg,#00ff88,#fbbf24)"></div></div></div>
-<div class="phone-metric"><div class="pm-label">Status</div><div class="pm-value" style="color:#00ff88;font-size:14px">SAFE</div></div>
-<div class="phone-metric"><div class="pm-label">Session</div><div class="pm-value" style="font-size:14px">14:22</div></div>
-</div>
-</div>
-<div class="phone-home"><div class="phone-home-bar"></div></div>
+  <div class="phone-island"><div class="phone-island-cam"></div></div>
+  <div class="phone-statusbar">
+    <span class="sb-time">9:41</span>
+    <span class="sb-icons">
+      <svg width="17" height="12" viewBox="0 0 17 12" fill="white"><rect x="0" y="3" width="3" height="9" rx="1"/><rect x="4.5" y="2" width="3" height="10" rx="1"/><rect x="9" y="0.5" width="3" height="11.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="white"><rect x="1" y="1" width="12" height="10" rx="2" fill="none" stroke="white" stroke-width="1.5"/><rect x="13" y="4" width="2" height="4" rx="1"/><rect x="2.5" y="2.5" width="9" height="7" rx="1.5"/></svg>
+    </span>
+  </div>
+  <div class="camera-view">
+    <div class="face-outline">
+      <div class="eye-dots"><div class="eye-dot"></div><div class="eye-dot"></div></div>
+    </div>
+    <div class="scan-line"></div>
+  </div>
+  <div class="phone-panel">
+    <div class="phone-status"><div class="status-dot"></div><span>Monitoring Active</span></div>
+    <div class="phone-metrics">
+      <div class="phone-metric">
+        <div class="pm-label">Fatigue Score</div>
+        <div class="pm-value">12</div>
+        <div class="pm-bar"><div class="pm-fill" style="width:12%;background:linear-gradient(90deg,#00ff64,#00cc50)"></div></div>
+      </div>
+      <div class="phone-metric">
+        <div class="pm-label">Confidence</div>
+        <div class="pm-value">94%</div>
+        <div class="pm-bar"><div class="pm-fill" style="width:94%;background:linear-gradient(90deg,#ffd700,#ffaa00)"></div></div>
+      </div>
+      <div class="phone-metric">
+        <div class="pm-label">Status</div>
+        <div class="pm-value" style="color:#00ff64;font-size:15px">SAFE</div>
+      </div>
+      <div class="phone-metric">
+        <div class="pm-label">Session</div>
+        <div class="pm-value" style="font-size:15px">14:22</div>
+      </div>
+    </div>
+  </div>
+  <div class="phone-home"><div class="phone-home-bar"></div></div>
 </div>
 </div>
 <div class="watch-wrap">
 <div class="watch-band-top"></div>
 <div class="watch-case">
-<div class="watch-lug-top"></div>
-<div class="watch-body">
-<div class="watch-crown"></div>
-<div class="watch-side-btn"></div>
-<div class="watch-action-btn"></div>
-<div class="watch-screen-bezel">
-<div class="watch-screen">
-<div class="watch-time-row">
-<div><div class="watch-time">9:41</div><div class="watch-date">Sun Jun 21</div></div>
-</div>
-<div class="watch-alert-pill"><div class="watch-alert-dot"></div><div class="watch-alert-text">ACTIVE</div></div>
-<div class="watch-eye-icon">👁</div>
-<div class="watch-metric-row">
-<div class="watch-metric"><div class="watch-metric-val" style="color:#00ff88">12</div><div class="watch-metric-lbl">Fatigue</div></div>
-<div class="watch-metric"><div class="watch-metric-val">94%</div><div class="watch-metric-lbl">Conf.</div></div>
-</div>
-</div>
-</div>
-</div>
-<div class="watch-lug-bottom"></div>
+  <div class="watch-lug-top"></div>
+  <div class="watch-body">
+    <div class="watch-crown"></div>
+    <div class="watch-side-btn"></div>
+    <div class="watch-action-btn"></div>
+    <div class="watch-screen-bezel">
+      <div class="watch-screen">
+        <div class="watch-time-row"><div><div class="watch-time">9:41</div><div class="watch-date">Sun Jun 21</div></div></div>
+        <div class="watch-alert-pill"><div class="watch-alert-dot"></div><div class="watch-alert-text">Active</div></div>
+        <div class="watch-eye-icon"></div>
+        <div class="watch-metric-row">
+          <div class="watch-metric"><div class="watch-metric-val">12</div><div class="watch-metric-lbl">Fatigue</div></div>
+          <div class="watch-metric"><div class="watch-metric-val">94%</div><div class="watch-metric-lbl">Conf.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="watch-lug-bottom"></div>
 </div>
 <div class="watch-band-bottom"></div>
 </div>
