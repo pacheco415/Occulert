@@ -91,14 +91,14 @@ footer{background:var(--footer-bg);border-top:1px solid var(--border);padding:48
     <a href="/features.html">Features</a><a href="/how-it-works.html">How It Works</a><a href="/install.html">Install</a><a href="/about.html">About</a><a href="/faq.html">FAQ</a><a href="/product-hub.html">Product Hub</a><a href="/app.html" class="launch">Launch App</a>
   </div>
   <div class="nav-right">
-    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">ð</button>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
     <button class="hamburger" id="menuBtn" aria-label="Open menu"><span class="bar"></span><span class="bar"></span><span class="bar"></span></button>
   </div>
 </nav>
 <div class="mobile-menu" id="mobileMenu">
   <a href="/features.html">Features</a><a href="/how-it-works.html">How It Works</a><a href="/install.html">Install</a><a href="/about.html">About</a><a href="/faq.html">FAQ</a><a href="/product-hub.html">Product Hub</a>
   <a href="/app.html" class="launch" style="text-align:center;border-radius:9px">Launch App</a>
-  <div class="mobile-menu-footer"><span>Theme</span><button class="theme-toggle-mobile" id="themeToggleMobile">ð Dark Mode</button></div>
+  <div class="mobile-menu-footer"><span>Theme</span><button class="theme-toggle-mobile" id="themeToggleMobile">🌙 Dark Mode</button></div>
 </div>
 
 <main style="padding-top:72px">
@@ -109,17 +109,17 @@ footer{background:var(--footer-bg);border-top:1px solid var(--border);padding:48
     <div>
       <div class="avatar"><img src="/rich-pacheco.jpg" alt="Rich Pacheco" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" /></div>
       <h3 style="color:var(--text);font-size:18px;font-weight:800">Richard Pacheco</h3>
-      <p style="color:var(--text3);font-size:13px;margin-top:4px">Founder Â· San Francisco, CA</p>
+      <p style="color:var(--text3);font-size:13px;margin-top:4px">Founder · San Francisco, CA</p>
       <p style="margin-top:16px;color:var(--text2);font-style:italic;font-size:14px;line-height:1.6">"No one should lose their life because they were too tired to pull over. Occulert started as a personal project and grew into a mission."</p>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:20px">
-        <a class="contact" href="https://linkedin.com/in/richpacheco" target="_blank" rel="noopener"><div class="contact-icon">ð¼</div><div><h4>LinkedIn</h4><p>Connect professionally</p></div></a>
-        <a class="contact" href="mailto:rich@occulert.com"><div class="contact-icon">âï¸</div><div><h4>Email</h4><p>rich@occulert.com</p></div></a>
-        <a class="contact" href="/pilot-signup.html"><div class="contact-icon">ð</div><div><h4>Pilot Program</h4><p>Join the beta</p></div></a>
+        <a class="contact" href="https://linkedin.com/in/richpacheco" target="_blank" rel="noopener"><div class="contact-icon">💼</div><div><h4>LinkedIn</h4><p>Connect professionally</p></div></a>
+        <a class="contact" href="mailto:rich@occulert.com"><div class="contact-icon">✉️</div><div><h4>Email</h4><p>rich@occulert.com</p></div></a>
+        <a class="contact" href="/pilot-signup.html"><div class="contact-icon">🚀</div><div><h4>Pilot Program</h4><p>Join the beta</p></div></a>
       </div>
     </div>
     <div>
       <h3 style="font-size:22px;font-weight:800;color:var(--text);margin-bottom:16px">Why Occulert Exists</h3>
-      <p style="font-size:15px;color:var(--text2);line-height:1.7;margin-bottom:16px">Drowsy driving kills thousands of people every year. Unlike drunk driving, there is no breathalyzer for fatigue â and most drivers don't realize how impaired they actually are until it is too late.</p>
+      <p style="font-size:15px;color:var(--text2);line-height:1.7;margin-bottom:16px">Drowsy driving kills thousands of people every year. Unlike drunk driving, there is no breathalyzer for fatigue — and most drivers don't realize how impaired they actually are until it is too late.</p>
       <p style="font-size:15px;color:var(--text2);line-height:1.7;margin-bottom:16px">Occulert was built to change that. Using advances in browser-based AI and on-device camera processing, we can now detect the early warning signs of fatigue directly on a standard smartphone with no expensive hardware, no app store, and no subscription.</p>
       <p style="font-size:15px;color:var(--text2);line-height:1.7">This is still a prototype and we are actively improving it. If you are a fleet operator, safety researcher, or developer interested in contributing, we would love to hear from you.</p>
       <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap">
@@ -147,12 +147,12 @@ footer{background:var(--footer-bg);border-top:1px solid var(--border);padding:48
       </div>
     </div>
     <div class="footer-bottom">
-      <span>Â© 2025 Occulert. All rights reserved.</span>
-      <span>Prototype â not a substitute for rest or safe driving practices</span>
+      <span>© 2025 Occulert. All rights reserved.</span>
+      <span>Prototype — not a substitute for rest or safe driving practices</span>
     </div>
   </div>
 </footer>
-<button class="scroll-top" id="scrollTop" aria-label="Back to top">â</button>
+<button class="scroll-top" id="scrollTop" aria-label="Back to top">↑</button>
 <script>
 // Active nav highlighting
 function updateActiveNav(){
@@ -171,7 +171,7 @@ function updateActiveNav(){
 window.addEventListener('scroll',updateActiveNav,{passive:true});
 updateActiveNav();
 function getTheme(){return localStorage.getItem('occulert-theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}
-function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('occulert-theme',t);const icon=t==='light'?'âï¸':'ð';document.getElementById('themeToggle').textContent=icon;const mob=document.getElementById('themeToggleMobile');if(mob)mob.textContent=icon+(t==='light'?' Light Mode':' Dark Mode');document.querySelector('meta[name="theme-color"]')?.setAttribute('content',t==='light'?'#f0f4f8':'#0a0e1a')}
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('occulert-theme',t);const icon=t==='light'?'☀️':'🌙';document.getElementById('themeToggle').textContent=icon;const mob=document.getElementById('themeToggleMobile');if(mob)mob.textContent=icon+(t==='light'?' Light Mode':' Dark Mode');document.querySelector('meta[name="theme-color"]')?.setAttribute('content',t==='light'?'#f0f4f8':'#0a0e1a')}
 function toggleTheme(){setTheme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light')}
 setTheme(getTheme());
 document.getElementById('themeToggle')?.addEventListener('click',toggleTheme);
