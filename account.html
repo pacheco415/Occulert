@@ -17,7 +17,7 @@
 .brand{font-weight:900;color:#fff;font-size:18px;display:flex;align-items:center;gap:10px}
 .brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#2563eb,#06b6d4);display:flex;align-items:center;justify-content:center}
 .nav{display:flex;gap:8px}
-.btn{border:1px solid #344d72;background:#1e2d45;color:#e2e8f0;border-radius:10px;padding:9px 14px;text-decoration:none;font-weight:800;font-size:13px;cursor:pointer;transition:border-color .15s}
+.btn{border:1px solid #344d72;background:#1e2d45;color:#e2e8f0;border-radius:10px;padding:9px 14px;text-decoration:none;font-weight:800;font-size:13px;cursor:pointer;transition:border-color .15s;display:inline-block}
 .btn:hover{border-color:#4a7aaa}
 .btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}.btn.primary:hover{background:#1d4ed8}
 .btn.green{background:#10b981;border-color:#10b981;color:#03140f}
@@ -27,7 +27,7 @@
 .page-header h1{margin:0 0 6px;color:#fff;font-size:34px;letter-spacing:-1px}
 .page-header p{color:#64748b;font-size:14px;margin:0}
 .grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
-.card{background:#111827;border:1px solid #24324a;border-radius:20px;padding:22px}
+.card{background:#111827;border:1px solid #24324a;border-radius:20px;padding:22px;margin-bottom:16px}
 .section-label{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:#4a7a8a;font-weight:900;margin-bottom:14px}
 .form{display:grid;gap:12px}
 .field label{display:block;color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:700}
@@ -42,7 +42,7 @@
 .row:last-child{border-bottom:none}
 .row span:first-child{color:#64748b;font-size:13px}
 .row span:last-child{font-weight:800;color:#e2e8f0;text-align:right;font-size:14px}
-.row .badge{font-size:11px;font-weight:900;border-radius:999px;padding:4px 10px;background:rgba(37,99,235,.12);color:#60a5fa;border:1px solid rgba(37,99,235,.25)}
+.badge{font-size:11px;font-weight:900;border-radius:999px;padding:4px 10px;background:rgba(37,99,235,.12);color:#60a5fa;border:1px solid rgba(37,99,235,.25)}
 .note{border:1px solid rgba(37,99,235,.2);background:rgba(37,99,235,.07);border-radius:14px;padding:14px 16px;color:#94a3b8;font-size:13px;line-height:1.6;margin-top:14px}
 .note strong{color:#60a5fa}
 .avatar-row{display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #1e2d45}
@@ -50,19 +50,20 @@
 .avatar-info h3{margin:0 0 2px;color:#fff;font-size:17px}
 .avatar-info p{margin:0;color:#64748b;font-size:13px}
 .action-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:18px;border-top:1px solid #1e2d45}
+.quick-links{display:grid;gap:8px;margin-top:4px}
 @media(max-width:820px){.grid,.split{grid-template-columns:1fr}.nav{display:none}.page-header h1{font-size:26px}}
 </style>
 </head>
 <body>
 <div class="top">
   <div class="brand"><div class="brand-mark"><svg width="18" height="18" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></div>Occulert Settings</div>
-  <div class="nav"><a class="btn" href="/">Home</a><a class="btn" href="/login.html">Login</a><a class="btn" href="/app.html">Driver App</a><a class="btn" href="/fleet-dashboard.html">Fleet</a><a class="btn" href="/product-hub.html">Product Hub</a></div>
+  <div class="nav"><a class="btn" href="/">Home</a><a class="btn" href="/login.html">Login</a><a class="btn" href="/app.html">Driver App</a><a class="btn" href="/fleet-dashboard.html">Fleet</a><a class="btn" href="/product-hub.html">Hub</a></div>
 </div>
 <main class="wrap">
 <div class="page-header"><h1>Account Settings</h1><p>Manage your Occulert profile, preferences, and account credentials.</p></div>
 <section class="grid">
 <div>
-  <div class="card" style="margin-bottom:16px">
+  <div class="card">
     <div class="section-label">Profile Information</div>
     <p style="color:#94a3b8;font-size:13px;margin:0 0 16px">Name, role, company, fleet ID, and vehicle are saved to this device for the prototype.</p>
     <form class="form" onsubmit="saveProfile(event)">
@@ -79,10 +80,10 @@
       <button class="btn green" type="submit">Save Profile</button>
     </form>
   </div>
-  <div class="card" style="margin-bottom:16px">
+  <div class="card">
     <div class="section-label">Account Security</div>
-    <p style="color:#94a3b8;font-size:13px;margin:0 0 16px">Email/password changes use Firebase when you are signed in.</p>
-    <form class="form" onsubmit="changeEmail(event)" style="margin-bottom:14px">
+    <p style="color:#94a3b8;font-size:13px;margin:0 0 16px">Email and password changes use Firebase authentication when you are signed in.</p>
+    <form class="form" style="margin-bottom:14px" onsubmit="changeEmail(event)">
       <div class="field"><label>New Email</label><input id="newEmail" type="email" placeholder="new@email.com" autocomplete="email"></div>
       <button class="btn primary" type="submit">Change Email</button>
     </form>
@@ -95,7 +96,7 @@
   </div>
 </div>
 <aside>
-  <div class="card" style="margin-bottom:16px">
+  <div class="card">
     <div class="section-label">Current Account</div>
     <div id="profileBox"><div style="color:#64748b;font-size:13px">Loading profile…</div></div>
     <div class="action-row">
@@ -103,7 +104,7 @@
       <button class="btn red" onclick="signOut()">Sign Out</button>
     </div>
   </div>
-  <div class="card" style="margin-bottom:16px">
+  <div class="card">
     <div class="section-label">App Preferences</div>
     <div class="row"><span>App version</span><span class="badge">v3 AI</span></div>
     <div class="row"><span>Data storage</span><span>Local device</span></div>
@@ -112,7 +113,7 @@
   </div>
   <div class="card">
     <div class="section-label">Quick Links</div>
-    <div style="display:grid;gap:8px;margin-top:4px">
+    <div class="quick-links">
       <a class="btn" href="/app.html" style="text-align:center">&#128065;&#65039; Driver App</a>
       <a class="btn" href="/fleet-dashboard.html" style="text-align:center">&#128205; Fleet Dashboard</a>
       <a class="btn" href="/session-history.html" style="text-align:center">&#128202; Session History</a>
@@ -127,72 +128,12 @@ function show(msg,type){let s=document.getElementById('status');s.className='sta
 function cleanFleet(v){return String(v||'OCCULERT-DEMO').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'-').slice(0,40)||'OCCULERT-DEMO'}
 function getProfile(){return window.OcculertAuth&&window.OcculertAuth.getProfile?window.OcculertAuth.getProfile():JSON.parse(localStorage.getItem('occulert-profile')||'null')}
 function setProfile(p){if(window.OcculertAuth&&window.OcculertAuth.saveProfile)return window.OcculertAuth.saveProfile(p);localStorage.setItem('occulert-profile',JSON.stringify(p));localStorage.setItem('occulert-role',p.role);localStorage.setItem('occulert-fleet-id',p.fleetId);return p}
-function load(){
-  let p=getProfile()||{};
-  document.getElementById('name').value=p.name||'';
-  document.getElementById('role').value=p.role||localStorage.getItem('occulert-role')||'driver';
-  document.getElementById('company').value=p.company||'';
-  document.getElementById('fleetId').value=p.fleetId||localStorage.getItem('occulert-fleet-id')||'OCCULERT-DEMO';
-  document.getElementById('vehicle').value=p.vehicle||'';
-  document.getElementById('bio').value=p.bio||'';
-  document.getElementById('newEmail').value=p.email||'';
-  const driverId=localStorage.getItem('occulert-driver-id')||'--';
-  const driverIdEl=document.getElementById('driverIdDisplay');
-  if(driverIdEl)driverIdEl.textContent=driverId;
-  const cloudSync=localStorage.getItem('occulert-cloud-consent')==='true'?'Enabled':'Disabled';
-  const cloudEl=document.getElementById('cloudStatus');
-  if(cloudEl)cloudEl.textContent=cloudSync;
-  render(p)
-}
-function saveProfile(e){
-  e.preventDefault();
-  let p=getProfile()||{};
-  p.name=document.getElementById('name').value.trim();
-  p.role=document.getElementById('role').value;
-  p.company=document.getElementById('company').value.trim()||'Occulert';
-  p.fleetId=cleanFleet(document.getElementById('fleetId').value);
-  p.vehicle=document.getElementById('vehicle').value.trim();
-  p.bio=document.getElementById('bio').value.trim();
-  p.savedAt=new Date().toISOString();
-  p=setProfile(p);render(p);show('Profile saved successfully.','good')
-}
-async function changeEmail(e){
-  e.preventDefault();
-  try{
-    let email=document.getElementById('newEmail').value.trim();
-    let user=window.firebase&&firebase.auth&&firebase.auth().currentUser;
-    if(!user)throw new Error('Sign in first before changing email.');
-    await user.updateEmail(email);
-    let p=getProfile()||{};p.email=email;setProfile(p);render(p);show('Email updated.','good')
-  }catch(err){show(err.message||String(err),'bad')}
-}
-async function changePassword(e){
-  e.preventDefault();
-  try{
-    let pw=document.getElementById('newPassword').value;
-    if(!pw)throw new Error('Enter a new password.');
-    let user=window.firebase&&firebase.auth&&firebase.auth().currentUser;
-    if(!user)throw new Error('Sign in first before changing password.');
-    await user.updatePassword(pw);
-    show('Password updated.','good');document.getElementById('newPassword').value=''
-  }catch(err){show(err.message||String(err),'bad')}
-}
-async function signOut(){
-  try{if(window.OcculertAuth)await window.OcculertAuth.signOut();show('Signed out.','good')}
-  catch(e){show('Signed out locally.','good')}
-}
-function render(p){
-  p=p||getProfile()||{};
-  document.getElementById('continueBtn').href=(p.role==='fleet')?'/fleet-dashboard.html':'/app.html';
-  const initials=(p.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-  document.getElementById('profileBox').innerHTML=
-    '<div class="avatar-row"><div class="avatar">'+initials+'</div><div class="avatar-info"><h3>'+(p.name||'No name set')+'</h3><p>'+(p.email||'No email')+'</p></div></div>'+
-    '<div class="row"><span>Role</span><span>'+(p.role==='fleet'?'Fleet Manager':'Driver')+'</span></div>'+
-    '<div class="row"><span>Company</span><span>'+(p.company||'Not set')+'</span></div>'+
-    '<div class="row"><span>Fleet ID</span><span style="font-family:monospace;font-size:13px">'+(p.fleetId||'OCCULERT-DEMO')+'</span></div>'+
-    '<div class="row"><span>Vehicle</span><span>'+(p.vehicle||'Not set')+'</span></div>'+
-    '<div class="row"><span>Login</span><span class="badge">'+(p.authenticated?'Firebase':'Local')+'</span></div>';
-}
+function load(){let p=getProfile()||{};document.getElementById('name').value=p.name||'';document.getElementById('role').value=p.role||localStorage.getItem('occulert-role')||'driver';document.getElementById('company').value=p.company||'';document.getElementById('fleetId').value=p.fleetId||localStorage.getItem('occulert-fleet-id')||'OCCULERT-DEMO';document.getElementById('vehicle').value=p.vehicle||'';document.getElementById('bio').value=p.bio||'';document.getElementById('newEmail').value=p.email||'';const dId=localStorage.getItem('occulert-driver-id')||'--';const dEl=document.getElementById('driverIdDisplay');if(dEl)dEl.textContent=dId;const cEl=document.getElementById('cloudStatus');if(cEl)cEl.textContent=localStorage.getItem('occulert-cloud-consent')==='true'?'Enabled':'Disabled';render(p)}
+function saveProfile(e){e.preventDefault();let p=getProfile()||{};p.name=document.getElementById('name').value.trim();p.role=document.getElementById('role').value;p.company=document.getElementById('company').value.trim()||'Occulert';p.fleetId=cleanFleet(document.getElementById('fleetId').value);p.vehicle=document.getElementById('vehicle').value.trim();p.bio=document.getElementById('bio').value.trim();p.savedAt=new Date().toISOString();p=setProfile(p);render(p);show('Profile saved successfully.','good')}
+async function changeEmail(e){e.preventDefault();try{let email=document.getElementById('newEmail').value.trim();let user=window.firebase&&firebase.auth&&firebase.auth().currentUser;if(!user)throw new Error('Sign in first before changing email.');await user.updateEmail(email);let p=getProfile()||{};p.email=email;setProfile(p);render(p);show('Email updated.','good')}catch(err){show(err.message||String(err),'bad')}}
+async function changePassword(e){e.preventDefault();try{let pw=document.getElementById('newPassword').value;if(!pw)throw new Error('Enter a new password.');let user=window.firebase&&firebase.auth&&firebase.auth().currentUser;if(!user)throw new Error('Sign in first before changing password.');await user.updatePassword(pw);show('Password updated.','good');document.getElementById('newPassword').value=''}catch(err){show(err.message||String(err),'bad')}}
+async function signOut(){try{if(window.OcculertAuth)await window.OcculertAuth.signOut();show('Signed out.','good')}catch(e){show('Signed out locally.','good')}}
+function render(p){p=p||getProfile()||{};document.getElementById('continueBtn').href=(p.role==='fleet')?'/fleet-dashboard.html':'/app.html';const initials=(p.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?';document.getElementById('profileBox').innerHTML='<div class="avatar-row"><div class="avatar">'+initials+'</div><div class="avatar-info"><h3>'+(p.name||'No name set')+'</h3><p>'+(p.email||'No email set')+'</p></div></div><div class="row"><span>Role</span><span>'+(p.role==='fleet'?'Fleet Manager':'Driver')+'</span></div><div class="row"><span>Company</span><span>'+(p.company||'Not set')+'</span></div><div class="row"><span>Fleet ID</span><span style="font-family:monospace;font-size:13px">'+(p.fleetId||'OCCULERT-DEMO')+'</span></div><div class="row"><span>Vehicle</span><span>'+(p.vehicle||'Not set')+'</span></div><div class="row"><span>Login</span><span class="badge">'+(p.authenticated?'Firebase':'Local')+'</span></div>'}
 if(window.OcculertAuth){window.OcculertAuth.onAuth(function(user,p){load()})}else load();
 </script>
 </body>
