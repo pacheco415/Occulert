@@ -1,65 +1,148 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"><title>Occulert Product Hub</title><meta name="description" content="Occulert product hub linking the AI drowsiness detection app, fleet dashboard, driver profiles, session history, and pilot signup."><meta name="theme-color" content="#0a0e1a"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Product Hub — Occulert</title>
+<meta name="description" content="Occulert Product Hub — access the driver app, fleet dashboard, pilot leads, session history, and all product resources." />
+<meta name="theme-color" content="#0a0e1a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="icon" type="image/png" href="/occulert-logo-alt.png" />
+<link rel="apple-touch-icon" href="/occulert-logo-main.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
 <style>
-:root,[data-theme="dark"]{--bg:#0a0e1a;--bg2:#111827;--border:#24324a;--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--card-bg:#111827;--card-border:#24324a;--section-label:#4a7a8a;--top-bg:#111827;--toggle-bg:rgba(255,255,255,.07);--toggle-border:#344d72}
-[data-theme="light"]{--bg:#f0f4f8;--bg2:#ffffff;--border:#cbd5e1;--text:#0f172a;--text2:#475569;--text3:#64748b;--card-bg:#ffffff;--card-border:#cbd5e1;--section-label:#3b82f6;--top-bg:#ffffff;--toggle-bg:rgba(0,0,0,.05);--toggle-border:#94a3b8}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif;transition:background .25s,color .25s}
-.top{height:68px;background:var(--top-bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;transition:background .25s,border-color .25s}
-.brand{font-weight:900;color:var(--text);transition:color .25s}
-.top-right{display:flex;align-items:center;gap:10px}
-.theme-toggle{background:var(--toggle-bg);border:1px solid var(--toggle-border);color:var(--text2);border-radius:9px;padding:7px 10px;cursor:pointer;font-size:16px;transition:background .2s,transform .15s;width:36px;height:36px;display:flex;align-items:center;justify-content:center}
+:root,[data-theme="dark"]{--bg:#0a0e1a;--bg2:#0f1729;--surface:#121c2e;--border:#25344f;--border2:#344d72;--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--nav-bg:rgba(10,14,26,.94);--card-hover:rgba(37,99,235,.08);--theme-toggle-bg:rgba(255,255,255,.07);--theme-toggle-border:#344d72}
+[data-theme="light"]{--bg:#f0f4f8;--bg2:#e8eef5;--surface:#ffffff;--border:#cbd5e1;--border2:#94a3b8;--text:#0f172a;--text2:#475569;--text3:#64748b;--nav-bg:rgba(240,244,248,.95);--card-hover:rgba(37,99,235,.04);--theme-toggle-bg:rgba(0,0,0,.05);--theme-toggle-border:#94a3b8}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;transition:background .25s,color .25s}
+nav{position:sticky;top:0;z-index:40;background:var(--nav-bg);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 28px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:900;font-size:19px;color:var(--text)}
+.logo-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#06b6d4);display:flex;align-items:center;justify-content:center}
+.nav-actions{display:flex;align-items:center;gap:8px}
+.back-link{font-size:13px;font-weight:600;color:var(--text2);text-decoration:none;padding:7px 12px;border-radius:8px;border:1px solid var(--border);transition:background .15s,color .15s}
+.back-link:hover{background:var(--theme-toggle-bg);color:var(--text)}
+.theme-toggle{background:var(--theme-toggle-bg);border:1px solid var(--theme-toggle-border);color:var(--text2);border-radius:9px;padding:6px 10px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:background .2s,transform .15s;width:36px;height:36px}
 .theme-toggle:hover{transform:scale(1.1)}
-.wrap{max-width:1120px;margin:0 auto;padding:34px 22px}
-h1{font-size:42px;color:var(--text);margin:0 0 10px;transition:color .25s}
-.muted{color:var(--text2);line-height:1.7;transition:color .25s}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:26px}
-.card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:20px;padding:22px;text-decoration:none;color:var(--text);transition:transform .15s,border-color .15s,background .25s;display:block}
-.card:hover{transform:translateY(-3px);border-color:#2563eb}
-.icon{font-size:30px;margin-bottom:12px}
-.card h2{margin:0 0 8px;color:var(--text);transition:color .25s}
-.card p{color:var(--text2);transition:color .25s}
-.btn{border:1px solid var(--border);background:var(--card-bg);color:var(--text);border-radius:10px;padding:10px 14px;text-decoration:none;font-weight:800;font-size:13px;transition:background .2s,border-color .2s}
-.btn:hover{border-color:#2563eb}
-.status{display:inline-flex;margin-top:14px;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:900;color:#10b981;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3)}
-.status.beta{color:#f59e0b;background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3)}
-.status.demo{color:var(--text3);background:rgba(148,163,184,.06);border-color:rgba(148,163,184,.2)}
-.section-label{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:var(--section-label);font-weight:900;margin:32px 0 14px;transition:color .25s}
-@media(max-width:850px){.grid{grid-template-columns:1fr}h1{font-size:34px}}
-</style></head>
-<body><div class="top"><div class="brand">Occulert Product Hub</div><div class="top-right"><button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode">&#9790;</button><a class="btn" href="/">Home</a></div></div>
-<main class="wrap"><h1>Occulert product system</h1><p class="muted">Use this hub to test every part of the current prototype: driver app, fleet dashboard, profiles, history, pilot requests, and policy pages.</p>
-<div class="section-label">Driver Apps</div>
-<section class="grid">
-<a class="card" href="/app.html"><div class="icon">&#128065;&#65039;</div><h2>Driver App</h2><p class="muted">AI fatigue score, eye tracking, head-nod detection, alerts, session timer, night mode, and session report.</p><span class="status">Live</span></a>
-<a class="card" href="/app-ai-v3.html"><div class="icon">&#128161;</div><h2>App v3 (AI)</h2><p class="muted">Experimental AI build with enhanced detection pipeline. For testing and development use.</p><span class="status beta">Beta</span></a>
-<a class="card" href="/app-v2.html"><div class="icon">&#128736;&#65039;</div><h2>App v2</h2><p class="muted">Previous driver app build. Useful for comparison testing and regression checks.</p><span class="status demo">Legacy</span></a>
-</section>
-<div class="section-label">Fleet &amp; Management</div>
-<section class="grid">
-<a class="card" href="/fleet-dashboard.html"><div class="icon">&#128205;</div><h2>Fleet Dashboard</h2><p class="muted">View live local app session data, safety scores, driver status, and alerts.</p><span class="status beta">Prototype</span></a>
-<a class="card" href="/driver-profiles.html"><div class="icon">&#129322;</div><h2>Driver Profiles</h2><p class="muted">Create demo drivers for fleet presentations and testing.</p><span class="status demo">Local profiles</span></a>
-<a class="card" href="/pilot-leads.html"><div class="icon">&#128202;</div><h2>Pilot Leads</h2><p class="muted">View and manage fleet pilot leads collected from the signup form. Local data only.</p><span class="status demo">Local data</span></a>
-</section>
-<div class="section-label">History &amp; Signup</div>
-<section class="grid">
-<a class="card" href="/session-history.html"><div class="icon">&#128202;</div><h2>Session History</h2><p class="muted">Review local sessions, alerts, head nods, and safety scores.</p><span class="status demo">Local data</span></a>
-<a class="card" href="/pilot-signup.html"><div class="icon">&#128666;</div><h2>Fleet Pilot Signup</h2><p class="muted">Collect local pilot leads and prepare for backend/email integration.</p><span class="status demo">Demo form</span></a>
-<a class="card" href="/account.html"><div class="icon">&#9881;&#65039;</div><h2>Account Settings</h2><p class="muted">Update your driver profile, role, fleet ID, and account preferences.</p><span class="status demo">Local settings</span></a>
-</section>
-<div class="section-label">Legal &amp; Safety</div>
-<section class="grid">
-<a class="card" href="/safety.html"><div class="icon">&#9888;&#65039;</div><h2>Safety Disclaimer</h2><p class="muted">Clear safety boundaries for assistive drowsiness detection.</p><span class="status">Required</span></a>
-<a class="card" href="/privacy.html"><div class="icon">&#128274;</div><h2>Privacy Policy</h2><p class="muted">How Occulert handles your data, camera, and GPS information.</p><span class="status">Required</span></a>
-</section>
+main{max-width:1100px;margin:0 auto;padding:52px 28px 80px}
+.page-header{text-align:center;margin-bottom:52px}
+.page-label{font-size:12px;text-transform:uppercase;letter-spacing:3px;color:#3b82f6;font-weight:800;margin-bottom:12px}
+.page-title{font-size:clamp(30px,4vw,48px);font-weight:900;letter-spacing:-1.5px;color:var(--text);margin-bottom:12px}
+.page-desc{font-size:16px;color:var(--text2);max-width:540px;margin:0 auto;line-height:1.6}
+.section-label{font-size:11px;text-transform:uppercase;letter-spacing:3px;color:var(--text3);font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-bottom:48px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:28px;text-decoration:none;color:var(--text);display:flex;flex-direction:column;gap:14px;transition:border-color .2s,transform .2s,background .2s;position:relative;overflow:hidden}
+.card:hover{border-color:#3b82f6;transform:translateY(-3px);background:var(--card-hover)}
+.card-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.card-icon.blue{background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.25)}
+.card-icon.cyan{background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.25)}
+.card-icon.green{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25)}
+.card-icon.amber{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25)}
+.card-icon.purple{background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25)}
+.card-icon.rose{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.25)}
+.card h3{font-size:17px;font-weight:800;color:var(--text);line-height:1.2}
+.card p{font-size:13px;color:var(--text2);line-height:1.6;flex:1}
+.card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+.card-arrow{font-size:18px;color:var(--text3);transition:transform .2s}
+.card:hover .card-arrow{transform:translateX(4px);color:#3b82f6}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em}
+.badge-live{background:rgba(0,255,136,.1);color:#00d97e;border:1px solid rgba(0,255,136,.2)}
+.badge-beta{background:rgba(37,99,235,.12);color:#60a5fa;border:1px solid rgba(37,99,235,.25)}
+.badge-dev{background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.25)}
+.badge-soon{background:rgba(100,116,139,.1);color:#94a3b8;border:1px solid rgba(100,116,139,.25)}
+@media(max-width:600px){main{padding:36px 18px 60px}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+  <a class="logo" href="/"><span class="logo-mark"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></span>Occulert</a>
+  <div class="nav-actions">
+    <a class="back-link" href="/">← Home</a>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
+  </div>
+</nav>
+<main>
+  <div class="page-header">
+    <div class="page-label">Internal Tools</div>
+    <div class="page-title">Product Hub</div>
+    <p class="page-desc">Central access point for all Occulert products, tools, and resources.</p>
+  </div>
+
+  <div class="section-label">Core Product</div>
+  <div class="grid">
+    <a class="card" href="/app.html">
+      <div class="card-icon blue">🚗</div>
+      <div><h3>Driver App</h3><p>Real-time on-device drowsiness detection using AI eye tracking. The core Occulert experience.</p></div>
+      <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
+    </a>
+    <a class="card" href="/fleet-dashboard.html">
+      <div class="card-icon cyan">📊</div>
+      <div><h3>Fleet Dashboard</h3><p>Monitor driver safety metrics, live session status, and alerts across your entire fleet.</p></div>
+      <div class="card-footer"><span class="badge badge-beta">Beta</span><span class="card-arrow">→</span></div>
+    </a>
+    <a class="card" href="/session-history.html">
+      <div class="card-icon green">📋</div>
+      <div><h3>Session History</h3><p>View past session reports, fatigue trends, and safety scores over time.</p></div>
+      <div class="card-footer"><span class="badge badge-beta">Beta</span><span class="card-arrow">→</span></div>
+    </a>
+    <a class="card" href="/account.html">
+      <div class="card-icon purple">⚙️</div>
+      <div><h3>Account Settings</h3><p>Manage your driver profile, preferences, theme, and cloud sync settings.</p></div>
+      <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
+    </a>
+  </div>
+
+  <div class="section-label">Development Builds</div>
+  <div class="grid">
+    <a class="card" href="/app-v2.html">
+      <div class="card-icon amber">🧪</div>
+      <div><h3>App v2</h3><p>Second iteration of the driver app with improved calibration and fatigue scoring.</p></div>
+      <div class="card-footer"><span class="badge badge-dev">Dev</span><span class="card-arrow">→</span></div>
+    </a>
+    <a class="card" href="/app-v3.html">
+      <div class="card-icon amber">🔬</div>
+      <div><h3>App v3</h3><p>Latest development build with display intensity presets and enhanced session tracking.</p></div>
+      <div class="card-footer"><span class="badge badge-dev">Dev</span><span class="card-arrow">→</span></div>
+    </a>
+  </div>
+
+  <div class="section-label">Growth and Outreach</div>
+  <div class="grid">
+    <a class="card" href="/pilot-leads.html">
+      <div class="card-icon rose">🎯</div>
+      <div><h3>Pilot Leads</h3><p>View and manage inbound pilot program requests from fleet operators and safety teams.</p></div>
+      <div class="card-footer"><span class="badge badge-beta">Beta</span><span class="card-arrow">→</span></div>
+    </a>
+    <a class="card" href="/pilot-signup.html">
+      <div class="card-icon green">🚀</div>
+      <div><h3>Pilot Signup</h3><p>Public-facing signup page for organizations interested in joining the Occulert pilot program.</p></div>
+      <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
+    </a>
+  </div>
+
+  <div class="section-label">Legal and Safety</div>
+  <div class="grid">
+    <a class="card" href="/privacy.html">
+      <div class="card-icon purple">🔒</div>
+      <div><h3>Privacy Policy</h3><p>How Occulert handles your data, camera access, GPS, and cloud sync preferences.</p></div>
+      <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
+    </a>
+    <a class="card" href="/safety.html">
+      <div class="card-icon rose">⚠️</div>
+      <div><h3>Safety Information</h3><p>Important disclaimers, usage guidelines, and limitations of the Occulert prototype.</p></div>
+      <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
+    </a>
+  </div>
 </main>
 <script>
-const html=document.documentElement;
-const THEME_KEY='occulert-theme';
-function getTheme(){return localStorage.getItem(THEME_KEY)||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}
-function setTheme(t){html.setAttribute('data-theme',t);localStorage.setItem(THEME_KEY,t);const btn=document.getElementById('themeToggle');if(btn)btn.textContent=t==='light'?'\u2600\uFE0F':'\u263E';document.querySelector('meta[name="theme-color"]')?.setAttribute('content',t==='light'?'#f0f4f8':'#0a0e1a')}
+function getTheme(){return localStorage.getItem('occulert-theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('occulert-theme',t);const btn=document.getElementById('themeToggle');if(btn)btn.textContent=t==='light'?'☀️':'🌙';document.querySelector('meta[name="theme-color"]')?.setAttribute('content',t==='light'?'#f0f4f8':'#0a0e1a')}
+function toggleTheme(){setTheme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light')}
 setTheme(getTheme());
-document.getElementById('themeToggle')?.addEventListener('click',()=>setTheme(html.getAttribute('data-theme')==='light'?'dark':'light'));
+document.getElementById('themeToggle')?.addEventListener('click',toggleTheme);
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{})}
 </script>
-</body></html>
+</body>
+</html>
