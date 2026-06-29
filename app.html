@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
 <link rel="manifest" href="/manifest.json" />
-<link rel="apple-touch-icon" href="/occulert-logo-main.png" />
+<link rel="apple-touch-icon" href="/occulert-logo-main.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
 <!-- Firebase: loaded lazily when user enables cloud sync -->
 <style>
@@ -360,5 +360,5 @@ if(recalBtn){recalBtn.onclick=()=>{if(!running)return;calibrating=true;calibrate
 const resetBtn=document.getElementById('resetBtn');
 if(resetBtn){resetBtn.onclick=()=>{if(!confirm('Reset all session data?'))return;fatigue=0;confidence=0;alerts=0;headNods=0;microsleeps=0;maxFatigue=0;fatigueSamples=[];perclosWindow=[];eyesClosedSince=0;turnedSince=0;totalDistractionMs=0;escalationLevel=0;earHistory=[];noseYHistory=[];alertsEl.textContent='0';nodsEl.textContent='0';microsleepsEl.textContent='0';perclosEl.textContent='0%';distractionEl.textContent='0s';escalationEl.textContent='0';reportEl.style.display='none';logEl.innerHTML='';log('Session data reset');render()}}document.addEventListener('visibilitychange',()=>{if(running&&document.visibilityState==='hidden'){hiddenAt=Date.now();log('Monitoring paused in background to save battery')}else if(running&&hiddenAt){lastFrame=0;hiddenAt=0;log('Monitoring resumed')}});cloudConsent.addEventListener('change',initCloud);render();initCloud();
 </script>
-</body>
+<script src="/lang.js" defer></script></body>
 </html>
