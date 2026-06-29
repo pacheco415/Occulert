@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v10';
+const CACHE = 'occulert-v11';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -13,7 +13,13 @@ const STATIC_ASSETS = [
   '/pilot-signup.html',
   '/occulert-logo-alt.png',
   '/occulert-logo.png',
-  '/occulert-logo-main.png'
+  '/occulert-logo-main.png',
+  '/lang.js',
+  '/faq.html',
+  '/features.html',
+  '/install.html',
+  '/about.html',
+  '/how-it-works.html'
 ];
 
 self.addEventListener('install', event => {
