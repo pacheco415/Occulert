@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="manifest" href="/manifest.json" />
 <link rel="icon" type="image/png" href="/occulert-logo-alt.png" />
-<link rel="apple-touch-icon" href="/occulert-logo-main.png" />
+<link rel="apple-touch-icon" href="/occulert-logo-main.png" /><link rel="canonical" href="https://www.occulert.com/product-hub.html" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
 <style>
@@ -130,5 +130,5 @@ setTheme(getTheme());
 document.getElementById('themeToggle')?.addEventListener('click',toggleTheme);
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{})}
 </script>
-</body>
+<script src="/lang.js" defer></script></body>
 </html>
