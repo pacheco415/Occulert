@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Occulert",
+    "slug": "occulert",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050a0f"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.occulert.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Occulert uses your front camera to detect eye fatigue while driving. No video is stored or uploaded.",
+        "NSMicrophoneUsageDescription": "Occulert does not use the microphone.",
+        "UIBackgroundModes": ["audio"],
+        "NSHealthShareUsageDescription": "Occulert reads HRV and sleep data to compute your pre-drive fatigue risk score.",
+        "NSHealthUpdateUsageDescription": "Occulert does not write health data."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#050a0f"
+      },
+      "package": "com.occulert.app",
+      "permissions": [
+        "CAMERA",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "FOREGROUND_SERVICE"
+      ]
+    },
+    "plugins": [
+      ["expo-camera", { "cameraPermission": "Occulert uses your front camera to detect eye fatigue. No video is stored or uploaded." }],
+      "expo-router",
+      "expo-keep-awake"
+    ],
+    "experiments": { "typedRoutes": true },
+    "scheme": "occulert",
+    "extra": {
+      "router": { "origin": false },
+      "eas": { "projectId": "YOUR_EAS_PROJECT_ID_HERE" }
+    }
+  }
+}
