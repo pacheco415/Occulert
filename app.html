@@ -585,11 +585,31 @@ function updateChart(val){
 }
 
 // ── PWA Install Prompt ────────────────────────────────────────────
+const _isIOS=(/iphone|ipad|ipod/i).test(navigator.userAgent)&&!window.navigator.standalone;
+const _isAndroid=/android/i.test(navigator.userAgent);
+const _isStandalone=window.navigator.standalone===true||window.matchMedia('(display-mode:standalone)').matches;
+
 window.addEventListener('beforeinstallprompt',e=>{
   e.preventDefault();window._pwaPrompt=e;
   const b=document.getElementById('pwaInstallBtn');if(b)b.style.display='inline-flex';
 });
+
+// Show install button on iOS Safari (no beforeinstallprompt on iOS)
+if(_isIOS&&!_isStandalone){
+  document.addEventListener('DOMContentLoaded',()=>{
+    const b=document.getElementById('pwaInstallBtn');if(b)b.style.display='inline-flex';
+  },{once:true});
+  if(document.readyState!=='loading'){
+    const b=document.getElementById('pwaInstallBtn');if(b)b.style.display='inline-flex';
+  }
+}
+
 function triggerPWAInstall(){
+  if(_isIOS&&!_isStandalone){
+    // Show iOS instructions modal
+    const m=document.getElementById('iosInstallModal');
+    if(m){m.style.display='flex';return;}
+  }
   if(!window._pwaPrompt)return;
   window._pwaPrompt.prompt();
   window._pwaPrompt.userChoice.then(r=>{
@@ -597,6 +617,9 @@ function triggerPWAInstall(){
     window._pwaPrompt=null;
     const b=document.getElementById('pwaInstallBtn');if(b)b.style.display='none';
   });
+}
+function closeIOSInstallModal(){
+  const m=document.getElementById('iosInstallModal');if(m)m.style.display='none';
 }
 
 // ── Battery Awareness ─────────────────────────────────────────────
@@ -669,5 +692,36 @@ render();initCloud();
   else window.addEventListener('load',()=>{typeof initChart==='function'&&initChart();});
 })();
 </script>
+
+<!-- iOS Add to Home Screen Modal -->
+<div id="iosInstallModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom)">
+  <div style="background:#0f1e2e;border:1px solid #1a3a4a;border-radius:20px 20px 0 0;padding:28px 24px 32px;width:100%;max-width:480px;position:relative">
+    <button onclick="closeIOSInstallModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1">✕</button>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+      <img src="/occulert-logo-main.png" style="width:52px;height:52px;border-radius:12px" alt="Occulert">
+      <div>
+        <div style="font-weight:900;font-size:17px;color:#fff">Add Occulert to Home Screen</div>
+        <div style="font-size:13px;color:#94a3b8;margin-top:3px">Install for the best experience</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:22px">
+      <div style="display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px 14px">
+        <span style="font-size:26px;flex-shrink:0">1️⃣</span>
+        <span style="font-size:14px;color:#c8e8f0">Tap the <strong style="color:#fff">Share</strong> button <span style="font-size:18px">⎋</span> at the bottom of Safari</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px 14px">
+        <span style="font-size:26px;flex-shrink:0">2️⃣</span>
+        <span style="font-size:14px;color:#c8e8f0">Scroll down and tap <strong style="color:#fff">Add to Home Screen</strong></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px 14px">
+        <span style="font-size:26px;flex-shrink:0">3️⃣</span>
+        <span style="font-size:14px;color:#c8e8f0">Tap <strong style="color:#fff">Add</strong> in the top right corner</span>
+      </div>
+    </div>
+    <div style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#94a3b8;text-align:center">
+      ✅ Once installed, Occulert runs fullscreen with faster startup and notification support
+    </div>
+  </div>
+</div>
 </body>
 </html>
