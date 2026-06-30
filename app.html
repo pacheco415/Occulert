@@ -307,21 +307,21 @@ canvas{pointer-events:none}
     <div class="card" style="padding:12px 14px;margin-bottom:10px">
       <div class="label" style="margin-bottom:10px">Controls</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-        <button id="voiceToggleBtn" onclick="typeof occ!=='undefined'&&occ.toggleVoice()" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">🔇 Voice OFF</button>
-        <button onclick="typeof occ!=='undefined'&&occ.snoozeAlerts(5)" style="background:rgba(100,116,139,.1);border:1px solid #475569;color:#94a3b8;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">💤 Snooze 5m</button>
+        <button id="voiceToggleBtn" onclick="typeof toggleVoice==='function'&&toggleVoice()" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">🔇 Voice OFF</button>
+        <button onclick="typeof snoozeAlerts==='function'&&snoozeAlerts(5)" style="background:rgba(100,116,139,.1);border:1px solid #475569;color:#94a3b8;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">💤 Snooze 5m</button>
         <span id="snoozeStatus" style="display:none;font-size:11px;color:#ffaa00;font-weight:700;padding:4px 8px;background:rgba(255,170,0,.1);border-radius:6px"></span>
       </div>
       <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <label style="font-size:11px;font-weight:800;color:var(--text2);white-space:nowrap">Sensitivity</label>
-        <input type="range" min="0.5" max="2" step="0.5" value="1" oninput="typeof occ!=='undefined'&&occ.setSensitivity(this.value)" style="flex:1;min-width:80px;accent-color:#2563eb">
+        <input type="range" min="0.5" max="2" step="0.5" value="1" oninput="typeof setSensitivity==='function'&&setSensitivity(this.value)" style="flex:1;min-width:80px;accent-color:#2563eb">
         <span id="sensitivityLabel" style="font-size:11px;color:var(--text2);font-weight:700;white-space:nowrap">Normal</span>
       </div>
     </div>
 
     <!-- Export + Install row -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <button onclick="typeof occ!=='undefined'&&occ.exportCSV()" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
-      <button id="pwaInstallBtn" onclick="typeof occ!=='undefined'&&occ.triggerPWAInstall()" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
+      <button onclick="typeof exportCSV==='function'&&exportCSV()" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
+      <button id="pwaInstallBtn" onclick="typeof triggerPWAInstall==='function'&&triggerPWAInstall()" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
     </div>
 </aside>
 </div>
@@ -407,7 +407,7 @@ if(typeof detectYawn==='function')detectYawn(lm);
 if(typeof calcMAR==='function'){const mar=calcMAR(lm);const marEl=document.getElementById('marEl');if(marEl)marEl.textContent=mar.toFixed(2);}
 const videoEl=document.getElementById('video')||document.querySelector('video');
 if(typeof checkLightLevel==='function'&&videoEl)checkLightLevel(videoEl);
-if(typeof updateTrackingState==='function'){const earOk=ear>.1&&ear<.5;updateTrackingState(true,earOk);}
+if(typeof updateTrackingState==='function'){const earOk=ear>.05&&ear<.65;updateTrackingState(true,earOk);}
 drawEyes(lm,fatigue>=60?'#ff3344':fatigue>=35?'#ffaa00':'#00ff88');render(ear);if(!calibrating&&confidence>=45&&fatigue>=80)trigger('Fatigue');else if(!calibrating&&confidence>=45&&turnedSince&&Date.now()-turnedSince>6500)trigger('Distraction')}async function initModel(){if(faceMesh)return;if(typeof FaceMesh==='undefined')throw new Error('AI model failed to load. Check internet connection and refresh.');faceMesh=new FaceMesh({locateFile:f=>'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/'+f});faceMesh.setOptions({maxNumFaces:1,refineLandmarks:false,minDetectionConfidence:.62,minTrackingConfidence:.58});faceMesh.onResults(onResults);log('AI model ready')}let _fbLoaded=false;async function loadFirebase(){if(_fbLoaded)return _fbLoaded=true,Promise.resolve();_fbLoaded=true;const urls=['https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js','/firebase-config.js','/firebase-sync-v2.js'];for(const u of urls){await new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}}async function initCloud(){if(!cloudConsent.checked){cloudReady=false;syncEl.textContent='LOCAL';return}try{await loadFirebase();if(window.OcculertSync){cloudReady=await window.OcculertSync.init();syncEl.textContent=cloudReady?'ON':'LOCAL';log(cloudReady?'Cloud sync ready':'Local mode only')}}catch(e){cloudReady=false;syncEl.textContent='LOCAL';log('Cloud sync unavailable')}}
 async function loop(ts){if(!running)return;raf=requestAnimationFrame(loop);if(document.hidden){render();return}if(ts-lastFrame<PROCESS_INTERVAL)return;lastFrame=ts;if(video.readyState>=2&&faceMesh){if(canvas.width!==video.videoWidth){canvas.width=video.videoWidth;canvas.height=video.videoHeight}try{await faceMesh.send({image:video})}catch(e){log('AI frame skipped')}}}async function start(){if(starting)return;starting=true;startBtn.disabled=true;startBtn.textContent='STARTING...';setOverlay('Opening Camera','Please allow camera access when your browser asks.','GPS and cloud sync are optional. Enable them above before starting if needed.',false);try{if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('Camera is not supported in this browser. Try Safari or Chrome on HTTPS.');stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:480},height:{ideal:360},frameRate:{ideal:12,max:16}},audio:false});video.srcObject=stream;await video.play();await initModel();await initCloud();running=true;sessionStart=Date.now();startTimer();try{if('wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen');log('Screen wake lock active')}}catch(e){log('Wake lock unavailable - keep screen unlocked')}fatigue=0;confidence=0;alerts=0;headNods=0;microsleeps=0;maxFatigue=0;fatigueSamples=[];noseYHistory=[];earHistory=[];perclosWindow=[];eyesClosedSince=0;turnedSince=0;totalDistractionMs=0;escalationLevel=0;distanceMeters=0;routePoints=[];lastPosition=null;noFaceSince=0;lastFaceSeen=0;lastRender=0;calibrating=true;calibrated=false;calibrationSamples=[];calibrationUntil=Date.now()+CALIBRATION_MS;baselineEAR=.28;eyeClosedThreshold=.18;eyeWatchThreshold=.22;alertsEl.textContent='0';nodsEl.textContent='0';microsleepsEl.textContent='0';perclosEl.textContent='0%';distractionEl.textContent='0s';escalationEl.textContent='0';locationEl.textContent='--';faceStateEl.textContent='--';calibrationEl.textContent='0%';calibrationFill.style.width='0%';reportEl.style.display='none';overlay.classList.add('hide');startBtn.textContent='STOP MONITORING';startBtn.className='btn stop';log('Monitoring started - calibrating');startGPS();raf=requestAnimationFrame(loop)}catch(e){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}let msg=(e&&e.name==='NotAllowedError')?'Camera permission was blocked.':'Camera could not start.';setOverlay(msg,'Occulert needs camera access to detect eye closure and fatigue.','<strong>Fix:</strong> allow camera access in your browser settings, then refresh this page.',false);log('Camera error: '+(e.message||e.name||e));startBtn.textContent='START MONITORING';startBtn.className='btn primary'}finally{starting=false;startBtn.disabled=false;render()}}
 async function stop(){running=false;calibrating=false;stopTimer();const rb3=document.getElementById('recalBtn');if(rb3)rb3.style.display='none';if(wakeLock){try{await wakeLock.release()}catch(e){}wakeLock=null}if(raf)cancelAnimationFrame(raf);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;stopGPS();ctx.clearRect(0,0,canvas.width,canvas.height);setOverlay('AI Fatigue Monitoring','Prototype safety tool. Keep your attention on the road and never rely on alerts alone.<br>Press Start Monitoring and allow camera access.','<strong>iPhone tip:</strong> keep Safari open, screen unlocked, and Low Power Mode off for best reliability.',true);startBtn.textContent='START MONITORING';startBtn.className='btn primary';let p=fleetPayload(),mins=sessionStart?((Date.now()-sessionStart)/60000).toFixed(1):'0.0';render(.001);pushFleet(true);reportEl.style.display='block';reportEl.textContent='OCCULERT SESSION REPORT\n\nStatus: '+p.status+'\nDuration: '+mins+' min\nSafety Score: '+p.safetyScore+'/100\n\nCalibration: '+(calibrated?'Personalized':'Default')+'\nOpen-eye EAR: '+baselineEAR.toFixed(3)+'\nClosed-eye threshold: '+eyeClosedThreshold.toFixed(3)+'\n\nAlerts Triggered: '+alerts+'\nEscalation Level: '+escalationLevel+'\nHead Nods Detected: '+headNods+'\nMicrosleeps Detected: '+microsleeps+'\nPERCLOS: '+p.perclos+'%\nDistraction Time: '+p.distractionSeconds+'s\nAverage Fatigue: '+p.avgFatigue+'/100\nMax Fatigue: '+p.maxFatigue+'/100\n\nGPS Enabled: '+(p.gpsEnabled?'Yes':'No')+'\nDistance: '+p.distanceMiles+' mi\nLast Location: '+(p.location?p.location.lat+', '+p.location.lng:'Not available')+'\n\nSync Mode: '+(cloudConsent.checked&&cloudReady?'Cloud + Local':'Local only')+'\nSaved: '+new Date().toLocaleString()+'\n\nSafety: Occulert may miss drowsiness and may trigger false alerts. Do not interact with the app while driving.';try{if(cloudConsent.checked&&cloudReady&&window.OcculertSync)await window.OcculertSync.saveSessionHistory(p)}catch(e){}log('Session ended')}
@@ -493,7 +493,7 @@ let _voiceEnabled=localStorage.getItem('occulert-voice')==='true';
 const VOICE_MSGS=['Pull over safely','Take a break, you are tired','Drowsiness detected, rest now','Danger! Pull over immediately'];
 function speak(msg){
   if(!_voiceEnabled||!window.speechSynthesis)return;
-  try{window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(msg);u.rate=0.9;u.pitch=1.0;u.volume=1.0;window.speechSynthesis.speak(u);}catch(e){}
+  try{if(window.speechSynthesis.paused)window.speechSynthesis.resume();window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(msg);u.rate=0.9;u.pitch=1.0;u.volume=1.0;window.speechSynthesis.speak(u);}catch(e){}
 }
 function toggleVoice(){
   _voiceEnabled=!_voiceEnabled;localStorage.setItem('occulert-voice',_voiceEnabled);
@@ -564,10 +564,11 @@ function initChart(){
 }
 function updateChart(val){
   if(!_chartCtx)return;
-  _chartData.push({t:Date.now(),v:val});
+  _chartData.push({t:Date.now(),v:isNaN(val)?0:Math.min(100,Math.max(0,val))});
   if(_chartData.length>120)_chartData.shift();
   const cv=document.getElementById('alertnessChart');
   if(!cv)return;
+  if(cv.offsetWidth>0&&cv.width!==cv.offsetWidth){cv.width=cv.offsetWidth;_chartCtx=cv.getContext('2d');}
   const w=cv.width,h=cv.height;
   _chartCtx.clearRect(0,0,w,h);
   if(_chartData.length<2)return;
@@ -610,8 +611,9 @@ if('getBattery' in navigator){
 
 // ── Patch trigger() to add voice + break check ───────────────────
 (function(){
+  if(typeof trigger==='function'&&trigger._patched)return;
   const _orig=trigger;
-  window.trigger=trigger=function(reason){
+  const _patched=function(reason){
     if(isSnoozed()){log('Alert snoozed');return;}
     _orig.call(this,reason);
     speak(VOICE_MSGS[Math.min(escalationLevel,VOICE_MSGS.length-1)]);
@@ -619,6 +621,7 @@ if('getBattery' in navigator){
     logEvent('alert',reason||'Fatigue','esc='+escalationLevel);
     updateChart(fatigue);
   };
+  trigger._patched=true;
 })();
 
 // ── Patch onResults to add yawn/light/tracking ───────────────────
@@ -628,7 +631,7 @@ if('getBattery' in navigator){
 setInterval(()=>{
   if(!running)return;
   updateChart(fatigue);
-  logEvent('fatigue',fatigue,'');
+  if(_sessionLog.length>1000)_sessionLog.splice(0,100);logEvent('fatigue',fatigue,'');
 },5000);
 
 // Init chart on load
@@ -656,6 +659,9 @@ render();initCloud();
   const s=parseFloat(localStorage.getItem('occulert-sensitivity')||'1.0');
   const sl=document.getElementById('sensitivityLabel');
   if(sl){const names=['','Off','Low','Normal','High','Max'];sl.textContent=names[Math.round(s*3)]||'Normal';}
+  // Restore sensitivity slider value
+  const sliderEl=document.querySelector('input[type="range"][oninput*="setSensitivity"]');
+  if(sliderEl)sliderEl.value=s;
   // Initialize chart when DOM ready
   if(document.readyState==='complete'){typeof initChart==='function'&&initChart();}
   else window.addEventListener('load',()=>{typeof initChart==='function'&&initChart();});
