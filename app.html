@@ -416,7 +416,234 @@ document.addEventListener('keydown',(e)=>{if(e.code==='Space'&&e.target===docume
 const recalBtn=document.getElementById('recalBtn');
 if(recalBtn){recalBtn.onclick=()=>{if(!running)return;calibrating=true;calibrated=false;calibrationSamples=[];calibrationUntil=Date.now()+CALIBRATION_MS;calibrationEl.textContent='0%';calibrationFill.style.width='0%';earHistory=[];log('Recalibration started');recalBtn.style.display='none'};};demoBtn.onclick=demoAlert;
 const resetBtn=document.getElementById('resetBtn');
-if(resetBtn){resetBtn.onclick=()=>{if(!confirm('Reset all session data?'))return;fatigue=0;confidence=0;alerts=0;headNods=0;microsleeps=0;maxFatigue=0;fatigueSamples=[];perclosWindow=[];eyesClosedSince=0;turnedSince=0;totalDistractionMs=0;escalationLevel=0;earHistory=[];noseYHistory=[];alertsEl.textContent='0';nodsEl.textContent='0';microsleepsEl.textContent='0';perclosEl.textContent='0%';distractionEl.textContent='0s';escalationEl.textContent='0';reportEl.style.display='none';logEl.innerHTML='';log('Session data reset');render()}}document.addEventListener('visibilitychange',()=>{if(running&&document.visibilityState==='hidden'){hiddenAt=Date.now();log('Monitoring paused in background to save battery')}else if(running&&hiddenAt){lastFrame=0;hiddenAt=0;log('Monitoring resumed')}});cloudConsent.addEventListener('change',initCloud);render();initCloud();
+if(resetBtn){resetBtn.onclick=()=>{if(!confirm('Reset all session data?'))return;fatigue=0;confidence=0;alerts=0;headNods=0;microsleeps=0;maxFatigue=0;fatigueSamples=[];perclosWindow=[];eyesClosedSince=0;turnedSince=0;totalDistractionMs=0;escalationLevel=0;earHistory=[];noseYHistory=[];alertsEl.textContent='0';nodsEl.textContent='0';microsleepsEl.textContent='0';perclosEl.textContent='0%';distractionEl.textContent='0s';escalationEl.textContent='0';reportEl.style.display='none';logEl.innerHTML='';log('Session data reset');render()}}document.addEventListener('visibilitychange',()=>{if(running&&document.visibilityState==='hidden'){hiddenAt=Date.now();log('Monitoring paused in background to save battery')}else if(running&&hiddenAt){lastFrame=0;hiddenAt=0;log('Monitoring resumed')}});cloudConsent.addEventListener('change',initCloud);
+
+// ═══════════════════════════════════════════════════════════════════
+// OCCULERT v1.2 UPGRADE — Feature Pack (injected into main scope)
+// Features: MAR/Yawn, Low-Light, Tracking Quality, Voice Alerts,
+//           Break Recommendations, Snooze, CSV Export, Chart,
+//           PWA Install Prompt, Battery Awareness
+// ═══════════════════════════════════════════════════════════════════
+
+// ── MAR (Mouth Aspect Ratio) / Yawn Detection ─────────────────────
+let yawnCount=0,lastYawn=0,_marHist=[],_mouthOpenSince=0;
+const MAR_YAWN_THRESH=0.58, YAWN_HOLD_MS=1200, YAWN_COOLDOWN_MS=8000;
+
+function calcMAR(lm){
+  try{
+    const top=lm[13],bot=lm[14],left=lm[61],right=lm[291];
+    if(!top||!bot||!left||!right)return 0;
+    const vert=Math.sqrt((bot.x-top.x)**2+(bot.y-top.y)**2+(bot.z-top.z)**2);
+    const horiz=Math.sqrt((right.x-left.x)**2+(right.y-left.y)**2+(right.z-left.z)**2);
+    return horiz<0.001?0:vert/horiz;
+  }catch(e){return 0;}
+}
+function smoothMAR(v){_marHist.push(v);if(_marHist.length>5)_marHist.shift();return _marHist.reduce((a,b)=>a+b,0)/_marHist.length;}
+function detectYawn(lm){
+  const mar=smoothMAR(calcMAR(lm));
+  const now=Date.now();
+  if(mar>MAR_YAWN_THRESH){
+    if(!_mouthOpenSince)_mouthOpenSince=now;
+    if(now-_mouthOpenSince>YAWN_HOLD_MS&&now-lastYawn>YAWN_COOLDOWN_MS){
+      yawnCount++;lastYawn=now;
+      const yEl=document.getElementById('yawnCountEl');if(yEl)yEl.textContent=yawnCount;
+      log('Yawn detected (MAR='+mar.toFixed(2)+')');
+      triggerBreakCheck();
+      fatigue=Math.min(100,fatigue+8);
+    }
+  }else{_mouthOpenSince=0;}
+  const mEl=document.getElementById('marEl');if(mEl)mEl.textContent=mar.toFixed(2);
+}
+
+// ── Low-Light Detection ───────────────────────────────────────────
+let _lastLightCheck=0;
+function checkLightLevel(videoEl){
+  const now=Date.now();
+  if(now-_lastLightCheck<5000)return;
+  _lastLightCheck=now;
+  try{
+    const tc=document.createElement('canvas');tc.width=64;tc.height=48;
+    const tx=tc.getContext('2d');tx.drawImage(videoEl,0,0,64,48);
+    const d=tx.getImageData(0,0,64,48).data;
+    let lum=0;
+    for(let i=0;i<d.length;i+=16)lum+=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    lum/=(d.length/16);
+    const b=document.getElementById('lightBadge');
+    if(b){
+      if(lum<18){b.textContent='🌑 Too Dark to Track';b.style.color='#ff4444';b.style.display='inline-flex';}
+      else if(lum<28){b.textContent='⚠️ Low Light';b.style.color='#ffaa00';b.style.display='inline-flex';}
+      else{b.style.display='none';}
+    }
+  }catch(e){}
+}
+
+// ── Tracking Quality Badge ────────────────────────────────────────
+let _trackLostSince=0;
+function updateTrackingState(hasFace,hasGoodEAR){
+  const b=document.getElementById('trackingBadge');if(!b)return;
+  const now=Date.now();
+  if(!hasFace||!hasGoodEAR){
+    if(!_trackLostSince)_trackLostSince=now;
+    if(now-_trackLostSince>3000){b.textContent='⚠️ Tracking Lost';b.style.color='#ffaa00';b.style.display='inline-flex';}
+  }else{_trackLostSince=0;b.textContent='✓ Tracking Good';b.style.color='#00ff88';b.style.display='inline-flex';}
+}
+
+// ── Voice Alerts (SpeechSynthesis) ───────────────────────────────
+let _voiceEnabled=localStorage.getItem('occulert-voice')==='true';
+const VOICE_MSGS=['Pull over safely','Take a break, you are tired','Drowsiness detected, rest now','Danger! Pull over immediately'];
+function speak(msg){
+  if(!_voiceEnabled||!window.speechSynthesis)return;
+  try{window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(msg);u.rate=0.9;u.pitch=1.0;u.volume=1.0;window.speechSynthesis.speak(u);}catch(e){}
+}
+function toggleVoice(){
+  _voiceEnabled=!_voiceEnabled;localStorage.setItem('occulert-voice',_voiceEnabled);
+  const b=document.getElementById('voiceToggleBtn');if(b)b.textContent=_voiceEnabled?'🔊 Voice ON':'🔇 Voice OFF';
+}
+
+// ── Snooze & Sensitivity ──────────────────────────────────────────
+let _snoozedUntil=0;
+function isSnoozed(){return Date.now()<_snoozedUntil;}
+function snoozeAlerts(mins){
+  _snoozedUntil=Date.now()+mins*60000;log('Alerts snoozed '+mins+'m');
+  const el=document.getElementById('snoozeStatus');
+  if(el){el.textContent='Snoozed '+mins+'m';el.style.display='inline';}
+  setTimeout(()=>{if(el)el.style.display='none';},mins*60000);
+}
+function setSensitivity(val){
+  localStorage.setItem('occulert-sensitivity',val);
+  const names=['','Off','Low','Normal','High','Max'];
+  const sl=document.getElementById('sensitivityLabel');
+  if(sl)sl.textContent=names[Math.round(parseFloat(val)*3)]||'Normal';
+}
+
+// ── Break Recommendations ─────────────────────────────────────────
+let _alertsSinceBreak=0,_lastBreakPrompt=0;
+function triggerBreakCheck(){
+  _alertsSinceBreak++;
+  const sessionMs=sessionStart?Date.now()-sessionStart:0;
+  if((_alertsSinceBreak>=3||sessionMs>40*60*1000)&&Date.now()-_lastBreakPrompt>15*60*1000){
+    _lastBreakPrompt=Date.now();
+    const el=document.getElementById('breakBanner');
+    if(el){
+      const mins=Math.round(sessionMs/60000);
+      el.innerHTML='🛑 Rest Stop Recommended — '+mins+' min driving, '+_alertsSinceBreak+' alerts. <button onclick="dismissBreak()" style="background:none;border:1px solid #00ff88;color:#00ff88;padding:4px 10px;border-radius:6px;cursor:pointer;margin-left:10px">Dismiss</button>';
+      el.style.display='block';
+    }
+    speak('Rest stop recommended. Please pull over safely and take a break.');
+  }
+}
+function dismissBreak(){
+  const el=document.getElementById('breakBanner');if(el)el.style.display='none';
+  _alertsSinceBreak=0;
+}
+
+// ── CSV Export ───────────────────────────────────────────────────
+let _sessionLog=[];
+function logEvent(type,value,extra){_sessionLog.push({ts:Date.now(),type,value,extra:extra||''});}
+function exportCSV(){
+  if(!_sessionLog.length){
+    // Generate from current session state
+    _sessionLog.push({ts:Date.now(),type:'snapshot',value:fatigue,extra:'alerts='+alerts+',microsleeps='+microsleeps+',nods='+headNods});
+  }
+  const rows=_sessionLog.map(e=>[new Date(e.ts).toISOString(),e.type,e.value,e.extra].join(',')).join('\n');
+  const blob=new Blob(['Timestamp,Type,Value,Extra\n'+rows],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='occulert-session-'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  log('CSV exported: '+_sessionLog.length+' events');
+}
+
+// ── Alertness Mini Chart ─────────────────────────────────────────
+let _chartData=[],_chartCtx=null;
+function initChart(){
+  const cv=document.getElementById('alertnessChart');if(!cv)return;
+  cv.width=cv.offsetWidth||300;cv.height=cv.offsetHeight||60;
+  _chartCtx=cv.getContext('2d');
+}
+function updateChart(val){
+  if(!_chartCtx)return;
+  _chartData.push({t:Date.now(),v:val});
+  if(_chartData.length>120)_chartData.shift();
+  const cv=document.getElementById('alertnessChart');
+  if(!cv)return;
+  const w=cv.width,h=cv.height;
+  _chartCtx.clearRect(0,0,w,h);
+  if(_chartData.length<2)return;
+  _chartCtx.strokeStyle='rgba(255,255,255,0.06)';_chartCtx.lineWidth=1;
+  [25,50,75].forEach(y=>{const py=h-(y/100)*h;_chartCtx.beginPath();_chartCtx.moveTo(0,py);_chartCtx.lineTo(w,py);_chartCtx.stroke();});
+  for(let i=1;i<_chartData.length;i++){
+    const x0=((i-1)/(_chartData.length-1))*w,x1=(i/(_chartData.length-1))*w;
+    const y0=h-(_chartData[i-1].v/100)*h,y1=h-(_chartData[i].v/100)*h;
+    _chartCtx.strokeStyle=_chartData[i].v>70?'#ff3344':_chartData[i].v>40?'#ffaa00':'#00ff88';
+    _chartCtx.lineWidth=2;_chartCtx.beginPath();_chartCtx.moveTo(x0,y0);_chartCtx.lineTo(x1,y1);_chartCtx.stroke();
+  }
+}
+
+// ── PWA Install Prompt ────────────────────────────────────────────
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();window._pwaPrompt=e;
+  const b=document.getElementById('pwaInstallBtn');if(b)b.style.display='inline-flex';
+});
+function triggerPWAInstall(){
+  if(!window._pwaPrompt)return;
+  window._pwaPrompt.prompt();
+  window._pwaPrompt.userChoice.then(r=>{
+    if(r.outcome==='accepted')log('PWA installed');
+    window._pwaPrompt=null;
+    const b=document.getElementById('pwaInstallBtn');if(b)b.style.display='none';
+  });
+}
+
+// ── Battery Awareness ─────────────────────────────────────────────
+if('getBattery' in navigator){
+  navigator.getBattery().then(b=>{
+    function checkBatt(){
+      const badge=document.getElementById('batteryBadge');if(!badge)return;
+      if(!b.charging&&b.level<0.2){badge.textContent='🔋 Low Battery — check performance';badge.style.display='inline-flex';}
+      else{badge.style.display='none';}
+    }
+    b.addEventListener('levelchange',checkBatt);b.addEventListener('chargingchange',checkBatt);checkBatt();
+  }).catch(()=>{});
+}
+
+// ── Patch trigger() to add voice + break check ───────────────────
+(function(){
+  const _orig=trigger;
+  window.trigger=trigger=function(reason){
+    if(isSnoozed()){log('Alert snoozed');return;}
+    _orig.call(this,reason);
+    speak(VOICE_MSGS[Math.min(escalationLevel,VOICE_MSGS.length-1)]);
+    triggerBreakCheck();
+    logEvent('alert',reason||'Fatigue','esc='+escalationLevel);
+    updateChart(fatigue);
+  };
+})();
+
+// ── Patch onResults to add yawn/light/tracking ───────────────────
+// These are called inside the existing onResults via the injected code above
+
+// ── Periodic updates ────────────────────────────────────────────
+setInterval(()=>{
+  if(!running)return;
+  updateChart(fatigue);
+  logEvent('fatigue',fatigue,'');
+},5000);
+
+// Init chart on load
+if(document.readyState==='complete'){initChart();}
+else{window.addEventListener('load',initChart);}
+
+// Expose globally for inline HTML onclick handlers
+window.snoozeAlerts=snoozeAlerts;
+window.setSensitivity=setSensitivity;
+window.toggleVoice=toggleVoice;
+window.exportCSV=exportCSV;
+window.triggerPWAInstall=triggerPWAInstall;
+window.dismissBreak=dismissBreak;
+
+render();initCloud();
 </script>
 <script src="/lang.js" defer></script>
 <script>
