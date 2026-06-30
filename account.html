@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Occulert Account Settings</title>
+<meta name="description" content="Manage your Occulert account settings, driver profile, preferences, and notification options.">
 <meta property="og:title" content="Account Settings — Occulert" />
 <meta property="og:description" content="Manage your Occulert driver profile, preferences, and account settings." />
 <meta property="og:image" content="https://www.occulert.com/occulert-logo-main.png" />
@@ -84,6 +85,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 @media(max-width:820px){.grid,.split{grid-template-columns:1fr}.nav .btn:not(:last-child){display:none}.page-header h1{font-size:26px}}
 :focus-visible{outline:2px solid #3b82f6;outline-offset:3px;border-radius:4px}
 </style>
+<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>
 </head>
 <body>
 <div class="top">
@@ -176,5 +178,7 @@ async function signOut(){try{if(window.OcculertAuth)await window.OcculertAuth.si
 function render(p){p=p||getProfile()||{};document.getElementById('continueBtn').href=(p.role==='fleet')?'/fleet-dashboard.html':'/app.html';const initials=(p.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?';document.getElementById('profileBox').innerHTML='<div class="avatar-row"><div class="avatar">'+initials+'</div><div class="avatar-info"><h3>'+(p.name||'No name set')+'</h3><p>'+(p.email||'No email set')+'</p></div></div><div class="row"><span>Role</span><span>'+(p.role==='fleet'?'Fleet Manager':'Driver')+'</span></div><div class="row"><span>Company</span><span>'+(p.company||'Not set')+'</span></div><div class="row"><span>Fleet ID</span><span style="font-family:monospace;font-size:13px">'+(p.fleetId||'OCCULERT-DEMO')+'</span></div><div class="row"><span>Vehicle</span><span>'+(p.vehicle||'Not set')+'</span></div><div class="row"><span>Login</span><span class="badge">'+(p.authenticated?'Firebase':'Local')+'</span></div>'}
 if(window.OcculertAuth){window.OcculertAuth.onAuth(function(user,p){load()})}else load();
 </script>
+
+<footer style="text-align:center;padding:28px 16px 24px;border-top:1px solid #1e293b;color:#4a6070;font-size:12px;margin-top:40px"><a href="/" style="color:#60a5fa;text-decoration:none;font-weight:700">Occulert</a> &nbsp;·&nbsp; <a href="/privacy.html" style="color:#4a6070;text-decoration:none">Privacy</a> &nbsp;·&nbsp; <a href="/safety.html" style="color:#4a6070;text-decoration:none">Safety</a> &nbsp;·&nbsp; <a href="/app.html" style="color:#4a6070;text-decoration:none">Driver App</a><div style="margin-top:8px">© 2026 Occulert. Prototype — not a substitute for rest or safe driving.</div></footer>
 </body>
 </html>
