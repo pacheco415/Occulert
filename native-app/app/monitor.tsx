@@ -30,6 +30,7 @@ export default function MonitorScreen() {
   const [sessionTime, setSessionTime] = useState(0);
   const [alertCount, setAlertCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevAlertingRef = useRef(false);
 
   const [metrics, setMetrics] = useState<EyeMetrics>({
     ear: 0.3, perclos: 0, fatigueScore: 0, state: 'noFace',
@@ -59,7 +60,7 @@ export default function MonitorScreen() {
       const { granted } = await requestPermission();
       if (!granted) return;
     }
-    reset(); setAlertCount(0); setIsRunning(true);
+    reset(); prevAlertingRef.current = false; setAlertCount(0); setIsRunning(true);
   };
 
   const handleStop = () => { setIsRunning(false); reset(); };
@@ -72,9 +73,13 @@ export default function MonitorScreen() {
   const onFrame = useCallback((landmarks: Array<{x:number;y:number}> | null) => {
     const result = processLandmarks(landmarks);
     setMetrics(result);
-    if (result.state === 'closed' || result.state === 'watch') {
+    // Count discrete alert events only: increment once on transition INTO an
+    // alerting state (closed), not on every frame while eyes stay closed.
+    const alerting = result.state === 'closed';
+    if (alerting && !prevAlertingRef.current) {
       setAlertCount((c) => c + 1);
     }
+    prevAlertingRef.current = alerting;
   }, [processLandmarks]);
 
   // ── DEV SIMULATION: slow blink wave (remove for production) ──────────────
