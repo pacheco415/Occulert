@@ -18,7 +18,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Occulert uses your front camera to detect eye fatigue while driving. No video is stored or uploaded.",
         "NSMicrophoneUsageDescription": "Occulert does not use the microphone.",
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": ["audio", "bluetooth-central"],
         "NSHealthShareUsageDescription": "Occulert reads HRV and sleep data to compute your pre-drive fatigue risk score.",
         "NSHealthUpdateUsageDescription": "Occulert does not write health data."
       }
