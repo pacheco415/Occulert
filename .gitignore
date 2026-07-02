@@ -1,0 +1,36 @@
+# Firebase local config (use firebase-config.example.js as a template)
+firebase-config.js
+
+# Dependencies
+node_modules/
+native-app/node_modules/
+
+# Expo / React Native build artifacts
+.expo/
+native-app/.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
