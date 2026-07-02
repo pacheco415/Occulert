@@ -1,8 +1,10 @@
 import React, { useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sendAlertToWatch } from '../lib/watchBridge';
+import { configureAlertAudioMode } from '../lib/audioSession';
 import { ALERT_COOLDOWN_MS, PERCLOS_ALERT_THRESHOLD } from '../constants/thresholds';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 
@@ -20,11 +22,22 @@ export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
   const lastAlert = useRef(0);
   const hapticEnabled = useRef(true);
   const audioEnabled = useRef(true);
+  const airpodsEnabled = useRef(true);   // route alerts to AirPods / Bluetooth output
+  const watchEnabled = useRef(true);     // mirror alerts to a paired Apple Watch (dev/TestFlight build)
 
   // Load persisted alert preferences (set on the Settings screen).
   React.useEffect(() => {
     AsyncStorage.getItem('occulert-haptic').then(v => { if (v != null) hapticEnabled.current = v === 'true'; });
     AsyncStorage.getItem('occulert-audio').then(v => { if (v != null) audioEnabled.current = v === 'true'; });
+  // Connected-device preferences (AirPods / Apple Watch)
+    AsyncStorage.getItem('occulert-airpods').then((v) => { if (v !== null) airpodsEnabled.current = v === 'true'; });
+    AsyncStorage.getItem('occulert-watch').then((v) => { if (v !== null) watchEnabled.current = v === 'true'; });
+
+    // Configure the audio session so alert sounds route to AirPods /
+    // Bluetooth output and keep playing while the phone is on silent or
+    // the app is backgrounded during a drive.
+    configureAlertAudioMode().catch(() => {});
+  
   }, []);
   const pulse = useRef(new Animated.Value(1)).current;
   const sound = useRef<Audio.Sound | null>(null);
@@ -60,6 +73,12 @@ export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
     } catch {}
+
+    // Mirror the alert to a paired Apple Watch (no-op unless a watchOS
+    // companion is installed via a dev / TestFlight build).
+    if (watchEnabled.current) {
+      sendAlertToWatch({ level: lv, perclos: metrics.perclos, at: now }).catch(() => {});
+    }
 
     try {
       if (!audioEnabled.current) return;
