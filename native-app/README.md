@@ -104,3 +104,91 @@ Before App Store submission, the native app should match or exceed the PWA:
 ---
 
 *Occulertâ¢ Â· Native app scaffold Â· Start here for iOS/Android development*
+
+## Connected Devices (AirPods & Apple Watch)
+
+Occulert is designed to use the driver's existing Apple / Android hardware the
+same way the web app does, but with deeper device access in a native build.
+
+### AirPods / Bluetooth audio (works today)
+
+Alert sounds route to whatever audio output is connected (AirPods Pro, car
+audio, headphones). This is handled by `lib/audioSession.ts`, which configures
+the audio session so alerts:
+
+- play even when the phone's mute switch is on (`playsInSilentModeIOS`),
+- keep firing while the app is backgrounded during a drive (`staysActiveInBackground`),
+- duck music / navigation instead of stopping it.
+
+iOS and Android route audio to the connected Bluetooth device automatically;
+you cannot (and don't need to) address AirPods directly. Toggle this in
+Settings -> Connected Devices -> "AirPods / Bluetooth audio".
+
+### Apple Watch alerts (requires a development / TestFlight build)
+
+Wrist haptics need a native watchOS companion app plus `WatchConnectivity`.
+This **cannot run in Expo Go** - it requires a development build (EAS) or a
+TestFlight build.
+
+The phone side is already wired up in `lib/watchBridge.ts`, which sends each
+alert to the watch via `react-native-watch-connectivity`. It is a safe no-op
+until the watchOS target exists, so the app keeps running in Expo Go.
+
+To make the Watch part live:
+
+1. Add the dependency (already listed in `package.json`) and create a dev build:
+   ```bash
+   npx expo install react-native-watch-connectivity
+   eas build --profile development --platform ios
+   ```
+2. Open the generated `ios/` project in Xcode and add a **watchOS App** target
+   (File -> New -> Target -> Watch App). Give it the app group / bundle id that
+   matches `com.occulert.app`.
+3. In the watchOS target, add a `WCSession` receiver. Minimal SwiftUI stub:
+   ```swift
+   import WatchConnectivity
+   import WatchKit
+
+   final class AlertReceiver: NSObject, WCSessionDelegate, ObservableObject {
+       @Published var lastLevel: String = "none"
+
+       override init() {
+           super.init()
+           if WCSession.isSupported() {
+               WCSession.default.delegate = self
+               WCSession.default.activate()
+           }
+       }
+
+       func session(_ s: WCSession, didReceiveMessage m: [String: Any]) {
+           handle(m)
+       }
+       func session(_ s: WCSession, didReceiveApplicationContext c: [String: Any]) {
+           handle(c)
+       }
+       private func handle(_ m: [String: Any]) {
+           guard (m["type"] as? String) == "occulert-alert" else { return }
+           let level = (m["level"] as? String) ?? "alert"
+           DispatchQueue.main.async { self.lastLevel = level }
+           // Critical alerts get a stronger, repeated haptic.
+           WKInterfaceDevice.current().play(level == "critical" ? .failure : .notification)
+       }
+
+       func session(_ s: WCSession, activationDidCompleteWith st: WCSessionActivationState, error: Error?) {}
+       func sessionDidBecomeInactive(_ s: WCSession) {}
+       func sessionDidDeactivate(_ s: WCSession) { WCSession.default.activate() }
+   }
+   ```
+4. Build to TestFlight with `eas build --platform ios` and submit via
+   `eas submit -p ios`.
+
+### Android (Wear OS)
+
+The same `watchBridge` pattern applies; swap in a Wear OS `MessageClient`
+module in a dev build. `bluetooth-central` background mode is already declared
+in `app.json`.
+
+### Message contract
+
+Each alert sends: `{ type: 'occulert-alert', level, perclos, at }` where
+`level` is one of `none | watch | alert | critical`.
