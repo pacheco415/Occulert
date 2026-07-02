@@ -9,11 +9,15 @@ export default function SettingsScreen() {
   const [sens, setSens] = useState<SensitivityLevel>('medium');
   const [haptic, setHaptic] = useState(true);
   const [audio, setAudio] = useState(true);
+  const [airpods, setAirpods] = useState(true);
+  const [watch, setWatch] = useState(true);
 
   useEffect(() => {
     loadSavedSensitivity().then(setSens);
     AsyncStorage.getItem('occulert-haptic').then(v => { if(v) setHaptic(v==='true'); });
     AsyncStorage.getItem('occulert-audio').then(v => { if(v) setAudio(v==='true'); });
+    AsyncStorage.getItem('occulert-airpods').then(v => { if(v) setAirpods(v==='true'); });
+    AsyncStorage.getItem('occulert-watch').then(v => { if(v) setWatch(v==='true'); });
   }, []);
 
   const tog = async (key: string, val: boolean, set: (v: boolean) => void) => {
@@ -36,6 +40,31 @@ export default function SettingsScreen() {
             <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
             <Switch value={audio} onValueChange={v=>tog('occulert-audio',v,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
+          <View style={s.card}>
+            <Text style={s.cardTitle}>CONNECTED DEVICES</Text>
+            <View style={s.row}>
+              <View style={s.rowL}>
+                <Ionicons name="headset-outline" size={18} color="#60a5fa" />
+                <View>
+                  <Text style={s.label}>AirPods / Bluetooth audio</Text>
+                  <Text style={s.sub}>Play alerts through connected earbuds</Text>
+                </View>
+              </View>
+              <Switch value={airpods} onValueChange={v => tog('occulert-airpods', v, setAirpods)} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
+            </View>
+            <View style={s.div} />
+            <View style={s.row}>
+              <View style={s.rowL}>
+                <Ionicons name="watch-outline" size={18} color="#60a5fa" />
+                <View>
+                  <Text style={s.label}>Apple Watch alerts</Text>
+                  <Text style={s.sub}>Wrist haptics (requires the Watch app)</Text>
+                </View>
+              </View>
+              <Switch value={watch} onValueChange={v => tog('occulert-watch', v, setWatch)} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
+            </View>
+          </View>
+
           <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>No camera video stored or uploaded. Detection is fully on-device.</Text></View>
         </View>
         <Text style={s.ver}>Occulert™ · v1.0.0 · San Francisco, CA</Text>
