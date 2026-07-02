@@ -4,8 +4,9 @@ import {
   type SensitivityLevel,
 } from '../constants/thresholds';
 
-const LEFT_EYE  = [362, 385, 387, 263, 373, 380];
-const RIGHT_EYE = [33,  160, 158, 133, 153, 144];
+// MediaPipe FaceMesh EAR sets, ordered [corner, top, top, corner, bottom, bottom]
+const LEFT_EYE = [33,  160, 158, 133, 153, 144];
+const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
 
 export interface EyeMetrics {
   ear: number;
@@ -44,7 +45,10 @@ export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY) {
         ? win.current.filter(e => e.closed).length / win.current.length : 0;
 
       const drop = Math.max(0, (preset.eyeWatchThreshold - avgEar) / preset.eyeWatchThreshold);
-      const fatigueScore = Math.min(100, Math.round(drop * 50 + perclos * 50));
+      // Normalize PERCLOS against its clinical alert threshold so the score reaches
+      // ~100 when PERCLOS hits the alert threshold sustained with eyes drooping.
+      const perclosRatio = Math.min(1, perclos / PERCLOS_ALERT_THRESHOLD);
+      const fatigueScore = Math.min(100, Math.round(drop * 50 + perclosRatio * 50));
 
       return { ear: avgEar, perclos, fatigueScore, state: closed ? 'closed' : watching ? 'watch' : 'open' };
     },
