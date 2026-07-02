@@ -2,6 +2,7 @@ import React, { useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ALERT_COOLDOWN_MS, PERCLOS_ALERT_THRESHOLD } from '../constants/thresholds';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 
@@ -17,6 +18,14 @@ interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; }
  */
 export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
   const lastAlert = useRef(0);
+  const hapticEnabled = useRef(true);
+  const audioEnabled = useRef(true);
+
+  // Load persisted alert preferences (set on the Settings screen).
+  React.useEffect(() => {
+    AsyncStorage.getItem('occulert-haptic').then(v => { if (v != null) hapticEnabled.current = v === 'true'; });
+    AsyncStorage.getItem('occulert-audio').then(v => { if (v != null) audioEnabled.current = v === 'true'; });
+  }, []);
   const pulse = useRef(new Animated.Value(1)).current;
   const sound = useRef<Audio.Sound | null>(null);
 
@@ -40,7 +49,9 @@ export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
     ]).start();
 
     try {
-      if (lv === 'critical') {
+      if (!hapticEnabled.current) {
+        // haptics disabled in Settings
+      } else if (lv === 'critical') {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error), 350);
       } else if (lv === 'alert') {
@@ -51,6 +62,7 @@ export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
     } catch {}
 
     try {
+      if (!audioEnabled.current) return;
       if (sound.current) { await sound.current.stopAsync(); await sound.current.unloadAsync(); sound.current = null; }
       const { sound: snd } = await Audio.Sound.createAsync(
         { uri: 'https://occulert.com/alert.mp3' },
