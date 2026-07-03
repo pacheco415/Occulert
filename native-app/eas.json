@@ -1,0 +1,30 @@
+{
+  "cli": {
+    "version": ">= 10.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview"
+    },
+    "production": {
+      "autoIncrement": true,
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "SET_AFTER_CREATING_APP_IN_APP_STORE_CONNECT"
+      }
+    }
+  }
+}

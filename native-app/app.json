@@ -37,7 +37,13 @@
       ]
     },
     "plugins": [
-      ["expo-camera", { "cameraPermission": "Occulert uses your front camera to detect eye fatigue. No video is stored or uploaded." }],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Occulert uses your front camera to detect eye fatigue while driving. No video is stored or uploaded.",
+          "enableMicrophonePermission": false
+        }
+      ],
       "expo-router",
       "expo-keep-awake"
     ],
