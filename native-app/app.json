@@ -44,14 +44,13 @@
           "enableMicrophonePermission": false
         }
       ],
-      "expo-router",
-      "expo-keep-awake"
+      "expo-router"
     ],
     "experiments": { "typedRoutes": true },
     "scheme": "occulert",
     "extra": {
       "router": { "origin": false },
-      "eas": { "projectId": "YOUR_EAS_PROJECT_ID_HERE" }
+      "eas": { "projectId": "69c230c1-c42a-4d83-b2a0-e1752e719b53" }
     }
   }
 }
