@@ -258,9 +258,175 @@
           de: 'Deutsch', ar: 'العربية', zh: '中文', ja: '日本語'
     };
 
+   const commonTextTranslations = {
+         "Home": { es: "Inicio", fr: "Accueil", pt: "Início", de: "Startseite", ar: "الرئيسية", zh: "首页", ja: "ホーム" },
+         "Driver App": { es: "App de Conductor", fr: "App Conducteur", pt: "App do Motorista", de: "Fahrer-App", ar: "تطبيق السائق", zh: "驾驶员应用", ja: "ドライバーアプリ" },
+         "Fleet Dashboard": { es: "Panel de Flota", fr: "Tableau de Flotte", pt: "Painel da Frota", de: "Flotten-Dashboard", ar: "لوحة الأسطول", zh: "车队仪表板", ja: "フリートダッシュボード" },
+         "Session History": { es: "Historial de Sesiones", fr: "Historique des Sessions", pt: "Histórico de Sessões", de: "Sitzungsverlauf", ar: "سجل الجلسات", zh: "会话历史", ja: "セッション履歴" },
+         "History": { es: "Historial", fr: "Historique", pt: "Histórico", de: "Verlauf", ar: "السجل", zh: "历史", ja: "履歴" },
+         "Account Settings": { es: "Configuración de Cuenta", fr: "Paramètres du Compte", pt: "Configurações da Conta", de: "Kontoeinstellungen", ar: "إعدادات الحساب", zh: "账户设置", ja: "アカウント設定" },
+         "Privacy": { es: "Privacidad", fr: "Confidentialité", pt: "Privacidade", de: "Datenschutz", ar: "الخصوصية", zh: "隐私", ja: "プライバシー" },
+         "Privacy Policy": { es: "Política de Privacidad", fr: "Politique de Confidentialité", pt: "Política de Privacidade", de: "Datenschutzerklärung", ar: "سياسة الخصوصية", zh: "隐私政策", ja: "プライバシーポリシー" },
+         "Safety": { es: "Seguridad", fr: "Sécurité", pt: "Segurança", de: "Sicherheit", ar: "السلامة", zh: "安全", ja: "安全" },
+         "Safety Info": { es: "Información de Seguridad", fr: "Infos Sécurité", pt: "Informações de Segurança", de: "Sicherheitsinfo", ar: "معلومات السلامة", zh: "安全信息", ja: "安全情報" },
+         "Contact": { es: "Contacto", fr: "Contact", pt: "Contato", de: "Kontakt", ar: "اتصال", zh: "联系", ja: "連絡先" },
+         "Pilot Program": { es: "Programa Piloto", fr: "Programme Pilote", pt: "Programa Piloto", de: "Pilotprogramm", ar: "برنامج تجريبي", zh: "试点计划", ja: "パイロットプログラム" },
+         "Join the Pilot Program": { es: "Unirse al Programa Piloto", fr: "Rejoindre le Programme Pilote", pt: "Entrar no Programa Piloto", de: "Am Pilotprogramm teilnehmen", ar: "انضم إلى البرنامج التجريبي", zh: "加入试点计划", ja: "パイロットプログラムに参加" },
+         "View Product Hub": { es: "Ver Centro de Producto", fr: "Voir le Hub Produit", pt: "Ver Hub do Produto", de: "Produkt-Hub ansehen", ar: "عرض مركز المنتج", zh: "查看产品中心", ja: "製品ハブを見る" },
+         "Theme": { es: "Tema", fr: "Thème", pt: "Tema", de: "Design", ar: "المظهر", zh: "主题", ja: "テーマ" },
+         "Dark Mode": { es: "Modo Oscuro", fr: "Mode Sombre", pt: "Modo Escuro", de: "Dunkelmodus", ar: "الوضع الداكن", zh: "深色模式", ja: "ダークモード" },
+         "Light Mode": { es: "Modo Claro", fr: "Mode Clair", pt: "Modo Claro", de: "Hellmodus", ar: "الوضع الفاتح", zh: "浅色模式", ja: "ライトモード" },
+         "☀️ Light Mode": { es: "☀️ Modo Claro", fr: "☀️ Mode Clair", pt: "☀️ Modo Claro", de: "☀️ Hellmodus", ar: "☀️ الوضع الفاتح", zh: "☀️ 浅色模式", ja: "☀️ ライトモード" },
+         "🌙 Dark Mode": { es: "🌙 Modo Oscuro", fr: "🌙 Mode Sombre", pt: "🌙 Modo Escuro", de: "🌙 Dunkelmodus", ar: "🌙 الوضع الداكن", zh: "🌙 深色模式", ja: "🌙 ダークモード" },
+         "Toggle theme": { es: "Cambiar tema", fr: "Changer le thème", pt: "Alternar tema", de: "Design wechseln", ar: "تبديل المظهر", zh: "切换主题", ja: "テーマを切り替え" },
+         "Open menu": { es: "Abrir menú", fr: "Ouvrir le menu", pt: "Abrir menu", de: "Menü öffnen", ar: "فتح القائمة", zh: "打开菜单", ja: "メニューを開く" },
+         "Back to top": { es: "Volver arriba", fr: "Retour en haut", pt: "Voltar ao topo", de: "Nach oben", ar: "العودة للأعلى", zh: "返回顶部", ja: "トップへ戻る" },
+         "Select language": { es: "Seleccionar idioma", fr: "Choisir la langue", pt: "Selecionar idioma", de: "Sprache auswählen", ar: "اختر اللغة", zh: "选择语言", ja: "言語を選択" },
+         "Occulert home": { es: "Inicio de Occulert", fr: "Accueil Occulert", pt: "Início do Occulert", de: "Occulert Startseite", ar: "صفحة Occulert الرئيسية", zh: "Occulert 首页", ja: "Occulert ホーム" },
+         "AI-powered drowsiness detection for drivers. Built to make roads safer for everyone.": { es: "Detección de somnolencia con IA para conductores. Creada para hacer las carreteras más seguras para todos.", fr: "Détection de somnolence par IA pour les conducteurs. Conçu pour rendre les routes plus sûres pour tous.", pt: "Detecção de sonolência por IA para motoristas. Criado para tornar as estradas mais seguras para todos.", de: "KI-gestützte Müdigkeitserkennung für Fahrer. Entwickelt, um Straßen für alle sicherer zu machen.", ar: "كشف النعاس بالذكاء الاصطناعي للسائقين. مصمم لجعل الطرق أكثر أماناً للجميع.", zh: "面向驾驶员的 AI 疲劳检测。旨在让道路对每个人都更安全。", ja: "ドライバー向けのAI眠気検出。すべての人にとって道路をより安全にするために作られました。" },
+         "Prototype — not a substitute for rest or safe driving practices": { es: "Prototipo — no sustituye el descanso ni las prácticas de conducción segura", fr: "Prototype — ne remplace pas le repos ni les pratiques de conduite sûres", pt: "Protótipo — não substitui descanso nem práticas de direção segura", de: "Prototyp — kein Ersatz für Ruhe oder sicheres Fahren", ar: "نموذج أولي — ليس بديلاً عن الراحة أو ممارسات القيادة الآمنة", zh: "原型产品 — 不能替代休息或安全驾驶习惯", ja: "プロトタイプ — 休息や安全運転の代わりにはなりません" },
+         "No video ever leaves your device": { es: "Ningún video sale de tu dispositivo", fr: "Aucune vidéo ne quitte votre appareil", pt: "Nenhum vídeo sai do seu dispositivo", de: "Kein Video verlässt Ihr Gerät", ar: "لا يغادر أي فيديو جهازك أبداً", zh: "视频永远不会离开您的设备", ja: "動画がデバイス外へ送信されることはありません" },
+         "Built for Every Driver": { es: "Creado para Todo Conductor", fr: "Conçu pour Chaque Conducteur", pt: "Criado para Todo Motorista", de: "Für jeden Fahrer entwickelt", ar: "مصمم لكل سائق", zh: "为每位驾驶员打造", ja: "すべてのドライバーのために" },
+         "Whether you drive for a living or just get behind the wheel when tired, Occulert™ has your back.": { es: "Ya sea que conduzcas por trabajo o solo manejes cuando estás cansado, Occulert™ te respalda.", fr: "Que vous conduisiez pour gagner votre vie ou simplement lorsque vous êtes fatigué, Occulert™ vous accompagne.", pt: "Se você dirige profissionalmente ou apenas pega o volante quando está cansado, o Occulert™ está com você.", de: "Ob Sie beruflich fahren oder nur müde am Steuer sitzen, Occulert™ unterstützt Sie.", ar: "سواء كنت تقود لكسب رزقك أو تقود وأنت متعب، فإن Occulert™ يدعمك.", zh: "无论您以驾驶为生，还是疲劳时才开车，Occulert™ 都会支持您。", ja: "仕事で運転する場合でも、疲れている時に運転する場合でも、Occulert™ が支えます。" },
+         "Real-Time Eye Tracking": { es: "Seguimiento Ocular en Tiempo Real", fr: "Suivi Oculaire en Temps Réel", pt: "Rastreamento Ocular em Tempo Real", de: "Echtzeit-Augentracking", ar: "تتبع العين في الوقت الفعلي", zh: "实时眼动追踪", ja: "リアルタイム視線追跡" },
+         "On-Device AI": { es: "IA en el Dispositivo", fr: "IA sur l'Appareil", pt: "IA no Dispositivo", de: "KI auf dem Gerät", ar: "ذكاء اصطناعي على الجهاز", zh: "设备端 AI", ja: "オンデバイスAI" },
+         "Escalating Alerts": { es: "Alertas Escalonadas", fr: "Alertes Progressives", pt: "Alertas Escalonados", de: "Eskalierende Warnungen", ar: "تنبيهات متصاعدة", zh: "升级警报", ja: "段階的アラート" },
+         "Session Reports": { es: "Informes de Sesión", fr: "Rapports de Session", pt: "Relatórios de Sessão", de: "Sitzungsberichte", ar: "تقارير الجلسة", zh: "会话报告", ja: "セッションレポート" },
+         "Fleet Ready": { es: "Listo para Flotas", fr: "Prêt pour les Flottes", pt: "Pronto para Frotas", de: "Flottenbereit", ar: "جاهز للأساطيل", zh: "适用于车队", ja: "フリート対応" },
+         "Privacy First": { es: "Privacidad Primero", fr: "Confidentialité d'Abord", pt: "Privacidade em Primeiro Lugar", de: "Datenschutz zuerst", ar: "الخصوصية أولاً", zh: "隐私优先", ja: "プライバシー第一" },
+         "Why Occulert Exists": { es: "Por Qué Existe Occulert", fr: "Pourquoi Occulert Existe", pt: "Por Que o Occulert Existe", de: "Warum es Occulert gibt", ar: "لماذا يوجد Occulert", zh: "Occulert 存在的原因", ja: "Occulertが存在する理由" },
+         "Connect professionally": { es: "Conectar profesionalmente", fr: "Se connecter professionnellement", pt: "Conectar profissionalmente", de: "Beruflich vernetzen", ar: "تواصل مهنياً", zh: "专业联系", ja: "仕事でつながる" },
+         "Join the beta": { es: "Únete a la beta", fr: "Rejoindre la bêta", pt: "Entrar no beta", de: "Beta beitreten", ar: "انضم إلى النسخة التجريبية", zh: "加入测试版", ja: "ベータに参加" },
+         "Does Occulert record video?": { es: "¿Occulert graba video?", fr: "Occulert enregistre-t-il la vidéo ?", pt: "O Occulert grava vídeo?", de: "Zeichnet Occulert Videos auf?", ar: "هل يسجل Occulert الفيديو؟", zh: "Occulert 会录制视频吗？", ja: "Occulertは動画を録画しますか？" },
+         "Is it free to use?": { es: "¿Es gratis?", fr: "Est-ce gratuit ?", pt: "É gratuito?", de: "Ist die Nutzung kostenlos?", ar: "هل الاستخدام مجاني؟", zh: "可以免费使用吗？", ja: "無料で使えますか？" },
+         "What devices does it work on?": { es: "¿En qué dispositivos funciona?", fr: "Sur quels appareils cela fonctionne-t-il ?", pt: "Em quais dispositivos funciona?", de: "Auf welchen Geräten funktioniert es?", ar: "على أي أجهزة يعمل؟", zh: "它支持哪些设备？", ja: "どのデバイスで動作しますか？" },
+         "How accurate is the drowsiness detection?": { es: "¿Qué tan precisa es la detección de somnolencia?", fr: "Quelle est la précision de la détection de somnolence ?", pt: "Qual é a precisão da detecção de sonolência?", de: "Wie genau ist die Müdigkeitserkennung?", ar: "ما مدى دقة كشف النعاس؟", zh: "疲劳检测有多准确？", ja: "眠気検出の精度はどれくらいですか？" },
+         "Does it work without internet?": { es: "¿Funciona sin internet?", fr: "Fonctionne-t-il sans Internet ?", pt: "Funciona sem internet?", de: "Funktioniert es ohne Internet?", ar: "هل يعمل بدون إنترنت؟", zh: "没有互联网也能工作吗？", ja: "インターネットなしで動作しますか？" },
+         "Is my location data shared?": { es: "¿Se comparten mis datos de ubicación?", fr: "Mes données de localisation sont-elles partagées ?", pt: "Meus dados de localização são compartilhados?", de: "Werden meine Standortdaten geteilt?", ar: "هل تتم مشاركة بيانات موقعي؟", zh: "我的位置数据会被共享吗？", ja: "位置情報は共有されますか？" },
+         "AI Fatigue Monitoring": { es: "Monitoreo de Fatiga con IA", fr: "Surveillance de Fatigue IA", pt: "Monitoramento de Fadiga por IA", de: "KI-Müdigkeitsüberwachung", ar: "مراقبة التعب بالذكاء الاصطناعي", zh: "AI 疲劳监测", ja: "AI疲労モニタリング" },
+         "DROWSY ALERT": { es: "ALERTA DE SOMNOLENCIA", fr: "ALERTE SOMNOLENCE", pt: "ALERTA DE SONOLÊNCIA", de: "MÜDIGKEITSWARNUNG", ar: "تنبيه النعاس", zh: "疲劳警报", ja: "眠気アラート" },
+         "Pull over safely": { es: "Detente con seguridad", fr: "Arrêtez-vous en sécurité", pt: "Pare com segurança", de: "Sicher anhalten", ar: "توقف بأمان", zh: "安全靠边停车", ja: "安全に停車してください" },
+         "START MONITORING": { es: "INICIAR MONITOREO", fr: "DÉMARRER LA SURVEILLANCE", pt: "INICIAR MONITORAMENTO", de: "ÜBERWACHUNG STARTEN", ar: "بدء المراقبة", zh: "开始监测", ja: "モニタリング開始" },
+         "STOP MONITORING": { es: "DETENER MONITOREO", fr: "ARRÊTER LA SURVEILLANCE", pt: "PARAR MONITORAMENTO", de: "ÜBERWACHUNG STOPPEN", ar: "إيقاف المراقبة", zh: "停止监测", ja: "モニタリング停止" },
+         "Driving Status": { es: "Estado de Conducción", fr: "État de Conduite", pt: "Status de Condução", de: "Fahrstatus", ar: "حالة القيادة", zh: "驾驶状态", ja: "運転状態" },
+         "Safety Notice": { es: "Aviso de Seguridad", fr: "Avis de Sécurité", pt: "Aviso de Segurança", de: "Sicherheitshinweis", ar: "إشعار السلامة", zh: "安全提示", ja: "安全通知" },
+         "Privacy Controls": { es: "Controles de Privacidad", fr: "Contrôles de Confidentialité", pt: "Controles de Privacidade", de: "Datenschutzeinstellungen", ar: "عناصر التحكم في الخصوصية", zh: "隐私控制", ja: "プライバシー設定" },
+         "Calibration": { es: "Calibración", fr: "Calibration", pt: "Calibração", de: "Kalibrierung", ar: "المعايرة", zh: "校准", ja: "キャリブレーション" },
+         "Risk State": { es: "Estado de Riesgo", fr: "État du Risque", pt: "Estado de Risco", de: "Risikostatus", ar: "حالة المخاطر", zh: "风险状态", ja: "リスク状態" },
+         "Developer Tools": { es: "Herramientas de Desarrollador", fr: "Outils Développeur", pt: "Ferramentas de Desenvolvedor", de: "Entwicklertools", ar: "أدوات المطور", zh: "开发者工具", ja: "開発者ツール" },
+         "Simulate Drowsy Alert": { es: "Simular Alerta de Somnolencia", fr: "Simuler une Alerte Somnolence", pt: "Simular Alerta de Sonolência", de: "Müdigkeitswarnung simulieren", ar: "محاكاة تنبيه النعاس", zh: "模拟疲劳警报", ja: "眠気アラートをシミュレート" },
+         "Reset Session Data": { es: "Restablecer Datos de Sesión", fr: "Réinitialiser les Données de Session", pt: "Redefinir Dados da Sessão", de: "Sitzungsdaten zurücksetzen", ar: "إعادة تعيين بيانات الجلسة", zh: "重置会话数据", ja: "セッションデータをリセット" },
+         "Fleet Overview": { es: "Resumen de Flota", fr: "Vue d'Ensemble de la Flotte", pt: "Visão Geral da Frota", de: "Flottenübersicht", ar: "نظرة عامة على الأسطول", zh: "车队概览", ja: "フリート概要" },
+         "Action Queue": { es: "Cola de Acciones", fr: "File d'Actions", pt: "Fila de Ações", de: "Aktionsliste", ar: "قائمة الإجراءات", zh: "操作队列", ja: "対応キュー" },
+         "Refresh": { es: "Actualizar", fr: "Actualiser", pt: "Atualizar", de: "Aktualisieren", ar: "تحديث", zh: "刷新", ja: "更新" },
+         "Add Test Lead": { es: "Agregar Lead de Prueba", fr: "Ajouter un Prospect Test", pt: "Adicionar Lead de Teste", de: "Test-Lead hinzufügen", ar: "إضافة عميل تجريبي", zh: "添加测试线索", ja: "テストリードを追加" },
+         "Clear local leads": { es: "Borrar leads locales", fr: "Effacer les prospects locaux", pt: "Limpar leads locais", de: "Lokale Leads löschen", ar: "مسح العملاء المحليين", zh: "清除本地线索", ja: "ローカルリードを消去" },
+         "Total Leads": { es: "Leads Totales", fr: "Prospects Totaux", pt: "Total de Leads", de: "Leads gesamt", ar: "إجمالي العملاء", zh: "线索总数", ja: "リード合計" },
+         "Cloud Synced": { es: "Sincronizados en la Nube", fr: "Synchronisés Cloud", pt: "Sincronizados na Nuvem", de: "Cloud-synchronisiert", ar: "متزامن مع السحابة", zh: "云端已同步", ja: "クラウド同期済み" },
+         "Newest Lead": { es: "Lead Más Reciente", fr: "Prospect le Plus Récent", pt: "Lead Mais Recente", de: "Neuester Lead", ar: "أحدث عميل", zh: "最新线索", ja: "最新リード" },
+         "No pilot leads yet": { es: "Aún no hay leads piloto", fr: "Aucun prospect pilote pour l'instant", pt: "Ainda não há leads piloto", de: "Noch keine Pilot-Leads", ar: "لا توجد طلبات تجريبية بعد", zh: "还没有试点线索", ja: "パイロットリードはまだありません" },
+         "Open Pilot Signup": { es: "Abrir Registro Piloto", fr: "Ouvrir l'Inscription Pilote", pt: "Abrir Inscrição Piloto", de: "Pilot-Anmeldung öffnen", ar: "فتح تسجيل البرنامج التجريبي", zh: "打开试点注册", ja: "パイロット登録を開く" }
+   };
+
+   const originalTextNodes = new WeakMap();
+   let suppressObserver = false;
+   let pendingAutoTranslate = 0;
+
    function getLang() {
          return localStorage.getItem('occulert_lang') ||
                  navigator.language.slice(0,2) || 'en';
+   }
+
+   function normalizeText(value) {
+         return String(value || '').replace(/\s+/g, ' ').trim();
+   }
+
+   function getTextTranslation(text, lang) {
+         const original = normalizeText(text);
+         if (!original || lang === 'en') return original;
+
+         for (const [key, enText] of Object.entries(translations.en)) {
+               if (normalizeText(enText) === original) {
+                     return translations[lang][key] || original;
+               }
+         }
+
+         const common = commonTextTranslations[original];
+         return common && common[lang] ? common[lang] : original;
+   }
+
+   function shouldSkipNode(node) {
+         const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+         if (!element || element.closest('.lang-switcher')) return true;
+         return Boolean(element.closest('script,style,noscript,svg,canvas,video,audio,code,pre,textarea,select,[data-no-i18n]'));
+   }
+
+   function preserveWhitespace(source, translated) {
+         const leading = source.match(/^\s*/)[0];
+         const trailing = source.match(/\s*$/)[0];
+         return leading + translated + trailing;
+   }
+
+   function translateTextNodes(lang, root) {
+         const start = root || document.body;
+         if (!start) return;
+         const walker = document.createTreeWalker(start, NodeFilter.SHOW_TEXT, {
+               acceptNode(node) {
+                     if (shouldSkipNode(node) || !normalizeText(node.nodeValue)) {
+                           return NodeFilter.FILTER_REJECT;
+                     }
+                     return NodeFilter.FILTER_ACCEPT;
+               }
+         });
+
+         const nodes = [];
+         while (walker.nextNode()) nodes.push(walker.currentNode);
+
+         nodes.forEach(node => {
+               if (!originalTextNodes.has(node)) {
+                     originalTextNodes.set(node, normalizeText(node.nodeValue));
+               }
+               const source = originalTextNodes.get(node);
+               const next = lang === 'en' ? source : getTextTranslation(source, lang);
+               if (next && normalizeText(node.nodeValue) !== normalizeText(next)) {
+                     node.nodeValue = preserveWhitespace(node.nodeValue, next);
+               }
+         });
+   }
+
+   function translateAttributes(lang, root) {
+         const start = root || document;
+         if (!start.querySelectorAll) return;
+         const attrs = ['aria-label', 'title', 'placeholder', 'value'];
+         start.querySelectorAll('[aria-label],[title],[placeholder],input[type="button"],input[type="submit"]').forEach(el => {
+               if (shouldSkipNode(el)) return;
+               attrs.forEach(attr => {
+                     if (!el.hasAttribute(attr)) return;
+                     const cacheAttr = 'data-i18n-original-' + attr;
+                     if (!el.hasAttribute(cacheAttr)) {
+                           el.setAttribute(cacheAttr, normalizeText(el.getAttribute(attr)));
+                     }
+                     const source = el.getAttribute(cacheAttr);
+                     const next = lang === 'en' ? source : getTextTranslation(source, lang);
+                     if (next) el.setAttribute(attr, next);
+               });
+         });
+   }
+
+   function translatePlainContent(lang, root) {
+         suppressObserver = true;
+         translateTextNodes(lang, root);
+         translateAttributes(lang, root);
+         suppressObserver = false;
+   }
+
+   function schedulePlainContentTranslation(root) {
+         if (suppressObserver) return;
+         window.clearTimeout(pendingAutoTranslate);
+         pendingAutoTranslate = window.setTimeout(() => {
+               const lang = getLang();
+               if (lang !== 'en') translatePlainContent(lang, root || document.body);
+         }, 50);
    }
 
    function setLang(lang) {
@@ -277,6 +443,7 @@
                  const key = el.getAttribute('data-i18n-placeholder');
                  if (t[key] !== undefined) el.setAttribute('placeholder', t[key]);
          });
+         translatePlainContent(lang);
          // Update active state on selector
       document.querySelectorAll('.lang-option').forEach(btn => {
               btn.classList.toggle('active', btn.dataset.lang === lang);
@@ -362,8 +529,15 @@
          const saved = getLang();
          const supported = Object.keys(translations);
          setLang(supported.includes(saved) ? saved : 'en');
+         if (window.MutationObserver && document.body) {
+               const observer = new MutationObserver(mutations => {
+                     const changed = mutations.find(mutation => mutation.addedNodes.length || mutation.type === 'characterData');
+                     if (changed) schedulePlainContentTranslation(document.body);
+               });
+               observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+         }
    });
 
    // Expose globally for console use
-   window.OcculertLang = { setLang, getLang, translations, LANG_NAMES };
+   window.OcculertLang = { setLang, getLang, translations, LANG_NAMES, commonTextTranslations };
 })();
