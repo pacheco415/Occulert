@@ -99,9 +99,10 @@ Pilot signup always stores a local browser copy for the demo. To also forward re
 
 ```bash
 PILOT_LEADS_WEBHOOK_URL=https://your-webhook-endpoint.example
+OCCULERT_ALLOWED_ORIGINS=https://www.occulert.com,https://occulert.com
 ```
 
-The `/api/pilot-leads` endpoint validates required fields, strips oversized values, and forwards a JSON payload to that webhook.
+The `/api/pilot-leads` endpoint requires same-origin JSON submissions, validates required fields, strips oversized values, and only forwards to an HTTPS webhook.
 
 ---
 
