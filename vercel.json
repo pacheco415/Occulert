@@ -18,14 +18,26 @@
         {
           "key": "Permissions-Policy",
           "value": "camera=(self), microphone=(), geolocation=(self), payment=(), usb=(), bluetooth=(self)"
-          },
-          {
-            "key": "X-XSS-Protection",
-            "value": "1; mode=block"
-          },
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
         {
           "key": "Strict-Transport-Security",
           "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Origin-Agent-Cluster",
+          "value": "?1"
+        },
+        {
+          "key": "X-Permitted-Cross-Domain-Policies",
+          "value": "none"
         },
         {
           "key": "Content-Security-Policy-Report-Only",
@@ -115,7 +127,16 @@
       ]
     },
     {
-      "source": "/(.*).(png|jpg|jpeg|webp|gif|svg|mp4|webm|css)",
+      "source": "/favicon.ico",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).(png|jpg|jpeg|webp|gif|svg|mp4|webm|css|ico)",
       "headers": [
         {
           "key": "Cache-Control",
