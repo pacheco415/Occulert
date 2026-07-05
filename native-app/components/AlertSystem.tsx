@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,6 +9,8 @@ import { ALERT_COOLDOWN_MS, PERCLOS_ALERT_THRESHOLD } from '../constants/thresho
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 
 export type AlertLevel = 'none' | 'watch' | 'alert' | 'critical';
+
+const ALERT_SOUND = require('../assets/alert.wav');
 
 interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; }
 
@@ -30,14 +32,11 @@ export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
     AsyncStorage.getItem('occulert-haptic').then(v => { if (v != null) hapticEnabled.current = v === 'true'; });
     AsyncStorage.getItem('occulert-audio').then(v => { if (v != null) audioEnabled.current = v === 'true'; });
   // Connected-device preferences (AirPods / Apple Watch)
-    AsyncStorage.getItem('occulert-airpods').then((v) => { if (v !== null) airpodsEnabled.current = v === 'true'; });
+    AsyncStorage.getItem('occulert-airpods').then((v) => {
+      if (v !== null) airpodsEnabled.current = v === 'true';
+      if (airpodsEnabled.current) configureAlertAudioMode().catch(() => {});
+    });
     AsyncStorage.getItem('occulert-watch').then((v) => { if (v !== null) watchEnabled.current = v === 'true'; });
-
-    // Configure the audio session so alert sounds route to AirPods /
-    // Bluetooth output and keep playing while the phone is on silent or
-    // the app is backgrounded during a drive.
-    configureAlertAudioMode().catch(() => {});
-  
   }, []);
   const pulse = useRef(new Animated.Value(1)).current;
   const sound = useRef<Audio.Sound | null>(null);
@@ -84,7 +83,7 @@ export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
       if (!audioEnabled.current) return;
       if (sound.current) { await sound.current.stopAsync(); await sound.current.unloadAsync(); sound.current = null; }
       const { sound: snd } = await Audio.Sound.createAsync(
-        { uri: 'https://occulert.com/alert.mp3' },
+        ALERT_SOUND,
         { shouldPlay: true, volume: lv === 'critical' ? 1.0 : 0.75 },
       );
       sound.current = snd;

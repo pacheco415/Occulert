@@ -1,0 +1,11 @@
+{
+  "name": "occulert-site",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "audit:site": "node scripts/audit-site.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

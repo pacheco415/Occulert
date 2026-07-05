@@ -83,6 +83,26 @@ occulert/
 
 Before using Occulert with real drivers or fleet data, review `FIREBASE_SECURITY.md`. Do not leave Firestore open to public read/write. Use Firebase Auth, fleet-scoped data, and driver consent.
 
+## 🧪 Site Audit
+
+Run the static safety checks before deploying:
+
+```bash
+npm run audit:site
+```
+
+The audit checks local links/assets, Firebase disabled-by-default behavior, sensitive JS cache rules, CSP report-only headers, and the bundled native alert sound.
+
+## 📬 Pilot Lead Capture
+
+Pilot signup always stores a local browser copy for the demo. To also forward requests server-side on Vercel, set:
+
+```bash
+PILOT_LEADS_WEBHOOK_URL=https://your-webhook-endpoint.example
+```
+
+The `/api/pilot-leads` endpoint validates required fields, strips oversized values, and forwards a JSON payload to that webhook.
+
 ---
 
 ## 💚 Support the Project
