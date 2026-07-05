@@ -51,6 +51,9 @@ assertIncludes("vercel.json", "\"value\": \"no-store\"", "vercel.json must inclu
 assertIncludes("vercel.json", "Content-Security-Policy-Report-Only", "vercel.json must include CSP report-only hardening");
 assertIncludes("account.html", "function esc(v)", "account.html must escape rendered profile fields");
 assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "native alert sound must be bundled locally");
+assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");
+assertIncludes("api/pilot-leads.js", "unsupported_media_type", "pilot lead API must require JSON submissions");
+assertIncludes("api/pilot-leads.js", "url.protocol === \"https:\"", "pilot lead API must only forward to HTTPS webhooks");
 
 if (failures.length) {
   console.error("Occulert site audit failed:");
