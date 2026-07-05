@@ -16,13 +16,13 @@ A native app removes all of these blockers.
 
 ## Stack
 
-- **React Native** via [Expo](https://expo.dev) â fastest path from web skills to native
-- **TypeScript** â strongly typed for safety-critical logic
-- **Expo Camera** â camera access with background capability
-- **Expo Sensors** â accelerometer for head-nod detection
-- **React Native Health** (iOS) / **Health Connect** (Android) â HRV and sleep data
-- **Expo Notifications** â push alert support
-- **Expo Haptics** â vibration alerts
+- **React Native** via [Expo](https://expo.dev) - fastest path from web skills to native
+- **TypeScript** - strongly typed for safety-critical logic
+- **Expo Camera** - camera access with background capability
+- **Expo Sensors** - accelerometer for head-nod detection
+- **React Native Health** (iOS) / **Health Connect** (Android) - HRV and sleep data
+- **Expo Notifications** - push alert support
+- **Expo Haptics** - vibration alerts
 
 ## Setup
 
@@ -54,41 +54,41 @@ npx expo start
 
 ```
 native-app/
-âââ app/                    # Expo Router screens
-â   âââ index.tsx           # Landing / home screen
-â   âââ monitor.tsx         # Main monitoring screen (camera)
-â   âââ pre-drive.tsx       # Pre-drive risk score screen
-â   âââ history.tsx         # Session history
-â   âââ settings.tsx        # Sensitivity + preferences
-âââ components/
-â   âââ EyeTracker.tsx      # Camera + MediaPipe detection
-â   âââ AlertSystem.tsx     # Alert triggering + haptics + audio
-â   âââ FatigueScore.tsx    # Score display component
-â   âââ SensitivitySlider.tsx # Low/Med/High sensitivity control
-âââ hooks/
-â   âââ useEyeTracking.ts   # EAR calculation logic
-â   âââ useHeadNod.ts       # Accelerometer head-nod detection
-â   âââ useHealthData.ts    # HRV/sleep from HealthKit/Health Connect
-âââ constants/
-â   âââ thresholds.ts       # Sensitivity presets (mirrors web app)
-âââ package.json
-âââ app.json            # Expo config
-âââ tsconfig.json
+|-- app/                    # Expo Router screens
+|   |-- index.tsx           # Landing / home screen
+|   |-- monitor.tsx         # Main monitoring screen (camera)
+|   |-- pre-drive.tsx       # Pre-drive risk score screen
+|   |-- history.tsx         # Session history
+|   `-- settings.tsx        # Sensitivity + preferences
+|-- components/
+|   |-- EyeTracker.tsx      # Camera + MediaPipe detection
+|   |-- AlertSystem.tsx     # Alert triggering + haptics + audio
+|   |-- FatigueScore.tsx    # Score display component
+|   `-- SensitivitySlider.tsx # Low/Med/High sensitivity control
+|-- hooks/
+|   |-- useEyeTracking.ts   # EAR calculation logic
+|   |-- useHeadNod.ts       # Accelerometer head-nod detection
+|   `-- useHealthData.ts    # HRV/sleep from HealthKit/Health Connect
+|-- constants/
+|   `-- thresholds.ts       # Sensitivity presets (mirrors web app)
+|-- package.json
+|-- app.json                # Expo config
+`-- tsconfig.json
 ```
 
 ## Phase Milestones
 
 | Milestone | Status |
 |-----------|--------|
-| Expo project initialized | â Scaffold created |
-| Camera + EAR detection running | â `useEyeTracking.ts` + dev simulation loop |
-| Background camera access (iOS) | â `useKeepAwake` + CameraView in monitor.tsx |
-| Sensitivity slider | â `SensitivitySlider.tsx` + AsyncStorage |
-| Alert system (haptic + audio) | â `AlertSystem.tsx` — expo-haptics + expo-av |
-| Head-nod detection (accelerometer) | â³ Phase 1: wire expo-sensors |
-| HealthKit HRV/sleep integration | â³ Phase 2 |
-| Pre-drive risk score screen | â³ Phase 2 |
-| App Store submission | â³ TODO |
+| Expo project initialized | Done - scaffold created |
+| Camera + EAR detection running | Done - `useEyeTracking.ts` + dev simulation loop |
+| Background camera access (iOS) | Done - `useKeepAwake` + CameraView in monitor.tsx |
+| Sensitivity slider | Done - `SensitivitySlider.tsx` + AsyncStorage |
+| Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-av |
+| Head-nod detection (accelerometer) | In progress - Phase 1: wire expo-sensors |
+| HealthKit HRV/sleep integration | Planned - Phase 2 |
+| Pre-drive risk score screen | Planned - Phase 2 |
+| App Store submission | TODO |
 
 ## PWA Parity Checklist
 
@@ -103,7 +103,7 @@ Before App Store submission, the native app should match or exceed the PWA:
 
 ---
 
-*Occulertâ¢ Â· Native app scaffold Â· Start here for iOS/Android development*
+*Occulert - Native app scaffold - Start here for iOS/Android development*
 
 ## Connected Devices (AirPods & Apple Watch)
 

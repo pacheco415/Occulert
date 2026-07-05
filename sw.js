@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v13';
+const CACHE = 'occulert-v14';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -11,6 +11,7 @@ const STATIC_ASSETS = [
   '/session-history.html',
   '/driver-profiles.html',
   '/pilot-signup.html',
+  '/favicon.ico',
   '/occulert-logo-alt.png',
   '/occulert-logo.png',
   '/occulert-logo-main.png',
@@ -81,6 +82,9 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE).then(cache => cache.put(req, copy));
         }
         return res;
+      }).catch(() => {
+        if (req.destination === 'image') return caches.match('/occulert-logo-main.png');
+        return Response.error();
       });
     })
   );

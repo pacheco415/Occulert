@@ -21,7 +21,7 @@
                   trust2: "Runs on your device",
                   trust3: "No data sold",
                   disclaimer_title: "Safety Disclaimer",
-                  disclaimer_text: "Occulert is a supplemental alerting tool. It does not replace attentive driving, adequate rest, or compliance with traffic laws. Always maintain full attention while driving.",
+                  disclaimer_text: "Occulert is a supplemental prototype alerting tool only. It does not replace attentive driving, adequate rest, emergency services, medical judgment, fleet safety programs, or compliance with traffic laws. Never drive tired.",
                   stats_label1: "Crashes involve driver fatigue",
                   stats_label2: "Fatigue-related crashes per year in the US",
                   stats_label3: "Of drowsy drivers don't realize they're impaired",
