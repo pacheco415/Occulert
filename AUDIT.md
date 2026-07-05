@@ -1,54 +1,27 @@
 # Occulert Technical Audit
 
-Last updated: 2026-06-14
+Last updated: 2026-07-05 (previously 2026-06-14). For the current consolidated near/mid/long-term gap list across both the web app and native-app, see issue #6.
 
 ## Completed quick wins
 
-- Updated robots.txt to point search engines to the custom domain sitemap.
-- Updated sitemap.xml to use https://occulert.com instead of the temporary Vercel URL.
-- Improved the PWA manifest description and shortcuts.
-- Added Vercel caching rules for static assets.
-- Added security/privacy headers for safer browser behavior.
+Updated robots.txt to point search engines to the custom domain sitemap. Updated sitemap.xml to use https://occulert.com instead of the temporary Vercel URL. Improved the PWA manifest description and shortcuts. Added Vercel caching rules for static assets. Added security/privacy headers for safer browser behavior.
 
 ## App observations
 
-The app is already more advanced than a basic demo. It includes:
+The app is already more advanced than a basic demo. It includes a camera permission flow, MediaPipe FaceMesh loading, Eye Aspect Ratio detection, calibration, sensitivity and cooldown controls, vibration/audio alerts, session stats, theme controls, a Bluetooth pairing UI, and Wake Lock support.
 
-- Camera permission flow
-- MediaPipe FaceMesh loading
-- Eye Aspect Ratio detection
-- Calibration
-- Sensitivity and cooldown controls
-- Vibration/audio alerts
-- Session stats
-- Theme controls
-- Bluetooth pairing UI
-- Wake Lock support
+Separately, a native iOS app (Expo/React Native, under native-app/) is now in progress with a real vision-camera plus ML Kit eye-tracking pipeline, history and settings screens, and AirPods/Apple Watch alert bridges. That work has its own audit trail (see PR #1, "Audit fixes," in this repo) and is tracked going forward in issue #6 rather than this document.
 
 ## High-priority next fixes
 
-1. Split large inline CSS and JavaScript out of index.html and app.html into separate files.
-2. Add full homepage SEO tags directly inside index.html: canonical URL, Open Graph, Twitter cards, and longer meta description.
-3. Improve camera permission fallback text for iPhone Safari and Android Chrome.
-4. Add a real beta waitlist form that stores inquiries somewhere reliable.
-5. Add a visible demo video section above the fold.
-6. Add a safety/legal disclaimer page.
-7. Improve app testing for night driving, sunglasses, bumpy roads, and false alerts.
+Status of the items identified in the original audit: splitting the large inline CSS and JavaScript out of index.html and app.html into separate files is still open. Adding full homepage SEO tags directly inside index.html (canonical URL, Open Graph, Twitter cards, longer meta description) is still open, though several other pages such as pilot-signup.html, product-hub.html, privacy.html, and session-history.html have since gained canonical/OG/PWA meta tags. Improving camera permission fallback text for iPhone Safari and Android Chrome is still open. Adding a real beta waitlist form that stores inquiries reliably is partially addressed, since pilot-signup.html and pilot-leads.html now exist, but the backend storage should be verified. Adding a visible demo video section above the fold is still open. Adding a safety/legal disclaimer page is done, since safety.html and privacy.html are live and safety.html has since gained an accuracy-status and pilot-fleet-program section. Improving app testing for night driving, sunglasses, bumpy roads, and false alerts is still open.
 
 ## App reliability notes
 
-- Monitoring pauses when the page is backgrounded; this is expected for browser-based camera apps.
-- Phone/watch vibration depends on browser and device support.
-- Bluetooth support varies by browser and is strongest on Chrome-based browsers.
-- iOS Safari has stricter limitations for background camera, vibration, and Bluetooth.
+Monitoring pauses when the page is backgrounded; this is expected for browser-based camera apps. Phone/watch vibration depends on browser and device support. Bluetooth support varies by browser and is strongest on Chrome-based browsers. iOS Safari has stricter limitations for background camera, vibration, and Bluetooth.
 
 ## Recommended product direction
 
-Prioritize fleet safety as the business model:
+Prioritize fleet safety as the business model: driver drowsiness alerts, a fleet dashboard, GPS tracking, driver safety scoring, incident history, and a pilot program for local fleet operators.
 
-- Driver drowsiness alerts
-- Fleet dashboard
-- GPS tracking
-- Driver safety scoring
-- Incident history
-- Pilot program for local fleet operators
+A fleet dashboard prototype exists today using localStorage (see BACKEND_ROADMAP.md); moving it to a real backend with driver/fleet/session tables remains the next step toward this direction.
