@@ -135,3 +135,18 @@ def eye_aspect_ratio(landmarks, eye_indices, img_w, img_h):
                                                                                                                                                     ---
                                                                                                                                                     
                                                                                                                                                     *Occulert™ · San Francisco, CA · accuracy benchmark guide v1.0*
+
+
+---
+
+## Immediate Next Steps (added 2026-07-05)
+
+This benchmark has not been executed yet, so here is a concrete path to move it from "not yet completed" to a real result. This complements BETA_TEST_PLAN.md, which covers real-world human testing; this document covers offline validation against labeled datasets.
+
+Request access to the NTHU DDD dataset first, since it is the most widely cited and does not require special hardware like DROZY's EEG rig. Expect the request-form turnaround to take a few days, so kick this off before anything else.
+
+While waiting on dataset access, turn the Step 2/3 Python snippets already in this document into a small standalone script (for example benchmark/run_benchmark.py) that takes a directory of labeled clips and prints the Precision/Recall/F1/False Alert Rate table for all three sensitivity presets, so it is ready to run the moment clips arrive.
+
+Once a first pass of numbers exists for even one sensitivity preset on one dataset, fill in the results table above with real numbers rather than TBD, and compare against the "What Good Looks Like" targets (greater than 85% recall, under 15% false alert rate at Medium). Treat this as a rough draft benchmark, not a final one — the DROZY and UTA datasets can follow once NTHU is done.
+
+Finally, cross-link the outcome: update this file's Current Status table, add the "Validated Accuracy" note to README.md and safety.html as the Publishing Results section already describes, and close out the corresponding item in issue #6 once real numbers are in place.
