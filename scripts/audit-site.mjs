@@ -51,6 +51,10 @@ assertIncludes("vercel.json", "\"value\": \"no-store\"", "vercel.json must inclu
 assertIncludes("vercel.json", "Content-Security-Policy-Report-Only", "vercel.json must include CSP report-only hardening");
 assertIncludes("account.html", "function esc(v)", "account.html must escape rendered profile fields");
 assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "native alert sound must be bundled locally");
+assertIncludes("fleet-dashboard.html", "id=\"driverSearch\"", "fleet dashboard must keep driver search controls");
+assertIncludes("fleet-dashboard.html", "function exportFleetCSV()", "fleet dashboard must keep CSV export");
+assertIncludes("fleet-dashboard.html", "function seedDemoData()", "fleet dashboard must keep demo data loading");
+assertIncludes("fleet-dashboard.html", "function copyDriver(id)", "fleet dashboard must keep per-driver copy summaries");
 
 if (failures.length) {
   console.error("Occulert site audit failed:");
