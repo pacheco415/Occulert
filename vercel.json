@@ -30,6 +30,42 @@
       ]
     },
     {
+      "source": "/firebase-config.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/auth-helper.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/firebase-sync-v2.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
       "source": "/sw.js",
       "headers": [
         {
@@ -75,7 +111,7 @@
       ]
     },
     {
-      "source": "/(.*).(png|jpg|jpeg|webp|gif|svg|mp4|webm|css|js)",
+      "source": "/(.*).(png|jpg|jpeg|webp|gif|svg|mp4|webm|css)",
       "headers": [
         {
           "key": "Cache-Control",
