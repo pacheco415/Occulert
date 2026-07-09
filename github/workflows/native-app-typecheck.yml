@@ -1,0 +1,24 @@
+name: Native App Typecheck
+
+on:
+  pull_request:
+    paths:
+      - "native-app/**"
+  push:
+    branches: [main]
+    paths:
+      - "native-app/**"
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: native-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npx tsc --noEmit
