@@ -4,7 +4,7 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 ★ = top-priority milestone for each phase
 
-**Last updated: 2026-07-05** — statuses below reflect actual progress in the native-app build and web app. See AUDIT.md and issue #6 for the fuller near/mid/long-term gap list.
+**Last updated: 2026-07-08** — statuses below reflect actual progress in the native-app build and web app. Backend scaffolding for the fleet dashboard now exists (PR #18) but is not yet connected to a real database. See AUDIT.md and issue #6 for the fuller near/mid/long-term gap list.
 
 ---
 
@@ -60,7 +60,7 @@ Note: a basic Apple Watch alert bridge shipped via react-native-watch-connectivi
 |------|----------|--------|
 | Unified confidence model fusing camera + earbud + watch signals | ★ | Not started |
 | Device-agnostic engine (works with any combination of devices) | — | Not started |
-| Fleet dashboard with per-driver device and signal data | — | Prototype (localStorage-based; see BACKEND_ROADMAP.md) |
+| Fleet dashboard with per-driver device and signal data | — | Backend scaffolding drafted (Supabase API + schema, PR #18); still localStorage-based in production, see BACKEND_ROADMAP.md and BACKEND_SETUP.md |
 | Tiered pricing model for fleet operators | — | Not started |
 
 ---
@@ -98,7 +98,7 @@ Note: a basic Apple Watch alert bridge shipped via react-native-watch-connectivi
 | 0 · Foundation | Accuracy & pilots | Detection validation, pilot fleet | Not started |
 | 1 · Earbuds | Head & heart signals | Head-nod detection, directional alerts | Partial (audio routing done) |
 | 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (basic alert bridge done) |
-| 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Not started |
+| 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Not started (fleet dashboard backend scaffolding drafted, PR #18) |
 | 4 · Smart Glasses | Ambient + eye tracking | Inward eye-tracking | Not started |
 | Platform | Native apps | iOS app, real-time sensor access | In progress |
 
