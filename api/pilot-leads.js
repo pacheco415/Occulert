@@ -1,5 +1,9 @@
 const MAX_FIELD_LENGTH = 1200;
 const MAX_BODY_LENGTH = 4096;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const RATE_LIMIT_MAX = 5;
+const rateBuckets = new Map();
+const { pgFetch } = require("./_lib/supabase");
 const DEFAULT_ALLOWED_ORIGINS = new Set([
   "https://www.occulert.com",
   "https://occulert.com",
@@ -37,6 +41,29 @@ function isAllowedOrigin(request) {
   return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) && /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host);
 }
 
+function clientAddress(request) {
+  const forwarded = String(request.headers["x-vercel-forwarded-for"] || request.headers["x-forwarded-for"] || "");
+  return forwarded.split(",")[0].trim() || request.socket?.remoteAddress || "unknown";
+}
+
+function rateLimited(request) {
+  const now = Date.now();
+  const key = clientAddress(request);
+  const recent = (rateBuckets.get(key) || []).filter((time) => now - time < RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT_MAX) {
+    rateBuckets.set(key, recent);
+    return true;
+  }
+  recent.push(now);
+  rateBuckets.set(key, recent);
+  if (rateBuckets.size > 1000) {
+    for (const [address, times] of rateBuckets) {
+      if (!times.some((time) => now - time < RATE_LIMIT_WINDOW_MS)) rateBuckets.delete(address);
+    }
+  }
+  return false;
+}
+
 function parseWebhookUrl(value) {
   if (!value) return null;
   try {
@@ -61,6 +88,11 @@ module.exports = async function handler(request, response) {
     return json(response, 415, { ok: false, error: "unsupported_media_type" });
   }
 
+  if (rateLimited(request)) {
+    response.setHeader("Retry-After", String(Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)));
+    return json(response, 429, { ok: false, error: "rate_limited" });
+  }
+
   const body = typeof request.body === "object" && request.body ? request.body : {};
   if (Array.isArray(body)) {
     return json(response, 400, { ok: false, error: "invalid_body" });
@@ -68,6 +100,16 @@ module.exports = async function handler(request, response) {
 
   if (JSON.stringify(body).length > MAX_BODY_LENGTH) {
     return json(response, 413, { ok: false, error: "payload_too_large" });
+  }
+
+  if (clean(body.website, 120)) {
+    return json(response, 400, { ok: false, error: "invalid_lead" });
+  }
+
+  const startedAt = Date.parse(String(body.startedAt || ""));
+  const ageMs = Date.now() - startedAt;
+  if (!Number.isFinite(startedAt) || ageMs < 2000 || ageMs > 2 * 60 * 60 * 1000) {
+    return json(response, 400, { ok: false, error: "invalid_lead" });
   }
 
   const lead = {
@@ -87,13 +129,36 @@ module.exports = async function handler(request, response) {
     return json(response, 400, { ok: false, error: "invalid_lead" });
   }
 
+  let stored = false;
+  let storageError = false;
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const created = await pgFetch("pilot_leads", {
+        method: "POST",
+        body: {
+          name: lead.name,
+          role: lead.role || null,
+          company: lead.company,
+          email: lead.email,
+          phone: lead.phone || null,
+          fleet: lead.fleet || null,
+          use_case: lead.useCase || null,
+          message: lead.message || null,
+          source: lead.source,
+          received_at: lead.receivedAt,
+        },
+      });
+      stored = Array.isArray(created) && created.length > 0;
+    } catch {
+      storageError = true;
+    }
+  }
+
   const webhookUrl = parseWebhookUrl(process.env.PILOT_LEADS_WEBHOOK_URL);
   if (!webhookUrl) {
-    return json(response, 202, {
-      ok: true,
-      stored: false,
-      message: "Lead validated. Configure PILOT_LEADS_WEBHOOK_URL to forward submissions.",
-    });
+    if (stored) return json(response, 200, { ok: true, stored: true, storage: "supabase" });
+    if (storageError) return json(response, 502, { ok: false, error: "storage_unavailable" });
+    return json(response, 202, { ok: true, stored: false, message: "Lead validated but server storage is not configured." });
   }
 
   const controller = new AbortController();
@@ -106,12 +171,13 @@ module.exports = async function handler(request, response) {
       signal: controller.signal,
     });
 
-    if (!webhookResponse.ok) {
+    if (!webhookResponse.ok && !stored) {
       return json(response, 502, { ok: false, error: "webhook_failed" });
     }
 
-    return json(response, 200, { ok: true, stored: true });
+    return json(response, 200, { ok: true, stored: true, storage: stored ? "supabase" : "webhook" });
   } catch (error) {
+    if (stored) return json(response, 200, { ok: true, stored: true, storage: "supabase" });
     return json(response, 502, { ok: false, error: "webhook_unreachable" });
   } finally {
     clearTimeout(timeout);

@@ -6,10 +6,11 @@ import { useRouter } from 'expo-router';
 import {
   Camera, useCameraDevice, useCameraPermission, useFrameProcessor,
 } from 'react-native-vision-camera';
-import { useFaceDetector, type FaceDetectionOptions } from 'react-native-vision-camera-face-detector';
+import { useFaceDetector, type FrameFaceDetectionOptions } from 'react-native-vision-camera-face-detector';
 import { Worklets } from 'react-native-worklets-core';
 import { useKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEyeTracking } from '../hooks/useEyeTracking';
 import { AlertSystem } from '../components/AlertSystem';
 import { loadSavedSensitivity } from '../components/SensitivitySlider';
@@ -31,7 +32,7 @@ import type { SensitivityLevel } from '../constants/thresholds';
  * development`) — the monitor screen will NOT run in Expo Go.
  */
 
-const FACE_DETECTOR_OPTIONS: FaceDetectionOptions = {
+const FACE_DETECTOR_OPTIONS: FrameFaceDetectionOptions = {
   performanceMode: 'fast',      // prioritize frame rate for real-time alerts
   classificationMode: 'all',    // REQUIRED: enables eye-open probabilities
   landmarkMode: 'none',
@@ -39,6 +40,8 @@ const FACE_DETECTOR_OPTIONS: FaceDetectionOptions = {
   trackingEnabled: false,
   cameraFacing: 'front',
 };
+
+const HISTORY_KEY = 'occulert-session-history';
 
 export default function MonitorScreen() {
   useKeepAwake(); // screen never dims while monitoring
@@ -52,6 +55,8 @@ export default function MonitorScreen() {
   const [alertCount, setAlertCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevAlertingRef = useRef(false);
+  const fatigueSumRef = useRef(0);
+  const fatigueSamplesRef = useRef(0);
 
   const [metrics, setMetrics] = useState<EyeMetrics>({
     ear: 0.3, perclos: 0, fatigueScore: 0, state: 'noFace',
@@ -82,10 +87,41 @@ export default function MonitorScreen() {
       const granted = await requestPermission();
       if (!granted) return;
     }
-    reset(); prevAlertingRef.current = false; setAlertCount(0); setIsRunning(true);
+    reset();
+    prevAlertingRef.current = false;
+    fatigueSumRef.current = 0;
+    fatigueSamplesRef.current = 0;
+    setAlertCount(0);
+    setIsRunning(true);
   };
 
-  const handleStop = () => { setIsRunning(false); reset(); };
+  const saveSession = useCallback(async (durationSec: number, alerts: number) => {
+    if (durationSec <= 0) return;
+    const avgFatigue = fatigueSamplesRef.current
+      ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
+      : 0;
+    const record = {
+      sessionId: 'session-' + Date.now(),
+      savedAt: new Date().toISOString(),
+      durationSec,
+      alertCount: alerts,
+      avgFatigue,
+    };
+    try {
+      const raw = await AsyncStorage.getItem(HISTORY_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const sessions = Array.isArray(parsed) ? parsed : [];
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify([record, ...sessions].slice(0, 50)));
+    } catch {
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify([record]));
+    }
+  }, []);
+
+  const handleStop = useCallback(async () => {
+    if (isRunning) await saveSession(sessionTime, alertCount);
+    setIsRunning(false);
+    reset();
+  }, [alertCount, isRunning, reset, saveSession, sessionTime]);
 
   /**
    * onEyeState — receives eye-open probabilities from the frame processor
@@ -95,6 +131,10 @@ export default function MonitorScreen() {
   const onEyeState = useCallback((leftProb: number, rightProb: number, faceFound: boolean) => {
     const result = faceFound ? processEyeOpenness(leftProb, rightProb) : processNoFace();
     setMetrics(result);
+    if (faceFound) {
+      fatigueSumRef.current += result.fatigueScore;
+      fatigueSamplesRef.current += 1;
+    }
     // Count discrete alert events only: increment once on transition INTO an
     // alerting state (closed), not on every frame while eyes stay closed.
     const alerting = result.state === 'closed';
@@ -191,7 +231,7 @@ export default function MonitorScreen() {
       <SafeAreaView style={s.overlay} pointerEvents="box-none">
         {/* Top bar */}
         <View style={s.topBar}>
-          <TouchableOpacity style={s.backBtn} onPress={() => { handleStop(); router.back(); }}>
+          <TouchableOpacity style={s.backBtn} onPress={async () => { await handleStop(); router.back(); }}>
             <Ionicons name="chevron-back" size={20} color="#c8e8f0" />
             <Text style={s.backLbl}>Home</Text>
           </TouchableOpacity>

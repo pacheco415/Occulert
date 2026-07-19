@@ -41,6 +41,11 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 `api/events.js`, and `api/fleet-summary.js` will respond with
 `501 backend_not_configured` instead of touching a database.
 
+`api/pilot-leads.js` will also store validated pilot requests in the
+`pilot_leads` table when the two server-side Supabase variables are present.
+Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the browser keeps only its
+local fallback copy and the API reports `stored: false`.
+
 ## 4. Wire up the frontend
 
 The scaffolded endpoints expect an `Authorization: Bearer <access_token>`
@@ -62,6 +67,7 @@ Supabase `user_id`.
 - [x] Schema drafted (`db/schema.sql`)
 - [x] API scaffolding drafted (`api/sessions.js`, `api/events.js`,
 `api/fleet-summary.js`, `api/_lib/supabase.js`)
+- [x] Pilot-lead storage path, spam checks, and per-instance rate limiting
 - [ ] Supabase project created (requires you)
 - [ ] Environment variables set in Vercel (requires you)
 - [ ] Frontend wired to call these endpoints instead of localStorage
