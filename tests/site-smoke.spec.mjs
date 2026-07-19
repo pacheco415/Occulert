@@ -4,7 +4,7 @@ test("important public pages load with one primary heading", async ({ page }) =>
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  for (const path of ["/", "/features.html", "/how-it-works.html", "/install.html", "/pilot-signup.html", "/fleet-dashboard.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
+  for (const path of ["/", "/features.html", "/how-it-works.html", "/install.html", "/pilot-signup.html", "/fleet-dashboard.html", "/fleet-onboarding.html", "/accept-invite.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
     const response = await page.goto(path, { waitUntil: "domcontentloaded" });
     expect(response?.ok(), `${path} should load`).toBeTruthy();
     expect(await page.locator("h1").count(), `${path} should have one h1`).toBe(1);
@@ -88,4 +88,78 @@ test("pilot request controls use an accessible form", async ({ page }) => {
   await expect(page.getByLabel("Name")).toHaveAttribute("required", "");
   await expect(page.getByLabel("Company")).toHaveAttribute("required", "");
   await expect(page.getByLabel("Email")).toHaveAttribute("required", "");
+});
+
+test("driver invitation tokens leave the URL immediately and stay in session storage", async ({ page }) => {
+  const token = "a".repeat(43);
+  await page.goto(`/accept-invite.html#token=${token}`, { waitUntil: "domcontentloaded" });
+  expect(page.url()).toMatch(/\/accept-invite\.html$/);
+  expect(await page.evaluate(() => sessionStorage.getItem("occulert-invite-token"))).toBe(token);
+  expect(await page.evaluate(() => localStorage.getItem("occulert-invite-token"))).toBeNull();
+});
+
+test("verified fleet managers can create a server-owned fleet from onboarding", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "manager-token",
+      refresh_token: "manager-refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "manager-1", email: "manager@example.com" },
+    }));
+  });
+  await page.route("**/api/fleets", async (route) => {
+    const request = route.request();
+    if (request.method() === "GET") {
+      await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false, error: "fleet_not_found" }) });
+      return;
+    }
+    expect(request.headers().authorization).toBe("Bearer manager-token");
+    expect(request.postDataJSON()).toEqual({ company_name: "Safe Transit" });
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true, fleet: { id: "fleet-1", company_name: "Safe Transit", plan: "trial" } }) });
+  });
+  await page.route("**/api/fleet-invitations", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, invitations: [] }),
+  }));
+
+  await page.goto("/fleet-onboarding.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#createCard")).toBeVisible();
+  await page.locator("#companyName").fill("Safe Transit");
+  await page.getByRole("button", { name: "Create Fleet" }).click();
+  await expect(page.locator("#fleetName")).toHaveText("Invite drivers to Safe Transit");
+  await expect(page.locator("#inviteCard")).toBeVisible();
+});
+
+test("authenticated fleet dashboards never fall back to unrelated local driver data", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "manager-token",
+      refresh_token: "manager-refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "manager-1", email: "manager@example.com" },
+    }));
+    localStorage.setItem("occulert-live-session", JSON.stringify({
+      name: "Unrelated Local Driver",
+      driverId: "local-driver",
+      status: "ALERT",
+      alerts: 99,
+      lastUpdate: new Date().toISOString(),
+    }));
+  });
+  await page.route("**/api/fleet-summary", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      ok: true,
+      fleet: { id: "fleet-1", company_name: "Safe Transit", plan: "trial" },
+      drivers: [],
+      sessions: [],
+    }),
+  }));
+
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
+  await expect(page.locator("#kpiDrivers")).toHaveText("0");
+  await expect(page.getByText("Unrelated Local Driver")).toHaveCount(0);
 });

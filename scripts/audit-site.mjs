@@ -74,6 +74,15 @@ assertIncludes("api/public-config.js", "SUPABASE_ANON_KEY", "public config endpo
 assertNotIncludes("api/public-config.js", "SUPABASE_SERVICE_ROLE_KEY", "public config endpoint must never expose the service-role key");
 assertIncludes("api/profile.js", "fleet_id: null", "driver profile creation must not trust caller-provided fleet membership");
 assertIncludes("db/schema.sql", "drivers_user_id_unique", "driver profiles must be unique per authenticated user");
+assertIncludes("db/schema.sql", "fleets_owner_user_id_unique", "fleet managers must own at most one fleet");
+assertIncludes("db/schema.sql", "create table if not exists fleet_invitations", "database schema must include protected fleet invitations");
+assertIncludes("db/schema.sql", "security definer", "invitation acceptance must use an atomic database function");
+assertIncludes("db/schema.sql", "grant execute on function public.accept_fleet_invitation(text, uuid, text) to service_role", "invitation acceptance must be service-role-only");
+assertIncludes("api/fleet-invitations.js", "crypto.randomBytes(32)", "fleet invitations must use cryptographically random tokens");
+assertIncludes("api/fleet-invitations.js", "token_hash: tokenHash", "fleet invitations must store only token hashes");
+assertNotIncludes("api/fleet-invitations.js", "token: token", "fleet invitations must not store raw tokens");
+assertIncludes("api/accept-invitation.js", "email_confirmed_at", "invitation acceptance must require a verified email");
+assertIncludes("api/accept-invitation.js", "rpc/accept_fleet_invitation", "invitation acceptance must use the atomic database function");
 assertIncludes("sw.js", "url.pathname.startsWith('/api/')", "service worker must never intercept or cache API responses");
 assertIncludes("api/sessions.js", "driver_id: \"eq.\" + driver.id", "session updates must be scoped to the authenticated driver's own sessions");
 assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes must verify the session belongs to the authenticated driver");
@@ -91,6 +100,10 @@ assertIncludes("app.html", "window.OcculertBackend.startSession()", "driver app 
 assertIncludes("app.html", "window.OcculertBackend.endSession", "driver app must finish protected cloud sessions when opted in");
 assertIncludes("app.html", "queueBackendEvent", "driver app must queue protected alert events when opted in");
 assertIncludes("login.html", "src=\"/occulert-backend.js\"", "login must load the Supabase backend client");
+assertNotIncludes("login.html", "id=\"fleetId\"", "login must not offer caller-controlled fleet membership");
+assertIncludes("fleet-onboarding.html", "createFleetInvitation", "fleet onboarding must create protected invitations through the API");
+assertIncludes("accept-invite.html", "history.replaceState", "invite pages must immediately remove tokens from the visible URL");
+assertIncludes("accept-invite.html", "sessionStorage", "invite tokens must stay out of persistent local storage");
 assertNotIncludes("app.html", "oninput=\"typeof setSensitivity", "driver app must not keep the conflicting numeric sensitivity slider");
 for (const path of ["features.html", "how-it-works.html", "install.html"]) assertSingleH1(path);
 assertIncludes("account.html", "function esc(v)", "account.html must escape rendered profile fields");
@@ -100,6 +113,9 @@ assertIncludes("fleet-dashboard.html", "id=\"driverSearch\"", "fleet dashboard m
 assertIncludes("fleet-dashboard.html", "function exportFleetCSV()", "fleet dashboard must keep CSV export");
 assertIncludes("fleet-dashboard.html", "function seedDemoData()", "fleet dashboard must keep demo data loading");
 assertIncludes("fleet-dashboard.html", "function copyDriver(id)", "fleet dashboard must keep per-driver copy summaries");
+assertIncludes("fleet-dashboard.html", "getFleetSummary()", "signed-in fleet dashboards must use the owner-scoped backend summary");
+assertIncludes("fleet-dashboard.html", "!fleetMode&&local", "protected fleet dashboards must not fall back to unrelated local driver data");
+for (const path of ["fleet-onboarding.html", "accept-invite.html"]) assertSingleH1(path);
 assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");
 assertIncludes("api/pilot-leads.js", "unsupported_media_type", "pilot lead API must require JSON submissions");
 assertIncludes("api/pilot-leads.js", "url.protocol === \"https:\"", "pilot lead API must only forward to HTTPS webhooks");

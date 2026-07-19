@@ -146,6 +146,26 @@ window.OcculertBackend = (function () {
 
   function getFleetSummary() { return api("GET", "/api/fleet-summary"); }
 
+  function getFleet() { return api("GET", "/api/fleets"); }
+
+  function createFleet(companyName) {
+    return api("POST", "/api/fleets", { company_name: companyName });
+  }
+
+  function listFleetInvitations() { return api("GET", "/api/fleet-invitations"); }
+
+  function createFleetInvitation(email) {
+    return api("POST", "/api/fleet-invitations", { email: email });
+  }
+
+  function revokeFleetInvitation(invitationId) {
+    return api("DELETE", "/api/fleet-invitations", { invitation_id: invitationId });
+  }
+
+  function acceptFleetInvitation(token) {
+    return api("POST", "/api/accept-invitation", { token: token });
+  }
+
   return {
     isConfigured: isConfigured,
     signUp: signUp,
@@ -157,5 +177,11 @@ window.OcculertBackend = (function () {
     endSession: endSession,
     logEvent: logEvent,
     getFleetSummary: getFleetSummary,
+    getFleet: getFleet,
+    createFleet: createFleet,
+    listFleetInvitations: listFleetInvitations,
+    createFleetInvitation: createFleetInvitation,
+    revokeFleetInvitation: revokeFleetInvitation,
+    acceptFleetInvitation: acceptFleetInvitation,
   };
 })();

@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v15';
+const CACHE = 'occulert-v16';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -8,6 +8,8 @@ const STATIC_ASSETS = [
   '/privacy.html',
   '/safety.html',
   '/fleet-dashboard.html',
+  '/fleet-onboarding.html',
+  '/accept-invite.html',
   '/session-history.html',
   '/driver-profiles.html',
   '/pilot-signup.html',
