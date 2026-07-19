@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "android": "expo start --android",
     "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
     "build:dev": "eas build --profile development --platform ios",
     "build:ios": "eas build --platform ios",
     "build:android": "eas build --platform android",

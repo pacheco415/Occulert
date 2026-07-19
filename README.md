@@ -95,14 +95,18 @@ The audit checks local links/assets, Firebase disabled-by-default behavior, sens
 
 ## 📬 Pilot Lead Capture
 
-Pilot signup always stores a local browser copy for the demo. To also forward requests server-side on Vercel, set:
+Pilot signup always stores a local browser copy for the demo. When the Supabase
+server variables from `BACKEND_SETUP.md` are configured, validated requests are
+stored in the `pilot_leads` table. To additionally forward requests, set:
 
 ```bash
 PILOT_LEADS_WEBHOOK_URL=https://your-webhook-endpoint.example
 OCCULERT_ALLOWED_ORIGINS=https://www.occulert.com,https://occulert.com
 ```
 
-The `/api/pilot-leads` endpoint requires same-origin JSON submissions, validates required fields, strips oversized values, and only forwards to an HTTPS webhook.
+The `/api/pilot-leads` endpoint requires same-origin JSON submissions, validates
+required fields and form timing, strips oversized values, rate limits bursts,
+and only forwards to an HTTPS webhook.
 
 ---
 

@@ -59,6 +59,6 @@ limit: "50",
 
 return json(response, 200, { ok: true, fleet: fleet, drivers: drivers, sessions: sessions });
 } catch (error) {
-return json(response, 502, { ok: false, error: "supabase_error", details: error.details || null });
+return json(response, 502, { ok: false, error: "supabase_error" });
 }
 };

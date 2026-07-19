@@ -50,6 +50,20 @@ create table if not exists events (
   created_at timestamptz not null default now()
   );
 
+create table if not exists pilot_leads (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  role text,
+  company text not null,
+  email text not null,
+  phone text,
+  fleet text,
+  use_case text,
+  message text,
+  source text not null default 'pilot-signup-page',
+  received_at timestamptz not null default now()
+  );
+
 -- Row Level Security: drivers can only read their own rows; fleet managers
 -- (fleet owners) can read rows scoped to their fleet. Writes go through the
 -- serverless API using the service_role key, which bypasses RLS by design.
@@ -59,6 +73,10 @@ alter table fleets enable row level security;
 alter table drivers enable row level security;
 alter table sessions enable row level security;
 alter table events enable row level security;
+alter table pilot_leads enable row level security;
+
+-- Pilot leads are inserted only by the serverless API with the service-role
+-- key. No browser-facing policy is intentionally defined.
 
 create policy "fleet owner can read own fleet" on fleets
 for select using (owner_user_id = auth.uid());

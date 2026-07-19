@@ -10,6 +10,8 @@ native-app/node_modules/
 native-app/.expo/
 dist/
 web-build/
+playwright-report/
+test-results/
 *.jks
 *.p8
 *.p12

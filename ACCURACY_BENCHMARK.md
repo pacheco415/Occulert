@@ -1,152 +1,96 @@
-# Occulert Detection Accuracy Benchmark Guide
+# Occulert Detection Accuracy Benchmark
 
-This document outlines how to formally validate Occulert's drowsiness detection accuracy against ground-truth datasets, and tracks the current benchmark status.
+Occulert has not yet been validated against a peer-reviewed drowsy-driving
+dataset. This document defines the repeatable benchmark path and deliberately
+does not claim an accuracy percentage before real labeled data is evaluated.
 
----
-
-## Current Status
+## Current status
 
 | Item | Status |
-|------|--------|
-| Algorithm | MediaPipe FaceMesh EAR (Eye Aspect Ratio) + PERCLOS |
-| Sensitivity presets | Low / Medium / High (tunable thresholds) |
-| Formal dataset validation | ⏳ Not yet completed |
-| Peer-reviewed publication | ⏳ Not yet completed |
-| Last updated | June 2026 |
+|---|---|
+| Algorithm | MediaPipe FaceMesh EAR, PERCLOS, head movement, and fatigue scoring |
+| Sensitivity presets | Low, Medium, High |
+| Reproducible EAR threshold runner | Ready in `benchmark/run-benchmark.mjs` |
+| Formal dataset validation | Not completed; dataset access is required |
+| Peer-reviewed publication | Not completed |
+| Last updated | July 2026 |
 
----
+## Target datasets
 
-## Target Datasets
+1. **NTHU Drowsy Driver Detection Dataset** — labeled daytime/nighttime,
+   glasses/no-glasses driving footage. Access requires the dataset owner's
+   request process.
+2. **DROZY** — video plus physiological and sleepiness measures.
+3. **UTA Real-Life Drowsiness Dataset** — real-world drowsiness footage.
 
-These are the standard open datasets used for drowsy driver detection research:
+Review each dataset's license and consent restrictions before downloading,
+processing, or publishing derived results. Do not commit licensed video or
+person-identifiable footage to this repository.
 
-### 1. NTHU Drowsy Driver Detection Dataset
-- **Source:** National Tsing Hua University, Taiwan
-- **URL:** http://cv.cs.nthu.edu.tw/php/callforpaper/datasets/DDD/
-- **Contents:** ~36 subjects, daytime/nighttime, glasses/no glasses, indoor/outdoor lighting
-- **Ground truth:** Frame-level drowsiness labels
-- **Why use it:** Widely cited benchmark — lets you compare against published papers
+## Run the checked-in benchmark
 
-### 2. DROZY Dataset
-- **Source:** University of Mons, Belgium
-- **URL:** http://www.drozy.ulg.ac.be/
-- **Contents:** EEG + video + Karolinska Sleepiness Scale (KSS) scores
-- **Ground truth:** Subjective + physiological sleepiness labels
-- **Why use it:** EEG ground truth is more objective than self-report
+The runner accepts precomputed, labeled Eye Aspect Ratio samples:
 
-### 3. UTA Real-Life Drowsiness Dataset
-- **Source:** University of Texas Arlington
-- **Contents:** Real driving footage with verified drowsiness events
-- **Why use it:** Real-world (not lab) conditions
+```csv
+label,ear
+awake,0.31
+awake,0.28
+drowsy,0.14
+high_fatigue,0.16
+```
 
----
+Run:
 
-## How to Run the Benchmark
+```bash
+node benchmark/run-benchmark.mjs --input path/to/labeled-ear.csv
+```
 
-### Step 1: Obtain a dataset
-Download the NTHU DDD dataset (requires a request form on their site). You will receive labeled video clips: `awake`, `low_fatigue`, `high_fatigue`, `drowsy`.
+It reports precision, recall, F1, and false-alert rate for all three
+sensitivity thresholds. Verify the runner itself with:
 
-### Step 2: Extract EAR values from clips
-Run MediaPipe FaceMesh on each video clip and compute EAR per frame. You can use the Python snippet below:
+```bash
+npm run test:benchmark
+```
 
-```python
-import cv2
-import mediapipe as mp
-import numpy as np
+This first runner is intentionally dependency-free and evaluates frame-level
+EAR thresholds. It does **not** validate camera tracking, calibration,
+PERCLOS timing, head-nod logic, the complete fatigue score, or real driving
+behavior. Those must be evaluated by a later full-pipeline harness and a
+properly governed human pilot.
 
-mp_face = mp.solutions.face_mesh
+## Ground-truth workflow
 
-# Eye landmark indices (MediaPipe FaceMesh)
-LEFT_EYE  = [362, 385, 387, 263, 373, 380]
-RIGHT_EYE = [33,  160, 158, 133, 153, 144]
+1. Obtain permission to use one target dataset.
+2. Extract one EAR value per usable frame with the same MediaPipe landmarks
+   and preprocessing used by Occulert.
+3. Map the dataset's labels to `awake`, `drowsy`, or `high_fatigue`, recording
+   the mapping and any excluded frames.
+4. Run the checked-in benchmark without tuning thresholds on the test split.
+5. Report participant-level or clip-level splits so adjacent frames from the
+   same person do not leak between training/tuning and evaluation.
+6. Repeat important slices separately: daytime, nighttime, glasses,
+   sunglasses, head turns, camera positions, and skin-tone ranges where the
+   dataset supports responsible reporting.
+7. Preserve the raw output, runner commit SHA, dataset version, exclusions,
+   and environment details with the published results.
 
-def eye_aspect_ratio(landmarks, eye_indices, img_w, img_h):
-    pts = [(int(landmarks[i].x * img_w), int(landmarks[i].y * img_h)) for i in eye_indices]
-        A = np.linalg.norm(np.array(pts[1]) - np.array(pts[5]))
-            B = np.linalg.norm(np.array(pts[2]) - np.array(pts[4]))
-                C = np.linalg.norm(np.array(pts[0]) - np.array(pts[3]))
-                    return (A + B) / (2.0 * C)
+## Initial targets
 
-                    cap = cv2.VideoCapture('path/to/clip.avi')
-                    with mp_face.FaceMesh(static_image_mode=False, max_num_faces=1) as face_mesh:
-                        while cap.isOpened():
-                                ret, frame = cap.read()
-                                        if not ret:
-                                                    break
-                                                            h, w = frame.shape[:2]
-                                                                    results = face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                                                                            if results.multi_face_landmarks:
-                                                                                        lm = results.multi_face_landmarks[0].landmark
-                                                                                                    left_ear  = eye_aspect_ratio(lm, LEFT_EYE,  w, h)
-                                                                                                                right_ear = eye_aspect_ratio(lm, RIGHT_EYE, w, h)
-                                                                                                                            avg_ear = (left_ear + right_ear) / 2
-                                                                                                                                        print(avg_ear)
-                                                                                                                                        cap.release()
-                                                                                                                                        ```
-                                                                                                                                        
-                                                                                                                                        ### Step 3: Apply Occulert thresholds and compare to labels
-                                                                                                                                        
-                                                                                                                                        For each frame, apply the three sensitivity presets and check against ground truth:
-                                                                                                                                        
-                                                                                                                                        ```python
-                                                                                                                                        SENSITIVITY = {
-                                                                                                                                            'low':    {'closed': 0.15, 'watch': 0.19},
-                                                                                                                                                'medium': {'closed': 0.18, 'watch': 0.22},
-                                                                                                                                                    'high':   {'closed': 0.21, 'watch': 0.25},
-                                                                                                                                                    }
-                                                                                                                                                    
-                                                                                                                                                    # For each frame: predicted = 'alert' | 'watch' | 'closed'
-                                                                                                                                                    # Compare to ground truth label
-                                                                                                                                                    # Calculate: True Positive, False Positive, True Negative, False Negative
-                                                                                                                                                    # Report: Precision, Recall, F1, False Alert Rate
-                                                                                                                                                    ```
-                                                                                                                                                    
-                                                                                                                                                    ### Step 4: Record results here
-                                                                                                                                                    
-                                                                                                                                                    Update the table below when benchmarking is complete:
-                                                                                                                                                    
-                                                                                                                                                    | Dataset | Sensitivity | Precision | Recall | F1 | False Alert Rate |
-                                                                                                                                                    |---------|------------|-----------|--------|----|------------------|
-                                                                                                                                                    | NTHU DDD | Low | TBD | TBD | TBD | TBD |
-                                                                                                                                                    | NTHU DDD | Medium | TBD | TBD | TBD | TBD |
-                                                                                                                                                    | NTHU DDD | High | TBD | TBD | TBD | TBD |
-                                                                                                                                                    | DROZY | Medium | TBD | TBD | TBD | TBD |
-                                                                                                                                                    
-                                                                                                                                                    ---
-                                                                                                                                                    
-                                                                                                                                                    ## What "Good" Looks Like
-                                                                                                                                                    
-                                                                                                                                                    For a driver safety tool, prioritize **recall over precision** — it is better to have a false alert (driver is fine but app warns them) than a missed alert (driver is drowsy but app stays silent).
-                                                                                                                                                    
-                                                                                                                                                    - **Target recall:** > 85% on drowsy/high-fatigue frames
-                                                                                                                                                    - **Target false alert rate:** < 15% on awake frames at Medium sensitivity
-                                                                                                                                                    - **Stretch goal:** > 90% recall, < 10% false alert rate
-                                                                                                                                                    
-                                                                                                                                                    ---
-                                                                                                                                                    
-                                                                                                                                                    ## Publishing Results
-                                                                                                                                                    
-                                                                                                                                                    Once benchmarked, publish results:
-                                                                                                                                                    1. Update this file with the completed table
-                                                                                                                                                    2. Add a "Validated Accuracy" badge/section to README.md
-                                                                                                                                                    3. Add a brief accuracy statement to safety.html
-                                                                                                                                                    4. Consider submitting a short paper to an HCI or transportation safety venue
-                                                                                                                                                    
-                                                                                                                                                    ---
-                                                                                                                                                    
-                                                                                                                                                    *Occulert™ · San Francisco, CA · accuracy benchmark guide v1.0*
+- Medium sensitivity recall above 85% on drowsy/high-fatigue samples.
+- Medium sensitivity false-alert rate below 15% on awake samples.
+- Stretch target: recall above 90% and false-alert rate below 10%.
 
+Targets are product goals, not current performance claims. Even strong offline
+results would not make Occulert a certified medical or safety device.
 
----
+## Results
 
-## Immediate Next Steps (added 2026-07-05)
+| Dataset | Split/version | Sensitivity | Precision | Recall | F1 | False-alert rate |
+|---|---|---|---:|---:|---:|---:|
+| Pending | Pending | Low | TBD | TBD | TBD | TBD |
+| Pending | Pending | Medium | TBD | TBD | TBD | TBD |
+| Pending | Pending | High | TBD | TBD | TBD | TBD |
 
-This benchmark has not been executed yet, so here is a concrete path to move it from "not yet completed" to a real result. This complements BETA_TEST_PLAN.md, which covers real-world human testing; this document covers offline validation against labeled datasets.
-
-Request access to the NTHU DDD dataset first, since it is the most widely cited and does not require special hardware like DROZY's EEG rig. Expect the request-form turnaround to take a few days, so kick this off before anything else.
-
-While waiting on dataset access, turn the Step 2/3 Python snippets already in this document into a small standalone script (for example benchmark/run_benchmark.py) that takes a directory of labeled clips and prints the Precision/Recall/F1/False Alert Rate table for all three sensitivity presets, so it is ready to run the moment clips arrive.
-
-Once a first pass of numbers exists for even one sensitivity preset on one dataset, fill in the results table above with real numbers rather than TBD, and compare against the "What Good Looks Like" targets (greater than 85% recall, under 15% false alert rate at Medium). Treat this as a rough draft benchmark, not a final one — the DROZY and UTA datasets can follow once NTHU is done.
-
-Finally, cross-link the outcome: update this file's Current Status table, add the "Validated Accuracy" note to README.md and safety.html as the Publishing Results section already describes, and close out the corresponding item in issue #6 once real numbers are in place.
+Only replace `TBD` with reproducible results from an authorized dataset. After
+that, update `README.md`, `safety.html`, and the related GitHub roadmap issue
+with the exact dataset and limitations.

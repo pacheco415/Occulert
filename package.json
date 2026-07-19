@@ -3,7 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "audit:site": "node scripts/audit-site.mjs"
+    "audit:site": "node scripts/audit-site.mjs",
+    "test:api": "node scripts/test-api-security.mjs",
+    "test:benchmark": "node benchmark/test-benchmark.mjs",
+    "test:browser": "playwright test",
+    "verify": "npm run audit:site && npm run test:api && npm run test:benchmark"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1"
   },
   "engines": {
     "node": ">=20"

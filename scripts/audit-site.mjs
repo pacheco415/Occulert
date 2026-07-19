@@ -27,6 +27,15 @@ function assertIncludes(path, needle, message) {
   if (!read(path).includes(needle)) fail(message);
 }
 
+function assertNotIncludes(path, needle, message) {
+  if (read(path).includes(needle)) fail(message);
+}
+
+function assertSingleH1(path) {
+  const count = (read(path).match(/<h1\b/gi) || []).length;
+  if (count !== 1) fail(`${path} must contain exactly one h1 (found ${count})`);
+}
+
 walk(root);
 
 for (const file of htmlFiles) {
@@ -48,9 +57,27 @@ assertIncludes("firebase-config.js", "OCCULERT_FIREBASE_ENABLED = false", "fireb
 assertIncludes("firebase-config.js", "OCCULERT_FIREBASE_CONFIG = null", "firebase-config.js must not ship a live public config by default");
 assertIncludes("vercel.json", "\"source\": \"/firebase-config.js\"", "vercel.json must include a firebase-config.js cache rule");
 assertIncludes("vercel.json", "\"value\": \"no-store\"", "vercel.json must include no-store for sensitive helper files");
-assertIncludes("vercel.json", "Content-Security-Policy-Report-Only", "vercel.json must include CSP report-only hardening");
+assertIncludes("vercel.json", "\"key\": \"Content-Security-Policy\"", "vercel.json must enforce its tested CSP");
+assertIncludes("vercel.json", "https://unpkg.com", "vercel.json CSP must allow Leaflet assets used by the fleet map");
+assertIncludes("vercel.json", "https://fonts.googleapis.com", "vercel.json CSP must allow Google Fonts stylesheets used by marketing pages");
+assertIncludes("vercel.json", "font-src 'self' https://fonts.gstatic.com", "vercel.json CSP must allow Google Fonts font files");
+assertIncludes("api/sessions.js", "driver_id: \"eq.\" + driver.id", "session updates must be scoped to the authenticated driver's own sessions");
+assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes must verify the session belongs to the authenticated driver");
+assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event GPS latitude must be range validated");
+assertIncludes("api/sessions.js", "MAX_BODY_LENGTH", "session API must reject oversized JSON bodies");
+assertIncludes("api/pilot-leads.js", "body.website", "pilot lead API must include honeypot spam filtering");
+assertIncludes("pilot-signup.html", "startedAt:formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
+assertIncludes("api/pilot-leads.js", "rateLimited(request)", "pilot lead API must rate limit submission bursts");
+assertIncludes("api/pilot-leads.js", "pgFetch(\"pilot_leads\"", "pilot lead API must support durable Supabase storage");
+assertIncludes("db/schema.sql", "create table if not exists pilot_leads", "database schema must include pilot lead storage");
+assertIncludes("pilot-signup.html", "<form class=\"card\"", "pilot signup controls must use a semantic form");
+assertIncludes("app.html", "trigger=_patched", "enhanced alert behavior must replace the active trigger function");
+assertIncludes("app.html", "if(alerts===previousAlerts)return", "enhanced alert behavior must respect alert cooldowns");
+assertNotIncludes("app.html", "oninput=\"typeof setSensitivity", "driver app must not keep the conflicting numeric sensitivity slider");
+for (const path of ["features.html", "how-it-works.html", "install.html"]) assertSingleH1(path);
 assertIncludes("account.html", "function esc(v)", "account.html must escape rendered profile fields");
 assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "native alert sound must be bundled locally");
+assertIncludes("native-app/app/monitor.tsx", "AsyncStorage.setItem(HISTORY_KEY", "native monitor must save completed sessions for the history screen");
 assertIncludes("fleet-dashboard.html", "id=\"driverSearch\"", "fleet dashboard must keep driver search controls");
 assertIncludes("fleet-dashboard.html", "function exportFleetCSV()", "fleet dashboard must keep CSV export");
 assertIncludes("fleet-dashboard.html", "function seedDemoData()", "fleet dashboard must keep demo data loading");
