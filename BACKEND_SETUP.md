@@ -1,7 +1,7 @@
 # Backend Setup Guide (Supabase)
 
-This guide turns the backend scaffolding in `api/sessions.js`, `api/events.js`,
-`api/fleet-summary.js`, and `api/_lib/supabase.js` into a working real
+This guide turns the backend routes in `api/profile.js`, `api/sessions.js`,
+`api/events.js`, `api/fleet-summary.js`, and `api/_lib/supabase.js` into a working real
 backend, replacing the localStorage-only prototype described in
 BACKEND_ROADMAP.md.
 
@@ -38,7 +38,7 @@ In your Vercel project settings -> Environment Variables, add:
 - `SUPABASE_ANON_KEY` (if the frontend will call Supabase Auth directly)
 
 Redeploy after adding these. Until they are set, `api/sessions.js`,
-`api/events.js`, and `api/fleet-summary.js` will respond with
+`api/profile.js`, `api/events.js`, and `api/fleet-summary.js` will respond with
 `501 backend_not_configured` instead of touching a database.
 
 `api/pilot-leads.js` will also store validated pilot requests in the
@@ -46,21 +46,25 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the browser keeps only its
 local fallback copy and the API reports `stored: false`.
 
-## 4. Wire up the frontend
+## 4. Frontend behavior
 
-The scaffolded endpoints expect an `Authorization: Bearer <access_token>`
+The endpoints expect an `Authorization: Bearer <access_token>`
 header, where `access_token` comes from Supabase Auth running in the
-browser (e.g. `supabase.auth.signInWithPassword(...)`). `app.html` and
-`fleet-dashboard.html` still read/write `localStorage` today; connecting
-them to `/api/sessions`, `/api/events`, and `/api/fleet-summary` is the next
-implementation step once the project above exists.
+browser. `api/public-config.js` exposes only the public project URL and anon
+key at runtime; it must never expose the service-role key. Email/password
+login creates or updates the authenticated user's driver profile, and
+`app.html` writes opted-in session summaries and alert events through the
+protected API routes. Local storage remains the fallback when cloud sync is
+off, unavailable, or the user is signed out. The fleet dashboard remains
+local/demo-only until an administrator invitation and fleet-membership flow
+is implemented.
 
 ## 5. Seed fleets and drivers
 
-`fleets` and `drivers` rows need to exist (created manually in the Supabase
-table editor, or via a future admin screen) before a driver can start a
-session, since `api/sessions.js` looks up the driver's `fleet_id` via their
-Supabase `user_id`.
+`api/profile.js` safely creates a driver row for the authenticated user with
+no fleet membership. It does not accept a caller-provided fleet ID. Fleet
+membership must be assigned later through a trusted administrator invitation
+flow. Run the full current `db/schema.sql` before enabling driver sync.
 
 ## Status
 
@@ -68,8 +72,9 @@ Supabase `user_id`.
 - [x] API scaffolding drafted (`api/sessions.js`, `api/events.js`,
 `api/fleet-summary.js`, `api/_lib/supabase.js`)
 - [x] Pilot-lead storage path, spam checks, and per-instance rate limiting
-- [ ] Supabase project created (requires you)
-- [ ] Environment variables set in Vercel (requires you)
-- [ ] Frontend wired to call these endpoints instead of localStorage
+- [x] Supabase project and protected pilot-lead table created
+- [ ] Full fleet/driver/session/event schema applied and verified
+- [ ] `SUPABASE_ANON_KEY` environment variable set in Vercel and deployment verified
+- [x] Frontend wired with authenticated API calls and local fallback
 - [ ] Row Level Security policies reviewed for production use
-- [ ] Admin/seeding flow for creating fleets and drivers
+- [ ] Trusted fleet invitation/administration flow

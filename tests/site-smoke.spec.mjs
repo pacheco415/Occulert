@@ -36,6 +36,51 @@ test("driver alerts enhance only successful triggers and sensitivity is unambigu
   expect(await page.evaluate(() => eyeClosedThreshold)).toBeCloseTo(0.21, 5);
 });
 
+test("opted-in driver sessions use authenticated cloud APIs without sending GPS by default", async ({ page }) => {
+  const apiCalls = [];
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "test-access-token",
+      refresh_token: "test-refresh-token",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "user-1", email: "driver@example.com" },
+    }));
+  });
+  await page.route("**/api/public-config", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, supabase: { configured: true, url: "https://example.supabase.co", anonKey: "public-test-key" } }),
+  }));
+  await page.route("**/api/sessions", async (route) => {
+    const request = route.request();
+    apiCalls.push({ method: request.method(), headers: request.headers(), body: request.postDataJSON() });
+    const session = request.method() === "POST" ? { id: "session-1" } : { id: "session-1", ended_at: new Date().toISOString() };
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, session }) });
+  });
+  await page.route("**/api/events", async (route) => {
+    const request = route.request();
+    apiCalls.push({ method: request.method(), headers: request.headers(), body: request.postDataJSON() });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, event: { id: "event-1" } }) });
+  });
+
+  await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+  await page.locator("#cloudConsent").check();
+  await page.evaluate(() => initCloud());
+  await expect(page.locator("#sync")).toHaveText("ON");
+  await page.evaluate(async () => {
+    backendSessionPromise = beginBackendSession();
+    await backendSessionPromise;
+    queueBackendEvent("drowsy");
+    await finishBackendSession({ avgFatigue: 25, maxFatigue: 60, safetyScore: 72, alerts: 1, headNods: 0 });
+  });
+
+  expect(apiCalls.map((call) => call.method)).toEqual(["POST", "POST", "PATCH"]);
+  expect(apiCalls.every((call) => call.headers.authorization === "Bearer test-access-token")).toBe(true);
+  expect(apiCalls[1].body.type).toBe("drowsy");
+  expect(apiCalls[1].body.latitude).toBeUndefined();
+  expect(apiCalls[1].body.longitude).toBeUndefined();
+});
+
 test("pilot request controls use an accessible form", async ({ page }) => {
   const response = await page.goto("/pilot-signup.html", { waitUntil: "domcontentloaded" });
   expect(response?.headers()["content-security-policy"]).toContain("default-src 'self'");

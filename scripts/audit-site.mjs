@@ -40,6 +40,11 @@ walk(root);
 
 for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
+  const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+  for (const [index, match] of inlineScripts.entries()) {
+    try { new Function(match[1]); }
+    catch (error) { fail(`${file}: inline script ${index + 1} does not parse (${error.message})`); }
+  }
   const refs = [...html.matchAll(/\b(?:href|src)=["']([^"'#?]+)[^"']*["']/g)].map((match) => match[1]);
   for (const ref of refs) {
     if (!ref.startsWith("/") || ref.startsWith("//")) continue;
@@ -61,6 +66,15 @@ assertIncludes("vercel.json", "\"key\": \"Content-Security-Policy\"", "vercel.js
 assertIncludes("vercel.json", "https://unpkg.com", "vercel.json CSP must allow Leaflet assets used by the fleet map");
 assertIncludes("vercel.json", "https://fonts.googleapis.com", "vercel.json CSP must allow Google Fonts stylesheets used by marketing pages");
 assertIncludes("vercel.json", "font-src 'self' https://fonts.gstatic.com", "vercel.json CSP must allow Google Fonts font files");
+assertIncludes("vercel.json", "https://*.supabase.co", "vercel.json CSP must allow configured Supabase Auth requests");
+assertIncludes("vercel.json", "\"source\": \"/occulert-backend.js\"", "browser auth helper must not be cached across configuration changes");
+assertNotIncludes("occulert-backend.js", "PASTE_ANON_KEY_HERE", "browser backend client must not ship placeholder credentials");
+assertIncludes("occulert-backend.js", "/api/public-config", "browser backend client must load public runtime configuration");
+assertIncludes("api/public-config.js", "SUPABASE_ANON_KEY", "public config endpoint must read the browser-safe anon key from the environment");
+assertNotIncludes("api/public-config.js", "SUPABASE_SERVICE_ROLE_KEY", "public config endpoint must never expose the service-role key");
+assertIncludes("api/profile.js", "fleet_id: null", "driver profile creation must not trust caller-provided fleet membership");
+assertIncludes("db/schema.sql", "drivers_user_id_unique", "driver profiles must be unique per authenticated user");
+assertIncludes("sw.js", "url.pathname.startsWith('/api/')", "service worker must never intercept or cache API responses");
 assertIncludes("api/sessions.js", "driver_id: \"eq.\" + driver.id", "session updates must be scoped to the authenticated driver's own sessions");
 assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes must verify the session belongs to the authenticated driver");
 assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event GPS latitude must be range validated");
@@ -73,6 +87,10 @@ assertIncludes("db/schema.sql", "create table if not exists pilot_leads", "datab
 assertIncludes("pilot-signup.html", "<form class=\"card\"", "pilot signup controls must use a semantic form");
 assertIncludes("app.html", "trigger=_patched", "enhanced alert behavior must replace the active trigger function");
 assertIncludes("app.html", "if(alerts===previousAlerts)return", "enhanced alert behavior must respect alert cooldowns");
+assertIncludes("app.html", "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
+assertIncludes("app.html", "window.OcculertBackend.endSession", "driver app must finish protected cloud sessions when opted in");
+assertIncludes("app.html", "queueBackendEvent", "driver app must queue protected alert events when opted in");
+assertIncludes("login.html", "src=\"/occulert-backend.js\"", "login must load the Supabase backend client");
 assertNotIncludes("app.html", "oninput=\"typeof setSensitivity", "driver app must not keep the conflicting numeric sensitivity slider");
 for (const path of ["features.html", "how-it-works.html", "install.html"]) assertSingleH1(path);
 assertIncludes("account.html", "function esc(v)", "account.html must escape rendered profile fields");

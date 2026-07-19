@@ -24,6 +24,9 @@ create table if not exists drivers (
   created_at timestamptz not null default now()
   );
 
+create unique index if not exists drivers_user_id_unique
+on drivers(user_id) where user_id is not null;
+
 create table if not exists sessions (
   id uuid primary key default gen_random_uuid(),
   driver_id uuid not null references drivers(id) on delete cascade,
