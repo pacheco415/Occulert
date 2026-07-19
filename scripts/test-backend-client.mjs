@@ -34,6 +34,12 @@ async function fetchMock(url, options = {}) {
   if (url === "/api/sessions" && options.method === "POST") return response({ ok: true, session: { id: "session-1" } });
   if (url === "/api/sessions" && options.method === "PATCH") return response({ ok: true, session: { id: "session-1" } });
   if (url === "/api/events") return response({ ok: true, event: { id: "event-1" } });
+  if (url === "/api/fleets" && options.method === "GET") return response({ ok: true, fleet: { id: "fleet-1" } });
+  if (url === "/api/fleets" && options.method === "POST") return response({ ok: true, fleet: { id: "fleet-1" } }, 201);
+  if (url === "/api/fleet-invitations" && options.method === "GET") return response({ ok: true, invitations: [] });
+  if (url === "/api/fleet-invitations" && options.method === "POST") return response({ ok: true, invitation: { id: "invite-1" } }, 201);
+  if (url === "/api/fleet-invitations" && options.method === "DELETE") return response({ ok: true });
+  if (url === "/api/accept-invitation") return response({ ok: true, fleet: { id: "fleet-1" } });
   throw new Error(`unexpected fetch: ${options.method || "GET"} ${url}`);
 }
 
@@ -67,11 +73,19 @@ assert.equal((await backend.ensureDriverProfile({ name: "Test Driver", vehicle: 
 assert.equal((await backend.startSession()).body.session.id, "session-1");
 assert.equal((await backend.logEvent("session-1", "drowsy", { fatigue_score: 80 })).ok, true);
 assert.equal((await backend.endSession("session-1", { safety_score: 70 })).ok, true);
+assert.equal((await backend.getFleet()).body.fleet.id, "fleet-1");
+assert.equal((await backend.createFleet("Safe Transit")).status, 201);
+assert.equal((await backend.listFleetInvitations()).ok, true);
+assert.equal((await backend.createFleetInvitation("driver@example.com")).status, 201);
+assert.equal((await backend.revokeFleetInvitation("invite-1")).ok, true);
+assert.equal((await backend.acceptFleetInvitation("one-time-token")).body.fleet.id, "fleet-1");
 
 const protectedCalls = calls.filter((call) => String(call.url).startsWith("/api/") && call.url !== "/api/public-config");
 assert.ok(protectedCalls.length >= 4);
 assert.ok(protectedCalls.every((call) => call.headers.Authorization === "Bearer access-token"));
 assert.equal(calls.find((call) => String(call.url).includes("/auth/v1/token")).headers.apikey, "public-key");
+assert.equal(JSON.parse(calls.find((call) => call.url === "/api/fleets" && call.method === "POST").body).company_name, "Safe Transit");
+assert.equal(JSON.parse(calls.find((call) => call.url === "/api/fleet-invitations" && call.method === "DELETE").body).invitation_id, "invite-1");
 
 backend.signOut();
 assert.equal(backend.currentUser(), null);

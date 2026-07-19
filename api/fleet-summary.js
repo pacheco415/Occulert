@@ -50,7 +50,7 @@ params: { select: "id,name,active,vehicle_id", fleet_id: "eq." + fleet.id },
 
 const sessions = await pgFetch("sessions", {
 params: {
-select: "id,driver_id,started_at,ended_at,safety_score,alert_count",
+select: "id,driver_id,started_at,ended_at,average_fatigue,max_fatigue,safety_score,alert_count,head_nod_count",
 fleet_id: "eq." + fleet.id,
 order: "started_at.desc",
 limit: "50",

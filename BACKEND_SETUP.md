@@ -1,7 +1,8 @@
 # Backend Setup Guide (Supabase)
 
 This guide turns the backend routes in `api/profile.js`, `api/sessions.js`,
-`api/events.js`, `api/fleet-summary.js`, and `api/_lib/supabase.js` into a working real
+`api/events.js`, `api/fleets.js`, `api/fleet-invitations.js`,
+`api/accept-invitation.js`, `api/fleet-summary.js`, and `api/_lib/supabase.js` into a working real
 backend, replacing the localStorage-only prototype described in
 BACKEND_ROADMAP.md.
 
@@ -18,6 +19,11 @@ handling real driver data.
 2. In the SQL editor, run the contents of `db/schema.sql` from this repo.
 3. Under Authentication, enable email/password (or magic link) sign-in for
 drivers and fleet managers.
+
+For an existing Occulert project that already has the core tables, review and
+run only `db/migrations/20260719_secure_fleet_invitations.sql`. It adds the
+one-fleet-per-owner constraint, protected invitation table, and atomic
+service-role-only acceptance function without recreating existing policies.
 
 ## 2. Collect your keys
 
@@ -38,7 +44,8 @@ In your Vercel project settings -> Environment Variables, add:
 - `SUPABASE_ANON_KEY` (if the frontend will call Supabase Auth directly)
 
 Redeploy after adding these. Until they are set, `api/sessions.js`,
-`api/profile.js`, `api/events.js`, and `api/fleet-summary.js` will respond with
+`api/profile.js`, `api/events.js`, `api/fleets.js`, the invitation routes, and
+`api/fleet-summary.js` will respond with
 `501 backend_not_configured` instead of touching a database.
 
 `api/pilot-leads.js` will also store validated pilot requests in the
@@ -55,16 +62,21 @@ key at runtime; it must never expose the service-role key. Email/password
 login creates or updates the authenticated user's driver profile, and
 `app.html` writes opted-in session summaries and alert events through the
 protected API routes. Local storage remains the fallback when cloud sync is
-off, unavailable, or the user is signed out. The fleet dashboard remains
-local/demo-only until an administrator invitation and fleet-membership flow
-is implemented.
+off, unavailable, or the user is signed out. A verified manager creates a
+server-owned fleet at `fleet-onboarding.html`, then generates a seven-day
+one-time link for the driver's exact email. The raw token is shown once and
+only its SHA-256 digest is stored. `accept-invite.html` requires the driver to
+sign in with that verified email before the database atomically assigns the
+driver to the fleet. The authenticated fleet dashboard reads only the fleet
+owned by the access-token user.
 
 ## 5. Seed fleets and drivers
 
 `api/profile.js` safely creates a driver row for the authenticated user with
-no fleet membership. It does not accept a caller-provided fleet ID. Fleet
-membership must be assigned later through a trusted administrator invitation
-flow. Run the full current `db/schema.sql` before enabling driver sync.
+no fleet membership. It does not accept a caller-provided fleet ID. Only the
+atomic invitation acceptance function can assign that row to a fleet. Run the
+full current `db/schema.sql` for a new project or the dated migration above
+for the existing project before enabling fleet onboarding.
 
 ## Status
 
@@ -77,4 +89,5 @@ flow. Run the full current `db/schema.sql` before enabling driver sync.
 - [ ] `SUPABASE_ANON_KEY` environment variable set in Vercel and deployment verified
 - [x] Frontend wired with authenticated API calls and local fallback
 - [ ] Row Level Security policies reviewed for production use
-- [ ] Trusted fleet invitation/administration flow
+- [x] Trusted fleet invitation/administration flow implemented in code
+- [ ] Secure fleet invitation migration applied and independently verified

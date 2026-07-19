@@ -9,7 +9,13 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
 process.env.SUPABASE_ANON_KEY = "test-public-anon-key";
 delete process.env.PILOT_LEADS_WEBHOOK_URL;
 
-function loadHandler(path, pgFetch) {
+const verifiedUser = {
+  id: "user-1",
+  email: "manager@example.com",
+  email_confirmed_at: "2026-07-19T00:00:00.000Z",
+};
+
+function loadHandler(path, pgFetch, user = verifiedUser) {
   const handlerPath = require.resolve(path);
   delete require.cache[handlerPath];
   require.cache[libPath] = {
@@ -18,7 +24,7 @@ function loadHandler(path, pgFetch) {
     loaded: true,
     exports: {
       pgFetch,
-      verifyAccessToken: async () => ({ id: "user-1" }),
+      verifyAccessToken: async () => user,
       bearerToken: () => "valid-token",
     },
   };
@@ -138,6 +144,113 @@ assert.equal(savedProfile.status, 200);
 assert.equal(insertedProfile.user_id, "user-1");
 assert.equal(insertedProfile.fleet_id, null, "drivers must not self-assign fleet membership");
 assert.equal(Object.hasOwn(insertedProfile, "role"), false, "privileged roles must not be accepted from the browser");
+
+let insertedFleet;
+const fleets = loadHandler("../api/fleets.js", async (table, options = {}) => {
+  assert.equal(table, "fleets");
+  if (!options.method) return [];
+  if (options.method === "POST") {
+    insertedFleet = options.body;
+    return [{ id: "fleet-1", created_at: new Date().toISOString(), ...options.body }];
+  }
+  throw new Error(`unexpected fleet call: ${options.method}`);
+});
+const createdFleet = await invoke(fleets, request("POST", {
+  company_name: "Safe Transit",
+  owner_user_id: "attacker-user",
+  plan: "enterprise",
+  role: "admin",
+}));
+assert.equal(createdFleet.status, 201);
+assert.equal(insertedFleet.owner_user_id, "user-1", "fleet ownership must come from the verified access token");
+assert.equal(insertedFleet.plan, "trial", "browser callers must not choose privileged plans");
+assert.equal(Object.hasOwn(insertedFleet, "role"), false, "browser callers must not create privileged roles");
+
+const unverifiedFleet = loadHandler("../api/fleets.js", async () => {
+  throw new Error("database must not be called for an unverified owner");
+}, { id: "user-2", email: "unverified@example.com" });
+const unverifiedFleetResult = await invoke(unverifiedFleet, request("POST", { company_name: "Unverified Fleet" }));
+assert.equal(unverifiedFleetResult.status, 403);
+assert.equal(unverifiedFleetResult.body.error, "email_not_verified");
+
+let insertedInvitation;
+let pendingInvitationParams;
+const invitations = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
+  if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
+  if (table === "fleet_invitations" && !options.method) {
+    pendingInvitationParams = options.params;
+    return [];
+  }
+  if (table === "fleet_invitations" && options.method === "POST") {
+    insertedInvitation = options.body;
+    return [{ id: "11111111-1111-4111-8111-111111111111", ...options.body }];
+  }
+  throw new Error(`unexpected invitation call: ${table} ${options.method || "GET"}`);
+});
+const createdInvitation = await invoke(invitations, request("POST", { email: "Driver@Example.com" }));
+assert.equal(createdInvitation.status, 201);
+assert.equal(insertedInvitation.fleet_id, "fleet-1");
+assert.equal(insertedInvitation.invited_by, "user-1");
+assert.equal(insertedInvitation.email, "driver@example.com");
+assert.match(pendingInvitationParams.expires_at, /^gt\./, "expired invitations must not exhaust the active invitation limit");
+assert.match(insertedInvitation.token_hash, /^[0-9a-f]{64}$/);
+assert.equal(Object.hasOwn(insertedInvitation, "token"), false, "raw invitation tokens must never be stored");
+const rawInviteToken = createdInvitation.body.invitation.accept_path.split("#token=")[1];
+assert.ok(rawInviteToken.length >= 32);
+assert.equal(JSON.stringify(insertedInvitation).includes(rawInviteToken), false, "the stored invitation must not contain its usable token");
+
+let invitationListSelect;
+const listInvitations = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
+  if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
+  invitationListSelect = options.params.select;
+  return [{ id: "invite-1", email: "driver@example.com", expires_at: new Date(Date.now() + 60000).toISOString() }];
+});
+const invitationList = await invoke(listInvitations, request("GET"));
+assert.equal(invitationList.status, 200);
+assert.equal(invitationListSelect.includes("token_hash"), false, "invitation listings must never select token hashes");
+
+const nonOwnerInvitations = loadHandler("../api/fleet-invitations.js", async (table) => {
+  if (table === "fleets") return [];
+  throw new Error("a non-owner must not reach invitation data");
+});
+const nonOwnerInviteResult = await invoke(nonOwnerInvitations, request("POST", { email: "driver@example.com" }));
+assert.equal(nonOwnerInviteResult.status, 403, "only a server-verified fleet owner may invite drivers");
+
+let acceptanceCall;
+const acceptInvitation = loadHandler("../api/accept-invitation.js", async (table, options = {}) => {
+  acceptanceCall = { table, options };
+  return [{ fleet_id: "fleet-1", company_name: "Safe Transit", driver_id: "driver-1" }];
+}, { id: "driver-user", email: "driver@example.com", email_confirmed_at: "2026-07-19T00:00:00.000Z" });
+const acceptedInvitation = await invoke(acceptInvitation, request("POST", { token: rawInviteToken }));
+assert.equal(acceptedInvitation.status, 200);
+assert.equal(acceptanceCall.table, "rpc/accept_fleet_invitation");
+assert.equal(acceptanceCall.options.body.p_user_id, "driver-user");
+assert.equal(acceptanceCall.options.body.p_user_email, "driver@example.com");
+assert.match(acceptanceCall.options.body.p_token_hash, /^[0-9a-f]{64}$/);
+assert.equal(JSON.stringify(acceptanceCall).includes(rawInviteToken), false, "the raw token must be hashed before the database call");
+
+const mismatchedInvitation = loadHandler("../api/accept-invitation.js", async () => {
+  const error = new Error("database rejected mismatched email");
+  error.details = { message: "invitation_email_mismatch" };
+  throw error;
+}, { id: "attacker-user", email: "attacker@example.com", email_confirmed_at: "2026-07-19T00:00:00.000Z" });
+const mismatchedResult = await invoke(mismatchedInvitation, request("POST", { token: rawInviteToken }));
+assert.equal(mismatchedResult.status, 403);
+assert.equal(mismatchedResult.body.error, "invitation_email_mismatch");
+
+const fleetSummaryCalls = [];
+const fleetSummary = loadHandler("../api/fleet-summary.js", async (table, options = {}) => {
+  fleetSummaryCalls.push({ table, options });
+  if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
+  if (table === "drivers") return [{ id: "driver-1", name: "Driver", active: true, vehicle_id: "Van 12" }];
+  if (table === "sessions") return [];
+  throw new Error(`unexpected fleet summary call: ${table}`);
+});
+const fleetSummaryResult = await invoke(fleetSummary, request("GET"));
+assert.equal(fleetSummaryResult.status, 200);
+assert.equal(fleetSummaryCalls[0].options.params.owner_user_id, "eq.user-1");
+assert.equal(fleetSummaryCalls[1].options.params.fleet_id, "eq.fleet-1");
+assert.equal(fleetSummaryCalls[2].options.params.fleet_id, "eq.fleet-1");
 
 const publicConfigPath = require.resolve("../api/public-config.js");
 delete require.cache[publicConfigPath];
