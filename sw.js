@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v14';
+const CACHE = 'occulert-v15';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -16,6 +16,7 @@ const STATIC_ASSETS = [
   '/occulert-logo.png',
   '/occulert-logo-main.png',
   '/lang.js',
+  '/occulert-backend.js',
   '/faq.html',
   '/features.html',
   '/install.html',
@@ -57,6 +58,8 @@ self.addEventListener('fetch', event => {
   const req = event.request;
 
   if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
 
   if (req.mode === 'navigate' || req.url.endsWith('.html')) {
     event.respondWith(

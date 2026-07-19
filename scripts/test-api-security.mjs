@@ -6,6 +6,7 @@ const libPath = require.resolve("../api/_lib/supabase.js");
 
 process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
+process.env.SUPABASE_ANON_KEY = "test-public-anon-key";
 delete process.env.PILOT_LEADS_WEBHOOK_URL;
 
 function loadHandler(path, pgFetch) {
@@ -116,6 +117,37 @@ const eventWithoutLocation = await invoke(events, request("POST", {
 assert.equal(eventWithoutLocation.status, 200);
 assert.equal(insertedEvent.latitude, null, "explicitly absent latitude must not become 0");
 assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must not become 0");
+
+let insertedProfile;
+const profile = loadHandler("../api/profile.js", async (table, options = {}) => {
+  assert.equal(table, "drivers");
+  if (!options.method) return [];
+  if (options.method === "POST") {
+    insertedProfile = options.body;
+    return [{ id: "driver-1", ...options.body }];
+  }
+  throw new Error(`unexpected profile call: ${options.method}`);
+});
+const savedProfile = await invoke(profile, request("POST", {
+  name: "Test Driver",
+  vehicle: "Van 12",
+  fleet_id: "attacker-chosen-fleet",
+  role: "fleet-owner",
+}));
+assert.equal(savedProfile.status, 200);
+assert.equal(insertedProfile.user_id, "user-1");
+assert.equal(insertedProfile.fleet_id, null, "drivers must not self-assign fleet membership");
+assert.equal(Object.hasOwn(insertedProfile, "role"), false, "privileged roles must not be accepted from the browser");
+
+const publicConfigPath = require.resolve("../api/public-config.js");
+delete require.cache[publicConfigPath];
+const publicConfig = require(publicConfigPath);
+const configResult = await invoke(publicConfig, request("GET"));
+assert.equal(configResult.status, 200);
+assert.equal(configResult.body.supabase.configured, true);
+assert.equal(configResult.body.supabase.url, "https://example.supabase.co");
+assert.equal(configResult.body.supabase.anonKey, "test-public-anon-key");
+assert.equal(JSON.stringify(configResult.body).includes("test-service-role"), false, "public config must never expose the service-role key");
 
 let storedLead;
 const pilotLeads = loadHandler("../api/pilot-leads.js", async (table, options = {}) => {

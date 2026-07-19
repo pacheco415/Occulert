@@ -1,63 +1,86 @@
-// occulert-backend.js — browser client for the Occulert backend.
-// Zero dependencies, matching the style of api/_lib/supabase.js.
-// Include on any page that needs auth or backend calls:
-//   <script src="/occulert-backend.js"></script>
-//
-// ONE VALUE TO FILL IN: the anon (public) key from
-// Supabase Dashboard -> Project Settings -> API Keys -> Legacy -> anon.
-// The anon key is designed to be public — safe to ship in client code.
-//
-// Auth: talks directly to Supabase GoTrue (email/password).
-// Data: talks to this site's own /api/* endpoints with a Bearer token.
+// Browser client for Supabase Auth and Occulert's authenticated /api routes.
+// Runtime configuration comes from /api/public-config so no deploy-specific
+// values or server secrets are committed to this file.
 
 window.OcculertBackend = (function () {
-  var SUPABASE_URL = "https://wbsynfcjpwlgdzioqpoa.supabase.co";
-  var SUPABASE_ANON_KEY = "PASTE_ANON_KEY_HERE";
   var STORAGE_KEY = "occulert-auth";
+  var configPromise = null;
 
-  // ---------- session persistence ----------
   function loadAuth() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); }
     catch (e) { return null; }
   }
+
   function saveAuth(data) {
-    if (data) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    else localStorage.removeItem(STORAGE_KEY);
+    try {
+      if (data) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      else localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
   }
 
-  // ---------- GoTrue helpers ----------
-  function authFetch(path, body) {
-    return fetch(SUPABASE_URL + "/auth/v1" + path, {
-      method: "POST",
-      headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); });
-  }
-
-  function persistFrom(resBody) {
-    saveAuth({
-      access_token: resBody.access_token,
-      refresh_token: resBody.refresh_token,
-      expires_at: Math.floor(Date.now() / 1000) + (resBody.expires_in || 3600) - 60,
-      user: resBody.user ? { id: resBody.user.id, email: resBody.user.email } : null
+  function readJson(response) {
+    return response.text().then(function (text) {
+      if (!text) return {};
+      try { return JSON.parse(text); }
+      catch (e) { return { error: "invalid_json_response" }; }
     });
   }
 
-  // Sign up a new driver / fleet manager. May require email confirmation
-  // depending on project settings ("Confirm email").
+  function loadConfig() {
+    if (!configPromise) {
+      configPromise = fetch("/api/public-config", { headers: { Accept: "application/json" }, cache: "no-store" })
+        .then(function (response) { return readJson(response); })
+        .then(function (body) {
+          var config = body && body.supabase;
+          return config && config.configured && config.url && config.anonKey ? config : null;
+        })
+        .catch(function () { return null; });
+    }
+    return configPromise;
+  }
+
+  function isConfigured() {
+    return loadConfig().then(function (config) { return Boolean(config); });
+  }
+
+  function authFetch(path, body) {
+    return loadConfig().then(function (config) {
+      if (!config) return { status: 503, ok: false, body: { error: "cloud_not_configured" } };
+      return fetch(config.url + "/auth/v1" + path, {
+        method: "POST",
+        headers: { apikey: config.anonKey, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(function (response) {
+        return readJson(response).then(function (result) {
+          return { status: response.status, ok: response.ok, body: result };
+        });
+      }).catch(function () {
+        return { status: 503, ok: false, body: { error: "cloud_unavailable" } };
+      });
+    });
+  }
+
+  function persistFrom(body) {
+    saveAuth({
+      access_token: body.access_token,
+      refresh_token: body.refresh_token,
+      expires_at: Math.floor(Date.now() / 1000) + (body.expires_in || 3600) - 60,
+      user: body.user ? { id: body.user.id, email: body.user.email } : null,
+    });
+  }
+
   function signUp(email, password) {
-    return authFetch("/signup", { email: email, password: password }).then(function (r) {
-      if (r.ok && r.body.access_token) persistFrom(r.body);
-      return r;
+    return authFetch("/signup", { email: email, password: password }).then(function (result) {
+      if (result.ok && result.body.access_token) persistFrom(result.body);
+      return result;
     });
   }
 
   function signIn(email, password) {
-    return authFetch("/token?grant_type=password", { email: email, password: password })
-      .then(function (r) {
-        if (r.ok) persistFrom(r.body);
-        return r;
-      });
+    return authFetch("/token?grant_type=password", { email: email, password: password }).then(function (result) {
+      if (result.ok && result.body.access_token) persistFrom(result.body);
+      return result;
+    });
   }
 
   function signOut() { saveAuth(null); }
@@ -66,12 +89,12 @@ window.OcculertBackend = (function () {
     var auth = loadAuth();
     if (!auth) return Promise.resolve(null);
     if (auth.expires_at > Math.floor(Date.now() / 1000)) return Promise.resolve(auth);
-    return authFetch("/token?grant_type=refresh_token", { refresh_token: auth.refresh_token })
-      .then(function (r) {
-        if (r.ok) { persistFrom(r.body); return loadAuth(); }
-        saveAuth(null);
-        return null;
-      });
+    if (!auth.refresh_token) { saveAuth(null); return Promise.resolve(null); }
+    return authFetch("/token?grant_type=refresh_token", { refresh_token: auth.refresh_token }).then(function (result) {
+      if (result.ok && result.body.access_token) { persistFrom(result.body); return loadAuth(); }
+      saveAuth(null);
+      return null;
+    });
   }
 
   function currentUser() {
@@ -79,58 +102,60 @@ window.OcculertBackend = (function () {
     return auth ? auth.user : null;
   }
 
-  // ---------- backend API helpers ----------
   function api(method, path, body) {
     return refreshIfNeeded().then(function (auth) {
-      var headers = { "Content-Type": "application/json" };
-      if (auth) headers.Authorization = "Bearer " + auth.access_token;
+      if (!auth || !auth.access_token) {
+        return { status: 401, ok: false, body: { error: "sign_in_required" } };
+      }
+      var headers = { Accept: "application/json", "Content-Type": "application/json", Authorization: "Bearer " + auth.access_token };
       return fetch(path, {
         method: method,
         headers: headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined
-      }).then(function (r) {
-        return r.json().then(function (j) { return { status: r.status, ok: r.ok, body: j }; });
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      }).then(function (response) {
+        return readJson(response).then(function (result) {
+          return { status: response.status, ok: response.ok, body: result };
+        });
+      }).catch(function () {
+        return { status: 503, ok: false, body: { error: "cloud_unavailable" } };
       });
     });
   }
 
-  // POST /api/sessions — call when monitoring starts. Returns session row.
-  function startSession() {
-    return api("POST", "/api/sessions", {
-      device: navigator.platform || "unknown",
-      browser: navigator.userAgent.slice(0, 120)
+  function ensureDriverProfile(profile) {
+    return api("POST", "/api/profile", {
+      name: profile && profile.name,
+      vehicle: profile && profile.vehicle,
     });
   }
 
-  // PATCH /api/sessions — call when monitoring stops.
-  // stats: { average_fatigue, max_fatigue, safety_score, alert_count, head_nod_count }
+  function startSession() {
+    return api("POST", "/api/sessions", {
+      device: navigator.platform || "unknown",
+      browser: String(navigator.userAgent || "unknown").slice(0, 120),
+    });
+  }
+
   function endSession(sessionId, stats) {
-    var body = Object.assign({ session_id: sessionId }, stats || {});
-    return api("PATCH", "/api/sessions", body);
+    return api("PATCH", "/api/sessions", Object.assign({ session_id: sessionId }, stats || {}));
   }
 
-  // POST /api/events — call on each alert. type must be one of:
-  // drowsy | distracted | head_nod | yawn | phone_use | ok_check_in | emergency
-  // Only include latitude/longitude if the driver opted into GPS.
   function logEvent(sessionId, type, extra) {
-    var body = Object.assign({ session_id: sessionId, type: type }, extra || {});
-    return api("POST", "/api/events", body);
+    return api("POST", "/api/events", Object.assign({ session_id: sessionId, type: type }, extra || {}));
   }
 
-  // GET /api/fleet-summary — for fleet-dashboard.html (fleet owners only).
-  // Returns { fleet, drivers, sessions }.
-  function getFleetSummary() {
-    return api("GET", "/api/fleet-summary");
-  }
+  function getFleetSummary() { return api("GET", "/api/fleet-summary"); }
 
   return {
+    isConfigured: isConfigured,
     signUp: signUp,
     signIn: signIn,
     signOut: signOut,
     currentUser: currentUser,
+    ensureDriverProfile: ensureDriverProfile,
     startSession: startSession,
     endSession: endSession,
     logEvent: logEvent,
-    getFleetSummary: getFleetSummary
+    getFleetSummary: getFleetSummary,
   };
 })();
