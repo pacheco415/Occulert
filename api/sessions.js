@@ -19,6 +19,8 @@ response.end(JSON.stringify(body));
 }
 
 function numberOrNull(value, min, max) {
+if (value === null || value === undefined || typeof value === "boolean" || typeof value === "object") return null;
+if (typeof value === "string" && !value.trim()) return null;
 const n = Number(value);
 if (!Number.isFinite(n)) return null;
 return Math.max(min, Math.min(max, n));

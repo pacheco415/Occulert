@@ -19,6 +19,8 @@ function json(response, status, body) {
 const ALLOWED_TYPES = ["drowsy", "distracted", "head_nod", "yawn", "phone_use", "ok_check_in", "emergency"];
 
 function numberOrNull(value, min, max) {
+  if (value === null || value === undefined || typeof value === "boolean" || typeof value === "object") return null;
+  if (typeof value === "string" && !value.trim()) return null;
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
   return Math.max(min, Math.min(max, n));

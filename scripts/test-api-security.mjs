@@ -51,10 +51,12 @@ async function invoke(handler, req) {
 
 let allowSessionUpdate = false;
 let sessionPatchParams;
+let patchedSession;
 const sessions = loadHandler("../api/sessions.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
   if (table === "sessions" && options.method === "PATCH") {
     sessionPatchParams = options.params;
+    patchedSession = options.body;
     return allowSessionUpdate ? [{ id: "session-1" }] : [];
   }
   throw new Error(`unexpected sessions call: ${table}`);
@@ -68,6 +70,17 @@ assert.deepEqual(sessionPatchParams, { id: "eq.session-1", driver_id: "eq.driver
 allowSessionUpdate = true;
 const allowedPatch = await invoke(sessions, request("PATCH", patchBody));
 assert.equal(allowedPatch.status, 200, "the authenticated driver must still be able to finish their own session");
+
+const blankMetricsPatch = await invoke(sessions, request("PATCH", {
+  session_id: "session-1",
+  average_fatigue: null,
+  max_fatigue: "",
+  safety_score: false,
+}));
+assert.equal(blankMetricsPatch.status, 200);
+assert.equal(patchedSession.average_fatigue, null, "explicitly absent fatigue must not become 0");
+assert.equal(patchedSession.max_fatigue, null, "blank fatigue must not become 0");
+assert.equal(patchedSession.safety_score, null, "boolean metrics must not become 0");
 
 let allowEventSession = false;
 let insertedEvent;
@@ -92,6 +105,17 @@ assert.equal(insertedEvent.fatigue_score, 100);
 assert.equal(insertedEvent.confidence, 0);
 assert.equal(insertedEvent.latitude, 90);
 assert.equal(insertedEvent.longitude, -180);
+
+const eventWithoutLocation = await invoke(events, request("POST", {
+  session_id: "session-1",
+  type: "drowsy",
+  fatigue_score: 25,
+  latitude: null,
+  longitude: "",
+}));
+assert.equal(eventWithoutLocation.status, 200);
+assert.equal(insertedEvent.latitude, null, "explicitly absent latitude must not become 0");
+assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must not become 0");
 
 let storedLead;
 const pilotLeads = loadHandler("../api/pilot-leads.js", async (table, options = {}) => {
