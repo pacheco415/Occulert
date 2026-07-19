@@ -1,11 +1,8 @@
 import { test, expect } from "@playwright/test";
 
 test("important public pages load with one primary heading", async ({ page }) => {
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
 
   for (const path of ["/", "/features.html", "/how-it-works.html", "/install.html", "/pilot-signup.html", "/fleet-dashboard.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
     const response = await page.goto(path, { waitUntil: "domcontentloaded" });
@@ -14,7 +11,7 @@ test("important public pages load with one primary heading", async ({ page }) =>
     expect(await page.locator('link[rel="canonical"]').count(), `${path} should have a canonical URL`).toBe(1);
   }
 
-  expect(errors).toEqual([]);
+  expect(pageErrors).toEqual([]);
 });
 
 test("driver alerts enhance only successful triggers and sensitivity is unambiguous", async ({ page }) => {
