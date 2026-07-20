@@ -1,7 +1,7 @@
 import React, { useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sendAlertToWatch } from '../lib/watchBridge';
 import { configureAlertAudioMode } from '../lib/audioSession';
@@ -18,7 +18,7 @@ interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; }
  * AlertSystem — Week 2
  * Renders the alert banner and triggers:
  *   - expo-haptics vibration (impact/notification style per severity)
- *   - expo-av audio tone (with cooldown so it doesn't spam)
+ *   - expo-audio alert tone (with cooldown so it doesn't spam)
  */
 export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
   const lastAlert = useRef(0);
@@ -39,7 +39,7 @@ export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
     AsyncStorage.getItem('occulert-watch').then((v) => { if (v !== null) watchEnabled.current = v === 'true'; });
   }, []);
   const pulse = useRef(new Animated.Value(1)).current;
-  const sound = useRef<Audio.Sound | null>(null);
+  const player = useAudioPlayer(ALERT_SOUND, { keepAudioSessionActive: true });
 
   const level: AlertLevel =
     !isRunning || metrics.state === 'noFace' ? 'none'
@@ -81,17 +81,12 @@ export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
 
     try {
       if (!audioEnabled.current) return;
-      if (sound.current) { await sound.current.stopAsync(); await sound.current.unloadAsync(); sound.current = null; }
-      const { sound: snd } = await Audio.Sound.createAsync(
-        ALERT_SOUND,
-        { shouldPlay: true, volume: lv === 'critical' ? 1.0 : 0.75 },
-      );
-      sound.current = snd;
-      snd.setOnPlaybackStatusUpdate((st) => {
-        if ('didJustFinish' in st && st.didJustFinish) { snd.unloadAsync(); sound.current = null; }
-      });
+      player.pause();
+      await player.seekTo(0);
+      player.volume = lv === 'critical' ? 1.0 : 0.75;
+      player.play();
     } catch {}
-  }, [pulse]);
+  }, [metrics.perclos, player, pulse]);
 
   React.useEffect(() => {
     if (level !== 'none') fire(level);

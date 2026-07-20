@@ -12,19 +12,10 @@
       }
     },
     "preview": {
-      "distribution": "internal",
-      "channel": "preview"
+      "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "channel": "production"
-    }
-  },
-  "submit": {
-    "production": {
-      "ios": {
-        "ascAppId": "SET_AFTER_CREATING_APP_IN_APP_STORE_CONNECT"
-      }
+      "autoIncrement": true
     }
   }
 }

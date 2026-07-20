@@ -6,21 +6,19 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#050a0f"
-    },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
+      "appleTeamId": "W3W6Z8U68C",
       "bundleIdentifier": "com.occulert.app",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Occulert uses your front camera to detect eye fatigue while driving. No video is stored or uploaded.",
-        "NSMicrophoneUsageDescription": "Occulert does not use the microphone.",
-        "UIBackgroundModes": ["audio", "bluetooth-central"],
-        "NSHealthShareUsageDescription": "Occulert reads HRV and sleep data to compute your pre-drive fatigue risk score.",
-        "NSHealthUpdateUsageDescription": "Occulert does not write health data."
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -37,20 +35,37 @@
       ]
     },
     "plugins": [
+      "expo-router",
       [
-        "react-native-vision-camera",
+        "expo-audio",
         {
-          "cameraPermissionText": "Occulert uses your front camera to detect eye fatigue while driving. No video is stored or uploaded.",
-          "enableMicrophonePermission": false
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
-      "expo-router"
+      "expo-status-bar",
+      "expo-font",
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#050a0f"
+        }
+      ]
     ],
-    "experiments": { "typedRoutes": true },
+    "experiments": {
+      "typedRoutes": true
+    },
     "scheme": "occulert",
     "extra": {
-      "router": { "origin": false },
-      "eas": { "projectId": "69c230c1-c42a-4d83-b2a0-e1752e719b53" }
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "69c230c1-c42a-4d83-b2a0-e1752e719b53"
+      }
     }
   }
 }

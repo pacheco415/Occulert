@@ -215,14 +215,14 @@ export default function MonitorScreen() {
     <View style={s.container}>
       {isRunning ? (
         <Camera
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           device={device}
           isActive={isRunning}
           frameProcessor={frameProcessor}
           pixelFormat="yuv"
         />
       ) : (
-        <View style={[StyleSheet.absoluteFillObject, s.camOff]}>
+        <View style={[StyleSheet.absoluteFill, s.camOff]}>
           <Ionicons name="eye-off" size={64} color="#1a3a4a" />
           <Text style={s.camOffTxt}>Tap Start to begin monitoring</Text>
         </View>
