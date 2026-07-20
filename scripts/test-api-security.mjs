@@ -8,9 +8,6 @@ process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
 process.env.SUPABASE_ANON_KEY = "test-public-anon-key";
 delete process.env.PILOT_LEADS_WEBHOOK_URL;
-delete process.env.RESEND_API_KEY;
-delete process.env.RESEND_FROM_EMAIL;
-delete process.env.OCCULERT_PUBLIC_URL;
 
 const verifiedUser = {
   id: "user-1",
@@ -201,7 +198,6 @@ assert.match(pendingInvitationParams.expires_at, /^gt\./, "expired invitations m
 assert.equal(recentInvitationParams.fleet_id, "eq.fleet-1", "hourly invitation limits must use the verified owner's indexed fleet scope");
 assert.match(insertedInvitation.token_hash, /^[0-9a-f]{64}$/);
 assert.equal(Object.hasOwn(insertedInvitation, "token"), false, "raw invitation tokens must never be stored");
-assert.equal(createdInvitation.body.invitation.delivery.status, "not_configured", "copy-link fallback must survive missing email configuration");
 const rawInviteToken = createdInvitation.body.invitation.accept_path.split("#token=")[1];
 assert.ok(rawInviteToken.length >= 32);
 assert.equal(JSON.stringify(insertedInvitation).includes(rawInviteToken), false, "the stored invitation must not contain its usable token");
@@ -255,36 +251,6 @@ const invitationList = await invoke(listInvitations, request("GET"));
 assert.equal(invitationList.status, 200);
 assert.equal(invitationListSelect.includes("token_hash"), false, "invitation listings must never select token hashes");
 
-const emailLibPath = require.resolve("../api/_lib/email.js");
-delete require.cache[emailLibPath];
-process.env.RESEND_API_KEY = "re_test_server_secret";
-process.env.RESEND_FROM_EMAIL = "Occulert <invites@occulert.com>";
-const originalFetch = global.fetch;
-let resendRequest;
-global.fetch = async (url, options) => {
-  resendRequest = { url, options };
-  return { ok: true, async json() { return { id: "email-1" }; } };
-};
-const emailLib = require(emailLibPath);
-const sentEmail = await emailLib.sendFleetInvitationEmail({
-  to: "driver@example.com",
-  fleetName: "Safe <Transit>\r\nBcc: attacker@example.com",
-  acceptUrl: "https://www.occulert.com/accept-invite.html#token=safe-token",
-  invitationId: "33333333-3333-4333-8333-333333333333",
-});
-global.fetch = originalFetch;
-delete process.env.RESEND_API_KEY;
-delete process.env.RESEND_FROM_EMAIL;
-assert.equal(sentEmail.status, "sent");
-assert.equal(resendRequest.url, "https://api.resend.com/emails");
-assert.equal(resendRequest.options.headers["Idempotency-Key"], "fleet-invitation-33333333-3333-4333-8333-333333333333");
-assert.equal(resendRequest.options.headers.Authorization, "Bearer re_test_server_secret");
-const resendBody = JSON.parse(resendRequest.options.body);
-assert.equal(resendBody.to[0], "driver@example.com");
-assert.equal(resendBody.subject.includes("\r"), false, "fleet names must not inject email headers");
-assert.equal(resendBody.subject.includes("\n"), false, "fleet names must not inject email headers");
-assert.ok(resendBody.html.includes("Safe &lt;Transit&gt;"), "fleet names must be escaped in HTML email");
-assert.equal(resendRequest.options.body.includes("re_test_server_secret"), false, "email provider keys must never enter message bodies");
 
 const nonOwnerInvitations = loadHandler("../api/fleet-invitations.js", async (table) => {
   if (table === "fleets") return [];

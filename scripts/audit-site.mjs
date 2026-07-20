@@ -82,11 +82,8 @@ assertIncludes("db/schema.sql", "grant execute on function public.accept_fleet_i
 assertIncludes("api/fleet-invitations.js", "crypto.randomBytes(32)", "fleet invitations must use cryptographically random tokens");
 assertIncludes("api/fleet-invitations.js", "token_hash: tokenHash", "fleet invitations must store only token hashes");
 assertNotIncludes("api/fleet-invitations.js", "token: token", "fleet invitations must not store raw tokens");
-assertIncludes("api/fleet-invitations.js", "MAX_INVITATIONS_PER_HOUR", "fleet invitation emails must have a server-side abuse limit");
+assertIncludes("api/fleet-invitations.js", "MAX_INVITATIONS_PER_HOUR", "fleet invitation creation must have a server-side abuse limit");
 assertIncludes("api/fleet-invitations.js", "replace_invitation_id", "resending must replace the old one-time invitation");
-assertIncludes("api/_lib/email.js", "Idempotency-Key", "transactional invitation email must be idempotent");
-assertIncludes("api/_lib/email.js", "RESEND_API_KEY", "invitation email must use a server-only provider key");
-assertNotIncludes("occulert-backend.js", "RESEND_API_KEY", "the browser client must never expose the email provider key");
 assertIncludes("api/accept-invitation.js", "email_confirmed_at", "invitation acceptance must require a verified email");
 assertIncludes("api/accept-invitation.js", "rpc/accept_fleet_invitation", "invitation acceptance must use the atomic database function");
 assertIncludes("sw.js", "url.pathname.startsWith('/api/')", "service worker must never intercept or cache API responses");
@@ -112,7 +109,8 @@ assertNotIncludes("login.html", "onclick=\"passkeyAuth()\"", "login must not off
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
 assertIncludes("fleet-onboarding.html", "createFleetInvitation", "fleet onboarding must create protected invitations through the API");
 assertIncludes("fleet-onboarding.html", "resendFleetInvitation", "fleet onboarding must support replacing pending invitation links");
-assertIncludes("fleet-onboarding.html", "Automatic email is not configured yet", "fleet onboarding must preserve a copy-link fallback");
+assertIncludes("fleet-onboarding.html", "mailto:", "fleet onboarding must support no-cost sharing through the manager's mail app");
+assertIncludes("fleet-onboarding.html", "Copy Link", "fleet onboarding must preserve a copy-link fallback");
 assertIncludes("accept-invite.html", "history.replaceState", "invite pages must immediately remove tokens from the visible URL");
 assertIncludes("accept-invite.html", "sessionStorage", "invite tokens must stay out of persistent local storage");
 assertIncludes("accept-invite.html", ".hidden{display:none!important}", "invite success actions must remain hidden until acceptance succeeds");

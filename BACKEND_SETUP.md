@@ -21,10 +21,10 @@ drivers and fleet managers.
 `https://www.occulert.com` and allow `https://www.occulert.com/login.html` as
 a redirect URL. This keeps confirmation links on the production site instead
 of sending drivers to localhost.
-5. Configure a custom SMTP provider before a multi-driver pilot. Supabase's
-built-in email sender is intended for initial testing and can rate-limit
-confirmation messages across the whole project. Resend can provide the SMTP
-credentials after the sending domain is verified.
+5. For a no-cost controlled pilot, Supabase's built-in sender can handle a
+small number of confirmation messages. Keep volume low because it can
+rate-limit confirmation messages across the project. A custom SMTP provider
+is optional if pilot volume later grows.
 
 For an existing Occulert project that already has the core tables, review and
 run only `db/migrations/20260719_secure_fleet_invitations.sql`. It adds the
@@ -48,10 +48,6 @@ In your Vercel project settings -> Environment Variables, add:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_ANON_KEY` (if the frontend will call Supabase Auth directly)
-- `RESEND_API_KEY` (server-side only, for fleet invitation delivery)
-- `RESEND_FROM_EMAIL` (a verified sender such as `Occulert <invites@occulert.com>`)
-- `OCCULERT_PUBLIC_URL` (`https://www.occulert.com`; optional because this is
-  the secure default used to build invitation links)
 
 Redeploy after adding these. Until they are set, `api/sessions.js`,
 `api/profile.js`, `api/events.js`, `api/fleets.js`, the invitation routes, and
@@ -63,10 +59,10 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the browser keeps only its
 local fallback copy and the API reports `stored: false`.
 
-When Resend is not configured or delivery fails, invitation creation still
-returns the one-time link to the verified manager. The dashboard explains that
-the manager must copy and send it manually. A resend revokes the prior token,
-creates a fresh token, and is limited to reduce email abuse.
+Invitation creation returns the one-time link only to the verified manager.
+The dashboard can open a pre-addressed message in the manager's existing mail
+app or copy the link. Sending a new link revokes the prior token, creates a
+fresh token, and is limited to reduce abuse without adding a paid provider.
 
 ## 4. Frontend behavior
 
@@ -106,4 +102,5 @@ for the existing project before enabling fleet onboarding.
 - [x] Row Level Security and service-role invitation boundaries independently verified
 - [x] Trusted fleet invitation/administration flow implemented in code
 - [x] Secure fleet invitation migration applied and independently verified
-- [ ] Resend domain, API key, sender address, and Supabase custom SMTP configured
+- [x] No-cost invitation sharing through the manager's mail app and copy-link fallback
+- [ ] Optional custom SMTP configured only if pilot volume outgrows Supabase's built-in sender

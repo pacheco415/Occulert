@@ -10,7 +10,6 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const sendFleetInvitationEmail = require("./_lib/email").sendFleetInvitationEmail;
 const MAX_BODY_LENGTH = 2048;
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_PENDING_INVITATIONS = 100;
@@ -41,16 +40,6 @@ function validUuid(value) {
 
 function emailVerified(user) {
   return Boolean(user && user.email && (user.email_confirmed_at || user.confirmed_at));
-}
-
-function publicOrigin() {
-  try {
-    const url = new URL(process.env.OCCULERT_PUBLIC_URL || "https://www.occulert.com");
-    if (url.protocol !== "https:" && url.hostname !== "localhost") throw new Error("invalid public URL");
-    return url.origin;
-  } catch (_) {
-    return "https://www.occulert.com";
-  }
 }
 
 async function ownedFleet(userId) {
@@ -188,12 +177,6 @@ module.exports = async function handler(request, response) {
     if (!rows.length) return json(response, 502, { ok: false, error: "invitation_not_saved" });
 
     const acceptPath = "/accept-invite.html#token=" + token;
-    const delivery = await sendFleetInvitationEmail({
-      to: email,
-      fleetName: fleet.company_name,
-      acceptUrl: new URL(acceptPath, publicOrigin()).href,
-      invitationId: rows[0].id,
-    });
 
     return json(response, 201, {
       ok: true,
@@ -202,7 +185,6 @@ module.exports = async function handler(request, response) {
         email: email,
         expires_at: expiresAt,
         accept_path: acceptPath,
-        delivery: { status: delivery.status },
       },
     });
   } catch (_) {

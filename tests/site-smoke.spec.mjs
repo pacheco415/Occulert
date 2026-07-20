@@ -179,7 +179,6 @@ test("fleet managers can email invitations and replace pending one-time links", 
           email: renewed ? "pending@example.com" : body.email,
           expires_at: new Date(Date.now() + 86400000).toISOString(),
           accept_path: `/accept-invite.html#token=${renewed ? "renewed-token" : "new-token"}`,
-          delivery: { status: renewed ? "sent" : "not_configured" },
         },
       }),
     });
@@ -188,14 +187,16 @@ test("fleet managers can email invitations and replace pending one-time links", 
   await page.goto("/fleet-onboarding.html", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("button", { name: "Send New Link" })).toBeVisible();
   await page.getByRole("button", { name: "Send New Link" }).click();
-  await expect(page.locator("#inviteStatus")).toContainText("The email was sent");
+  await expect(page.locator("#inviteStatus")).toContainText("Choose Email Link or Copy Link");
   await expect(page.locator("#inviteLink")).toHaveValue(/renewed-token$/);
+  await expect(page.locator("#emailInvite")).toHaveAttribute("href", /^mailto:pending%40example\.com/);
   expect(invitationPosts[0]).toEqual({ replace_invitation_id: "11111111-1111-4111-8111-111111111111" });
 
   await page.locator("#driverEmail").fill("new-driver@example.com");
   await page.getByRole("button", { name: "Send Invite" }).click();
-  await expect(page.locator("#inviteStatus")).toContainText("Automatic email is not configured yet");
+  await expect(page.locator("#inviteStatus")).toContainText("Choose Email Link or Copy Link");
   await expect(page.locator("#inviteLink")).toHaveValue(/new-token$/);
+  await expect(page.locator("#emailInvite")).toHaveAttribute("href", /^mailto:new-driver%40example\.com/);
   expect(invitationPosts[1]).toEqual({ email: "new-driver@example.com" });
 });
 
