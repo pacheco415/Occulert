@@ -44,9 +44,9 @@
     if(window.OcculertBackend&&await window.OcculertBackend.isConfigured()){
       var result=mode==='signup'?await window.OcculertBackend.signUp(email,password):await window.OcculertBackend.signIn(email,password);
       if(!result.ok){
-        var message=result.body&&(result.body.msg||result.body.message||result.body.error);
-        throw new Error(message||'Cloud sign-in failed.');
+        throw new Error(window.OcculertBackend.authMessage(result,mode));
       }
+      if(mode==='signup'&&!result.body.access_token){var pending=new Error('Account created. Check your email to confirm it, then return and sign in.');pending.code='confirmation_required';throw pending;}
       var user=window.OcculertBackend.currentUser();
       if(!user)throw new Error(mode==='signup'?'Check your email to confirm the account, then sign in.':'Cloud sign-in did not return a session.');
       currentUser=backendUser(user);

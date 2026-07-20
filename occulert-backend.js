@@ -60,6 +60,32 @@ window.OcculertBackend = (function () {
     });
   }
 
+  function authErrorText(result) {
+    var body = result && result.body ? result.body : (result || {});
+    return [body.code, body.error_code, body.error, body.msg, body.message]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+  }
+
+  function isEmailRateLimited(result) {
+    var text = authErrorText(result);
+    return text.indexOf("rate limit") >= 0 || text.indexOf("over_email_send_rate_limit") >= 0 || text.indexOf("email_rate_limit_exceeded") >= 0;
+  }
+
+  function authMessage(result, mode) {
+    var text = authErrorText(result);
+    if (isEmailRateLimited(result)) return "Too many confirmation emails were requested. Wait about an hour, then try Create Account once.";
+    if (text.indexOf("user_already_exists") >= 0 || text.indexOf("email_exists") >= 0 || text.indexOf("already registered") >= 0) return "An account already exists for this email. Use Sign In instead.";
+    if (text.indexOf("invalid_credentials") >= 0 || text.indexOf("invalid login credentials") >= 0) return "Email or password is incorrect.";
+    if (text.indexOf("email_not_confirmed") >= 0 || text.indexOf("email not confirmed") >= 0) return "Confirm your email, then return and sign in.";
+    if (text.indexOf("weak_password") >= 0 || text.indexOf("password should be") >= 0) return "Use a password with at least 6 characters.";
+    if (text.indexOf("signup_disabled") >= 0 || text.indexOf("signups not allowed") >= 0) return "New account creation is temporarily unavailable.";
+    if (text.indexOf("cloud_not_configured") >= 0) return "Cloud sign-in is not configured yet. The Driver App is still available in local-only mode.";
+    if (text.indexOf("cloud_unavailable") >= 0) return "Occulert could not reach the sign-in service. Check your connection and try again.";
+    return mode === "signup" ? "The account could not be created. Please try again." : "Sign-in failed. Check your email and password, then try again.";
+  }
+
   function persistFrom(body) {
     saveAuth({
       access_token: body.access_token,
@@ -70,7 +96,11 @@ window.OcculertBackend = (function () {
   }
 
   function signUp(email, password) {
-    return authFetch("/signup", { email: email, password: password }).then(function (result) {
+    var redirect = "";
+    try {
+      if (window.location && window.location.origin) redirect = "?redirect_to=" + encodeURIComponent(window.location.origin + "/login.html");
+    } catch (e) {}
+    return authFetch("/signup" + redirect, { email: email, password: password }).then(function (result) {
       if (result.ok && result.body.access_token) persistFrom(result.body);
       return result;
     });
@@ -168,6 +198,8 @@ window.OcculertBackend = (function () {
 
   return {
     isConfigured: isConfigured,
+    authMessage: authMessage,
+    isEmailRateLimited: isEmailRateLimited,
     signUp: signUp,
     signIn: signIn,
     signOut: signOut,

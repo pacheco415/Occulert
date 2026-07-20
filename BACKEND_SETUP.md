@@ -19,6 +19,13 @@ handling real driver data.
 2. In the SQL editor, run the contents of `db/schema.sql` from this repo.
 3. Under Authentication, enable email/password (or magic link) sign-in for
 drivers and fleet managers.
+4. Under Authentication -> URL Configuration, set the Site URL to
+`https://www.occulert.com` and allow `https://www.occulert.com/login.html` as
+a redirect URL. This keeps confirmation links on the production site instead
+of sending drivers to localhost.
+5. Configure a custom SMTP provider before a multi-driver pilot. Supabase's
+built-in email sender is intended for initial testing and can rate-limit
+confirmation messages across the whole project.
 
 For an existing Occulert project that already has the core tables, review and
 run only `db/migrations/20260719_secure_fleet_invitations.sql`. It adds the

@@ -30,6 +30,7 @@ async function fetchMock(url, options = {}) {
       user: { id: "user-1", email: "driver@example.com" },
     });
   }
+  if (String(url).includes("/auth/v1/signup")) return response({ user: { id: "pending-user", email: "new@example.com" } });
   if (url === "/api/profile") return response({ ok: true, driver: { id: "driver-1" } });
   if (url === "/api/sessions" && options.method === "POST") return response({ ok: true, session: { id: "session-1" } });
   if (url === "/api/sessions" && options.method === "PATCH") return response({ ok: true, session: { id: "session-1" } });
@@ -43,7 +44,7 @@ async function fetchMock(url, options = {}) {
   throw new Error(`unexpected fetch: ${options.method || "GET"} ${url}`);
 }
 
-const window = {};
+const window = { location: { origin: "https://www.occulert.com" } };
 const context = {
   window,
   localStorage,
@@ -65,7 +66,15 @@ window.fetch = fetchMock;
 vm.runInNewContext(readFileSync(new URL("../occulert-backend.js", import.meta.url), "utf8"), context);
 const backend = window.OcculertBackend;
 
+assert.equal(backend.authMessage({ body: { code: "over_email_send_rate_limit", message: "email rate limit exceeded" } }, "signup"), "Too many confirmation emails were requested. Wait about an hour, then try Create Account once.");
+assert.equal(backend.authMessage({ body: { error: "invalid_credentials" } }, "signin"), "Email or password is incorrect.");
+assert.equal(backend.authMessage({ body: { message: "User already registered" } }, "signup"), "An account already exists for this email. Use Sign In instead.");
+assert.equal(backend.isEmailRateLimited({ body: { error: "email_rate_limit_exceeded" } }), true);
+assert.equal(backend.authMessage({ body: { error: "internal_server_error" } }, "signup"), "The account could not be created. Please try again.");
+
 assert.equal(await backend.isConfigured(), true);
+assert.equal((await backend.signUp("new@example.com", "password123")).ok, true);
+assert.ok(calls.some((call) => String(call.url).includes("/auth/v1/signup?redirect_to=https%3A%2F%2Fwww.occulert.com%2Flogin.html")));
 const signedIn = await backend.signIn("driver@example.com", "password123");
 assert.equal(signedIn.ok, true);
 assert.equal(backend.currentUser().id, "user-1");
