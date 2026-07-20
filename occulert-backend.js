@@ -188,6 +188,10 @@ window.OcculertBackend = (function () {
     return api("POST", "/api/fleet-invitations", { email: email });
   }
 
+  function resendFleetInvitation(invitationId) {
+    return api("POST", "/api/fleet-invitations", { replace_invitation_id: invitationId });
+  }
+
   function revokeFleetInvitation(invitationId) {
     return api("DELETE", "/api/fleet-invitations", { invitation_id: invitationId });
   }
@@ -213,6 +217,7 @@ window.OcculertBackend = (function () {
     createFleet: createFleet,
     listFleetInvitations: listFleetInvitations,
     createFleetInvitation: createFleetInvitation,
+    resendFleetInvitation: resendFleetInvitation,
     revokeFleetInvitation: revokeFleetInvitation,
     acceptFleetInvitation: acceptFleetInvitation,
   };

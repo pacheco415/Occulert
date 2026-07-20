@@ -6,12 +6,10 @@ This guide turns the backend routes in `api/profile.js`, `api/sessions.js`,
 backend, replacing the localStorage-only prototype described in
 BACKEND_ROADMAP.md.
 
-**None of these steps can be done on your behalf.** They require creating
-and owning a Supabase account, running SQL against your own database, and
-setting Vercel environment variables yourself. This scaffolding was drafted
-by an AI assistant and has not been security-reviewed for production use;
-review it carefully (especially the Row Level Security policies) before
-handling real driver data.
+The live account, billing, sending-domain, DNS, and secret-configuration steps
+require the project owner's approval. Review access policies and delivery
+configuration before expanding beyond a controlled pilot or handling real
+driver data.
 
 ## 1. Create a Supabase project
 
@@ -25,7 +23,8 @@ a redirect URL. This keeps confirmation links on the production site instead
 of sending drivers to localhost.
 5. Configure a custom SMTP provider before a multi-driver pilot. Supabase's
 built-in email sender is intended for initial testing and can rate-limit
-confirmation messages across the whole project.
+confirmation messages across the whole project. Resend can provide the SMTP
+credentials after the sending domain is verified.
 
 For an existing Occulert project that already has the core tables, review and
 run only `db/migrations/20260719_secure_fleet_invitations.sql`. It adds the
@@ -49,6 +48,10 @@ In your Vercel project settings -> Environment Variables, add:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_ANON_KEY` (if the frontend will call Supabase Auth directly)
+- `RESEND_API_KEY` (server-side only, for fleet invitation delivery)
+- `RESEND_FROM_EMAIL` (a verified sender such as `Occulert <invites@occulert.com>`)
+- `OCCULERT_PUBLIC_URL` (`https://www.occulert.com`; optional because this is
+  the secure default used to build invitation links)
 
 Redeploy after adding these. Until they are set, `api/sessions.js`,
 `api/profile.js`, `api/events.js`, `api/fleets.js`, the invitation routes, and
@@ -59,6 +62,11 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 `pilot_leads` table when the two server-side Supabase variables are present.
 Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the browser keeps only its
 local fallback copy and the API reports `stored: false`.
+
+When Resend is not configured or delivery fails, invitation creation still
+returns the one-time link to the verified manager. The dashboard explains that
+the manager must copy and send it manually. A resend revokes the prior token,
+creates a fresh token, and is limited to reduce email abuse.
 
 ## 4. Frontend behavior
 
@@ -92,9 +100,10 @@ for the existing project before enabling fleet onboarding.
 `api/fleet-summary.js`, `api/_lib/supabase.js`)
 - [x] Pilot-lead storage path, spam checks, and per-instance rate limiting
 - [x] Supabase project and protected pilot-lead table created
-- [ ] Full fleet/driver/session/event schema applied and verified
-- [ ] `SUPABASE_ANON_KEY` environment variable set in Vercel and deployment verified
+- [x] Full fleet/driver/session/event schema applied and verified
+- [x] `SUPABASE_ANON_KEY` environment variable set in Vercel and deployment verified
 - [x] Frontend wired with authenticated API calls and local fallback
-- [ ] Row Level Security policies reviewed for production use
+- [x] Row Level Security and service-role invitation boundaries independently verified
 - [x] Trusted fleet invitation/administration flow implemented in code
-- [ ] Secure fleet invitation migration applied and independently verified
+- [x] Secure fleet invitation migration applied and independently verified
+- [ ] Resend domain, API key, sender address, and Supabase custom SMTP configured

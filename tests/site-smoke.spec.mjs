@@ -131,6 +131,74 @@ test("verified fleet managers can create a server-owned fleet from onboarding", 
   await expect(page.locator("#inviteCard")).toBeVisible();
 });
 
+test("fleet managers can email invitations and replace pending one-time links", async ({ page }) => {
+  const invitationPosts = [];
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "manager-token",
+      refresh_token: "manager-refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "manager-1", email: "manager@example.com" },
+    }));
+  });
+  await page.route("**/api/fleets", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, fleet: { id: "fleet-1", company_name: "Safe Transit", plan: "trial" } }),
+  }));
+  await page.route("**/api/fleet-invitations", async (route) => {
+    const request = route.request();
+    if (request.method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          invitations: [{
+            id: "11111111-1111-4111-8111-111111111111",
+            email: "pending@example.com",
+            created_at: new Date(Date.now() - 120000).toISOString(),
+            expires_at: new Date(Date.now() + 86400000).toISOString(),
+            accepted_at: null,
+            revoked_at: null,
+          }],
+        }),
+      });
+      return;
+    }
+    const body = request.postDataJSON();
+    invitationPosts.push(body);
+    const renewed = Boolean(body.replace_invitation_id);
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        invitation: {
+          id: renewed ? "22222222-2222-4222-8222-222222222222" : "33333333-3333-4333-8333-333333333333",
+          email: renewed ? "pending@example.com" : body.email,
+          expires_at: new Date(Date.now() + 86400000).toISOString(),
+          accept_path: `/accept-invite.html#token=${renewed ? "renewed-token" : "new-token"}`,
+          delivery: { status: renewed ? "sent" : "not_configured" },
+        },
+      }),
+    });
+  });
+
+  await page.goto("/fleet-onboarding.html", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("button", { name: "Send New Link" })).toBeVisible();
+  await page.getByRole("button", { name: "Send New Link" }).click();
+  await expect(page.locator("#inviteStatus")).toContainText("The email was sent");
+  await expect(page.locator("#inviteLink")).toHaveValue(/renewed-token$/);
+  expect(invitationPosts[0]).toEqual({ replace_invitation_id: "11111111-1111-4111-8111-111111111111" });
+
+  await page.locator("#driverEmail").fill("new-driver@example.com");
+  await page.getByRole("button", { name: "Send Invite" }).click();
+  await expect(page.locator("#inviteStatus")).toContainText("Automatic email is not configured yet");
+  await expect(page.locator("#inviteLink")).toHaveValue(/new-token$/);
+  expect(invitationPosts[1]).toEqual({ email: "new-driver@example.com" });
+});
+
 test("authenticated fleet dashboards never fall back to unrelated local driver data", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("occulert-auth", JSON.stringify({
