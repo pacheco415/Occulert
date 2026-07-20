@@ -1,4 +1,4 @@
-import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+import { setAudioModeAsync } from 'expo-audio';
 
 /**
  * Configure the global audio session for Occulert alerts.
@@ -15,19 +15,17 @@ import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
  * Call this once before the first alert plays. Safe to call repeatedly.
  */
 export async function configureAlertAudioMode(): Promise<void> {
-  await Audio.setAudioModeAsync({
+  await setAudioModeAsync({
     // Play through the earpiece/speaker/Bluetooth even when the ringer is silenced.
-    playsInSilentModeIOS: true,
+    playsInSilentMode: true,
     // Keep the session alive so background alerts still fire while driving.
-    staysActiveInBackground: true,
+    shouldPlayInBackground: true,
     // We are not recording; keep this false so playback isn't forced to the
     // receiver and can route to AirPods / speaker.
-    allowsRecordingIOS: false,
+    allowsRecording: false,
     // Lower other audio (music, nav) during an alert rather than pausing it.
-    interruptionModeIOS: InterruptionModeIOS.DuckOthers,
-    interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
-    shouldDuckAndroid: true,
+    interruptionMode: 'duckOthers',
     // Route audio to speaker/Bluetooth output rather than the earpiece on Android.
-    playThroughEarpieceAndroid: false,
+    shouldRouteThroughEarpiece: false,
   });
 }
