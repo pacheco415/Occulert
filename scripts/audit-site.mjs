@@ -82,6 +82,8 @@ assertIncludes("db/schema.sql", "grant execute on function public.accept_fleet_i
 assertIncludes("api/fleet-invitations.js", "crypto.randomBytes(32)", "fleet invitations must use cryptographically random tokens");
 assertIncludes("api/fleet-invitations.js", "token_hash: tokenHash", "fleet invitations must store only token hashes");
 assertNotIncludes("api/fleet-invitations.js", "token: token", "fleet invitations must not store raw tokens");
+assertIncludes("api/fleet-invitations.js", "MAX_INVITATIONS_PER_HOUR", "fleet invitation creation must have a server-side abuse limit");
+assertIncludes("api/fleet-invitations.js", "replace_invitation_id", "resending must replace the old one-time invitation");
 assertIncludes("api/accept-invitation.js", "email_confirmed_at", "invitation acceptance must require a verified email");
 assertIncludes("api/accept-invitation.js", "rpc/accept_fleet_invitation", "invitation acceptance must use the atomic database function");
 assertIncludes("sw.js", "url.pathname.startsWith('/api/')", "service worker must never intercept or cache API responses");
@@ -106,6 +108,9 @@ assertIncludes("login.html", "Google and passkey sign-in are coming soon", "logi
 assertNotIncludes("login.html", "onclick=\"passkeyAuth()\"", "login must not offer a nonfunctional passkey action");
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
 assertIncludes("fleet-onboarding.html", "createFleetInvitation", "fleet onboarding must create protected invitations through the API");
+assertIncludes("fleet-onboarding.html", "resendFleetInvitation", "fleet onboarding must support replacing pending invitation links");
+assertIncludes("fleet-onboarding.html", "mailto:", "fleet onboarding must support no-cost sharing through the manager's mail app");
+assertIncludes("fleet-onboarding.html", "Copy Link", "fleet onboarding must preserve a copy-link fallback");
 assertIncludes("accept-invite.html", "history.replaceState", "invite pages must immediately remove tokens from the visible URL");
 assertIncludes("accept-invite.html", "sessionStorage", "invite tokens must stay out of persistent local storage");
 assertIncludes("accept-invite.html", ".hidden{display:none!important}", "invite success actions must remain hidden until acceptance succeeds");
@@ -126,6 +131,12 @@ for (const path of ["fleet-onboarding.html", "accept-invite.html"]) assertSingle
 assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");
 assertIncludes("api/pilot-leads.js", "unsupported_media_type", "pilot lead API must require JSON submissions");
 assertIncludes("api/pilot-leads.js", "url.protocol === \"https:\"", "pilot lead API must only forward to HTTPS webhooks");
+for (const workflow of [".github/workflows/browser-smoke.yml", ".github/workflows/native-app-typecheck.yml", ".github/workflows/site-audit.yml"]) {
+  assertIncludes(workflow, "actions/checkout@v6", `${workflow} must use the Node 24 checkout action`);
+  assertIncludes(workflow, "actions/setup-node@v6", `${workflow} must use the Node 24 setup action`);
+  assertIncludes(workflow, "node-version: 24", `${workflow} must test on Node 24`);
+}
+assertIncludes("package.json", "\"node\": \"24.x\"", "Vercel functions and local checks must use the verified Node 24 runtime");
 
 if (failures.length) {
   console.error("Occulert site audit failed:");

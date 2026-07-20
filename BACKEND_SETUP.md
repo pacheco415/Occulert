@@ -6,12 +6,10 @@ This guide turns the backend routes in `api/profile.js`, `api/sessions.js`,
 backend, replacing the localStorage-only prototype described in
 BACKEND_ROADMAP.md.
 
-**None of these steps can be done on your behalf.** They require creating
-and owning a Supabase account, running SQL against your own database, and
-setting Vercel environment variables yourself. This scaffolding was drafted
-by an AI assistant and has not been security-reviewed for production use;
-review it carefully (especially the Row Level Security policies) before
-handling real driver data.
+The live account, billing, sending-domain, DNS, and secret-configuration steps
+require the project owner's approval. Review access policies and delivery
+configuration before expanding beyond a controlled pilot or handling real
+driver data.
 
 ## 1. Create a Supabase project
 
@@ -23,9 +21,10 @@ drivers and fleet managers.
 `https://www.occulert.com` and allow `https://www.occulert.com/login.html` as
 a redirect URL. This keeps confirmation links on the production site instead
 of sending drivers to localhost.
-5. Configure a custom SMTP provider before a multi-driver pilot. Supabase's
-built-in email sender is intended for initial testing and can rate-limit
-confirmation messages across the whole project.
+5. For a no-cost controlled pilot, Supabase's built-in sender can handle a
+small number of confirmation messages. Keep volume low because it can
+rate-limit confirmation messages across the project. A custom SMTP provider
+is optional if pilot volume later grows.
 
 For an existing Occulert project that already has the core tables, review and
 run only `db/migrations/20260719_secure_fleet_invitations.sql`. It adds the
@@ -60,6 +59,11 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the browser keeps only its
 local fallback copy and the API reports `stored: false`.
 
+Invitation creation returns the one-time link only to the verified manager.
+The dashboard can open a pre-addressed message in the manager's existing mail
+app or copy the link. Sending a new link revokes the prior token, creates a
+fresh token, and is limited to reduce abuse without adding a paid provider.
+
 ## 4. Frontend behavior
 
 The endpoints expect an `Authorization: Bearer <access_token>`
@@ -92,9 +96,11 @@ for the existing project before enabling fleet onboarding.
 `api/fleet-summary.js`, `api/_lib/supabase.js`)
 - [x] Pilot-lead storage path, spam checks, and per-instance rate limiting
 - [x] Supabase project and protected pilot-lead table created
-- [ ] Full fleet/driver/session/event schema applied and verified
-- [ ] `SUPABASE_ANON_KEY` environment variable set in Vercel and deployment verified
+- [x] Full fleet/driver/session/event schema applied and verified
+- [x] `SUPABASE_ANON_KEY` environment variable set in Vercel and deployment verified
 - [x] Frontend wired with authenticated API calls and local fallback
-- [ ] Row Level Security policies reviewed for production use
+- [x] Row Level Security and service-role invitation boundaries independently verified
 - [x] Trusted fleet invitation/administration flow implemented in code
-- [ ] Secure fleet invitation migration applied and independently verified
+- [x] Secure fleet invitation migration applied and independently verified
+- [x] No-cost invitation sharing through the manager's mail app and copy-link fallback
+- [ ] Optional custom SMTP configured only if pilot volume outgrows Supabase's built-in sender

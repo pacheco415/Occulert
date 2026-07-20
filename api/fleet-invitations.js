@@ -13,6 +13,8 @@ const bearerToken = supabaseLib.bearerToken;
 const MAX_BODY_LENGTH = 2048;
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_PENDING_INVITATIONS = 100;
+const MAX_INVITATIONS_PER_HOUR = 20;
+const RESEND_COOLDOWN_MS = 60 * 1000;
 
 function json(response, status, body) {
   response.statusCode = status;
@@ -97,14 +99,10 @@ module.exports = async function handler(request, response) {
       return json(response, 200, { ok: true, invitation: rows[0] });
     }
 
-    const email = normalizedEmail(request.body && request.body.email);
-    if (!email) return json(response, 400, { ok: false, error: "invalid_email" });
-    if (email === normalizedEmail(user.email)) return json(response, 400, { ok: false, error: "cannot_invite_self" });
-
     const now = Date.now();
     const pending = await pgFetch("fleet_invitations", {
       params: {
-        select: "id,email,expires_at",
+        select: "id,email,expires_at,created_at",
         fleet_id: "eq." + fleet.id,
         accepted_at: "is.null",
         revoked_at: "is.null",
@@ -113,11 +111,54 @@ module.exports = async function handler(request, response) {
         limit: String(MAX_PENDING_INVITATIONS + 1),
       },
     });
-    if (pending.length >= MAX_PENDING_INVITATIONS) {
+    const replacementId = String(request.body && request.body.replace_invitation_id || "");
+    if (replacementId && !validUuid(replacementId)) {
+      return json(response, 400, { ok: false, error: "invalid_invitation_id" });
+    }
+    const replacedInvitation = replacementId ? pending.find((invite) => invite.id === replacementId) : null;
+    if (replacementId && !replacedInvitation) {
+      return json(response, 404, { ok: false, error: "invitation_not_found" });
+    }
+    if (replacedInvitation && now - Date.parse(replacedInvitation.created_at) < RESEND_COOLDOWN_MS) {
+      response.setHeader("Retry-After", "60");
+      return json(response, 429, { ok: false, error: "resend_too_soon" });
+    }
+
+    const email = normalizedEmail(replacedInvitation ? replacedInvitation.email : request.body && request.body.email);
+    if (!email) return json(response, 400, { ok: false, error: "invalid_email" });
+    if (email === normalizedEmail(user.email)) return json(response, 400, { ok: false, error: "cannot_invite_self" });
+    if (pending.length >= MAX_PENDING_INVITATIONS && !replacedInvitation) {
       return json(response, 429, { ok: false, error: "too_many_pending_invitations" });
     }
-    if (pending.some((invite) => normalizedEmail(invite.email) === email)) {
+    if (!replacedInvitation && pending.some((invite) => normalizedEmail(invite.email) === email)) {
       return json(response, 409, { ok: false, error: "active_invitation_exists" });
+    }
+
+    const recent = await pgFetch("fleet_invitations", {
+      params: {
+        select: "id",
+        fleet_id: "eq." + fleet.id,
+        created_at: "gt." + new Date(now - 60 * 60 * 1000).toISOString(),
+        limit: String(MAX_INVITATIONS_PER_HOUR + 1),
+      },
+    });
+    if (recent.length >= MAX_INVITATIONS_PER_HOUR) {
+      response.setHeader("Retry-After", "3600");
+      return json(response, 429, { ok: false, error: "invitation_rate_limited" });
+    }
+
+    if (replacedInvitation) {
+      const revoked = await pgFetch("fleet_invitations", {
+        method: "PATCH",
+        params: {
+          id: "eq." + replacedInvitation.id,
+          fleet_id: "eq." + fleet.id,
+          accepted_at: "is.null",
+          revoked_at: "is.null",
+        },
+        body: { revoked_at: new Date(now).toISOString() },
+      });
+      if (!revoked.length) return json(response, 409, { ok: false, error: "invitation_not_pending" });
     }
 
     const token = crypto.randomBytes(32).toString("base64url");
@@ -135,13 +176,15 @@ module.exports = async function handler(request, response) {
     });
     if (!rows.length) return json(response, 502, { ok: false, error: "invitation_not_saved" });
 
+    const acceptPath = "/accept-invite.html#token=" + token;
+
     return json(response, 201, {
       ok: true,
       invitation: {
         id: rows[0].id,
         email: email,
         expires_at: expiresAt,
-        accept_path: "/accept-invite.html#token=" + token,
+        accept_path: acceptPath,
       },
     });
   } catch (_) {
