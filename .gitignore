@@ -15,6 +15,7 @@ test-results/
 *.jks
 *.p8
 *.p12
+credentials.json
 *.key
 *.mobileprovision
 *.orig.*
