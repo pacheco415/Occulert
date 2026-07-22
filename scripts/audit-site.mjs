@@ -123,6 +123,7 @@ assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "
 assertIncludes("native-app/app/monitor.tsx", "AsyncStorage.setItem(HISTORY_KEY", "native monitor must save completed sessions for the history screen");
 assertIncludes("native-app/app/history.tsx", "openFeedback(item)", "native session history must offer pilot feedback tied to a completed session");
 assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, or location are attached.", "native pilot feedback must state that sensitive media and location are not attached");
+assertIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native iOS builds must explain optional location access to satisfy App Store validation");
 assertIncludes("fleet-dashboard.html", "id=\"driverSearch\"", "fleet dashboard must keep driver search controls");
 assertIncludes("fleet-dashboard.html", "function exportFleetCSV()", "fleet dashboard must keep CSV export");
 assertIncludes("fleet-dashboard.html", "function seedDemoData()", "fleet dashboard must keep demo data loading");
