@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { openFeedback } from '../lib/feedback';
 
 const HISTORY_KEY = 'occulert-session-history';
 
@@ -89,6 +90,19 @@ export default function HistoryScreen() {
                 <Text style={s.statLbl}>Driver</Text>
               </View>
             </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Send feedback about this session"
+              style={s.feedbackBtn}
+              onPress={async () => {
+                if (!await openFeedback(item)) {
+                  Alert.alert('Mail is unavailable', 'Email hello@occulert.com to share pilot feedback.');
+                }
+              }}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={16} color="#93c5fd" />
+              <Text style={s.feedbackTxt}>Send session feedback</Text>
+            </TouchableOpacity>
           </View>
         ))}
       </ScrollView>
@@ -113,4 +127,6 @@ const s = StyleSheet.create({
   stat: { flex: 1, alignItems: 'center', backgroundColor: 'rgba(37,99,235,0.06)', borderRadius: 10, paddingVertical: 10 },
   statVal: { color: '#fff', fontSize: 16, fontWeight: '900' },
   statLbl: { color: '#4a7a8a', fontSize: 10, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
+  feedbackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
+  feedbackTxt: { color: '#93c5fd', fontSize: 13, fontWeight: '800' },
 });

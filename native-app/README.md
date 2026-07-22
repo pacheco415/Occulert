@@ -90,6 +90,10 @@ native-app/
 | Pre-drive risk score screen | Planned - Phase 2 |
 | App Store submission | TODO |
 
+Pilot testers can send general feedback from Settings or attach basic session
+metrics from History. The app opens the device mail composer for review and
+does not attach camera images, video, audio, or location.
+
 ## PWA Parity Checklist
 
 Before App Store submission, the native app should match or exceed the PWA:

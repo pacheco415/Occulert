@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SensitivitySlider, loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { SensitivityLevel } from '../constants/thresholds';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { openFeedback } from '../lib/feedback';
 
 export default function SettingsScreen() {
   const [sens, setSens] = useState<SensitivityLevel>('medium');
@@ -40,32 +41,46 @@ export default function SettingsScreen() {
             <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
             <Switch value={audio} onValueChange={v=>tog('occulert-audio',v,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
-          <View style={s.card}>
-            <Text style={s.cardTitle}>CONNECTED DEVICES</Text>
-            <View style={s.row}>
-              <View style={s.rowL}>
-                <Ionicons name="headset-outline" size={18} color="#60a5fa" />
-                <View>
-                  <Text style={s.label}>AirPods / Bluetooth audio</Text>
-                  <Text style={s.sub}>Play alerts through connected earbuds</Text>
-                </View>
+        </View>
+        <View style={s.card}>
+          <Text style={s.cardTitle}>CONNECTED DEVICES</Text>
+          <View style={s.row}>
+            <View style={s.rowL}>
+              <Ionicons name="headset-outline" size={18} color="#60a5fa" />
+              <View>
+                <Text style={s.label}>AirPods / Bluetooth audio</Text>
+                <Text style={s.sub}>Play alerts through connected earbuds</Text>
               </View>
-              <Switch value={airpods} onValueChange={v => tog('occulert-airpods', v, setAirpods)} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
             </View>
-            <View style={s.div} />
-            <View style={s.row}>
-              <View style={s.rowL}>
-                <Ionicons name="watch-outline" size={18} color="#60a5fa" />
-                <View>
-                  <Text style={s.label}>Apple Watch alerts</Text>
-                  <Text style={s.sub}>Wrist haptics (requires the Watch app)</Text>
-                </View>
-              </View>
-              <Switch value={watch} onValueChange={v => tog('occulert-watch', v, setWatch)} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
-            </View>
+            <Switch value={airpods} onValueChange={v => tog('occulert-airpods', v, setAirpods)} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
           </View>
-
-          <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>No camera video stored or uploaded. Detection is fully on-device.</Text></View>
+          <View style={s.div} />
+          <View style={s.row}>
+            <View style={s.rowL}>
+              <Ionicons name="watch-outline" size={18} color="#60a5fa" />
+              <View>
+                <Text style={s.label}>Apple Watch alerts</Text>
+                <Text style={s.sub}>Wrist haptics (requires the Watch app)</Text>
+              </View>
+            </View>
+            <Switch value={watch} onValueChange={v => tog('occulert-watch', v, setWatch)} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
+          </View>
+        </View>
+        <View style={s.card}>
+          <Text style={s.cardTitle}>PILOT SUPPORT</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={s.row}
+            onPress={async () => {
+              if (!await openFeedback()) {
+                Alert.alert('Mail is unavailable', 'Email hello@occulert.com to share pilot feedback.');
+              }
+            }}
+          >
+            <View style={s.rowL}><Ionicons name="chatbubble-ellipses-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Send feedback</Text><Text style={s.sub}>Report an alert issue or share a suggestion</Text></View></View>
+            <Ionicons name="chevron-forward" size={18} color="#4a7a8a" />
+          </TouchableOpacity>
+          <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>Feedback opens in Mail for your review. No camera video, audio, or location is attached.</Text></View>
         </View>
         <Text style={s.ver}>Occulert™ · v1.0.0 · San Francisco, CA</Text>
       </ScrollView>
