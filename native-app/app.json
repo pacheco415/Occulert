@@ -16,6 +16,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Occulert uses your front camera to detect eye fatigue while driving. No video is stored or uploaded.",
+        "NSLocationWhenInUseUsageDescription": "Occulert uses your location only when you choose to enable optional trip location features. Core fatigue monitoring works without location.",
         "UIBackgroundModes": [
           "audio"
         ]
