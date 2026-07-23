@@ -16,6 +16,11 @@ import { AlertSystem } from '../components/AlertSystem';
 import { loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 import type { SensitivityLevel } from '../constants/thresholds';
+import {
+  beginCloudSession,
+  finishCloudSession,
+  logCloudAlert,
+} from '../lib/cloudSync';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking
@@ -51,6 +56,7 @@ export default function MonitorScreen() {
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
   const [isRunning, setIsRunning] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [sensitivity, setSensitivity] = useState<SensitivityLevel>('medium');
   const [sessionTime, setSessionTime] = useState(0);
   const [alertCount, setAlertCount] = useState(0);
@@ -58,7 +64,11 @@ export default function MonitorScreen() {
   const prevAlertingRef = useRef(false);
   const fatigueSumRef = useRef(0);
   const fatigueSamplesRef = useRef(0);
+  const maxFatigueRef = useRef(0);
   const closedSinceRef = useRef<number | null>(null);
+  const stoppingRef = useRef(false);
+  const cloudSessionRef = useRef<Promise<string | null> | null>(null);
+  const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const [metrics, setMetrics] = useState<EyeMetrics>({
     ear: 0.3, perclos: 0, fatigueScore: 0, state: 'noFace',
@@ -85,6 +95,7 @@ export default function MonitorScreen() {
     String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 
   const handleStart = async () => {
+    if (isStopping) return;
     if (!hasPermission) {
       const granted = await requestPermission();
       if (!granted) return;
@@ -93,18 +104,22 @@ export default function MonitorScreen() {
     prevAlertingRef.current = false;
     fatigueSumRef.current = 0;
     fatigueSamplesRef.current = 0;
+    maxFatigueRef.current = 0;
     closedSinceRef.current = null;
+    cloudEventQueueRef.current = Promise.resolve();
+    cloudSessionRef.current = beginCloudSession();
     setAlertCount(0);
     setIsRunning(true);
   };
 
-  const saveSession = useCallback(async (durationSec: number, alerts: number) => {
-    if (durationSec <= 0) return;
+  const saveSession = useCallback(async (durationSec: number, alerts: number): Promise<string | null> => {
+    if (durationSec <= 0) return null;
     const avgFatigue = fatigueSamplesRef.current
       ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
       : 0;
+    const sessionId = 'session-' + Date.now();
     const record = {
-      sessionId: 'session-' + Date.now(),
+      sessionId,
       savedAt: new Date().toISOString(),
       durationSec,
       alertCount: alerts,
@@ -118,13 +133,59 @@ export default function MonitorScreen() {
     } catch {
       await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify([record]));
     }
+    return sessionId;
+  }, []);
+
+  const markSessionSynced = useCallback(async (localSessionId: string, cloudSessionId: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(HISTORY_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(parsed)) return;
+      const updated = parsed.map(item => item?.sessionId === localSessionId
+        ? { ...item, cloudSynced: true, cloudSessionId }
+        : item);
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+    } catch {
+      // The local session remains intact even if its cloud badge cannot update.
+    }
   }, []);
 
   const handleStop = useCallback(async () => {
-    if (isRunning) await saveSession(sessionTime, alertCount);
+    if (stoppingRef.current) return;
+    stoppingRef.current = true;
+    setIsStopping(true);
+    const wasRunning = isRunning;
+    const durationSec = sessionTime;
+    const alerts = alertCount;
+    const averageFatigue = fatigueSamplesRef.current
+      ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
+      : 0;
+    const maxFatigue = maxFatigueRef.current;
+    const cloudSession = cloudSessionRef.current;
+    const pendingEvents = cloudEventQueueRef.current;
+    cloudSessionRef.current = null;
+    cloudEventQueueRef.current = Promise.resolve();
     setIsRunning(false);
     reset();
-  }, [alertCount, isRunning, reset, saveSession, sessionTime]);
+    try {
+      if (!wasRunning) return;
+      const localSessionId = await saveSession(durationSec, alerts);
+      const cloudSessionId = cloudSession ? await cloudSession.catch(() => null) : null;
+      if (!cloudSessionId) return;
+      await pendingEvents.catch(() => {});
+      const safetyScore = Math.max(0, 100 - Math.round(maxFatigue * 0.65) - alerts * 8);
+      const synced = await finishCloudSession(cloudSessionId, {
+        averageFatigue,
+        maxFatigue,
+        safetyScore,
+        alertCount: alerts,
+      });
+      if (synced && localSessionId) await markSessionSynced(localSessionId, cloudSessionId);
+    } finally {
+      stoppingRef.current = false;
+      setIsStopping(false);
+    }
+  }, [alertCount, isRunning, markSessionSynced, reset, saveSession, sessionTime]);
 
   /**
    * onEyeState — receives eye-open probabilities from the frame processor
@@ -152,12 +213,22 @@ export default function MonitorScreen() {
     if (faceFound) {
       fatigueSumRef.current += result.fatigueScore;
       fatigueSamplesRef.current += 1;
+      maxFatigueRef.current = Math.max(maxFatigueRef.current, result.fatigueScore);
     }
     // Count discrete alert events only: increment once on transition INTO an
     // alerting state (closed), not on every frame while eyes stay closed.
     const alerting = result.state === 'closed';
     if (alerting && !prevAlertingRef.current) {
       setAlertCount((c) => c + 1);
+      const cloudSession = cloudSessionRef.current;
+      if (cloudSession) {
+        cloudEventQueueRef.current = cloudEventQueueRef.current
+          .then(async () => {
+            const sessionId = await cloudSession;
+            if (sessionId) await logCloudAlert(sessionId, result.fatigueScore);
+          })
+          .catch(() => {});
+      }
     }
     prevAlertingRef.current = alerting;
   }, [processEyeOpenness, processNoFace]);
@@ -286,9 +357,13 @@ export default function MonitorScreen() {
         {/* Controls */}
         <View style={s.ctrl}>
           {!isRunning ? (
-            <TouchableOpacity style={s.startBtn} onPress={handleStart}>
+            <TouchableOpacity
+              disabled={isStopping}
+              style={[s.startBtn, isStopping && s.disabledBtn]}
+              onPress={handleStart}
+            >
               <Ionicons name="eye" size={22} color="#fff" />
-              <Text style={s.startTxt}>START MONITORING</Text>
+              <Text style={s.startTxt}>{isStopping ? 'SAVING SESSION...' : 'START MONITORING'}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={s.stopBtn} onPress={handleStop}>
@@ -320,6 +395,7 @@ const s = StyleSheet.create({
   cardVal: { color: '#c8e8f0', fontSize: 16, fontWeight: '900', marginTop: 2 },
   ctrl: { padding: 20 },
   startBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#2563eb', borderRadius: 16, paddingVertical: 20, shadowColor: '#2563eb', shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
+  disabledBtn: { opacity: 0.55 },
   startTxt: { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
   stopBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#dc2626', borderRadius: 16, paddingVertical: 20 },
   stopTxt: { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
