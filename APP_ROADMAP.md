@@ -4,7 +4,9 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 ★ = top-priority milestone for each phase
 
-**Last updated: 2026-07-08** — statuses below reflect actual progress in the native-app build and web app. Backend scaffolding for the fleet dashboard now exists (PR #18) but is not yet connected to a real database. See AUDIT.md and issue #6 for the fuller near/mid/long-term gap list.
+**Last updated: 2026-07-22** — statuses below reflect private TestFlight build
+11 and the current web app. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
+and issue #6 for the remaining validation and product gaps.
 
 ---
 
@@ -14,8 +16,9 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Validate detection accuracy against ground-truth drowsiness data | ★ | Not started |
+| Validate detection accuracy against ground-truth drowsiness data | ★ | Pilot feedback capture ready; formal dataset validation not started |
 | Add user-controlled sensitivity slider (low / medium / high) | — | Done |
+| Capture structured correct / false / missed alert feedback | — | Done in private TestFlight build 11 |
 | Audit background reliability (screen-off, app-backgrounded) | — | Partial |
 | Land a pilot fleet (rideshare, delivery, or trucking partner) | ★ | Not started |
 | Tighten safety disclaimers and credibility documentation | — | Done |
@@ -45,10 +48,13 @@ Note: AirPods audio routing shipped in native-app (PR #2), covering auto-detect/
 |------|----------|--------|
 | Pull HRV and sleep data from Apple Health / Google Fit | — | Not started |
 | Pre-drive fatigue risk score shown before each trip | ★ | Not started |
-| Wrist haptic alert when fatigue threshold is crossed | — | Partial |
+| Wrist haptic alert when fatigue threshold is crossed | — | Done in private TestFlight build 11 |
 | Watch-face widget showing live safety score | — | Not started |
 
-Note: a basic Apple Watch alert bridge shipped via react-native-watch-connectivity (native-app PR #2); the full watchOS companion app is tracked in issue #3.
+Note: the packaged watchOS companion, live and queued WatchConnectivity
+delivery, direct test control, and wrist haptics passed a real iPhone/Apple
+Watch check in private TestFlight build 11. Watch biometrics and a complication
+remain separate future work.
 
 ---
 
@@ -83,10 +89,10 @@ Note: a basic Apple Watch alert bridge shipped via react-native-watch-connectivi
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Native iOS app (Swift / React Native) | ★ | In progress (native-app/, Expo + EAS build) |
+| Native iOS app (Swift / React Native) | ★ | Private TestFlight pilot (build 11) |
 | Native Android app | — | Not started |
 | Keep PWA as lightweight onboarding funnel | — | Done |
-| Verify real-time sensor access per platform (camera, motion, BT) | ★ | Partial (camera via vision-camera + ML Kit shipped; motion/BT partial) |
+| Verify real-time sensor access per platform (camera, motion, BT) | ★ | Partial (camera and Watch alerts verified; experimental earbud motion is not calibrated) |
 | Preserve and enforce privacy-first promise across all platforms | — | Ongoing |
 
 ---
@@ -97,10 +103,10 @@ Note: a basic Apple Watch alert bridge shipped via react-native-watch-connectivi
 |-------|-------|------------------|--------|
 | 0 · Foundation | Accuracy & pilots | Detection validation, pilot fleet | Not started |
 | 1 · Earbuds | Head & heart signals | Head-nod detection, directional alerts | Partial (audio routing done) |
-| 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (basic alert bridge done) |
+| 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (wrist alerts done; biometrics and risk score not started) |
 | 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Not started (fleet dashboard backend scaffolding drafted, PR #18) |
 | 4 · Smart Glasses | Ambient + eye tracking | Inward eye-tracking | Not started |
-| Platform | Native apps | iOS app, real-time sensor access | In progress |
+| Platform | Native apps | iOS app, real-time sensor access | Private iOS pilot |
 
 For the current detailed gap list and near/mid/long-term breakdown, see issue #6.
 
