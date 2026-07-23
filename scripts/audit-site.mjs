@@ -124,6 +124,10 @@ assertIncludes("native-app/app/monitor.tsx", "AsyncStorage.setItem(HISTORY_KEY",
 assertIncludes("native-app/app/history.tsx", "openFeedback(item)", "native session history must offer pilot feedback tied to a completed session");
 assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, or location are attached.", "native pilot feedback must state that sensitive media and location are not attached");
 assertIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native iOS builds must explain optional location access to satisfy App Store validation");
+assertIncludes("native-app/app/monitor.tsx", "CLOSED_CONFIRM_MS = 1_200", "native monitoring must confirm sustained eye closure before a full alert");
+assertIncludes("native-app/components/AlertSystem.tsx", "CRITICAL_WARMUP_SECONDS = 10", "native monitoring must not trigger a critical alert immediately after startup");
+assertIncludes("native-app/lib/watchBridge.ts", "getIsWatchAppInstalled", "Apple Watch controls must require the companion app, not pairing alone");
+assertIncludes("native-app/app/settings.tsx", "AUTOMATIC", "connected audio settings must describe iPhone output routing truthfully");
 assertIncludes("fleet-dashboard.html", "id=\"driverSearch\"", "fleet dashboard must keep driver search controls");
 assertIncludes("fleet-dashboard.html", "function exportFleetCSV()", "fleet dashboard must keep CSV export");
 assertIncludes("fleet-dashboard.html", "function seedDemoData()", "fleet dashboard must keep demo data loading");

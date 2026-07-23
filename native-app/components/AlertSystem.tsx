@@ -12,7 +12,9 @@ export type AlertLevel = 'none' | 'watch' | 'alert' | 'critical';
 
 const ALERT_SOUND = require('../assets/alert.wav');
 
-interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; }
+interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; sessionTime: number; }
+
+const CRITICAL_WARMUP_SECONDS = 10;
 
 /**
  * AlertSystem — Week 2
@@ -20,22 +22,19 @@ interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; }
  *   - expo-haptics vibration (impact/notification style per severity)
  *   - expo-audio alert tone (with cooldown so it doesn't spam)
  */
-export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
+export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProps) {
   const lastAlert = useRef(0);
   const hapticEnabled = useRef(true);
   const audioEnabled = useRef(true);
-  const airpodsEnabled = useRef(true);   // route alerts to AirPods / Bluetooth output
-  const watchEnabled = useRef(true);     // mirror alerts to a paired Apple Watch (dev/TestFlight build)
+  const watchEnabled = useRef(false);    // enabled only after the user opts in with a companion installed
 
   // Load persisted alert preferences (set on the Settings screen).
   React.useEffect(() => {
     AsyncStorage.getItem('occulert-haptic').then(v => { if (v != null) hapticEnabled.current = v === 'true'; });
     AsyncStorage.getItem('occulert-audio').then(v => { if (v != null) audioEnabled.current = v === 'true'; });
-  // Connected-device preferences (AirPods / Apple Watch)
-    AsyncStorage.getItem('occulert-airpods').then((v) => {
-      if (v !== null) airpodsEnabled.current = v === 'true';
-      if (airpodsEnabled.current) configureAlertAudioMode().catch(() => {});
-    });
+    // iOS routes playback through the active output (speaker, AirPods, or car
+    // audio). This is automatic rather than a capability Occulert can toggle.
+    configureAlertAudioMode().catch(() => {});
     AsyncStorage.getItem('occulert-watch').then((v) => { if (v !== null) watchEnabled.current = v === 'true'; });
   }, []);
   const pulse = useRef(new Animated.Value(1)).current;
@@ -43,7 +42,7 @@ export function AlertSystem({ metrics, isRunning }: AlertSystemProps) {
 
   const level: AlertLevel =
     !isRunning || metrics.state === 'noFace' ? 'none'
-    : metrics.perclos >= PERCLOS_ALERT_THRESHOLD ? 'critical'
+    : sessionTime >= CRITICAL_WARMUP_SECONDS && metrics.perclos >= PERCLOS_ALERT_THRESHOLD ? 'critical'
     : metrics.state === 'closed' ? 'alert'
     : metrics.state === 'watch'  ? 'watch'
     : 'none';
@@ -114,7 +113,7 @@ const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;colo
 };
 
 const s = StyleSheet.create({
-  banner: { position:'absolute', bottom:100, left:16, right:16, flexDirection:'row', alignItems:'center', gap:14, borderWidth:1.5, borderRadius:16, padding:18 },
+  banner: { position:'absolute', top:76, left:16, right:16, flexDirection:'row', alignItems:'center', gap:14, borderWidth:1.5, borderRadius:16, padding:18 },
   icon: { fontSize:28 },
   txt:  { flex:1 },
   title:{ fontSize:16, fontWeight:'900', letterSpacing:0.5 },
