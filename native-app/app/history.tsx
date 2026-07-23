@@ -5,7 +5,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { openFeedback } from '../lib/feedback';
+import { openFeedback, type AlertAssessment } from '../lib/feedback';
 
 const HISTORY_KEY = 'occulert-session-history';
 
@@ -17,7 +17,19 @@ interface SessionRecord {
   durationSec?: number;
   alertCount?: number;
   avgFatigue?: number;
+  alertAssessment?: AlertAssessment;
+  assessmentUpdatedAt?: string;
 }
+
+const ASSESSMENT_OPTIONS: Array<{
+  value: AlertAssessment;
+  label: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+}> = [
+  { value: 'accurate', label: 'Felt right', icon: 'checkmark-circle-outline' },
+  { value: 'false_alert', label: 'False alert', icon: 'alert-circle-outline' },
+  { value: 'missed_alert', label: 'Missed alert', icon: 'eye-off-outline' },
+];
 
 function fmtDuration(sec?: number): string {
   if (!sec || sec < 0) return '0:00';
@@ -51,6 +63,19 @@ export default function HistoryScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const saveAssessment = async (index: number, value: AlertAssessment) => {
+    const updated = sessions.map((item, itemIndex) => itemIndex === index
+      ? { ...item, alertAssessment: value, assessmentUpdatedAt: new Date().toISOString() }
+      : item);
+    setSessions(updated);
+    try {
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+    } catch {
+      await load();
+      Alert.alert('Could not save review', 'Please try rating this session again.');
+    }
+  };
 
   return (
     <SafeAreaView style={s.bg}>
@@ -90,6 +115,32 @@ export default function HistoryScreen() {
                 <Text style={s.statLbl}>Driver</Text>
               </View>
             </View>
+            <View style={s.review}>
+              <Text style={s.reviewTitle}>How accurate were the alerts?</Text>
+              <View style={s.reviewOptions}>
+                {ASSESSMENT_OPTIONS.map((option) => {
+                  const selected = item.alertAssessment === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      accessibilityRole="button"
+                      accessibilityLabel={option.label}
+                      accessibilityState={{ selected }}
+                      style={[s.reviewOption, selected && s.reviewOptionSelected]}
+                      onPress={() => saveAssessment(i, option.value)}
+                    >
+                      <Ionicons name={option.icon} size={15} color={selected ? '#dbeafe' : '#4a7a8a'} />
+                      <Text style={[s.reviewOptionText, selected && s.reviewOptionTextSelected]}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={s.reviewPrivacy}>
+                Saved only on this iPhone. Included only if you choose to send feedback.
+              </Text>
+            </View>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Send feedback about this session"
@@ -127,6 +178,14 @@ const s = StyleSheet.create({
   stat: { flex: 1, alignItems: 'center', backgroundColor: 'rgba(37,99,235,0.06)', borderRadius: 10, paddingVertical: 10 },
   statVal: { color: '#fff', fontSize: 16, fontWeight: '900' },
   statLbl: { color: '#4a7a8a', fontSize: 10, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
+  review: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
+  reviewTitle: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', marginBottom: 10 },
+  reviewOptions: { flexDirection: 'row', gap: 7 },
+  reviewOption: { flex: 1, minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 7 },
+  reviewOptionSelected: { borderColor: '#3b82f6', backgroundColor: 'rgba(37,99,235,0.22)' },
+  reviewOptionText: { color: '#4a7a8a', fontSize: 10, fontWeight: '800', textAlign: 'center' },
+  reviewOptionTextSelected: { color: '#dbeafe' },
+  reviewPrivacy: { color: '#4a7a8a', fontSize: 10, lineHeight: 14, marginTop: 8 },
   feedbackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   feedbackTxt: { color: '#93c5fd', fontSize: 13, fontWeight: '800' },
 });

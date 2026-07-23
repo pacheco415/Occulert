@@ -1,5 +1,7 @@
 import { Linking, Platform } from 'react-native';
 
+export type AlertAssessment = 'accurate' | 'false_alert' | 'missed_alert';
+
 export interface FeedbackSession {
   sessionId?: string;
   savedAt?: string;
@@ -7,12 +9,20 @@ export interface FeedbackSession {
   durationSec?: number;
   alertCount?: number;
   avgFatigue?: number;
+  alertAssessment?: AlertAssessment;
 }
 
 const FEEDBACK_EMAIL = 'hello@occulert.com';
 
 function valueOrDash(value: number | undefined): string {
   return Number.isFinite(value) ? String(value) : '-';
+}
+
+function assessmentLabel(value?: AlertAssessment): string {
+  if (value === 'accurate') return 'Alerts felt right';
+  if (value === 'false_alert') return 'False alert reported';
+  if (value === 'missed_alert') return 'Missed alert reported';
+  return '-';
 }
 
 export function feedbackUrl(session?: FeedbackSession): string {
@@ -34,6 +44,7 @@ export function feedbackUrl(session?: FeedbackSession): string {
       'Duration seconds: ' + valueOrDash(session.durationSec),
       'Alerts: ' + valueOrDash(session.alertCount),
       'Average fatigue: ' + valueOrDash(session.avgFatigue),
+      'Alert assessment: ' + assessmentLabel(session.alertAssessment),
     );
   }
 
