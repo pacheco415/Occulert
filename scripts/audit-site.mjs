@@ -131,6 +131,10 @@ assertIncludes("native-app/components/AlertSystem.tsx", "top:132", "native alert
 assertIncludes("native-app/app/monitor.tsx", "bottom: 200", "native metrics must remain above the stop control");
 assertIncludes("native-app/lib/watchBridge.ts", "getIsWatchAppInstalled", "Apple Watch controls must require the companion app, not pairing alone");
 assertIncludes("native-app/app/settings.tsx", "AUTOMATIC", "connected audio settings must describe iPhone output routing truthfully");
+assertIncludes("native-app/components/AlertSystem.tsx", "AsyncStorage.getItem('occulert-watch')", "native alerts must read the latest Watch preference instead of a stale mount-time value");
+assertIncludes("native-app/lib/watchBridge.ts", "transferUserInfo", "Watch alerts must have a reliable queued delivery fallback");
+assertIncludes("native-app/targets/occulert-watch/AlertReceiver.swift", "didReceiveUserInfo", "the Watch companion must receive queued alert deliveries");
+assertIncludes("native-app/app/settings.tsx", "Test Watch alert", "connected-device settings must provide a direct Watch alert test");
 assertIncludes("native-app/app.json", "@bacons/apple-targets", "native iOS builds must package the Watch companion target");
 assertIncludes("native-app/targets/occulert-watch/expo-target.config.js", "type: 'watch'", "the Watch companion must be configured as a watchOS target");
 assertIncludes("native-app/targets/occulert-watch/AlertReceiver.swift", "WKInterfaceDevice.current()", "the Watch companion must play wrist haptics locally");

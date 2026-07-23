@@ -26,7 +26,6 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
   const lastAlert = useRef(0);
   const hapticEnabled = useRef(true);
   const audioEnabled = useRef(true);
-  const watchEnabled = useRef(false);    // enabled only after the user opts in with a companion installed
 
   // Load persisted alert preferences (set on the Settings screen).
   React.useEffect(() => {
@@ -35,7 +34,6 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
     // iOS routes playback through the active output (speaker, AirPods, or car
     // audio). This is automatic rather than a capability Occulert can toggle.
     configureAlertAudioMode().catch(() => {});
-    AsyncStorage.getItem('occulert-watch').then((v) => { if (v !== null) watchEnabled.current = v === 'true'; });
   }, []);
   const pulse = useRef(new Animated.Value(1)).current;
   const player = useAudioPlayer(ALERT_SOUND, { keepAudioSessionActive: true });
@@ -74,11 +72,16 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
       }
     } catch {}
 
-    // Mirror the alert to a paired Apple Watch (no-op unless a watchOS
-    // companion is installed via a dev / TestFlight build).
-    if (watchEnabled.current) {
-      sendAlertToWatch({ level: lv, perclos: metrics.perclos, at: now }).catch(() => {});
-    }
+    // Read this preference at alert time. Expo Router can keep the monitor
+    // mounted while Settings is open, so a value captured only on mount can
+    // remain stale after the user enables Watch alerts.
+    AsyncStorage.getItem('occulert-watch')
+      .then((enabled) => {
+        if (enabled === 'true') {
+          return sendAlertToWatch({ level: lv, perclos: metrics.perclos, at: now });
+        }
+      })
+      .catch(() => {});
 
     try {
       if (!audioEnabled.current) return;
