@@ -82,17 +82,21 @@ native-app/
 |-----------|--------|
 | Expo project initialized | Done - scaffold created |
 | Camera + EAR detection running | Done - `useEyeTracking.ts` + dev simulation loop |
-| Background camera access (iOS) | Done - `useKeepAwake` + CameraView in monitor.tsx |
+| Foreground camera monitoring (iOS) | Done - `useKeepAwake` + VisionCamera in `monitor.tsx` |
+| Screen-off / app-backgrounded camera monitoring | Not supported - keep the app foregrounded |
 | Sensitivity slider | Done - `SensitivitySlider.tsx` + AsyncStorage |
-| Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-av |
+| Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-audio |
+| Apple Watch companion + wrist haptics | Done - private TestFlight build 11 |
+| Structured session alert review | Done - local correct / false / missed labels |
 | Head-nod detection (accelerometer) | In progress - Phase 1: wire expo-sensors |
 | HealthKit HRV/sleep integration | Planned - Phase 2 |
 | Pre-drive risk score screen | Planned - Phase 2 |
-| App Store submission | TODO |
+| App Store submission | Private TestFlight build 11 validated |
 
 Pilot testers can send general feedback from Settings or attach basic session
-metrics from History. The app opens the device mail composer for review and
-does not attach camera images, video, audio, or location.
+metrics and a structured alert assessment from History. Alert assessments stay
+on the iPhone unless the tester chooses to open an editable feedback email.
+The app does not attach camera images, video, audio, or location.
 
 ## PWA Parity Checklist
 
@@ -121,7 +125,7 @@ audio, headphones). This is handled by `lib/audioSession.ts`, which configures
 the audio session so alerts:
 
 - play even when the phone's mute switch is on (`playsInSilentModeIOS`),
-- keep firing while the app is backgrounded during a drive (`staysActiveInBackground`),
+- keep the audio session available during active foreground monitoring,
 - duck music / navigation instead of stopping it.
 
 iOS and Android route audio to the connected Bluetooth device automatically;
@@ -141,9 +145,11 @@ The phone side in `lib/watchBridge.ts` sends alerts through
 the iPhone app.
 
 The companion shows the latest alert and plays a Watch haptic for a live alert.
-Critical alerts use a stronger repeated haptic. Settings only enables the Watch
-switch when iOS confirms that the companion is installed. Expo Go remains a
-safe no-op because it cannot contain the Watch target.
+The phone uses an immediate message when the Watch app is reachable and a
+queued fallback when it is not. Critical alerts use a stronger repeated
+haptic. Settings only enables the Watch switch when iOS confirms that the
+companion is installed and includes a direct Watch alert test. Expo Go remains
+a safe no-op because it cannot contain the Watch target.
 
 Build and submit both targets together with the production EAS profile. On the
 physical devices, open the Occulert Watch app, confirm the iPhone reports the
