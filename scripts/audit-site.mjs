@@ -123,6 +123,10 @@ assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "
 assertIncludes("native-app/app/monitor.tsx", "AsyncStorage.setItem(HISTORY_KEY", "native monitor must save completed sessions for the history screen");
 assertIncludes("native-app/app/history.tsx", "openFeedback(item)", "native session history must offer pilot feedback tied to a completed session");
 assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, or location are attached.", "native pilot feedback must state that sensitive media and location are not attached");
+assertIncludes("native-app/app/history.tsx", "false_alert", "native session history must capture structured false-alert feedback");
+assertIncludes("native-app/app/history.tsx", "missed_alert", "native session history must capture structured missed-alert feedback");
+assertIncludes("native-app/app/history.tsx", "Saved only on this iPhone", "native alert assessments must disclose their local-only storage");
+assertIncludes("native-app/lib/feedback.ts", "Alert assessment:", "native session feedback must include the tester's alert assessment");
 assertIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native iOS builds must explain optional location access to satisfy App Store validation");
 assertIncludes("native-app/app/monitor.tsx", "CLOSED_CONFIRM_MS = 1_200", "native monitoring must confirm sustained eye closure before a full alert");
 assertIncludes("native-app/components/AlertSystem.tsx", "CRITICAL_WARMUP_SECONDS = 10", "native monitoring must not trigger a critical alert immediately after startup");
