@@ -65,6 +65,14 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     }
   }
 
+  nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+    Task { @MainActor in
+      let sentAt = userInfo["at"] as? Double ?? 0
+      let ageMilliseconds = Date().timeIntervalSince1970 * 1_000 - sentAt
+      self.handle(userInfo, shouldPlayHaptic: ageMilliseconds >= 0 && ageMilliseconds < 5_000)
+    }
+  }
+
   private func handle(_ message: [String: Any], shouldPlayHaptic: Bool) {
     guard message["type"] as? String == "occulert-alert" else { return }
     let sentAt = message["at"] as? Double ?? 0
