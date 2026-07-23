@@ -42,7 +42,9 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
 
   const level: AlertLevel =
     !isRunning || metrics.state === 'noFace' ? 'none'
-    : sessionTime >= CRITICAL_WARMUP_SECONDS && metrics.perclos >= PERCLOS_ALERT_THRESHOLD ? 'critical'
+    // PERCLOS is a rolling history. Never keep a red alert on screen after
+    // the driver's eyes are visibly open again.
+    : metrics.state === 'closed' && sessionTime >= CRITICAL_WARMUP_SECONDS && metrics.perclos >= PERCLOS_ALERT_THRESHOLD ? 'critical'
     : metrics.state === 'closed' ? 'alert'
     : metrics.state === 'watch'  ? 'watch'
     : 'none';
@@ -100,20 +102,20 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
       <Text style={s.icon}>{cfg.icon}</Text>
       <View style={s.txt}>
         <Text style={[s.title, { color: cfg.color }]}>{cfg.title}</Text>
-        <Text style={[s.sub,   { color: cfg.color }]}>{cfg.sub}</Text>
+        <Text style={[s.sub,   { color: cfg.subColor }]}>{cfg.sub}</Text>
       </View>
     </Animated.View>
   );
 }
 
-const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;color:string;icon:string;title:string;sub:string }> = {
-  watch:    { bg:'rgba(234,179,8,0.12)',  border:'rgba(234,179,8,0.5)',  color:'#fbbf24', icon:'👁',  title:'Eyes Drooping',         sub:'Stay alert. Pull over soon if drowsy.' },
-  alert:    { bg:'rgba(239,68,68,0.14)', border:'rgba(239,68,68,0.6)', color:'#f87171', icon:'⚠️', title:'DROWSINESS DETECTED',    sub:'Pull over safely when you can.' },
-  critical: { bg:'rgba(239,68,68,0.22)', border:'#ef4444',              color:'#ff6b6b', icon:'🚨', title:'PULL OVER NOW',          sub:'High fatigue. Find a safe spot immediately.' },
+const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;color:string;subColor:string;icon:string;title:string;sub:string }> = {
+  watch:    { bg:'rgba(45,35,4,0.92)', border:'#ca8a04', color:'#fde047', subColor:'#fef3c7', icon:'👁',  title:'Eyes Drooping',      sub:'Stay alert. Pull over soon if drowsy.' },
+  alert:    { bg:'rgba(55,8,12,0.94)', border:'#ef4444', color:'#fda4af', subColor:'#ffe4e6', icon:'⚠️', title:'DROWSINESS DETECTED', sub:'Pull over safely when you can.' },
+  critical: { bg:'rgba(55,8,12,0.96)', border:'#ff3344', color:'#ff8a91', subColor:'#fff1f2', icon:'🚨', title:'PULL OVER NOW',       sub:'High fatigue. Find a safe spot immediately.' },
 };
 
 const s = StyleSheet.create({
-  banner: { position:'absolute', top:76, left:16, right:16, flexDirection:'row', alignItems:'center', gap:14, borderWidth:1.5, borderRadius:16, padding:18 },
+  banner: { position:'absolute', top:132, left:16, right:16, zIndex:2, flexDirection:'row', alignItems:'center', gap:14, borderWidth:1.5, borderRadius:16, padding:18 },
   icon: { fontSize:28 },
   txt:  { flex:1 },
   title:{ fontSize:16, fontWeight:'900', letterSpacing:0.5 },

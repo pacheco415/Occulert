@@ -314,7 +314,7 @@ const s = StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(15,30,46,0.85)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#1a3a4a' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   pillTxt: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
-  metrics: { position: 'absolute', left: 14, right: 14, bottom: 116, flexDirection: 'row', gap: 6, justifyContent: 'center' },
+  metrics: { position: 'absolute', left: 14, right: 14, bottom: 200, flexDirection: 'row', gap: 6, justifyContent: 'center' },
   card: { flex: 1, backgroundColor: 'rgba(15,30,46,0.9)', borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10, paddingHorizontal: 5, paddingVertical: 7, alignItems: 'center' },
   cardLbl: { color: '#4a7a8a', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
   cardVal: { color: '#c8e8f0', fontSize: 16, fontWeight: '900', marginTop: 2 },
