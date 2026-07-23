@@ -17,6 +17,8 @@ interface SessionRecord {
   durationSec?: number;
   alertCount?: number;
   avgFatigue?: number;
+  cloudSynced?: boolean;
+  cloudSessionId?: string;
   alertAssessment?: AlertAssessment;
   assessmentUpdatedAt?: string;
 }
@@ -115,6 +117,16 @@ export default function HistoryScreen() {
                 <Text style={s.statLbl}>Driver</Text>
               </View>
             </View>
+            <View style={s.storageRow}>
+              <Ionicons
+                name={item.cloudSynced ? 'cloud-done-outline' : 'phone-portrait-outline'}
+                size={14}
+                color={item.cloudSynced ? '#34d399' : '#4a7a8a'}
+              />
+              <Text style={[s.storageText, item.cloudSynced && s.storageTextSynced]}>
+                {item.cloudSynced ? 'Summary synced to your protected account' : 'Saved only on this iPhone'}
+              </Text>
+            </View>
             <View style={s.review}>
               <Text style={s.reviewTitle}>How accurate were the alerts?</Text>
               <View style={s.reviewOptions}>
@@ -138,7 +150,7 @@ export default function HistoryScreen() {
                 })}
               </View>
               <Text style={s.reviewPrivacy}>
-                Saved only on this iPhone. Included only if you choose to send feedback.
+                This alert rating stays only on this iPhone. It is included only if you choose to send feedback.
               </Text>
             </View>
             <TouchableOpacity
@@ -178,6 +190,9 @@ const s = StyleSheet.create({
   stat: { flex: 1, alignItems: 'center', backgroundColor: 'rgba(37,99,235,0.06)', borderRadius: 10, paddingVertical: 10 },
   statVal: { color: '#fff', fontSize: 16, fontWeight: '900' },
   statLbl: { color: '#4a7a8a', fontSize: 10, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
+  storageRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 12 },
+  storageText: { color: '#4a7a8a', fontSize: 10, fontWeight: '700' },
+  storageTextSynced: { color: '#34d399' },
   review: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewTitle: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', marginBottom: 10 },
   reviewOptions: { flexDirection: 'row', gap: 7 },

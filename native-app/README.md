@@ -88,6 +88,7 @@ native-app/
 | Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-audio |
 | Apple Watch companion + wrist haptics | Done - private TestFlight build 11 |
 | Structured session alert review | Done - local correct / false / missed labels |
+| Optional protected cloud session sync | Implemented - secure sign-in + explicit consent |
 | Head-nod detection (accelerometer) | In progress - Phase 1: wire expo-sensors |
 | HealthKit HRV/sleep integration | Planned - Phase 2 |
 | Pre-drive risk score screen | Planned - Phase 2 |
@@ -98,13 +99,20 @@ metrics and a structured alert assessment from History. Alert assessments stay
 on the iPhone unless the tester chooses to open an editable feedback email.
 The app does not attach camera images, video, audio, or location.
 
+Drivers with an existing Occulert account can optionally sign in from Settings
+and separately enable cloud session sync. Access and refresh tokens are stored
+with Expo SecureStore. Synced data is limited to session timestamps, fatigue
+scores, safety score, alert counts, and drowsy alert events. Monitoring and
+local history continue to work when signed out or offline. Camera images,
+video, audio, GPS location, and structured alert ratings are not uploaded.
+
 ## PWA Parity Checklist
 
 Before App Store submission, the native app should match or exceed the PWA:
 - [ ] EAR-based eye tracking with PERCLOS
 - [ ] Sensitivity control (Low / Med / High)
 - [ ] Session event log
-- [ ] Fleet dashboard sync (optional)
+- [x] Fleet dashboard sync (optional)
 - [ ] GPS opt-in
 - [ ] Privacy-first (no video stored)
 - [ ] Safety disclaimer screen

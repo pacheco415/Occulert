@@ -7,6 +7,7 @@ import type { SensitivityLevel } from '../constants/thresholds';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { openFeedback } from '../lib/feedback';
 import { getWatchStatus, sendAlertToWatch, type WatchStatus } from '../lib/watchBridge';
+import { CloudSyncCard } from '../components/CloudSyncCard';
 
 const EMPTY_WATCH_STATUS: WatchStatus = {
   moduleAvailable: false,
@@ -120,6 +121,7 @@ export default function SettingsScreen() {
             <Text style={s.testText}>Test Watch alert</Text>
           </TouchableOpacity>
         </View>
+        <CloudSyncCard />
         <View style={s.card}>
           <Text style={s.cardTitle}>PILOT SUPPORT</Text>
           <TouchableOpacity
