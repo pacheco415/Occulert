@@ -5,20 +5,25 @@ import { SensitivitySlider, loadSavedSensitivity } from '../components/Sensitivi
 import type { SensitivityLevel } from '../constants/thresholds';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { openFeedback } from '../lib/feedback';
+import { isWatchAvailable } from '../lib/watchBridge';
 
 export default function SettingsScreen() {
   const [sens, setSens] = useState<SensitivityLevel>('medium');
   const [haptic, setHaptic] = useState(true);
   const [audio, setAudio] = useState(true);
-  const [airpods, setAirpods] = useState(true);
-  const [watch, setWatch] = useState(true);
+  const [watch, setWatch] = useState(false);
+  const [watchAvailable, setWatchAvailable] = useState(false);
 
   useEffect(() => {
     loadSavedSensitivity().then(setSens);
     AsyncStorage.getItem('occulert-haptic').then(v => { if(v) setHaptic(v==='true'); });
     AsyncStorage.getItem('occulert-audio').then(v => { if(v) setAudio(v==='true'); });
-    AsyncStorage.getItem('occulert-airpods').then(v => { if(v) setAirpods(v==='true'); });
-    AsyncStorage.getItem('occulert-watch').then(v => { if(v) setWatch(v==='true'); });
+    isWatchAvailable().then(async available => {
+      setWatchAvailable(available);
+      const saved = await AsyncStorage.getItem('occulert-watch');
+      setWatch(available && saved === 'true');
+      if (!available) await AsyncStorage.setItem('occulert-watch', 'false');
+    });
   }, []);
 
   const tog = async (key: string, val: boolean, set: (v: boolean) => void) => {
@@ -49,10 +54,10 @@ export default function SettingsScreen() {
               <Ionicons name="headset-outline" size={18} color="#60a5fa" />
               <View>
                 <Text style={s.label}>AirPods / Bluetooth audio</Text>
-                <Text style={s.sub}>Play alerts through connected earbuds</Text>
+                <Text style={s.sub}>Uses the iPhone's current audio output automatically</Text>
               </View>
             </View>
-            <Switch value={airpods} onValueChange={v => tog('occulert-airpods', v, setAirpods)} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
+            <Text style={s.status}>AUTOMATIC</Text>
           </View>
           <View style={s.div} />
           <View style={s.row}>
@@ -60,10 +65,10 @@ export default function SettingsScreen() {
               <Ionicons name="watch-outline" size={18} color="#60a5fa" />
               <View>
                 <Text style={s.label}>Apple Watch alerts</Text>
-                <Text style={s.sub}>Wrist haptics (requires the Watch app)</Text>
+                <Text style={s.sub}>{watchAvailable ? 'Watch companion detected' : 'Unavailable until the Watch app is installed'}</Text>
               </View>
             </View>
-            <Switch value={watch} onValueChange={v => tog('occulert-watch', v, setWatch)} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
+            <Switch disabled={!watchAvailable} value={watch} onValueChange={v => tog('occulert-watch', v, setWatch)} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
           </View>
         </View>
         <View style={s.card}>
@@ -95,6 +100,7 @@ const s = StyleSheet.create({
   row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:16,paddingVertical:14,gap:12},
   rowL:{flexDirection:'row',alignItems:'center',gap:12,flex:1},
   label:{color:'#c8e8f0',fontSize:14,fontWeight:'700'}, sub:{color:'#4a7a8a',fontSize:11,marginTop:2},
+  status:{color:'#60a5fa',fontSize:10,fontWeight:'900',letterSpacing:0.6},
   div:{height:1,backgroundColor:'#1a3a4a',marginHorizontal:16},
   privNote:{flexDirection:'row',alignItems:'flex-start',gap:8,padding:14,backgroundColor:'rgba(0,0,0,0.2)',borderTopWidth:1,borderColor:'#1a3a4a'},
   privTxt:{color:'#4a7a8a',fontSize:11,lineHeight:16,flex:1},

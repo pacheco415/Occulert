@@ -17,6 +17,7 @@ type WatchModule = {
   sendMessage: (message: Record<string, unknown>, reply?: (r: unknown) => void, err?: (e: unknown) => void) => void;
   updateApplicationContext: (context: Record<string, unknown>) => void;
   getIsPaired?: () => Promise<boolean>;
+  getIsWatchAppInstalled?: () => Promise<boolean>;
 };
 
 let watch: WatchModule | null = null;
@@ -67,14 +68,18 @@ export async function sendAlertToWatch(payload: WatchAlertPayload): Promise<void
 }
 
 /**
- * Whether a paired, reachable Apple Watch is available. Returns false in
- * Expo Go, on Android, or before the watchOS companion is installed.
+ * Whether a paired Apple Watch with the Occulert companion installed is
+ * available. Pairing alone is not enough to promise wrist alerts.
  */
 export async function isWatchAvailable(): Promise<boolean> {
   const mod = loadWatchModule();
-  if (!mod || !mod.getIsPaired) return false;
+  if (!mod || !mod.getIsPaired || !mod.getIsWatchAppInstalled) return false;
   try {
-    return await mod.getIsPaired();
+    const [paired, installed] = await Promise.all([
+      mod.getIsPaired(),
+      mod.getIsWatchAppInstalled(),
+    ]);
+    return paired && installed;
   } catch {
     return false;
   }

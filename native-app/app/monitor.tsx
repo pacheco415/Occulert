@@ -42,6 +42,7 @@ const FACE_DETECTOR_OPTIONS: FrameFaceDetectionOptions = {
 };
 
 const HISTORY_KEY = 'occulert-session-history';
+const CLOSED_CONFIRM_MS = 1_200;
 
 export default function MonitorScreen() {
   useKeepAwake(); // screen never dims while monitoring
@@ -57,6 +58,7 @@ export default function MonitorScreen() {
   const prevAlertingRef = useRef(false);
   const fatigueSumRef = useRef(0);
   const fatigueSamplesRef = useRef(0);
+  const closedSinceRef = useRef<number | null>(null);
 
   const [metrics, setMetrics] = useState<EyeMetrics>({
     ear: 0.3, perclos: 0, fatigueScore: 0, state: 'noFace',
@@ -91,6 +93,7 @@ export default function MonitorScreen() {
     prevAlertingRef.current = false;
     fatigueSumRef.current = 0;
     fatigueSamplesRef.current = 0;
+    closedSinceRef.current = null;
     setAlertCount(0);
     setIsRunning(true);
   };
@@ -129,7 +132,22 @@ export default function MonitorScreen() {
    * thread and drives the UI + AlertSystem.
    */
   const onEyeState = useCallback((leftProb: number, rightProb: number, faceFound: boolean) => {
-    const result = faceFound ? processEyeOpenness(leftProb, rightProb) : processNoFace();
+    const rawResult = faceFound ? processEyeOpenness(leftProb, rightProb) : processNoFace();
+    const now = Date.now();
+    if (rawResult.state === 'closed') {
+      closedSinceRef.current ??= now;
+    } else {
+      closedSinceRef.current = null;
+    }
+    // A blink or one noisy camera frame must not create a driver alert. Keep
+    // showing the caution state until eye closure has been continuous long
+    // enough to be meaningful.
+    const confirmedClosed = rawResult.state === 'closed'
+      && closedSinceRef.current !== null
+      && now - closedSinceRef.current >= CLOSED_CONFIRM_MS;
+    const result: EyeMetrics = confirmedClosed
+      ? rawResult
+      : rawResult.state === 'closed' ? { ...rawResult, state: 'watch' } : rawResult;
     setMetrics(result);
     if (faceFound) {
       fatigueSumRef.current += result.fatigueScore;
@@ -244,7 +262,7 @@ export default function MonitorScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Metrics */}
+        {/* Metrics stay below the driver's face instead of covering it. */}
         {isRunning && (
           <View style={s.metrics}>
             {[
@@ -263,7 +281,7 @@ export default function MonitorScreen() {
         )}
 
         {/* Alert system — renders banner + triggers haptics + audio */}
-        <AlertSystem metrics={metrics} isRunning={isRunning} />
+        <AlertSystem metrics={metrics} isRunning={isRunning} sessionTime={sessionTime} />
 
         {/* Controls */}
         <View style={s.ctrl}>
@@ -296,8 +314,8 @@ const s = StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(15,30,46,0.85)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#1a3a4a' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   pillTxt: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
-  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, margin: 14, alignSelf: 'flex-start' },
-  card: { backgroundColor: 'rgba(15,30,46,0.85)', borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, minWidth: 64, alignItems: 'center' },
+  metrics: { position: 'absolute', left: 14, right: 14, bottom: 200, flexDirection: 'row', gap: 6, justifyContent: 'center' },
+  card: { flex: 1, backgroundColor: 'rgba(15,30,46,0.9)', borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10, paddingHorizontal: 5, paddingVertical: 7, alignItems: 'center' },
   cardLbl: { color: '#4a7a8a', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
   cardVal: { color: '#c8e8f0', fontSize: 16, fontWeight: '900', marginTop: 2 },
   ctrl: { padding: 20 },
