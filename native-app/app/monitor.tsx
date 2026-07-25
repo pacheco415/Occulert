@@ -66,6 +66,7 @@ export default function MonitorScreen() {
   const fatigueSamplesRef = useRef(0);
   const maxFatigueRef = useRef(0);
   const closedSinceRef = useRef<number | null>(null);
+  const sessionSensitivityRef = useRef<SensitivityLevel>('medium');
   const stoppingRef = useRef(false);
   const cloudSessionRef = useRef<Promise<string | null> | null>(null);
   const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -106,6 +107,7 @@ export default function MonitorScreen() {
     fatigueSamplesRef.current = 0;
     maxFatigueRef.current = 0;
     closedSinceRef.current = null;
+    sessionSensitivityRef.current = sensitivity;
     cloudEventQueueRef.current = Promise.resolve();
     cloudSessionRef.current = beginCloudSession();
     setAlertCount(0);
@@ -124,6 +126,7 @@ export default function MonitorScreen() {
       durationSec,
       alertCount: alerts,
       avgFatigue,
+      sensitivity: sessionSensitivityRef.current,
     };
     try {
       const raw = await AsyncStorage.getItem(HISTORY_KEY);

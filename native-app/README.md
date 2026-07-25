@@ -88,6 +88,7 @@ native-app/
 | Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-audio |
 | Apple Watch companion + wrist haptics | Done - private TestFlight build 11 |
 | Structured session alert review | Done - local correct / false / missed labels |
+| Pilot accuracy checkpoint | Implemented - local 10-session Medium progress summary |
 | Optional protected cloud session sync | Implemented - secure sign-in + explicit consent |
 | Head-nod detection (accelerometer) | In progress - Phase 1: wire expo-sensors |
 | HealthKit HRV/sleep integration | Planned - Phase 2 |
@@ -98,6 +99,11 @@ Pilot testers can send general feedback from Settings or attach basic session
 metrics and a structured alert assessment from History. Alert assessments stay
 on the iPhone unless the tester chooses to open an editable feedback email.
 The app does not attach camera images, video, audio, or location.
+
+Each new local session also preserves the sensitivity used for that session.
+History counts reviewed Medium-sensitivity sessions toward the first 10-session
+accuracy checkpoint and summarizes felt-right, false, and missed ratings
+without uploading those ratings.
 
 Drivers with an existing Occulert account can optionally sign in from Settings
 and separately enable cloud session sync. Access and refresh tokens are stored
