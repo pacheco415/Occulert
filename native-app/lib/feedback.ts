@@ -1,4 +1,5 @@
 import { Linking, Platform } from 'react-native';
+import type { SensitivityLevel } from '../constants/thresholds';
 
 export type AlertAssessment = 'accurate' | 'false_alert' | 'missed_alert';
 
@@ -10,6 +11,7 @@ export interface FeedbackSession {
   alertCount?: number;
   avgFatigue?: number;
   alertAssessment?: AlertAssessment;
+  sensitivity?: SensitivityLevel;
 }
 
 const FEEDBACK_EMAIL = 'hello@occulert.com';
@@ -44,6 +46,7 @@ export function feedbackUrl(session?: FeedbackSession): string {
       'Duration seconds: ' + valueOrDash(session.durationSec),
       'Alerts: ' + valueOrDash(session.alertCount),
       'Average fatigue: ' + valueOrDash(session.avgFatigue),
+      'Sensitivity: ' + (session.sensitivity || '-'),
       'Alert assessment: ' + assessmentLabel(session.alertAssessment),
     );
   }

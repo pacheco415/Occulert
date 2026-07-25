@@ -6,8 +6,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { openFeedback, type AlertAssessment } from '../lib/feedback';
+import type { SensitivityLevel } from '../constants/thresholds';
 
 const HISTORY_KEY = 'occulert-session-history';
+const CHECKPOINT_TARGET = 10;
 
 interface SessionRecord {
   sessionId?: string;
@@ -21,6 +23,7 @@ interface SessionRecord {
   cloudSessionId?: string;
   alertAssessment?: AlertAssessment;
   assessmentUpdatedAt?: string;
+  sensitivity?: SensitivityLevel;
 }
 
 const ASSESSMENT_OPTIONS: Array<{
@@ -45,6 +48,13 @@ function fmtDate(iso?: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return 'Unknown date';
   return d.toLocaleDateString() + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function sensitivityLabel(value?: SensitivityLevel): string {
+  if (value === 'low') return 'Low';
+  if (value === 'medium') return 'Medium';
+  if (value === 'high') return 'High';
+  return 'Not recorded';
 }
 
 export default function HistoryScreen() {
@@ -79,10 +89,55 @@ export default function HistoryScreen() {
     }
   };
 
+  const reviewedMedium = sessions.filter(
+    item => item.sensitivity === 'medium' && Boolean(item.alertAssessment),
+  );
+  const checkpointProgress = Math.min(reviewedMedium.length, CHECKPOINT_TARGET);
+  const accurateCount = reviewedMedium.filter(item => item.alertAssessment === 'accurate').length;
+  const falseAlertCount = reviewedMedium.filter(item => item.alertAssessment === 'false_alert').length;
+  const missedAlertCount = reviewedMedium.filter(item => item.alertAssessment === 'missed_alert').length;
+
   return (
     <SafeAreaView style={s.bg}>
       <ScrollView contentContainerStyle={s.scroll}>
         <Text style={s.title}>Session History</Text>
+
+        {loaded && sessions.length > 0 && (
+          <View style={s.checkpoint}>
+            <View style={s.checkpointHeader}>
+              <View style={s.checkpointHeaderCopy}>
+                <Text style={s.checkpointEyebrow}>FIRST ACCURACY CHECKPOINT</Text>
+                <Text style={s.checkpointTitle}>
+                  {checkpointProgress} of {CHECKPOINT_TARGET} Medium sessions reviewed
+                </Text>
+              </View>
+              <Text style={s.checkpointPercent}>
+                {Math.round((checkpointProgress / CHECKPOINT_TARGET) * 100)}%
+              </Text>
+            </View>
+            <View
+              accessibilityLabel={`${checkpointProgress} of ${CHECKPOINT_TARGET} Medium sensitivity sessions reviewed`}
+              accessibilityRole="progressbar"
+              accessibilityValue={{ min: 0, max: CHECKPOINT_TARGET, now: checkpointProgress }}
+              style={s.progressTrack}
+            >
+              <View
+                style={[
+                  s.progressFill,
+                  { width: `${(checkpointProgress / CHECKPOINT_TARGET) * 100}%` },
+                ]}
+              />
+            </View>
+            <View style={s.checkpointStats}>
+              <Text style={s.checkpointStat}>{accurateCount} felt right</Text>
+              <Text style={s.checkpointStat}>{falseAlertCount} false</Text>
+              <Text style={s.checkpointStat}>{missedAlertCount} missed</Text>
+            </View>
+            <Text style={s.checkpointNote}>
+              Only reviewed sessions recorded on Medium count here. Ratings stay on this iPhone.
+            </Text>
+          </View>
+        )}
 
         {loaded && sessions.length === 0 && (
           <View style={s.empty}>
@@ -113,8 +168,8 @@ export default function HistoryScreen() {
                 <Text style={s.statLbl}>Avg Fatigue</Text>
               </View>
               <View style={s.stat}>
-                <Text style={s.statVal}>{item.driverId || '-'}</Text>
-                <Text style={s.statLbl}>Driver</Text>
+                <Text style={s.statValSmall}>{sensitivityLabel(item.sensitivity)}</Text>
+                <Text style={s.statLbl}>Sensitivity</Text>
               </View>
             </View>
             <View style={s.storageRow}>
@@ -177,6 +232,17 @@ const s = StyleSheet.create({
   bg: { flex: 1, backgroundColor: '#050a0f' },
   scroll: { padding: 20, paddingBottom: 48 },
   title: { color: '#fff', fontSize: 28, fontWeight: '900', marginBottom: 20 },
+  checkpoint: { backgroundColor: '#0b2132', borderWidth: 1, borderColor: '#1d4f68', borderRadius: 14, padding: 16, marginBottom: 16 },
+  checkpointHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  checkpointHeaderCopy: { flex: 1 },
+  checkpointEyebrow: { color: '#60a5fa', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  checkpointTitle: { color: '#e0f2fe', fontSize: 15, fontWeight: '800', marginTop: 4 },
+  checkpointPercent: { color: '#93c5fd', fontSize: 18, fontWeight: '900' },
+  progressTrack: { height: 7, borderRadius: 999, backgroundColor: '#173647', overflow: 'hidden', marginTop: 14 },
+  progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#3b82f6' },
+  checkpointStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12 },
+  checkpointStat: { color: '#bae6fd', fontSize: 11, fontWeight: '800' },
+  checkpointNote: { color: '#6592a5', fontSize: 10, lineHeight: 15, marginTop: 10 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 10 },
   emptyTitle: { color: '#c8e8f0', fontSize: 17, fontWeight: '800', marginTop: 8 },
   emptySub: { color: '#4a7a8a', fontSize: 13, textAlign: 'center', lineHeight: 19, paddingHorizontal: 20 },
@@ -189,6 +255,7 @@ const s = StyleSheet.create({
   stats: { flexDirection: 'row', gap: 12 },
   stat: { flex: 1, alignItems: 'center', backgroundColor: 'rgba(37,99,235,0.06)', borderRadius: 10, paddingVertical: 10 },
   statVal: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  statValSmall: { color: '#fff', fontSize: 12, fontWeight: '900' },
   statLbl: { color: '#4a7a8a', fontSize: 10, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
   storageRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 12 },
   storageText: { color: '#4a7a8a', fontSize: 10, fontWeight: '700' },

@@ -9,6 +9,8 @@ before changing detection thresholds or making accuracy claims.
   Watch haptics passed a real-device check in private TestFlight build 11.
 - Session History lets testers label a completed session as **Felt right**,
   **False alert**, or **Missed alert**.
+- New sessions preserve the active sensitivity setting, and Session History
+  shows progress toward the first 10 reviewed Medium-sensitivity sessions.
 - Those labels stay on the tester's iPhone unless the tester chooses to send an
   editable feedback email.
 - This pilot feedback is not a substitute for the authorized dataset benchmark
