@@ -6,7 +6,7 @@ before changing detection thresholds or making accuracy claims.
 ## Current private baseline
 
 - iPhone monitoring, phone alerts, AirPods/Bluetooth audio routing, and Apple
-  Watch haptics passed a real-device check in private TestFlight build 11.
+  Watch haptics passed a real-device check in private TestFlight build 13.
 - Session History lets testers label a completed session as **Felt right**,
   **False alert**, or **Missed alert**.
 - New sessions preserve the active sensitivity setting, and Session History
@@ -116,7 +116,7 @@ pilot:
 
 ## Next build priorities
 
-1. Complete 10 safely reviewed build-11 sessions.
+1. Complete 10 safely reviewed build-13 sessions.
 2. Summarize false and missed alerts by lighting, eyewear, phone position, and
    sensitivity.
 3. Adjust thresholds only when the reviewed evidence supports a change.
