@@ -24,6 +24,13 @@ import {
 import { consumePreDriveSafety } from '../lib/preDriveGate';
 import { currentAppBuildInfo } from '../lib/appBuildInfo';
 import { HeadNodDetector } from '../lib/headNodDetector';
+import {
+  addHeadphoneMotionSampleListener,
+  addHeadphoneMotionStatusListener,
+  startHeadphoneMotion,
+  stopHeadphoneMotion,
+  type HeadphoneMotionState,
+} from '../lib/headphoneMotion';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking
@@ -59,6 +66,7 @@ export default function MonitorScreen() {
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
   const [isRunning, setIsRunning] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [sensitivity, setSensitivity] = useState<SensitivityLevel>('medium');
   const [sensitivityLoaded, setSensitivityLoaded] = useState(false);
@@ -72,12 +80,18 @@ export default function MonitorScreen() {
   const maxFatigueRef = useRef(0);
   const closedSinceRef = useRef<number | null>(null);
   const sessionSensitivityRef = useRef<SensitivityLevel>('medium');
+  const startingRef = useRef(false);
   const stoppingRef = useRef(false);
   const cloudSessionRef = useRef<Promise<string | null> | null>(null);
   const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastSampleAtRef = useRef(0);
   const headNodDetectorRef = useRef(new HeadNodDetector());
   const headNodObservationsRef = useRef(0);
+  const monitoringActiveRef = useRef(false);
+  const headphoneHeadNodDetectorRef = useRef(new HeadNodDetector());
+  const headphoneHeadNodObservationsRef = useRef(0);
+  const headphoneMotionSamplesRef = useRef(0);
+  const headphoneMotionStatusRef = useRef<HeadphoneMotionState>('not-built');
 
   const [metrics, setMetrics] = useState<EyeMetrics>({
     ear: 0.3, perclos: 0, fatigueScore: 0, state: 'noFace',
@@ -90,6 +104,31 @@ export default function MonitorScreen() {
     loadSavedSensitivity()
       .then(setSensitivity)
       .finally(() => setSensitivityLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    const sampleSubscription = addHeadphoneMotionSampleListener((sample) => {
+      if (!monitoringActiveRef.current) return;
+      headphoneMotionSamplesRef.current += 1;
+      const result = headphoneHeadNodDetectorRef.current.update({
+        at: sample.timestampMs,
+        faceFound: true,
+        pitchAngle: sample.pitchAngle,
+        yawAngle: sample.yawAngle,
+        rollAngle: sample.rollAngle,
+      });
+      // Observation only: headphone motion never changes the fatigue score or alerts.
+      if (result.observed) headphoneHeadNodObservationsRef.current += 1;
+    });
+    const statusSubscription = addHeadphoneMotionStatusListener((status) => {
+      if (monitoringActiveRef.current) headphoneMotionStatusRef.current = status.state;
+    });
+    return () => {
+      monitoringActiveRef.current = false;
+      sampleSubscription.remove();
+      statusSubscription.remove();
+      void stopHeadphoneMotion();
+    };
   }, []);
 
   useEffect(() => {
@@ -106,30 +145,46 @@ export default function MonitorScreen() {
     String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 
   const handleStart = async () => {
-    if (isStopping || !sensitivityLoaded) return;
-    if (!hasPermission) {
-      const granted = await requestPermission();
-      if (!granted) return;
+    if (startingRef.current || isStopping || !sensitivityLoaded) return;
+    startingRef.current = true;
+    setIsStarting(true);
+    try {
+      if (!hasPermission) {
+        const granted = await requestPermission();
+        if (!granted) return;
+      }
+      if (!consumePreDriveSafety()) {
+        router.replace('/pre-drive');
+        return;
+      }
+      reset();
+      prevAlertingRef.current = false;
+      fatigueSumRef.current = 0;
+      fatigueSamplesRef.current = 0;
+      maxFatigueRef.current = 0;
+      closedSinceRef.current = null;
+      headNodDetectorRef.current.reset();
+      headNodObservationsRef.current = 0;
+      headphoneHeadNodDetectorRef.current.reset();
+      headphoneHeadNodObservationsRef.current = 0;
+      headphoneMotionSamplesRef.current = 0;
+      headphoneMotionStatusRef.current = 'starting';
+      monitoringActiveRef.current = true;
+      lastSampleAtRef.current = Date.now();
+      setSensorFault(null);
+      sessionSensitivityRef.current = sensitivity;
+      cloudEventQueueRef.current = Promise.resolve();
+      const headphoneStatus = await startHeadphoneMotion();
+      if (headphoneMotionStatusRef.current === 'starting') {
+        headphoneMotionStatusRef.current = headphoneStatus.state;
+      }
+      cloudSessionRef.current = beginCloudSession();
+      setAlertCount(0);
+      setIsRunning(true);
+    } finally {
+      startingRef.current = false;
+      setIsStarting(false);
     }
-    if (!consumePreDriveSafety()) {
-      router.replace('/pre-drive');
-      return;
-    }
-    reset();
-    prevAlertingRef.current = false;
-    fatigueSumRef.current = 0;
-    fatigueSamplesRef.current = 0;
-    maxFatigueRef.current = 0;
-    closedSinceRef.current = null;
-    headNodDetectorRef.current.reset();
-    headNodObservationsRef.current = 0;
-    lastSampleAtRef.current = Date.now();
-    setSensorFault(null);
-    sessionSensitivityRef.current = sensitivity;
-    cloudEventQueueRef.current = Promise.resolve();
-    cloudSessionRef.current = beginCloudSession();
-    setAlertCount(0);
-    setIsRunning(true);
   };
 
   const saveSession = useCallback(async (durationSec: number, alerts: number): Promise<string | null> => {
@@ -145,6 +200,10 @@ export default function MonitorScreen() {
       alertCount: alerts,
       avgFatigue,
       headNodObservations: headNodObservationsRef.current,
+      cameraHeadNodObservations: headNodObservationsRef.current,
+      headphoneHeadNodObservations: headphoneHeadNodObservationsRef.current,
+      headphoneMotionSamples: headphoneMotionSamplesRef.current,
+      headphoneMotionStatus: headphoneMotionStatusRef.current,
       sensitivity: sessionSensitivityRef.current,
       ...currentAppBuildInfo(),
     };
@@ -175,6 +234,8 @@ export default function MonitorScreen() {
     const maxFatigue = maxFatigueRef.current;
     const cloudSession = cloudSessionRef.current;
     const pendingEvents = cloudEventQueueRef.current;
+    monitoringActiveRef.current = false;
+    void stopHeadphoneMotion();
     cloudSessionRef.current = null;
     cloudEventQueueRef.current = Promise.resolve();
     setIsRunning(false);
@@ -408,12 +469,14 @@ export default function MonitorScreen() {
         <View style={s.ctrl}>
           {!isRunning ? (
             <TouchableOpacity
-              disabled={isStopping || !sensitivityLoaded}
-              style={[s.startBtn, (isStopping || !sensitivityLoaded) && s.disabledBtn]}
+              disabled={isStarting || isStopping || !sensitivityLoaded}
+              style={[s.startBtn, (isStarting || isStopping || !sensitivityLoaded) && s.disabledBtn]}
               onPress={handleStart}
             >
               <Ionicons name="eye" size={22} color="#fff" />
-              <Text style={s.startTxt}>{isStopping ? 'SAVING SESSION...' : sensitivityLoaded ? 'START MONITORING' : 'LOADING SETTINGS...'}</Text>
+              <Text style={s.startTxt}>
+                {isStarting ? 'PREPARING SENSORS...' : isStopping ? 'SAVING SESSION...' : sensitivityLoaded ? 'START MONITORING' : 'LOADING SETTINGS...'}
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={s.stopBtn} onPress={handleStop}>

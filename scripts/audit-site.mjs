@@ -122,7 +122,7 @@ assertIncludes("account.html", "function esc(v)", "account.html must escape rend
 assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "native alert sound must be bundled locally");
 assertIncludes("native-app/app/monitor.tsx", "updateSessionHistory", "native monitor must serialize completed-session history writes");
 assertIncludes("native-app/app/history.tsx", "openFeedback(item)", "native session history must offer pilot feedback tied to a completed session");
-assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, or location are attached.", "native pilot feedback must state that sensitive media and location are not attached");
+assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, raw motion readings, or location are attached.", "native pilot feedback must state that sensitive media, raw motion, and location are not attached");
 assertIncludes("native-app/app/history.tsx", "false_alert", "native session history must capture structured false-alert feedback");
 assertIncludes("native-app/app/history.tsx", "missed_alert", "native session history must capture structured missed-alert feedback");
 assertIncludes("native-app/app/history.tsx", "Saved only on this iPhone", "native alert assessments must disclose their local-only storage");
@@ -154,6 +154,11 @@ assertIncludes("native-app/app/monitor.tsx", "headNodObservationsRef.current += 
 assertIncludes("native-app/app/history.tsx", "Does not trigger alerts", "experimental head-nod observations must not be presented as an alert signal");
 assertNotIncludes("native-app/components/AlertSystem.tsx", "headNod", "unvalidated head-nod observations must not affect alert delivery");
 assertNotIncludes("native-app/lib/cloudSync.ts", "headNodObservations", "unvalidated head-nod observations must remain out of cloud sync");
+assertIncludes("native-app/app.json", "NSMotionUsageDescription", "native iOS builds must explain compatible-headphone motion access");
+assertIncludes("native-app/app/monitor.tsx", "headphoneHeadNodObservationsRef.current += 1", "native monitoring must keep headphone candidate observations separate");
+assertIncludes("native-app/app/history.tsx", "Saved locally as aggregate observations only", "native history must disclose aggregate-only head-motion storage");
+assertNotIncludes("native-app/lib/cloudSync.ts", "headphoneMotionSamples", "raw headphone-motion diagnostics must remain out of cloud sync");
+assertNotIncludes("native-app/components/AlertSystem.tsx", "headphoneMotion", "unvalidated headphone motion must not affect alert delivery");
 assertIncludes("native-app/lib/alertPolicy.ts", "CRITICAL_WARMUP_SECONDS = 10", "native monitoring must not trigger a critical alert immediately after startup");
 assertIncludes("native-app/lib/alertPolicy.ts", "metrics.state === 'closed'", "native critical alerts must clear when the driver's eyes reopen");
 assertIncludes("native-app/components/AlertSystem.tsx", "deriveAlertLevel", "native alerts must use the tested alert policy");

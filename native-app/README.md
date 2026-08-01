@@ -102,20 +102,21 @@ native-app/
 | Local false/missed alert pattern summary | Done - private TestFlight build 15 |
 | Pilot accuracy checkpoint | Implemented - local 10-session Medium progress summary |
 | Optional protected cloud session sync | Implemented - secure sign-in + explicit consent |
-| Head-nod detection | Experimental local face-pitch observations; does not trigger alerts or sync |
-| HealthKit HRV/sleep integration | Implemented in source - optional read-only summary in protected local storage; requires a future native build |
+| Head-nod detection | Experimental local camera and compatible-headphone observations; does not trigger alerts or sync |
+| HealthKit HRV/sleep integration | Done - optional read-only local context validated in private TestFlight build 19 |
 | Pre-drive risk score screen | Foundation in source - factual sleep/HRV context only; no score or alert influence |
-| Private iOS distribution | TestFlight build 15 validated on iPhone and Apple Watch; no external testing or App Review started |
+| Private iOS distribution | TestFlight build 19 validated on iPhone and Apple Watch; no external testing or App Review started |
 
 Pilot testers can send general feedback from Settings or attach basic session
 metrics and a structured alert assessment from History. Alert assessments stay
 on the iPhone unless the tester chooses to open an editable feedback email.
-The app does not attach camera images, video, audio, or location.
+The app does not attach camera images, video, audio, raw motion readings, or
+location.
 
 History can also record lighting, eyewear, and phone position after the tester
 is safely parked. These structured conditions stay local unless the tester
 opens the editable session feedback email. They are included in the validated
-private TestFlight build 15 baseline.
+private TestFlight build 19 baseline.
 
 The same local review can capture subjective battery use and phone heat after
 the tester parks. These are explicitly described as tester observations rather
@@ -181,6 +182,25 @@ the audio session so alerts:
 iOS and Android route audio to the connected Bluetooth device automatically;
 you cannot (and don't need to) address AirPods directly. Settings reports this
 as automatic routing instead of presenting a misleading AirPods switch.
+
+### Compatible-headphone motion diagnostics (source only)
+
+The private local Expo module in
+`modules/occulert-headphone-motion/` uses Apple's
+`CMHeadphoneMotionManager` to read processed motion from compatible connected
+headphones during active foreground monitoring. iOS requires Motion access and
+the `NSMotionUsageDescription` entry in `app.json` before updates can start.
+
+The JavaScript adapter in `lib/headphoneMotion.ts` gracefully reports
+`not-built`, unavailable, denied, and error states, so monitoring continues with
+the camera when headphone motion cannot run. Transient pitch/yaw/roll samples
+feed a separate candidate head-nod detector. Raw motion samples are discarded;
+session history stores only sample and candidate counts plus the source status.
+
+This path is diagnostic only. It does **not** change PERCLOS, fatigue scoring,
+alerts, Watch haptics, or cloud payloads. A new native development/TestFlight
+build and real compatible-headphone calibration are still required before this
+can be treated as a validated signal.
 
 ### Apple Watch alerts (requires a development / TestFlight build)
 

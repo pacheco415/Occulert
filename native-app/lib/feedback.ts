@@ -28,6 +28,10 @@ export interface FeedbackSession {
   alertCount?: number;
   avgFatigue?: number;
   headNodObservations?: number;
+  cameraHeadNodObservations?: number;
+  headphoneHeadNodObservations?: number;
+  headphoneMotionSamples?: number;
+  headphoneMotionStatus?: string;
   alertAssessment?: AlertAssessment;
   sensitivity?: SensitivityLevel;
   testConditions?: SessionTestConditions;
@@ -78,7 +82,12 @@ export function feedbackUrl(session?: FeedbackSession): string {
       'Duration seconds: ' + valueOrDash(session.durationSec),
       'Alerts: ' + valueOrDash(session.alertCount),
       'Average fatigue: ' + valueOrDash(session.avgFatigue),
-      'Experimental head-nod observations: ' + valueOrDash(session.headNodObservations),
+      'Experimental camera head-nod observations: ' + valueOrDash(
+        session.cameraHeadNodObservations ?? session.headNodObservations,
+      ),
+      'Experimental headphone head-nod observations: ' + valueOrDash(session.headphoneHeadNodObservations),
+      'Headphone motion samples processed: ' + valueOrDash(session.headphoneMotionSamples),
+      'Headphone motion status: ' + (session.headphoneMotionStatus || '-'),
       'Sensitivity: ' + (session.sensitivity || '-'),
       'Alert assessment: ' + assessmentLabel(session.alertAssessment),
       'Lighting: ' + conditionLabel(session.testConditions?.lighting),
@@ -89,7 +98,7 @@ export function feedbackUrl(session?: FeedbackSession): string {
     );
   }
 
-  lines.push('', 'No camera images, video, audio, or location are attached.');
+  lines.push('', 'No camera images, video, audio, raw motion readings, or location are attached.');
   return 'mailto:' + FEEDBACK_EMAIL + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(lines.join('\n'));
 }
 

@@ -33,7 +33,7 @@ test('monitoring fails visibly on stale samples and waits for sensitivity', () =
   assert.match(monitor, /Monitoring stopped: camera analysis stalled/);
   assert.match(monitor, /Alert\.alert\('Monitoring stopped'/);
   assert.match(monitor, /sensitivityLoaded/);
-  assert.match(monitor, /disabled=\{isStopping \|\| !sensitivityLoaded\}/);
+  assert.match(monitor, /disabled=\{isStarting \|\| isStopping \|\| !sensitivityLoaded\}/);
   assert.match(monitor, /updateSessionHistory/);
 });
 
