@@ -94,6 +94,7 @@ native-app/
 | Tester-reported battery use + phone heat | Implemented in source - pending a later private build |
 | Collapsible session reviews + completion status | Implemented in source - pending a later private build |
 | Per-session app version + native build stamp | Implemented in source - pending a later private build |
+| Local false/missed alert pattern summary | Implemented in source - pending a later private build |
 | Pilot accuracy checkpoint | Implemented - local 10-session Medium progress summary |
 | Optional protected cloud session sync | Implemented - secure sign-in + explicit consent |
 | Head-nod detection (accelerometer) | In progress - Phase 1: wire expo-sensors |
@@ -121,6 +122,11 @@ Each new local session also preserves the sensitivity used for that session.
 History counts reviewed Medium-sensitivity sessions toward the first 10-session
 accuracy checkpoint and summarizes felt-right, false, and missed ratings
 without uploading those ratings.
+
+When false or missed alerts are reviewed, History also groups their local
+observation counts by sensitivity, lighting, eyewear, and phone position. The
+app labels these as observations rather than error rates and calls out missing
+test-condition context so small or incomplete samples are not overinterpreted.
 
 Drivers with an existing Occulert account can optionally sign in from Settings
 and separately enable cloud session sync. Access and refresh tokens are stored
