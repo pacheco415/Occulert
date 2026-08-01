@@ -73,7 +73,7 @@ pre-drive score and Watch complication remain separate future work.
 |------|----------|--------|
 | Unified confidence model fusing camera + earbud + watch signals | ★ | Not started |
 | Device-agnostic engine (works with any combination of devices) | — | Not started |
-| Fleet dashboard with per-driver device and signal data | — | Backend scaffolding drafted (Supabase API + schema, PR #18); still localStorage-based in production, see BACKEND_ROADMAP.md and BACKEND_SETUP.md |
+| Fleet dashboard with per-driver device and signal data | — | Protected session and event history implemented in source with a local fallback; deployment verification pending |
 | Tiered pricing model for fleet operators | — | Not started |
 
 ---
@@ -111,7 +111,7 @@ pre-drive score and Watch complication remain separate future work.
 | 0 · Foundation | Accuracy & pilots | Detection validation, pilot fleet | Not started |
 | 1 · Earbuds | Head & heart signals | Head-nod detection, directional alerts | Partial (audio routing and local motion diagnostics implemented; calibration and directional alerts open) |
 | 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (wrist alerts done; local read-only Apple Health context implemented in source) |
-| 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Not started (fleet dashboard backend scaffolding drafted, PR #18) |
+| 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Partial (protected fleet session history implemented in source; fusion not started) |
 | 4 · Smart Glasses | Ambient + eye tracking | Inward eye-tracking | Not started |
 | Platform | Native apps | iOS app, real-time sensor access | Private iOS pilot |
 

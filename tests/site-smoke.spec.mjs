@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 test("important public pages load with one primary heading", async ({ page }) => {
   const pageErrors = [];
@@ -243,4 +244,72 @@ test("authenticated fleet dashboards never fall back to unrelated local driver d
   await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
   await expect(page.locator("#kpiDrivers")).toHaveText("0");
   await expect(page.getByText("Unrelated Local Driver")).toHaveCount(0);
+});
+
+test("protected fleet history shows scoped events and exports formula-safe rows without coordinates", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "manager-token",
+      refresh_token: "manager-refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "manager-1", email: "manager@example.com" },
+    }));
+    localStorage.setItem("occulert-session-history", JSON.stringify([{
+      id: "local-session",
+      name: "Unrelated Local History",
+      safetyScore: 1,
+    }]));
+  });
+  await page.route("**/api/fleet-summary", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      ok: true,
+      fleet: { id: "fleet-1", company_name: "Safe Transit", plan: "trial" },
+      drivers: [{ id: "driver-1", name: "Alex Driver", active: true, vehicle_id: "Van 12" }],
+      sessions: [{
+        id: "11111111-1111-4111-8111-111111111111",
+        driver_id: "driver-1",
+        started_at: "2026-08-01T16:00:00.000Z",
+        ended_at: "2026-08-01T16:30:00.000Z",
+        average_fatigue: 24,
+        max_fatigue: 61,
+        safety_score: 76,
+        alert_count: 1,
+        head_nod_count: 2,
+        device: '=WEBSERVICE("https://example.invalid")',
+      }],
+      events: [{
+        id: "event-1",
+        session_id: "11111111-1111-4111-8111-111111111111",
+        type: "drowsy",
+        fatigue_score: 61,
+        confidence: 88,
+        created_at: "2026-08-01T16:12:00.000Z",
+        latitude: 37.7749,
+        longitude: -122.4194,
+      }],
+      telemetry_trust: "unverified_client_report",
+      privacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false },
+    }),
+  }));
+
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
+  await expect(page.locator("#sessionHistory")).toContainText("Alex Driver");
+  await expect(page.locator("#sessionHistory")).toContainText("drowsy");
+  await expect(page.locator("#sessionHistory")).toContainText("Client-reported telemetry");
+  await expect(page.getByText("Unrelated Local History")).toHaveCount(0);
+  await expect(page.locator("#sessionHistory")).not.toContainText("37.7749");
+  await expect(page.locator("#sessionHistory")).not.toContainText("-122.4194");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export Session CSV" }).click();
+  const download = await downloadPromise;
+  const downloadPath = await download.path();
+  expect(downloadPath).toBeTruthy();
+  const csv = await readFile(downloadPath, "utf8");
+  expect(csv).toContain("Alex Driver");
+  expect(csv).toContain("'=WEBSERVICE");
+  expect(csv).not.toMatch(/latitude|longitude|37\.7749|-122\.4194/i);
 });

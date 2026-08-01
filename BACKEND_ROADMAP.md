@@ -2,16 +2,21 @@
 
 The current app-to-dashboard sync uses browser localStorage. That is good for a prototype, but real fleet operations need a backend.
 
-## Current prototype
+## Current implementation
 
-- App writes live session data to localStorage.
-- Fleet dashboard reads localStorage on the same browser/device.
-- Session history reads localStorage on the same browser/device.
-- Driver profiles are stored locally.
+- Signed-in drivers can opt into protected session and event writes through the
+  Supabase-backed API; localStorage remains the fallback.
+- Verified fleet owners can read their server-scoped roster and recent sessions.
+- Protected fleet history includes recent alert events without GPS coordinates,
+  personal media, or raw motion.
+- The dashboard keeps local demo and same-browser fallback data separate from
+  authenticated fleet data.
 
 ## Next production upgrade
 
-Use a backend database and authentication system so fleet managers can see drivers across devices.
+Verify the protected fleet history in the deployed environment, then add
+manager reporting workflows without weakening driver consent or ownership
+checks.
 
 Recommended stack options:
 

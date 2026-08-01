@@ -1,13 +1,12 @@
-// GET /api/fleet-summary -> live roster + recent sessions for the
-// authenticated fleet manager's fleet. Powers a future real fleet-dashboard.html
-// (replacing the current localStorage-only prototype).
-// This endpoint is scaffolding: it returns 501 until SUPABASE_URL and
-// SUPABASE_SERVICE_ROLE_KEY are configured. See BACKEND_SETUP.md.
+// GET /api/fleet-summary -> live roster, recent sessions, and privacy-limited
+// events for the authenticated fleet manager's server-owned fleet.
+// Returns 501 when the required Supabase environment is not configured.
 
 const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function json(response, status, body) {
 response.statusCode = status;
@@ -57,7 +56,44 @@ limit: "50",
 },
 });
 
-return json(response, 200, { ok: true, fleet: fleet, drivers: drivers, sessions: sessions });
+const sessionIds = sessions
+.map(function (session) { return String(session.id || ""); })
+.filter(function (id) { return UUID_PATTERN.test(id); });
+let events = [];
+if (sessionIds.length) {
+const eventRows = await pgFetch("events", {
+params: {
+select: "id,session_id,type,fatigue_score,confidence,created_at",
+session_id: "in.(" + sessionIds.join(",") + ")",
+order: "created_at.desc",
+limit: "200",
+},
+});
+events = eventRows.map(function (event) {
+return {
+id: event.id,
+session_id: event.session_id,
+type: String(event.type || "").slice(0, 40),
+fatigue_score: event.fatigue_score,
+confidence: event.confidence,
+created_at: event.created_at,
+};
+});
+}
+
+return json(response, 200, {
+ok: true,
+fleet: fleet,
+drivers: drivers,
+sessions: sessions,
+events: events,
+telemetry_trust: "unverified_client_report",
+privacy: {
+includes_location: false,
+includes_personal_media: false,
+includes_raw_motion: false,
+},
+});
 } catch (error) {
 return json(response, 502, { ok: false, error: "supabase_error" });
 }

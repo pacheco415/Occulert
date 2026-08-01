@@ -37,6 +37,7 @@ async function fetchMock(url, options = {}) {
   if (url === "/api/events") return response({ ok: true, event: { id: "event-1" } });
   if (url === "/api/fleets" && options.method === "GET") return response({ ok: true, fleet: { id: "fleet-1" } });
   if (url === "/api/fleets" && options.method === "POST") return response({ ok: true, fleet: { id: "fleet-1" } }, 201);
+  if (url === "/api/fleet-summary") return response({ ok: true, fleet: { id: "fleet-1" }, drivers: [], sessions: [], events: [] });
   if (url === "/api/fleet-invitations" && options.method === "GET") return response({ ok: true, invitations: [] });
   if (url === "/api/fleet-invitations" && options.method === "POST") return response({ ok: true, invitation: { id: "invite-1" } }, 201);
   if (url === "/api/fleet-invitations" && options.method === "DELETE") return response({ ok: true });
@@ -84,6 +85,7 @@ assert.equal((await backend.logEvent("session-1", "drowsy", { fatigue_score: 80 
 assert.equal((await backend.endSession("session-1", { safety_score: 70 })).ok, true);
 assert.equal((await backend.getFleet()).body.fleet.id, "fleet-1");
 assert.equal((await backend.createFleet("Safe Transit")).status, 201);
+assert.equal((await backend.getFleetSummary()).body.fleet.id, "fleet-1");
 assert.equal((await backend.listFleetInvitations()).ok, true);
 assert.equal((await backend.createFleetInvitation("driver@example.com")).status, 201);
 assert.equal((await backend.revokeFleetInvitation("invite-1")).ok, true);

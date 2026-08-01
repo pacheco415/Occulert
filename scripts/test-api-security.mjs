@@ -313,11 +313,22 @@ assert.equal(mismatchedResult.status, 403);
 assert.equal(mismatchedResult.body.error, "invitation_email_mismatch");
 
 const fleetSummaryCalls = [];
+const fleetSessionId = "11111111-1111-4111-8111-111111111111";
 const fleetSummary = loadHandler("../api/fleet-summary.js", async (table, options = {}) => {
   fleetSummaryCalls.push({ table, options });
   if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
   if (table === "drivers") return [{ id: "driver-1", name: "Driver", active: true, vehicle_id: "Van 12" }];
-  if (table === "sessions") return [];
+  if (table === "sessions") return [{ id: fleetSessionId, driver_id: "driver-1", safety_score: 74 }];
+  if (table === "events") return [{
+    id: "event-1",
+    session_id: fleetSessionId,
+    type: "drowsy",
+    fatigue_score: 68,
+    confidence: 91,
+    latitude: 37.7749,
+    longitude: -122.4194,
+    created_at: "2026-08-01T17:00:00.000Z",
+  }];
   throw new Error(`unexpected fleet summary call: ${table}`);
 });
 const fleetSummaryResult = await invoke(fleetSummary, request("GET"));
@@ -325,6 +336,17 @@ assert.equal(fleetSummaryResult.status, 200);
 assert.equal(fleetSummaryCalls[0].options.params.owner_user_id, "eq.user-1");
 assert.equal(fleetSummaryCalls[1].options.params.fleet_id, "eq.fleet-1");
 assert.equal(fleetSummaryCalls[2].options.params.fleet_id, "eq.fleet-1");
+assert.equal(fleetSummaryCalls[3].table, "events");
+assert.equal(fleetSummaryCalls[3].options.params.session_id, `in.(${fleetSessionId})`);
+assert.doesNotMatch(fleetSummaryCalls[3].options.params.select, /latitude|longitude/i);
+assert.equal(fleetSummaryResult.body.telemetry_trust, "unverified_client_report");
+assert.deepEqual(fleetSummaryResult.body.privacy, {
+  includes_location: false,
+  includes_personal_media: false,
+  includes_raw_motion: false,
+});
+assert.equal(Object.hasOwn(fleetSummaryResult.body.events[0], "latitude"), false);
+assert.equal(Object.hasOwn(fleetSummaryResult.body.events[0], "longitude"), false);
 
 const publicConfigPath = require.resolve("../api/public-config.js");
 delete require.cache[publicConfigPath];
