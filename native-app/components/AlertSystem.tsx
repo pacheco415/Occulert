@@ -6,15 +6,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sendAlertToWatch } from '../lib/watchBridge';
 import { configureAlertAudioMode } from '../lib/audioSession';
 import { ALERT_COOLDOWN_MS, PERCLOS_ALERT_THRESHOLD } from '../constants/thresholds';
+import {
+  deriveAlertLevel,
+  SENSOR_LOSS_GRACE_MS,
+  shouldDeliverAlert,
+  type AlertLevel,
+} from '../lib/alertPolicy';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 
-export type AlertLevel = 'none' | 'watch' | 'alert' | 'critical';
+export type { AlertLevel } from '../lib/alertPolicy';
 
 const ALERT_SOUND = require('../assets/alert.wav');
 
 interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; sessionTime: number; }
-
-const CRITICAL_WARMUP_SECONDS = 10;
 
 /**
  * AlertSystem — Week 2
@@ -23,9 +27,10 @@ const CRITICAL_WARMUP_SECONDS = 10;
  *   - expo-audio alert tone (with cooldown so it doesn't spam)
  */
 export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProps) {
-  const lastAlert = useRef(0);
+  const lastAlert = useRef<{ level: AlertLevel; at: number }>({ level: 'none', at: 0 });
   const hapticEnabled = useRef(true);
   const audioEnabled = useRef(true);
+  const [trackingLost, setTrackingLost] = React.useState(false);
 
   // Load persisted alert preferences (set on the Settings screen).
   React.useEffect(() => {
@@ -35,22 +40,46 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
     // audio). This is automatic rather than a capability Occulert can toggle.
     configureAlertAudioMode().catch(() => {});
   }, []);
+  React.useEffect(() => {
+    if (!isRunning || metrics.state !== 'noFace') {
+      setTrackingLost(false);
+      return;
+    }
+    const timer = setTimeout(() => setTrackingLost(true), SENSOR_LOSS_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [isRunning, metrics.state]);
+  React.useEffect(() => {
+    if (!isRunning) lastAlert.current = { level: 'none', at: 0 };
+  }, [isRunning]);
   const pulse = useRef(new Animated.Value(1)).current;
   const player = useAudioPlayer(ALERT_SOUND, { keepAudioSessionActive: true });
 
-  const level: AlertLevel =
-    !isRunning || metrics.state === 'noFace' ? 'none'
-    // PERCLOS is a rolling history. Never keep a red alert on screen after
-    // the driver's eyes are visibly open again.
-    : metrics.state === 'closed' && sessionTime >= CRITICAL_WARMUP_SECONDS && metrics.perclos >= PERCLOS_ALERT_THRESHOLD ? 'critical'
-    : metrics.state === 'closed' ? 'alert'
-    : metrics.state === 'watch'  ? 'watch'
-    : 'none';
+  // PERCLOS is a rolling history. Never keep a red alert on screen after
+  // the driver's eyes are visibly open again. Sustained tracking loss is a
+  // separate warning because zeroed metrics must never look reassuring.
+  const level = deriveAlertLevel({
+    isRunning,
+    metrics,
+    sessionTime,
+    trackingLostForMs: trackingLost ? SENSOR_LOSS_GRACE_MS : 0,
+    criticalPerclosThreshold: PERCLOS_ALERT_THRESHOLD,
+  });
 
   const fire = useCallback(async (lv: AlertLevel) => {
     const now = Date.now();
-    if (now - lastAlert.current < ALERT_COOLDOWN_MS) return;
-    lastAlert.current = now;
+    const previous = lastAlert.current;
+    if (!shouldDeliverAlert(previous.level, previous.at, lv, now, ALERT_COOLDOWN_MS)) return;
+    lastAlert.current = { level: lv, at: now };
+
+    // Expo Router can keep this screen mounted while Settings is open. Read
+    // all delivery preferences for each alert so enable/disable changes take
+    // effect immediately instead of waiting for a remount.
+    const [hapticValue, audioValue] = await Promise.all([
+      AsyncStorage.getItem('occulert-haptic').catch(() => null),
+      AsyncStorage.getItem('occulert-audio').catch(() => null),
+    ]);
+    if (hapticValue != null) hapticEnabled.current = hapticValue === 'true';
+    if (audioValue != null) audioEnabled.current = audioValue === 'true';
 
     Animated.sequence([
       Animated.timing(pulse, { toValue: 1.04, duration: 110, useNativeDriver: true }),
@@ -65,7 +94,7 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
       } else if (lv === 'critical') {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error), 350);
-      } else if (lv === 'alert') {
+      } else if (lv === 'alert' || lv === 'tracking') {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       } else {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -112,6 +141,7 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
 }
 
 const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;color:string;subColor:string;icon:string;title:string;sub:string }> = {
+  tracking: { bg:'rgba(55,31,8,0.96)', border:'#f59e0b', color:'#fbbf24', subColor:'#fef3c7', icon:'📷', title:'TRACKING LOST', sub:'Pull over safely before adjusting the phone or camera.' },
   watch:    { bg:'rgba(45,35,4,0.92)', border:'#ca8a04', color:'#fde047', subColor:'#fef3c7', icon:'👁',  title:'Eyes Drooping',      sub:'Stay alert. Pull over soon if drowsy.' },
   alert:    { bg:'rgba(55,8,12,0.94)', border:'#ef4444', color:'#fda4af', subColor:'#ffe4e6', icon:'⚠️', title:'DROWSINESS DETECTED', sub:'Pull over safely when you can.' },
   critical: { bg:'rgba(55,8,12,0.96)', border:'#ff3344', color:'#ff8a91', subColor:'#fff1f2', icon:'🚨', title:'PULL OVER NOW',       sub:'High fatigue. Find a safe spot immediately.' },

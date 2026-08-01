@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Linking,
+  View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Linking, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -10,12 +10,12 @@ import { useFaceDetector, type FrameFaceDetectionOptions } from 'react-native-vi
 import { Worklets } from 'react-native-worklets-core';
 import { useKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEyeTracking } from '../hooks/useEyeTracking';
 import { AlertSystem } from '../components/AlertSystem';
 import { loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 import type { SensitivityLevel } from '../constants/thresholds';
+import { updateSessionHistory } from '../lib/sessionHistory';
 import {
   beginCloudSession,
   finishCloudSession,
@@ -46,8 +46,8 @@ const FACE_DETECTOR_OPTIONS: FrameFaceDetectionOptions = {
   cameraFacing: 'front',
 };
 
-const HISTORY_KEY = 'occulert-session-history';
 const CLOSED_CONFIRM_MS = 1_200;
+const SENSOR_STALL_MS = 3_000;
 
 export default function MonitorScreen() {
   useKeepAwake(); // screen never dims while monitoring
@@ -58,6 +58,8 @@ export default function MonitorScreen() {
   const [isRunning, setIsRunning] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [sensitivity, setSensitivity] = useState<SensitivityLevel>('medium');
+  const [sensitivityLoaded, setSensitivityLoaded] = useState(false);
+  const [sensorFault, setSensorFault] = useState<string | null>(null);
   const [sessionTime, setSessionTime] = useState(0);
   const [alertCount, setAlertCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -70,6 +72,7 @@ export default function MonitorScreen() {
   const stoppingRef = useRef(false);
   const cloudSessionRef = useRef<Promise<string | null> | null>(null);
   const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const lastSampleAtRef = useRef(0);
 
   const [metrics, setMetrics] = useState<EyeMetrics>({
     ear: 0.3, perclos: 0, fatigueScore: 0, state: 'noFace',
@@ -79,7 +82,9 @@ export default function MonitorScreen() {
   const { detectFaces } = useFaceDetector(FACE_DETECTOR_OPTIONS);
 
   useEffect(() => {
-    loadSavedSensitivity().then(setSensitivity);
+    loadSavedSensitivity()
+      .then(setSensitivity)
+      .finally(() => setSensitivityLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -96,7 +101,7 @@ export default function MonitorScreen() {
     String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 
   const handleStart = async () => {
-    if (isStopping) return;
+    if (isStopping || !sensitivityLoaded) return;
     if (!hasPermission) {
       const granted = await requestPermission();
       if (!granted) return;
@@ -107,6 +112,8 @@ export default function MonitorScreen() {
     fatigueSamplesRef.current = 0;
     maxFatigueRef.current = 0;
     closedSinceRef.current = null;
+    lastSampleAtRef.current = Date.now();
+    setSensorFault(null);
     sessionSensitivityRef.current = sensitivity;
     cloudEventQueueRef.current = Promise.resolve();
     cloudSessionRef.current = beginCloudSession();
@@ -128,26 +135,15 @@ export default function MonitorScreen() {
       avgFatigue,
       sensitivity: sessionSensitivityRef.current,
     };
-    try {
-      const raw = await AsyncStorage.getItem(HISTORY_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      const sessions = Array.isArray(parsed) ? parsed : [];
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify([record, ...sessions].slice(0, 50)));
-    } catch {
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify([record]));
-    }
+    await updateSessionHistory<Record<string, unknown>>(sessions => [record, ...sessions].slice(0, 50));
     return sessionId;
   }, []);
 
   const markSessionSynced = useCallback(async (localSessionId: string, cloudSessionId: string) => {
     try {
-      const raw = await AsyncStorage.getItem(HISTORY_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(parsed)) return;
-      const updated = parsed.map(item => item?.sessionId === localSessionId
+      await updateSessionHistory<Record<string, unknown>>(sessions => sessions.map(item => item?.sessionId === localSessionId
         ? { ...item, cloudSynced: true, cloudSessionId }
-        : item);
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+        : item));
     } catch {
       // The local session remains intact even if its cloud badge cannot update.
     }
@@ -190,12 +186,25 @@ export default function MonitorScreen() {
     }
   }, [alertCount, isRunning, markSessionSynced, reset, saveSession, sessionTime]);
 
+  useEffect(() => {
+    if (!isRunning) return;
+    const watchdog = setInterval(() => {
+      if (stoppingRef.current || Date.now() - lastSampleAtRef.current <= SENSOR_STALL_MS) return;
+      const message = 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.';
+      setSensorFault(message);
+      Alert.alert('Monitoring stopped', message);
+      void handleStop();
+    }, 500);
+    return () => clearInterval(watchdog);
+  }, [handleStop, isRunning]);
+
   /**
    * onEyeState — receives eye-open probabilities from the frame processor
    * worklet (already throttled). Runs the PERCLOS/fatigue scoring on the JS
    * thread and drives the UI + AlertSystem.
    */
   const onEyeState = useCallback((leftProb: number, rightProb: number, faceFound: boolean) => {
+    lastSampleAtRef.current = Date.now();
     const rawResult = faceFound ? processEyeOpenness(leftProb, rightProb) : processNoFace();
     const now = Date.now();
     if (rawResult.state === 'closed') {
@@ -337,6 +346,12 @@ export default function MonitorScreen() {
         </View>
 
         {/* Metrics stay below the driver's face instead of covering it. */}
+        {sensorFault && (
+          <View style={s.sensorFault} accessibilityRole="alert">
+            <Text style={s.sensorFaultTitle}>CAMERA ANALYSIS STOPPED</Text>
+            <Text style={s.sensorFaultText}>{sensorFault}</Text>
+          </View>
+        )}
         {isRunning && (
           <View style={s.metrics}>
             {[
@@ -361,12 +376,12 @@ export default function MonitorScreen() {
         <View style={s.ctrl}>
           {!isRunning ? (
             <TouchableOpacity
-              disabled={isStopping}
-              style={[s.startBtn, isStopping && s.disabledBtn]}
+              disabled={isStopping || !sensitivityLoaded}
+              style={[s.startBtn, (isStopping || !sensitivityLoaded) && s.disabledBtn]}
               onPress={handleStart}
             >
               <Ionicons name="eye" size={22} color="#fff" />
-              <Text style={s.startTxt}>{isStopping ? 'SAVING SESSION...' : 'START MONITORING'}</Text>
+              <Text style={s.startTxt}>{isStopping ? 'SAVING SESSION...' : sensitivityLoaded ? 'START MONITORING' : 'LOADING SETTINGS...'}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={s.stopBtn} onPress={handleStop}>
@@ -392,6 +407,9 @@ const s = StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(15,30,46,0.85)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#1a3a4a' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   pillTxt: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
+  sensorFault: { position: 'absolute', top: 88, left: 16, right: 16, zIndex: 4, backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
+  sensorFaultTitle: { color: '#fecaca', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
+  sensorFaultText: { color: '#fff1f2', fontSize: 12, lineHeight: 18, marginTop: 4 },
   metrics: { position: 'absolute', left: 14, right: 14, bottom: 200, flexDirection: 'row', gap: 6, justifyContent: 'center' },
   card: { flex: 1, backgroundColor: 'rgba(15,30,46,0.9)', borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10, paddingHorizontal: 5, paddingVertical: 7, alignItems: 'center' },
   cardLbl: { color: '#4a7a8a', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },

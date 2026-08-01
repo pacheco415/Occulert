@@ -6,7 +6,7 @@ struct ContentView: View {
   private var alertColor: Color {
     switch receiver.lastLevel {
     case "critical", "alert": return .red
-    case "watch": return .yellow
+    case "tracking", "watch": return .yellow
     default: return .green
     }
   }

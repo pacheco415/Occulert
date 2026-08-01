@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v16';
+const CACHE = 'occulert-v17';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -18,13 +18,19 @@ const STATIC_ASSETS = [
   '/occulert-logo.png',
   '/occulert-logo-main.png',
   '/lang.js',
-  '/occulert-backend.js',
+  '/security-utils.js',
   '/faq.html',
   '/features.html',
   '/install.html',
   '/about.html',
   '/how-it-works.html'
 ];
+
+const NETWORK_ONLY_ASSETS = new Set([
+  '/auth-helper.js',
+  '/occulert-backend.js',
+  '/firebase-sync-v2.js',
+]);
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -62,6 +68,10 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
+  if (url.origin === self.location.origin && NETWORK_ONLY_ASSETS.has(url.pathname)) {
+    event.respondWith(fetch(req, { cache: 'no-store' }));
+    return;
+  }
 
   if (req.mode === 'navigate' || req.url.endsWith('.html')) {
     event.respondWith(

@@ -143,7 +143,7 @@
                   hero_btn2: "So funktioniert's",
                   trust1: "Kein Konto erforderlich",
                   trust2: "Läuft auf Ihrem Gerät",
-                  trust3: "Keine Datenweitergabe",
+                  trust3: "Keine Daten verkauft",
                   disclaimer_title: "Sicherheitshinweis",
                   disclaimer_text: "Occulert ist ein ergänzendes Warnsystem. Es ersetzt keine aufmerksame Fahrweise, ausreichende Ruhe oder die Einhaltung der Verkehrsregeln.",
                   stats_label1: "Unfälle durch Fahrermüdigkeit",
@@ -437,7 +437,11 @@
          const t = translations[lang];
          document.querySelectorAll('[data-i18n]').forEach(el => {
                  const key = el.getAttribute('data-i18n');
-                 if (t[key] !== undefined) el.textContent = t[key];
+                 if (key === 'disclaimer_text' && lang !== 'en') {
+                         el.textContent = translations.en.disclaimer_text + ' English safety wording pending professional translation.';
+                 } else if (t[key] !== undefined) {
+                         el.textContent = t[key];
+                 }
          });
          document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
                  const key = el.getAttribute('data-i18n-placeholder');

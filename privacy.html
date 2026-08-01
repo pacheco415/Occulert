@@ -94,20 +94,21 @@ footer a{color:var(--di);text-decoration:none}
 <div class="sec" id="data">
 <h2><span class="n">5</span> Data We Collect</h2>
 <ul>
-<li><b>Local device storage:</b> Driver IDs, fatigue scores, alert counts, session duration, optional GPS, and preferences — stored in your browser, not automatically sent to any server.</li>
-<li><b>Fleet inquiry data:</b> Name, company, email, phone, fleet size, and message — used only to respond to your inquiry.</li>
+<li><b>Local device storage:</b> Driver IDs, fatigue scores, alert counts, session duration, optional GPS, and preferences — stored on your device unless you separately sign in and enable cloud sync.</li>
+<li><b>Fleet inquiry data:</b> Name, company, email, phone, fleet size, and message — sent once to our protected pilot-request endpoint, stored server-side through Supabase when configured (or a configured HTTPS processor fallback), and used only to respond to your inquiry. The current form does not keep a browser-storage copy.</li>
 <li><b>Analytics:</b> If analytics are enabled, they should be limited to anonymous usage data such as page views or app launches, and should not be linked to your identity or camera data.</li>
 </ul>
 <p>We do not sell, rent, or share personal data with third parties for marketing or advertising.</p>
 </div>
 <div class="sec" id="location">
 <h2><span class="n">6</span> Location &amp; GPS</h2>
-<p>GPS is <b>optional and off by default.</b> When enabled, we may record GPS coordinates, route points, speed, and trip distance — stored locally and, if cloud sync is enabled, uploaded to Google Firebase. You may deny GPS at any time. Core drowsiness detection works without location access.</p>
+<p>GPS is <b>optional and off by default.</b> When enabled, the web app may record GPS coordinates, route points, speed, and trip distance locally. Location is sent to the protected Supabase-backed service only when both location sharing and cloud sync are enabled. You may revoke either permission at any time. Core drowsiness detection works without location access.</p>
 <p>Local browser data can be cleared from the app controls or browser storage settings. For pilot inquiry data sent through the website, contact us to request deletion or correction.</p>
 </div>
 <div class="sec" id="cloud">
 <h2><span class="n">7</span> Cloud Sync &amp; Third Parties</h2>
-<p>When cloud sync is enabled, session data is stored in Google Firebase Firestore, subject to <a href="https://policies.google.com/privacy" target="_blank" rel="noopener" style="color:var(--bl)">Google's Privacy Policy</a>. You are responsible for your Firebase security configuration. Occulert is not liable for breaches from misconfigured third-party services.</p>
+<p>Current authenticated cloud sync and pilot requests use Occulert server endpoints backed by Supabase. Depending on the feature you enable, Supabase may process account identifiers, driver profiles, session summaries, alerts, optional location, fleet membership, invitations, and pilot contact details. Camera frames are not included. Cloud writes stop when sharing consent is revoked; the local monitoring and local-history paths remain available.</p>
+<p>Legacy Firebase prototypes are retired from supported monitoring and pilot-contact flows. Do not deploy a legacy page or connector without a separate privacy review, explicit consent, and verified access rules.</p>
 </div>
 <div class="sec" id="fleet">
 <h2><span class="n">8</span> Fleet Operators</h2>

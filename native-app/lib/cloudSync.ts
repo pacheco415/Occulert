@@ -68,6 +68,7 @@ export interface CloudSignInResult {
 }
 
 let configPromise: Promise<PublicConfig | null> | null = null;
+let consentOverride: boolean | null = null;
 
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
@@ -157,6 +158,7 @@ async function saveAuth(body: AuthResponse, previous?: StoredAuth | null): Promi
 }
 
 async function clearAuth(): Promise<void> {
+  consentOverride = false;
   await Promise.allSettled([
     SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS),
     AsyncStorage.setItem(CONSENT_KEY, 'false'),
@@ -269,8 +271,10 @@ async function ensureDriverProfile(): Promise<boolean> {
 }
 
 async function consentEnabled(): Promise<boolean> {
+  if (consentOverride !== null) return consentOverride;
   try {
-    return await AsyncStorage.getItem(CONSENT_KEY) === 'true';
+    consentOverride = await AsyncStorage.getItem(CONSENT_KEY) === 'true';
+    return consentOverride;
   } catch {
     return false;
   }
@@ -333,17 +337,21 @@ export async function signOutOfCloud(): Promise<void> {
 }
 
 export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
+  if (!enabled) consentOverride = false;
   if (enabled && !await refreshIfNeeded()) return false;
   try {
     await AsyncStorage.setItem(CONSENT_KEY, String(enabled));
+    consentOverride = enabled;
     return true;
   } catch {
+    if (enabled) consentOverride = false;
     return false;
   }
 }
 
 export async function beginCloudSession(): Promise<string | null> {
   if (!await consentEnabled() || !await ensureDriverProfile()) return null;
+  if (!await consentEnabled()) return null;
   const result = await backendApi<{ session?: { id?: string } }>('POST', '/api/sessions', {
     device: `${Platform.OS} ${String(Platform.Version)}`.slice(0, 120),
     browser: `Occulert native app (${Platform.OS})`,
@@ -352,6 +360,7 @@ export async function beginCloudSession(): Promise<string | null> {
 }
 
 export async function logCloudAlert(sessionId: string, fatigueScore: number): Promise<boolean> {
+  if (!await consentEnabled()) return false;
   const result = await backendApi('POST', '/api/events', {
     session_id: sessionId,
     type: 'drowsy',
@@ -364,6 +373,7 @@ export async function finishCloudSession(
   sessionId: string,
   stats: CloudSessionStats,
 ): Promise<boolean> {
+  if (!await consentEnabled()) return false;
   const result = await backendApi('PATCH', '/api/sessions', {
     session_id: sessionId,
     average_fatigue: stats.averageFatigue,
