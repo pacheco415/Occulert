@@ -127,6 +127,17 @@ function sensitivityLabel(value?: SensitivityLevel): string {
   return 'Not recorded';
 }
 
+function headphoneMotionLabel(value?: string): string {
+  if (value === 'active') return 'Compatible headphones provided motion';
+  if (value === 'starting') return 'No motion sample arrived before the session ended';
+  if (value === 'unavailable') return 'No compatible headphone motion was available';
+  if (value === 'denied') return 'Motion access was not allowed';
+  if (value === 'error') return 'Headphone motion stopped with an error';
+  if (value === 'not-built') return 'This build does not include headphone motion';
+  if (value === 'stopped') return 'Headphone motion was stopped';
+  return 'Headphone motion status was not recorded';
+}
+
 function hasCompleteReview(item: SessionRecord): boolean {
   return Boolean(
     item.alertAssessment
@@ -381,10 +392,20 @@ export default function HistoryScreen() {
             <Text style={s.buildInfo}>
               App {item.appVersion || 'not recorded'} · Build {item.appBuildNumber || 'not recorded'}
             </Text>
-            {item.headNodObservations != null && (
-              <Text style={s.observationInfo}>
-                Experimental head-nod observations: {item.headNodObservations} · Does not trigger alerts
-              </Text>
+            {(item.headNodObservations != null || item.headphoneMotionStatus != null) && (
+              <View style={s.observationBox}>
+                <Text style={s.observationTitle}>EXPERIMENTAL HEAD-MOTION DIAGNOSTICS</Text>
+                <Text style={s.observationInfo}>
+                  Camera candidates: {item.cameraHeadNodObservations ?? item.headNodObservations ?? 0}
+                </Text>
+                <Text style={s.observationInfo}>
+                  Headphone candidates: {item.headphoneHeadNodObservations ?? 0} from {item.headphoneMotionSamples ?? 0} transient samples
+                </Text>
+                <Text style={s.observationStatus}>{headphoneMotionLabel(item.headphoneMotionStatus)}</Text>
+                <Text style={s.observationCaution}>
+                  Saved locally as aggregate observations only and included only if you choose Send session feedback. Does not trigger alerts or change scores.
+                </Text>
+              </View>
             )}
             <View style={s.reviewSummary}>
               <View style={[s.reviewBadge, reviewComplete ? s.reviewBadgeComplete : s.reviewBadgeNeeded]}>
@@ -573,7 +594,11 @@ const s = StyleSheet.create({
   storageText: { color: '#4a7a8a', fontSize: 10, fontWeight: '700' },
   storageTextSynced: { color: '#34d399' },
   buildInfo: { color: '#6592a5', fontSize: 10, fontWeight: '700', marginTop: 7 },
-  observationInfo: { color: '#6592a5', fontSize: 10, lineHeight: 15, marginTop: 5 },
+  observationBox: { backgroundColor: 'rgba(37,99,235,0.06)', borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 9, marginTop: 9, padding: 10 },
+  observationTitle: { color: '#60a5fa', fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  observationInfo: { color: '#bae6fd', fontSize: 10, lineHeight: 15, marginTop: 4 },
+  observationStatus: { color: '#6592a5', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  observationCaution: { color: '#4a7a8a', fontSize: 9, lineHeight: 14, marginTop: 6 },
   reviewSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6 },
   reviewBadgeComplete: { backgroundColor: 'rgba(22,163,74,0.12)', borderColor: 'rgba(74,222,128,0.35)' },

@@ -5,7 +5,7 @@ This document outlines the full multi-phase development plan for Occulert — ex
 ★ = top-priority milestone for each phase
 
 **Last updated: 2026-08-01** — statuses below reflect private TestFlight build
-15 and the current source on `main`. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
+19 and the current development source. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
 and issue #6 for the remaining validation and product gaps.
 
 ---
@@ -31,12 +31,16 @@ and issue #6 for the remaining validation and product gaps.
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Head-nod / head-drop detection via earbud accelerometer | ★ | Not started |
+| Head-nod / head-drop detection via earbud accelerometer | ★ | Local-only compatible-headphone motion diagnostics implemented in source; device calibration not started |
 | In-ear heart rate and HRV monitoring (where supported) | — | Not started |
 | Directional in-ear audio alerts (left/right/stereo cues) | ★ | Not started |
 | Auto-detect paired earbuds and graceful fallback to phone speaker | — | Done |
 
-Note: AirPods audio routing shipped in native-app (PR #2), covering auto-detect/fallback; head-nod detection and directional cues are still open.
+Note: AirPods audio routing shipped in native-app (PR #2), covering
+auto-detect/fallback. Current source can read processed motion from compatible
+Apple headphones during foreground monitoring and save only aggregate candidate
+observations locally. It does not change scores or alerts. Real-device
+calibration and directional cues remain open.
 
 ---
 
@@ -90,10 +94,10 @@ pre-drive score and Watch complication remain separate future work.
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Native iOS app (Swift / React Native) | ★ | Private TestFlight pilot (build 15) |
+| Native iOS app (Swift / React Native) | ★ | Private TestFlight pilot (build 19) |
 | Native Android app | — | Not started |
 | Keep PWA as lightweight onboarding funnel | — | Done |
-| Verify real-time sensor access per platform (camera, motion, BT) | ★ | Partial (camera and Watch alerts verified; experimental earbud motion is not calibrated) |
+| Verify real-time sensor access per platform (camera, motion, BT) | ★ | Partial (camera and Watch alerts verified; compatible-headphone motion bridge implemented but not device-calibrated) |
 | Preserve and enforce privacy-first promise across all platforms | — | Ongoing |
 
 ---
@@ -103,7 +107,7 @@ pre-drive score and Watch complication remain separate future work.
 | Phase | Focus | Key Milestones | Status |
 |-------|-------|------------------|--------|
 | 0 · Foundation | Accuracy & pilots | Detection validation, pilot fleet | Not started |
-| 1 · Earbuds | Head & heart signals | Head-nod detection, directional alerts | Partial (audio routing done) |
+| 1 · Earbuds | Head & heart signals | Head-nod detection, directional alerts | Partial (audio routing and local motion diagnostics implemented; calibration and directional alerts open) |
 | 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (wrist alerts done; local read-only Apple Health context implemented in source) |
 | 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Not started (fleet dashboard backend scaffolding drafted, PR #18) |
 | 4 · Smart Glasses | Ambient + eye tracking | Inward eye-tracking | Not started |

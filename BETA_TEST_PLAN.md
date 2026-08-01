@@ -6,8 +6,8 @@ before changing detection thresholds or making accuracy claims.
 ## Current private baseline
 
 - iPhone monitoring, phone alert/audio behavior, Apple Watch haptics, alert
-  frequency, and layout passed a real-device check in private TestFlight build
-  15.
+  frequency, layout, and read-only Apple Health context passed real-device
+  checks in private TestFlight build 19.
 - Session History lets testers label a completed session as **Felt right**,
   **False alert**, or **Missed alert**.
 - New sessions preserve the active sensitivity setting, and Session History
@@ -27,6 +27,10 @@ before changing detection thresholds or making accuracy claims.
 - A local alert-pattern summary groups reviewed false and missed alerts by
   sensitivity, lighting, eyewear, and phone position. It shows observation
   counts, not accuracy or error rates.
+- Current source adds local compatible-headphone motion diagnostics. Raw motion
+  readings are discarded; only source status, sample count, and candidate
+  head-nod count are saved. This signal is not calibrated and does not affect
+  scores, alerts, Watch haptics, or cloud sync.
 - Independent development may continue while this checkpoint is deferred, but
   detection-threshold changes and accuracy claims remain blocked on reviewed
   evidence.

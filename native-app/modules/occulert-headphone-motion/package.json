@@ -1,0 +1,9 @@
+{
+  "name": "occulert-headphone-motion",
+  "version": "1.0.0",
+  "description": "Private local Expo module for read-only compatible-headphone motion diagnostics in Occulert.",
+  "private": true,
+  "peerDependencies": {
+    "expo": "*"
+  }
+}
