@@ -380,6 +380,7 @@ export async function finishCloudSession(
     max_fatigue: stats.maxFatigue,
     safety_score: stats.safetyScore,
     alert_count: stats.alertCount,
+    // Candidate head-nod observations remain local until device validation.
     head_nod_count: 0,
   });
   return result.ok;

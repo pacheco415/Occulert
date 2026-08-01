@@ -5,28 +5,31 @@ before changing detection thresholds or making accuracy claims.
 
 ## Current private baseline
 
-- iPhone monitoring, phone alerts, AirPods/Bluetooth audio routing, and Apple
-  Watch haptics passed a real-device check in private TestFlight build 13.
+- iPhone monitoring, phone alert/audio behavior, Apple Watch haptics, alert
+  frequency, and layout passed a real-device check in private TestFlight build
+  15.
 - Session History lets testers label a completed session as **Felt right**,
   **False alert**, or **Missed alert**.
 - New sessions preserve the active sensitivity setting, and Session History
   shows progress toward the first 10 reviewed Medium-sensitivity sessions.
 - Those labels stay on the tester's iPhone unless the tester chooses to send an
   editable feedback email.
-- Structured lighting, eyewear, and phone-position capture is implemented in
-  source for a later private build. It is not part of validated build 13.
-- The same source update adds local coverage counts so repeated test conditions
-  do not create a misleading 10-session checkpoint.
-- Tester-reported battery use and phone heat are also implemented locally in
-  source for a later private build; they are observations, not measurements.
+- Build 15 includes structured lighting, eyewear, and phone-position capture,
+  plus local coverage counts so repeated test conditions do not create a
+  misleading 10-session checkpoint.
+- Build 15 includes tester-reported battery use and phone heat; they are
+  observations, not measurements.
 - Completed reviews collapse to a summary, while incomplete sessions remain
-  open with a **Needs review** indicator in the later-build source bundle.
+  open with a **Needs review** indicator.
 - New sessions are stamped with the app version and immutable native build
-  number in source for a later private build. Older sessions remain explicitly
-  labeled as not recorded instead of being assigned a guessed build.
+  number. Older sessions remain explicitly labeled as not recorded instead of
+  being assigned a guessed build.
 - A local alert-pattern summary groups reviewed false and missed alerts by
-  sensitivity, lighting, eyewear, and phone position in source for a later
-  private build. It shows observation counts, not accuracy or error rates.
+  sensitivity, lighting, eyewear, and phone position. It shows observation
+  counts, not accuracy or error rates.
+- Independent development may continue while this checkpoint is deferred, but
+  detection-threshold changes and accuracy claims remain blocked on reviewed
+  evidence.
 - This pilot feedback is not a substitute for the authorized dataset benchmark
   defined in `ACCURACY_BENCHMARK.md`.
 
@@ -78,8 +81,7 @@ After each safely completed session:
 
 1. Open **Session History**.
 2. Choose **Felt right**, **False alert**, or **Missed alert**.
-3. In a later build that includes the source update, record lighting, eyewear,
-   and phone position directly on the session card.
+3. Record lighting, eyewear, and phone position directly on the session card.
 4. Record the tester-observed battery use and phone heat after safely parking.
 5. Record any remaining non-sensitive test conditions below.
 
@@ -131,9 +133,9 @@ pilot:
 - summary report
 - before/after safety insights
 
-## Next build priorities
+## Next pilot priorities
 
-1. Complete 10 safely reviewed build-13 sessions.
+1. Complete 10 safely reviewed build-15 sessions on Medium sensitivity.
 2. Use the local alert-pattern summary to compare false and missed alerts by
    lighting, eyewear, phone position, and sensitivity after coverage is broad
    enough to avoid misleading conclusions.

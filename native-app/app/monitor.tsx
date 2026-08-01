@@ -23,6 +23,7 @@ import {
 } from '../lib/cloudSync';
 import { consumePreDriveSafety } from '../lib/preDriveGate';
 import { currentAppBuildInfo } from '../lib/appBuildInfo';
+import { HeadNodDetector } from '../lib/headNodDetector';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking
@@ -75,6 +76,8 @@ export default function MonitorScreen() {
   const cloudSessionRef = useRef<Promise<string | null> | null>(null);
   const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastSampleAtRef = useRef(0);
+  const headNodDetectorRef = useRef(new HeadNodDetector());
+  const headNodObservationsRef = useRef(0);
 
   const [metrics, setMetrics] = useState<EyeMetrics>({
     ear: 0.3, perclos: 0, fatigueScore: 0, state: 'noFace',
@@ -118,6 +121,8 @@ export default function MonitorScreen() {
     fatigueSamplesRef.current = 0;
     maxFatigueRef.current = 0;
     closedSinceRef.current = null;
+    headNodDetectorRef.current.reset();
+    headNodObservationsRef.current = 0;
     lastSampleAtRef.current = Date.now();
     setSensorFault(null);
     sessionSensitivityRef.current = sensitivity;
@@ -139,6 +144,7 @@ export default function MonitorScreen() {
       durationSec,
       alertCount: alerts,
       avgFatigue,
+      headNodObservations: headNodObservationsRef.current,
       sensitivity: sessionSensitivityRef.current,
       ...currentAppBuildInfo(),
     };
@@ -210,10 +216,26 @@ export default function MonitorScreen() {
    * worklet (already throttled). Runs the PERCLOS/fatigue scoring on the JS
    * thread and drives the UI + AlertSystem.
    */
-  const onEyeState = useCallback((leftProb: number, rightProb: number, faceFound: boolean) => {
+  const onEyeState = useCallback((
+    leftProb: number,
+    rightProb: number,
+    faceFound: boolean,
+    pitchAngle: number,
+    yawAngle: number,
+    rollAngle: number,
+  ) => {
     lastSampleAtRef.current = Date.now();
-    const rawResult = faceFound ? processEyeOpenness(leftProb, rightProb) : processNoFace();
     const now = Date.now();
+    const headNodResult = headNodDetectorRef.current.update({
+      at: now,
+      faceFound,
+      pitchAngle,
+      yawAngle,
+      rollAngle,
+    });
+    // Observation only: this does not change fatigue scoring or alert delivery.
+    if (headNodResult.observed) headNodObservationsRef.current += 1;
+    const rawResult = faceFound ? processEyeOpenness(leftProb, rightProb) : processNoFace();
     if (rawResult.state === 'closed') {
       closedSinceRef.current ??= now;
     } else {
@@ -266,7 +288,7 @@ export default function MonitorScreen() {
 
     const faces = detectFaces(frame);
     if (faces.length === 0) {
-      onEyeStateJS(-1, -1, false);
+      onEyeStateJS(-1, -1, false, 0, 0, 0);
       return;
     }
     // Largest face = the driver.
@@ -279,6 +301,9 @@ export default function MonitorScreen() {
       face.leftEyeOpenProbability ?? -1,
       face.rightEyeOpenProbability ?? -1,
       true,
+      face.pitchAngle,
+      face.yawAngle,
+      face.rollAngle,
     );
   }, [detectFaces, onEyeStateJS, lastSample]);
 
