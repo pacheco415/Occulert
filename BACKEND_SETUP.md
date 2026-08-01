@@ -103,4 +103,6 @@ for the existing project before enabling fleet onboarding.
 - [x] Trusted fleet invitation/administration flow implemented in code
 - [x] Secure fleet invitation migration applied and independently verified
 - [x] No-cost invitation sharing through the manager's mail app and copy-link fallback
+- [x] Manager-scoped session and event history excludes GPS, personal media, and raw motion
+- [ ] Protected session-history deployment and signed-in manager verification
 - [ ] Optional custom SMTP configured only if pilot volume outgrows Supabase's built-in sender
