@@ -5,6 +5,12 @@ import { useAudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sendAlertToWatch } from '../lib/watchBridge';
 import { configureAlertAudioMode } from '../lib/audioSession';
+import {
+  IN_EAR_ALERT_PATTERN_KEY,
+  nextAlertAudioChannel,
+  parseInEarAlertPattern,
+  type AlertAudioChannel,
+} from '../lib/inEarAlerts';
 import { ALERT_COOLDOWN_MS, PERCLOS_ALERT_THRESHOLD } from '../constants/thresholds';
 import {
   deriveAlertLevel,
@@ -17,6 +23,8 @@ import type { EyeMetrics } from '../hooks/useEyeTracking';
 export type { AlertLevel } from '../lib/alertPolicy';
 
 const ALERT_SOUND = require('../assets/alert.wav');
+const ALERT_SOUND_LEFT = require('../assets/alert-left.wav');
+const ALERT_SOUND_RIGHT = require('../assets/alert-right.wav');
 
 interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; sessionTime: number; }
 
@@ -30,6 +38,7 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
   const lastAlert = useRef<{ level: AlertLevel; at: number }>({ level: 'none', at: 0 });
   const hapticEnabled = useRef(true);
   const audioEnabled = useRef(true);
+  const lastDirectionalChannel = useRef<Exclude<AlertAudioChannel, 'balanced'> | null>(null);
   const [trackingLost, setTrackingLost] = React.useState(false);
 
   // Load persisted alert preferences (set on the Settings screen).
@@ -49,10 +58,15 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
     return () => clearTimeout(timer);
   }, [isRunning, metrics.state]);
   React.useEffect(() => {
-    if (!isRunning) lastAlert.current = { level: 'none', at: 0 };
+    if (!isRunning) {
+      lastAlert.current = { level: 'none', at: 0 };
+      lastDirectionalChannel.current = null;
+    }
   }, [isRunning]);
   const pulse = useRef(new Animated.Value(1)).current;
-  const player = useAudioPlayer(ALERT_SOUND, { keepAudioSessionActive: true });
+  const balancedPlayer = useAudioPlayer(ALERT_SOUND, { keepAudioSessionActive: true });
+  const leftPlayer = useAudioPlayer(ALERT_SOUND_LEFT, { keepAudioSessionActive: true });
+  const rightPlayer = useAudioPlayer(ALERT_SOUND_RIGHT, { keepAudioSessionActive: true });
 
   // PERCLOS is a rolling history. Never keep a red alert on screen after
   // the driver's eyes are visibly open again. Sustained tracking loss is a
@@ -74,9 +88,10 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
     // Expo Router can keep this screen mounted while Settings is open. Read
     // all delivery preferences for each alert so enable/disable changes take
     // effect immediately instead of waiting for a remount.
-    const [hapticValue, audioValue] = await Promise.all([
+    const [hapticValue, audioValue, inEarPatternValue] = await Promise.all([
       AsyncStorage.getItem('occulert-haptic').catch(() => null),
       AsyncStorage.getItem('occulert-audio').catch(() => null),
+      AsyncStorage.getItem(IN_EAR_ALERT_PATTERN_KEY).catch(() => null),
     ]);
     if (hapticValue != null) hapticEnabled.current = hapticValue === 'true';
     if (audioValue != null) audioEnabled.current = audioValue === 'true';
@@ -114,12 +129,25 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
 
     try {
       if (!audioEnabled.current) return;
-      player.pause();
+      const channel = nextAlertAudioChannel(
+        parseInEarAlertPattern(inEarPatternValue),
+        lv,
+        lastDirectionalChannel.current,
+      );
+      if (channel !== 'balanced') lastDirectionalChannel.current = channel;
+      const player = channel === 'left'
+        ? leftPlayer
+        : channel === 'right'
+          ? rightPlayer
+          : balancedPlayer;
+      balancedPlayer.pause();
+      leftPlayer.pause();
+      rightPlayer.pause();
       await player.seekTo(0);
       player.volume = lv === 'critical' ? 1.0 : 0.75;
       player.play();
     } catch {}
-  }, [metrics.perclos, player, pulse]);
+  }, [balancedPlayer, leftPlayer, metrics.perclos, pulse, rightPlayer]);
 
   React.useEffect(() => {
     if (level !== 'none') fire(level);
