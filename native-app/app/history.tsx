@@ -13,6 +13,7 @@ import {
   type SessionTestConditions,
 } from '../lib/feedback';
 import { updateSessionHistory } from '../lib/sessionHistory';
+import { formatPilotCounts, summarizePilotIssues } from '../lib/pilotInsights';
 import type { SensitivityLevel } from '../constants/thresholds';
 
 const HISTORY_KEY = 'occulert-session-history';
@@ -240,6 +241,8 @@ export default function HistoryScreen() {
   const completeDeviceImpactCount = reviewedMedium.filter(item => (
     Boolean(item.deviceImpact?.batteryImpact) && Boolean(item.deviceImpact?.phoneHeat)
   )).length;
+  const issueInsights = summarizePilotIssues(sessions);
+  const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
 
   return (
     <SafeAreaView style={s.bg}>
@@ -292,6 +295,39 @@ export default function HistoryScreen() {
                 {completeDeviceImpactCount} include battery-use and phone-heat observations
               </Text>
             </View>
+            {issueSessionCount > 0 && (
+              <View style={s.patternSummary}>
+                <Text style={s.coverageTitle}>ALERT PATTERNS</Text>
+                <Text style={s.patternIntro}>
+                  All reviewed sensitivities are included. Counts stay on this iPhone.
+                </Text>
+                {issueInsights.map(insight => (
+                  <View key={insight.assessment} style={s.patternGroup}>
+                    <Text style={s.patternTitle}>{insight.total} {insight.label.toLowerCase()}</Text>
+                    {insight.total === 0 ? (
+                      <Text style={s.patternCopy}>None in reviewed sessions.</Text>
+                    ) : (
+                      <>
+                        <Text style={s.patternCopy}>
+                          Sensitivity: {formatPilotCounts(insight.sensitivities) || 'not recorded'}
+                        </Text>
+                        <Text style={s.patternCopy}>
+                          Conditions: {formatPilotCounts(insight.conditions) || 'not recorded'}
+                        </Text>
+                        {insight.completeConditionCount < insight.total && (
+                          <Text style={s.patternMissing}>
+                            {insight.total - insight.completeConditionCount} missing one or more test conditions
+                          </Text>
+                        )}
+                      </>
+                    )}
+                  </View>
+                ))}
+                <Text style={s.patternCaution}>
+                  These are observations, not error rates. Compare patterns only after each condition has enough reviewed sessions.
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -342,6 +378,9 @@ export default function HistoryScreen() {
                 {item.cloudSynced ? 'Summary synced to your protected account' : 'Saved only on this iPhone'}
               </Text>
             </View>
+            <Text style={s.buildInfo}>
+              App {item.appVersion || 'not recorded'} · Build {item.appBuildNumber || 'not recorded'}
+            </Text>
             <View style={s.reviewSummary}>
               <View style={[s.reviewBadge, reviewComplete ? s.reviewBadgeComplete : s.reviewBadgeNeeded]}>
                 <Ionicons
@@ -504,6 +543,13 @@ const s = StyleSheet.create({
   coverageTitle: { color: '#60a5fa', fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   coverageCopy: { color: '#bae6fd', fontSize: 10, lineHeight: 15, marginTop: 5 },
   coverageStats: { color: '#6592a5', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  patternSummary: { borderTopWidth: 1, borderTopColor: '#1d4f68', marginTop: 12, paddingTop: 12 },
+  patternIntro: { color: '#6592a5', fontSize: 10, lineHeight: 15, marginTop: 5 },
+  patternGroup: { backgroundColor: 'rgba(5,10,15,0.22)', borderRadius: 9, padding: 9, marginTop: 8 },
+  patternTitle: { color: '#e0f2fe', fontSize: 11, fontWeight: '800' },
+  patternCopy: { color: '#93c5fd', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  patternMissing: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  patternCaution: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 8 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 10 },
   emptyTitle: { color: '#c8e8f0', fontSize: 17, fontWeight: '800', marginTop: 8 },
   emptySub: { color: '#4a7a8a', fontSize: 13, textAlign: 'center', lineHeight: 19, paddingHorizontal: 20 },
@@ -521,6 +567,7 @@ const s = StyleSheet.create({
   storageRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 12 },
   storageText: { color: '#4a7a8a', fontSize: 10, fontWeight: '700' },
   storageTextSynced: { color: '#34d399' },
+  buildInfo: { color: '#6592a5', fontSize: 10, fontWeight: '700', marginTop: 7 },
   reviewSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6 },
   reviewBadgeComplete: { backgroundColor: 'rgba(22,163,74,0.12)', borderColor: 'rgba(74,222,128,0.35)' },

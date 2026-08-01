@@ -21,6 +21,12 @@ before changing detection thresholds or making accuracy claims.
   source for a later private build; they are observations, not measurements.
 - Completed reviews collapse to a summary, while incomplete sessions remain
   open with a **Needs review** indicator in the later-build source bundle.
+- New sessions are stamped with the app version and immutable native build
+  number in source for a later private build. Older sessions remain explicitly
+  labeled as not recorded instead of being assigned a guessed build.
+- A local alert-pattern summary groups reviewed false and missed alerts by
+  sensitivity, lighting, eyewear, and phone position in source for a later
+  private build. It shows observation counts, not accuracy or error rates.
 - This pilot feedback is not a substitute for the authorized dataset benchmark
   defined in `ACCURACY_BENCHMARK.md`.
 
@@ -128,8 +134,9 @@ pilot:
 ## Next build priorities
 
 1. Complete 10 safely reviewed build-13 sessions.
-2. Summarize false and missed alerts by lighting, eyewear, phone position, and
-   sensitivity.
+2. Use the local alert-pattern summary to compare false and missed alerts by
+   lighting, eyewear, phone position, and sensitivity after coverage is broad
+   enough to avoid misleading conclusions.
 3. Adjust thresholds only when the reviewed evidence supports a change.
 4. Obtain authorized dataset access and run `ACCURACY_BENCHMARK.md`.
 5. Add a privacy-safe aggregate export only if manual review becomes too slow.
