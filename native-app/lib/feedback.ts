@@ -27,6 +27,7 @@ export interface FeedbackSession {
   durationSec?: number;
   alertCount?: number;
   avgFatigue?: number;
+  headNodObservations?: number;
   alertAssessment?: AlertAssessment;
   sensitivity?: SensitivityLevel;
   testConditions?: SessionTestConditions;
@@ -77,6 +78,7 @@ export function feedbackUrl(session?: FeedbackSession): string {
       'Duration seconds: ' + valueOrDash(session.durationSec),
       'Alerts: ' + valueOrDash(session.alertCount),
       'Average fatigue: ' + valueOrDash(session.avgFatigue),
+      'Experimental head-nod observations: ' + valueOrDash(session.headNodObservations),
       'Sensitivity: ' + (session.sensitivity || '-'),
       'Alert assessment: ' + assessmentLabel(session.alertAssessment),
       'Lighting: ' + conditionLabel(session.testConditions?.lighting),

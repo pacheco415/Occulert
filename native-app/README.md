@@ -18,8 +18,10 @@ A native app removes all of these blockers.
 
 - **React Native** via [Expo](https://expo.dev) - fastest path from web skills to native
 - **TypeScript** - strongly typed for safety-critical logic
-- **Expo Camera** - camera access with background capability
-- **Expo Sensors** - accelerometer for head-nod detection
+- **VisionCamera + ML Kit** - foreground camera access and on-device face/eye
+  analysis
+- **ML Kit face pose** - experimental pitch-cycle observations for future
+  head-nod validation
 - **React Native Health** (iOS) / **Health Connect** (Android) - HRV and sleep data
 - **Expo Notifications** - push alert support
 - **Expo Haptics** - vibration alerts
@@ -61,16 +63,19 @@ native-app/
 |   |-- history.tsx         # Session history
 |   `-- settings.tsx        # Sensitivity + preferences
 |-- components/
-|   |-- EyeTracker.tsx      # Camera + MediaPipe detection
 |   |-- AlertSystem.tsx     # Alert triggering + haptics + audio
-|   |-- FatigueScore.tsx    # Score display component
+|   |-- CloudSyncCard.tsx   # Optional protected account sync
 |   `-- SensitivitySlider.tsx # Low/Med/High sensitivity control
 |-- hooks/
-|   |-- useEyeTracking.ts   # EAR calculation logic
-|   |-- useHeadNod.ts       # Accelerometer head-nod detection
-|   `-- useHealthData.ts    # HRV/sleep from HealthKit/Health Connect
+|   `-- useEyeTracking.ts   # Eye openness + PERCLOS scoring
+|-- lib/
+|   |-- headNodDetector.ts  # Experimental face-pitch observation state machine
+|   |-- sessionHistory.ts   # Serialized local session storage
+|   `-- watchBridge.ts      # iPhone-to-Watch alert delivery
 |-- constants/
 |   `-- thresholds.ts       # Sensitivity presets (mirrors web app)
+|-- targets/
+|   `-- occulert-watch/     # SwiftUI watchOS companion
 |-- package.json
 |-- app.json                # Expo config
 `-- tsconfig.json
@@ -86,21 +91,21 @@ native-app/
 | Screen-off / app-backgrounded camera monitoring | Not supported - keep the app foregrounded |
 | Sensitivity slider | Done - `SensitivitySlider.tsx` + AsyncStorage |
 | Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-audio |
-| Apple Watch companion + wrist haptics | Done - private TestFlight build 13 |
+| Apple Watch companion + wrist haptics | Done - private TestFlight build 15 validated |
 | Per-session pre-drive safety confirmation | Done - required before monitoring |
 | Structured session alert review | Done - local correct / false / missed labels |
-| Structured session test conditions | Implemented in source - pending a later private build |
-| Pilot test-condition coverage summary | Implemented in source - pending a later private build |
-| Tester-reported battery use + phone heat | Implemented in source - pending a later private build |
-| Collapsible session reviews + completion status | Implemented in source - pending a later private build |
-| Per-session app version + native build stamp | Implemented in source - pending a later private build |
-| Local false/missed alert pattern summary | Implemented in source - pending a later private build |
+| Structured session test conditions | Done - private TestFlight build 15 |
+| Pilot test-condition coverage summary | Done - private TestFlight build 15 |
+| Tester-reported battery use + phone heat | Done - private TestFlight build 15 |
+| Collapsible session reviews + completion status | Done - private TestFlight build 15 |
+| Per-session app version + native build stamp | Done - private TestFlight build 15 |
+| Local false/missed alert pattern summary | Done - private TestFlight build 15 |
 | Pilot accuracy checkpoint | Implemented - local 10-session Medium progress summary |
 | Optional protected cloud session sync | Implemented - secure sign-in + explicit consent |
-| Head-nod detection (accelerometer) | In progress - Phase 1: wire expo-sensors |
+| Head-nod detection | Experimental local face-pitch observations; does not trigger alerts or sync |
 | HealthKit HRV/sleep integration | Planned - Phase 2 |
 | Pre-drive risk score screen | Planned - Phase 2 |
-| Private iOS distribution | TestFlight build 13 validated; no App Review started |
+| Private iOS distribution | TestFlight build 15 validated on iPhone and Apple Watch; no external testing or App Review started |
 
 Pilot testers can send general feedback from Settings or attach basic session
 metrics and a structured alert assessment from History. Alert assessments stay
@@ -109,8 +114,8 @@ The app does not attach camera images, video, audio, or location.
 
 History can also record lighting, eyewear, and phone position after the tester
 is safely parked. These structured conditions stay local unless the tester
-opens the editable session feedback email. They are implemented in source and
-are not part of the validated private TestFlight build 13 baseline.
+opens the editable session feedback email. They are included in the validated
+private TestFlight build 15 baseline.
 
 The same local review can capture subjective battery use and phone heat after
 the tester parks. These are explicitly described as tester observations rather

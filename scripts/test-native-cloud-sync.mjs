@@ -31,7 +31,7 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   cloud,
-  /testConditions|lighting|eyewear|phonePosition|deviceImpact|batteryImpact|phoneHeat|appVersion|appBuildNumber/,
+  /testConditions|lighting|eyewear|phonePosition|deviceImpact|batteryImpact|phoneHeat|appVersion|appBuildNumber|headNodObservations/,
   'pilot review observations and build metadata must not be added to cloud sync',
 );
 assert.match(cloud, /if \(!await consentEnabled\(\) \|\| !await ensureDriverProfile\(\)\) return null;/);
@@ -51,7 +51,10 @@ assert.match(monitor, /beginCloudSession\(\)/);
 assert.match(monitor, /logCloudAlert\(sessionId, result\.fatigueScore\)/);
 assert.match(monitor, /finishCloudSession\(cloudSessionId/);
 assert.match(monitor, /cloudSynced: true/);
+assert.match(monitor, /headNodObservationsRef\.current \+= 1/);
+assert.match(cloud, /Candidate head-nod observations remain local until device validation/);
 assert.match(settings, /<CloudSyncCard \/>/);
 assert.match(history, /This alert rating stays only on this iPhone/);
+assert.match(history, /Does not trigger alerts/);
 
 console.log('Occulert native cloud-sync contract tests passed.');

@@ -150,6 +150,10 @@ assertNotIncludes("native-app/lib/feedback.ts", "App version: 1.0.0", "native fe
 assertIncludes("native-app/app/history.tsx", "router.push('/pre-drive')", "native history must route monitoring through the pre-drive safety gate");
 assertIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native iOS builds must explain optional location access to satisfy App Store validation");
 assertIncludes("native-app/app/monitor.tsx", "CLOSED_CONFIRM_MS = 1_200", "native monitoring must confirm sustained eye closure before a full alert");
+assertIncludes("native-app/app/monitor.tsx", "headNodObservationsRef.current += 1", "native monitoring must store candidate head-nod observations locally");
+assertIncludes("native-app/app/history.tsx", "Does not trigger alerts", "experimental head-nod observations must not be presented as an alert signal");
+assertNotIncludes("native-app/components/AlertSystem.tsx", "headNod", "unvalidated head-nod observations must not affect alert delivery");
+assertNotIncludes("native-app/lib/cloudSync.ts", "headNodObservations", "unvalidated head-nod observations must remain out of cloud sync");
 assertIncludes("native-app/lib/alertPolicy.ts", "CRITICAL_WARMUP_SECONDS = 10", "native monitoring must not trigger a critical alert immediately after startup");
 assertIncludes("native-app/lib/alertPolicy.ts", "metrics.state === 'closed'", "native critical alerts must clear when the driver's eyes reopen");
 assertIncludes("native-app/components/AlertSystem.tsx", "deriveAlertLevel", "native alerts must use the tested alert policy");
