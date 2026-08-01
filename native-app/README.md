@@ -93,6 +93,7 @@ native-app/
 | Pilot test-condition coverage summary | Implemented in source - pending a later private build |
 | Tester-reported battery use + phone heat | Implemented in source - pending a later private build |
 | Collapsible session reviews + completion status | Implemented in source - pending a later private build |
+| Per-session app version + native build stamp | Implemented in source - pending a later private build |
 | Pilot accuracy checkpoint | Implemented - local 10-session Medium progress summary |
 | Optional protected cloud session sync | Implemented - secure sign-in + explicit consent |
 | Head-nod detection (accelerometer) | In progress - Phase 1: wire expo-sensors |

@@ -31,8 +31,8 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   cloud,
-  /testConditions|lighting|eyewear|phonePosition|deviceImpact|batteryImpact|phoneHeat/,
-  'structured pilot review observations must not be added to cloud sync',
+  /testConditions|lighting|eyewear|phonePosition|deviceImpact|batteryImpact|phoneHeat|appVersion|appBuildNumber/,
+  'pilot review observations and build metadata must not be added to cloud sync',
 );
 assert.match(cloud, /if \(!await consentEnabled\(\) \|\| !await ensureDriverProfile\(\)\) return null;/);
 assert.match(cloud, /https:\/\/www\.occulert\.com/);

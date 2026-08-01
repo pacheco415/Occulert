@@ -22,6 +22,7 @@ import {
   logCloudAlert,
 } from '../lib/cloudSync';
 import { consumePreDriveSafety } from '../lib/preDriveGate';
+import { currentAppBuildInfo } from '../lib/appBuildInfo';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking
@@ -139,6 +140,7 @@ export default function MonitorScreen() {
       alertCount: alerts,
       avgFatigue,
       sensitivity: sessionSensitivityRef.current,
+      ...currentAppBuildInfo(),
     };
     await updateSessionHistory<Record<string, unknown>>(sessions => [record, ...sessions].slice(0, 50));
     return sessionId;

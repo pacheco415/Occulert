@@ -342,6 +342,9 @@ export default function HistoryScreen() {
                 {item.cloudSynced ? 'Summary synced to your protected account' : 'Saved only on this iPhone'}
               </Text>
             </View>
+            <Text style={s.buildInfo}>
+              App {item.appVersion || 'not recorded'} · Build {item.appBuildNumber || 'not recorded'}
+            </Text>
             <View style={s.reviewSummary}>
               <View style={[s.reviewBadge, reviewComplete ? s.reviewBadgeComplete : s.reviewBadgeNeeded]}>
                 <Ionicons
@@ -521,6 +524,7 @@ const s = StyleSheet.create({
   storageRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 12 },
   storageText: { color: '#4a7a8a', fontSize: 10, fontWeight: '700' },
   storageTextSynced: { color: '#34d399' },
+  buildInfo: { color: '#6592a5', fontSize: 10, fontWeight: '700', marginTop: 7 },
   reviewSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6 },
   reviewBadgeComplete: { backgroundColor: 'rgba(22,163,74,0.12)', borderColor: 'rgba(74,222,128,0.35)' },

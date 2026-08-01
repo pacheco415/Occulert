@@ -21,6 +21,9 @@ before changing detection thresholds or making accuracy claims.
   source for a later private build; they are observations, not measurements.
 - Completed reviews collapse to a summary, while incomplete sessions remain
   open with a **Needs review** indicator in the later-build source bundle.
+- New sessions are stamped with the app version and immutable native build
+  number in source for a later private build. Older sessions remain explicitly
+  labeled as not recorded instead of being assigned a guessed build.
 - This pilot feedback is not a substitute for the authorized dataset benchmark
   defined in `ACCURACY_BENCHMARK.md`.
 

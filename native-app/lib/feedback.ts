@@ -1,5 +1,6 @@
 import { Linking, Platform } from 'react-native';
 import type { SensitivityLevel } from '../constants/thresholds';
+import { currentAppBuildInfo } from './appBuildInfo';
 
 export type AlertAssessment = 'accurate' | 'false_alert' | 'missed_alert';
 export type LightingCondition = 'daylight' | 'low_light';
@@ -30,6 +31,8 @@ export interface FeedbackSession {
   sensitivity?: SensitivityLevel;
   testConditions?: SessionTestConditions;
   deviceImpact?: SessionDeviceImpact;
+  appVersion?: string;
+  appBuildNumber?: string;
 }
 
 const FEEDBACK_EMAIL = 'hello@occulert.com';
@@ -55,13 +58,15 @@ function conditionLabel(value?: string): string {
 
 export function feedbackUrl(session?: FeedbackSession): string {
   const subject = session ? 'Occulert pilot session feedback' : 'Occulert pilot feedback';
+  const currentBuild = currentAppBuildInfo();
   const lines = [
     'Please tell us what worked, what did not, and whether any alert felt late, missed, or incorrect.',
     '',
     'Feedback:',
     '',
     '--- App details (you can remove these before sending) ---',
-    'App version: 1.0.0',
+    'App version: ' + (session?.appVersion || currentBuild.appVersion || '-'),
+    'Build number: ' + (session?.appBuildNumber || currentBuild.appBuildNumber || '-'),
     'Platform: ' + Platform.OS,
   ];
 
