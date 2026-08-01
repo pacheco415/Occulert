@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Linking,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,6 +12,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import {
+  clearStoredHealthReadiness,
+  isAppleHealthAvailable,
+  loadStoredHealthReadiness,
+  refreshAppleHealthReadiness,
+} from '../lib/appleHealth';
+import type { HealthReadinessSnapshot } from '../lib/healthReadiness';
 import { confirmPreDriveSafety } from '../lib/preDriveGate';
 
 const CHECKS = [
@@ -31,15 +40,75 @@ const CHECKS = [
   },
 ] as const;
 
+function formatSleep(minutes: number | null): string {
+  if (minutes === null) return 'No recent sample';
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours > 0 ? `${hours}h ${remainder}m` : `${remainder}m`;
+}
+
+function formatUpdated(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Unknown';
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export default function PreDriveScreen() {
   const router = useRouter();
   const [checked, setChecked] = useState<boolean[]>(() => CHECKS.map(() => false));
+  const [healthAvailable, setHealthAvailable] = useState<boolean | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthNotice, setHealthNotice] = useState<string | null>(null);
+  const [healthSnapshot, setHealthSnapshot] = useState<HealthReadinessSnapshot | null>(null);
   const ready = useMemo(() => checked.every(Boolean), [checked]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    let active = true;
+    Promise.all([loadStoredHealthReadiness(), isAppleHealthAvailable()])
+      .then(([stored, available]) => {
+        if (!active) return;
+        setHealthSnapshot(stored);
+        setHealthAvailable(available);
+      });
+    return () => { active = false; };
+  }, []);
 
   const toggle = (index: number) => {
     setChecked(current => current.map((value, itemIndex) => (
       itemIndex === index ? !value : value
     )));
+  };
+
+  const refreshHealth = async () => {
+    setHealthLoading(true);
+    setHealthNotice(null);
+    try {
+      const result = await refreshAppleHealthReadiness();
+      setHealthSnapshot(result.snapshot);
+      setHealthNotice(result.status === 'no_data'
+        ? 'Apple Health returned no recent sleep or HRV samples. This can mean no data or limited access.'
+        : 'Apple Health context updated on this iPhone.');
+    } catch {
+      setHealthNotice('Apple Health could not be read. Check Health access for Occulert and try again.');
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
+  const removeHealthSummary = async () => {
+    try {
+      await clearStoredHealthReadiness();
+      setHealthSnapshot(null);
+      setHealthNotice('The local Apple Health summary was removed. Manage future access in iOS Health settings.');
+    } catch {
+      setHealthNotice('The local Apple Health summary could not be removed. Try again.');
+    }
   };
 
   return (
@@ -61,6 +130,84 @@ export default function PreDriveScreen() {
             Never begin or configure Occulert while operating a vehicle.
           </Text>
         </View>
+
+        {Platform.OS === 'ios' && (
+          <View style={styles.healthCard}>
+            <View style={styles.healthHeading}>
+              <View style={styles.healthIcon}>
+                <Ionicons name="heart" size={18} color="#fb7185" />
+              </View>
+              <View style={styles.healthHeadingCopy}>
+                <Text style={styles.healthEyebrow}>APPLE HEALTH · OPTIONAL</Text>
+                <Text style={styles.healthTitle}>Pre-drive context</Text>
+              </View>
+            </View>
+
+            <Text style={styles.healthDescription}>
+              Read recent sleep and heart rate variability from Apple Health. Only a small summary is kept in this iPhone's protected storage.
+            </Text>
+
+            {healthSnapshot && (
+              <View style={styles.healthMetrics}>
+                <View style={styles.healthMetric}>
+                  <Text style={styles.healthMetricLabel}>SLEEP · PAST 24H</Text>
+                  <Text style={styles.healthMetricValue}>{formatSleep(healthSnapshot.sleepMinutes24h)}</Text>
+                </View>
+                <View style={styles.healthMetric}>
+                  <Text style={styles.healthMetricLabel}>HRV (SDNN) · PAST 7D</Text>
+                  <Text style={styles.healthMetricValue}>
+                    {healthSnapshot.latestHrvMs === null ? 'No recent sample' : `${healthSnapshot.latestHrvMs} ms`}
+                  </Text>
+                  {healthSnapshot.latestHrvAt && (
+                    <Text style={styles.healthMetricTime}>{formatUpdated(healthSnapshot.latestHrvAt)}</Text>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {healthSnapshot && (
+              <Text style={styles.healthUpdated}>Updated {formatUpdated(healthSnapshot.capturedAt)}</Text>
+            )}
+
+            {healthAvailable === false ? (
+              <Text style={styles.healthNotice}>Apple Health is unavailable on this device or build.</Text>
+            ) : (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityState={{ disabled: healthAvailable !== true || healthLoading }}
+                disabled={healthAvailable !== true || healthLoading}
+                activeOpacity={0.8}
+                onPress={refreshHealth}
+                style={[
+                  styles.healthButton,
+                  (healthAvailable !== true || healthLoading) && styles.healthButtonDisabled,
+                ]}
+              >
+                {healthLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="refresh" size={16} color="#fff" />}
+                <Text style={styles.healthButtonText}>
+                  {healthSnapshot ? 'REFRESH APPLE HEALTH' : 'CONNECT APPLE HEALTH'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {healthNotice && <Text style={styles.healthNotice}>{healthNotice}</Text>}
+            {healthSnapshot && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                activeOpacity={0.75}
+                onPress={removeHealthSummary}
+                style={styles.healthRemoveButton}
+              >
+                <Text style={styles.healthRemoveText}>REMOVE LOCAL HEALTH SUMMARY</Text>
+              </TouchableOpacity>
+            )}
+            <Text style={styles.healthLimit}>
+              Informational only. These values do not calculate medical or driving fitness, change fatigue scoring, or affect alerts.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.checkList}>
           {CHECKS.map((item, index) => (
@@ -153,6 +300,56 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   warningText: { flex: 1, color: '#fde68a', fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  healthCard: {
+    backgroundColor: '#0f1e2e',
+    borderWidth: 1,
+    borderColor: '#1a3a4a',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  healthHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  healthIcon: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: 'rgba(251,113,133,0.12)',
+  },
+  healthHeadingCopy: { flex: 1 },
+  healthEyebrow: { color: '#fb7185', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  healthTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '900', marginTop: 2 },
+  healthDescription: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginTop: 12 },
+  healthMetrics: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  healthMetric: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#09131f',
+    borderWidth: 1,
+    borderColor: '#1a3a4a',
+    padding: 11,
+  },
+  healthMetricLabel: { color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  healthMetricValue: { color: '#f8fafc', fontSize: 15, fontWeight: '900', marginTop: 5 },
+  healthMetricTime: { color: '#64748b', fontSize: 9, marginTop: 4 },
+  healthUpdated: { color: '#64748b', fontSize: 10, marginTop: 8 },
+  healthButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 14,
+  },
+  healthButtonDisabled: { backgroundColor: '#26374a', opacity: 0.65 },
+  healthButtonText: { color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
+  healthNotice: { color: '#cbd5e1', fontSize: 11, lineHeight: 17, marginTop: 10 },
+  healthRemoveButton: { alignItems: 'center', paddingTop: 12 },
+  healthRemoveText: { color: '#94a3b8', fontSize: 10, fontWeight: '800', letterSpacing: 0.45 },
+  healthLimit: { color: '#64748b', fontSize: 10, lineHeight: 15, marginTop: 10 },
   checkList: { gap: 10 },
   checkCard: {
     flexDirection: 'row',

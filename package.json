@@ -11,9 +11,10 @@
     "test:remaining-fixes": "node --test scripts/test-remaining-security-fixes.mjs",
     "test:pilot-insights": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-pilot-insights.mjs",
     "test:head-nod": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-head-nod-detector.mjs",
+    "test:health-readiness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-health-readiness.mjs",
     "test:benchmark": "node benchmark/test-benchmark.mjs",
     "test:browser": "playwright test",
-    "verify": "npm run audit:site && npm run test:api && npm run test:client && npm run test:native-cloud && npm run test:high-fixes && npm run test:remaining-fixes && npm run test:pilot-insights && npm run test:head-nod && npm run test:benchmark"
+    "verify": "npm run audit:site && npm run test:api && npm run test:client && npm run test:native-cloud && npm run test:high-fixes && npm run test:remaining-fixes && npm run test:pilot-insights && npm run test:head-nod && npm run test:health-readiness && npm run test:benchmark"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.1"

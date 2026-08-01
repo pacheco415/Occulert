@@ -4,8 +4,8 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 ★ = top-priority milestone for each phase
 
-**Last updated: 2026-07-31** — statuses below reflect private TestFlight build
-13 and the current web app. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
+**Last updated: 2026-08-01** — statuses below reflect private TestFlight build
+15 and the current source on `main`. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
 and issue #6 for the remaining validation and product gaps.
 
 ---
@@ -46,15 +46,16 @@ Note: AirPods audio routing shipped in native-app (PR #2), covering auto-detect/
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Pull HRV and sleep data from Apple Health / Google Fit | — | Not started |
-| Pre-drive fatigue risk score shown before each trip | ★ | Not started |
-| Wrist haptic alert when fatigue threshold is crossed | — | Done in private TestFlight build 13 |
+| Pull HRV and sleep data from Apple Health / Google Fit | — | Apple Health read-only foundation implemented in source; Android not started |
+| Pre-drive fatigue risk score shown before each trip | ★ | Factual local sleep/HRV context implemented in source; scoring intentionally deferred |
+| Wrist haptic alert when fatigue threshold is crossed | — | Done in private TestFlight build 15 |
 | Watch-face widget showing live safety score | — | Not started |
 
 Note: the packaged watchOS companion, live and queued WatchConnectivity
 delivery, direct test control, and wrist haptics passed a real iPhone/Apple
-Watch check in private TestFlight build 13. Watch biometrics and a complication
-remain separate future work.
+Watch check in private TestFlight build 15. The Apple Health foundation is
+read-only, local-only, and informational; it does not alter alerts. A validated
+pre-drive score and Watch complication remain separate future work.
 
 ---
 
@@ -89,7 +90,7 @@ remain separate future work.
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Native iOS app (Swift / React Native) | ★ | Private TestFlight pilot (build 13) |
+| Native iOS app (Swift / React Native) | ★ | Private TestFlight pilot (build 15) |
 | Native Android app | — | Not started |
 | Keep PWA as lightweight onboarding funnel | — | Done |
 | Verify real-time sensor access per platform (camera, motion, BT) | ★ | Partial (camera and Watch alerts verified; experimental earbud motion is not calibrated) |
@@ -103,7 +104,7 @@ remain separate future work.
 |-------|-------|------------------|--------|
 | 0 · Foundation | Accuracy & pilots | Detection validation, pilot fleet | Not started |
 | 1 · Earbuds | Head & heart signals | Head-nod detection, directional alerts | Partial (audio routing done) |
-| 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (wrist alerts done; biometrics and risk score not started) |
+| 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (wrist alerts done; local read-only Apple Health context implemented in source) |
 | 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Not started (fleet dashboard backend scaffolding drafted, PR #18) |
 | 4 · Smart Glasses | Ambient + eye tracking | Inward eye-tracking | Not started |
 | Platform | Native apps | iOS app, real-time sensor access | Private iOS pilot |
