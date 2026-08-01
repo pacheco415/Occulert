@@ -2,6 +2,22 @@ import { Linking, Platform } from 'react-native';
 import type { SensitivityLevel } from '../constants/thresholds';
 
 export type AlertAssessment = 'accurate' | 'false_alert' | 'missed_alert';
+export type LightingCondition = 'daylight' | 'low_light';
+export type EyewearCondition = 'none' | 'glasses' | 'sunglasses';
+export type PhonePosition = 'high' | 'center' | 'low';
+export type BatteryImpactObservation = 'low' | 'noticeable' | 'high';
+export type PhoneHeatObservation = 'cool' | 'warm' | 'hot';
+
+export interface SessionTestConditions {
+  lighting?: LightingCondition;
+  eyewear?: EyewearCondition;
+  phonePosition?: PhonePosition;
+}
+
+export interface SessionDeviceImpact {
+  batteryImpact?: BatteryImpactObservation;
+  phoneHeat?: PhoneHeatObservation;
+}
 
 export interface FeedbackSession {
   sessionId?: string;
@@ -12,6 +28,8 @@ export interface FeedbackSession {
   avgFatigue?: number;
   alertAssessment?: AlertAssessment;
   sensitivity?: SensitivityLevel;
+  testConditions?: SessionTestConditions;
+  deviceImpact?: SessionDeviceImpact;
 }
 
 const FEEDBACK_EMAIL = 'hello@occulert.com';
@@ -25,6 +43,14 @@ function assessmentLabel(value?: AlertAssessment): string {
   if (value === 'false_alert') return 'False alert reported';
   if (value === 'missed_alert') return 'Missed alert reported';
   return '-';
+}
+
+function conditionLabel(value?: string): string {
+  if (!value) return '-';
+  return value
+    .split('_')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 export function feedbackUrl(session?: FeedbackSession): string {
@@ -48,6 +74,11 @@ export function feedbackUrl(session?: FeedbackSession): string {
       'Average fatigue: ' + valueOrDash(session.avgFatigue),
       'Sensitivity: ' + (session.sensitivity || '-'),
       'Alert assessment: ' + assessmentLabel(session.alertAssessment),
+      'Lighting: ' + conditionLabel(session.testConditions?.lighting),
+      'Eyewear: ' + conditionLabel(session.testConditions?.eyewear),
+      'Phone position: ' + conditionLabel(session.testConditions?.phonePosition),
+      'Battery impact (tester-reported): ' + conditionLabel(session.deviceImpact?.batteryImpact),
+      'Phone heat (tester-reported): ' + conditionLabel(session.deviceImpact?.phoneHeat),
     );
   }
 

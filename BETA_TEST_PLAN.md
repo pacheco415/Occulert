@@ -13,6 +13,14 @@ before changing detection thresholds or making accuracy claims.
   shows progress toward the first 10 reviewed Medium-sensitivity sessions.
 - Those labels stay on the tester's iPhone unless the tester chooses to send an
   editable feedback email.
+- Structured lighting, eyewear, and phone-position capture is implemented in
+  source for a later private build. It is not part of validated build 13.
+- The same source update adds local coverage counts so repeated test conditions
+  do not create a misleading 10-session checkpoint.
+- Tester-reported battery use and phone heat are also implemented locally in
+  source for a later private build; they are observations, not measurements.
+- Completed reviews collapse to a summary, while incomplete sessions remain
+  open with a **Needs review** indicator in the later-build source bundle.
 - This pilot feedback is not a substitute for the authorized dataset benchmark
   defined in `ACCURACY_BENCHMARK.md`.
 
@@ -64,7 +72,10 @@ After each safely completed session:
 
 1. Open **Session History**.
 2. Choose **Felt right**, **False alert**, or **Missed alert**.
-3. Record the non-sensitive test conditions below.
+3. In a later build that includes the source update, record lighting, eyewear,
+   and phone position directly on the session card.
+4. Record the tester-observed battery use and phone heat after safely parking.
+5. Record any remaining non-sensitive test conditions below.
 
 Do not record or attach face video, camera images, audio, precise location, or
 other person-identifiable footage.
