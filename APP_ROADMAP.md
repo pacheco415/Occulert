@@ -5,7 +5,7 @@ This document outlines the full multi-phase development plan for Occulert — ex
 ★ = top-priority milestone for each phase
 
 **Last updated: 2026-08-01** — statuses below reflect private TestFlight build
-19 and the current development source. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
+20 and the current development source. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
 and issue #6 for the remaining validation and product gaps.
 
 ---
@@ -33,14 +33,16 @@ and issue #6 for the remaining validation and product gaps.
 |------|----------|--------|
 | Head-nod / head-drop detection via earbud accelerometer | ★ | Local-only compatible-headphone motion diagnostics implemented in source; device calibration not started |
 | In-ear heart rate and HRV monitoring (where supported) | — | Not started |
-| Directional in-ear audio alerts (left/right/stereo cues) | ★ | Not started |
+| Directional in-ear audio alerts (left/right/stereo cues) | ★ | Opt-in alternating stereo emphasis implemented in source; device verification pending |
 | Auto-detect paired earbuds and graceful fallback to phone speaker | — | Done |
 
 Note: AirPods audio routing shipped in native-app (PR #2), covering
 auto-detect/fallback. Current source can read processed motion from compatible
 Apple headphones during foreground monitoring and save only aggregate candidate
-observations locally. It does not change scores or alerts. Real-device
-calibration and directional cues remain open.
+observations locally. It does not change scores or alerts. Directional audio is
+independent: the centered default remains, with opt-in alternating left/right
+emphasis for non-critical alerts. Real-device calibration and stereo-earbud
+verification remain open.
 
 ---
 
@@ -94,7 +96,7 @@ pre-drive score and Watch complication remain separate future work.
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Native iOS app (Swift / React Native) | ★ | Private TestFlight pilot (build 19) |
+| Native iOS app (Swift / React Native) | ★ | Private TestFlight pilot (build 20) |
 | Native Android app | — | Not started |
 | Keep PWA as lightweight onboarding funnel | — | Done |
 | Verify real-time sensor access per platform (camera, motion, BT) | ★ | Partial (camera and Watch alerts verified; compatible-headphone motion bridge implemented but not device-calibrated) |

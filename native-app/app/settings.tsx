@@ -8,6 +8,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { openFeedback } from '../lib/feedback';
 import { getWatchStatus, sendAlertToWatch, type WatchStatus } from '../lib/watchBridge';
 import { CloudSyncCard } from '../components/CloudSyncCard';
+import {
+  IN_EAR_ALERT_PATTERN_KEY,
+  parseInEarAlertPattern,
+  type InEarAlertPattern,
+} from '../lib/inEarAlerts';
 
 const EMPTY_WATCH_STATUS: WatchStatus = {
   moduleAvailable: false,
@@ -20,14 +25,26 @@ export default function SettingsScreen() {
   const [sens, setSens] = useState<SensitivityLevel>('medium');
   const [haptic, setHaptic] = useState(true);
   const [audio, setAudio] = useState(true);
+  const [inEarPattern, setInEarPattern] = useState<InEarAlertPattern>('balanced');
   const [watch, setWatch] = useState(false);
   const [watchStatus, setWatchStatus] = useState<WatchStatus>(EMPTY_WATCH_STATUS);
   const watchAvailable = watchStatus.paired && watchStatus.appInstalled;
 
   useEffect(() => {
-    loadSavedSensitivity().then(setSens);
-    AsyncStorage.getItem('occulert-haptic').then(v => { if(v) setHaptic(v==='true'); });
-    AsyncStorage.getItem('occulert-audio').then(v => { if(v) setAudio(v==='true'); });
+    let active = true;
+    Promise.all([
+      loadSavedSensitivity(),
+      AsyncStorage.getItem('occulert-haptic'),
+      AsyncStorage.getItem('occulert-audio'),
+      AsyncStorage.getItem(IN_EAR_ALERT_PATTERN_KEY),
+    ]).then(([savedSensitivity, savedHaptic, savedAudio, savedInEarPattern]) => {
+      if (!active) return;
+      setSens(savedSensitivity);
+      if (savedHaptic != null) setHaptic(savedHaptic === 'true');
+      if (savedAudio != null) setAudio(savedAudio === 'true');
+      setInEarPattern(parseInEarAlertPattern(savedInEarPattern));
+    }).catch(() => {});
+    return () => { active = false; };
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -45,6 +62,11 @@ export default function SettingsScreen() {
 
   const tog = async (key: string, val: boolean, set: (v: boolean) => void) => {
     set(val); await AsyncStorage.setItem(key, String(val));
+  };
+
+  const chooseInEarPattern = async (pattern: InEarAlertPattern) => {
+    setInEarPattern(pattern);
+    await AsyncStorage.setItem(IN_EAR_ALERT_PATTERN_KEY, pattern);
   };
 
   const watchDescription = !watchStatus.moduleAvailable
@@ -98,6 +120,36 @@ export default function SettingsScreen() {
               </View>
             </View>
             <Text style={s.status}>AUTOMATIC</Text>
+          </View>
+          <View style={s.div} />
+          <View style={s.patternBlock}>
+            <View style={s.rowL}>
+              <Ionicons name="ear-outline" size={18} color="#60a5fa" />
+              <View>
+                <Text style={s.label}>In-ear alert pattern</Text>
+                <Text style={s.sub}>Optional stereo emphasis for early and standard alerts</Text>
+              </View>
+            </View>
+            <View style={s.patternOptions}>
+              {([
+                ['balanced', 'Centered'],
+                ['alternating', 'Alternate L/R'],
+              ] as const).map(([value, label]) => {
+                const selected = inEarPattern === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={[s.patternOption, selected && s.patternOptionSelected]}
+                    onPress={() => chooseInEarPattern(value)}
+                  >
+                    <Text style={[s.patternOptionText, selected && s.patternOptionTextSelected]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={s.patternNote}>Both ears remain audible. Critical and tracking-loss alerts stay centered.</Text>
           </View>
           <View style={s.div} />
           <View style={s.row}>
@@ -156,6 +208,13 @@ const s = StyleSheet.create({
   testRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:13},
   testRowDisabled:{opacity:0.35},
   testText:{color:'#60a5fa',fontSize:13,fontWeight:'800'},
+  patternBlock:{paddingHorizontal:16,paddingVertical:14,gap:12},
+  patternOptions:{flexDirection:'row',gap:8},
+  patternOption:{flex:1,alignItems:'center',borderWidth:1,borderColor:'#315266',borderRadius:9,paddingVertical:9,backgroundColor:'#09131d'},
+  patternOptionSelected:{borderColor:'#60a5fa',backgroundColor:'rgba(37,99,235,0.2)'},
+  patternOptionText:{color:'#7f9ba8',fontSize:12,fontWeight:'800'},
+  patternOptionTextSelected:{color:'#bfdbfe'},
+  patternNote:{color:'#4a7a8a',fontSize:11,lineHeight:16},
   privNote:{flexDirection:'row',alignItems:'flex-start',gap:8,padding:14,backgroundColor:'rgba(0,0,0,0.2)',borderTopWidth:1,borderColor:'#1a3a4a'},
   privTxt:{color:'#4a7a8a',fontSize:11,lineHeight:16,flex:1},
   ver:{textAlign:'center',color:'#4a7a8a',fontSize:11,marginTop:8},

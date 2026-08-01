@@ -202,6 +202,20 @@ alerts, Watch haptics, or cloud payloads. A new native development/TestFlight
 build and real compatible-headphone calibration are still required before this
 can be treated as a validated signal.
 
+### Directional in-ear alert pattern (source only)
+
+Settings keeps the existing centered alert tone as the default and offers an
+opt-in **Alternate L/R** pattern for stereo earbuds. The derived stereo assets
+emphasize one channel at a time while retaining a quieter copy in the other ear,
+then alternate emphasis across early and standard drowsiness alerts. Critical
+and tracking-loss alerts always use the centered tone at full audibility.
+
+The pattern never claims to detect a left/right hazard and does not depend on
+headphone-motion observations. Speaker, car-audio, and single-earbud users
+should leave the centered default selected. A new TestFlight build and physical
+stereo-earbud check remain required before this source change is considered
+device-verified.
+
 ### Apple Watch alerts (requires a development / TestFlight build)
 
 Wrist haptics need a native watchOS companion app plus `WatchConnectivity`.
