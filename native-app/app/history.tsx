@@ -5,25 +5,44 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { openFeedback, type AlertAssessment } from '../lib/feedback';
+import {
+  openFeedback,
+  type AlertAssessment,
+  type FeedbackSession,
+  type SessionDeviceImpact,
+  type SessionTestConditions,
+} from '../lib/feedback';
+import { updateSessionHistory } from '../lib/sessionHistory';
 import type { SensitivityLevel } from '../constants/thresholds';
 
 const HISTORY_KEY = 'occulert-session-history';
 const CHECKPOINT_TARGET = 10;
 
-interface SessionRecord {
-  sessionId?: string;
+interface SessionRecord extends FeedbackSession {
   driverId?: string;
-  savedAt?: string;
-  updatedAt?: string;
-  durationSec?: number;
-  alertCount?: number;
-  avgFatigue?: number;
   cloudSynced?: boolean;
   cloudSessionId?: string;
-  alertAssessment?: AlertAssessment;
   assessmentUpdatedAt?: string;
-  sensitivity?: SensitivityLevel;
+  conditionsUpdatedAt?: string;
+  deviceImpactUpdatedAt?: string;
+}
+
+type TestConditionKey = keyof SessionTestConditions;
+type TestConditionValue = NonNullable<SessionTestConditions[TestConditionKey]>;
+
+interface TestConditionGroup {
+  key: TestConditionKey;
+  label: string;
+  options: Array<{ value: TestConditionValue; label: string }>;
+}
+
+type DeviceImpactKey = keyof SessionDeviceImpact;
+type DeviceImpactValue = NonNullable<SessionDeviceImpact[DeviceImpactKey]>;
+
+interface DeviceImpactGroup {
+  key: DeviceImpactKey;
+  label: string;
+  options: Array<{ value: DeviceImpactValue; label: string }>;
 }
 
 const ASSESSMENT_OPTIONS: Array<{
@@ -34,6 +53,56 @@ const ASSESSMENT_OPTIONS: Array<{
   { value: 'accurate', label: 'Felt right', icon: 'checkmark-circle-outline' },
   { value: 'false_alert', label: 'False alert', icon: 'alert-circle-outline' },
   { value: 'missed_alert', label: 'Missed alert', icon: 'eye-off-outline' },
+];
+
+const TEST_CONDITION_GROUPS: TestConditionGroup[] = [
+  {
+    key: 'lighting',
+    label: 'Lighting',
+    options: [
+      { value: 'daylight', label: 'Daylight' },
+      { value: 'low_light', label: 'Low light' },
+    ],
+  },
+  {
+    key: 'eyewear',
+    label: 'Eyewear',
+    options: [
+      { value: 'none', label: 'None' },
+      { value: 'glasses', label: 'Glasses' },
+      { value: 'sunglasses', label: 'Sunglasses' },
+    ],
+  },
+  {
+    key: 'phonePosition',
+    label: 'Phone position',
+    options: [
+      { value: 'high', label: 'High' },
+      { value: 'center', label: 'Center' },
+      { value: 'low', label: 'Low' },
+    ],
+  },
+];
+
+const DEVICE_IMPACT_GROUPS: DeviceImpactGroup[] = [
+  {
+    key: 'batteryImpact',
+    label: 'Battery use',
+    options: [
+      { value: 'low', label: 'Low' },
+      { value: 'noticeable', label: 'Noticeable' },
+      { value: 'high', label: 'High' },
+    ],
+  },
+  {
+    key: 'phoneHeat',
+    label: 'Phone heat',
+    options: [
+      { value: 'cool', label: 'Cool' },
+      { value: 'warm', label: 'Warm' },
+      { value: 'hot', label: 'Hot' },
+    ],
+  },
 ];
 
 function fmtDuration(sec?: number): string {
@@ -57,10 +126,22 @@ function sensitivityLabel(value?: SensitivityLevel): string {
   return 'Not recorded';
 }
 
+function hasCompleteReview(item: SessionRecord): boolean {
+  return Boolean(
+    item.alertAssessment
+    && item.testConditions?.lighting
+    && item.testConditions?.eyewear
+    && item.testConditions?.phonePosition
+    && item.deviceImpact?.batteryImpact
+    && item.deviceImpact?.phoneHeat,
+  );
+}
+
 export default function HistoryScreen() {
   const router = useRouter();
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     try {
@@ -76,17 +157,65 @@ export default function HistoryScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const saveAssessment = async (index: number, value: AlertAssessment) => {
-    const updated = sessions.map((item, itemIndex) => itemIndex === index
-      ? { ...item, alertAssessment: value, assessmentUpdatedAt: new Date().toISOString() }
-      : item);
+  const saveSessionChanges = async (
+    index: number,
+    changes: Partial<SessionRecord>,
+    errorTitle: string,
+    errorMessage: string,
+  ) => {
+    const target = sessions[index];
+    if (!target) return;
+
+    const updated = sessions.map((item, itemIndex) => itemIndex === index ? { ...item, ...changes } : item);
     setSessions(updated);
     try {
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+      await updateSessionHistory<Record<string, unknown>>(stored => stored.map((item, itemIndex) => {
+        const matches = target.sessionId
+          ? item.sessionId === target.sessionId
+          : target.savedAt
+            ? item.savedAt === target.savedAt
+            : itemIndex === index;
+        return matches ? { ...item, ...changes } : item;
+      }));
     } catch {
       await load();
-      Alert.alert('Could not save review', 'Please try rating this session again.');
+      Alert.alert(errorTitle, errorMessage);
     }
+  };
+
+  const saveAssessment = async (index: number, value: AlertAssessment) => {
+    await saveSessionChanges(
+      index,
+      { alertAssessment: value, assessmentUpdatedAt: new Date().toISOString() },
+      'Could not save review',
+      'Please try rating this session again.',
+    );
+  };
+
+  const saveTestCondition = async (index: number, key: TestConditionKey, value: TestConditionValue) => {
+    const current = sessions[index]?.testConditions || {};
+    await saveSessionChanges(
+      index,
+      {
+        testConditions: { ...current, [key]: value } as SessionTestConditions,
+        conditionsUpdatedAt: new Date().toISOString(),
+      },
+      'Could not save conditions',
+      'Please try recording these test conditions again.',
+    );
+  };
+
+  const saveDeviceImpact = async (index: number, key: DeviceImpactKey, value: DeviceImpactValue) => {
+    const current = sessions[index]?.deviceImpact || {};
+    await saveSessionChanges(
+      index,
+      {
+        deviceImpact: { ...current, [key]: value } as SessionDeviceImpact,
+        deviceImpactUpdatedAt: new Date().toISOString(),
+      },
+      'Could not save device impact',
+      'Please try recording the device impact again.',
+    );
   };
 
   const reviewedMedium = sessions.filter(
@@ -96,6 +225,21 @@ export default function HistoryScreen() {
   const accurateCount = reviewedMedium.filter(item => item.alertAssessment === 'accurate').length;
   const falseAlertCount = reviewedMedium.filter(item => item.alertAssessment === 'false_alert').length;
   const missedAlertCount = reviewedMedium.filter(item => item.alertAssessment === 'missed_alert').length;
+  const completeConditionCount = reviewedMedium.filter(item => (
+    Boolean(item.testConditions?.lighting)
+    && Boolean(item.testConditions?.eyewear)
+    && Boolean(item.testConditions?.phonePosition)
+  )).length;
+  const lowLightCount = reviewedMedium.filter(item => item.testConditions?.lighting === 'low_light').length;
+  const eyewearCount = reviewedMedium.filter(item => (
+    item.testConditions?.eyewear === 'glasses' || item.testConditions?.eyewear === 'sunglasses'
+  )).length;
+  const phonePositionCount = new Set(
+    reviewedMedium.map(item => item.testConditions?.phonePosition).filter(Boolean),
+  ).size;
+  const completeDeviceImpactCount = reviewedMedium.filter(item => (
+    Boolean(item.deviceImpact?.batteryImpact) && Boolean(item.deviceImpact?.phoneHeat)
+  )).length;
 
   return (
     <SafeAreaView style={s.bg}>
@@ -136,6 +280,18 @@ export default function HistoryScreen() {
             <Text style={s.checkpointNote}>
               Only reviewed sessions recorded on Medium count here. Ratings stay on this iPhone.
             </Text>
+            <View style={s.coverageSummary}>
+              <Text style={s.coverageTitle}>TEST CONDITION COVERAGE</Text>
+              <Text style={s.coverageCopy}>
+                {completeConditionCount} of {reviewedMedium.length} reviewed sessions include lighting, eyewear, and phone position.
+              </Text>
+              <Text style={s.coverageStats}>
+                {lowLightCount} low light · {eyewearCount} with eyewear · {phonePositionCount} phone positions
+              </Text>
+              <Text style={s.coverageStats}>
+                {completeDeviceImpactCount} include battery-use and phone-heat observations
+              </Text>
+            </View>
           </View>
         )}
 
@@ -146,14 +302,18 @@ export default function HistoryScreen() {
             <Text style={s.emptySub}>
               Completed monitoring sessions will appear here.
             </Text>
-            <TouchableOpacity style={s.cta} onPress={() => router.push('/monitor')}>
+            <TouchableOpacity style={s.cta} onPress={() => router.push('/pre-drive')}>
               <Text style={s.ctaTxt}>Start Monitoring</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {sessions.map((item, i) => (
-          <View key={item.sessionId || String(i)} style={s.card}>
+        {sessions.map((item, i) => {
+          const sessionKey = item.sessionId || `${item.savedAt || item.updatedAt || 'session'}-${i}`;
+          const reviewComplete = hasCompleteReview(item);
+          const isExpanded = expandedSessions[sessionKey] ?? !reviewComplete;
+          return (
+          <View key={sessionKey} style={s.card}>
             <View style={s.rowBetween}>
               <Text style={s.date}>{fmtDate(item.savedAt || item.updatedAt)}</Text>
               <Text style={s.dur}>{fmtDuration(item.durationSec)}</Text>
@@ -182,6 +342,33 @@ export default function HistoryScreen() {
                 {item.cloudSynced ? 'Summary synced to your protected account' : 'Saved only on this iPhone'}
               </Text>
             </View>
+            <View style={s.reviewSummary}>
+              <View style={[s.reviewBadge, reviewComplete ? s.reviewBadgeComplete : s.reviewBadgeNeeded]}>
+                <Ionicons
+                  name={reviewComplete ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={14}
+                  color={reviewComplete ? '#86efac' : '#fbbf24'}
+                />
+                <Text style={[s.reviewBadgeText, reviewComplete ? s.reviewBadgeTextComplete : s.reviewBadgeTextNeeded]}>
+                  {reviewComplete ? 'Review complete' : 'Needs review'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={isExpanded ? 'Hide session review details' : 'Show session review details'}
+                accessibilityState={{ expanded: isExpanded }}
+                style={s.reviewToggle}
+                onPress={() => setExpandedSessions(current => ({
+                  ...current,
+                  [sessionKey]: !(current[sessionKey] ?? !reviewComplete),
+                }))}
+              >
+                <Text style={s.reviewToggleText}>{isExpanded ? 'Hide details' : 'Show details'}</Text>
+                <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
+              </TouchableOpacity>
+            </View>
+            {isExpanded && (
+              <>
             <View style={s.review}>
               <Text style={s.reviewTitle}>How accurate were the alerts?</Text>
               <View style={s.reviewOptions}>
@@ -208,6 +395,73 @@ export default function HistoryScreen() {
                 This alert rating stays only on this iPhone. It is included only if you choose to send feedback.
               </Text>
             </View>
+            <View style={s.conditions}>
+              <Text style={s.conditionsTitle}>Test conditions</Text>
+              <Text style={s.conditionsSafety}>Record only after you are safely parked.</Text>
+              {TEST_CONDITION_GROUPS.map(group => (
+                <View key={group.key} style={s.conditionGroup}>
+                  <Text style={s.conditionLabel}>{group.label}</Text>
+                  <View style={s.conditionOptions}>
+                    {group.options.map(option => {
+                      const selected = item.testConditions?.[group.key] === option.value;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${group.label}: ${option.label}`}
+                          accessibilityState={{ selected }}
+                          style={[s.conditionOption, selected && s.conditionOptionSelected]}
+                          onPress={() => saveTestCondition(i, group.key, option.value)}
+                        >
+                          <Text style={[s.conditionOptionText, selected && s.conditionOptionTextSelected]}>
+                            {option.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+              <Text style={s.conditionsPrivacy}>
+                Conditions stay on this iPhone and are included only if you choose Send session feedback. No location or media is attached.
+              </Text>
+            </View>
+            <View style={s.deviceImpact}>
+              <Text style={s.conditionsTitle}>Device impact</Text>
+              <Text style={s.deviceImpactNote}>
+                Record after safely parking. These are tester observations, not device measurements.
+              </Text>
+              {DEVICE_IMPACT_GROUPS.map(group => (
+                <View key={group.key} style={s.conditionGroup}>
+                  <Text style={s.conditionLabel}>{group.label}</Text>
+                  <View style={s.conditionOptions}>
+                    {group.options.map(option => {
+                      const selected = item.deviceImpact?.[group.key] === option.value;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${group.label}: ${option.label}, tester-reported`}
+                          accessibilityState={{ selected }}
+                          style={[s.conditionOption, selected && s.conditionOptionSelected]}
+                          onPress={() => saveDeviceImpact(i, group.key, option.value)}
+                        >
+                          <Text style={[s.conditionOptionText, selected && s.conditionOptionTextSelected]}>
+                            {option.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+              <Text style={s.deviceWarning}>
+                If iPhone shows a temperature warning, stop using Occulert and let the phone cool before another session.
+              </Text>
+              <Text style={s.conditionsPrivacy}>
+                Device-impact observations stay on this iPhone unless you choose Send session feedback.
+              </Text>
+            </View>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Send feedback about this session"
@@ -221,8 +475,11 @@ export default function HistoryScreen() {
               <Ionicons name="chatbubble-ellipses-outline" size={16} color="#93c5fd" />
               <Text style={s.feedbackTxt}>Send session feedback</Text>
             </TouchableOpacity>
+              </>
+            )}
           </View>
-        ))}
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -243,6 +500,10 @@ const s = StyleSheet.create({
   checkpointStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12 },
   checkpointStat: { color: '#bae6fd', fontSize: 11, fontWeight: '800' },
   checkpointNote: { color: '#6592a5', fontSize: 10, lineHeight: 15, marginTop: 10 },
+  coverageSummary: { borderTopWidth: 1, borderTopColor: '#1d4f68', marginTop: 12, paddingTop: 12 },
+  coverageTitle: { color: '#60a5fa', fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  coverageCopy: { color: '#bae6fd', fontSize: 10, lineHeight: 15, marginTop: 5 },
+  coverageStats: { color: '#6592a5', fontSize: 10, lineHeight: 15, marginTop: 3 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 10 },
   emptyTitle: { color: '#c8e8f0', fontSize: 17, fontWeight: '800', marginTop: 8 },
   emptySub: { color: '#4a7a8a', fontSize: 13, textAlign: 'center', lineHeight: 19, paddingHorizontal: 20 },
@@ -260,6 +521,15 @@ const s = StyleSheet.create({
   storageRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 12 },
   storageText: { color: '#4a7a8a', fontSize: 10, fontWeight: '700' },
   storageTextSynced: { color: '#34d399' },
+  reviewSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
+  reviewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6 },
+  reviewBadgeComplete: { backgroundColor: 'rgba(22,163,74,0.12)', borderColor: 'rgba(74,222,128,0.35)' },
+  reviewBadgeNeeded: { backgroundColor: 'rgba(217,119,6,0.10)', borderColor: 'rgba(251,191,36,0.35)' },
+  reviewBadgeText: { fontSize: 10, fontWeight: '900' },
+  reviewBadgeTextComplete: { color: '#86efac' },
+  reviewBadgeTextNeeded: { color: '#fbbf24' },
+  reviewToggle: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
+  reviewToggleText: { color: '#93c5fd', fontSize: 11, fontWeight: '800' },
   review: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewTitle: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', marginBottom: 10 },
   reviewOptions: { flexDirection: 'row', gap: 7 },
@@ -268,6 +538,20 @@ const s = StyleSheet.create({
   reviewOptionText: { color: '#4a7a8a', fontSize: 10, fontWeight: '800', textAlign: 'center' },
   reviewOptionTextSelected: { color: '#dbeafe' },
   reviewPrivacy: { color: '#4a7a8a', fontSize: 10, lineHeight: 14, marginTop: 8 },
+  conditions: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
+  conditionsTitle: { color: '#c8e8f0', fontSize: 12, fontWeight: '800' },
+  conditionsSafety: { color: '#fbbf24', fontSize: 10, fontWeight: '700', marginTop: 4, marginBottom: 10 },
+  conditionGroup: { marginTop: 9 },
+  conditionLabel: { color: '#6592a5', fontSize: 10, fontWeight: '800', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
+  conditionOptions: { flexDirection: 'row', gap: 7 },
+  conditionOption: { flex: 1, minHeight: 38, borderRadius: 9, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, paddingVertical: 7 },
+  conditionOptionSelected: { borderColor: '#3b82f6', backgroundColor: 'rgba(37,99,235,0.22)' },
+  conditionOptionText: { color: '#4a7a8a', fontSize: 10, fontWeight: '800', textAlign: 'center' },
+  conditionOptionTextSelected: { color: '#dbeafe' },
+  conditionsPrivacy: { color: '#4a7a8a', fontSize: 10, lineHeight: 14, marginTop: 10 },
+  deviceImpact: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
+  deviceImpactNote: { color: '#6592a5', fontSize: 10, lineHeight: 14, marginTop: 4, marginBottom: 4 },
+  deviceWarning: { color: '#fbbf24', fontSize: 10, fontWeight: '700', lineHeight: 14, marginTop: 10 },
   feedbackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   feedbackTxt: { color: '#93c5fd', fontSize: 13, fontWeight: '800' },
 });

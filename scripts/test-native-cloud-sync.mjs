@@ -29,6 +29,11 @@ assert.doesNotMatch(
   /SERVICE_ROLE|service.role/i,
   'the native bundle must never reference the Supabase service-role credential',
 );
+assert.doesNotMatch(
+  cloud,
+  /testConditions|lighting|eyewear|phonePosition|deviceImpact|batteryImpact|phoneHeat/,
+  'structured pilot review observations must not be added to cloud sync',
+);
 assert.match(cloud, /if \(!await consentEnabled\(\) \|\| !await ensureDriverProfile\(\)\) return null;/);
 assert.match(cloud, /https:\/\/www\.occulert\.com/);
 

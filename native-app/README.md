@@ -89,6 +89,10 @@ native-app/
 | Apple Watch companion + wrist haptics | Done - private TestFlight build 13 |
 | Per-session pre-drive safety confirmation | Done - required before monitoring |
 | Structured session alert review | Done - local correct / false / missed labels |
+| Structured session test conditions | Implemented in source - pending a later private build |
+| Pilot test-condition coverage summary | Implemented in source - pending a later private build |
+| Tester-reported battery use + phone heat | Implemented in source - pending a later private build |
+| Collapsible session reviews + completion status | Implemented in source - pending a later private build |
 | Pilot accuracy checkpoint | Implemented - local 10-session Medium progress summary |
 | Optional protected cloud session sync | Implemented - secure sign-in + explicit consent |
 | Head-nod detection (accelerometer) | In progress - Phase 1: wire expo-sensors |
@@ -100,6 +104,17 @@ Pilot testers can send general feedback from Settings or attach basic session
 metrics and a structured alert assessment from History. Alert assessments stay
 on the iPhone unless the tester chooses to open an editable feedback email.
 The app does not attach camera images, video, audio, or location.
+
+History can also record lighting, eyewear, and phone position after the tester
+is safely parked. These structured conditions stay local unless the tester
+opens the editable session feedback email. They are implemented in source and
+are not part of the validated private TestFlight build 13 baseline.
+
+The same local review can capture subjective battery use and phone heat after
+the tester parks. These are explicitly described as tester observations rather
+than device measurements, remain out of cloud sync, and can be included in the
+editable feedback email. A temperature warning tells the tester to stop using
+Occulert and let the iPhone cool before another session.
 
 Each new local session also preserves the sensitivity used for that session.
 History counts reviewed Medium-sensitivity sessions toward the first 10-session

@@ -132,6 +132,18 @@ assertIncludes("native-app/app/history.tsx", "item.sensitivity === 'medium'", "n
 assertIncludes("native-app/app/history.tsx", "Ratings stay on this iPhone", "native accuracy checkpoint must disclose local-only rating storage");
 assertIncludes("native-app/lib/feedback.ts", "Alert assessment:", "native session feedback must include the tester's alert assessment");
 assertIncludes("native-app/lib/feedback.ts", "Sensitivity:", "native session feedback must include the recorded sensitivity");
+assertIncludes("native-app/app/history.tsx", "Record only after you are safely parked.", "native test-condition review must prohibit in-drive interaction");
+assertIncludes("native-app/app/history.tsx", "Conditions stay on this iPhone", "native test conditions must disclose local-only storage");
+assertIncludes("native-app/app/history.tsx", "TEST CONDITION COVERAGE", "native pilot checkpoint must summarize test-condition coverage");
+assertIncludes("native-app/lib/feedback.ts", "Phone position:", "native session feedback must include structured test conditions");
+assertIncludes("native-app/app/history.tsx", "tester observations, not device measurements", "native device-impact review must not misrepresent subjective observations as measurements");
+assertIncludes("native-app/app/history.tsx", "let the phone cool before another session", "native device-impact review must give safe temperature-warning guidance");
+assertIncludes("native-app/lib/feedback.ts", "Battery impact (tester-reported):", "native session feedback must label subjective battery observations");
+assertIncludes("native-app/lib/feedback.ts", "Phone heat (tester-reported):", "native session feedback must label subjective phone-heat observations");
+assertIncludes("native-app/app/history.tsx", "Review complete", "native history must identify fully reviewed sessions");
+assertIncludes("native-app/app/history.tsx", "Needs review", "native history must identify incomplete session reviews");
+assertIncludes("native-app/app/history.tsx", "expanded: isExpanded", "native session review details must expose their expanded state for accessibility");
+assertIncludes("native-app/app/history.tsx", "router.push('/pre-drive')", "native history must route monitoring through the pre-drive safety gate");
 assertIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native iOS builds must explain optional location access to satisfy App Store validation");
 assertIncludes("native-app/app/monitor.tsx", "CLOSED_CONFIRM_MS = 1_200", "native monitoring must confirm sustained eye closure before a full alert");
 assertIncludes("native-app/lib/alertPolicy.ts", "CRITICAL_WARMUP_SECONDS = 10", "native monitoring must not trigger a critical alert immediately after startup");
