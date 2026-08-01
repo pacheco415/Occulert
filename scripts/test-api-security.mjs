@@ -108,6 +108,7 @@ assert.equal(deniedEvent.status, 404, "events must not be written to another dri
 allowEventSession = true;
 const allowedEvent = await invoke(events, request("POST", eventBody));
 assert.equal(allowedEvent.status, 200, "events for the authenticated driver's session must still be accepted");
+assert.equal(allowedEvent.body.telemetry_trust, "unverified_client_report");
 assert.equal(insertedEvent.fatigue_score, 100);
 assert.equal(insertedEvent.confidence, 0);
 assert.equal(insertedEvent.latitude, 90);
@@ -204,6 +205,7 @@ assert.equal(JSON.stringify(insertedInvitation).includes(rawInviteToken), false,
 
 let revokedReplacement;
 let replacementInsert;
+const replacementCallOrder = [];
 const replacementId = "22222222-2222-4222-8222-222222222222";
 const replacementInvitations = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
   if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
@@ -213,10 +215,12 @@ const replacementInvitations = loadHandler("../api/fleet-invitations.js", async 
   }
   if (!options.method) return [];
   if (options.method === "PATCH") {
+    replacementCallOrder.push("revoke-old");
     revokedReplacement = options;
     return [{ id: replacementId }];
   }
   if (options.method === "POST") {
+    replacementCallOrder.push("insert-new");
     replacementInsert = options.body;
     return [{ id: "33333333-3333-4333-8333-333333333333", ...options.body }];
   }
@@ -224,9 +228,36 @@ const replacementInvitations = loadHandler("../api/fleet-invitations.js", async 
 });
 const replacedInvitation = await invoke(replacementInvitations, request("POST", { replace_invitation_id: replacementId, email: "attacker@example.com" }));
 assert.equal(replacedInvitation.status, 201);
+assert.deepEqual(replacementCallOrder, ["insert-new", "revoke-old"], "a resend must preserve the old link until its replacement exists");
 assert.equal(revokedReplacement.params.id, "eq." + replacementId, "resending must revoke the selected pending invitation");
 assert.equal(replacementInsert.email, "driver@example.com", "resending must reuse the server-stored invited email");
 assert.notEqual(replacementInsert.token_hash, insertedInvitation.token_hash, "resending must create a fresh one-time token");
+
+const rollbackCalls = [];
+const failedReplacement = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
+  if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
+  if (!options.method && options.params.select !== "id") {
+    return [{ id: replacementId, email: "driver@example.com", expires_at: new Date(Date.now() + 60000).toISOString(), created_at: new Date(Date.now() - 120000).toISOString() }];
+  }
+  if (!options.method) return [];
+  if (options.method === "POST") {
+    rollbackCalls.push("insert-new");
+    return [{ id: "44444444-4444-4444-8444-444444444444", ...options.body }];
+  }
+  if (options.method === "PATCH" && options.params.id === "eq." + replacementId) {
+    rollbackCalls.push("revoke-old-failed");
+    return [];
+  }
+  if (options.method === "PATCH") {
+    rollbackCalls.push("revoke-new");
+    return [{ id: "44444444-4444-4444-8444-444444444444" }];
+  }
+  throw new Error(`unexpected failed replacement call: ${table}`);
+});
+const failedReplacementResult = await invoke(failedReplacement, request("POST", { replace_invitation_id: replacementId }));
+assert.equal(failedReplacementResult.status, 409);
+assert.equal(failedReplacementResult.body.error, "replacement_not_revoked");
+assert.deepEqual(rollbackCalls, ["insert-new", "revoke-old-failed", "revoke-new"], "failed resend must keep the old link and revoke the unused replacement");
 
 const invitationRateLimit = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
   if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
@@ -306,7 +337,14 @@ assert.equal(configResult.body.supabase.anonKey, "test-public-anon-key");
 assert.equal(JSON.stringify(configResult.body).includes("test-service-role"), false, "public config must never expose the service-role key");
 
 let storedLead;
+const pilotRateCounts = new Map();
 const pilotLeads = loadHandler("../api/pilot-leads.js", async (table, options = {}) => {
+  if (table === "rpc/check_pilot_lead_rate_limit") {
+    const key = options.body.p_rate_key;
+    const count = (pilotRateCounts.get(key) || 0) + 1;
+    pilotRateCounts.set(key, count);
+    return [{ allowed: count <= 5, retry_after_seconds: 900 }];
+  }
   assert.equal(table, "pilot_leads");
   storedLead = options.body;
   return [{ id: "lead-1", ...options.body }];
@@ -328,6 +366,14 @@ assert.equal(stored.status, 200);
 assert.equal(stored.body.stored, true);
 assert.equal(storedLead.email, "driver@example.com");
 assert.equal(storedLead.use_case, null);
+
+const unavailableRateLimit = loadHandler("../api/pilot-leads.js", async (table) => {
+  assert.equal(table, "rpc/check_pilot_lead_rate_limit");
+  throw new Error("rate store offline");
+});
+const unavailableRateResult = await invoke(unavailableRateLimit, request("POST", validLead, "203.0.113.23"));
+assert.equal(unavailableRateResult.status, 503, "pilot contact writes must fail closed if durable throttling is unavailable");
+assert.equal(unavailableRateResult.body.error, "rate_limit_unavailable");
 
 let rateLimited;
 for (let i = 0; i < 6; i += 1) {

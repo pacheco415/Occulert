@@ -28,14 +28,6 @@
       return payload;
     },
 
-    savePilotLead: async function (lead) {
-      lead.createdAt = lead.createdAt || new Date().toISOString();
-      var leads = localRead('occulert-pilot-leads', []);
-      leads.unshift(lead);
-      localSave('occulert-pilot-leads', leads.slice(0, 100));
-      return lead;
-    },
-
     getLiveSession: function () {
       return localRead('occulert-live-session', null);
     },

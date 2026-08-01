@@ -93,7 +93,7 @@ assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event G
 assertIncludes("api/sessions.js", "MAX_BODY_LENGTH", "session API must reject oversized JSON bodies");
 assertIncludes("api/pilot-leads.js", "body.website", "pilot lead API must include honeypot spam filtering");
 assertIncludes("pilot-signup.html", "startedAt:formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
-assertIncludes("api/pilot-leads.js", "rateLimited(request)", "pilot lead API must rate limit submission bursts");
+assertIncludes("api/pilot-leads.js", "rateLimitState(request)", "pilot lead API must use durable distributed rate limiting");
 assertIncludes("api/pilot-leads.js", "pgFetch(\"pilot_leads\"", "pilot lead API must support durable Supabase storage");
 assertIncludes("db/schema.sql", "create table if not exists pilot_leads", "database schema must include pilot lead storage");
 assertIncludes("pilot-signup.html", "<form class=\"card\"", "pilot signup controls must use a semantic form");
@@ -120,7 +120,7 @@ assertNotIncludes("app.html", "oninput=\"typeof setSensitivity", "driver app mus
 for (const path of ["features.html", "how-it-works.html", "install.html"]) assertSingleH1(path);
 assertIncludes("account.html", "function esc(v)", "account.html must escape rendered profile fields");
 assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "native alert sound must be bundled locally");
-assertIncludes("native-app/app/monitor.tsx", "AsyncStorage.setItem(HISTORY_KEY", "native monitor must save completed sessions for the history screen");
+assertIncludes("native-app/app/monitor.tsx", "updateSessionHistory", "native monitor must serialize completed-session history writes");
 assertIncludes("native-app/app/history.tsx", "openFeedback(item)", "native session history must offer pilot feedback tied to a completed session");
 assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, or location are attached.", "native pilot feedback must state that sensitive media and location are not attached");
 assertIncludes("native-app/app/history.tsx", "false_alert", "native session history must capture structured false-alert feedback");
@@ -134,8 +134,12 @@ assertIncludes("native-app/lib/feedback.ts", "Alert assessment:", "native sessio
 assertIncludes("native-app/lib/feedback.ts", "Sensitivity:", "native session feedback must include the recorded sensitivity");
 assertIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native iOS builds must explain optional location access to satisfy App Store validation");
 assertIncludes("native-app/app/monitor.tsx", "CLOSED_CONFIRM_MS = 1_200", "native monitoring must confirm sustained eye closure before a full alert");
-assertIncludes("native-app/components/AlertSystem.tsx", "CRITICAL_WARMUP_SECONDS = 10", "native monitoring must not trigger a critical alert immediately after startup");
-assertIncludes("native-app/components/AlertSystem.tsx", "metrics.state === 'closed' && sessionTime", "native critical alerts must clear when the driver's eyes reopen");
+assertIncludes("native-app/lib/alertPolicy.ts", "CRITICAL_WARMUP_SECONDS = 10", "native monitoring must not trigger a critical alert immediately after startup");
+assertIncludes("native-app/lib/alertPolicy.ts", "metrics.state === 'closed'", "native critical alerts must clear when the driver's eyes reopen");
+assertIncludes("native-app/components/AlertSystem.tsx", "deriveAlertLevel", "native alerts must use the tested alert policy");
+assertIncludes("native-app/components/AlertSystem.tsx", "shouldDeliverAlert", "native alert escalation must use the tested cooldown policy");
+assertIncludes("native-app/components/AlertSystem.tsx", "setTrackingLost(true)", "native monitoring must apply a grace period before warning about tracking loss");
+assertIncludes("native-app/components/AlertSystem.tsx", "TRACKING LOST", "native monitoring must warn after sustained tracking loss");
 assertIncludes("native-app/components/AlertSystem.tsx", "top:132", "native alert banners must remain below the top navigation");
 assertIncludes("native-app/app/monitor.tsx", "bottom: 200", "native metrics must remain above the stop control");
 assertIncludes("native-app/lib/watchBridge.ts", "getIsWatchAppInstalled", "Apple Watch controls must require the companion app, not pairing alone");
@@ -147,6 +151,7 @@ assertIncludes("native-app/app/settings.tsx", "Test Watch alert", "connected-dev
 assertIncludes("native-app/app.json", "@bacons/apple-targets", "native iOS builds must package the Watch companion target");
 assertIncludes("native-app/targets/occulert-watch/expo-target.config.js", "type: 'watch'", "the Watch companion must be configured as a watchOS target");
 assertIncludes("native-app/targets/occulert-watch/AlertReceiver.swift", "WKInterfaceDevice.current()", "the Watch companion must play wrist haptics locally");
+assertIncludes("native-app/targets/occulert-watch/AlertReceiver.swift", "Tracking lost — check iPhone safely", "the Watch companion must explain tracking-loss alerts");
 assertIncludes("fleet-dashboard.html", "id=\"driverSearch\"", "fleet dashboard must keep driver search controls");
 assertIncludes("fleet-dashboard.html", "function exportFleetCSV()", "fleet dashboard must keep CSV export");
 assertIncludes("fleet-dashboard.html", "function seedDemoData()", "fleet dashboard must keep demo data loading");
@@ -163,6 +168,10 @@ for (const workflow of [".github/workflows/browser-smoke.yml", ".github/workflow
   assertIncludes(workflow, "node-version: 24", `${workflow} must test on Node 24`);
 }
 assertIncludes("package.json", "\"node\": \"24.x\"", "Vercel functions and local checks must use the verified Node 24 runtime");
+assertNotIncludes("how-it-works.html", "runs silently in the background", "public copy must not claim unsupported background monitoring");
+assertIncludes("how-it-works.html", "open in the foreground", "public copy must disclose that monitoring requires the foreground");
+assertIncludes("app.html", "async function handleVisibilityChange", "web monitoring must handle foreground loss explicitly");
+assertIncludes("app.html", "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
 
 if (failures.length) {
   console.error("Occulert site audit failed:");

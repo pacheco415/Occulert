@@ -2,7 +2,7 @@ const MAX_FIELD_LENGTH = 1200;
 const MAX_BODY_LENGTH = 4096;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX = 5;
-const rateBuckets = new Map();
+const crypto = require("node:crypto");
 const { pgFetch } = require("./_lib/supabase");
 const DEFAULT_ALLOWED_ORIGINS = new Set([
   "https://www.occulert.com",
@@ -46,22 +46,28 @@ function clientAddress(request) {
   return forwarded.split(",")[0].trim() || request.socket?.remoteAddress || "unknown";
 }
 
-function rateLimited(request) {
-  const now = Date.now();
-  const key = clientAddress(request);
-  const recent = (rateBuckets.get(key) || []).filter((time) => now - time < RATE_LIMIT_WINDOW_MS);
-  if (recent.length >= RATE_LIMIT_MAX) {
-    rateBuckets.set(key, recent);
-    return true;
+async function rateLimitState(request) {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("durable_rate_limit_not_configured");
   }
-  recent.push(now);
-  rateBuckets.set(key, recent);
-  if (rateBuckets.size > 1000) {
-    for (const [address, times] of rateBuckets) {
-      if (!times.some((time) => now - time < RATE_LIMIT_WINDOW_MS)) rateBuckets.delete(address);
-    }
-  }
-  return false;
+  const rateKey = crypto
+    .createHmac("sha256", process.env.SUPABASE_SERVICE_ROLE_KEY)
+    .update(clientAddress(request))
+    .digest("hex");
+  const result = await pgFetch("rpc/check_pilot_lead_rate_limit", {
+    method: "POST",
+    body: {
+      p_rate_key: rateKey,
+      p_limit: RATE_LIMIT_MAX,
+      p_window_seconds: Math.ceil(RATE_LIMIT_WINDOW_MS / 1000),
+    },
+  });
+  const row = Array.isArray(result) ? result[0] : result;
+  if (!row || typeof row.allowed !== "boolean") throw new Error("invalid_rate_limit_response");
+  return {
+    limited: !row.allowed,
+    retryAfter: Math.max(1, Number(row.retry_after_seconds) || Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)),
+  };
 }
 
 function parseWebhookUrl(value) {
@@ -88,8 +94,14 @@ module.exports = async function handler(request, response) {
     return json(response, 415, { ok: false, error: "unsupported_media_type" });
   }
 
-  if (rateLimited(request)) {
-    response.setHeader("Retry-After", String(Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)));
+  let rateLimit;
+  try {
+    rateLimit = await rateLimitState(request);
+  } catch {
+    return json(response, 503, { ok: false, error: "rate_limit_unavailable" });
+  }
+  if (rateLimit.limited) {
+    response.setHeader("Retry-After", String(rateLimit.retryAfter));
     return json(response, 429, { ok: false, error: "rate_limited" });
   }
 
@@ -154,9 +166,12 @@ module.exports = async function handler(request, response) {
     }
   }
 
+  // Use exactly one configured destination for contact PII. Supabase is the
+  // primary store; the webhook is a fallback only when Supabase is absent.
+  if (stored) return json(response, 200, { ok: true, stored: true, storage: "supabase" });
+
   const webhookUrl = parseWebhookUrl(process.env.PILOT_LEADS_WEBHOOK_URL);
   if (!webhookUrl) {
-    if (stored) return json(response, 200, { ok: true, stored: true, storage: "supabase" });
     if (storageError) return json(response, 502, { ok: false, error: "storage_unavailable" });
     return json(response, 202, { ok: true, stored: false, message: "Lead validated but server storage is not configured." });
   }
@@ -171,13 +186,12 @@ module.exports = async function handler(request, response) {
       signal: controller.signal,
     });
 
-    if (!webhookResponse.ok && !stored) {
+    if (!webhookResponse.ok) {
       return json(response, 502, { ok: false, error: "webhook_failed" });
     }
 
-    return json(response, 200, { ok: true, stored: true, storage: stored ? "supabase" : "webhook" });
+    return json(response, 200, { ok: true, stored: true, storage: "webhook" });
   } catch (error) {
-    if (stored) return json(response, 200, { ok: true, stored: true, storage: "supabase" });
     return json(response, 502, { ok: false, error: "webhook_unreachable" });
   } finally {
     clearTimeout(timeout);

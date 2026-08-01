@@ -147,20 +147,6 @@ module.exports = async function handler(request, response) {
       return json(response, 429, { ok: false, error: "invitation_rate_limited" });
     }
 
-    if (replacedInvitation) {
-      const revoked = await pgFetch("fleet_invitations", {
-        method: "PATCH",
-        params: {
-          id: "eq." + replacedInvitation.id,
-          fleet_id: "eq." + fleet.id,
-          accepted_at: "is.null",
-          revoked_at: "is.null",
-        },
-        body: { revoked_at: new Date(now).toISOString() },
-      });
-      if (!revoked.length) return json(response, 409, { ok: false, error: "invitation_not_pending" });
-    }
-
     const token = crypto.randomBytes(32).toString("base64url");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     const expiresAt = new Date(now + INVITE_TTL_MS).toISOString();
@@ -175,6 +161,29 @@ module.exports = async function handler(request, response) {
       },
     });
     if (!rows.length) return json(response, 502, { ok: false, error: "invitation_not_saved" });
+
+    if (replacedInvitation) {
+      const revoked = await pgFetch("fleet_invitations", {
+        method: "PATCH",
+        params: {
+          id: "eq." + replacedInvitation.id,
+          fleet_id: "eq." + fleet.id,
+          accepted_at: "is.null",
+          revoked_at: "is.null",
+        },
+        body: { revoked_at: new Date(now).toISOString() },
+      });
+      if (!revoked.length) {
+        // Preserve the working old link. Best-effort revoke the just-created
+        // replacement so a failed resend never strands the invited driver.
+        await pgFetch("fleet_invitations", {
+          method: "PATCH",
+          params: { id: "eq." + rows[0].id, fleet_id: "eq." + fleet.id },
+          body: { revoked_at: new Date().toISOString() },
+        }).catch(() => {});
+        return json(response, 409, { ok: false, error: "replacement_not_revoked" });
+      }
+    }
 
     const acceptPath = "/accept-invite.html#token=" + token;
 

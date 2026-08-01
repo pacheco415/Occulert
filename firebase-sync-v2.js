@@ -46,21 +46,8 @@ window.OcculertSync={
     data.cloudSynced=await writeDoc('sessionHistory',data.sessionId,data);
     return data;
   },
-  savePilotLead:async function(lead){
-    lead.createdAt=lead.createdAt||new Date().toISOString();
-    lead.leadId=lead.leadId||uid('lead');
-    lead.status=lead.status||'new';
-    var leads=readLocal('occulert-pilot-leads',[]);
-    if(!leads.find(function(x){return x.leadId===lead.leadId;}))leads.unshift(lead);
-    saveLocal('occulert-pilot-leads',leads.slice(0,100));
-    lead.cloudSynced=await writeDoc('pilotLeads',lead.leadId,lead);
-    leads=readLocal('occulert-pilot-leads',[]).map(function(x){return x.leadId===lead.leadId?lead:x;});
-    saveLocal('occulert-pilot-leads',leads.slice(0,100));
-    return lead;
-  },
   getLiveSession:function(){return readLocal('occulert-live-session',null);},
   getSessionHistory:function(){return readLocal('occulert-session-history',[]);},
-  getPilotLeads:function(){return readLocal('occulert-pilot-leads',[]);},
   listenLiveSessions:async function(cb){
     var ok=await init();
     if(!ok||!db)return null;

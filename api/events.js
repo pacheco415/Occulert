@@ -91,7 +91,12 @@ module.exports = async function handler(request, response) {
         created_at: new Date().toISOString(),
       },
     });
-    return json(response, 200, { ok: true, event: created[0] });
+    return json(response, 200, {
+      ok: true,
+      event: created[0],
+      telemetry_trust: "unverified_client_report",
+      message: "Client-reported telemetry is not independently measured or attested.",
+    });
   } catch (error) {
     return json(response, 502, { ok: false, error: "supabase_error" });
   }

@@ -19,8 +19,11 @@ Ready-to-send messages for recruiting real-world pilot fleet partners. Copy, per
 ### Template A — Facebook/Reddit (Driver Communities)
 
 ```
-Hey everyone — I built a free app called Occulert that uses your phone’s front camera 
-to detect drowsiness while you drive and alert you before it becomes dangerous.
+Hey everyone — I built a free prototype called Occulert that uses your phone’s front camera
+to look for eye-closure patterns associated with drowsiness and provide supplemental alerts.
+
+It can miss drowsiness or produce false alerts, so never rely on it to decide whether it is safe
+to keep driving. If you feel tired or unsafe, pull over safely and rest. Set it up only while parked.
 
 I’m a driver myself and built this because I know how real drowsy driving is, 
 especially on long shifts. It works right now as a web app at occulert.com — no download needed, 
@@ -45,8 +48,12 @@ Subject: Free Pilot — AI Drowsiness Detection for Your Drivers
 Hi [Name / Fleet Manager],
 
 My name is Richard Pacheco. I’m an automotive technology student and fleet driver 
-from San Francisco who built Occulert — a free, privacy-first app that uses a 
-driver’s phone camera to detect drowsiness and trigger an alert before an incident occurs.
+from San Francisco who built Occulert — a free, privacy-first prototype that uses a
+driver’s phone camera to look for eye-closure patterns and provide supplemental alerts.
+
+Occulert has not been validated to prevent incidents. It may miss drowsiness or produce false
+alerts and must not replace rest, attentive driving, fleet policy, or emergency judgment. Drivers
+must pull over safely if tired and must not interact with the app while driving.
 
 I’m looking for a small fleet (5–20 vehicles) to run a 2–4 week pilot at no cost. 
 Here’s what that looks like:
@@ -81,6 +88,9 @@ I’ve been building.
 Occulert is a free, privacy-first drowsiness detection app that runs on a driver’s 
 phone (no hardware needed). It uses on-device AI to monitor eye fatigue and alert 
 drivers in real time. GPS and cloud sync are opt-in only.
+
+It is a supplemental prototype that may miss drowsiness or produce false alerts. Drivers must
+pull over safely when tired and must not use Occulert as a reason to remain on the road.
 
 I’m currently recruiting pilot fleets for a free 30-day trial. If drowsy driving 
 is a concern for your operation, I’d love to get your feedback.

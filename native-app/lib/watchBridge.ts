@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { AlertLevel } from '../components/AlertSystem';
+import type { AlertLevel } from './alertPolicy';
 
 /**
  * Payload sent to the Apple Watch companion on each alert.

@@ -36,6 +36,18 @@ test("driver alerts enhance only successful triggers and sensitivity is unambigu
   expect(await page.evaluate(() => eyeClosedThreshold)).toBeCloseTo(0.21, 5);
 });
 
+test("driver monitoring stops instead of appearing active after foreground loss", async ({ page }) => {
+  await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(async () => {
+    running = true;
+    sessionStart = Date.now();
+    await handleVisibilityChange(true);
+  });
+  expect(await page.evaluate(() => running)).toBe(false);
+  await expect(page.locator("#overlayText")).toContainText("Supplemental prototype only");
+  await expect(page.locator("#overlayHint")).toContainText("Foreground required");
+});
+
 test("opted-in driver sessions use authenticated cloud APIs without sending GPS by default", async ({ page }) => {
   const apiCalls = [];
   await page.addInitScript(() => {

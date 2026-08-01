@@ -84,6 +84,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     lastMessage = switch level {
     case "critical": "PULL OVER NOW"
     case "alert": "Drowsiness detected"
+    case "tracking": "Tracking lost — check iPhone safely"
     case "watch": "Eyes drooping"
     default: "Monitoring"
     }
