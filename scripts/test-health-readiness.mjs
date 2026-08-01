@@ -74,7 +74,10 @@ test('HealthKit source is read-only, foreground-only, local-only, and disclosed'
   const healthPlugin = appConfig.expo.plugins.find(item => Array.isArray(item)
     && item[0] === '@kingstinct/react-native-healthkit');
   assert.ok(healthPlugin, 'HealthKit Expo plugin must be configured');
-  assert.equal(healthPlugin[1].NSHealthUpdateUsageDescription, false);
+  assert.match(
+    healthPlugin[1].NSHealthUpdateUsageDescription,
+    /does not add or change data in Apple Health/i,
+  );
   assert.equal(healthPlugin[1].background, false);
   assert.match(healthPlugin[1].NSHealthShareUsageDescription, /stays on this iPhone/i);
 
