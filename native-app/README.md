@@ -86,14 +86,15 @@ native-app/
 | Screen-off / app-backgrounded camera monitoring | Not supported - keep the app foregrounded |
 | Sensitivity slider | Done - `SensitivitySlider.tsx` + AsyncStorage |
 | Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-audio |
-| Apple Watch companion + wrist haptics | Done - private TestFlight build 11 |
+| Apple Watch companion + wrist haptics | Done - private TestFlight build 13 |
+| Per-session pre-drive safety confirmation | Done - required before monitoring |
 | Structured session alert review | Done - local correct / false / missed labels |
 | Pilot accuracy checkpoint | Implemented - local 10-session Medium progress summary |
 | Optional protected cloud session sync | Implemented - secure sign-in + explicit consent |
 | Head-nod detection (accelerometer) | In progress - Phase 1: wire expo-sensors |
 | HealthKit HRV/sleep integration | Planned - Phase 2 |
 | Pre-drive risk score screen | Planned - Phase 2 |
-| App Store submission | Private TestFlight build 11 validated |
+| Private iOS distribution | TestFlight build 13 validated; no App Review started |
 
 Pilot testers can send general feedback from Settings or attach basic session
 metrics and a structured alert assessment from History. Alert assessments stay
@@ -121,7 +122,7 @@ Before App Store submission, the native app should match or exceed the PWA:
 - [x] Fleet dashboard sync (optional)
 - [ ] GPS opt-in
 - [ ] Privacy-first (no video stored)
-- [ ] Safety disclaimer screen
+- [x] Per-session safety confirmation screen
 
 ---
 
