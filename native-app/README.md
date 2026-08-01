@@ -22,7 +22,7 @@ A native app removes all of these blockers.
   analysis
 - **ML Kit face pose** - experimental pitch-cycle observations for future
   head-nod validation
-- **React Native Health** (iOS) / **Health Connect** (Android) - HRV and sleep data
+- **React Native HealthKit** (iOS) - optional read-only HRV and sleep context
 - **Expo Notifications** - push alert support
 - **Expo Haptics** - vibration alerts
 
@@ -103,8 +103,8 @@ native-app/
 | Pilot accuracy checkpoint | Implemented - local 10-session Medium progress summary |
 | Optional protected cloud session sync | Implemented - secure sign-in + explicit consent |
 | Head-nod detection | Experimental local face-pitch observations; does not trigger alerts or sync |
-| HealthKit HRV/sleep integration | Planned - Phase 2 |
-| Pre-drive risk score screen | Planned - Phase 2 |
+| HealthKit HRV/sleep integration | Implemented in source - optional read-only summary in protected local storage; requires a future native build |
+| Pre-drive risk score screen | Foundation in source - factual sleep/HRV context only; no score or alert influence |
 | Private iOS distribution | TestFlight build 15 validated on iPhone and Apple Watch; no external testing or App Review started |
 
 Pilot testers can send general feedback from Settings or attach basic session
@@ -132,6 +132,14 @@ When false or missed alerts are reviewed, History also groups their local
 observation counts by sensitivity, lighting, eyewear, and phone position. The
 app labels these as observations rather than error rates and calls out missing
 test-condition context so small or incomplete samples are not overinterpreted.
+
+The pre-drive screen can optionally request read access to Apple Health sleep
+analysis and heart rate variability (SDNN). Occulert stores only a derived
+24-hour sleep total and the latest HRV value in the iPhone keychain. It does not
+write Health data, enable background HealthKit delivery, upload these values,
+calculate medical or driving fitness, or use them to change fatigue scoring or
+alerts. Apple Health access is requested only when the user taps the connect
+button and can be changed later in iOS Health settings.
 
 Drivers with an existing Occulert account can optionally sign in from Settings
 and separately enable cloud session sync. Access and refresh tokens are stored
