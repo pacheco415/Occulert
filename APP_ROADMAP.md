@@ -4,8 +4,8 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 ★ = top-priority milestone for each phase
 
-**Last updated: 2026-07-22** — statuses below reflect private TestFlight build
-11 and the current web app. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
+**Last updated: 2026-07-31** — statuses below reflect private TestFlight build
+13 and the current web app. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
 and issue #6 for the remaining validation and product gaps.
 
 ---
@@ -18,7 +18,7 @@ and issue #6 for the remaining validation and product gaps.
 |------|----------|--------|
 | Validate detection accuracy against ground-truth drowsiness data | ★ | Pilot feedback capture ready; formal dataset validation not started |
 | Add user-controlled sensitivity slider (low / medium / high) | — | Done |
-| Capture structured correct / false / missed alert feedback | — | Done in private TestFlight build 11 |
+| Capture structured correct / false / missed alert feedback | — | Done in private TestFlight build 13 |
 | Audit background reliability (screen-off, app-backgrounded) | — | Partial |
 | Land a pilot fleet (rideshare, delivery, or trucking partner) | ★ | Not started |
 | Tighten safety disclaimers and credibility documentation | — | Done |
@@ -48,12 +48,12 @@ Note: AirPods audio routing shipped in native-app (PR #2), covering auto-detect/
 |------|----------|--------|
 | Pull HRV and sleep data from Apple Health / Google Fit | — | Not started |
 | Pre-drive fatigue risk score shown before each trip | ★ | Not started |
-| Wrist haptic alert when fatigue threshold is crossed | — | Done in private TestFlight build 11 |
+| Wrist haptic alert when fatigue threshold is crossed | — | Done in private TestFlight build 13 |
 | Watch-face widget showing live safety score | — | Not started |
 
 Note: the packaged watchOS companion, live and queued WatchConnectivity
 delivery, direct test control, and wrist haptics passed a real iPhone/Apple
-Watch check in private TestFlight build 11. Watch biometrics and a complication
+Watch check in private TestFlight build 13. Watch biometrics and a complication
 remain separate future work.
 
 ---
@@ -89,7 +89,7 @@ remain separate future work.
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Native iOS app (Swift / React Native) | ★ | Private TestFlight pilot (build 11) |
+| Native iOS app (Swift / React Native) | ★ | Private TestFlight pilot (build 13) |
 | Native Android app | — | Not started |
 | Keep PWA as lightweight onboarding funnel | — | Done |
 | Verify real-time sensor access per platform (camera, motion, BT) | ★ | Partial (camera and Watch alerts verified; experimental earbud motion is not calibrated) |
