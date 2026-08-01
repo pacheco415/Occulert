@@ -16,8 +16,12 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" options={{ title: 'Occulert', headerShown: false }} />
         <Stack.Screen
+          name="pre-drive"
+          options={{ title: 'Pre-Drive Safety Check', headerBackTitle: 'Home' }}
+        />
+        <Stack.Screen
           name="monitor"
-          options={{ title: 'Monitoring', headerBackTitle: 'Home', headerShown: false }}
+          options={{ title: 'Monitoring', headerBackTitle: 'Safety Check', headerShown: false }}
         />
         <Stack.Screen name="settings" options={{ title: 'Settings', headerBackTitle: 'Back' }} />
         <Stack.Screen name="history" options={{ title: 'Session History', headerBackTitle: 'Back' }} />

@@ -21,6 +21,7 @@ import {
   finishCloudSession,
   logCloudAlert,
 } from '../lib/cloudSync';
+import { consumePreDriveSafety } from '../lib/preDriveGate';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking
@@ -105,6 +106,10 @@ export default function MonitorScreen() {
     if (!hasPermission) {
       const granted = await requestPermission();
       if (!granted) return;
+    }
+    if (!consumePreDriveSafety()) {
+      router.replace('/pre-drive');
+      return;
     }
     reset();
     prevAlertingRef.current = false;

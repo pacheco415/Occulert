@@ -32,11 +32,11 @@ export default function HomeScreen() {
         {/* Start button */}
         <TouchableOpacity
           style={styles.startBtn}
-          onPress={() => router.push('/monitor')}
+          onPress={() => router.push('/pre-drive')}
           activeOpacity={0.85}
         >
-          <Ionicons name="eye" size={22} color="#fff" />
-          <Text style={styles.startBtnText}>START MONITORING</Text>
+          <Ionicons name="shield-checkmark" size={22} color="#fff" />
+          <Text style={styles.startBtnText}>PRE-DRIVE CHECK</Text>
         </TouchableOpacity>
 
         {/* Quick links */}

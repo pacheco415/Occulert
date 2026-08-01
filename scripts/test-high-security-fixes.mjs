@@ -7,6 +7,12 @@ import {
   SENSOR_LOSS_GRACE_MS,
   shouldDeliverAlert,
 } from '../native-app/lib/alertPolicy.ts';
+import {
+  clearPreDriveSafetyConfirmation,
+  confirmPreDriveSafety,
+  consumePreDriveSafety,
+  PRE_DRIVE_CONFIRMATION_TTL_MS,
+} from '../native-app/lib/preDriveGate.ts';
 
 const noFace = { ear: 0.3, perclos: 0, fatigueScore: 0, state: 'noFace' };
 const open = { ear: 0.3, perclos: 0, fatigueScore: 0, state: 'open' };
@@ -118,4 +124,25 @@ test('web copy and runtime disclose and enforce foreground-only monitoring', asy
   context.running = true;
   assert.equal(await context.testHandler(false), false);
   assert.equal(stopCount, 1);
+});
+
+test('native monitoring requires a fresh one-time pre-drive safety confirmation', () => {
+  clearPreDriveSafetyConfirmation();
+  assert.equal(consumePreDriveSafety(1_000), false);
+
+  confirmPreDriveSafety(1_000);
+  assert.equal(consumePreDriveSafety(1_001), true);
+  assert.equal(consumePreDriveSafety(1_002), false);
+
+  confirmPreDriveSafety(1_000);
+  assert.equal(consumePreDriveSafety(1_000 + PRE_DRIVE_CONFIRMATION_TTL_MS + 1), false);
+
+  const home = readFileSync(new URL('../native-app/app/index.tsx', import.meta.url), 'utf8');
+  const preDrive = readFileSync(new URL('../native-app/app/pre-drive.tsx', import.meta.url), 'utf8');
+  const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  assert.match(home, /router\.push\('\/pre-drive'\)/);
+  assert.match(preDrive, /checked\.every\(Boolean\)/);
+  assert.match(preDrive, /confirmPreDriveSafety\(\)/);
+  assert.match(monitor, /if \(!consumePreDriveSafety\(\)\)/);
+  assert.match(monitor, /router\.replace\('\/pre-drive'\)/);
 });
