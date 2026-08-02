@@ -130,6 +130,14 @@ assertIncludes("accept-invite.html", "setAuthBusy(true)", "invite auth actions m
 assertNotIncludes("app.html", "oninput=\"typeof setSensitivity", "driver app must not keep the conflicting numeric sensitivity slider");
 for (const path of ["features.html", "how-it-works.html", "install.html"]) assertSingleH1(path);
 assertIncludes("account.html", "function esc(v)", "account.html must escape rendered profile fields");
+assertIncludes("account.html", "OcculertBackend.updateEmail", "account email changes must go through Supabase Auth");
+assertIncludes("account.html", "OcculertBackend.updatePassword", "account password changes must go through Supabase Auth");
+assertNotIncludes("account.html", "window.firebase", "account.html must not call the retired Firebase SDK");
+assertIncludes("account.html", "Your sign-in email changes once you open the link", "email changes must disclose that confirmation is required");
+assertIncludes("account.html", "your current address may receive one too", "email changes must account for secure-email-change double confirmation");
+assertIncludes("account.html", "setBusy('emailBtn',true", "account credential actions must prevent duplicate in-flight requests");
+assertIncludes("occulert-backend.js", "/auth/v1/user", "backend client must expose authenticated account updates");
+assertIncludes("occulert-backend.js", "Authorization: \"Bearer \" + auth.access_token", "account updates must be authorized with the live session token");
 assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "native alert sound must be bundled locally");
 assertIncludes("native-app/app/monitor.tsx", "updateSessionHistory", "native monitor must serialize completed-session history writes");
 assertIncludes("native-app/app/history.tsx", "openFeedback(item)", "native session history must offer pilot feedback tied to a completed session");
