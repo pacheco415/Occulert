@@ -17,9 +17,7 @@
 <meta name="theme-color" content="#0a0e1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-<script src="/firebase-config.js"></script>
+<script src="/occulert-backend.js"></script>
 <script src="/auth-helper.js"></script>
 <style>
 :root,[data-theme="dark"]{
@@ -115,16 +113,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
   </div>
   <div class="card">
     <div class="section-label">Account Security</div>
-    <p style="color:var(--text2);font-size:13px;margin:0 0 16px">Email and password changes use Firebase authentication when you are signed in.</p>
-    <form class="form" style="margin-bottom:14px" onsubmit="changeEmail(event)">
-      <div class="field"><label>New Email</label><input id="newEmail" type="email" placeholder="new@email.com" autocomplete="email"></div>
-      <button class="btn primary" type="submit">Change Email</button>
-    </form>
-    <form class="form" onsubmit="changePassword(event)">
-      <div class="field"><label>New Password</label><input id="newPassword" type="password" minlength="6" placeholder="Minimum 6 characters" autocomplete="new-password"></div>
-      <button class="btn primary" type="submit">Change Password</button>
-    </form>
-    <div class="note"><strong>Note:</strong> Firebase may ask you to re-authenticate before changing email or password. This is normal security behavior.</div>
+    <p style="color:var(--text2);font-size:13px;margin:0 0 16px">In-app email and password changes are coming soon. To reset your password now, sign out and use the password reset link on the sign-in page.</p>
+    <div class="note"><strong>Note:</strong> Your sign-in is handled by Supabase Auth. Occulert never stores your password.</div>
     <div class="status" id="status"></div>
   </div>
 </div>
@@ -171,12 +161,10 @@ function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&l
 function cleanFleet(v){return String(v||'OCCULERT-DEMO').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'-').slice(0,40)||'OCCULERT-DEMO'}
 function getProfile(){return window.OcculertAuth&&window.OcculertAuth.getProfile?window.OcculertAuth.getProfile():JSON.parse(localStorage.getItem('occulert-profile')||'null')}
 function setProfile(p){if(window.OcculertAuth&&window.OcculertAuth.saveProfile)return window.OcculertAuth.saveProfile(p);localStorage.setItem('occulert-profile',JSON.stringify(p));localStorage.setItem('occulert-role',p.role);localStorage.setItem('occulert-fleet-id',p.fleetId);return p}
-function load(){let p=getProfile()||{};document.getElementById('name').value=p.name||'';document.getElementById('role').value=p.role||localStorage.getItem('occulert-role')||'driver';document.getElementById('company').value=p.company||'';document.getElementById('fleetId').value=p.fleetId||localStorage.getItem('occulert-fleet-id')||'OCCULERT-DEMO';document.getElementById('vehicle').value=p.vehicle||'';document.getElementById('bio').value=p.bio||'';document.getElementById('newEmail').value=p.email||'';const dEl=document.getElementById('driverIdDisplay');if(dEl)dEl.textContent=localStorage.getItem('occulert-driver-id')||'--';const cEl=document.getElementById('cloudStatus');if(cEl)cEl.textContent=localStorage.getItem('occulert-cloud-consent')==='true'?'Enabled':'Disabled';render(p)}
+function load(){let p=getProfile()||{};document.getElementById('name').value=p.name||'';document.getElementById('role').value=p.role||localStorage.getItem('occulert-role')||'driver';document.getElementById('company').value=p.company||'';document.getElementById('fleetId').value=p.fleetId||localStorage.getItem('occulert-fleet-id')||'OCCULERT-DEMO';document.getElementById('vehicle').value=p.vehicle||'';document.getElementById('bio').value=p.bio||'';const dEl=document.getElementById('driverIdDisplay');if(dEl)dEl.textContent=localStorage.getItem('occulert-driver-id')||'--';const cEl=document.getElementById('cloudStatus');if(cEl)cEl.textContent=localStorage.getItem('occulert-cloud-consent')==='true'?'Enabled':'Disabled';render(p)}
 function saveProfile(e){e.preventDefault();let p=getProfile()||{};p.name=document.getElementById('name').value.trim();p.role=document.getElementById('role').value;p.company=document.getElementById('company').value.trim()||'Occulert';p.fleetId=cleanFleet(document.getElementById('fleetId').value);p.vehicle=document.getElementById('vehicle').value.trim();p.bio=document.getElementById('bio').value.trim();p.savedAt=new Date().toISOString();p=setProfile(p);render(p);show('Profile saved successfully.','good')}
-async function changeEmail(e){e.preventDefault();try{let email=document.getElementById('newEmail').value.trim();let user=window.firebase&&firebase.auth&&firebase.auth().currentUser;if(!user)throw new Error('Sign in first before changing email.');await user.updateEmail(email);let p=getProfile()||{};p.email=email;setProfile(p);render(p);show('Email updated.','good')}catch(err){show(err.message||String(err),'bad')}}
-async function changePassword(e){e.preventDefault();try{let pw=document.getElementById('newPassword').value;if(!pw)throw new Error('Enter a new password.');let user=window.firebase&&firebase.auth&&firebase.auth().currentUser;if(!user)throw new Error('Sign in first before changing password.');await user.updatePassword(pw);show('Password updated.','good');document.getElementById('newPassword').value=''}catch(err){show(err.message||String(err),'bad')}}
 async function signOut(){try{if(window.OcculertAuth)await window.OcculertAuth.signOut();show('Signed out.','good')}catch(e){show('Signed out locally.','good')}}
-function render(p){p=p||getProfile()||{};document.getElementById('continueBtn').href=(p.role==='fleet')?'/fleet-dashboard.html':'/app.html';const initials=esc((p.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?');document.getElementById('profileBox').innerHTML='<div class="avatar-row"><div class="avatar">'+initials+'</div><div class="avatar-info"><h3>'+esc(p.name||'No name set')+'</h3><p>'+esc(p.email||'No email set')+'</p></div></div><div class="row"><span>Role</span><span>'+(p.role==='fleet'?'Fleet Manager':'Driver')+'</span></div><div class="row"><span>Company</span><span>'+esc(p.company||'Not set')+'</span></div><div class="row"><span>Fleet ID</span><span style="font-family:monospace;font-size:13px">'+esc(p.fleetId||'OCCULERT-DEMO')+'</span></div><div class="row"><span>Vehicle</span><span>'+esc(p.vehicle||'Not set')+'</span></div><div class="row"><span>Login</span><span class="badge">'+(p.authenticated?'Firebase':'Local')+'</span></div>'}
+function render(p){p=p||getProfile()||{};document.getElementById('continueBtn').href=(p.role==='fleet')?'/fleet-dashboard.html':'/app.html';const initials=esc((p.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?');document.getElementById('profileBox').innerHTML='<div class="avatar-row"><div class="avatar">'+initials+'</div><div class="avatar-info"><h3>'+esc(p.name||'No name set')+'</h3><p>'+esc(p.email||'No email set')+'</p></div></div><div class="row"><span>Role</span><span>'+(p.role==='fleet'?'Fleet Manager':'Driver')+'</span></div><div class="row"><span>Company</span><span>'+esc(p.company||'Not set')+'</span></div><div class="row"><span>Fleet ID</span><span style="font-family:monospace;font-size:13px">'+esc(p.fleetId||'OCCULERT-DEMO')+'</span></div><div class="row"><span>Vehicle</span><span>'+esc(p.vehicle||'Not set')+'</span></div><div class="row"><span>Login</span><span class="badge">'+(p.authenticated?'Cloud':'Local')+'</span></div>'}
 if(window.OcculertAuth){window.OcculertAuth.onAuth(function(user,p){load()})}else load();
 </script>
 

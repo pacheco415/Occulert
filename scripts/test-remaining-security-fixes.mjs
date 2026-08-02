@@ -62,8 +62,6 @@ test('pilot contacts are server-only and disclosed accurately', () => {
   const privacy = read('privacy.html');
   assert.doesNotMatch(signup, /occulert-pilot-leads|savePilotLead|firebase/i);
   assert.doesNotMatch(viewer, /getPilotLeads|occulert-pilot-leads/);
-  assert.doesNotMatch(read('firebase-sync.js'), /savePilotLead|occulert-pilot-leads/);
-  assert.doesNotMatch(read('firebase-sync-v2.js'), /savePilotLead|getPilotLeads|occulert-pilot-leads/);
   assert.match(viewer, /does not display contact records/i);
   assert.match(privacy, /Supabase/i);
   assert.match(privacy, /pilot request/i);
@@ -90,7 +88,7 @@ test('legacy monitors are retired and stale auth helpers are never cached', () =
   assert.match(read('app-ai-v3.html'), /Legacy monitor retired/i);
   const sw = read('sw.js');
   const assetList = sw.slice(sw.indexOf('const STATIC_ASSETS'), sw.indexOf('];') + 2);
-  assert.doesNotMatch(assetList, /occulert-backend\.js|auth-helper\.js|firebase-sync-v2\.js/);
+  assert.doesNotMatch(assetList, /occulert-backend\.js|auth-helper\.js/);
   assert.match(sw, /NETWORK_ONLY_ASSETS/);
 });
 

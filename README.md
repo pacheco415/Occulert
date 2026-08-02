@@ -14,7 +14,7 @@ Occulert is a prototype real-time AI drowsiness detection platform that uses you
 - ⚡ **Fast Alerts** — Designed to warn quickly when signs of fatigue appear.
 - 🔒 **Privacy First** — Core camera processing is intended to run on device.
 - 📍 **Opt-In GPS** — Location tracking is off by default and only starts when enabled.
-- ☁️ **Opt-In Cloud Sync** — Fleet cloud sync is off by default and should only be used with secure Firebase rules/auth.
+- ☁️ **Opt-In Cloud Sync** — Fleet cloud sync is off by default. When enabled it uses Supabase Auth with fleet-scoped row-level security.
 - 📊 **Session Event Log** — Alerts and fatigue metrics can be saved locally in the browser.
 - 📱 **PWA Installable** — Add to iPhone or Android home screen like a native app.
 
@@ -58,11 +58,17 @@ occulert/
 ├── session-history.html    # Local session history
 ├── privacy.html            # Privacy policy
 ├── safety.html             # Safety disclaimer
+├── login.html              # Driver / fleet manager sign-in
+├── account.html            # Account and profile
+├── fleet-onboarding.html   # Fleet creation and driver invitations
+├── accept-invite.html      # Invitation acceptance
 ├── manifest.json           # PWA manifest
 ├── sw.js                   # Service worker
-├── firebase-config.js      # Firebase client config
-├── firebase-sync-v2.js     # Optional Firebase sync helper
-└── FIREBASE_SECURITY.md    # Firebase security checklist
+├── occulert-backend.js     # Browser client for Supabase Auth + /api routes
+├── auth-helper.js          # Profile and session helper
+├── api/                    # Vercel serverless endpoints
+├── db/schema.sql           # Database schema and RLS policies
+└── BACKEND_SETUP.md        # Backend configuration guide
 ```
 
 ---
@@ -79,9 +85,9 @@ occulert/
 
 ---
 
-## 🔐 Firebase / Fleet Security
+## 🔐 Backend / Fleet Security
 
-Before using Occulert with real drivers or fleet data, review `FIREBASE_SECURITY.md`. Do not leave Firestore open to public read/write. Use Firebase Auth, fleet-scoped data, and driver consent.
+Before using Occulert with real drivers or fleet data, review `BACKEND_SETUP.md` and the row-level security policies in `db/schema.sql`. Driver sessions and events are scoped to the authenticated driver, fleet history is scoped to the fleet owner, and invitations are stored as hashed one-time tokens. Never expose the Supabase service-role key to the browser — only the publishable anon key is served, via `/api/public-config`.
 
 ## 🧪 Site Audit
 
@@ -91,7 +97,7 @@ Run the static safety checks before deploying:
 npm run audit:site
 ```
 
-The audit checks local links/assets, Firebase disabled-by-default behavior, sensitive JS cache rules, CSP report-only headers, and the bundled native alert sound.
+The audit checks local links/assets, inline script/style extraction, the Supabase public-config contract, no-store cache rules for sensitive helper files, CSP headers, protected session and invitation handling, and the bundled native alert sound.
 
 ## 📬 Pilot Lead Capture
 

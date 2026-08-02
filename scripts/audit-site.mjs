@@ -73,12 +73,8 @@ assertIncludes("app.html", "<link rel=\"stylesheet\" href=\"/driver-app.css\" />
 assertNotIncludes("app.html", "<style>", "driver app must keep its styles out of the HTML document");
 assertIncludes("driver-app.css", "--overlay-dim", "driver app stylesheet must preserve display-intensity controls");
 assertIncludes("sw.js", "'/driver-app.css'", "service worker must cache the external driver app stylesheet");
-assertIncludes("firebase-config.js", "OCCULERT_FIREBASE_ENABLED = false", "firebase-config.js must keep cloud sync disabled by default");
-assertIncludes("firebase-config.js", "OCCULERT_FIREBASE_CONFIG = null", "firebase-config.js must not ship a live public config by default");
-assertIncludes("vercel.json", "\"source\": \"/firebase-config.js\"", "vercel.json must include a firebase-config.js cache rule");
 assertIncludes("vercel.json", "\"value\": \"no-store\"", "vercel.json must include no-store for sensitive helper files");
 assertIncludes("vercel.json", "\"key\": \"Content-Security-Policy\"", "vercel.json must enforce its tested CSP");
-assertIncludes("vercel.json", "https://unpkg.com", "vercel.json CSP must allow Leaflet assets used by the fleet map");
 assertIncludes("vercel.json", "https://fonts.googleapis.com", "vercel.json CSP must allow Google Fonts stylesheets used by marketing pages");
 assertIncludes("vercel.json", "font-src 'self' https://fonts.gstatic.com", "vercel.json CSP must allow Google Fonts font files");
 assertIncludes("vercel.json", "https://*.supabase.co", "vercel.json CSP must allow configured Supabase Auth requests");
