@@ -31,6 +31,16 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await expect(page.locator("#mobileMenu")).toHaveClass(/open/);
 });
 
+test("driver app external stylesheet preserves layout without moving monitoring scripts", async ({ page }) => {
+  await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+
+  expect(await page.locator('link[href="/driver-app.css"]').count()).toBe(1);
+  expect(await page.locator("script:not([src])").count()).toBe(2);
+  await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
+  await expect(page.locator(".top")).toHaveCSS("min-height", "74px");
+  await expect(page.locator(".app")).toHaveCSS("display", "grid");
+});
+
 test("driver alerts enhance only successful triggers and sensitivity is unambiguous", async ({ page }) => {
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
   expect(await page.locator('[data-sensitivity="low"]').count()).toBe(1);
