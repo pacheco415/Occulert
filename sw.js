@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v19';
+const CACHE = 'occulert-v20';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -32,7 +32,6 @@ const STATIC_ASSETS = [
 const NETWORK_ONLY_ASSETS = new Set([
   '/auth-helper.js',
   '/occulert-backend.js',
-  '/firebase-sync-v2.js',
 ]);
 
 self.addEventListener('install', event => {

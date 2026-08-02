@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /pilot-leads.html
+Disallow: /app-v2.html
+Disallow: /app-ai-v3.html
 
 Sitemap: https://www.occulert.com/sitemap.xml

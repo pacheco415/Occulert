@@ -1,5 +1,6 @@
-# Firebase local config (use firebase-config.example.js as a template)
-firebase-config.js
+# Local environment files
+.env
+.env.local
 
 # Dependencies
 node_modules/
