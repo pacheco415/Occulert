@@ -15,6 +15,22 @@ test("important public pages load with one primary heading", async ({ page }) =>
   expect(pageErrors).toEqual([]);
 });
 
+test("homepage external assets preserve theme and mobile navigation controls", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  expect(await page.locator('link[href="/homepage.css"]').count()).toBe(1);
+  expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
+  await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
+
+  const initialTheme = await page.locator("html").getAttribute("data-theme");
+  await page.locator("#themeToggle").click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", initialTheme === "light" ? "dark" : "light");
+
+  await page.locator("#menuBtn").click();
+  await expect(page.locator("#mobileMenu")).toHaveClass(/open/);
+});
+
 test("driver alerts enhance only successful triggers and sensitivity is unambiguous", async ({ page }) => {
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
   expect(await page.locator('[data-sensitivity="low"]').count()).toBe(1);
