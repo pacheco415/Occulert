@@ -6,6 +6,10 @@
 node_modules/
 native-app/node_modules/
 
+# Downloaded browser binaries (Playwright installs to its own cache, not here)
+chromedriver/
+.cache/ms-playwright/
+
 # Expo / React Native build artifacts
 .expo/
 native-app/.expo/
