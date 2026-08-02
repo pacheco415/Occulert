@@ -31,6 +31,12 @@ async function fetchMock(url, options = {}) {
     });
   }
   if (String(url).includes("/auth/v1/signup")) return response({ user: { id: "pending-user", email: "new@example.com" } });
+  if (String(url).includes("/auth/v1/user") && options.method === "PUT") {
+    const sent = JSON.parse(options.body || "{}");
+    if (sent.password === "short") return response({ error_code: "weak_password", msg: "Password should be at least 6 characters" }, 422);
+    if (sent.email === "taken@example.com") return response({ error_code: "email_exists", msg: "email address already registered" }, 422);
+    return response({ id: "user-1", email: "driver@example.com", new_email: sent.email });
+  }
   if (url === "/api/profile") return response({ ok: true, driver: { id: "driver-1" } });
   if (url === "/api/sessions" && options.method === "POST") return response({ ok: true, session: { id: "session-1" } });
   if (url === "/api/sessions" && options.method === "PATCH") return response({ ok: true, session: { id: "session-1" } });
@@ -90,6 +96,29 @@ assert.equal((await backend.listFleetInvitations()).ok, true);
 assert.equal((await backend.createFleetInvitation("driver@example.com")).status, 201);
 assert.equal((await backend.revokeFleetInvitation("invite-1")).ok, true);
 assert.equal((await backend.acceptFleetInvitation("one-time-token")).body.fleet.id, "fleet-1");
+
+// Account credential changes go to Supabase Auth with the live session token.
+const emailChange = await backend.updateEmail("second@example.com");
+assert.equal(emailChange.ok, true);
+const emailCall = calls.find((call) => String(call.url).includes("/auth/v1/user") && call.method === "PUT");
+assert.equal(emailCall.headers.Authorization, "Bearer access-token");
+assert.equal(emailCall.headers.apikey, "public-key");
+assert.equal(JSON.parse(emailCall.body).email, "second@example.com");
+assert.ok(String(emailCall.url).includes("redirect_to=https%3A%2F%2Fwww.occulert.com%2Flogin.html"));
+
+assert.equal((await backend.updatePassword("longenough")).ok, true);
+const passwordCall = calls.filter((call) => String(call.url).includes("/auth/v1/user") && call.method === "PUT").pop();
+assert.equal(JSON.parse(passwordCall.body).password, "longenough");
+assert.equal(JSON.parse(passwordCall.body).email, undefined);
+
+const weak = await backend.updatePassword("short");
+assert.equal(weak.ok, false);
+assert.equal(backend.accountMessage(weak, "password"), "Use a password with at least 6 characters.");
+const taken = await backend.updateEmail("taken@example.com");
+assert.equal(taken.ok, false);
+assert.equal(backend.accountMessage(taken, "email"), "Another account already uses that email address.");
+assert.equal(backend.accountMessage({ body: { error: "cloud_unavailable" } }, "email"), "Occulert could not reach the account service. Check your connection and try again.");
+assert.equal(backend.accountMessage({ body: { code: "reauthentication_needed" } }, "password"), "For security, sign out and sign back in, then change your password again.");
 
 const protectedCalls = calls.filter((call) => String(call.url).startsWith("/api/") && call.url !== "/api/public-config");
 assert.ok(protectedCalls.length >= 4);

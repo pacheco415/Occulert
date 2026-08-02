@@ -63,6 +63,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 .field input,.field select,.field textarea{width:100%;background:var(--input-bg);border:1px solid var(--input-border);color:var(--text);border-radius:11px;padding:12px 14px;font-size:15px;font-family:inherit;transition:border-color .15s,background .25s,color .25s}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#3b82f6}
 .split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hidden{display:none!important}
 .status{display:none;margin-top:14px;border-radius:12px;padding:13px 16px;font-weight:800;font-size:14px}
 .status.show{display:block}
 .good{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.35);color:#bbf7d0}
@@ -113,8 +114,18 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
   </div>
   <div class="card">
     <div class="section-label">Account Security</div>
-    <p style="color:var(--text2);font-size:13px;margin:0 0 16px">In-app email and password changes are coming soon. To reset your password now, sign out and use the password reset link on the sign-in page.</p>
-    <div class="note"><strong>Note:</strong> Your sign-in is handled by Supabase Auth. Occulert never stores your password.</div>
+    <p style="color:var(--text2);font-size:13px;margin:0 0 16px" id="securityIntro">Sign in to change your email or password.</p>
+    <div id="securityForms" class="hidden">
+      <form class="form" style="margin-bottom:14px" onsubmit="changeEmail(event)">
+        <div class="field"><label for="newEmail">New Email</label><input id="newEmail" type="email" required placeholder="new@email.com" autocomplete="email"></div>
+        <button class="btn primary" id="emailBtn" type="submit">Change Email</button>
+      </form>
+      <form class="form" onsubmit="changePassword(event)">
+        <div class="field"><label for="newPassword">New Password</label><input id="newPassword" type="password" required minlength="6" placeholder="Minimum 6 characters" autocomplete="new-password"></div>
+        <button class="btn primary" id="passwordBtn" type="submit">Change Password</button>
+      </form>
+    </div>
+    <div class="note"><strong>Note:</strong> Changing your email sends a confirmation link to the new address, and depending on your account security settings your current address may receive one too. Your sign-in email stays the same until confirmation is complete. Occulert never stores your password.</div>
     <div class="status" id="status"></div>
   </div>
 </div>
@@ -163,9 +174,39 @@ function getProfile(){return window.OcculertAuth&&window.OcculertAuth.getProfile
 function setProfile(p){if(window.OcculertAuth&&window.OcculertAuth.saveProfile)return window.OcculertAuth.saveProfile(p);localStorage.setItem('occulert-profile',JSON.stringify(p));localStorage.setItem('occulert-role',p.role);localStorage.setItem('occulert-fleet-id',p.fleetId);return p}
 function load(){let p=getProfile()||{};document.getElementById('name').value=p.name||'';document.getElementById('role').value=p.role||localStorage.getItem('occulert-role')||'driver';document.getElementById('company').value=p.company||'';document.getElementById('fleetId').value=p.fleetId||localStorage.getItem('occulert-fleet-id')||'OCCULERT-DEMO';document.getElementById('vehicle').value=p.vehicle||'';document.getElementById('bio').value=p.bio||'';const dEl=document.getElementById('driverIdDisplay');if(dEl)dEl.textContent=localStorage.getItem('occulert-driver-id')||'--';const cEl=document.getElementById('cloudStatus');if(cEl)cEl.textContent=localStorage.getItem('occulert-cloud-consent')==='true'?'Enabled':'Disabled';render(p)}
 function saveProfile(e){e.preventDefault();let p=getProfile()||{};p.name=document.getElementById('name').value.trim();p.role=document.getElementById('role').value;p.company=document.getElementById('company').value.trim()||'Occulert';p.fleetId=cleanFleet(document.getElementById('fleetId').value);p.vehicle=document.getElementById('vehicle').value.trim();p.bio=document.getElementById('bio').value.trim();p.savedAt=new Date().toISOString();p=setProfile(p);render(p);show('Profile saved successfully.','good')}
-async function signOut(){try{if(window.OcculertAuth)await window.OcculertAuth.signOut();show('Signed out.','good')}catch(e){show('Signed out locally.','good')}}
+async function signOut(){try{if(window.OcculertAuth)await window.OcculertAuth.signOut();show('Signed out.','good')}catch(e){show('Signed out locally.','good')}renderSecurity()}
+function signedInUser(){return window.OcculertBackend&&window.OcculertBackend.currentUser?window.OcculertBackend.currentUser():null}
+function renderSecurity(){const user=signedInUser(),forms=document.getElementById('securityForms'),intro=document.getElementById('securityIntro');if(!forms||!intro)return;if(user){forms.classList.remove('hidden');intro.textContent='Signed in as '+user.email+'.';const e=document.getElementById('newEmail');if(e&&!e.value)e.value=user.email||''}else{forms.classList.add('hidden');intro.textContent='Sign in to change your email or password.'}}
+function setBusy(id,busy,label){const b=document.getElementById(id);if(!b)return;b.disabled=busy;b.textContent=busy?'Working...':label}
+async function changeEmail(e){
+  e.preventDefault();
+  if(!signedInUser())return show('Sign in first before changing your email.','bad');
+  const email=document.getElementById('newEmail').value.trim();
+  if(!email)return show('Enter a new email address.','bad');
+  setBusy('emailBtn',true,'Change Email');
+  try{
+    const result=await window.OcculertBackend.updateEmail(email);
+    if(!result.ok)return show(window.OcculertBackend.accountMessage(result,'email'),'bad');
+    show('Confirmation sent to '+email+'. Your sign-in email changes once you open the link.','good');
+  }catch(err){show('The email could not be updated. Please try again.','bad')}
+  finally{setBusy('emailBtn',false,'Change Email')}
+}
+async function changePassword(e){
+  e.preventDefault();
+  if(!signedInUser())return show('Sign in first before changing your password.','bad');
+  const field=document.getElementById('newPassword'),pw=field.value;
+  if(!pw||pw.length<6)return show('Use a password with at least 6 characters.','bad');
+  setBusy('passwordBtn',true,'Change Password');
+  try{
+    const result=await window.OcculertBackend.updatePassword(pw);
+    if(!result.ok)return show(window.OcculertBackend.accountMessage(result,'password'),'bad');
+    field.value='';
+    show('Password updated. Use it the next time you sign in.','good');
+  }catch(err){show('The password could not be updated. Please try again.','bad')}
+  finally{setBusy('passwordBtn',false,'Change Password')}
+}
 function render(p){p=p||getProfile()||{};document.getElementById('continueBtn').href=(p.role==='fleet')?'/fleet-dashboard.html':'/app.html';const initials=esc((p.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?');document.getElementById('profileBox').innerHTML='<div class="avatar-row"><div class="avatar">'+initials+'</div><div class="avatar-info"><h3>'+esc(p.name||'No name set')+'</h3><p>'+esc(p.email||'No email set')+'</p></div></div><div class="row"><span>Role</span><span>'+(p.role==='fleet'?'Fleet Manager':'Driver')+'</span></div><div class="row"><span>Company</span><span>'+esc(p.company||'Not set')+'</span></div><div class="row"><span>Fleet ID</span><span style="font-family:monospace;font-size:13px">'+esc(p.fleetId||'OCCULERT-DEMO')+'</span></div><div class="row"><span>Vehicle</span><span>'+esc(p.vehicle||'Not set')+'</span></div><div class="row"><span>Login</span><span class="badge">'+(p.authenticated?'Cloud':'Local')+'</span></div>'}
-if(window.OcculertAuth){window.OcculertAuth.onAuth(function(user,p){load()})}else load();
+if(window.OcculertAuth){window.OcculertAuth.onAuth(function(user,p){load();renderSecurity()})}else{load();renderSecurity()}
 </script>
 
 <footer style="text-align:center;padding:28px 16px 24px;border-top:1px solid #1e293b;color:#4a6070;font-size:12px;margin-top:40px"><a href="/" style="color:#60a5fa;text-decoration:none;font-weight:700">Occulert</a> &nbsp;·&nbsp; <a href="/privacy.html" style="color:#4a6070;text-decoration:none">Privacy</a> &nbsp;·&nbsp; <a href="/safety.html" style="color:#4a6070;text-decoration:none">Safety</a> &nbsp;·&nbsp; <a href="/app.html" style="color:#4a6070;text-decoration:none">Driver App</a><div style="margin-top:8px">© 2026 Occulert. Prototype — not a substitute for rest or safe driving.</div></footer>
