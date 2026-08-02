@@ -38,6 +38,11 @@ function assertSingleH1(path) {
 
 walk(root);
 
+for (const scriptPath of ["homepage.js"]) {
+  try { new Function(read(scriptPath)); }
+  catch (error) { fail(`${scriptPath} does not parse (${error.message})`); }
+}
+
 for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
   const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
@@ -58,6 +63,12 @@ for (const file of htmlFiles) {
   }
 }
 
+assertIncludes("index.html", "<link rel=\"stylesheet\" href=\"/homepage.css\" />", "homepage must load its external stylesheet");
+assertIncludes("index.html", "<script src=\"/homepage.js\" defer></script>", "homepage must load its external behavior script");
+assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
+assertNotIncludes("index.html", "<script>", "homepage must keep its behavior script out of the HTML document");
+assertIncludes("sw.js", "'/homepage.css'", "service worker must cache the external homepage stylesheet");
+assertIncludes("sw.js", "'/homepage.js'", "service worker must cache the external homepage behavior script");
 assertIncludes("firebase-config.js", "OCCULERT_FIREBASE_ENABLED = false", "firebase-config.js must keep cloud sync disabled by default");
 assertIncludes("firebase-config.js", "OCCULERT_FIREBASE_CONFIG = null", "firebase-config.js must not ship a live public config by default");
 assertIncludes("vercel.json", "\"source\": \"/firebase-config.js\"", "vercel.json must include a firebase-config.js cache rule");
