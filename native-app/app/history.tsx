@@ -15,6 +15,8 @@ import {
 import { updateSessionHistory } from '../lib/sessionHistory';
 import { formatPilotCounts, summarizePilotIssues } from '../lib/pilotInsights';
 import type { SensitivityLevel } from '../constants/thresholds';
+import { AmbientBackground } from '../components/GlassSurface';
+import { colors, radii } from '../constants/theme';
 
 const HISTORY_KEY = 'occulert-session-history';
 const CHECKPOINT_TARGET = 10;
@@ -257,6 +259,7 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={s.bg}>
+      <AmbientBackground />
       <ScrollView contentContainerStyle={s.scroll}>
         <Text style={s.title}>Session History</Text>
 
@@ -551,10 +554,10 @@ export default function HistoryScreen() {
 }
 
 const s = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#050a0f' },
+  bg: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 20, paddingBottom: 48 },
-  title: { color: '#fff', fontSize: 28, fontWeight: '900', marginBottom: 20 },
-  checkpoint: { backgroundColor: '#0b2132', borderWidth: 1, borderColor: '#1d4f68', borderRadius: 14, padding: 16, marginBottom: 16 },
+  title: { color: colors.text, fontSize: 32, fontWeight: '800', letterSpacing: -0.8, marginBottom: 20 },
+  checkpoint: { backgroundColor: 'rgba(11,33,50,0.94)', borderWidth: 1, borderColor: 'rgba(96,165,250,0.28)', borderRadius: radii.large, padding: 18, marginBottom: 16 },
   checkpointHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   checkpointHeaderCopy: { flex: 1 },
   checkpointEyebrow: { color: '#60a5fa', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
@@ -581,7 +584,7 @@ const s = StyleSheet.create({
   emptySub: { color: '#4a7a8a', fontSize: 13, textAlign: 'center', lineHeight: 19, paddingHorizontal: 20 },
   cta: { marginTop: 16, backgroundColor: '#2563eb', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
   ctaTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  card: { backgroundColor: '#0f1e2e', borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 14, padding: 16, marginBottom: 12 },
+  card: { backgroundColor: 'rgba(14,26,43,0.94)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: radii.large, padding: 18, marginBottom: 12 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   date: { color: '#c8e8f0', fontSize: 13, fontWeight: '700' },
   dur: { color: '#60a5fa', fontSize: 13, fontWeight: '800' },

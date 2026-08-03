@@ -20,6 +20,8 @@ import {
 } from '../lib/appleHealth';
 import type { HealthReadinessSnapshot } from '../lib/healthReadiness';
 import { confirmPreDriveSafety } from '../lib/preDriveGate';
+import { AmbientBackground, GlassSurface } from '../components/GlassSurface';
+import { colors, radii } from '../constants/theme';
 
 const CHECKS = [
   {
@@ -113,11 +115,12 @@ export default function PreDriveScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <AmbientBackground />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <View style={styles.iconWrap}>
+          <GlassSurface style={styles.iconWrap} tintColor="rgba(251, 191, 36, 0.18)">
             <Ionicons name="shield-checkmark" size={34} color="#fbbf24" />
-          </View>
+          </GlassSurface>
           <Text style={styles.title}>Confirm your safe setup</Text>
           <Text style={styles.subtitle}>
             Complete this check while parked before every monitoring session.
@@ -232,20 +235,26 @@ export default function PreDriveScreen() {
           ))}
         </View>
 
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !ready }}
-          disabled={!ready}
-          activeOpacity={0.85}
-          onPress={() => {
-            confirmPreDriveSafety();
-            router.replace('/monitor');
-          }}
-          style={[styles.continueButton, !ready && styles.continueButtonDisabled]}
+        <GlassSurface
+          interactive={ready}
+          style={[styles.continueSurface, !ready && styles.continueButtonDisabled]}
+          tintColor="rgba(42, 105, 244, 0.58)"
         >
-          <Ionicons name="eye" size={22} color="#fff" />
-          <Text style={styles.continueText}>CONTINUE TO MONITORING</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !ready }}
+            disabled={!ready}
+            activeOpacity={0.85}
+            onPress={() => {
+              confirmPreDriveSafety();
+              router.replace('/monitor');
+            }}
+            style={styles.continueButton}
+          >
+            <Ionicons name="eye" size={22} color="#fff" />
+            <Text style={styles.continueText}>CONTINUE TO MONITORING</Text>
+          </TouchableOpacity>
+        </GlassSurface>
 
         <TouchableOpacity
           accessibilityRole="link"
@@ -265,23 +274,21 @@ export default function PreDriveScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#050a0f' },
-  scroll: { padding: 20, paddingBottom: 40 },
+  container: { flex: 1, backgroundColor: colors.background },
+  scroll: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 },
   hero: { alignItems: 'center', paddingTop: 12, marginBottom: 22 },
   iconWrap: {
     width: 66,
     height: 66,
-    borderRadius: 20,
+    borderRadius: radii.medium,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(251,191,36,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.35)',
+    overflow: 'hidden',
     marginBottom: 14,
   },
-  title: { color: '#fff', fontSize: 24, fontWeight: '900', textAlign: 'center' },
+  title: { color: colors.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.6, textAlign: 'center' },
   subtitle: {
-    color: '#94a3b8',
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 21,
     textAlign: 'center',
@@ -295,17 +302,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(251,191,36,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(251,191,36,0.3)',
-    borderRadius: 14,
+    borderRadius: radii.medium,
     padding: 14,
     marginBottom: 16,
   },
   warningText: { flex: 1, color: '#fde68a', fontSize: 13, lineHeight: 19, fontWeight: '700' },
   healthCard: {
-    backgroundColor: '#0f1e2e',
+    backgroundColor: 'rgba(14, 26, 43, 0.94)',
     borderWidth: 1,
-    borderColor: '#1a3a4a',
-    borderRadius: 16,
-    padding: 16,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderRadius: radii.large,
+    padding: 18,
     marginBottom: 16,
   },
   healthHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -319,46 +326,46 @@ const styles = StyleSheet.create({
   },
   healthHeadingCopy: { flex: 1 },
   healthEyebrow: { color: '#fb7185', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
-  healthTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '900', marginTop: 2 },
-  healthDescription: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginTop: 12 },
+  healthTitle: { color: colors.text, fontSize: 17, fontWeight: '800', marginTop: 2 },
+  healthDescription: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 12 },
   healthMetrics: { flexDirection: 'row', gap: 10, marginTop: 14 },
   healthMetric: {
     flex: 1,
     borderRadius: 12,
-    backgroundColor: '#09131f',
+    backgroundColor: 'rgba(5, 9, 19, 0.72)',
     borderWidth: 1,
-    borderColor: '#1a3a4a',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     padding: 11,
   },
-  healthMetricLabel: { color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-  healthMetricValue: { color: '#f8fafc', fontSize: 15, fontWeight: '900', marginTop: 5 },
-  healthMetricTime: { color: '#64748b', fontSize: 9, marginTop: 4 },
-  healthUpdated: { color: '#64748b', fontSize: 10, marginTop: 8 },
+  healthMetricLabel: { color: colors.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  healthMetricValue: { color: colors.text, fontSize: 15, fontWeight: '900', marginTop: 5 },
+  healthMetricTime: { color: colors.textMuted, fontSize: 9, marginTop: 4 },
+  healthUpdated: { color: colors.textMuted, fontSize: 10, marginTop: 8 },
   healthButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
+    backgroundColor: '#3979ee',
+    borderRadius: radii.small,
     paddingVertical: 12,
     marginTop: 14,
   },
   healthButtonDisabled: { backgroundColor: '#26374a', opacity: 0.65 },
   healthButtonText: { color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
-  healthNotice: { color: '#cbd5e1', fontSize: 11, lineHeight: 17, marginTop: 10 },
+  healthNotice: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 10 },
   healthRemoveButton: { alignItems: 'center', paddingTop: 12 },
-  healthRemoveText: { color: '#94a3b8', fontSize: 10, fontWeight: '800', letterSpacing: 0.45 },
-  healthLimit: { color: '#64748b', fontSize: 10, lineHeight: 15, marginTop: 10 },
+  healthRemoveText: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 0.45 },
+  healthLimit: { color: colors.textMuted, fontSize: 10, lineHeight: 15, marginTop: 10 },
   checkList: { gap: 10 },
   checkCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    backgroundColor: '#0f1e2e',
+    backgroundColor: 'rgba(14, 26, 43, 0.94)',
     borderWidth: 1,
-    borderColor: '#1a3a4a',
-    borderRadius: 14,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderRadius: radii.medium,
     padding: 15,
   },
   checkCardSelected: {
@@ -366,19 +373,21 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,255,136,0.45)',
   },
   checkCopy: { flex: 1 },
-  checkTitle: { color: '#f8fafc', fontSize: 15, fontWeight: '800' },
-  checkDetail: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  checkTitle: { color: colors.text, fontSize: 15, fontWeight: '800' },
+  checkDetail: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  continueSurface: {
+    borderRadius: radii.large,
+    overflow: 'hidden',
+    marginTop: 22,
+  },
   continueButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#2563eb',
-    borderRadius: 16,
     paddingVertical: 19,
-    marginTop: 22,
   },
-  continueButtonDisabled: { backgroundColor: '#26374a', opacity: 0.6 },
+  continueButtonDisabled: { opacity: 0.5 },
   continueText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 0.7 },
   safetyLink: {
     flexDirection: 'row',
@@ -388,5 +397,5 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   safetyLinkText: { color: '#60a5fa', fontSize: 13, fontWeight: '700' },
-  footer: { color: '#4a7a8a', fontSize: 11, lineHeight: 17, textAlign: 'center' },
+  footer: { color: colors.textMuted, fontSize: 11, lineHeight: 17, textAlign: 'center' },
 });
