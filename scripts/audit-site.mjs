@@ -113,6 +113,10 @@ assertIncludes("app.html", "if(alerts===previousAlerts)return", "enhanced alert 
 assertIncludes("app.html", "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
 assertIncludes("app.html", "window.OcculertBackend.endSession", "driver app must finish protected cloud sessions when opted in");
 assertIncludes("app.html", "queueBackendEvent", "driver app must queue protected alert events when opted in");
+assertIncludes("app.html", "function cameraRecoveryGuidance", "driver app must keep camera failure recovery guidance available");
+assertIncludes("app.html", "const recovery=cameraRecoveryGuidance(e)", "driver app must show recovery guidance after camera startup failures");
+assertIncludes("app.html", "Website Settings → Camera → Allow", "driver app must explain iPhone and iPad camera recovery");
+assertIncludes("app.html", "Permissions → Camera → Allow", "driver app must explain Android camera recovery");
 assertIncludes("login.html", "src=\"/occulert-backend.js\"", "login must load the Supabase backend client");
 assertNotIncludes("login.html", "id=\"fleetId\"", "login must not offer caller-controlled fleet membership");
 assertIncludes("login.html", "Google and passkey sign-in are coming soon", "login must not present disabled authentication methods as active");

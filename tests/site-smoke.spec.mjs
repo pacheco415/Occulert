@@ -41,6 +41,33 @@ test("driver app external stylesheet preserves layout without moving monitoring 
   await expect(page.locator(".app")).toHaveCSS("display", "grid");
 });
 
+test("camera permission recovery is platform specific and actionable", async ({ page }) => {
+  await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+
+  const guidance = await page.evaluate(() => ({
+    ios: cameraRecoveryGuidance(
+      { name: "NotAllowedError" },
+      { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", platform: "iPhone", maxTouchPoints: 5 },
+    ),
+    android: cameraRecoveryGuidance(
+      { name: "NotAllowedError" },
+      { userAgent: "Mozilla/5.0 (Linux; Android 15; Pixel 9)", platform: "Linux armv8l", maxTouchPoints: 5 },
+    ),
+    busy: cameraRecoveryGuidance(
+      { name: "NotReadableError" },
+      { userAgent: "Mozilla/5.0", platform: "MacIntel", maxTouchPoints: 0 },
+    ),
+  }));
+
+  expect(guidance.ios.title).toBe("Camera Access Blocked");
+  expect(guidance.ios.hint).toContain("Page Menu");
+  expect(guidance.ios.hint).toContain("Website Settings → Camera → Allow");
+  expect(guidance.android.title).toBe("Camera Access Blocked");
+  expect(guidance.android.hint).toContain("Permissions → Camera → Allow");
+  expect(guidance.busy.title).toBe("Camera Is Busy");
+  expect(guidance.busy.hint).toContain("other app or browser tab");
+});
+
 test("driver alerts enhance only successful triggers and sensitivity is unambiguous", async ({ page }) => {
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
   expect(await page.locator('[data-sensitivity="low"]').count()).toBe(1);
