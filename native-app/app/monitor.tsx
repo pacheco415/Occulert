@@ -12,6 +12,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
 import { useEyeTracking } from '../hooks/useEyeTracking';
 import { AlertSystem } from '../components/AlertSystem';
+import { GlassSurface } from '../components/GlassSurface';
 import { loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 import type { SensitivityLevel } from '../constants/thresholds';
@@ -424,7 +425,7 @@ export default function MonitorScreen() {
 
       <SafeAreaView style={s.overlay} pointerEvents="box-none">
         {/* Top bar */}
-        <View style={s.topBar}>
+        <GlassSurface style={s.topBar} tintColor="rgba(5, 10, 18, 0.5)">
           <TouchableOpacity style={s.backBtn} onPress={async () => { await handleStop(); router.back(); }}>
             <Ionicons name="chevron-back" size={20} color="#c8e8f0" />
             <Text style={s.backLbl}>Home</Text>
@@ -436,7 +437,7 @@ export default function MonitorScreen() {
           <TouchableOpacity onPress={() => router.push('/settings')}>
             <Ionicons name="settings-outline" size={20} color="#c8e8f0" />
           </TouchableOpacity>
-        </View>
+        </GlassSurface>
 
         {/* Metrics stay below the driver's face instead of covering it. */}
         {sensorFault && (
@@ -496,7 +497,7 @@ const s = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'space-between' },
   camOff: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#050a0f' },
   camOffTxt: { color: '#1a3a4a', marginTop: 12, fontSize: 14 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: 'rgba(5,10,15,0.75)' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 10, marginTop: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 22, overflow: 'hidden' },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   backLbl: { color: '#c8e8f0', fontSize: 15 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(15,30,46,0.85)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#1a3a4a' },

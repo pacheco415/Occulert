@@ -8,6 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { openFeedback } from '../lib/feedback';
 import { getWatchStatus, sendAlertToWatch, type WatchStatus } from '../lib/watchBridge';
 import { CloudSyncCard } from '../components/CloudSyncCard';
+import { AmbientBackground } from '../components/GlassSurface';
+import { colors, radii } from '../constants/theme';
 import {
   IN_EAR_ALERT_PATTERN_KEY,
   parseInEarAlertPattern,
@@ -94,7 +96,9 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={s.bg}>
+      <AmbientBackground />
       <ScrollView contentContainerStyle={s.scroll}>
+        <Text style={s.eyebrow}>OCCULERT</Text>
         <Text style={s.title}>Settings</Text>
         <SensitivitySlider value={sens} onChange={setSens} />
         <View style={s.card}>
@@ -196,26 +200,27 @@ export default function SettingsScreen() {
   );
 }
 const s = StyleSheet.create({
-  bg:{flex:1,backgroundColor:'#050a0f'}, scroll:{padding:20,paddingBottom:48},
-  title:{color:'#fff',fontSize:28,fontWeight:'900',marginBottom:20},
-  card:{backgroundColor:'#0f1e2e',borderWidth:1,borderColor:'#1a3a4a',borderRadius:14,marginBottom:16,overflow:'hidden'},
-  cardTitle:{color:'#94a3b8',fontSize:11,fontWeight:'800',letterSpacing:0.8,textTransform:'uppercase',padding:12,borderBottomWidth:1,borderColor:'#1a3a4a'},
+  bg:{flex:1,backgroundColor:colors.background}, scroll:{padding:20,paddingBottom:48},
+  eyebrow:{color:colors.cyan,fontSize:10,fontWeight:'800',letterSpacing:1.5,marginTop:6,marginBottom:5},
+  title:{color:colors.text,fontSize:32,fontWeight:'800',letterSpacing:-0.8,marginBottom:22},
+  card:{backgroundColor:'rgba(14,26,43,0.94)',borderWidth:1,borderColor:'rgba(255,255,255,0.09)',borderRadius:radii.large,marginBottom:16,overflow:'hidden'},
+  cardTitle:{color:colors.textSecondary,fontSize:11,fontWeight:'800',letterSpacing:0.8,textTransform:'uppercase',padding:14,borderBottomWidth:1,borderColor:'rgba(255,255,255,0.08)'},
   row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:16,paddingVertical:14,gap:12},
   rowL:{flexDirection:'row',alignItems:'center',gap:12,flex:1},
-  label:{color:'#c8e8f0',fontSize:14,fontWeight:'700'}, sub:{color:'#4a7a8a',fontSize:11,marginTop:2},
-  status:{color:'#60a5fa',fontSize:10,fontWeight:'900',letterSpacing:0.6},
-  div:{height:1,backgroundColor:'#1a3a4a',marginHorizontal:16},
+  label:{color:colors.text,fontSize:14,fontWeight:'700'}, sub:{color:colors.textMuted,fontSize:11,marginTop:2},
+  status:{color:colors.cyan,fontSize:10,fontWeight:'900',letterSpacing:0.6},
+  div:{height:1,backgroundColor:'rgba(255,255,255,0.08)',marginHorizontal:16},
   testRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:13},
   testRowDisabled:{opacity:0.35},
   testText:{color:'#60a5fa',fontSize:13,fontWeight:'800'},
   patternBlock:{paddingHorizontal:16,paddingVertical:14,gap:12},
   patternOptions:{flexDirection:'row',gap:8},
-  patternOption:{flex:1,alignItems:'center',borderWidth:1,borderColor:'#315266',borderRadius:9,paddingVertical:9,backgroundColor:'#09131d'},
+  patternOption:{flex:1,alignItems:'center',borderWidth:1,borderColor:'rgba(255,255,255,0.12)',borderRadius:radii.small,paddingVertical:10,backgroundColor:'rgba(5,9,19,0.72)'},
   patternOptionSelected:{borderColor:'#60a5fa',backgroundColor:'rgba(37,99,235,0.2)'},
   patternOptionText:{color:'#7f9ba8',fontSize:12,fontWeight:'800'},
   patternOptionTextSelected:{color:'#bfdbfe'},
-  patternNote:{color:'#4a7a8a',fontSize:11,lineHeight:16},
-  privNote:{flexDirection:'row',alignItems:'flex-start',gap:8,padding:14,backgroundColor:'rgba(0,0,0,0.2)',borderTopWidth:1,borderColor:'#1a3a4a'},
-  privTxt:{color:'#4a7a8a',fontSize:11,lineHeight:16,flex:1},
-  ver:{textAlign:'center',color:'#4a7a8a',fontSize:11,marginTop:8},
+  patternNote:{color:colors.textMuted,fontSize:11,lineHeight:16},
+  privNote:{flexDirection:'row',alignItems:'flex-start',gap:8,padding:14,backgroundColor:'rgba(0,0,0,0.2)',borderTopWidth:1,borderColor:'rgba(255,255,255,0.08)'},
+  privTxt:{color:colors.textMuted,fontSize:11,lineHeight:16,flex:1},
+  ver:{textAlign:'center',color:colors.textMuted,fontSize:11,marginTop:8},
 });
