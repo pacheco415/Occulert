@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useAudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { sendAlertToWatch } from '../lib/watchBridge';
+import { sendAlertToWatch, sendMonitoringStatusToWatch } from '../lib/watchBridge';
 import { configureAlertAudioMode } from '../lib/audioSession';
 import {
   IN_EAR_ALERT_PATTERN_KEY,
@@ -39,6 +39,14 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
   const hapticEnabled = useRef(true);
   const audioEnabled = useRef(true);
   const lastDirectionalChannel = useRef<Exclude<AlertAudioChannel, 'balanced'> | null>(null);
+  const watchLiveSession = useRef(false);
+  const lastWatchStatusAt = useRef(0);
+  const watchStatusSnapshot = useRef({
+    state: metrics.state,
+    fatigueScore: metrics.fatigueScore,
+    perclos: metrics.perclos,
+    sessionTime,
+  });
   const [trackingLost, setTrackingLost] = React.useState(false);
 
   // Load persisted alert preferences (set on the Settings screen).
@@ -62,6 +70,74 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
       lastAlert.current = { level: 'none', at: 0 };
       lastDirectionalChannel.current = null;
     }
+  }, [isRunning]);
+  React.useEffect(() => {
+    watchStatusSnapshot.current = {
+      state: metrics.state,
+      fatigueScore: metrics.fatigueScore,
+      perclos: metrics.perclos,
+      sessionTime,
+    };
+  }, [metrics.fatigueScore, metrics.perclos, metrics.state, sessionTime]);
+  React.useEffect(() => {
+    if (!isRunning) return;
+
+    const nextWatchStatusAt = () => {
+      const at = Math.max(Date.now(), lastWatchStatusAt.current + 1);
+      lastWatchStatusAt.current = at;
+      return at;
+    };
+    let cancelled = false;
+    let syncing = false;
+    let statusEnabled = false;
+
+    const sendCurrentStatus = async () => {
+      if (syncing) return;
+      syncing = true;
+      try {
+        const enabled = await AsyncStorage.getItem('occulert-watch').catch(() => null);
+        if (cancelled) return;
+        const snapshot = watchStatusSnapshot.current;
+        if (enabled !== 'true') {
+          if (statusEnabled || watchLiveSession.current) {
+            statusEnabled = false;
+            watchLiveSession.current = false;
+            void sendMonitoringStatusToWatch({
+              running: false,
+              ...snapshot,
+              at: nextWatchStatusAt(),
+            }).catch(() => {});
+          }
+          return;
+        }
+
+        statusEnabled = true;
+        watchLiveSession.current = true;
+        void sendMonitoringStatusToWatch({
+          running: true,
+          ...snapshot,
+          at: nextWatchStatusAt(),
+        }).catch(() => {});
+      } finally {
+        syncing = false;
+      }
+    };
+
+    void sendCurrentStatus();
+    const interval = setInterval(() => { void sendCurrentStatus(); }, 1_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      if (!statusEnabled && !watchLiveSession.current) return;
+      const snapshot = watchStatusSnapshot.current;
+      statusEnabled = false;
+      watchLiveSession.current = false;
+      void sendMonitoringStatusToWatch({
+        running: false,
+        ...snapshot,
+        at: nextWatchStatusAt(),
+      }).catch(() => {});
+    };
   }, [isRunning]);
   const pulse = useRef(new Animated.Value(1)).current;
   const balancedPlayer = useAudioPlayer(ALERT_SOUND, { keepAudioSessionActive: true });
