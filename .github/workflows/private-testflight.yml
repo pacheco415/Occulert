@@ -1,0 +1,61 @@
+name: Private TestFlight release
+
+on:
+  push:
+    branches:
+      - release/testflight
+    paths:
+      - ".github/workflows/private-testflight.yml"
+      - "native-app/**"
+
+concurrency:
+  group: private-testflight-release
+  cancel-in-progress: false
+
+jobs:
+  queue:
+    name: Queue production iOS build and TestFlight upload
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Require Expo access token
+        shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::EXPO_TOKEN repository secret is not configured. No EAS build was started."
+            exit 1
+          fi
+
+      - name: Check out release source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: native-app/package-lock.json
+
+      - name: Set up Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install native dependencies
+        working-directory: native-app
+        run: npm ci
+
+      - name: Queue production iOS build and private TestFlight upload
+        working-directory: native-app
+        run: >-
+          eas build
+          --platform ios
+          --profile production
+          --auto-submit
+          --non-interactive
+          --no-wait
+          --message "Private TestFlight: live Apple Watch status"
