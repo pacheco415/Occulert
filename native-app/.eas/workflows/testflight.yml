@@ -1,0 +1,24 @@
+name: Build and submit private TestFlight release
+
+# Deliberately isolated from ordinary development pushes. Creating or updating
+# this release branch is an explicit approval to consume an iOS EAS build and
+# upload the result to App Store Connect for TestFlight processing only.
+on:
+  push:
+    branches:
+      - release/testflight
+
+jobs:
+  build_ios:
+    name: Build production iOS app
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit_testflight:
+    name: Submit to private TestFlight
+    needs: [build_ios]
+    type: testflight
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
