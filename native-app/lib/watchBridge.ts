@@ -123,7 +123,9 @@ export async function sendMonitoringStatusToWatch(
     return { accepted: false, reachable: false };
   }
 
-  const message = createWatchMonitoringMessage(payload);
+  const message: Record<string, unknown> = {
+    ...createWatchMonitoringMessage(payload),
+  };
   let accepted = false;
   try {
     mod.updateApplicationContext(message);
