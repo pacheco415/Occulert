@@ -8,6 +8,15 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   @Published private(set) var lastLevel = "none"
   @Published private(set) var lastMessage = "Start monitoring on your iPhone"
   @Published private(set) var lastAlertAt: Double = 0
+  @Published private(set) var isMonitoring = false
+  @Published private(set) var monitoringState = "stopped"
+  @Published private(set) var fatigueScore = 0
+  @Published private(set) var perclosPercent = 0
+  @Published private(set) var sessionSeconds = 0
+  @Published private(set) var lastStatusAt: Double = 0
+
+  private let statusFreshnessMilliseconds = 12_000.0
+  private var statusTimeoutTask: Task<Void, Never>?
 
   override init() {
     super.init()
@@ -59,7 +68,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     didReceiveApplicationContext applicationContext: [String: Any]
   ) {
     Task { @MainActor in
-      let sentAt = applicationContext["at"] as? Double ?? 0
+      let sentAt = self.numberValue(applicationContext["at"])
       let ageMilliseconds = Date().timeIntervalSince1970 * 1_000 - sentAt
       self.handle(applicationContext, shouldPlayHaptic: ageMilliseconds >= 0 && ageMilliseconds < 5_000)
     }
@@ -67,15 +76,25 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
 
   nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
     Task { @MainActor in
-      let sentAt = userInfo["at"] as? Double ?? 0
+      let sentAt = self.numberValue(userInfo["at"])
       let ageMilliseconds = Date().timeIntervalSince1970 * 1_000 - sentAt
       self.handle(userInfo, shouldPlayHaptic: ageMilliseconds >= 0 && ageMilliseconds < 5_000)
     }
   }
 
   private func handle(_ message: [String: Any], shouldPlayHaptic: Bool) {
-    guard message["type"] as? String == "occulert-alert" else { return }
-    let sentAt = message["at"] as? Double ?? 0
+    switch message["type"] as? String {
+    case "occulert-alert":
+      handleAlert(message, shouldPlayHaptic: shouldPlayHaptic)
+    case "occulert-status":
+      handleStatus(message)
+    default:
+      return
+    }
+  }
+
+  private func handleAlert(_ message: [String: Any], shouldPlayHaptic: Bool) {
+    let sentAt = numberValue(message["at"])
     guard sentAt > lastAlertAt else { return }
 
     let level = message["level"] as? String ?? "alert"
@@ -97,5 +116,64 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
         device.play(.failure)
       }
     }
+  }
+
+  private func handleStatus(_ message: [String: Any]) {
+    let sentAt = numberValue(message["at"])
+    guard sentAt > lastStatusAt else { return }
+    lastStatusAt = sentAt
+    statusTimeoutTask?.cancel()
+    statusTimeoutTask = nil
+
+    let running = message["running"] as? Bool ?? false
+    let fatigue = min(100, max(0, numberValue(message["fatigueScore"])))
+    fatigueScore = Int(fatigue.rounded())
+    let perclos = min(1, max(0, numberValue(message["perclos"])))
+    perclosPercent = Int((perclos * 100).rounded())
+    let duration = min(86_400, max(0, numberValue(message["sessionTime"])))
+    sessionSeconds = Int(duration)
+
+    guard running else {
+      isMonitoring = false
+      monitoringState = "stopped"
+      return
+    }
+
+    let state = message["state"] as? String ?? "noFace"
+    let acceptedState = switch state {
+    case "open", "watch", "closed", "noFace": state
+    default: "noFace"
+    }
+    let ageMilliseconds = max(0, Date().timeIntervalSince1970 * 1_000 - sentAt)
+    guard ageMilliseconds < statusFreshnessMilliseconds else {
+      isMonitoring = false
+      monitoringState = "stale"
+      return
+    }
+
+    isMonitoring = true
+    monitoringState = acceptedState
+    let remainingMilliseconds = max(1, statusFreshnessMilliseconds - ageMilliseconds)
+    let timeoutAt = sentAt
+    statusTimeoutTask = Task { [weak self] in
+      try? await Task.sleep(nanoseconds: UInt64(remainingMilliseconds * 1_000_000))
+      guard !Task.isCancelled, let self, self.lastStatusAt == timeoutAt else { return }
+      self.isMonitoring = false
+      self.monitoringState = "stale"
+    }
+  }
+
+  private func numberValue(_ value: Any?) -> Double {
+    let result: Double
+    if let number = value as? NSNumber {
+      result = number.doubleValue
+    } else if let number = value as? Double {
+      result = number
+    } else if let number = value as? Int {
+      result = Double(number)
+    } else {
+      return 0
+    }
+    return result.isFinite ? result : 0
   }
 }
