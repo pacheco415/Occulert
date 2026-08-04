@@ -18,21 +18,43 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+      issues: write
+      pull-requests: write
     steps:
-      - name: Require Expo access token
+      - name: Check Expo access token
+        id: expo_token
         shell: bash
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::EXPO_TOKEN repository secret is not configured. No EAS build was started."
-            exit 1
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Report missing Expo token
+        if: steps.expo_token.outputs.configured != 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment 63 --body "❌ **Private TestFlight build was not started.** The repository secret \`EXPO_TOKEN\` is not configured. Add a valid Expo access token under Repository settings → Secrets and variables → Actions, then update the \`release/testflight\` branch to retry. No Apple submission occurred."
+
+      - name: Stop when Expo token is missing
+        if: steps.expo_token.outputs.configured != 'true'
+        shell: bash
+        run: |
+          echo "::error::EXPO_TOKEN repository secret is not configured. No EAS build was started."
+          exit 1
+
       - name: Check out release source
+        if: steps.expo_token.outputs.configured == 'true'
         uses: actions/checkout@v5
 
       - name: Set up Node.js
+        if: steps.expo_token.outputs.configured == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -40,16 +62,20 @@ jobs:
           cache-dependency-path: native-app/package-lock.json
 
       - name: Set up Expo and EAS
+        if: steps.expo_token.outputs.configured == 'true'
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install native dependencies
+        if: steps.expo_token.outputs.configured == 'true'
         working-directory: native-app
         run: npm ci
 
       - name: Queue production iOS build and private TestFlight upload
+        id: queue_build
+        if: steps.expo_token.outputs.configured == 'true'
         working-directory: native-app
         run: >-
           eas build
@@ -59,3 +85,19 @@ jobs:
           --non-interactive
           --no-wait
           --message "Private TestFlight: live Apple Watch status"
+
+      - name: Report EAS queue result
+        if: always() && steps.expo_token.outputs.configured == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUEUE_OUTCOME: ${{ steps.queue_build.outcome }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$QUEUE_OUTCOME" = "success" ]; then
+            body="✅ **Private TestFlight release was queued in EAS.** The production iOS build was requested with automatic TestFlight submission. This confirms queue acceptance only; physical iPhone and Apple Watch verification is still required after processing. Workflow: $RUN_URL"
+          else
+            body="❌ **EAS rejected the private TestFlight queue request.** No successful build queue was confirmed. Review the sanitized workflow log for the authentication, credentials, or project-configuration error. Workflow: $RUN_URL"
+          fi
+          gh pr comment 63 --body "$body"
