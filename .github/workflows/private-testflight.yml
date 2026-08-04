@@ -39,8 +39,20 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh pr comment 63 --body "❌ **Private TestFlight build was not started.** The repository secret \`EXPO_TOKEN\` is not configured. Add a valid Expo access token under Repository settings → Secrets and variables → Actions, then update the \`release/testflight\` branch to retry. No Apple submission occurred."
+          body="❌ **Private TestFlight build was not started.** The repository secret \`EXPO_TOKEN\` is not configured. Add a valid Expo access token under Repository settings → Secrets and variables → Actions, then update the \`$BRANCH\` branch to retry. No Apple submission occurred. Workflow: $RUN_URL"
+          # The job summary always works, even with no checkout and no open PR.
+          printf '%s\n' "$body" >> "$GITHUB_STEP_SUMMARY"
+          # Additionally comment on the open release PR, if one exists.
+          pr="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$pr" ]; then
+            gh pr comment "$pr" --repo "$REPO" --body "$body"
+          else
+            echo "No open PR for $BRANCH; reported via job summary only."
+          fi
 
       - name: Stop when Expo token is missing
         if: steps.expo_token.outputs.configured != 'true'
@@ -92,6 +104,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
           QUEUE_OUTCOME: ${{ steps.queue_build.outcome }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -100,4 +114,10 @@ jobs:
           else
             body="❌ **EAS rejected the private TestFlight queue request.** No successful build queue was confirmed. Review the sanitized workflow log for the authentication, credentials, or project-configuration error. Workflow: $RUN_URL"
           fi
-          gh pr comment 63 --body "$body"
+          printf '%s\n' "$body" >> "$GITHUB_STEP_SUMMARY"
+          pr="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$pr" ]; then
+            gh pr comment "$pr" --repo "$REPO" --body "$body"
+          else
+            echo "No open PR for $BRANCH; reported via job summary only."
+          fi
