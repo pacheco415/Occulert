@@ -1,0 +1,44 @@
+{
+  "_comment": "Copy to benchmark/dataset-config.json and edit. That filename is gitignored so licensed dataset details never reach the repository.",
+  "dataset": {
+    "name": "NTHU Drowsy Driver Detection",
+    "version": "REPLACE-ME",
+    "license": "REPLACE-ME: exact license or agreement name",
+    "accessGrantedOn": "REPLACE-ME: YYYY-MM-DD",
+    "permittedUses": [
+      "research",
+      "internal-evaluation"
+    ],
+    "restrictions": "REPLACE-ME: publication, redistribution, and commercial terms verbatim from the agreement"
+  },
+  "columns": {
+    "label": "drowsiness_state",
+    "ear": "ear",
+    "participant": "subject_id",
+    "clip": "video_id"
+  },
+  "labelMap": {
+    "0": "awake",
+    "1": "drowsy",
+    "2": "high_fatigue"
+  },
+  "exclude": {
+    "labels": ["unknown", "ambiguous"],
+    "when": [
+      { "column": "face_detected", "equals": "0", "reason": "no face detected" },
+      { "column": "occluded", "equals": "1", "reason": "occlusion" },
+      { "column": "ear", "missing": true, "reason": "missing EAR" }
+    ]
+  },
+  "slices": {
+    "lighting": "lighting_condition",
+    "eyewear": "glasses",
+    "head_pose": "head_pose",
+    "camera": "camera_position"
+  },
+  "split": {
+    "by": "participant",
+    "testFraction": 0.3,
+    "seed": "occulert-benchmark-v1"
+  }
+}
