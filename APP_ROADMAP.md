@@ -4,7 +4,7 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 ★ = top-priority milestone for each phase
 
-**Last updated: 2026-08-01** — statuses below reflect private TestFlight build
+**Last updated: 2026-08-03** — statuses below reflect private TestFlight build
 20 and the current development source. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
 and issue #6 for the remaining validation and product gaps.
 
@@ -55,13 +55,17 @@ verification remain open.
 | Pull HRV and sleep data from Apple Health / Google Fit | — | Apple Health read-only foundation implemented in source; Android not started |
 | Pre-drive fatigue risk score shown before each trip | ★ | Factual local sleep/HRV context implemented in source; scoring intentionally deferred |
 | Wrist haptic alert when fatigue threshold is crossed | — | Done in private TestFlight build 15 |
-| Watch-face widget showing live safety score | — | Not started |
+| Watch-face widget showing live safety score | — | Live in-app Watch status implemented in source; watch-face complication not started |
 
 Note: the packaged watchOS companion, live and queued WatchConnectivity
-delivery, direct test control, and wrist haptics passed a real iPhone/Apple
-Watch check in private TestFlight build 15. The Apple Health foundation is
-read-only, local-only, and informational; it does not alter alerts. A validated
-pre-drive score and Watch complication remain separate future work.
+alert delivery, direct test control, and wrist haptics passed a real
+iPhone/Apple Watch check in private TestFlight build 15. Current source also
+mirrors a privacy-safe live monitoring snapshot—fatigue score, PERCLOS,
+tracking state, and session time—into the Watch app and visibly expires the
+snapshot when phone updates stop. These status updates do not change scoring,
+alerts, haptics, or cloud data. The Apple Health foundation remains read-only,
+local-only, and informational. A validated pre-drive score and true Watch-face
+complication remain separate future work.
 
 ---
 
@@ -110,7 +114,7 @@ pre-drive score and Watch complication remain separate future work.
 |-------|-------|------------------|--------|
 | 0 · Foundation | Accuracy & pilots | Detection validation, pilot fleet | Not started |
 | 1 · Earbuds | Head & heart signals | Head-nod detection, directional alerts | Partial (audio routing and local motion diagnostics implemented; calibration and directional alerts open) |
-| 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (wrist alerts done; local read-only Apple Health context implemented in source) |
+| 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (wrist alerts done; live in-app Watch status and local read-only Apple Health context implemented in source; pre-drive score and complication deferred) |
 | 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Partial (protected fleet session history implemented in source; fusion not started) |
 | 4 · Smart Glasses | Ambient + eye tracking | Inward eye-tracking | Not started |
 | Platform | Native apps | iOS app, real-time sensor access | Private iOS pilot |
