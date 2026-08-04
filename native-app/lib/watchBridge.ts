@@ -1,5 +1,11 @@
 import { Platform } from 'react-native';
 import type { AlertLevel } from './alertPolicy';
+import {
+  createWatchMonitoringMessage,
+  type WatchMonitoringPayload,
+} from './watchMessages';
+
+export type { WatchMonitoringPayload, WatchMonitoringState } from './watchMessages';
 
 /**
  * Payload sent to the Apple Watch companion on each alert.
@@ -92,6 +98,43 @@ export async function sendAlertToWatch(payload: WatchAlertPayload): Promise<Watc
   if (status.reachable) {
     try {
       // Live channel for an immediate haptic when the watch app is reachable.
+      mod.sendMessage(message);
+      accepted = true;
+    } catch {
+      // ignore
+    }
+  }
+  return { accepted, reachable: status.reachable };
+}
+
+/**
+ * Mirror the latest monitoring state to the Watch companion.
+ *
+ * Status is intentionally latest-state only: it uses application context plus
+ * a live message when reachable and never queues every one-second update.
+ */
+export async function sendMonitoringStatusToWatch(
+  payload: WatchMonitoringPayload,
+): Promise<WatchDeliveryResult> {
+  const mod = loadWatchModule();
+  if (!mod) return { accepted: false, reachable: false };
+  const status = await getWatchStatus();
+  if (!status.paired || !status.appInstalled) {
+    return { accepted: false, reachable: false };
+  }
+
+  const message: Record<string, unknown> = {
+    ...createWatchMonitoringMessage(payload),
+  };
+  let accepted = false;
+  try {
+    mod.updateApplicationContext(message);
+    accepted = true;
+  } catch {
+    // ignore
+  }
+  if (status.reachable) {
+    try {
       mod.sendMessage(message);
       accepted = true;
     } catch {
