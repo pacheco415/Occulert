@@ -30,6 +30,14 @@ credentials.json
 .env.local
 .env.*.local
 
+# Benchmark data derived from licensed datasets. The example config is tracked;
+# the real one names a dataset and licence and must never be committed, and
+# neither may any prepared EAR table, manifest, or result file.
+benchmark/dataset-config.json
+benchmark/*-ear.csv
+benchmark/*-manifest.json
+benchmark/results*.json
+
 # Logs
 *.log
 npm-debug.log*
