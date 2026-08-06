@@ -145,7 +145,7 @@ export default function MonitorScreen() {
         yawAngle: sample.yawAngle,
         rollAngle: sample.rollAngle,
       });
-      // Observation only: headphone motion never changes scoring or alerts.
+      // Observation only: headphone motion never changes the fatigue score or alerts.
       if (result.observed) headphoneHeadNodObservationsRef.current += 1;
     });
     const statusSubscription = addHeadphoneMotionStatusListener((status) => {
