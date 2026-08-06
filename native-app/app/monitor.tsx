@@ -269,7 +269,9 @@ export default function MonitorScreen() {
     }
   }, []);
 
-  const handleStop = useCallback(async () => {
+  const handleStop = useCallback(async (
+    options: { deferCloudFinalization?: boolean } = {},
+  ) => {
     if (stoppingRef.current) return;
     stoppingRef.current = true;
     setIsStopping(true);
@@ -291,9 +293,7 @@ export default function MonitorScreen() {
     setIsRunning(false);
     reset();
 
-    try {
-      if (!wasRunning) return;
-      const localSessionId = await saveSession(durationSec, alerts);
+    const finalizeCloud = async (localSessionId: string | null) => {
       const cloudSessionId = cloudSession ? await cloudSession.catch(() => null) : null;
       if (!cloudSessionId) return;
       await pendingEvents.catch(() => {});
@@ -307,6 +307,17 @@ export default function MonitorScreen() {
       if (synced && localSessionId) {
         await markSessionSynced(localSessionId, cloudSessionId);
       }
+    };
+
+    try {
+      if (!wasRunning) return;
+      const localSessionId = await saveSession(durationSec, alerts);
+      if (options.deferCloudFinalization) {
+        // Optional cloud finalization never delays a safe-stop Maps handoff.
+        void finalizeCloud(localSessionId).catch(() => {});
+        return;
+      }
+      await finalizeCloud(localSessionId);
     } finally {
       stoppingRef.current = false;
       setIsStopping(false);
@@ -320,9 +331,9 @@ export default function MonitorScreen() {
       // Camera monitoring cannot continue reliably after Maps backgrounds the
       // app. End and save first so the UI never implies hidden protection.
       try {
-        await handleStop();
+        await handleStop({ deferCloudFinalization: true });
       } catch {
-        // A storage or network problem must not trap a fatigued driver inside
+        // A local storage problem must not trap a fatigued driver inside
         // Occulert. Monitoring has already been disarmed before saving starts.
         Alert.alert(
           'Drive may not be fully saved',
@@ -680,7 +691,12 @@ export default function MonitorScreen() {
               </Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={s.stopBtn} onPress={handleStop}>
+            <TouchableOpacity
+              style={s.stopBtn}
+              onPress={() => {
+                void handleStop();
+              }}
+            >
               <Ionicons name="stop-circle" size={22} color="#fff" />
               <Text style={s.stopTxt}>STOP</Text>
             </TouchableOpacity>
@@ -725,18 +741,7 @@ const s = StyleSheet.create({
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   pillTxt: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
-  sensorFault: {
-    position: 'absolute',
-    top: 132,
-    left: 16,
-    right: 16,
-    zIndex: 4,
-    backgroundColor: 'rgba(69,10,10,0.96)',
-    borderWidth: 1.5,
-    borderColor: '#ef4444',
-    borderRadius: 14,
-    padding: 14,
-  },
+  sensorFault: { position: 'absolute', top: 132, left: 16, right: 16, zIndex: 4, backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
   sensorFaultTitle: { color: '#fecaca', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
   sensorFaultText: { color: '#fff1f2', fontSize: 12, lineHeight: 18, marginTop: 4 },
   metrics: {

@@ -11,8 +11,10 @@ persistent **Find a safe stop** action.
 2. A persistent action appears beneath the live monitor controls.
 3. The driver uses it only after parking, or asks a passenger to use it.
 4. The driver chooses **Rest area**, **Gas station**, or **Food or coffee**.
-5. Occulert disarms camera monitoring and saves the current drive before
-   handing the search to Apple Maps, an Android maps app, or a web fallback.
+5. Occulert disarms camera monitoring and saves the current drive locally
+   before handing the search to Apple Maps, an Android maps app, or a web
+   fallback. Optional cloud finalization continues best-effort and never blocks
+   the Maps handoff.
 
 The feature does not rank businesses, promise that a result is open or safe,
 or automatically start turn-by-turn navigation. The selected maps app owns the
@@ -40,6 +42,7 @@ use a separately validated, platform-supported sensor path.
 
 - [x] Deterministic URL-builder tests for iOS, Android, and web fallback
 - [x] Static regression guard proving the monitor saves/stops before Maps
+- [x] Static regression guard proving optional cloud sync cannot block Maps
 - [x] No new location dependency or cloud field
 - [ ] Physical iPhone/TestFlight handoff check
 - [ ] Android device handoff check
