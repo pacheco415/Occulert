@@ -743,7 +743,7 @@ const s = StyleSheet.create({
     position: 'absolute',
     left: 14,
     right: 14,
-    bottom: 246,
+    bottom: 200,
     flexDirection: 'row',
     gap: 6,
     justifyContent: 'center',
