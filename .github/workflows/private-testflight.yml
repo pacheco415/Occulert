@@ -1,0 +1,121 @@
+name: Private TestFlight release
+
+on:
+  push:
+    branches:
+      - release/testflight
+    paths:
+      - ".github/workflows/private-testflight.yml"
+      - "native-app/**"
+
+concurrency:
+  group: private-testflight-release
+  cancel-in-progress: false
+
+jobs:
+  queue:
+    name: Queue production iOS build and TestFlight upload
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Check Expo access token
+        id: expo_token
+        shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report missing Expo token
+        if: steps.expo_token.outputs.configured != 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="❌ **Private TestFlight build was not started.** The repository secret \`EXPO_TOKEN\` is not configured. Add a valid Expo access token under Repository settings → Secrets and variables → Actions, then update the \`$BRANCH\` branch to retry. No Apple submission occurred. Workflow: $RUN_URL"
+          printf '%s\n' "$body" >> "$GITHUB_STEP_SUMMARY"
+          pr="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$pr" ]; then
+            gh pr comment "$pr" --repo "$REPO" --body "$body"
+          else
+            echo "No open PR for $BRANCH; reported via job summary only."
+          fi
+
+      - name: Stop when Expo token is missing
+        if: steps.expo_token.outputs.configured != 'true'
+        shell: bash
+        run: |
+          echo "::error::EXPO_TOKEN repository secret is not configured. No EAS build was started."
+          exit 1
+
+      - name: Check out release source
+        if: steps.expo_token.outputs.configured == 'true'
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        if: steps.expo_token.outputs.configured == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: native-app/package-lock.json
+
+      - name: Set up Expo and EAS
+        if: steps.expo_token.outputs.configured == 'true'
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install native dependencies
+        if: steps.expo_token.outputs.configured == 'true'
+        working-directory: native-app
+        run: npm ci
+
+      - name: Queue production iOS build and private TestFlight upload
+        id: queue_build
+        if: steps.expo_token.outputs.configured == 'true'
+        working-directory: native-app
+        run: >-
+          eas build
+          --platform ios
+          --profile production
+          --auto-submit
+          --non-interactive
+          --no-wait
+          --message "Private TestFlight: post-alert safe-stop Maps handoff"
+
+      - name: Report EAS queue result
+        if: always() && steps.expo_token.outputs.configured == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          QUEUE_OUTCOME: ${{ steps.queue_build.outcome }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$QUEUE_OUTCOME" = "success" ]; then
+            body="✅ **Private safe-stop TestFlight release was queued in EAS.** The production iOS build was requested with automatic TestFlight submission. This confirms queue acceptance only; safely parked physical-iPhone verification is still required after processing. Workflow: $RUN_URL"
+          else
+            body="❌ **EAS rejected the private safe-stop TestFlight queue request.** No successful build queue was confirmed. Review the sanitized workflow log for the authentication, credentials, or project-configuration error. Workflow: $RUN_URL"
+          fi
+          printf '%s\n' "$body" >> "$GITHUB_STEP_SUMMARY"
+          pr="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$pr" ]; then
+            gh pr comment "$pr" --repo "$REPO" --body "$body"
+          else
+            echo "No open PR for $BRANCH; reported via job summary only."
+          fi
