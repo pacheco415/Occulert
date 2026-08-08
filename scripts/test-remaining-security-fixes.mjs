@@ -5,6 +5,11 @@ import test from 'node:test';
 
 const require = createRequire(import.meta.url);
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+const pngSize = path => {
+  const image = readFileSync(new URL(`../${path}`, import.meta.url));
+  assert.equal(image.subarray(1, 4).toString('ascii'), 'PNG');
+  return { width: image.readUInt32BE(16), height: image.readUInt32BE(20) };
+};
 
 test('spreadsheet exports neutralize formula cells', () => {
   const { csvCell } = require('../security-utils.js');
@@ -26,15 +31,28 @@ test('native cloud writes recheck current consent', () => {
   assert.match(cloud, /consentOverride/);
 });
 
-test('monitoring fails visibly on stale samples and waits for sensitivity', () => {
+test('monitoring fails visibly without overlapping the navigation or showing a duplicate modal', () => {
   const monitor = read('native-app/app/monitor.tsx');
-  assert.match(monitor, /SENSOR_STALL_MS/);
+  assert.match(monitor, /SENSOR_STARTUP_GRACE_MS = 10_000/);
+  assert.match(monitor, /SENSOR_STALL_MS = 5_000/);
+  assert.match(monitor, /hasCameraSampleRef\.current \? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS/);
+  assert.match(monitor, /hasCameraSampleRef\.current = true/);
   assert.match(monitor, /lastSampleAtRef\.current = Date\.now\(\)/);
   assert.match(monitor, /Monitoring stopped: camera analysis stalled/);
-  assert.match(monitor, /Alert\.alert\('Monitoring stopped'/);
+  assert.doesNotMatch(monitor, /Alert\.alert\('Monitoring stopped'/);
+  assert.match(monitor, /sensorFault: \{ position: 'absolute', top: 132/);
   assert.match(monitor, /sensitivityLoaded/);
   assert.match(monitor, /disabled=\{isStarting \|\| isStopping \|\| !sensitivityLoaded\}/);
   assert.match(monitor, /updateSessionHistory/);
+});
+
+test('native brand assets keep store-safe square dimensions', () => {
+  assert.deepEqual(pngSize('native-app/assets/icon.png'), { width: 1024, height: 1024 });
+  assert.deepEqual(pngSize('native-app/assets/adaptive-icon.png'), { width: 1024, height: 1024 });
+  assert.deepEqual(pngSize('native-app/assets/splash.png'), { width: 2048, height: 2048 });
+  assert.deepEqual(pngSize('occulert-logo-alt.png'), { width: 1024, height: 1024 });
+  const appConfig = JSON.parse(read('native-app/app.json'));
+  assert.equal(appConfig.expo.ios.icon, './assets/icon.png');
 });
 
 test('audio and haptic preferences are read when each alert fires', () => {

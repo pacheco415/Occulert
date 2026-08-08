@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Linking, Alert,
+  View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -58,7 +58,8 @@ const FACE_DETECTOR_OPTIONS: FrameFaceDetectionOptions = {
 };
 
 const CLOSED_CONFIRM_MS = 1_200;
-const SENSOR_STALL_MS = 3_000;
+const SENSOR_STARTUP_GRACE_MS = 10_000;
+const SENSOR_STALL_MS = 5_000;
 
 export default function MonitorScreen() {
   useKeepAwake(); // screen never dims while monitoring
@@ -86,6 +87,7 @@ export default function MonitorScreen() {
   const cloudSessionRef = useRef<Promise<string | null> | null>(null);
   const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastSampleAtRef = useRef(0);
+  const hasCameraSampleRef = useRef(false);
   const headNodDetectorRef = useRef(new HeadNodDetector());
   const headNodObservationsRef = useRef(0);
   const monitoringActiveRef = useRef(false);
@@ -171,7 +173,6 @@ export default function MonitorScreen() {
       headphoneMotionSamplesRef.current = 0;
       headphoneMotionStatusRef.current = 'starting';
       monitoringActiveRef.current = true;
-      lastSampleAtRef.current = Date.now();
       setSensorFault(null);
       sessionSensitivityRef.current = sensitivity;
       cloudEventQueueRef.current = Promise.resolve();
@@ -181,6 +182,8 @@ export default function MonitorScreen() {
       }
       cloudSessionRef.current = beginCloudSession();
       setAlertCount(0);
+      hasCameraSampleRef.current = false;
+      lastSampleAtRef.current = Date.now();
       setIsRunning(true);
     } finally {
       startingRef.current = false;
@@ -264,10 +267,10 @@ export default function MonitorScreen() {
   useEffect(() => {
     if (!isRunning) return;
     const watchdog = setInterval(() => {
-      if (stoppingRef.current || Date.now() - lastSampleAtRef.current <= SENSOR_STALL_MS) return;
+      const timeoutMs = hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS;
+      if (stoppingRef.current || Date.now() - lastSampleAtRef.current <= timeoutMs) return;
       const message = 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.';
       setSensorFault(message);
-      Alert.alert('Monitoring stopped', message);
       void handleStop();
     }, 500);
     return () => clearInterval(watchdog);
@@ -286,6 +289,7 @@ export default function MonitorScreen() {
     yawAngle: number,
     rollAngle: number,
   ) => {
+    hasCameraSampleRef.current = true;
     lastSampleAtRef.current = Date.now();
     const now = Date.now();
     const headNodResult = headNodDetectorRef.current.update({
@@ -503,7 +507,7 @@ const s = StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(15,30,46,0.85)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#1a3a4a' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   pillTxt: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
-  sensorFault: { position: 'absolute', top: 88, left: 16, right: 16, zIndex: 4, backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
+  sensorFault: { position: 'absolute', top: 132, left: 16, right: 16, zIndex: 4, backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
   sensorFaultTitle: { color: '#fecaca', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
   sensorFaultText: { color: '#fff1f2', fontSize: 12, lineHeight: 18, marginTop: 4 },
   metrics: { position: 'absolute', left: 14, right: 14, bottom: 200, flexDirection: 'row', gap: 6, justifyContent: 'center' },
