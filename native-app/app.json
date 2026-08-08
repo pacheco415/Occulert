@@ -10,6 +10,7 @@
       "**/*"
     ],
     "ios": {
+      "icon": "./assets/icon.png",
       "supportsTablet": false,
       "appleTeamId": "W3W6Z8U68C",
       "bundleIdentifier": "com.occulert.app",
