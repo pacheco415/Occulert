@@ -47,4 +47,10 @@ test('the monitor stops and saves before handing off to Maps', () => {
   assert.match(monitor, /buildSafeStopSearchUrls\(Platform\.OS, kind\)/);
   assert.match(monitor, /Linking\.openURL\(url\)/);
   assert.match(monitor, /does not read, store, or upload your location/i);
+
+  const controlsStart = monitor.indexOf('<View style={s.ctrl}>');
+  const metricsStart = monitor.indexOf('<View style={s.metrics}>');
+  const safeStopStart = monitor.indexOf('style={s.safeStopBtn}', controlsStart);
+  assert.ok(controlsStart < metricsStart && metricsStart < safeStopStart);
+  assert.doesNotMatch(monitor, /metrics:\s*\{\s*position:\s*'absolute'/);
 });

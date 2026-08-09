@@ -624,38 +624,38 @@ export default function MonitorScreen() {
           </View>
         )}
 
-        {isRunning && (
-          <View style={s.metrics}>
-            {[
-              { label: 'EYE', value: metrics.ear.toFixed(3), color: stateColor },
-              {
-                label: 'PERCLOS',
-                value: `${(metrics.perclos * 100).toFixed(0)}%`,
-                color: metrics.perclos > 0.15 ? '#f87171' : '#c8e8f0',
-              },
-              {
-                label: 'SCORE',
-                value: String(metrics.fatigueScore),
-                color: metrics.fatigueScore > 60 ? '#f87171' : '#00ff88',
-              },
-              { label: 'TIME', value: fmt(sessionTime), color: '#c8e8f0' },
-              {
-                label: 'ALERTS',
-                value: String(alertCount),
-                color: alertCount > 0 ? '#fbbf24' : '#c8e8f0',
-              },
-            ].map(({ label, value, color }) => (
-              <View key={label} style={s.card}>
-                <Text style={s.cardLbl}>{label}</Text>
-                <Text style={[s.cardVal, { color }]}>{value}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
         <AlertSystem metrics={metrics} isRunning={isRunning} sessionTime={sessionTime} />
 
         <View style={s.ctrl}>
+          {isRunning && (
+            <View style={s.metrics}>
+              {[
+                { label: 'EYE', value: metrics.ear.toFixed(3), color: stateColor },
+                {
+                  label: 'PERCLOS',
+                  value: `${(metrics.perclos * 100).toFixed(0)}%`,
+                  color: metrics.perclos > 0.15 ? '#f87171' : '#c8e8f0',
+                },
+                {
+                  label: 'SCORE',
+                  value: String(metrics.fatigueScore),
+                  color: metrics.fatigueScore > 60 ? '#f87171' : '#00ff88',
+                },
+                { label: 'TIME', value: fmt(sessionTime), color: '#c8e8f0' },
+                {
+                  label: 'ALERTS',
+                  value: String(alertCount),
+                  color: alertCount > 0 ? '#fbbf24' : '#c8e8f0',
+                },
+              ].map(({ label, value, color }) => (
+                <View key={label} style={s.card}>
+                  <Text style={s.cardLbl}>{label}</Text>
+                  <Text style={[s.cardVal, { color }]}>{value}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {isRunning && alertCount > 0 && (
             <TouchableOpacity
               accessibilityRole="button"
@@ -745,10 +745,6 @@ const s = StyleSheet.create({
   sensorFaultTitle: { color: '#fecaca', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
   sensorFaultText: { color: '#fff1f2', fontSize: 12, lineHeight: 18, marginTop: 4 },
   metrics: {
-    position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 200,
     flexDirection: 'row',
     gap: 6,
     justifyContent: 'center',

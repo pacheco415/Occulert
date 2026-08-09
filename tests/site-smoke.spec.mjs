@@ -29,6 +29,17 @@ test("homepage external assets preserve theme and mobile navigation controls", a
 
   await page.locator("#menuBtn").click();
   await expect(page.locator("#mobileMenu")).toHaveClass(/open/);
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  expect(await page.locator(".disclaimer > .disclaimer-content").count()).toBe(1);
+  expect(await page.locator(".disclaimer > .driver-groups").count()).toBe(1);
+  await expect(page.locator(".disclaimer")).toHaveCSS("display", "grid");
+  await expect(page.locator(".driver-groups-grid")).toHaveCSS("display", "grid");
+  expect(await page.locator(".driver-groups-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(2);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.locator(".disclaimer")).toHaveCSS("display", "flex");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
 });
 
 test("driver app external stylesheet preserves layout without moving monitoring scripts", async ({ page }) => {
