@@ -38,7 +38,7 @@ function assertSingleH1(path) {
 
 walk(root);
 
-for (const scriptPath of ["homepage.js"]) {
+for (const scriptPath of ["homepage.js", "lang.js"]) {
   try { new Function(read(scriptPath)); }
   catch (error) { fail(`${scriptPath} does not parse (${error.message})`); }
 }
@@ -67,6 +67,24 @@ assertIncludes("index.html", "<link rel=\"stylesheet\" href=\"/homepage.css\" />
 assertIncludes("index.html", "<script src=\"/homepage.js\" defer></script>", "homepage must load its external behavior script");
 assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
 assertNotIncludes("index.html", "<script>", "homepage must keep its behavior script out of the HTML document");
+for (const unsupportedStat of ["1 in 6", "100,000+", "91%", "Crashes involve driver fatigue"]) {
+  assertNotIncludes("index.html", unsupportedStat, `homepage must not present the unsupported statistic: ${unsupportedStat}`);
+}
+for (const productBoundary of [
+  "Camera frames are processed locally",
+  "Monitoring stops when Occulert leaves the screen",
+  "Local monitoring works without fleet sync",
+  "May miss events or trigger false alerts",
+]) {
+  assertIncludes("index.html", productBoundary, `homepage must disclose the product boundary: ${productBoundary}`);
+}
+for (let index = 1; index <= 4; index += 1) {
+  for (const prefix of ["stats_value", "stats_label"]) {
+    const key = `${prefix}${index}:`;
+    const count = read("lang.js").split(key).length - 1;
+    if (count !== 8) fail(`translations must include ${key.slice(0, -1)} for all 8 languages (found ${count})`);
+  }
+}
 assertIncludes("sw.js", "'/homepage.css'", "service worker must cache the external homepage stylesheet");
 assertIncludes("sw.js", "'/homepage.js'", "service worker must cache the external homepage behavior script");
 assertIncludes("app.html", "<link rel=\"stylesheet\" href=\"/driver-app.css\" />", "driver app must load its external stylesheet");
