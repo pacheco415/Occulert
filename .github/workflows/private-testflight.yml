@@ -1,11 +1,16 @@
 name: Private TestFlight release
 
 on:
+  # Manual trigger so a build can be queued from the Actions tab without
+  # inventing a commit on release/testflight.
+  workflow_dispatch:
   push:
     branches:
       - release/testflight
+    # Deliberately does NOT include this workflow file. Editing the release
+    # workflow must never spend an EAS build from the monthly quota; only
+    # actual app changes should queue one.
     paths:
-      - ".github/workflows/private-testflight.yml"
       - "native-app/**"
 
 concurrency:
