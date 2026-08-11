@@ -228,17 +228,26 @@ The phone side in `lib/watchBridge.ts` sends alerts through
 `@bacons/apple-targets`. Its bundle identifier is provisioned separately from
 the iPhone app.
 
-The companion shows the latest alert and plays a Watch haptic for a live alert.
+The companion shows the latest alert and plays a direct Watch haptic while the
+Watch app is active. Because WatchKit cannot play that direct haptic while the
+app is inactive or backgrounded, the companion can also schedule a Time
+Sensitive local notification after the tester explicitly enables background
+alerts in the Watch app. Silent Mode still permits the notification haptic;
+Focus and the user's notification settings remain authoritative.
+
 The phone uses an immediate message when the Watch app is reachable and a
-queued fallback when it is not. Critical alerts use a stronger repeated
-haptic. Settings only enables the Watch switch when iOS confirms that the
-companion is installed and includes a direct Watch alert test. Expo Go remains
-a safe no-op because it cannot contain the Watch target.
+queued fallback when it is not. Queued WatchConnectivity delivery can be
+delayed, so the iPhone alert remains the primary fail-safe and Occulert must not
+promise a guaranteed background wrist alert. Critical live alerts use a
+stronger repeated direct haptic. Settings only enables the Watch switch when
+iOS confirms that the companion is installed and includes a direct Watch alert
+test. Expo Go remains a safe no-op because it cannot contain the Watch target.
 
 Build and submit both targets together with the production EAS profile. On the
-physical devices, open the Occulert Watch app, confirm the iPhone reports the
-companion as installed, opt into Watch alerts, and verify the phone alert still
-works as the fallback.
+physical devices, open the Occulert Watch app, enable background alerts, confirm
+the iPhone reports the companion as installed, opt into Watch alerts, and test
+both the active-app haptic and the background notification. Verify the phone
+alert still works as the fallback.
 
 ### Android (Wear OS)
 

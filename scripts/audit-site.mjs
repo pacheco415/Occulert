@@ -215,7 +215,7 @@ assertIncludes("native-app/app/monitor.tsx", "<View style={s.ctrl}>\n          {
 assertNotIncludes("native-app/app/monitor.tsx", "metrics: {\n    position: 'absolute'", "native metrics must not rely on a fixed bottom offset that can overlap added controls");
 assertIncludes("native-app/lib/watchBridge.ts", "getIsWatchAppInstalled", "Apple Watch controls must require the companion app, not pairing alone");
 assertIncludes("native-app/app/settings.tsx", "AUTOMATIC", "connected audio settings must describe iPhone output routing truthfully");
-assertIncludes("native-app/components/AlertSystem.tsx", "AsyncStorage.getItem('occulert-watch')", "native alerts must read the latest Watch preference instead of a stale mount-time value");
+assertIncludes("native-app/components/AlertSystem.tsx", "getWatchAlertsEnabled(true)", "native alerts must read the latest Watch preference instead of a stale mount-time value");
 assertIncludes("native-app/lib/watchBridge.ts", "transferUserInfo", "Watch alerts must have a reliable queued delivery fallback");
 assertIncludes("native-app/targets/occulert-watch/AlertReceiver.swift", "didReceiveUserInfo", "the Watch companion must receive queued alert deliveries");
 assertIncludes("native-app/app/settings.tsx", "Test Watch alert", "connected-device settings must provide a direct Watch alert test");

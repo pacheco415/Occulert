@@ -42,6 +42,8 @@ export interface WatchDeliveryResult {
 
 let watch: WatchModule | null = null;
 let triedLoad = false;
+const WATCH_STATUS_CACHE_MS = 5_000;
+let cachedWatchStatus: { value: WatchStatus; checkedAt: number } | null = null;
 
 function loadWatchModule(): WatchModule | null {
   if (triedLoad) return watch;
@@ -118,7 +120,10 @@ export async function sendMonitoringStatusToWatch(
 ): Promise<WatchDeliveryResult> {
   const mod = loadWatchModule();
   if (!mod) return { accepted: false, reachable: false };
-  const status = await getWatchStatus();
+  // Live metrics are informational and frequent, so briefly reuse the paired /
+  // installed / reachable snapshot instead of crossing the native bridge three
+  // times for every status update. Alert delivery above always checks fresh.
+  const status = await getWatchStatus(WATCH_STATUS_CACHE_MS);
   if (!status.paired || !status.appInstalled) {
     return { accepted: false, reachable: false };
   }
@@ -148,10 +153,18 @@ export async function sendMonitoringStatusToWatch(
  * Whether a paired Apple Watch with the Occulert companion installed is
  * available. Pairing alone is not enough to promise wrist alerts.
  */
-export async function getWatchStatus(): Promise<WatchStatus> {
+export async function getWatchStatus(maxAgeMs = 0): Promise<WatchStatus> {
   const mod = loadWatchModule();
   if (!mod) {
     return { moduleAvailable: false, paired: false, appInstalled: false, reachable: false };
+  }
+  const now = Date.now();
+  if (
+    maxAgeMs > 0 &&
+    cachedWatchStatus &&
+    now - cachedWatchStatus.checkedAt < maxAgeMs
+  ) {
+    return cachedWatchStatus.value;
   }
   try {
     const [paired, appInstalled, reachable] = await Promise.all([
@@ -159,9 +172,13 @@ export async function getWatchStatus(): Promise<WatchStatus> {
       mod.getIsWatchAppInstalled?.() ?? Promise.resolve(false),
       mod.getReachability?.() ?? Promise.resolve(false),
     ]);
-    return { moduleAvailable: true, paired, appInstalled, reachable };
+    const value = { moduleAvailable: true, paired, appInstalled, reachable };
+    cachedWatchStatus = { value, checkedAt: now };
+    return value;
   } catch {
-    return { moduleAvailable: true, paired: false, appInstalled: false, reachable: false };
+    const value = { moduleAvailable: true, paired: false, appInstalled: false, reachable: false };
+    cachedWatchStatus = { value, checkedAt: now };
+    return value;
   }
 }
 

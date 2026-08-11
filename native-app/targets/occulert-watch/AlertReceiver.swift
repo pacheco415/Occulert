@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 import WatchConnectivity
 import WatchKit
 
@@ -14,12 +15,16 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   @Published private(set) var perclosPercent = 0
   @Published private(set) var sessionSeconds = 0
   @Published private(set) var lastStatusAt: Double = 0
+  @Published private(set) var backgroundAlertsAuthorized = false
+  @Published private(set) var canRequestBackgroundAlerts = false
+  @Published private(set) var backgroundAlertsText = "Checking background alerts…"
 
   private let statusFreshnessMilliseconds = 12_000.0
   private var statusTimeoutTask: Task<Void, Never>?
 
   override init() {
     super.init()
+    refreshNotificationAuthorization()
     guard WCSession.isSupported() else {
       connectionText = "Watch connection unavailable"
       return
@@ -51,7 +56,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   }
 
   nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-    Task { @MainActor in self.handle(message, shouldPlayHaptic: true) }
+    Task { @MainActor in self.handle(message, shouldDeliverFeedback: true) }
   }
 
   nonisolated func session(
@@ -59,7 +64,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     didReceiveMessage message: [String: Any],
     replyHandler: @escaping ([String: Any]) -> Void
   ) {
-    Task { @MainActor in self.handle(message, shouldPlayHaptic: true) }
+    Task { @MainActor in self.handle(message, shouldDeliverFeedback: true) }
     replyHandler(["received": true])
   }
 
@@ -70,7 +75,10 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     Task { @MainActor in
       let sentAt = self.numberValue(applicationContext["at"])
       let ageMilliseconds = Date().timeIntervalSince1970 * 1_000 - sentAt
-      self.handle(applicationContext, shouldPlayHaptic: ageMilliseconds >= 0 && ageMilliseconds < 5_000)
+      self.handle(
+        applicationContext,
+        shouldDeliverFeedback: ageMilliseconds >= 0 && ageMilliseconds < 5_000
+      )
     }
   }
 
@@ -78,14 +86,58 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     Task { @MainActor in
       let sentAt = self.numberValue(userInfo["at"])
       let ageMilliseconds = Date().timeIntervalSince1970 * 1_000 - sentAt
-      self.handle(userInfo, shouldPlayHaptic: ageMilliseconds >= 0 && ageMilliseconds < 5_000)
+      self.handle(
+        userInfo,
+        shouldDeliverFeedback: ageMilliseconds >= 0 && ageMilliseconds < 5_000
+      )
     }
   }
 
-  private func handle(_ message: [String: Any], shouldPlayHaptic: Bool) {
+  func refreshNotificationAuthorization() {
+    UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+      Task { @MainActor in
+        self?.updateNotificationAuthorization(settings.authorizationStatus)
+      }
+    }
+  }
+
+  func requestBackgroundAlertAuthorization() {
+    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [weak self] _, _ in
+      Task { @MainActor in
+        self?.refreshNotificationAuthorization()
+      }
+    }
+  }
+
+  private func updateNotificationAuthorization(_ status: UNAuthorizationStatus) {
+    switch status {
+    case .authorized:
+      backgroundAlertsAuthorized = true
+      canRequestBackgroundAlerts = false
+      backgroundAlertsText = "Background wrist alerts enabled"
+    case .notDetermined:
+      backgroundAlertsAuthorized = false
+      canRequestBackgroundAlerts = true
+      backgroundAlertsText = "Enable notifications for background wrist alerts"
+    case .denied:
+      backgroundAlertsAuthorized = false
+      canRequestBackgroundAlerts = false
+      backgroundAlertsText = "Allow Occulert notifications in Watch Settings"
+    case .provisional:
+      backgroundAlertsAuthorized = false
+      canRequestBackgroundAlerts = false
+      backgroundAlertsText = "Allow full notifications in Watch Settings"
+    @unknown default:
+      backgroundAlertsAuthorized = false
+      canRequestBackgroundAlerts = false
+      backgroundAlertsText = "Background wrist alerts unavailable"
+    }
+  }
+
+  private func handle(_ message: [String: Any], shouldDeliverFeedback: Bool) {
     switch message["type"] as? String {
     case "occulert-alert":
-      handleAlert(message, shouldPlayHaptic: shouldPlayHaptic)
+      handleAlert(message, shouldDeliverFeedback: shouldDeliverFeedback)
     case "occulert-status":
       handleStatus(message)
     default:
@@ -93,7 +145,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     }
   }
 
-  private func handleAlert(_ message: [String: Any], shouldPlayHaptic: Bool) {
+  private func handleAlert(_ message: [String: Any], shouldDeliverFeedback: Bool) {
     let sentAt = numberValue(message["at"])
     guard sentAt > lastAlertAt else { return }
 
@@ -108,13 +160,38 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     default: "Monitoring"
     }
 
-    guard shouldPlayHaptic else { return }
+    guard shouldDeliverFeedback else { return }
+    guard WKExtension.shared().applicationState == .active else {
+      scheduleBackgroundAlert(level: level, message: lastMessage, sentAt: sentAt)
+      return
+    }
+    playHaptic(level: level)
+  }
+
+  private func playHaptic(level: String) {
     let device = WKInterfaceDevice.current()
     device.play(level == "critical" ? .failure : .notification)
     if level == "critical" {
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
         device.play(.failure)
       }
+    }
+  }
+
+  private func scheduleBackgroundAlert(level: String, message: String, sentAt: Double) {
+    UNUserNotificationCenter.current().getNotificationSettings { settings in
+      guard settings.authorizationStatus == .authorized else { return }
+
+      let content = UNMutableNotificationContent()
+      content.title = level == "critical" ? "PULL OVER NOW" : "Occulert alert"
+      content.body = message
+      content.sound = .default
+      content.interruptionLevel = .timeSensitive
+      content.userInfo = ["level": level, "at": sentAt]
+
+      let identifier = "occulert-alert-\(Int64(sentAt))"
+      let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+      UNUserNotificationCenter.current().add(request)
     }
   }
 
