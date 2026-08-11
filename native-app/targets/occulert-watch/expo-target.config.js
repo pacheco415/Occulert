@@ -8,5 +8,5 @@ module.exports = () => ({
   colors: {
     $accent: '#2563eb',
   },
-  frameworks: ['SwiftUI', 'WatchConnectivity', 'WatchKit'],
+  frameworks: ['SwiftUI', 'UserNotifications', 'WatchConnectivity', 'WatchKit'],
 });

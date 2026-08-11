@@ -5,6 +5,7 @@ import { useAudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sendAlertToWatch, sendMonitoringStatusToWatch } from '../lib/watchBridge';
 import { configureAlertAudioMode } from '../lib/audioSession';
+import { getWatchAlertsEnabled } from '../lib/watchPreferences';
 import {
   IN_EAR_ALERT_PATTERN_KEY,
   nextAlertAudioChannel,
@@ -25,6 +26,7 @@ export type { AlertLevel } from '../lib/alertPolicy';
 const ALERT_SOUND = require('../assets/alert.wav');
 const ALERT_SOUND_LEFT = require('../assets/alert-left.wav');
 const ALERT_SOUND_RIGHT = require('../assets/alert-right.wav');
+const WATCH_STATUS_SYNC_INTERVAL_MS = 2_000;
 
 interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; sessionTime: number; }
 
@@ -95,10 +97,10 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
       if (syncing) return;
       syncing = true;
       try {
-        const enabled = await AsyncStorage.getItem('occulert-watch').catch(() => null);
+        const enabled = await getWatchAlertsEnabled();
         if (cancelled) return;
         const snapshot = watchStatusSnapshot.current;
-        if (enabled !== 'true') {
+        if (!enabled) {
           if (statusEnabled || watchLiveSession.current) {
             statusEnabled = false;
             watchLiveSession.current = false;
@@ -124,7 +126,10 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
     };
 
     void sendCurrentStatus();
-    const interval = setInterval(() => { void sendCurrentStatus(); }, 1_000);
+    // The Watch status is informational; alert delivery uses a separate,
+    // immediate path. A two-second heartbeat keeps the UI fresh while cutting
+    // bridge traffic and preference reads in half.
+    const interval = setInterval(() => { void sendCurrentStatus(); }, WATCH_STATUS_SYNC_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -195,9 +200,9 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
     // Read this preference at alert time. Expo Router can keep the monitor
     // mounted while Settings is open, so a value captured only on mount can
     // remain stale after the user enables Watch alerts.
-    AsyncStorage.getItem('occulert-watch')
+    getWatchAlertsEnabled(true)
       .then((enabled) => {
-        if (enabled === 'true') {
+        if (enabled) {
           return sendAlertToWatch({ level: lv, perclos: metrics.perclos, at: now });
         }
       })

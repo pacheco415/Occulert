@@ -4,6 +4,10 @@ import test from 'node:test';
 import { createWatchMonitoringMessage } from '../native-app/lib/watchMessages.ts';
 
 const watchBridge = readFileSync(new URL('../native-app/lib/watchBridge.ts', import.meta.url), 'utf8');
+const watchPreferences = readFileSync(
+  new URL('../native-app/lib/watchPreferences.ts', import.meta.url),
+  'utf8',
+);
 const alertSystem = readFileSync(new URL('../native-app/components/AlertSystem.tsx', import.meta.url), 'utf8');
 const alertReceiver = readFileSync(
   new URL('../native-app/targets/occulert-watch/AlertReceiver.swift', import.meta.url),
@@ -11,6 +15,14 @@ const alertReceiver = readFileSync(
 );
 const contentView = readFileSync(
   new URL('../native-app/targets/occulert-watch/ContentView.swift', import.meta.url),
+  'utf8',
+);
+const targetConfig = readFileSync(
+  new URL('../native-app/targets/occulert-watch/expo-target.config.js', import.meta.url),
+  'utf8',
+);
+const settingsScreen = readFileSync(
+  new URL('../native-app/app/settings.tsx', import.meta.url),
   'utf8',
 );
 
@@ -103,18 +115,62 @@ test('live status uses latest-state delivery and never queues every update', () 
   const sender = watchBridge.slice(start, end);
 
   assert.match(sender, /createWatchMonitoringMessage/);
+  assert.match(sender, /getWatchStatus\(WATCH_STATUS_CACHE_MS\)/);
   assert.match(sender, /updateApplicationContext/);
   assert.match(sender, /sendMessage/);
   assert.doesNotMatch(sender, /transferUserInfo/);
 });
 
+test('immediate alerts always refresh reachability instead of using the status cache', () => {
+  const start = watchBridge.indexOf('export async function sendAlertToWatch');
+  const end = watchBridge.indexOf('/**\n * Mirror the latest monitoring state', start);
+  assert.ok(start >= 0 && end > start, 'alert sender must be present');
+  const sender = watchBridge.slice(start, end);
+
+  assert.match(sender, /getWatchStatus\(\)/);
+  assert.doesNotMatch(sender, /WATCH_STATUS_CACHE_MS/);
+  assert.match(sender, /transferUserInfo/);
+  assert.match(sender, /sendMessage/);
+});
+
 test('the native monitor publishes live state and an explicit stop update', () => {
   assert.match(alertSystem, /sendMonitoringStatusToWatch/);
-  assert.match(alertSystem, /AsyncStorage\.getItem\('occulert-watch'\)/);
-  assert.match(alertSystem, /setInterval/);
+  assert.match(alertSystem, /const enabled = await getWatchAlertsEnabled\(\)/);
+  assert.match(alertSystem, /getWatchAlertsEnabled\(true\)/);
+  assert.doesNotMatch(alertSystem, /AsyncStorage\.getItem\('occulert-watch'\)/);
+  const intervalMatch = alertSystem.match(/WATCH_STATUS_SYNC_INTERVAL_MS\s*=\s*([\d_]+)/);
+  assert.ok(intervalMatch, 'Watch status interval must be explicit');
+  const intervalMs = Number(intervalMatch[1].replaceAll('_', ''));
+  assert.ok(intervalMs >= 2_000, 'informational Watch status must not cross the bridge every second');
+  assert.ok(intervalMs <= 5_000, 'Watch status must remain comfortably inside the freshness window');
+  assert.match(alertSystem, /setInterval[\s\S]*WATCH_STATUS_SYNC_INTERVAL_MS/);
   assert.match(alertSystem, /running: true/);
   assert.match(alertSystem, /running: false/);
   assert.match(alertSystem, /watchStatusSnapshot/);
+});
+
+test('the Watch preference cache removes repeated native storage reads', () => {
+  assert.match(watchPreferences, /cachedWatchAlertsEnabled/);
+  assert.match(watchPreferences, /pendingRead/);
+  assert.match(watchPreferences, /if \(!forceRefresh && cachedWatchAlertsEnabled !== undefined\)/);
+  assert.match(watchPreferences, /AsyncStorage\.getItem\(WATCH_ALERTS_PREFERENCE_KEY\)/);
+  assert.match(watchPreferences, /AsyncStorage\.setItem\(WATCH_ALERTS_PREFERENCE_KEY/);
+  assert.match(settingsScreen, /getWatchAlertsEnabled\(true\)/);
+  assert.match(settingsScreen, /setWatchAlertsEnabled/);
+});
+
+test('background Watch alerts use an authorized notification instead of a silent direct haptic', () => {
+  assert.match(alertReceiver, /import UserNotifications/);
+  assert.match(alertReceiver, /applicationState == \.active/);
+  assert.match(alertReceiver, /scheduleBackgroundAlert/);
+  assert.match(alertReceiver, /UNMutableNotificationContent/);
+  assert.match(alertReceiver, /interruptionLevel = \.timeSensitive/);
+  assert.match(alertReceiver, /requestAuthorization\(options: \[\.alert, \.sound\]\)/);
+  assert.match(alertReceiver, /authorizationStatus == \.authorized/);
+  assert.match(targetConfig, /'UserNotifications'/);
+  assert.match(contentView, /Enable background alerts/);
+  assert.match(contentView, /refreshNotificationAuthorization/);
+  assert.match(settingsScreen, /Queued delivery may be delayed/);
 });
 
 test('Watch status expires visibly and cannot play an alert haptic', () => {

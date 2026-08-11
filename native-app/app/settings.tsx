@@ -7,6 +7,7 @@ import type { SensitivityLevel } from '../constants/thresholds';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { openFeedback } from '../lib/feedback';
 import { getWatchStatus, sendAlertToWatch, type WatchStatus } from '../lib/watchBridge';
+import { getWatchAlertsEnabled, setWatchAlertsEnabled } from '../lib/watchPreferences';
 import { CloudSyncCard } from '../components/CloudSyncCard';
 import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
@@ -53,11 +54,11 @@ export default function SettingsScreen() {
     let active = true;
     Promise.all([
       getWatchStatus(),
-      AsyncStorage.getItem('occulert-watch'),
+      getWatchAlertsEnabled(true),
     ]).then(([status, saved]) => {
       if (!active) return;
       setWatchStatus(status);
-      setWatch(saved === 'true');
+      setWatch(saved);
     }).catch(() => {});
     return () => { active = false; };
   }, []));
@@ -71,6 +72,11 @@ export default function SettingsScreen() {
     await AsyncStorage.setItem(IN_EAR_ALERT_PATTERN_KEY, pattern);
   };
 
+  const changeWatchAlerts = async (enabled: boolean) => {
+    setWatch(enabled);
+    await setWatchAlertsEnabled(enabled);
+  };
+
   const watchDescription = !watchStatus.moduleAvailable
     ? 'Watch support is unavailable in this build'
     : !watchStatus.paired
@@ -78,8 +84,8 @@ export default function SettingsScreen() {
       : !watchStatus.appInstalled
         ? 'Install the Occulert Watch app to enable wrist alerts'
         : watchStatus.reachable
-          ? 'Connected — live wrist alerts are ready'
-          : 'Companion installed — open it for live wrist alerts';
+          ? 'Connected — enable background alerts in the Watch app'
+          : 'Companion installed — open it to finish wrist alert setup';
 
   const testWatchAlert = async () => {
     const result = await sendAlertToWatch({ level: 'alert', perclos: 0, at: Date.now() });
@@ -88,9 +94,9 @@ export default function SettingsScreen() {
     if (!result.accepted) {
       Alert.alert('Watch unavailable', 'Open Occulert on your Apple Watch, then try again.');
     } else if (result.reachable) {
-      Alert.alert('Watch test sent', 'Your Apple Watch should alert and vibrate now.');
+      Alert.alert('Watch test sent', 'Check your Apple Watch for the alert and wrist tap.');
     } else {
-      Alert.alert('Watch test queued', 'Open Occulert on your Apple Watch to receive the test alert.');
+      Alert.alert('Watch test queued', 'Open Occulert on your Apple Watch and enable background alerts. Queued delivery may be delayed.');
     }
   };
 
@@ -164,7 +170,7 @@ export default function SettingsScreen() {
                 <Text style={s.sub}>{watchDescription}</Text>
               </View>
             </View>
-            <Switch disabled={!watchAvailable} value={watch && watchAvailable} onValueChange={v => tog('occulert-watch', v, setWatch)} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
+            <Switch disabled={!watchAvailable} value={watch && watchAvailable} onValueChange={changeWatchAlerts} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
           </View>
           <View style={s.div} />
           <TouchableOpacity

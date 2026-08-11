@@ -4,9 +4,9 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 ★ = top-priority milestone for each phase
 
-**Last updated: 2026-08-03** — statuses below reflect private TestFlight build
+**Last updated: 2026-08-05** — statuses below reflect private TestFlight build
 20 and the current development source. See `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`,
-and issue #6 for the remaining validation and product gaps.
+`SAFE_STOP_HANDOFF.md`, and issue #6 for the remaining validation and product gaps.
 
 ---
 
@@ -20,8 +20,14 @@ and issue #6 for the remaining validation and product gaps.
 | Add user-controlled sensitivity slider (low / medium / high) | — | Done |
 | Capture structured correct / false / missed alert feedback | — | Done in private TestFlight build 13 |
 | Audit background reliability (screen-off, app-backgrounded) | — | Partial |
+| Offer a safe-stop Maps handoff after a confirmed alert | — | Implemented in source; physical-device verification pending |
 | Land a pilot fleet (rideshare, delivery, or trucking partner) | ★ | Not started |
 | Tighten safety disclaimers and credibility documentation | — | Done |
+
+The safe-stop handoff offers rest-area, gas-station, and food/coffee searches.
+It stops and saves the foreground camera session before opening Maps, does not
+add GPS collection, and must only be used after parking or by a passenger. See
+`SAFE_STOP_HANDOFF.md` for the exact boundary and validation checklist.
 
 ---
 
@@ -112,7 +118,7 @@ complication remain separate future work.
 
 | Phase | Focus | Key Milestones | Status |
 |-------|-------|------------------|--------|
-| 0 · Foundation | Accuracy & pilots | Detection validation, pilot fleet | Not started |
+| 0 · Foundation | Accuracy & pilots | Detection validation, safe-stop handoff, pilot fleet | Partial (handoff implemented; formal benchmark and pilot partner pending) |
 | 1 · Earbuds | Head & heart signals | Head-nod detection, directional alerts | Partial (audio routing and local motion diagnostics implemented; calibration and directional alerts open) |
 | 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (wrist alerts done; live in-app Watch status and local read-only Apple Health context implemented in source; pre-drive score and complication deferred) |
 | 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Partial (protected fleet session history implemented in source; fusion not started) |

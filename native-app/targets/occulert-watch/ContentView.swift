@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
   @EnvironmentObject private var receiver: AlertReceiver
+  @Environment(\.scenePhase) private var scenePhase
 
   private var alertColor: Color {
     switch receiver.lastLevel {
@@ -97,6 +98,21 @@ struct ContentView: View {
             .foregroundStyle(alertColor)
         }
 
+        if !receiver.backgroundAlertsAuthorized {
+          Divider()
+          Text(receiver.backgroundAlertsText)
+            .font(.caption2)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(.secondary)
+          if receiver.canRequestBackgroundAlerts {
+            Button("Enable background alerts") {
+              receiver.requestBackgroundAlertAuthorization()
+            }
+            .font(.caption2)
+            .buttonStyle(.borderedProminent)
+          }
+        }
+
         Divider()
         Text(receiver.connectionText)
           .font(.caption2)
@@ -109,6 +125,11 @@ struct ContentView: View {
           .foregroundStyle(.secondary)
       }
       .padding(.horizontal, 8)
+    }
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active {
+        receiver.refreshNotificationAuthorization()
+      }
     }
   }
 
