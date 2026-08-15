@@ -1,0 +1,270 @@
+/*
+ * Occulert Liquid Glass
+ * Shared spatial material layer for the marketing, account, driver, and fleet
+ * surfaces. Page-specific layout stays in each page; this file supplies the
+ * common material, lighting, controls, focus treatment, and accessibility
+ * fallbacks used by the homepage.
+ */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #06101f;
+  --bg2: #0a1525;
+  --surface: rgba(13, 26, 43, 0.9);
+  --surface2: rgba(16, 31, 50, 0.92);
+  --top-bg: rgba(12, 24, 40, 0.64);
+  --nav-bg: rgba(12, 24, 40, 0.64);
+  --mobile-bg: rgba(10, 22, 38, 0.9);
+  --card-bg: rgba(13, 26, 43, 0.82);
+  --input-bg: rgba(6, 18, 34, 0.74);
+  --border: rgba(255, 255, 255, 0.1);
+  --border2: rgba(255, 255, 255, 0.18);
+  --input-border: rgba(255, 255, 255, 0.18);
+  --text: #f7f9ff;
+  --text2: #a9b8cc;
+  --text3: #7890aa;
+  --glass: rgba(20, 39, 63, 0.56);
+  --glass-strong: rgba(15, 31, 52, 0.82);
+  --glass-line: rgba(255, 255, 255, 0.18);
+  --glass-highlight: rgba(255, 255, 255, 0.13);
+  --glass-shadow: 0 24px 70px rgba(0, 8, 23, 0.42), inset 0 1px 0 var(--glass-highlight);
+  --glass-shadow-soft: 0 18px 48px rgba(0, 7, 20, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --focus-ring: #7cb0ff;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eaf3ff;
+  --bg2: #dfeeff;
+  --surface: rgba(250, 253, 255, 0.9);
+  --surface2: rgba(240, 247, 255, 0.94);
+  --top-bg: rgba(244, 249, 255, 0.68);
+  --nav-bg: rgba(244, 249, 255, 0.68);
+  --mobile-bg: rgba(244, 249, 255, 0.94);
+  --card-bg: rgba(250, 253, 255, 0.82);
+  --input-bg: rgba(255, 255, 255, 0.7);
+  --border: rgba(38, 72, 112, 0.13);
+  --border2: rgba(38, 72, 112, 0.23);
+  --input-border: rgba(38, 72, 112, 0.22);
+  --text: #102239;
+  --text2: #465d78;
+  --text3: #627994;
+  --glass: rgba(250, 253, 255, 0.58);
+  --glass-strong: rgba(250, 253, 255, 0.84);
+  --glass-line: rgba(255, 255, 255, 0.86);
+  --glass-highlight: rgba(255, 255, 255, 0.94);
+  --glass-shadow: 0 24px 70px rgba(50, 88, 130, 0.17), inset 0 1px 0 var(--glass-highlight);
+  --glass-shadow-soft: 0 18px 48px rgba(50, 88, 130, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  --focus-ring: #175fda;
+}
+
+html {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 86% 7%, rgba(72, 135, 255, 0.23), transparent 31rem),
+    radial-gradient(circle at 3% 38%, rgba(0, 199, 232, 0.14), transparent 28rem),
+    radial-gradient(circle at 82% 76%, rgba(113, 72, 232, 0.11), transparent 30rem),
+    linear-gradient(155deg, var(--bg), var(--bg2));
+  background-attachment: fixed;
+  color: var(--text);
+  isolation: isolate;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.32;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 76%);
+  mask-image: linear-gradient(to bottom, #000, transparent 76%);
+}
+
+:root :is(.top, body > nav, body > header.top) {
+  top: max(10px, env(safe-area-inset-top));
+  margin: 10px 16px 0;
+  height: auto;
+  padding: 10px 20px;
+  border: 1px solid var(--glass-line);
+  border-radius: 24px;
+  background: var(--nav-bg);
+  -webkit-backdrop-filter: blur(28px) saturate(175%);
+  backdrop-filter: blur(28px) saturate(175%);
+  box-shadow: var(--glass-shadow);
+}
+
+body > nav {
+  left: 0;
+  right: 0;
+  width: auto;
+}
+
+:root :is(.logo-mark, .brand-mark) {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: linear-gradient(145deg, rgba(77, 140, 255, 0.96), rgba(45, 198, 230, 0.78));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 9px 24px rgba(38, 105, 235, 0.28);
+}
+
+:root :is(.card, .feature, .step, .item, .history-item, .faq-item, .device-card, .install-section, .contact, .driver, .metric, .mini > div) {
+  border-color: var(--glass-line);
+  border-radius: 24px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), transparent 42%),
+    var(--card-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: blur(18px) saturate(145%);
+  box-shadow: var(--glass-shadow-soft);
+}
+
+:root :is(a.card, .feature, .step, .contact, .driver) {
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+:root :is(a.card, .feature, .step, .contact):hover {
+  transform: translateY(-3px);
+  border-color: rgba(108, 166, 255, 0.62);
+  box-shadow: 0 24px 60px rgba(0, 9, 28, 0.3), inset 0 1px 0 var(--glass-highlight);
+}
+
+:root :is(.notice, .note, .privacy-banner, .privacy-note, .disclaimer, .status.show, .stats-row, .toolbar, .auth-tabs) {
+  border-color: var(--glass-line);
+  border-radius: 20px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: var(--glass-shadow-soft);
+}
+
+:root :is(.btn, button, .back-link, .theme-toggle, .theme-toggle-mobile, .hamburger) {
+  min-height: 42px;
+  border-color: var(--glass-line);
+  border-radius: 15px;
+  background: var(--glass);
+  color: var(--text);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+:root :is(.btn.primary, .btn-primary, .launch, button.primary) {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  background: linear-gradient(145deg, #4c8cff, #2f6fe8) !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), 0 12px 28px rgba(38, 105, 235, 0.31);
+}
+
+:root :is(.btn.green, button.green, .btn.good) {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: linear-gradient(145deg, #24c997, #0d9d78) !important;
+  color: #03251c !important;
+}
+
+:root :is(input, select, textarea) {
+  border-color: var(--input-border);
+  border-radius: 15px;
+  background: var(--input-bg);
+  color: var(--text);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+:root :is(input, select, textarea):focus {
+  border-color: #6ca6ff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(76, 140, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+:root :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+:root :is(h1, .page-title, .section-title) {
+  text-wrap: balance;
+  letter-spacing: -0.035em;
+}
+
+:root :is(.badge, .pill) {
+  border-color: var(--glass-line);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+}
+
+:root :is(footer, .footer) {
+  border-top-color: var(--glass-line);
+  background: rgba(7, 17, 31, 0.78);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+[data-theme="light"] :is(footer, .footer) {
+  background: rgba(228, 239, 251, 0.84);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root :is(.top, body > nav, body > header.top, .card, .feature, .step, .item, .history-item, .faq-item, .device-card, .install-section, .contact, .driver, .notice, .note, .privacy-banner, .privacy-note, .disclaimer, .status.show, .stats-row, .toolbar, .auth-tabs, .btn, button, input, select, textarea) {
+    background: var(--surface2);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root :is(.top, body > nav, body > header.top, .card, .feature, .step, .item, .history-item, .faq-item, .device-card, .install-section, .contact, .driver, .notice, .note, .privacy-banner, .privacy-note, .disclaimer, .status.show, .stats-row, .toolbar, .auth-tabs, .btn, button, input, select, textarea) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--surface2);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root,
+  [data-theme="dark"] {
+    --glass-line: rgba(255, 255, 255, 0.42);
+    --border: rgba(255, 255, 255, 0.3);
+  }
+
+  :root :is(.top, body > nav, body > header.top, .card, .feature, .step, .item, .history-item, .faq-item, .device-card, .install-section, .contact, .driver, .notice, .note, .privacy-banner, .privacy-note, .disclaimer, .status.show, .stats-row, .toolbar, .auth-tabs) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--surface2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 720px) {
+  :root :is(.top, body > nav, body > header.top) {
+    top: max(6px, env(safe-area-inset-top));
+    margin: 8px 10px 0;
+    padding: 8px 14px;
+    border-radius: 21px;
+    -webkit-backdrop-filter: blur(20px) saturate(165%);
+    backdrop-filter: blur(20px) saturate(165%);
+  }
+
+  :root :is(.card, .feature, .step, .item, .history-item, .faq-item, .device-card, .install-section, .contact, .driver) {
+    border-radius: 20px;
+    -webkit-backdrop-filter: blur(14px) saturate(135%);
+    backdrop-filter: blur(14px) saturate(135%);
+  }
+}

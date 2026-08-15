@@ -87,6 +87,39 @@ for (let index = 1; index <= 4; index += 1) {
 }
 assertIncludes("sw.js", "'/homepage.css'", "service worker must cache the external homepage stylesheet");
 assertIncludes("sw.js", "'/homepage.js'", "service worker must cache the external homepage behavior script");
+assertIncludes("sw.js", "'/liquid-glass.css'", "service worker must cache the shared Liquid Glass stylesheet");
+for (const path of [
+  "about.html",
+  "accept-invite.html",
+  "account.html",
+  "app-ai-v3.html",
+  "app-v2.html",
+  "app.html",
+  "driver-profiles.html",
+  "faq.html",
+  "features.html",
+  "fleet-dashboard.html",
+  "fleet-onboarding.html",
+  "how-it-works.html",
+  "install.html",
+  "login.html",
+  "pilot-leads.html",
+  "pilot-signup.html",
+  "privacy.html",
+  "product-hub.html",
+  "safety.html",
+  "session-history.html",
+]) {
+  assertIncludes(path, '<link rel="stylesheet" href="/liquid-glass.css" />', `${path} must use the shared Liquid Glass design layer`);
+}
+for (const accessibilityBoundary of [
+  "prefers-reduced-transparency",
+  "prefers-contrast: more",
+  "prefers-reduced-motion: reduce",
+  "@supports not ((backdrop-filter",
+]) {
+  assertIncludes("liquid-glass.css", accessibilityBoundary, `Liquid Glass must preserve the ${accessibilityBoundary} fallback`);
+}
 assertIncludes("app.html", "<link rel=\"stylesheet\" href=\"/driver-app.css\" />", "driver app must load its external stylesheet");
 assertNotIncludes("app.html", "<style>", "driver app must keep its styles out of the HTML document");
 assertIncludes("driver-app.css", "--overlay-dim", "driver app stylesheet must preserve display-intensity controls");
