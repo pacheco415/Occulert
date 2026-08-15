@@ -106,6 +106,43 @@ test('signed-out submits never reach the network', async () => {
   assert.match(el('status').textContent, /Sign in first/);
 });
 
+test('signed-out passkey enrollment never reaches the provider', async () => {
+  let registrations = 0;
+  const { context, el } = boot({ user: null, updateEmail: noCall, updatePassword: noCall });
+  context.window.OcculertPasskeys = {
+    isSupported: () => true,
+    register: () => { registrations += 1; return Promise.resolve({}); },
+    message: () => 'mapped passkey error',
+  };
+
+  await context.registerPasskey();
+  assert.equal(registrations, 0);
+  assert.match(el('passkeyStatus').textContent, /Sign in with your email and password/);
+});
+
+test('passkey names are escaped and removal requires confirmation', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  let removals = 0;
+  const { context, el } = boot({
+    user: { id: 'u1', email: 'driver@example.com' },
+    updateEmail: noCall,
+    updatePassword: noCall,
+  });
+  context.window.OcculertPasskeys = {
+    isSupported: () => true,
+    list: () => Promise.resolve([]),
+    remove: () => { removals += 1; return Promise.resolve({}); },
+    message: () => 'mapped passkey error',
+  };
+  context.window.confirm = () => false;
+  context.renderPasskeys([{ id, friendly_name: '<img src=x onerror=alert(1)>', created_at: '2026-08-15T00:00:00Z' }]);
+
+  assert.doesNotMatch(el('passkeyList').innerHTML, /<img/);
+  assert.match(el('passkeyList').innerHTML, /&lt;img/);
+  await context.removePasskey(id);
+  assert.equal(removals, 0);
+});
+
 test('short passwords are rejected before any request', async () => {
   const { context, el } = boot({
     user: { id: 'u1', email: 'driver@example.com' },

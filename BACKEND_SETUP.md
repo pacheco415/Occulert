@@ -31,6 +31,35 @@ run only `db/migrations/20260719_secure_fleet_invitations.sql`. It adds the
 one-fleet-per-owner constraint, protected invitation table, and atomic
 service-role-only acceptance function without recreating existing policies.
 
+### Passkey authentication (experimental)
+
+Supabase passkey support is experimental and requires a separate production
+configuration gate. Before enabling the passkey controls for a live pilot:
+
+1. In Supabase, open Authentication -> Passkeys and enable passkey
+   authentication.
+2. Set the Relying Party Display Name to `Occulert`.
+3. Set the Relying Party ID to `occulert.com`. Do not include a scheme, path,
+   or `www`.
+4. Allow these production origins:
+   - `https://occulert.com`
+   - `https://www.occulert.com`
+5. Keep the RP ID stable. Changing it invalidates every passkey registered
+   against the prior RP ID.
+
+Vercel's generated `*.vercel.app` previews and `127.0.0.1` are not subdomains
+of `occulert.com`, so they cannot complete the production WebAuthn ceremony.
+Use automated contract tests before merge, then perform the first enrollment
+and sign-in on the production Occulert domain after configuration. A future
+custom preview such as `passkey-preview.occulert.com` can be added as another
+allowed origin without changing the RP ID.
+
+Passkeys already visible in a password manager do not automatically migrate
+into Supabase Auth. The account must first sign in with its confirmed email and
+password, then register a new passkey from Account Settings. Email/password and
+the privacy-safe reset-link flow remain available for recovery. If the
+experimental provider is disabled, those existing methods continue to work.
+
 ## 2. Collect your keys
 
 From Project Settings -> API, copy:
@@ -99,6 +128,9 @@ for the existing project before enabling fleet onboarding.
 - [x] Full fleet/driver/session/event schema applied and verified
 - [x] `SUPABASE_ANON_KEY` environment variable set in Vercel and deployment verified
 - [x] Frontend wired with authenticated API calls and local fallback
+- [x] Passkey sign-in, enrollment, rename, and revocation implemented with a pinned Supabase SDK
+- [ ] Supabase passkey provider enabled with the stable `occulert.com` RP configuration
+- [ ] First production-domain enrollment and sign-in verified on a physical Apple device
 - [x] Row Level Security and service-role invitation boundaries independently verified
 - [x] Trusted fleet invitation/administration flow implemented in code
 - [x] Secure fleet invitation migration applied and independently verified

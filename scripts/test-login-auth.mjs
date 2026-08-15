@@ -40,7 +40,7 @@ function makeElement(id) {
 
 function boot({ resetResult = { ok: true, body: {} } } = {}) {
   const elements = new Map();
-  const calls = { auth: [], reset: [] };
+  const calls = { auth: [], reset: [], passkey: 0 };
   const context = {
     console,
     JSON,
@@ -62,10 +62,18 @@ function boot({ resetResult = { ok: true, body: {} } } = {}) {
     passwordResetMessage: () => 'mapped reset failure',
     isEmailRateLimited: () => false,
   };
+  context.window.OcculertPasskeys = {
+    isSupported: () => true,
+    message: () => 'mapped passkey failure',
+  };
   context.window.OcculertAuth = {
     getProfile: () => null,
     onAuth(callback) { callback(null, null); },
     signOut: () => Promise.resolve(),
+    signInPasskey() {
+      calls.passkey += 1;
+      return Promise.resolve({ role: 'driver', email: 'driver@example.com', authenticated: true });
+    },
     signInEmail(email, password, mode, extra) {
       calls.auth.push({ email, password, mode, extra });
       return Promise.resolve({ role: extra.role || 'driver', email, authenticated: true });
@@ -83,6 +91,17 @@ test('sign-in shows only email and password fields', () => {
   assert.equal(el('passwordField').classList.contains('hidden'), false);
   assert.equal(el('submitBtn').textContent, 'Sign In');
   assert.equal(el('forgotPasswordBtn').classList.contains('hidden'), false);
+  assert.equal(el('passkeyEntry').classList.contains('hidden'), false);
+});
+
+test('passkey sign-in does not require email or password input', async () => {
+  const { context, calls, el } = boot();
+  await context.signInPasskey();
+
+  assert.equal(calls.passkey, 1);
+  assert.equal(calls.auth.length, 0);
+  assert.match(el('status').textContent, /Signed in with your passkey/);
+  assert.equal(el('passkeySignInBtn').disabled, false);
 });
 
 test('account creation reveals setup fields and sends them only for signup', async () => {
@@ -97,6 +116,7 @@ test('account creation reveals setup fields and sends them only for signup', asy
   await context.submitAuth({ preventDefault });
 
   assert.equal(el('profileFields').classList.contains('hidden'), false);
+  assert.equal(el('passkeyEntry').classList.contains('hidden'), true);
   assert.equal(calls.auth[0].mode, 'signup');
   assert.equal(JSON.stringify(calls.auth[0].extra), JSON.stringify({ role: 'fleet', name: 'Fleet Owner', company: 'Pilot Fleet', vehicle: 'Route 12' }));
 

@@ -86,13 +86,23 @@ window.OcculertBackend = (function () {
     return mode === "signup" ? "The account could not be created. Please try again." : "Sign-in failed. Check your email and password, then try again.";
   }
 
-  function persistFrom(body) {
+  function adoptSession(body) {
+    if (!body || !body.access_token || !body.refresh_token || !body.user || !body.user.id) return null;
+    var expiresAt = Number(body.expires_at);
+    if (!Number.isFinite(expiresAt)) {
+      expiresAt = Math.floor(Date.now() / 1000) + (Number(body.expires_in) || 3600) - 60;
+    }
     saveAuth({
       access_token: body.access_token,
       refresh_token: body.refresh_token,
-      expires_at: Math.floor(Date.now() / 1000) + (body.expires_in || 3600) - 60,
+      expires_at: expiresAt,
       user: body.user ? { id: body.user.id, email: body.user.email } : null,
     });
+    return loadAuth();
+  }
+
+  function persistFrom(body) {
+    adoptSession(body);
   }
 
   function signUp(email, password) {
@@ -335,6 +345,9 @@ window.OcculertBackend = (function () {
 
   return {
     isConfigured: isConfigured,
+    getAuthConfig: loadConfig,
+    getSession: refreshIfNeeded,
+    adoptSession: adoptSession,
     authMessage: authMessage,
     isEmailRateLimited: isEmailRateLimited,
     signUp: signUp,

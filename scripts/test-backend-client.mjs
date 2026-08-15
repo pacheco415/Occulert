@@ -100,6 +100,15 @@ assert.equal(JSON.parse(resetCall.body).email, "driver@example.com");
 const signedIn = await backend.signIn("driver@example.com", "password123");
 assert.equal(signedIn.ok, true);
 assert.equal(backend.currentUser().id, "user-1");
+assert.equal((await backend.getSession()).access_token, "access-token");
+const adopted = backend.adoptSession({
+  access_token: "passkey-access",
+  refresh_token: "passkey-refresh",
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+  user: { id: "user-1", email: "driver@example.com" },
+});
+assert.equal(adopted.access_token, "passkey-access");
+backend.adoptSession(signedIn.body);
 assert.equal((await backend.ensureDriverProfile({ name: "Test Driver", vehicle: "Van 12" })).ok, true);
 assert.equal((await backend.startSession()).body.session.id, "session-1");
 assert.equal((await backend.logEvent("session-1", "drowsy", { fatigue_score: 80 })).ok, true);
