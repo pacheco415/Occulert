@@ -5,8 +5,8 @@ import vm from 'node:vm';
 
 const source = readFileSync(new URL('../passkey-auth.js', import.meta.url), 'utf8');
 
-function boot({ supported = true, signInError = null } = {}) {
-  const calls = { create: [], adopted: [], sessions: [], register: 0, list: 0, update: [], remove: [], signOut: [] };
+function boot({ supported = true, signInError = null, sdkAvailable = true, configAvailable = true } = {}) {
+  const calls = { create: [], adopted: [], sessions: [], register: 0, list: 0, update: [], remove: [], signOut: [], loader: 0, refreshConfig: 0 };
   const session = {
     access_token: 'existing-access',
     refresh_token: 'existing-refresh',
@@ -41,18 +41,32 @@ function boot({ supported = true, signInError = null } = {}) {
       },
     },
   };
+  const sdk = {
+    createClient(url, key, options) {
+      calls.create.push({ url, key, options });
+      return client;
+    },
+  };
   const window = {
     isSecureContext: supported,
     PublicKeyCredential: supported ? function PublicKeyCredential() {} : undefined,
     navigator: { credentials: supported ? {} : undefined },
-    supabase: {
-      createClient(url, key, options) {
-        calls.create.push({ url, key, options });
-        return client;
+    supabase: sdkAvailable ? sdk : undefined,
+    OcculertSupabaseLoader: {
+      load() {
+        calls.loader += 1;
+        if (!sdkAvailable) {
+          const error = new Error('sdk_load_failed');
+          error.code = 'sdk_load_failed';
+          return Promise.reject(error);
+        }
+        return Promise.resolve(sdk);
       },
+      retry() { return this.load(); },
     },
     OcculertBackend: {
-      getAuthConfig: async () => ({ configured: true, url: 'https://example.supabase.co', anonKey: 'public-key' }),
+      getAuthConfig: async () => configAvailable ? ({ configured: true, url: 'https://example.supabase.co', anonKey: 'public-key' }) : null,
+      refreshAuthConfig: async () => { calls.refreshConfig += 1; return configAvailable ? ({ configured: true, url: 'https://example.supabase.co', anonKey: 'public-key' }) : null; },
       getSession: async () => session,
       adoptSession(value) { calls.adopted.push(value); return value; },
     },
@@ -109,4 +123,20 @@ test('passkey errors are mapped to actionable messages without exposing raw serv
   assert.match(message, /not registered with this Occulert account/);
   assert.doesNotMatch(message, /database detail/);
   assert.match(passkeys.message({ name: 'SecurityError', message: 'RP ID mismatch' }, 'signin'), /approved Occulert domain/);
+  assert.match(passkeys.message({ code: 'sdk_load_failed' }, 'signin'), /Safari could not load Occulert's secure passkey helper/);
+  assert.match(passkeys.message({ code: 'auth_config_unavailable' }, 'signin'), /could not load account settings/);
+  assert.match(passkeys.message({ code: 'passkey_disabled' }, 'signin'), /not enabled for Occulert/);
+  assert.equal(passkeys.canRetry({ code: 'sdk_load_failed' }), true);
+  assert.equal(passkeys.canRetry({ code: 'auth_config_unavailable' }), true);
+  assert.equal(passkeys.canRetry({ code: 'passkey_disabled' }), false);
+  assert.equal(passkeys.canRetry({ code: 'sdk_unavailable' }), false);
+});
+
+test('missing browser SDK and runtime auth settings report distinct retryable failures', async () => {
+  const missingSdk = boot({ sdkAvailable: false });
+  await assert.rejects(missingSdk.passkeys.signIn(), /sdk_load_failed/);
+  assert.equal(missingSdk.calls.loader, 1);
+
+  const missingConfig = boot({ configAvailable: false });
+  await assert.rejects(missingConfig.passkeys.signIn(), /auth_config_unavailable/);
 });

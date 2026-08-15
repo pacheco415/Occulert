@@ -26,6 +26,10 @@ function makeElement(id) {
       add: (c) => classes.add(c),
       remove: (c) => classes.delete(c),
       contains: (c) => classes.has(c),
+      toggle(c, force) {
+        if (force === undefined ? !classes.has(c) : force) classes.add(c);
+        else classes.delete(c);
+      },
     },
     setAttribute() {},
     getAttribute() { return 'dark'; },

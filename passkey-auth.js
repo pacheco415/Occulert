@@ -40,6 +40,15 @@
     if (text.indexOf("passkey_disabled") >= 0) {
       return "Passkey authentication is not enabled for Occulert yet. Use email and password for now.";
     }
+    if (text.indexOf("sdk_load_failed") >= 0 || text.indexOf("sdk_load_timeout") >= 0) {
+      return "Safari could not load Occulert's secure passkey helper. Check content blockers or your connection, then retry.";
+    }
+    if (text.indexOf("sdk_unavailable") >= 0) {
+      return "This browser loaded an incompatible passkey helper. Reload the page or use email and password.";
+    }
+    if (text.indexOf("auth_config_unavailable") >= 0 || text.indexOf("cloud_not_configured") >= 0) {
+      return "Occulert could not load account settings. Check your connection, then retry.";
+    }
     if (text.indexOf("webauthn_credential_not_found") >= 0) {
       return "That passkey is not registered with this Occulert account. Sign in with your password and add a new passkey in Account Settings.";
     }
@@ -64,9 +73,6 @@
     if (text.indexOf("sign_in_required") >= 0) {
       return "Sign in with your email and password before managing passkeys.";
     }
-    if (text.indexOf("cloud_not_configured") >= 0 || text.indexOf("sdk_unavailable") >= 0) {
-      return "Occulert passkeys are not configured on this site yet. Use email and password for now.";
-    }
     if (text.indexOf("failed to fetch") >= 0 || text.indexOf("network") >= 0 || text.indexOf("cloud_unavailable") >= 0) {
       return "Occulert could not reach the account service. Check your connection and try again.";
     }
@@ -75,18 +81,42 @@
     return "Passkey sign-in failed. Try again or use your email and password.";
   }
 
-  function getClient() {
-    if (!isSupported()) return Promise.reject(codedError("passkey_unsupported"));
-    if (!window.supabase || typeof window.supabase.createClient !== "function") {
-      return Promise.reject(codedError("sdk_unavailable"));
-    }
+  function canRetry(error) {
+    var text = errorText(error);
+    return ["sdk_load_failed", "sdk_load_timeout", "auth_config_unavailable", "cloud_not_configured", "failed to fetch", "network", "cloud_unavailable"]
+      .some(function (value) { return text.indexOf(value) >= 0; });
+  }
+
+  function loadSdk(force) {
+    if (window.supabase && typeof window.supabase.createClient === "function") return Promise.resolve(window.supabase);
+    var loader = window.OcculertSupabaseLoader;
+    if (!loader || typeof loader.load !== "function") return Promise.reject(codedError("sdk_load_failed"));
+    return (force && typeof loader.retry === "function" ? loader.retry() : loader.load()).then(function (sdk) {
+      if (!sdk || typeof sdk.createClient !== "function") throw codedError("sdk_unavailable");
+      return sdk;
+    });
+  }
+
+  function loadAuthConfig(force) {
     if (!window.OcculertBackend || typeof window.OcculertBackend.getAuthConfig !== "function") {
-      return Promise.reject(codedError("cloud_not_configured"));
+      return Promise.reject(codedError("auth_config_unavailable"));
     }
+    var load = force && typeof window.OcculertBackend.refreshAuthConfig === "function"
+      ? window.OcculertBackend.refreshAuthConfig
+      : window.OcculertBackend.getAuthConfig;
+    return Promise.resolve(load()).then(function (config) {
+      if (!config || !config.url || !config.anonKey) throw codedError("auth_config_unavailable");
+      return config;
+    });
+  }
+
+  function getClient(force) {
+    if (!isSupported()) return Promise.reject(codedError("passkey_unsupported"));
+    if (force) clientPromise = null;
     if (!clientPromise) {
-      clientPromise = window.OcculertBackend.getAuthConfig().then(function (config) {
-        if (!config || !config.url || !config.anonKey) throw codedError("cloud_not_configured");
-        return window.supabase.createClient(config.url, config.anonKey, {
+      clientPromise = Promise.all([loadSdk(force), loadAuthConfig(force)]).then(function (values) {
+        var sdk = values[0], config = values[1];
+        return sdk.createClient(config.url, config.anonKey, {
           auth: {
             persistSession: false,
             autoRefreshToken: false,
@@ -100,6 +130,11 @@
       });
     }
     return clientPromise;
+  }
+
+  async function retry() {
+    clientPromise = null;
+    await Promise.all([loadSdk(true), loadAuthConfig(true)]);
   }
 
   async function authenticatedClient() {
@@ -174,6 +209,8 @@
   window.OcculertPasskeys = {
     isSupported: isSupported,
     message: message,
+    canRetry: canRetry,
+    retry: retry,
     signIn: signIn,
     register: register,
     list: list,
