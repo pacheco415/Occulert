@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { createCachedBooleanPreference } from '../native-app/lib/cachedBooleanPreference.ts';
 import { createWatchMonitoringMessage } from '../native-app/lib/watchMessages.ts';
 
 const watchBridge = readFileSync(new URL('../native-app/lib/watchBridge.ts', import.meta.url), 'utf8');
@@ -150,13 +151,105 @@ test('the native monitor publishes live state and an explicit stop update', () =
 });
 
 test('the Watch preference cache removes repeated native storage reads', () => {
-  assert.match(watchPreferences, /cachedWatchAlertsEnabled/);
-  assert.match(watchPreferences, /pendingRead/);
-  assert.match(watchPreferences, /if \(!forceRefresh && cachedWatchAlertsEnabled !== undefined\)/);
-  assert.match(watchPreferences, /AsyncStorage\.getItem\(WATCH_ALERTS_PREFERENCE_KEY\)/);
-  assert.match(watchPreferences, /AsyncStorage\.setItem\(WATCH_ALERTS_PREFERENCE_KEY/);
+  assert.match(watchPreferences, /createCachedBooleanPreference/);
+  assert.match(watchPreferences, /watchAlertsPreference\.get\(forceRefresh\)/);
+  assert.match(watchPreferences, /watchAlertsPreference\.set\(enabled\)/);
   assert.match(settingsScreen, /getWatchAlertsEnabled\(true\)/);
   assert.match(settingsScreen, /setWatchAlertsEnabled/);
+});
+
+test('the Watch preference cache reuses reads and supports an explicit refresh', async () => {
+  let value = 'true';
+  let reads = 0;
+  const preference = createCachedBooleanPreference({
+    async getItem() {
+      reads += 1;
+      return value;
+    },
+    async setItem(_key, nextValue) {
+      value = nextValue;
+    },
+  }, 'watch-alerts');
+
+  assert.equal(await preference.get(), true);
+  assert.equal(await preference.get(), true);
+  assert.equal(reads, 1);
+  value = 'false';
+  assert.equal(await preference.get(true), false);
+  assert.equal(reads, 2);
+});
+
+test('a stale Watch preference read cannot overwrite a newer write', async () => {
+  let resolveRead;
+  let stored = 'false';
+  const preference = createCachedBooleanPreference({
+    getItem() {
+      return new Promise((resolve) => { resolveRead = resolve; });
+    },
+    async setItem(_key, value) {
+      stored = value;
+    },
+  }, 'watch-alerts');
+
+  const staleRead = preference.get(true);
+  await Promise.resolve();
+  await preference.set(true);
+  resolveRead('false');
+
+  assert.equal(stored, 'true');
+  assert.equal(await staleRead, true);
+  assert.equal(await preference.get(), true);
+});
+
+test('overlapping Watch preference writes stay ordered', async () => {
+  const events = [];
+  let releaseFirst;
+  let stored = 'false';
+  const preference = createCachedBooleanPreference({
+    async getItem() {
+      return stored;
+    },
+    async setItem(_key, value) {
+      events.push(`start:${value}`);
+      if (value === 'true') {
+        await new Promise((resolve) => { releaseFirst = resolve; });
+      }
+      stored = value;
+      events.push(`end:${value}`);
+    },
+  }, 'watch-alerts');
+
+  const first = preference.set(true);
+  const second = preference.set(false);
+  await Promise.resolve();
+  assert.deepEqual(events, ['start:true']);
+  releaseFirst();
+  await Promise.all([first, second]);
+
+  assert.deepEqual(events, ['start:true', 'end:true', 'start:false', 'end:false']);
+  assert.equal(stored, 'false');
+  assert.equal(await preference.get(), false);
+});
+
+test('a failed Watch preference write does not poison the cache', async () => {
+  let stored = 'true';
+  let failNextWrite = true;
+  const preference = createCachedBooleanPreference({
+    async getItem() {
+      return stored;
+    },
+    async setItem(_key, value) {
+      if (failNextWrite) {
+        failNextWrite = false;
+        throw new Error('storage unavailable');
+      }
+      stored = value;
+    },
+  }, 'watch-alerts');
+
+  assert.equal(await preference.get(), true);
+  await assert.rejects(preference.set(false), /storage unavailable/);
+  assert.equal(await preference.get(), true);
 });
 
 test('background Watch alerts use an authorized notification instead of a silent direct haptic', () => {
