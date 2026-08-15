@@ -252,6 +252,26 @@ test('a failed Watch preference write does not poison the cache', async () => {
   assert.equal(await preference.get(), true);
 });
 
+test('a failed write does not discard a pending stored Watch preference', async () => {
+  let resolveRead;
+  const preference = createCachedBooleanPreference({
+    getItem() {
+      return new Promise((resolve) => { resolveRead = resolve; });
+    },
+    async setItem() {
+      throw new Error('storage unavailable');
+    },
+  }, 'watch-alerts');
+
+  const pendingRead = preference.get(true);
+  await Promise.resolve();
+  await assert.rejects(preference.set(false), /storage unavailable/);
+  resolveRead('true');
+
+  assert.equal(await pendingRead, true);
+  assert.equal(await preference.get(), true);
+});
+
 test('background Watch alerts use an authorized notification instead of a silent direct haptic', () => {
   assert.match(alertReceiver, /import UserNotifications/);
   assert.match(alertReceiver, /applicationState == \.active/);

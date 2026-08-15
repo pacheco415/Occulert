@@ -22,6 +22,7 @@ export function createCachedBooleanPreference(
   let revision = 0;
   let pendingRead: Promise<boolean> | null = null;
   let writeTail: Promise<void> = Promise.resolve();
+  let lastPersistedRevision = 0;
   let lastPersistedValue: boolean | undefined;
 
   const get = (forceRefresh = false): Promise<boolean> => {
@@ -33,11 +34,16 @@ export function createCachedBooleanPreference(
     const read = precedingWrites
       .then(() => storage.getItem(key))
       .then(async (value) => {
+        const storedValue = value === 'true';
         if (readRevision !== revision) {
           await writeTail;
-          return cached ?? fallback;
+          if (lastPersistedRevision > readRevision) {
+            return lastPersistedValue ?? fallback;
+          }
+          cached = storedValue;
+          return cached;
         }
-        cached = value === 'true';
+        cached = storedValue;
         return cached;
       })
       .catch(async () => {
@@ -53,10 +59,10 @@ export function createCachedBooleanPreference(
 
   const set = (enabled: boolean): Promise<void> => {
     const writeRevision = ++revision;
-    const operation = writeTail.then(() => storage.setItem(key, String(enabled)));
-    writeTail = operation.catch(() => {});
-    return operation.then(
+    const storageWrite = writeTail.then(() => storage.setItem(key, String(enabled)));
+    const operation = storageWrite.then(
       () => {
+        lastPersistedRevision = writeRevision;
         lastPersistedValue = enabled;
         if (writeRevision === revision) cached = enabled;
       },
@@ -67,6 +73,8 @@ export function createCachedBooleanPreference(
         throw error;
       },
     );
+    writeTail = operation.catch(() => {});
+    return operation;
   };
 
   return { get, set };
