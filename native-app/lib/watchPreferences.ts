@@ -1,9 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createCachedBooleanPreference } from './cachedBooleanPreference';
 
 export const WATCH_ALERTS_PREFERENCE_KEY = 'occulert-watch';
 
-let cachedWatchAlertsEnabled: boolean | undefined;
-let pendingRead: Promise<boolean> | null = null;
+const watchAlertsPreference = createCachedBooleanPreference(
+  AsyncStorage,
+  WATCH_ALERTS_PREFERENCE_KEY,
+);
 
 /**
  * Read the Watch-alert preference without crossing the native storage bridge
@@ -12,25 +15,9 @@ let pendingRead: Promise<boolean> | null = null;
  * synchronized during the current app process.
  */
 export async function getWatchAlertsEnabled(forceRefresh = false): Promise<boolean> {
-  if (!forceRefresh && cachedWatchAlertsEnabled !== undefined) {
-    return cachedWatchAlertsEnabled;
-  }
-  if (!forceRefresh && pendingRead) return pendingRead;
-
-  const read = AsyncStorage.getItem(WATCH_ALERTS_PREFERENCE_KEY)
-    .then((value) => {
-      cachedWatchAlertsEnabled = value === 'true';
-      return cachedWatchAlertsEnabled;
-    })
-    .catch(() => cachedWatchAlertsEnabled ?? false)
-    .finally(() => {
-      if (pendingRead === read) pendingRead = null;
-    });
-  pendingRead = read;
-  return read;
+  return watchAlertsPreference.get(forceRefresh);
 }
 
 export async function setWatchAlertsEnabled(enabled: boolean): Promise<void> {
-  await AsyncStorage.setItem(WATCH_ALERTS_PREFERENCE_KEY, String(enabled));
-  cachedWatchAlertsEnabled = enabled;
+  await watchAlertsPreference.set(enabled);
 }
