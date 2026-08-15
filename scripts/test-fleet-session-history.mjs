@@ -1,9 +1,19 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import vm from 'node:vm';
 
 function read(relativePath) {
   return readFileSync(new URL(`../${relativePath}`, import.meta.url), 'utf8');
+}
+
+function markedBlock(source, name) {
+  const startMarker = `/* ${name}:start */`;
+  const endMarker = `/* ${name}:end */`;
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker);
+  assert.ok(start >= 0 && end > start, `${name} block must be present`);
+  return source.slice(start + startMarker.length, end);
 }
 
 test('manager history is scoped through fleet sessions and excludes location fields', () => {
@@ -20,10 +30,7 @@ test('manager history is scoped through fleet sessions and excludes location fie
 
 test('dashboard keeps protected history separate from its local fallback', () => {
   const dashboard = read('fleet-dashboard.html');
-  const start = dashboard.indexOf('/* protected-session-history:start */');
-  const end = dashboard.indexOf('/* protected-session-history:end */');
-  assert.ok(start >= 0 && end > start, 'protected session history block must be present');
-  const history = dashboard.slice(start, end);
+  const history = markedBlock(dashboard, 'protected-session-history');
 
   assert.match(dashboard, /id="sessionHistory"/);
   assert.match(history, /if\(fleetMode\).*protectedSessions/s);
@@ -33,6 +40,45 @@ test('dashboard keeps protected history separate from its local fallback', () =>
   assert.match(history, /OcculertSecurity\.csvCell/);
   assert.match(history, /value===null\|\|value===undefined/);
   assert.doesNotMatch(history, /latitude|longitude|\blocation\b|camera media|\baudio\b|raw motion/i);
+});
+
+test('fleet projection preserves inactive and unmeasured driver states', () => {
+  const dashboard = read('fleet-dashboard.html');
+  const projection = markedBlock(dashboard, 'fleet-summary-projection');
+  const context = {};
+  vm.runInNewContext(`${projection};globalThis.rowsFromFleetForTest=rowsFromFleet`, context);
+
+  const rows = JSON.parse(JSON.stringify(context.rowsFromFleetForTest({
+    drivers: [
+      { id: 'no-session', name: 'No Session', active: true },
+      { id: 'inactive', name: 'Inactive Driver', active: false },
+      { id: 'measured', name: 'Measured Driver', active: true },
+    ],
+    sessions: [
+      { id: 'session-1', driver_id: 'measured', started_at: '2026-08-15T17:00:00.000Z', ended_at: null, safety_score: 64, max_fatigue: 58, alert_count: 1 },
+      { id: 'session-2', driver_id: 'inactive', started_at: '2026-08-14T17:00:00.000Z', ended_at: '2026-08-14T18:00:00.000Z', safety_score: 91, max_fatigue: 12, alert_count: 0 },
+    ],
+  })));
+
+  assert.deepEqual(rows.map(({ driverId, status, safetyScore, hasSafetyScore, hasSession, active, sessionActive }) => ({
+    driverId,
+    status,
+    safetyScore,
+    hasSafetyScore,
+    hasSession,
+    active,
+    sessionActive,
+  })), [
+    { driverId: 'no-session', status: 'NO DATA', safetyScore: null, hasSafetyScore: false, hasSession: false, active: true, sessionActive: false },
+    { driverId: 'inactive', status: 'INACTIVE', safetyScore: 91, hasSafetyScore: true, hasSession: true, active: false, sessionActive: false },
+    { driverId: 'measured', status: 'WATCH', safetyScore: 64, hasSafetyScore: true, hasSession: true, active: true, sessionActive: true },
+  ]);
+
+  assert.match(dashboard, /scoreRows=activeRows\.filter\(d=>d\.hasSafetyScore\)/);
+  assert.match(dashboard, /activeRows=rows\.filter\(d=>d\.active!==false\)/);
+  assert.match(dashboard, /events=rows\.filter\(d=>d\.hasSession\)/);
+  assert.match(dashboard, /GPS is not included/);
+  assert.doesNotMatch(projection, /!s\?'SAFE'/);
 });
 
 test('roadmap and setup docs distinguish source completion from deployment', () => {
