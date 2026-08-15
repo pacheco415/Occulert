@@ -381,7 +381,7 @@ export default function MonitorScreen() {
   const leaveMonitor = useCallback((navigate: () => void) => {
     if (stoppingRef.current) return Promise.resolve();
     return stopBeforeNavigation(
-      () => handleStopRef.current(),
+      () => handleStopRef.current({ deferCloudFinalization: true }),
       navigate,
       () => {
         Alert.alert(
@@ -407,7 +407,11 @@ export default function MonitorScreen() {
       setSensorFault(
         'Monitoring stopped when Occulert left the foreground. Restart only after you are safely parked.',
       );
-      void handleStopRef.current().catch(() => {});
+      void handleStopRef.current({ deferCloudFinalization: true }).catch(() => {
+        setSensorFault(
+          'Monitoring stopped when Occulert left the foreground, but this drive could not be saved.',
+        );
+      });
     });
     return () => subscription.remove();
   }, []);

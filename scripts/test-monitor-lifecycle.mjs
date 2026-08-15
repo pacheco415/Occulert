@@ -54,6 +54,12 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /handleStopRef\.current\(\)/);
   assert.match(monitor, /Monitoring stopped when Occulert left the foreground/);
   assert.match(monitor, /stopBeforeNavigation/);
+  assert.equal(
+    [...monitor.matchAll(/handleStopRef\.current\(\{ deferCloudFinalization: true \}\)/g)].length,
+    2,
+    'navigation and AppState shutdown must not wait for optional cloud finalization',
+  );
+  assert.match(monitor, /drive could not be saved/);
   assert.match(monitor, /leaveMonitor\(\(\) => router\.push\('\/settings'\)\)/);
   assert.match(monitor, /BackHandler\.addEventListener\('hardwareBackPress'/);
   assert.match(monitor, /if \(stoppingRef\.current\) return Promise\.resolve\(\)/);
