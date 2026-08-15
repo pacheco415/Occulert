@@ -3,6 +3,10 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createSettingPersister } from '../native-app/lib/settingPersistence.ts';
+import {
+  commitSessionHistoryEdit,
+  updateMatchingSessionRecord,
+} from '../native-app/lib/sessionHistoryEdits.ts';
 
 const require = createRequire(import.meta.url);
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -229,6 +233,73 @@ test('an older failed setting save cannot roll back a newer successful choice', 
   assert.deepEqual(events, ['start:true', 'start:false', 'end:false']);
   assert.deepEqual(applied, [true, false]);
   assert.deepEqual(errors, []);
+});
+
+test('session review mutations merge nested fields into the latest matching record', () => {
+  const target = { sessionId: 'session-1', savedAt: '2026-08-15T00:00:00.000Z' };
+  let sessions = [{
+    ...target,
+    testConditions: { lighting: 'daylight' },
+    deviceImpact: { batteryImpact: 'low' },
+  }];
+
+  sessions = updateMatchingSessionRecord(sessions, target, 0, item => ({
+    ...item,
+    testConditions: { ...item.testConditions, eyewear: 'glasses' },
+  }));
+  sessions = updateMatchingSessionRecord(sessions, target, 0, item => ({
+    ...item,
+    testConditions: { ...item.testConditions, phonePosition: 'center' },
+    deviceImpact: { ...item.deviceImpact, phoneHeat: 'warm' },
+  }));
+
+  assert.deepEqual(sessions[0].testConditions, {
+    lighting: 'daylight',
+    eyewear: 'glasses',
+    phonePosition: 'center',
+  });
+  assert.deepEqual(sessions[0].deviceImpact, {
+    batteryImpact: 'low',
+    phoneHeat: 'warm',
+  });
+});
+
+test('a failed session review edit leaves confirmed UI state intact and permits retry', async () => {
+  let sessions = [{ sessionId: 'session-1', alertAssessment: 'accurate' }];
+  const errors = [];
+  const update = item => ({ ...item, alertAssessment: 'missed_alert' });
+
+  const failed = await commitSessionHistoryEdit({
+    update,
+    persist: async () => { throw new Error('storage unavailable'); },
+    apply: mutation => { sessions = sessions.map(mutation); },
+    onError: () => errors.push('error'),
+  });
+  assert.equal(failed, false);
+  assert.equal(sessions[0].alertAssessment, 'accurate');
+  assert.deepEqual(errors, ['error']);
+
+  const retried = await commitSessionHistoryEdit({
+    update,
+    persist: async () => {},
+    apply: mutation => { sessions = sessions.map(mutation); },
+    onError: () => errors.push('unexpected'),
+  });
+  assert.equal(retried, true);
+  assert.equal(sessions[0].alertAssessment, 'missed_alert');
+  assert.deepEqual(errors, ['error']);
+});
+
+test('History commits after persistence and ignores loads started before a newer edit', () => {
+  const history = read('native-app/app/history.tsx');
+  const storage = read('native-app/lib/sessionHistory.ts');
+  assert.match(history, /await commitSessionHistoryEdit/);
+  assert.match(history, /persist: mutation => updateSessionHistory/);
+  assert.match(history, /apply: mutation => setSessions\(current/);
+  assert.match(history, /historyRevisionRef\.current === revision/);
+  assert.doesNotMatch(history, /const updated = sessions\.map/);
+  assert.match(storage, /const operation = historyQueue\.then/);
+  assert.match(storage, /historyQueue = operation\.catch/);
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {

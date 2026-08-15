@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const HISTORY_KEY = 'occulert-session-history';
 let historyQueue: Promise<void> = Promise.resolve();
 
-export function updateSessionHistory<T extends Record<string, unknown>>(
+export function updateSessionHistory<T extends object>(
   update: (sessions: T[]) => T[],
 ): Promise<void> {
   const operation = historyQueue.then(async () => {
