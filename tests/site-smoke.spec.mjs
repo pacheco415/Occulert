@@ -310,6 +310,58 @@ test("authenticated fleet dashboards never fall back to unrelated local driver d
   await expect(page.getByText("Unrelated Local Driver")).toHaveCount(0);
 });
 
+test("fleet dashboard does not turn missing or inactive telemetry into active safety scores", async ({ page }) => {
+  const now = new Date().toISOString();
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "manager-token",
+      refresh_token: "manager-refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "manager-1", email: "manager@example.com" },
+    }));
+  });
+  await page.route("**/api/fleet-summary", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      ok: true,
+      fleet: { id: "fleet-1", company_name: "Safe Transit", plan: "trial" },
+      drivers: [
+        { id: "driver-no-session", name: "No Session", active: true, vehicle_id: "Van 1" },
+        { id: "driver-inactive", name: "Inactive Driver", active: false, vehicle_id: "Van 2" },
+        { id: "driver-measured", name: "Measured Driver", active: true, vehicle_id: "Van 3" },
+      ],
+      sessions: [
+        { id: "session-inactive", driver_id: "driver-inactive", started_at: now, ended_at: now, safety_score: 91 },
+        { id: "session-measured", driver_id: "driver-measured", started_at: now, ended_at: null, safety_score: 64, max_fatigue: 58, alert_count: 1 },
+      ],
+      events: [],
+      telemetry_trust: "unverified_client_report",
+      privacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false },
+    }),
+  }));
+
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
+  await expect(page.locator("#kpiDrivers")).toHaveText("2");
+  await expect(page.locator("#kpiDriversSub")).toHaveText("1 live");
+  await expect(page.locator("#kpiScore")).toHaveText("64");
+  await expect(page.locator("#kpiScoreSub")).toHaveText("1 below 70");
+
+  const noSession = page.locator(".driver").filter({ hasText: "No Session" });
+  await expect(noSession).toContainText("NO DATA");
+  await expect(noSession).toContainText("No recorded session metrics");
+  await expect(noSession).toContainText("--");
+
+  const inactive = page.locator(".driver").filter({ hasText: "Inactive Driver" });
+  await expect(inactive).toContainText("INACTIVE");
+  await expect(page.locator("#coverageSummary")).toContainText("GPS data");
+  await expect(page.locator("#coverageSummary")).toContainText("Excluded");
+  await expect(page.locator("#map")).toContainText("GPS is not included");
+  await expect(page.locator('#riskFilter option[value="gps"]')).toBeDisabled();
+  await expect(page.locator('#riskFilter option[value="nogps"]')).toBeDisabled();
+});
+
 test("protected fleet history shows scoped events and exports formula-safe rows without coordinates", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("occulert-auth", JSON.stringify({
