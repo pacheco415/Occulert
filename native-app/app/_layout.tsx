@@ -23,7 +23,12 @@ export default function RootLayout() {
         />
         <Stack.Screen
           name="monitor"
-          options={{ title: 'Monitoring', headerBackTitle: 'Safety Check', headerShown: false }}
+          options={{
+            title: 'Monitoring',
+            headerBackTitle: 'Safety Check',
+            headerShown: false,
+            gestureEnabled: false,
+          }}
         />
         <Stack.Screen name="settings" options={{ title: 'Settings', headerBackTitle: 'Back' }} />
         <Stack.Screen name="history" options={{ title: 'Session History', headerBackTitle: 'Back' }} />
