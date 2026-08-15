@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { createSettingPersister } from '../native-app/lib/settingPersistence.ts';
 
 const require = createRequire(import.meta.url);
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -60,6 +61,165 @@ test('audio and haptic preferences are read when each alert fires', () => {
   const fire = alertSystem.slice(alertSystem.indexOf('const fire'), alertSystem.indexOf("React.useEffect(() => {\n    if (level"));
   assert.match(fire, /AsyncStorage\.getItem\('occulert-haptic'\)/);
   assert.match(fire, /AsyncStorage\.getItem\('occulert-audio'\)/);
+});
+
+test('native Settings reports persistence failures and restores the confirmed value', () => {
+  const settings = read('native-app/app/settings.tsx');
+  assert.match(settings, /createSettingPersister/);
+  assert.match(settings, /Could not save setting/);
+  assert.match(settings, /previous setting is still active/);
+  assert.match(settings, /storedSettingPersister\.save/);
+  assert.match(settings, /watchSettingPersister\.save/);
+  assert.doesNotMatch(settings, /set\(val\); await AsyncStorage\.setItem/);
+});
+
+test('a successful optimistic setting save becomes the confirmed value', async () => {
+  let stored = 'false';
+  const applied = [];
+  const errors = [];
+  const persister = createSettingPersister({
+    async getItem() { return stored; },
+    async setItem(_key, value) { stored = value; },
+  });
+
+  const saved = await persister.save({
+    key: 'audio',
+    nextValue: true,
+    previousValue: false,
+    serialize: String,
+    parse: value => value === 'true',
+    apply: value => applied.push(value),
+    onError: () => errors.push('error'),
+  });
+
+  assert.equal(saved, true);
+  assert.equal(stored, 'true');
+  assert.deepEqual(applied, [true]);
+  assert.deepEqual(errors, []);
+});
+
+test('a failed setting save restores storage and reports one error', async () => {
+  const applied = [];
+  const errors = [];
+  const persister = createSettingPersister({
+    async getItem() { return 'true'; },
+    async setItem() { throw new Error('storage unavailable'); },
+  });
+
+  const saved = await persister.save({
+    key: 'haptic',
+    nextValue: false,
+    previousValue: true,
+    serialize: String,
+    parse: value => value === 'true',
+    apply: value => applied.push(value),
+    onError: () => errors.push('error'),
+  });
+
+  assert.equal(saved, false);
+  assert.deepEqual(applied, [false, true]);
+  assert.deepEqual(errors, ['error']);
+});
+
+test('overlapping setting saves stay ordered and only the latest failure rolls back', async () => {
+  const events = [];
+  const applied = [];
+  const errors = [];
+  let stored = 'false';
+  let releaseFirst;
+  let markFirstStarted;
+  const firstStarted = new Promise((resolve) => { markFirstStarted = resolve; });
+  const persister = createSettingPersister({
+    async getItem() { return stored; },
+    async setItem(_key, value) {
+      events.push(`start:${value}`);
+      if (value === 'true') {
+        markFirstStarted();
+        await new Promise((resolve) => { releaseFirst = resolve; });
+        stored = value;
+        events.push(`end:${value}`);
+        return;
+      }
+      throw new Error('storage unavailable');
+    },
+  });
+
+  const first = persister.save({
+    key: 'watch',
+    nextValue: true,
+    previousValue: false,
+    serialize: String,
+    parse: value => value === 'true',
+    apply: value => applied.push(value),
+    onError: () => errors.push('first'),
+  });
+  const second = persister.save({
+    key: 'watch',
+    nextValue: false,
+    previousValue: true,
+    serialize: String,
+    parse: value => value === 'true',
+    apply: value => applied.push(value),
+    onError: () => errors.push('second'),
+  });
+
+  await firstStarted;
+  assert.deepEqual(events, ['start:true']);
+  releaseFirst();
+  assert.deepEqual(await Promise.all([first, second]), [true, false]);
+  assert.deepEqual(events, ['start:true', 'end:true', 'start:false']);
+  assert.deepEqual(applied, [true, false, true]);
+  assert.deepEqual(errors, ['second']);
+});
+
+test('an older failed setting save cannot roll back a newer successful choice', async () => {
+  const events = [];
+  const applied = [];
+  const errors = [];
+  let stored = 'false';
+  let releaseFirst;
+  let markFirstStarted;
+  const firstStarted = new Promise((resolve) => { markFirstStarted = resolve; });
+  const persister = createSettingPersister({
+    async getItem() { return stored; },
+    async setItem(_key, value) {
+      events.push(`start:${value}`);
+      if (value === 'true') {
+        markFirstStarted();
+        await new Promise((resolve) => { releaseFirst = resolve; });
+        throw new Error('storage unavailable');
+      }
+      stored = value;
+      events.push(`end:${value}`);
+    },
+  });
+
+  const first = persister.save({
+    key: 'audio',
+    nextValue: true,
+    previousValue: false,
+    serialize: String,
+    parse: value => value === 'true',
+    apply: value => applied.push(value),
+    onError: () => errors.push('first'),
+  });
+  const second = persister.save({
+    key: 'audio',
+    nextValue: false,
+    previousValue: true,
+    serialize: String,
+    parse: value => value === 'true',
+    apply: value => applied.push(value),
+    onError: () => errors.push('second'),
+  });
+
+  await firstStarted;
+  releaseFirst();
+  assert.deepEqual(await Promise.all([first, second]), [false, true]);
+  assert.equal(stored, 'false');
+  assert.deepEqual(events, ['start:true', 'start:false', 'end:false']);
+  assert.deepEqual(applied, [true, false]);
+  assert.deepEqual(errors, []);
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {

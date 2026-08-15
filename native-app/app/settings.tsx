@@ -7,11 +7,16 @@ import type { SensitivityLevel } from '../constants/thresholds';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { openFeedback } from '../lib/feedback';
 import { getWatchStatus, sendAlertToWatch, type WatchStatus } from '../lib/watchBridge';
-import { getWatchAlertsEnabled, setWatchAlertsEnabled } from '../lib/watchPreferences';
+import {
+  getWatchAlertsEnabled,
+  setWatchAlertsEnabled,
+  WATCH_ALERTS_PREFERENCE_KEY,
+} from '../lib/watchPreferences';
 import { CloudSyncCard } from '../components/CloudSyncCard';
 import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import { currentAppBuildInfo, formatAppBuildLabel } from '../lib/appBuildInfo';
+import { createSettingPersister } from '../lib/settingPersistence';
 import {
   IN_EAR_ALERT_PATTERN_KEY,
   parseInEarAlertPattern,
@@ -23,6 +28,23 @@ const EMPTY_WATCH_STATUS: WatchStatus = {
   paired: false,
   appInstalled: false,
   reachable: false,
+};
+
+const storedSettingPersister = createSettingPersister(AsyncStorage);
+const watchSettingPersister = createSettingPersister({
+  async getItem() {
+    return String(await getWatchAlertsEnabled(true));
+  },
+  async setItem(_key, value) {
+    await setWatchAlertsEnabled(value === 'true');
+  },
+});
+
+const showSettingSaveError = () => {
+  Alert.alert(
+    'Could not save setting',
+    'Your previous setting is still active. Please try again.',
+  );
 };
 
 export default function SettingsScreen() {
@@ -65,18 +87,45 @@ export default function SettingsScreen() {
     return () => { active = false; };
   }, []));
 
-  const tog = async (key: string, val: boolean, set: (v: boolean) => void) => {
-    set(val); await AsyncStorage.setItem(key, String(val));
+  const saveBooleanSetting = (
+    key: string,
+    nextValue: boolean,
+    previousValue: boolean,
+    apply: (value: boolean) => void,
+  ) => {
+    void storedSettingPersister.save({
+      key,
+      nextValue,
+      previousValue,
+      serialize: String,
+      parse: value => value === 'true',
+      apply,
+      onError: showSettingSaveError,
+    });
   };
 
-  const chooseInEarPattern = async (pattern: InEarAlertPattern) => {
-    setInEarPattern(pattern);
-    await AsyncStorage.setItem(IN_EAR_ALERT_PATTERN_KEY, pattern);
+  const chooseInEarPattern = (pattern: InEarAlertPattern) => {
+    void storedSettingPersister.save({
+      key: IN_EAR_ALERT_PATTERN_KEY,
+      nextValue: pattern,
+      previousValue: inEarPattern,
+      serialize: String,
+      parse: parseInEarAlertPattern,
+      apply: setInEarPattern,
+      onError: showSettingSaveError,
+    });
   };
 
-  const changeWatchAlerts = async (enabled: boolean) => {
-    setWatch(enabled);
-    await setWatchAlertsEnabled(enabled);
+  const changeWatchAlerts = (enabled: boolean) => {
+    void watchSettingPersister.save({
+      key: WATCH_ALERTS_PREFERENCE_KEY,
+      nextValue: enabled,
+      previousValue: watch,
+      serialize: String,
+      parse: value => value === 'true',
+      apply: setWatch,
+      onError: showSettingSaveError,
+    });
   };
 
   const watchDescription = !watchStatus.moduleAvailable
@@ -113,12 +162,12 @@ export default function SettingsScreen() {
           <Text style={s.cardTitle}>ALERTS</Text>
           <View style={s.row}>
             <View style={s.rowL}><Ionicons name="phone-portrait-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Haptic vibration</Text><Text style={s.sub}>Vibrate on alert</Text></View></View>
-            <Switch value={haptic} onValueChange={v=>tog('occulert-haptic',v,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <Switch value={haptic} onValueChange={v=>saveBooleanSetting('occulert-haptic',v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
           <View style={s.row}>
             <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
-            <Switch value={audio} onValueChange={v=>tog('occulert-audio',v,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <Switch value={audio} onValueChange={v=>saveBooleanSetting('occulert-audio',v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
         </View>
         <View style={s.card}>
