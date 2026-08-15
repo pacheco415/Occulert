@@ -73,6 +73,15 @@ test('native Settings reports persistence failures and restores the confirmed va
   assert.doesNotMatch(settings, /set\(val\); await AsyncStorage\.setItem/);
 });
 
+test('sensitivity changes use the same ordered persistence and rollback contract', () => {
+  const slider = read('native-app/components/SensitivitySlider.tsx');
+  assert.match(slider, /createSettingPersister/);
+  assert.match(slider, /previousValue: value/);
+  assert.match(slider, /Could not save sensitivity/);
+  assert.match(slider, /previous sensitivity setting is still active/);
+  assert.doesNotMatch(slider, /try \{ await AsyncStorage\.setItem/);
+});
+
 test('a successful optimistic setting save becomes the confirmed value', async () => {
   let stored = 'false';
   const applied = [];

@@ -1,17 +1,36 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Alert, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SENSITIVITY_PRESETS, type SensitivityLevel } from '../constants/thresholds';
+import { createSettingPersister } from '../lib/settingPersistence';
 
-const KEY = 'occulert-sensitivity';
+const SENSITIVITY_PREFERENCE_KEY = 'occulert-sensitivity';
 const LEVELS: SensitivityLevel[] = ['low', 'medium', 'high'];
+const sensitivitySettingPersister = createSettingPersister(AsyncStorage);
+
+const parseSensitivityLevel = (value: string): SensitivityLevel => {
+  if (value === 'low' || value === 'medium' || value === 'high') return value;
+  return 'medium';
+};
 
 interface Props { value: SensitivityLevel; onChange: (l: SensitivityLevel) => void; }
 
 export function SensitivitySlider({ value, onChange }: Props) {
-  const press = async (l: SensitivityLevel) => {
-    onChange(l);
-    try { await AsyncStorage.setItem(KEY, l); } catch {}
+  const press = (level: SensitivityLevel) => {
+    void sensitivitySettingPersister.save({
+      key: SENSITIVITY_PREFERENCE_KEY,
+      nextValue: level,
+      previousValue: value,
+      serialize: String,
+      parse: parseSensitivityLevel,
+      apply: onChange,
+      onError: () => {
+        Alert.alert(
+          'Could not save sensitivity',
+          'Your previous sensitivity setting is still active. Please try again.',
+        );
+      },
+    });
   };
   return (
     <View style={s.wrap}>
@@ -36,8 +55,8 @@ export function SensitivitySlider({ value, onChange }: Props) {
 
 export async function loadSavedSensitivity(): Promise<SensitivityLevel> {
   try {
-    const v = await AsyncStorage.getItem(KEY);
-    if (v === 'low' || v === 'medium' || v === 'high') return v;
+    const value = await AsyncStorage.getItem(SENSITIVITY_PREFERENCE_KEY);
+    if (value !== null) return parseSensitivityLevel(value);
   } catch {}
   return 'medium';
 }
