@@ -1,6 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Alert,
+  AppState,
+  BackHandler,
   Linking,
   Modal,
   Platform,
@@ -52,6 +54,10 @@ import {
   safeStopSearchQuery,
   type SafeStopKind,
 } from '../lib/safeStopLinks';
+import {
+  shouldStopMonitoringForAppState,
+  stopBeforeNavigation,
+} from '../lib/monitorLifecycle';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -73,6 +79,8 @@ const FACE_DETECTOR_OPTIONS: FrameFaceDetectionOptions = {
 const CLOSED_CONFIRM_MS = 1_200;
 const SENSOR_STARTUP_GRACE_MS = 10_000;
 const SENSOR_STALL_MS = 5_000;
+
+type StopOptions = { deferCloudFinalization?: boolean };
 
 const SAFE_STOP_ICONS: Record<SafeStopKind, React.ComponentProps<typeof Ionicons>['name']> = {
   'rest-area': 'bed-outline',
@@ -106,6 +114,8 @@ export default function MonitorScreen() {
   const sessionSensitivityRef = useRef<SensitivityLevel>('medium');
   const startingRef = useRef(false);
   const stoppingRef = useRef(false);
+  const isRunningRef = useRef(false);
+  const handleStopRef = useRef<(options?: StopOptions) => Promise<void>>(async () => {});
   const cloudSessionRef = useRef<Promise<string | null> | null>(null);
   const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastSampleAtRef = useRef(0);
@@ -270,7 +280,7 @@ export default function MonitorScreen() {
   }, []);
 
   const handleStop = useCallback(async (
-    options: { deferCloudFinalization?: boolean } = {},
+    options: StopOptions = {},
   ) => {
     if (stoppingRef.current) return;
     stoppingRef.current = true;
@@ -324,6 +334,11 @@ export default function MonitorScreen() {
     }
   }, [alertCount, isRunning, markSessionSynced, reset, saveSession, sessionTime]);
 
+  // App-state and hardware-back listeners stay registered across timer ticks,
+  // while these refs always expose the latest session snapshot to them.
+  isRunningRef.current = isRunning;
+  handleStopRef.current = handleStop;
+
   const handleSafeStopChoice = useCallback(async (kind: SafeStopKind) => {
     if (safeStopBusy || stoppingRef.current) return;
     setSafeStopBusy(true);
@@ -363,6 +378,40 @@ export default function MonitorScreen() {
     }
   }, [handleStop, safeStopBusy]);
 
+  const leaveMonitor = useCallback((navigate: () => void) => {
+    if (stoppingRef.current) return Promise.resolve();
+    return stopBeforeNavigation(
+      () => handleStopRef.current(),
+      navigate,
+      () => {
+        Alert.alert(
+          'Drive may not be fully saved',
+          'Monitoring has stopped, but Occulert could not finish saving this drive.',
+        );
+      },
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      void leaveMonitor(() => router.back());
+      return true;
+    });
+    return () => subscription.remove();
+  }, [isRunning, leaveMonitor, router]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (!shouldStopMonitoringForAppState(isRunningRef.current, nextState)) return;
+      setSensorFault(
+        'Monitoring stopped when Occulert left the foreground. Restart only after you are safely parked.',
+      );
+      void handleStopRef.current().catch(() => {});
+    });
+    return () => subscription.remove();
+  }, []);
+
   useEffect(() => {
     if (!isRunning) return;
     const watchdog = setInterval(() => {
@@ -370,10 +419,10 @@ export default function MonitorScreen() {
       if (stoppingRef.current || Date.now() - lastSampleAtRef.current <= timeoutMs) return;
       const message = 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.';
       setSensorFault(message);
-      void handleStop();
+      void handleStopRef.current();
     }, 500);
     return () => clearInterval(watchdog);
-  }, [handleStop, isRunning]);
+  }, [isRunning]);
 
   const onEyeState = useCallback((
     leftProb: number,
@@ -600,9 +649,8 @@ export default function MonitorScreen() {
         <GlassSurface style={s.topBar} tintColor="rgba(5, 10, 18, 0.5)">
           <TouchableOpacity
             style={s.backBtn}
-            onPress={async () => {
-              await handleStop();
-              router.back();
+            onPress={() => {
+              void leaveMonitor(() => router.back());
             }}
           >
             <Ionicons name="chevron-back" size={20} color="#c8e8f0" />
@@ -612,7 +660,13 @@ export default function MonitorScreen() {
             <View style={[s.dot, { backgroundColor: isRunning ? stateColor : '#4a7a8a' }]} />
             <Text style={s.pillTxt}>{isRunning ? metrics.state.toUpperCase() : 'STOPPED'}</Text>
           </View>
-          <TouchableOpacity onPress={() => router.push('/settings')}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Open settings and end monitoring"
+            onPress={() => {
+              void leaveMonitor(() => router.push('/settings'));
+            }}
+          >
             <Ionicons name="settings-outline" size={20} color="#c8e8f0" />
           </TouchableOpacity>
         </GlassSurface>
