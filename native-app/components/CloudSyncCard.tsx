@@ -18,6 +18,7 @@ import {
   signOutOfCloud,
   type CloudState,
 } from '../lib/cloudSync';
+import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
 
 const EMPTY_STATE: CloudState = {
   available: true,
@@ -32,56 +33,76 @@ export function CloudSyncCard() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(true);
   const mountedRef = useRef(true);
+  const actionRunnerRef = useRef(createSingleFlightActionRunner());
 
   const refresh = useCallback(async () => {
     const nextState = await getCloudState();
     if (!mountedRef.current) return;
     setState(nextState);
-    setBusy(false);
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
-    refresh().catch(() => {
-      if (mountedRef.current) setBusy(false);
-    });
+    refresh()
+      .catch(() => {})
+      .finally(() => {
+        if (mountedRef.current) setBusy(false);
+      });
     return () => { mountedRef.current = false; };
   }, [refresh]);
 
-  const signIn = async () => {
-    if (busy) return;
-    setBusy(true);
-    const result = await signInToCloud(email, password);
-    if (!mountedRef.current) return;
-    setPassword('');
-    await refresh();
-    if (mountedRef.current) {
-      Alert.alert(result.ok ? 'Signed in' : 'Sign-in unavailable', result.message);
-    }
+  const runBusyAction = useCallback((action: () => Promise<void>) => {
+    void actionRunnerRef.current.run({
+      action,
+      onBusyChange: nextBusy => {
+        if (mountedRef.current) setBusy(nextBusy);
+      },
+      onError: () => {
+        if (!mountedRef.current) return;
+        Alert.alert(
+          'Cloud sync unavailable',
+          'Occulert could not complete or confirm that change. Please check your connection and try again.',
+        );
+      },
+    });
+  }, []);
+
+  const signIn = () => {
+    runBusyAction(async () => {
+      const result = await signInToCloud(email, password);
+      if (!mountedRef.current) return;
+      setPassword('');
+      await refresh();
+      if (mountedRef.current) {
+        Alert.alert(result.ok ? 'Signed in' : 'Sign-in unavailable', result.message);
+      }
+    });
   };
 
-  const signOut = async () => {
-    setBusy(true);
-    await signOutOfCloud();
-    if (!mountedRef.current) return;
-    setEmail('');
-    setPassword('');
-    await refresh();
+  const signOut = () => {
+    runBusyAction(async () => {
+      await signOutOfCloud();
+      if (!mountedRef.current) return;
+      setEmail('');
+      setPassword('');
+      await refresh();
+    });
   };
 
-  const applyConsent = async (enabled: boolean) => {
-    setBusy(true);
-    const saved = await setCloudSyncEnabled(enabled);
-    if (!mountedRef.current) return;
-    await refresh();
-    if (!saved) {
-      Alert.alert('Cloud sync unavailable', 'Sign in again or check your connection, then try once more.');
-    }
+  const applyConsent = (enabled: boolean) => {
+    runBusyAction(async () => {
+      const saved = await setCloudSyncEnabled(enabled);
+      if (!mountedRef.current) return;
+      await refresh();
+      if (!saved) {
+        Alert.alert('Cloud sync unavailable', 'Sign in again or check your connection, then try once more.');
+      }
+    });
   };
 
   const changeConsent = (enabled: boolean) => {
     if (!enabled) {
-      applyConsent(false).catch(() => {});
+      applyConsent(false);
       return;
     }
     Alert.alert(
@@ -89,18 +110,24 @@ export function CloudSyncCard() {
       'Occulert will send timestamps, fatigue scores, and alert counts to your protected account. Camera images, video, audio, location, and alert ratings stay off the server.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Enable', onPress: () => { applyConsent(true).catch(() => {}); } },
+        { text: 'Enable', onPress: () => { applyConsent(true); } },
       ],
     );
   };
 
   const openAccountPage = async () => {
     const url = 'https://www.occulert.com/login.html';
-    if (!await Linking.canOpenURL(url)) {
-      Alert.alert('Account page unavailable', 'Open occulert.com/login.html in Safari.');
-      return;
+    try {
+      if (await Linking.canOpenURL(url)) {
+        await Linking.openURL(url);
+        return;
+      }
+    } catch {
+      // Use the same bounded recovery message as an unsupported link.
     }
-    await Linking.openURL(url);
+    if (mountedRef.current) {
+      Alert.alert('Account page unavailable', 'Open occulert.com/login.html in Safari.');
+    }
   };
 
   return (
