@@ -5,6 +5,13 @@ export interface AppBuildInfo {
   appBuildNumber?: string;
 }
 
+export function formatAppBuildLabel({ appVersion, appBuildNumber }: AppBuildInfo): string {
+  if (appVersion && appBuildNumber) return `v${appVersion} (${appBuildNumber})`;
+  if (appVersion) return `v${appVersion}`;
+  if (appBuildNumber) return `Build ${appBuildNumber}`;
+  return 'Version unavailable';
+}
+
 function normalized(value: string | number | null | undefined): string | undefined {
   if (value == null) return undefined;
   const text = String(value).trim();
