@@ -43,6 +43,11 @@ window.OcculertBackend = (function () {
     return loadConfig().then(function (config) { return Boolean(config); });
   }
 
+  function refreshAuthConfig() {
+    configPromise = null;
+    return loadConfig();
+  }
+
   function authFetch(path, body) {
     return loadConfig().then(function (config) {
       if (!config) return { status: 503, ok: false, body: { error: "cloud_not_configured" } };
@@ -346,6 +351,7 @@ window.OcculertBackend = (function () {
   return {
     isConfigured: isConfigured,
     getAuthConfig: loadConfig,
+    refreshAuthConfig: refreshAuthConfig,
     getSession: refreshIfNeeded,
     adoptSession: adoptSession,
     authMessage: authMessage,

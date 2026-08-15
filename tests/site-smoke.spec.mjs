@@ -60,6 +60,17 @@ test("passkey failures remain visible beside the passkey button", async ({ page 
   expect(await page.locator("#passkeyStatus").evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector("#authForm")) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
 });
 
+test("the passkey SDK loads through the resilient pinned loader", async ({ page }) => {
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+
+  await expect.poll(() => page.evaluate(() => window.OcculertSupabaseLoader?.state().ready)).toBe(true);
+  expect(await page.evaluate(() => window.OcculertSupabaseLoader.sources[0])).toBe("/vendor/supabase-2.112.3.min.js");
+  expect(await page.evaluate(() => typeof window.supabase?.createClient)).toBe("function");
+  const sdkResources = await page.evaluate(() => performance.getEntriesByType("resource").map((entry) => entry.name).filter((name) => name.includes("supabase")));
+  expect(sdkResources.some((name) => new URL(name).pathname === "/vendor/supabase-2.112.3.min.js")).toBe(true);
+  expect(sdkResources.some((name) => name.startsWith("https://cdn.jsdelivr.net/"))).toBe(false);
+});
+
 test("signed-out mobile fleet dashboard keeps navigation and recovery actions visible", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });

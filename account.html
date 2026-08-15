@@ -17,7 +17,7 @@
 <meta name="theme-color" content="#0a0e1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js" integrity="sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC" crossorigin="anonymous"></script>
+<script src="/supabase-loader.js"></script>
 <script src="/occulert-backend.js"></script>
 <script src="/passkey-auth.js"></script>
 <script src="/auth-helper.js"></script>
@@ -149,6 +149,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
         </div>
         <div class="passkey-list" id="passkeyList" aria-live="polite"><div class="passkey-empty">Loading passkeys…</div></div>
         <div class="status" id="passkeyStatus" role="status" aria-live="polite"></div>
+        <button class="btn hidden" id="passkeyRetryBtn" type="button" style="margin-top:10px" onclick="retryPasskeySetup()">Retry passkey setup</button>
       </section>
     </div>
     <div class="note"><strong>Note:</strong> Changing your email sends a confirmation link to the new address, and depending on your account security settings your current address may receive one too. Your sign-in email stays the same until confirmation is complete. Occulert never stores your password.</div>
@@ -195,6 +196,7 @@ document.getElementById('themeToggle')?.addEventListener('click',()=>setTheme(ht
 // ── Profile Logic ──
 function show(msg,type){let s=document.getElementById('status');s.className='status show '+(type||'good');s.textContent=msg}
 function showPasskey(msg,type){let s=document.getElementById('passkeyStatus');s.className='status show '+(type||'good');s.textContent=msg}
+function setPasskeyRetry(show){let b=document.getElementById('passkeyRetryBtn');if(b)b.classList.toggle('hidden',!show)}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function cleanFleet(v){return String(v||'OCCULERT-DEMO').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'-').slice(0,40)||'OCCULERT-DEMO'}
 function getProfile(){return window.OcculertAuth&&window.OcculertAuth.getProfile?window.OcculertAuth.getProfile():JSON.parse(localStorage.getItem('occulert-profile')||'null')}
@@ -209,7 +211,8 @@ let passkeyLoadId=0;
 function validPasskeyId(value){let id=String(value||'');return /^[0-9a-f-]{20,80}$/i.test(id)?id:''}
 function passkeySupported(){return Boolean(window.OcculertPasskeys&&window.OcculertPasskeys.isSupported())}
 function formatPasskeyDate(value){let date=new Date(value||'');return Number.isNaN(date.getTime())?'Unknown':date.toLocaleDateString()}
-function setPasskeyBusy(busy){let add=document.getElementById('registerPasskeyBtn');if(add){add.disabled=busy||!passkeySupported();add.textContent=busy?'Working…':'Add a passkey'}document.querySelectorAll('[data-passkey-action]').forEach(button=>{button.disabled=busy})}
+function setPasskeyBusy(busy){let add=document.getElementById('registerPasskeyBtn'),retry=document.getElementById('passkeyRetryBtn');if(add){add.disabled=busy||!passkeySupported();add.textContent=busy?'Working…':'Add a passkey'}if(retry)retry.disabled=busy;document.querySelectorAll('[data-passkey-action]').forEach(button=>{button.disabled=busy})}
+function handlePasskeyError(err,action){showPasskey(window.OcculertPasskeys.message(err,action),'bad');setPasskeyRetry(Boolean(window.OcculertPasskeys.canRetry&&window.OcculertPasskeys.canRetry(err)))}
 function renderPasskeys(passkeys){
   let list=document.getElementById('passkeyList');passkeysById={};
   (Array.isArray(passkeys)?passkeys:[]).forEach(item=>{let id=validPasskeyId(item&&item.id);if(id)passkeysById[id]=item});
@@ -221,16 +224,16 @@ async function loadPasskeys(){
   let list=document.getElementById('passkeyList'),requestId=++passkeyLoadId;
   if(!signedInUser()){passkeysById={};list.innerHTML='<div class="passkey-empty">Sign in to manage passkeys.</div>';return}
   if(!passkeySupported()){passkeysById={};list.innerHTML='<div class="passkey-empty">Passkeys require a supported browser on a secure Occulert page.</div>';setPasskeyBusy(false);return}
-  setPasskeyBusy(true);
+  setPasskeyRetry(false);setPasskeyBusy(true);
   try{let passkeys=await window.OcculertPasskeys.list();if(requestId===passkeyLoadId)renderPasskeys(passkeys)}
-  catch(err){if(requestId===passkeyLoadId){passkeysById={};list.innerHTML='<div class="passkey-empty">Passkeys could not be loaded.</div>';showPasskey(window.OcculertPasskeys.message(err,'manage'),'bad')}}
+  catch(err){if(requestId===passkeyLoadId){passkeysById={};list.innerHTML='<div class="passkey-empty">Passkeys could not be loaded.</div>';handlePasskeyError(err,'manage')}}
   finally{if(requestId===passkeyLoadId)setPasskeyBusy(false)}
 }
 async function registerPasskey(){
   if(!signedInUser())return showPasskey('Sign in with your email and password before adding a passkey.','bad');
   setPasskeyBusy(true);
-  try{await window.OcculertPasskeys.register();await loadPasskeys();showPasskey('Passkey added. You can use it the next time you sign in.','good')}
-  catch(err){showPasskey(window.OcculertPasskeys.message(err,'register'),'bad')}
+  try{setPasskeyRetry(false);await window.OcculertPasskeys.register();await loadPasskeys();showPasskey('Passkey added. You can use it the next time you sign in.','good')}
+  catch(err){handlePasskeyError(err,'register')}
   finally{setPasskeyBusy(false)}
 }
 async function renamePasskey(id){
@@ -239,7 +242,7 @@ async function renamePasskey(id){
   if(!next||next.length>120)return showPasskey('Use a passkey name between 1 and 120 characters.','bad');
   setPasskeyBusy(true);
   try{await window.OcculertPasskeys.rename(id,next);await loadPasskeys();showPasskey('Passkey renamed.','good')}
-  catch(err){showPasskey(window.OcculertPasskeys.message(err,'manage'),'bad')}
+  catch(err){handlePasskeyError(err,'manage')}
   finally{setPasskeyBusy(false)}
 }
 async function removePasskey(id){
@@ -247,11 +250,12 @@ async function removePasskey(id){
   if(!window.confirm('Remove '+name+' from this Occulert account?'))return;
   setPasskeyBusy(true);
   try{await window.OcculertPasskeys.remove(id);await loadPasskeys();showPasskey('Passkey removed. Your password and reset link still work.','good')}
-  catch(err){showPasskey(window.OcculertPasskeys.message(err,'manage'),'bad')}
+  catch(err){handlePasskeyError(err,'manage')}
   finally{setPasskeyBusy(false)}
 }
 function handlePasskeyAction(event){let button=event.target&&event.target.closest?event.target.closest('[data-passkey-action]'):null;if(!button)return;let action=button.dataset.passkeyAction,id=button.dataset.passkeyId;if(action==='rename')renamePasskey(id);else if(action==='remove')removePasskey(id)}
-function renderSecurity(){const user=signedInUser(),forms=document.getElementById('securityForms'),intro=document.getElementById('securityIntro');if(!forms||!intro)return;if(user){forms.classList.remove('hidden');intro.textContent=recoveryRequested()?'Recovery link verified for '+user.email+'. Choose a new password below.':'Signed in as '+user.email+'.';const e=document.getElementById('newEmail');if(e&&!e.value)e.value=user.email||'';if(window.OcculertPasskeys)loadPasskeys()}else{forms.classList.add('hidden');intro.textContent='Sign in to change your email or password.';passkeysById={}}}
+async function retryPasskeySetup(){setPasskeyRetry(false);setPasskeyBusy(true);try{await window.OcculertPasskeys.retry();await loadPasskeys();showPasskey('Passkey helper reloaded. You can add or manage passkeys now.','good')}catch(err){handlePasskeyError(err,'manage')}finally{setPasskeyBusy(false)}}
+function renderSecurity(){const user=signedInUser(),forms=document.getElementById('securityForms'),intro=document.getElementById('securityIntro');if(!forms||!intro)return;if(user){forms.classList.remove('hidden');intro.textContent=recoveryRequested()?'Recovery link verified for '+user.email+'. Choose a new password below.':'Signed in as '+user.email+'.';const e=document.getElementById('newEmail');if(e&&!e.value)e.value=user.email||'';if(window.OcculertPasskeys)loadPasskeys()}else{forms.classList.add('hidden');intro.textContent='Sign in to change your email or password.';passkeysById={};setPasskeyRetry(false)}}
 function setBusy(id,busy,label){const b=document.getElementById(id);if(!b)return;b.disabled=busy;b.textContent=busy?'Working...':label}
 async function changeEmail(e){
   e.preventDefault();

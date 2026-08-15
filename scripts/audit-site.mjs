@@ -38,7 +38,7 @@ function assertSingleH1(path) {
 
 walk(root);
 
-for (const scriptPath of ["homepage.js", "lang.js", "passkey-auth.js"]) {
+for (const scriptPath of ["homepage.js", "lang.js", "passkey-auth.js", "supabase-loader.js"]) {
   try { new Function(read(scriptPath)); }
   catch (error) { fail(`${scriptPath} does not parse (${error.message})`); }
 }
@@ -180,10 +180,17 @@ assertIncludes("login.html", "src=\"/passkey-auth.js\"", "login must load the pa
 assertIncludes("passkey-auth.js", "experimental: { passkey: true }", "passkey support must be explicitly enabled in the Supabase client");
 assertIncludes("passkey-auth.js", "signInWithPasskey", "passkey sign-in must use the Supabase WebAuthn implementation");
 assertIncludes("auth-helper.js", "signInPasskey:signInPasskey", "the login helper must adopt authenticated passkey sessions");
-assertIncludes("login.html", "@supabase/supabase-js@2.112.3", "login must pin a passkey-capable Supabase SDK version");
-assertIncludes("login.html", "integrity=\"sha384-", "the external Supabase SDK must use subresource integrity");
-assertIncludes("account.html", "@supabase/supabase-js@2.112.3", "account settings must pin the same passkey-capable Supabase SDK version");
-assertIncludes("account.html", "integrity=\"sha384-", "account settings must verify the external Supabase SDK with subresource integrity");
+assertIncludes("login.html", "src=\"/supabase-loader.js\"", "login must use the resilient same-site Supabase loader");
+assertIncludes("account.html", "src=\"/supabase-loader.js\"", "account settings must use the same resilient Supabase loader");
+assertIncludes("supabase-loader.js", "var VERSION = \"2.112.3\"", "the resilient loader must pin a passkey-capable Supabase SDK version");
+assertIncludes("supabase-loader.js", "sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC", "every Supabase loader path must verify the pinned SDK integrity");
+assertIncludes("supabase-loader.js", "/vendor/supabase-", "the Supabase loader must prefer the Occulert same-origin proxy");
+assertIncludes("vercel.json", "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js", "the same-origin proxy must target the pinned SDK artifact");
+assertIncludes("login.html", "id=\"passkeyRetryBtn\"", "login must offer recovery after a retryable Safari loader failure");
+assertIncludes("account.html", "id=\"passkeyRetryBtn\"", "account settings must offer recovery after a retryable passkey setup failure");
+assertIncludes("passkey-auth.js", "sdk_load_failed", "passkey errors must distinguish an SDK delivery failure");
+assertIncludes("passkey-auth.js", "auth_config_unavailable", "passkey errors must distinguish unavailable runtime account settings");
+assertIncludes("occulert-backend.js", "refreshAuthConfig", "passkey retry must be able to refresh a transient runtime configuration failure");
 assertIncludes("login.html", "Passkey biometrics, PINs, and private keys stay", "login must disclose that passkey secrets stay with the user's authenticator");
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
 assertIncludes("login.html", "id=\"profileFields\" class=\"hidden\"", "sign-in must hide profile setup fields by default");
@@ -215,11 +222,14 @@ assertIncludes("passkey-auth.js", "client.auth.registerPasskey", "passkey regist
 assertIncludes("passkey-auth.js", "client.auth.passkey.delete", "passkey deletion must use the authenticated Supabase account API");
 assertIncludes("passkey-auth.js", "signOut({ scope: \"local\" })", "sign-out must clear the passkey SDK's current browser session without signing out other devices");
 assertIncludes("sw.js", "'/passkey-auth.js'", "the service worker must keep the passkey client network-only");
+assertIncludes("sw.js", "'/supabase-loader.js'", "the service worker must keep the resilient Supabase loader network-only");
 const serviceWorker = read("sw.js");
 const staticAssets = serviceWorker.slice(serviceWorker.indexOf("const STATIC_ASSETS"), serviceWorker.indexOf("];", serviceWorker.indexOf("const STATIC_ASSETS")) + 2);
 const networkOnlyAssets = serviceWorker.slice(serviceWorker.indexOf("const NETWORK_ONLY_ASSETS"), serviceWorker.indexOf("]);", serviceWorker.indexOf("const NETWORK_ONLY_ASSETS")) + 3);
 if (staticAssets.includes("'/passkey-auth.js'")) fail("the experimental passkey client must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes("'/passkey-auth.js'")) fail("the passkey client must be listed as a network-only asset");
+if (staticAssets.includes("'/supabase-loader.js'")) fail("the resilient Supabase loader must not be stored in the offline static cache");
+if (!networkOnlyAssets.includes("'/supabase-loader.js'")) fail("the resilient Supabase loader must be listed as a network-only asset");
 assertIncludes("privacy.html", "passkey private key stay with your device", "privacy terms must disclose that Occulert does not receive passkey private keys or biometrics");
 assertNotIncludes("account.html", "window.firebase", "account.html must not call the retired Firebase SDK");
 assertIncludes("account.html", "Your sign-in email changes once you open the link", "email changes must disclose that confirmation is required");
@@ -305,7 +315,7 @@ assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet export
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v27'", "the passkey and mobile navigation repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v28'", "the Safari passkey loader repair must advance the offline cache");
 assertIncludes("api/fleet-summary.js", "includes_location: false", "fleet history responses must explicitly exclude location");
 for (const path of ["fleet-onboarding.html", "accept-invite.html"]) assertSingleH1(path);
 assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");

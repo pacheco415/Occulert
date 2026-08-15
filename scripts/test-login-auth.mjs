@@ -40,7 +40,8 @@ function makeElement(id) {
 
 function boot({ resetResult = { ok: true, body: {} }, passkeyError = null } = {}) {
   const elements = new Map();
-  const calls = { auth: [], reset: [], passkey: 0 };
+  const calls = { auth: [], reset: [], passkey: 0, retry: 0 };
+  let currentPasskeyError = passkeyError;
   const context = {
     console,
     JSON,
@@ -65,6 +66,8 @@ function boot({ resetResult = { ok: true, body: {} }, passkeyError = null } = {}
   context.window.OcculertPasskeys = {
     isSupported: () => true,
     message: () => 'mapped passkey failure',
+    canRetry: (error) => error && error.code === 'sdk_load_failed',
+    retry() { calls.retry += 1; currentPasskeyError = null; return Promise.resolve(); },
   };
   context.window.OcculertAuth = {
     getProfile: () => null,
@@ -72,7 +75,7 @@ function boot({ resetResult = { ok: true, body: {} }, passkeyError = null } = {}
     signOut: () => Promise.resolve(),
     signInPasskey() {
       calls.passkey += 1;
-      if (passkeyError) return Promise.reject(passkeyError);
+      if (currentPasskeyError) return Promise.reject(currentPasskeyError);
       return Promise.resolve({ role: 'driver', email: 'driver@example.com', authenticated: true });
     },
     signInEmail(email, password, mode, extra) {
@@ -115,6 +118,21 @@ test('passkey failures stay beside the passkey action instead of below the accou
   assert.equal(el('status').textContent, '');
   assert.ok(source.indexOf('id="passkeyStatus"') > source.indexOf('id="passkeySignInBtn"'));
   assert.ok(source.indexOf('id="passkeyStatus"') < source.indexOf('id="authForm"'));
+});
+
+test('retryable Safari loader failures reveal a retry action that can recover', async () => {
+  const error = new Error('loader unavailable');
+  error.code = 'sdk_load_failed';
+  const { context, calls, el } = boot({ passkeyError: error });
+
+  await context.signInPasskey();
+  assert.equal(el('passkeyRetryBtn').classList.contains('hidden'), false);
+
+  await context.signInPasskey(true);
+  assert.equal(calls.retry, 1);
+  assert.equal(calls.passkey, 2);
+  assert.equal(el('passkeyRetryBtn').classList.contains('hidden'), true);
+  assert.match(el('passkeyStatus').textContent, /Signed in with your passkey/);
 });
 
 test('account creation reveals setup fields and sends them only for signup', async () => {
