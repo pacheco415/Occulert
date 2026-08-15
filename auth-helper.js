@@ -47,7 +47,16 @@
     currentUser=backendUser(user);
     return saveBackendProfile(mergeUserIntoProfile(currentUser,extra));
   }
+  async function signInPasskey(){
+    if(!window.OcculertPasskeys)throw new Error('Passkey sign-in is not available on this page.');
+    await window.OcculertPasskeys.signIn();
+    var user=window.OcculertBackend&&window.OcculertBackend.currentUser();
+    if(!user)throw new Error('Passkey sign-in did not return a session.');
+    currentUser=backendUser(user);
+    return saveBackendProfile(mergeUserIntoProfile(currentUser,{}));
+  }
   async function signOut(){
+    try{if(window.OcculertPasskeys)await window.OcculertPasskeys.signOutLocal();}catch(e){}
     try{if(window.OcculertBackend)window.OcculertBackend.signOut();}catch(e){}
     localStorage.removeItem('occulert-auth-user');
     var profile=getProfile();
@@ -59,5 +68,5 @@
     if(backend){currentUser=backendUser(backend);cb(currentUser,getProfile());return;}
     cb(null,getProfile());
   }
-  window.OcculertAuth={getProfile:getProfile,saveProfile:saveProfile,signInEmail:signInEmail,signOut:signOut,onAuth:onAuth,mergeUserIntoProfile:mergeUserIntoProfile};
+  window.OcculertAuth={getProfile:getProfile,saveProfile:saveProfile,signInEmail:signInEmail,signInPasskey:signInPasskey,signOut:signOut,onAuth:onAuth,mergeUserIntoProfile:mergeUserIntoProfile};
 })();

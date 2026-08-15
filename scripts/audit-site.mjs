@@ -38,7 +38,7 @@ function assertSingleH1(path) {
 
 walk(root);
 
-for (const scriptPath of ["homepage.js", "lang.js"]) {
+for (const scriptPath of ["homepage.js", "lang.js", "passkey-auth.js"]) {
   try { new Function(read(scriptPath)); }
   catch (error) { fail(`${scriptPath} does not parse (${error.message})`); }
 }
@@ -129,7 +129,10 @@ assertIncludes("vercel.json", "\"key\": \"Content-Security-Policy\"", "vercel.js
 assertIncludes("vercel.json", "https://fonts.googleapis.com", "vercel.json CSP must allow Google Fonts stylesheets used by marketing pages");
 assertIncludes("vercel.json", "font-src 'self' https://fonts.gstatic.com", "vercel.json CSP must allow Google Fonts font files");
 assertIncludes("vercel.json", "https://*.supabase.co", "vercel.json CSP must allow configured Supabase Auth requests");
+assertIncludes("vercel.json", "publickey-credentials-create=(self)", "the production permissions policy must allow same-origin passkey enrollment");
+assertIncludes("vercel.json", "publickey-credentials-get=(self)", "the production permissions policy must allow same-origin passkey sign-in");
 assertIncludes("vercel.json", "\"source\": \"/occulert-backend.js\"", "browser auth helper must not be cached across configuration changes");
+assertIncludes("vercel.json", "\"source\": \"/passkey-auth.js\"", "passkey client must not be cached across experimental API changes");
 assertNotIncludes("occulert-backend.js", "PASTE_ANON_KEY_HERE", "browser backend client must not ship placeholder credentials");
 assertIncludes("occulert-backend.js", "/api/public-config", "browser backend client must load public runtime configuration");
 assertIncludes("occulert-backend.js", "redirect_to=", "signup confirmation emails must return users to the active Occulert site");
@@ -170,8 +173,16 @@ assertIncludes("app.html", "Website Settings → Camera → Allow", "driver app 
 assertIncludes("app.html", "Permissions → Camera → Allow", "driver app must explain Android camera recovery");
 assertIncludes("login.html", "src=\"/occulert-backend.js\"", "login must load the Supabase backend client");
 assertNotIncludes("login.html", "id=\"fleetId\"", "login must not offer caller-controlled fleet membership");
-assertIncludes("login.html", "Google and passkey sign-in are coming soon", "login must not present disabled authentication methods as active");
-assertNotIncludes("login.html", "onclick=\"passkeyAuth()\"", "login must not offer a nonfunctional passkey action");
+assertIncludes("login.html", "id=\"passkeySignInBtn\"", "login must offer the supported passkey sign-in action");
+assertIncludes("login.html", "src=\"/passkey-auth.js\"", "login must load the passkey client");
+assertIncludes("passkey-auth.js", "experimental: { passkey: true }", "passkey support must be explicitly enabled in the Supabase client");
+assertIncludes("passkey-auth.js", "signInWithPasskey", "passkey sign-in must use the Supabase WebAuthn implementation");
+assertIncludes("auth-helper.js", "signInPasskey:signInPasskey", "the login helper must adopt authenticated passkey sessions");
+assertIncludes("login.html", "@supabase/supabase-js@2.112.3", "login must pin a passkey-capable Supabase SDK version");
+assertIncludes("login.html", "integrity=\"sha384-", "the external Supabase SDK must use subresource integrity");
+assertIncludes("account.html", "@supabase/supabase-js@2.112.3", "account settings must pin the same passkey-capable Supabase SDK version");
+assertIncludes("account.html", "integrity=\"sha384-", "account settings must verify the external Supabase SDK with subresource integrity");
+assertIncludes("login.html", "Passkey biometrics, PINs, and private keys stay", "login must disclose that passkey secrets stay with the user's authenticator");
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
 assertIncludes("login.html", "id=\"profileFields\" class=\"hidden\"", "sign-in must hide profile setup fields by default");
 assertIncludes("login.html", "Forgot password?", "login must offer password recovery");
@@ -195,6 +206,19 @@ for (const path of ["features.html", "how-it-works.html", "install.html"]) asser
 assertIncludes("account.html", "function esc(v)", "account.html must escape rendered profile fields");
 assertIncludes("account.html", "OcculertBackend.updateEmail", "account email changes must go through Supabase Auth");
 assertIncludes("account.html", "OcculertBackend.updatePassword", "account password changes must go through Supabase Auth");
+assertIncludes("account.html", "id=\"registerPasskeyBtn\"", "signed-in account settings must offer passkey enrollment");
+assertIncludes("account.html", "data-passkey-action=\"remove\"", "account settings must allow users to revoke their own passkeys");
+assertIncludes("account.html", "Keep password recovery available as a backup", "passkey enrollment must preserve the recovery fallback");
+assertIncludes("passkey-auth.js", "client.auth.registerPasskey", "passkey registration must use the authenticated Supabase ceremony");
+assertIncludes("passkey-auth.js", "client.auth.passkey.delete", "passkey deletion must use the authenticated Supabase account API");
+assertIncludes("passkey-auth.js", "signOut({ scope: \"local\" })", "sign-out must clear the passkey SDK's current browser session without signing out other devices");
+assertIncludes("sw.js", "'/passkey-auth.js'", "the service worker must keep the passkey client network-only");
+const serviceWorker = read("sw.js");
+const staticAssets = serviceWorker.slice(serviceWorker.indexOf("const STATIC_ASSETS"), serviceWorker.indexOf("];", serviceWorker.indexOf("const STATIC_ASSETS")) + 2);
+const networkOnlyAssets = serviceWorker.slice(serviceWorker.indexOf("const NETWORK_ONLY_ASSETS"), serviceWorker.indexOf("]);", serviceWorker.indexOf("const NETWORK_ONLY_ASSETS")) + 3);
+if (staticAssets.includes("'/passkey-auth.js'")) fail("the experimental passkey client must not be stored in the offline static cache");
+if (!networkOnlyAssets.includes("'/passkey-auth.js'")) fail("the passkey client must be listed as a network-only asset");
+assertIncludes("privacy.html", "passkey private key stay with your device", "privacy terms must disclose that Occulert does not receive passkey private keys or biometrics");
 assertNotIncludes("account.html", "window.firebase", "account.html must not call the retired Firebase SDK");
 assertIncludes("account.html", "Your sign-in email changes once you open the link", "email changes must disclose that confirmation is required");
 assertIncludes("account.html", "your current address may receive one too", "email changes must account for secure-email-change double confirmation");

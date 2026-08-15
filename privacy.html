@@ -96,6 +96,7 @@ footer a{color:var(--di);text-decoration:none}
 <h2><span class="n">5</span> Data We Collect</h2>
 <ul>
 <li><b>Local device storage:</b> Driver IDs, fatigue scores, alert counts, session duration, optional GPS, and preferences — stored on your device unless you separately sign in and enable cloud sync.</li>
+<li><b>Account and passkey data:</b> Supabase Auth processes your account identifier and, if you enroll a passkey, stores the credential's public key and basic authenticator metadata. Your biometric, device PIN, and passkey private key stay with your device, security key, or password manager and are not provided to Occulert.</li>
 <li><b>Optional Apple Health context:</b> If you explicitly connect Apple Health on iPhone, Occulert reads recent sleep analysis and heart rate variability (SDNN) to display factual pre-drive context. Occulert stores only a derived 24-hour sleep total and latest HRV value in protected local device storage. It does not write Apple Health data, use background HealthKit delivery, upload these values through cloud sync, calculate medical or driving fitness, or use them to change alerts. You can remove the local summary in Occulert and change future access in Apple Health settings.</li>
 <li><b>Fleet inquiry data:</b> Name, company, email, phone, fleet size, and message — sent once to our protected pilot-request endpoint, stored server-side through Supabase when configured (or a configured HTTPS processor fallback), and used only to respond to your inquiry. The current form does not keep a browser-storage copy.</li>
 <li><b>Analytics:</b> If analytics are enabled, they should be limited to anonymous usage data such as page views or app launches, and should not be linked to your identity or camera data.</li>
@@ -109,7 +110,7 @@ footer a{color:var(--di);text-decoration:none}
 </div>
 <div class="sec" id="cloud">
 <h2><span class="n">7</span> Cloud Sync &amp; Third Parties</h2>
-<p>Current authenticated cloud sync and pilot requests use Occulert server endpoints backed by Supabase. Depending on the feature you enable, Supabase may process account identifiers, driver profiles, session summaries, alerts, optional location, fleet membership, invitations, and pilot contact details. Camera frames are not included. Cloud writes stop when sharing consent is revoked; the local monitoring and local-history paths remain available.</p>
+<p>Current authenticated cloud sync, passkey authentication, and pilot requests use Occulert server endpoints or authentication services backed by Supabase. Depending on the feature you enable, Supabase may process account identifiers, passkey public credentials, driver profiles, session summaries, alerts, optional location, fleet membership, invitations, and pilot contact details. Camera frames and passkey biometrics are not included. Cloud writes stop when sharing consent is revoked; the local monitoring and local-history paths remain available.</p>
 <p>Legacy Firebase prototypes are retired from supported monitoring and pilot-contact flows. Do not deploy a legacy page or connector without a separate privacy review, explicit consent, and verified access rules.</p>
 </div>
 <div class="sec" id="fleet">

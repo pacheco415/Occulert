@@ -17,7 +17,9 @@
 <meta name="theme-color" content="#0a0e1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js" integrity="sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC" crossorigin="anonymous"></script>
 <script src="/occulert-backend.js"></script>
+<script src="/passkey-auth.js"></script>
 <script src="/auth-helper.js"></script>
 <style>
 :root,[data-theme="dark"]{
@@ -75,6 +77,17 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 .badge{font-size:11px;font-weight:900;border-radius:999px;padding:4px 10px;background:var(--badge-bg);color:var(--badge-color);border:1px solid var(--badge-border);transition:background .25s,color .25s,border-color .25s}
 .note{border:1px solid var(--note-border);background:var(--note-bg);border-radius:14px;padding:14px 16px;color:var(--note-color);font-size:13px;line-height:1.6;margin-top:14px;transition:background .25s,border-color .25s,color .25s}
 .note strong{color:#60a5fa}
+.security-divider{height:1px;background:var(--divider);margin:20px 0;transition:background .25s}
+.passkey-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.passkey-toolbar h2{font-size:17px;margin:0 0 4px;color:var(--text)}
+.passkey-toolbar p{font-size:13px;color:var(--text2);margin:0;max-width:470px}
+.passkey-list{display:grid;gap:10px;margin-top:14px}
+.passkey-empty{border:1px dashed var(--border2);border-radius:12px;padding:14px;color:var(--text3);font-size:13px}
+.passkey-item{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid var(--border);background:var(--input-bg);border-radius:13px;padding:13px 14px}
+.passkey-item strong{display:block;color:var(--text);font-size:14px}
+.passkey-meta{color:var(--text3);font-size:11px;margin-top:3px}
+.passkey-actions{display:flex;gap:7px;flex-wrap:wrap}
+.passkey-actions .btn{padding:7px 10px;font-size:11px}
 .avatar-row{display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--divider);transition:border-color .25s}
 .avatar{width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#fff;flex-shrink:0}
 .avatar-info h3{margin:0 0 2px;color:var(--text);font-size:17px}
@@ -125,6 +138,18 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
         <div class="field"><label for="newPassword">New Password</label><input id="newPassword" type="password" required minlength="6" placeholder="Minimum 6 characters" autocomplete="new-password"></div>
         <button class="btn primary" id="passwordBtn" type="submit">Change Password</button>
       </form>
+      <div class="security-divider"></div>
+      <section aria-labelledby="passkeyHeading">
+        <div class="passkey-toolbar">
+          <div>
+            <h2 id="passkeyHeading">Passkeys <span class="badge">Beta</span></h2>
+            <p>Use Touch ID, Face ID, a device PIN, password manager, or security key. Keep password recovery available as a backup.</p>
+          </div>
+          <button class="btn primary" id="registerPasskeyBtn" type="button" onclick="registerPasskey()">Add a passkey</button>
+        </div>
+        <div class="passkey-list" id="passkeyList" aria-live="polite"><div class="passkey-empty">Loading passkeys…</div></div>
+        <div class="status" id="passkeyStatus" role="status" aria-live="polite"></div>
+      </section>
     </div>
     <div class="note"><strong>Note:</strong> Changing your email sends a confirmation link to the new address, and depending on your account security settings your current address may receive one too. Your sign-in email stays the same until confirmation is complete. Occulert never stores your password.</div>
     <div class="status" id="status"></div>
@@ -169,6 +194,7 @@ setTheme(getTheme());
 document.getElementById('themeToggle')?.addEventListener('click',()=>setTheme(html.getAttribute('data-theme')==='light'?'dark':'light'));
 // ── Profile Logic ──
 function show(msg,type){let s=document.getElementById('status');s.className='status show '+(type||'good');s.textContent=msg}
+function showPasskey(msg,type){let s=document.getElementById('passkeyStatus');s.className='status show '+(type||'good');s.textContent=msg}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function cleanFleet(v){return String(v||'OCCULERT-DEMO').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'-').slice(0,40)||'OCCULERT-DEMO'}
 function getProfile(){return window.OcculertAuth&&window.OcculertAuth.getProfile?window.OcculertAuth.getProfile():JSON.parse(localStorage.getItem('occulert-profile')||'null')}
@@ -178,7 +204,54 @@ function saveProfile(e){e.preventDefault();let p=getProfile()||{};p.name=documen
 async function signOut(){try{if(window.OcculertAuth)await window.OcculertAuth.signOut();show('Signed out.','good')}catch(e){show('Signed out locally.','good')}renderSecurity()}
 function signedInUser(){return window.OcculertBackend&&window.OcculertBackend.currentUser?window.OcculertBackend.currentUser():null}
 function recoveryRequested(){return /(?:^|[?&])recovery=1(?:&|$)/.test((window.location&&window.location.search)||'')}
-function renderSecurity(){const user=signedInUser(),forms=document.getElementById('securityForms'),intro=document.getElementById('securityIntro');if(!forms||!intro)return;if(user){forms.classList.remove('hidden');intro.textContent=recoveryRequested()?'Recovery link verified for '+user.email+'. Choose a new password below.':'Signed in as '+user.email+'.';const e=document.getElementById('newEmail');if(e&&!e.value)e.value=user.email||''}else{forms.classList.add('hidden');intro.textContent='Sign in to change your email or password.'}}
+let passkeysById={};
+let passkeyLoadId=0;
+function validPasskeyId(value){let id=String(value||'');return /^[0-9a-f-]{20,80}$/i.test(id)?id:''}
+function passkeySupported(){return Boolean(window.OcculertPasskeys&&window.OcculertPasskeys.isSupported())}
+function formatPasskeyDate(value){let date=new Date(value||'');return Number.isNaN(date.getTime())?'Unknown':date.toLocaleDateString()}
+function setPasskeyBusy(busy){let add=document.getElementById('registerPasskeyBtn');if(add){add.disabled=busy||!passkeySupported();add.textContent=busy?'Working…':'Add a passkey'}document.querySelectorAll('[data-passkey-action]').forEach(button=>{button.disabled=busy})}
+function renderPasskeys(passkeys){
+  let list=document.getElementById('passkeyList');passkeysById={};
+  (Array.isArray(passkeys)?passkeys:[]).forEach(item=>{let id=validPasskeyId(item&&item.id);if(id)passkeysById[id]=item});
+  let ids=Object.keys(passkeysById);
+  if(!ids.length){list.innerHTML='<div class="passkey-empty">No passkeys added yet. Your password and reset link continue to work.</div>';return}
+  list.innerHTML=ids.map(id=>{let item=passkeysById[id],name=esc(item.friendly_name||item.friendlyName||'Passkey'),created=formatPasskeyDate(item.created_at||item.createdAt),last=item.last_used_at||item.lastUsedAt;return '<div class="passkey-item"><div><strong>'+name+'</strong><div class="passkey-meta">Added '+esc(created)+(last?' · Last used '+esc(formatPasskeyDate(last)):'')+'</div></div><div class="passkey-actions"><button class="btn" type="button" data-passkey-action="rename" data-passkey-id="'+id+'">Rename</button><button class="btn red" type="button" data-passkey-action="remove" data-passkey-id="'+id+'">Remove</button></div></div>'}).join('')
+}
+async function loadPasskeys(){
+  let list=document.getElementById('passkeyList'),requestId=++passkeyLoadId;
+  if(!signedInUser()){passkeysById={};list.innerHTML='<div class="passkey-empty">Sign in to manage passkeys.</div>';return}
+  if(!passkeySupported()){passkeysById={};list.innerHTML='<div class="passkey-empty">Passkeys require a supported browser on a secure Occulert page.</div>';setPasskeyBusy(false);return}
+  setPasskeyBusy(true);
+  try{let passkeys=await window.OcculertPasskeys.list();if(requestId===passkeyLoadId)renderPasskeys(passkeys)}
+  catch(err){if(requestId===passkeyLoadId){passkeysById={};list.innerHTML='<div class="passkey-empty">Passkeys could not be loaded.</div>';showPasskey(window.OcculertPasskeys.message(err,'manage'),'bad')}}
+  finally{if(requestId===passkeyLoadId)setPasskeyBusy(false)}
+}
+async function registerPasskey(){
+  if(!signedInUser())return showPasskey('Sign in with your email and password before adding a passkey.','bad');
+  setPasskeyBusy(true);
+  try{await window.OcculertPasskeys.register();await loadPasskeys();showPasskey('Passkey added. You can use it the next time you sign in.','good')}
+  catch(err){showPasskey(window.OcculertPasskeys.message(err,'register'),'bad')}
+  finally{setPasskeyBusy(false)}
+}
+async function renamePasskey(id){
+  id=validPasskeyId(id);let item=id&&passkeysById[id];if(!item)return;
+  let current=item.friendly_name||item.friendlyName||'Passkey',next=window.prompt('Name this passkey',current);if(next===null)return;next=next.trim();
+  if(!next||next.length>120)return showPasskey('Use a passkey name between 1 and 120 characters.','bad');
+  setPasskeyBusy(true);
+  try{await window.OcculertPasskeys.rename(id,next);await loadPasskeys();showPasskey('Passkey renamed.','good')}
+  catch(err){showPasskey(window.OcculertPasskeys.message(err,'manage'),'bad')}
+  finally{setPasskeyBusy(false)}
+}
+async function removePasskey(id){
+  id=validPasskeyId(id);let item=id&&passkeysById[id];if(!item)return;let name=item.friendly_name||item.friendlyName||'this passkey';
+  if(!window.confirm('Remove '+name+' from this Occulert account?'))return;
+  setPasskeyBusy(true);
+  try{await window.OcculertPasskeys.remove(id);await loadPasskeys();showPasskey('Passkey removed. Your password and reset link still work.','good')}
+  catch(err){showPasskey(window.OcculertPasskeys.message(err,'manage'),'bad')}
+  finally{setPasskeyBusy(false)}
+}
+function handlePasskeyAction(event){let button=event.target&&event.target.closest?event.target.closest('[data-passkey-action]'):null;if(!button)return;let action=button.dataset.passkeyAction,id=button.dataset.passkeyId;if(action==='rename')renamePasskey(id);else if(action==='remove')removePasskey(id)}
+function renderSecurity(){const user=signedInUser(),forms=document.getElementById('securityForms'),intro=document.getElementById('securityIntro');if(!forms||!intro)return;if(user){forms.classList.remove('hidden');intro.textContent=recoveryRequested()?'Recovery link verified for '+user.email+'. Choose a new password below.':'Signed in as '+user.email+'.';const e=document.getElementById('newEmail');if(e&&!e.value)e.value=user.email||'';if(window.OcculertPasskeys)loadPasskeys()}else{forms.classList.add('hidden');intro.textContent='Sign in to change your email or password.';passkeysById={}}}
 function setBusy(id,busy,label){const b=document.getElementById(id);if(!b)return;b.disabled=busy;b.textContent=busy?'Working...':label}
 async function changeEmail(e){
   e.preventDefault();
@@ -213,6 +286,7 @@ function render(p){p=p||getProfile()||{};document.getElementById('continueBtn').
 async function initAccount(){
   let recovery={handled:false,ok:false};
   try{if(window.OcculertBackend&&window.OcculertBackend.consumeAuthRedirect)recovery=await window.OcculertBackend.consumeAuthRedirect()}catch(err){recovery={handled:true,ok:false,body:{error:'cloud_unavailable'}}}
+  document.getElementById('passkeyList')?.addEventListener('click',handlePasskeyAction);
   if(window.OcculertAuth){window.OcculertAuth.onAuth(function(user,p){load();renderSecurity()})}else{load();renderSecurity()}
   if(recovery.handled&&recovery.ok){show('Secure reset link verified. Choose a new password below.','good');document.getElementById('newPassword')?.focus()}
   else if(recovery.handled){show(window.OcculertBackend.passwordResetMessage(recovery),'bad')}

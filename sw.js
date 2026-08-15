@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v25';
+const CACHE = 'occulert-v26';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -33,6 +33,7 @@ const STATIC_ASSETS = [
 const NETWORK_ONLY_ASSETS = new Set([
   '/auth-helper.js',
   '/occulert-backend.js',
+  '/passkey-auth.js',
 ]);
 
 self.addEventListener('install', event => {
