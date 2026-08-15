@@ -113,6 +113,84 @@ window.OcculertBackend = (function () {
     });
   }
 
+  function passwordResetRedirect() {
+    try {
+      if (window.location && window.location.origin) {
+        return "?redirect_to=" + encodeURIComponent(window.location.origin + "/account.html?recovery=1");
+      }
+    } catch (e) {}
+    return "";
+  }
+
+  function requestPasswordReset(email) {
+    return authFetch("/recover" + passwordResetRedirect(), { email: email });
+  }
+
+  function passwordResetMessage(result) {
+    var text = authErrorText(result);
+    if (isEmailRateLimited(result)) return "Too many password reset emails were requested. Wait about an hour, then try once more.";
+    if (text.indexOf("expired") >= 0 || text.indexOf("invalid") >= 0) return "This password reset link is invalid or expired. Request a new link from the sign-in page.";
+    if (text.indexOf("cloud_not_configured") >= 0) return "Cloud accounts are not configured yet, so a reset email cannot be sent.";
+    if (text.indexOf("cloud_unavailable") >= 0) return "Occulert could not reach the account service. Check your connection and try again.";
+    return "The password reset request could not be completed. Please try again.";
+  }
+
+  // Supabase recovery links return short-lived session tokens in the URL
+  // fragment. Consume them only for password recovery, remove the fragment
+  // immediately, and verify the user before storing the temporary session.
+  function consumeAuthRedirect() {
+    var hash = "";
+    try { hash = window.location && window.location.hash ? window.location.hash : ""; }
+    catch (e) {}
+    if (!hash) return Promise.resolve({ handled: false, ok: false, body: {} });
+
+    var params;
+    try { params = new URLSearchParams(hash.slice(1)); }
+    catch (e) { return Promise.resolve({ handled: true, ok: false, body: { error: "invalid_recovery_link" } }); }
+    if (params.get("type") !== "recovery" && !params.get("error")) {
+      return Promise.resolve({ handled: false, ok: false, body: {} });
+    }
+
+    try {
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, "", (window.location.pathname || "/account.html") + (window.location.search || ""));
+      }
+    } catch (e) {}
+
+    var error = params.get("error_description") || params.get("error");
+    var accessToken = params.get("access_token");
+    var refreshToken = params.get("refresh_token");
+    if (error || !accessToken || !refreshToken) {
+      return Promise.resolve({ handled: true, ok: false, body: { error: error || "invalid_recovery_link" } });
+    }
+
+    var expiresAt = Number(params.get("expires_at"));
+    if (!Number.isFinite(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000)) {
+      expiresAt = Math.floor(Date.now() / 1000) + (Number(params.get("expires_in")) || 3600) - 60;
+    }
+    return loadConfig().then(function (config) {
+      if (!config) return { handled: true, status: 503, ok: false, body: { error: "cloud_not_configured" } };
+      return fetch(config.url + "/auth/v1/user", {
+        method: "GET",
+        headers: { apikey: config.anonKey, Authorization: "Bearer " + accessToken, Accept: "application/json" },
+      }).then(function (response) {
+        return readJson(response).then(function (body) {
+          if (response.ok && body && body.id) {
+            saveAuth({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+              expires_at: expiresAt,
+              user: { id: body.id, email: body.email || "" },
+            });
+          }
+          return { handled: true, status: response.status, ok: response.ok && Boolean(body && body.id), body: body };
+        });
+      }).catch(function () {
+        return { handled: true, status: 503, ok: false, body: { error: "cloud_unavailable" } };
+      });
+    });
+  }
+
   function signOut() { saveAuth(null); }
 
   function refreshIfNeeded() {
@@ -261,6 +339,9 @@ window.OcculertBackend = (function () {
     isEmailRateLimited: isEmailRateLimited,
     signUp: signUp,
     signIn: signIn,
+    requestPasswordReset: requestPasswordReset,
+    passwordResetMessage: passwordResetMessage,
+    consumeAuthRedirect: consumeAuthRedirect,
     signOut: signOut,
     currentUser: currentUser,
     updateEmail: updateEmail,

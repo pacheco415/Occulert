@@ -176,7 +176,8 @@ function load(){let p=getProfile()||{};document.getElementById('name').value=p.n
 function saveProfile(e){e.preventDefault();let p=getProfile()||{};p.name=document.getElementById('name').value.trim();p.role=document.getElementById('role').value;p.company=document.getElementById('company').value.trim()||'Occulert';p.fleetId=cleanFleet(document.getElementById('fleetId').value);p.vehicle=document.getElementById('vehicle').value.trim();p.bio=document.getElementById('bio').value.trim();p.savedAt=new Date().toISOString();p=setProfile(p);render(p);show('Profile saved successfully.','good')}
 async function signOut(){try{if(window.OcculertAuth)await window.OcculertAuth.signOut();show('Signed out.','good')}catch(e){show('Signed out locally.','good')}renderSecurity()}
 function signedInUser(){return window.OcculertBackend&&window.OcculertBackend.currentUser?window.OcculertBackend.currentUser():null}
-function renderSecurity(){const user=signedInUser(),forms=document.getElementById('securityForms'),intro=document.getElementById('securityIntro');if(!forms||!intro)return;if(user){forms.classList.remove('hidden');intro.textContent='Signed in as '+user.email+'.';const e=document.getElementById('newEmail');if(e&&!e.value)e.value=user.email||''}else{forms.classList.add('hidden');intro.textContent='Sign in to change your email or password.'}}
+function recoveryRequested(){return /(?:^|[?&])recovery=1(?:&|$)/.test((window.location&&window.location.search)||'')}
+function renderSecurity(){const user=signedInUser(),forms=document.getElementById('securityForms'),intro=document.getElementById('securityIntro');if(!forms||!intro)return;if(user){forms.classList.remove('hidden');intro.textContent=recoveryRequested()?'Recovery link verified for '+user.email+'. Choose a new password below.':'Signed in as '+user.email+'.';const e=document.getElementById('newEmail');if(e&&!e.value)e.value=user.email||''}else{forms.classList.add('hidden');intro.textContent='Sign in to change your email or password.'}}
 function setBusy(id,busy,label){const b=document.getElementById(id);if(!b)return;b.disabled=busy;b.textContent=busy?'Working...':label}
 async function changeEmail(e){
   e.preventDefault();
@@ -201,12 +202,22 @@ async function changePassword(e){
     const result=await window.OcculertBackend.updatePassword(pw);
     if(!result.ok)return show(window.OcculertBackend.accountMessage(result,'password'),'bad');
     field.value='';
-    show('Password updated. Use it the next time you sign in.','good');
+    const recovered=recoveryRequested();
+    if(recovered&&window.history&&window.history.replaceState)window.history.replaceState(null,'','/account.html');
+    show(recovered?'Password reset. You are signed in and can continue.':'Password updated. Use it the next time you sign in.','good');
   }catch(err){show('The password could not be updated. Please try again.','bad')}
   finally{setBusy('passwordBtn',false,'Change Password')}
 }
 function render(p){p=p||getProfile()||{};document.getElementById('continueBtn').href=(p.role==='fleet')?'/fleet-dashboard.html':'/app.html';const initials=esc((p.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?');document.getElementById('profileBox').innerHTML='<div class="avatar-row"><div class="avatar">'+initials+'</div><div class="avatar-info"><h3>'+esc(p.name||'No name set')+'</h3><p>'+esc(p.email||'No email set')+'</p></div></div><div class="row"><span>Role</span><span>'+(p.role==='fleet'?'Fleet Manager':'Driver')+'</span></div><div class="row"><span>Company</span><span>'+esc(p.company||'Not set')+'</span></div><div class="row"><span>Fleet ID</span><span style="font-family:monospace;font-size:13px">'+esc(p.fleetId||'OCCULERT-DEMO')+'</span></div><div class="row"><span>Vehicle</span><span>'+esc(p.vehicle||'Not set')+'</span></div><div class="row"><span>Login</span><span class="badge">'+(p.authenticated?'Cloud':'Local')+'</span></div>'}
-if(window.OcculertAuth){window.OcculertAuth.onAuth(function(user,p){load();renderSecurity()})}else{load();renderSecurity()}
+async function initAccount(){
+  let recovery={handled:false,ok:false};
+  try{if(window.OcculertBackend&&window.OcculertBackend.consumeAuthRedirect)recovery=await window.OcculertBackend.consumeAuthRedirect()}catch(err){recovery={handled:true,ok:false,body:{error:'cloud_unavailable'}}}
+  if(window.OcculertAuth){window.OcculertAuth.onAuth(function(user,p){load();renderSecurity()})}else{load();renderSecurity()}
+  if(recovery.handled&&recovery.ok){show('Secure reset link verified. Choose a new password below.','good');document.getElementById('newPassword')?.focus()}
+  else if(recovery.handled){show(window.OcculertBackend.passwordResetMessage(recovery),'bad')}
+  else if(recoveryRequested()&&!signedInUser()){show('This password reset link is missing, invalid, or expired. Request a new one from the sign-in page.','bad')}
+}
+initAccount();
 </script>
 
 <footer style="text-align:center;padding:28px 16px 24px;border-top:1px solid #1e293b;color:#4a6070;font-size:12px;margin-top:40px"><a href="/" style="color:#60a5fa;text-decoration:none;font-weight:700">Occulert</a> &nbsp;·&nbsp; <a href="/privacy.html" style="color:#4a6070;text-decoration:none">Privacy</a> &nbsp;·&nbsp; <a href="/safety.html" style="color:#4a6070;text-decoration:none">Safety</a> &nbsp;·&nbsp; <a href="/app.html" style="color:#4a6070;text-decoration:none">Driver App</a><div style="margin-top:8px">© 2026 Occulert. Prototype — not a substitute for rest or safe driving.</div></footer>

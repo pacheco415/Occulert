@@ -9,7 +9,7 @@
   <script src="/occulert-backend.js"></script>
   <script src="/auth-helper.js"></script>
   <style>
-    *{box-sizing:border-box}body{margin:0;background:#0a0e1a;color:#e2e8f0;font-family:Inter,Arial,sans-serif;line-height:1.6}.top{height:68px;background:#111827;border-bottom:1px solid #24324a;display:flex;align-items:center;justify-content:space-between;padding:0 24px}.brand{font-weight:900;color:#fff}.nav{display:flex;gap:10px}.btn{border:1px solid #344d72;background:#1e2d45;color:#e2e8f0;border-radius:10px;padding:10px 14px;text-decoration:none;font-weight:800;font-size:13px;cursor:pointer}.btn:disabled{cursor:not-allowed;opacity:.58}.btn.primary{background:#2563eb;border-color:#2563eb}.btn.green{background:#10b981;border-color:#10b981;color:#03140f}.wrap{max-width:980px;margin:0 auto;padding:34px 18px}.grid{display:grid;grid-template-columns:1fr 430px;gap:22px;align-items:start}.card{background:#111827;border:1px solid #24324a;border-radius:22px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.28)}h1{font-size:42px;line-height:1.1;margin:0 0 12px;color:#fff}.muted{color:#94a3b8}.roles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}.role{border:2px solid #24324a;background:#0f172a;border-radius:16px;padding:15px;cursor:pointer}.role.active{border-color:#3b82f6}.role strong{display:block;color:#fff}.role span{font-size:12px;color:#94a3b8}.form{display:grid;gap:13px}.field label{display:block;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px}.field input{width:100%;background:#0f172a;border:1px solid #344d72;color:#e2e8f0;border-radius:12px;padding:13px 14px;font-size:15px}.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.notice{border:1px solid #344d72;border-radius:14px;background:rgba(37,99,235,.08);padding:14px;color:#94a3b8;font-size:13px;margin-top:14px}.status{display:none;border-radius:14px;padding:14px;margin-top:14px;font-weight:800}.status.show{display:block}.good{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);color:#bbf7d0}.bad{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fecaca}.label{font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}.row{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid #24324a;padding:10px 0}.row span:first-child{color:#94a3b8}.row span:last-child{color:#fff;font-weight:800;text-align:right}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.tiny{font-size:12px;color:#64748b;margin-top:-6px}@media(max-width:840px){.grid,.roles,.split{grid-template-columns:1fr}.nav{display:none}h1{font-size:32px}}
+    *{box-sizing:border-box}body{margin:0;background:#0a0e1a;color:#e2e8f0;font-family:Inter,Arial,sans-serif;line-height:1.6}.top{height:68px;background:#111827;border-bottom:1px solid #24324a;display:flex;align-items:center;justify-content:space-between;padding:0 24px}.brand{font-weight:900;color:#fff}.nav{display:flex;gap:10px}.btn{border:1px solid #344d72;background:#1e2d45;color:#e2e8f0;border-radius:10px;padding:10px 14px;text-decoration:none;font-weight:800;font-size:13px;cursor:pointer}.btn:disabled{cursor:not-allowed;opacity:.58}.btn.primary{background:#2563eb;border-color:#2563eb}.btn.link{border:0;background:transparent;color:#93c5fd;padding:7px 2px;text-align:left}.wrap{max-width:980px;margin:0 auto;padding:34px 18px}.grid{display:grid;grid-template-columns:1fr 430px;gap:22px;align-items:start}.card{background:#111827;border:1px solid #24324a;border-radius:22px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.28)}h1{font-size:42px;line-height:1.1;margin:0 0 12px;color:#fff}.muted{color:#94a3b8}.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px;background:#0f172a;border:1px solid #24324a;border-radius:14px;margin:18px 0}.auth-tabs .btn{background:transparent;border-color:transparent}.auth-tabs .btn.active{background:#1e3a5f;border-color:#3b82f6;color:#fff}.roles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 13px}.role{width:100%;border:2px solid #24324a;background:#0f172a;color:inherit;border-radius:16px;padding:15px;cursor:pointer;text-align:left}.role.active{border-color:#3b82f6}.role strong{display:block;color:#fff}.role span{font-size:12px;color:#94a3b8}.form{display:grid;gap:13px}.field label{display:block;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px}.field input{width:100%;background:#0f172a;border:1px solid #344d72;color:#e2e8f0;border-radius:12px;padding:13px 14px;font-size:15px}.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.notice{border:1px solid #344d72;border-radius:14px;background:rgba(37,99,235,.08);padding:14px;color:#94a3b8;font-size:13px;margin-top:14px}.status{display:none;border-radius:14px;padding:14px;margin-top:14px;font-weight:800}.status.show{display:block}.good{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);color:#bbf7d0}.bad{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fecaca}.label{font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}.row{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid #24324a;padding:10px 0}.row span:first-child{color:#94a3b8}.row span:last-child{color:#fff;font-weight:800;text-align:right}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.tiny{font-size:12px;color:#94a3b8;margin:0}.hidden{display:none!important}@media(max-width:840px){.grid,.roles,.split{grid-template-columns:1fr}.nav{display:none}h1{font-size:32px}}
   </style>
 </head>
 <body>
@@ -17,38 +17,90 @@
   <main class="wrap">
     <section class="grid">
       <div class="card">
-        <h1>Sign in to Occulert</h1>
-        <p class="muted">Sign in securely to save opted-in driving sessions to Occulert's protected cloud backend. Your local profile keeps the app usable even when cloud service is unavailable.</p>
-        <div class="roles"><div class="role active" id="driverRole" onclick="setRole('driver')"><strong>Driver</strong><span>Use AI camera and GPS monitoring.</span></div><div class="role" id="fleetRole" onclick="setRole('fleet')"><strong>Fleet Manager</strong><span>View live drivers and alerts.</span></div></div>
-        <form class="form" onsubmit="emailAuth(event,'signin')">
-          <div class="split"><div class="field"><label>Name</label><input id="name" placeholder="Your name"></div><div class="field"><label>Company</label><input id="company" placeholder="Occulert Pilot Fleet"></div></div>
-          <div class="field"><label>Vehicle / Route</label><input id="vehicle" placeholder="Van 12"></div>
-          <div class="field"><label>Email</label><input id="email" type="email" required placeholder="name@email.com"></div>
-          <div class="field"><label>Password</label><input id="password" type="password" required minlength="6" placeholder="Minimum 6 characters"></div>
-          <div class="split"><button class="btn primary" id="signInBtn" type="submit">Sign In</button><button class="btn green" id="createAccountBtn" type="button" onclick="emailAuth(event,'signup')">Create Account</button></div>
-          <div class="notice"><strong>Google and passkey sign-in are coming soon.</strong> Use email and password for now. If this is your first visit, select Create Account only once and check your email.</div>
+        <h1 id="authHeading">Sign in to Occulert</h1>
+        <p class="muted" id="authIntro">Use the email and password for your existing Occulert account.</p>
+        <div class="auth-tabs" aria-label="Account action">
+          <button class="btn active" id="signInModeBtn" type="button" aria-pressed="true" onclick="showAuthMode('signin')">Sign In</button>
+          <button class="btn" id="signUpModeBtn" type="button" aria-pressed="false" onclick="showAuthMode('signup')">Create Account</button>
+        </div>
+        <form class="form" id="authForm" onsubmit="submitAuth(event)">
+          <div id="profileFields" class="hidden">
+            <div class="roles" aria-label="Account role">
+              <button class="role active" id="driverRole" type="button" aria-pressed="true" onclick="setRole('driver')"><strong>Driver</strong><span>Use AI camera and GPS monitoring.</span></button>
+              <button class="role" id="fleetRole" type="button" aria-pressed="false" onclick="setRole('fleet')"><strong>Fleet Manager</strong><span>Create or manage a protected fleet.</span></button>
+            </div>
+            <div class="split"><div class="field"><label for="name">Name</label><input id="name" autocomplete="name" placeholder="Your name"></div><div class="field"><label for="company">Company</label><input id="company" autocomplete="organization" placeholder="Occulert Pilot Fleet"></div></div>
+            <div class="field"><label for="vehicle">Vehicle / Route</label><input id="vehicle" placeholder="Van 12"></div>
+          </div>
+          <div class="field"><label for="email">Email</label><input id="email" type="email" required autocomplete="email" placeholder="name@email.com"></div>
+          <div class="field" id="passwordField"><label for="password">Password</label><input id="password" type="password" required minlength="6" autocomplete="current-password" placeholder="Minimum 6 characters"></div>
+          <button class="btn primary" id="submitBtn" type="submit">Sign In</button>
+          <button class="btn link" id="forgotPasswordBtn" type="button" onclick="showAuthMode('reset')">Forgot password?</button>
+          <button class="btn link hidden" id="backToSignInBtn" type="button" onclick="showAuthMode('signin')">Back to sign in</button>
+          <p class="tiny" id="modeHelp">Fleet manager? Sign in normally, then choose Manage Fleet. Fleet access is verified by server ownership—not by this form.</p>
         </form>
-        <div class="notice"><strong>Privacy:</strong> Cloud storage is optional. Email/password sign-in uses Supabase when the server is configured; otherwise the Driver App remains available in local-only mode. Fleet membership requires a separate administrator invitation.</div>
-        <div class="status" id="status"></div>
+        <div class="notice"><strong>Google and passkey sign-in are coming soon.</strong> Use email and password for now. New users should choose Create Account once and check their email.</div>
+        <div class="notice"><strong>Privacy:</strong> Cloud storage is optional. Passwords are handled by Supabase Auth and are never stored by Occulert. Fleet membership still requires protected server ownership or an administrator invitation.</div>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
       </div>
       <aside class="card">
         <div class="label">Signed-in Profile</div>
         <div id="profileBox"></div>
-        <div class="actions"><a class="btn primary" id="continueBtn" href="/app.html">Continue</a><button class="btn" onclick="logout()">Sign Out</button></div>
+        <div class="actions"><a class="btn primary" href="/app.html">Driver App</a><a class="btn" href="/fleet-onboarding.html">Manage Fleet</a><button class="btn" onclick="logout()">Sign Out</button></div>
       </aside>
     </section>
   </main>
 <script>
 let selectedRole='driver';
-function setRole(role){selectedRole=role;document.getElementById('driverRole').classList.toggle('active',role==='driver');document.getElementById('fleetRole').classList.toggle('active',role==='fleet');document.getElementById('continueBtn').href=role==='fleet'?'/fleet-onboarding.html':'/app.html'}
+let authMode='signin';
+function setRole(role){selectedRole=role;let driver=document.getElementById('driverRole'),fleet=document.getElementById('fleetRole');driver.classList.toggle('active',role==='driver');fleet.classList.toggle('active',role==='fleet');driver.setAttribute('aria-pressed',String(role==='driver'));fleet.setAttribute('aria-pressed',String(role==='fleet'))}
 function extras(){return{role:selectedRole,name:document.getElementById('name').value.trim(),company:document.getElementById('company').value.trim()||'Occulert Pilot Fleet',vehicle:document.getElementById('vehicle').value.trim()}}
 function show(msg,type){let s=document.getElementById('status');s.className='status show '+(type||'good');s.textContent=msg}
+function clearStatus(){let s=document.getElementById('status');s.className='status';s.textContent=''}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function setAuthBusy(busy){let form=document.querySelector('form');form.setAttribute('aria-busy',String(busy));document.getElementById('signInBtn').disabled=busy;let create=document.getElementById('createAccountBtn');create.disabled=busy||create.dataset.rateLimited==='true'}
-async function emailAuth(e,mode){e.preventDefault();setAuthBusy(true);try{let p=await window.OcculertAuth.signInEmail(document.getElementById('email').value.trim(),document.getElementById('password').value,mode,extras());renderProfile(p);show((mode==='signup'?'Account created.':'Signed in.')+' Continue to '+(p.role==='fleet'?'Manage Fleet':'Driver App')+'.','good')}catch(err){let message=err.message||String(err);if(message.startsWith('Too many confirmation emails'))document.getElementById('createAccountBtn').dataset.rateLimited='true';show(message,err.code==='confirmation_required'?'good':'bad')}finally{setAuthBusy(false)}}
+function showAuthMode(mode){
+  authMode=mode;clearStatus();
+  let signup=mode==='signup',reset=mode==='reset',password=document.getElementById('password'),submit=document.getElementById('submitBtn');
+  document.getElementById('profileFields').classList.toggle('hidden',!signup);
+  document.getElementById('passwordField').classList.toggle('hidden',reset);
+  document.getElementById('forgotPasswordBtn').classList.toggle('hidden',mode!=='signin');
+  document.getElementById('backToSignInBtn').classList.toggle('hidden',!reset);
+  document.getElementById('signInModeBtn').classList.toggle('active',mode==='signin');
+  document.getElementById('signUpModeBtn').classList.toggle('active',signup);
+  document.getElementById('signInModeBtn').setAttribute('aria-pressed',String(mode==='signin'));
+  document.getElementById('signUpModeBtn').setAttribute('aria-pressed',String(signup));
+  password.required=!reset;password.autocomplete=signup?'new-password':'current-password';
+  document.getElementById('authHeading').textContent=reset?'Reset your password':signup?'Create your Occulert account':'Sign in to Occulert';
+  document.getElementById('authIntro').textContent=reset?'Enter your account email. We will send a secure link for choosing a new password.':signup?'Set up your profile, then confirm the email Occulert sends you.':'Use the email and password for your existing Occulert account.';
+  document.getElementById('modeHelp').textContent=reset?'For privacy, the confirmation message is the same whether or not the email is registered.':signup?'Fleet-manager access is verified separately after sign-in; selecting the role here does not grant fleet access.':'Fleet manager? Sign in normally, then choose Manage Fleet. Fleet access is verified by server ownership—not by this form.';
+  submit.textContent=reset?'Send Reset Link':signup?'Create Account':'Sign In';
+  submit.disabled=submit.dataset.rateLimited===mode;
+  document.getElementById('email').focus();
+}
+function setAuthBusy(busy){let form=document.getElementById('authForm'),submit=document.getElementById('submitBtn');form.setAttribute('aria-busy',String(busy));submit.disabled=busy||submit.dataset.rateLimited===authMode;document.getElementById('signInModeBtn').disabled=busy;document.getElementById('signUpModeBtn').disabled=busy;document.getElementById('forgotPasswordBtn').disabled=busy;document.getElementById('backToSignInBtn').disabled=busy}
+async function submitAuth(e){
+  e.preventDefault();setAuthBusy(true);
+  let email=document.getElementById('email').value.trim();
+  try{
+    if(authMode==='reset'){
+      let result=await window.OcculertBackend.requestPasswordReset(email);
+      if(!result.ok){if(window.OcculertBackend.isEmailRateLimited(result))document.getElementById('submitBtn').dataset.rateLimited='reset';return show(window.OcculertBackend.passwordResetMessage(result),'bad')}
+      show('If an Occulert account uses that email, a password reset link is on the way. Check your inbox and spam folder.','good');
+      return;
+    }
+    let p=await window.OcculertAuth.signInEmail(email,document.getElementById('password').value,authMode,authMode==='signup'?extras():{});
+    renderProfile(p);
+    show(authMode==='signup'?'Account created. Check your email if confirmation is required.':'Signed in. Choose Driver App or Manage Fleet.','good');
+  }catch(err){
+    let message=err.message||String(err);
+    if(authMode==='signup'&&message.startsWith('Too many confirmation emails'))document.getElementById('submitBtn').dataset.rateLimited='signup';
+    show(message,err.code==='confirmation_required'?'good':'bad');
+  }finally{setAuthBusy(false)}
+}
 async function logout(){await window.OcculertAuth.signOut();renderProfile(null);show('Signed out on this browser.','good')}
-function renderProfile(p){p=p||window.OcculertAuth.getProfile();let box=document.getElementById('profileBox');if(!p){box.innerHTML='<div class="notice">No signed-in profile yet.</div>';return}setRole(p.role||'driver');['name','company','vehicle','email'].forEach(id=>{let el=document.getElementById(id);if(el&&!el.value)el.value=p[id]||''});document.getElementById('continueBtn').href=p.role==='fleet'?'/fleet-onboarding.html':'/app.html';box.innerHTML=`<div class="row"><span>Role</span><span>${p.role==='fleet'?'Fleet Manager':'Driver'}</span></div><div class="row"><span>Name</span><span>${esc(p.name||'Not set')}</span></div><div class="row"><span>Email</span><span>${esc(p.email||'Not set')}</span></div><div class="row"><span>Company</span><span>${esc(p.company||'Not set')}</span></div><div class="row"><span>Fleet access</span><span>${p.role==='fleet'?'Server ownership required':'Manager invitation required'}</span></div><div class="row"><span>Authenticated</span><span>${p.authenticated?'Yes':'Local only'}</span></div>`}
+function renderProfile(p){p=p||window.OcculertAuth.getProfile();let box=document.getElementById('profileBox');if(!p){box.innerHTML='<div class="notice">No signed-in profile yet.</div>';return}setRole(p.role||'driver');['name','company','vehicle','email'].forEach(id=>{let el=document.getElementById(id);if(el&&!el.value)el.value=p[id]||''});box.innerHTML=`<div class="row"><span>Role</span><span>${p.role==='fleet'?'Fleet Manager':'Driver'}</span></div><div class="row"><span>Name</span><span>${esc(p.name||'Not set')}</span></div><div class="row"><span>Email</span><span>${esc(p.email||'Not set')}</span></div><div class="row"><span>Company</span><span>${esc(p.company||'Not set')}</span></div><div class="row"><span>Fleet access</span><span>${p.role==='fleet'?'Server ownership required':'Manager invitation required'}</span></div><div class="row"><span>Authenticated</span><span>${p.authenticated?'Yes':'Local only'}</span></div>`}
 window.OcculertAuth.onAuth(function(user,profile){renderProfile(profile)});
+showAuthMode('signin');
 </script>
 </body>
 </html>

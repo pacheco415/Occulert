@@ -31,6 +31,10 @@ async function fetchMock(url, options = {}) {
     });
   }
   if (String(url).includes("/auth/v1/signup")) return response({ user: { id: "pending-user", email: "new@example.com" } });
+  if (String(url).includes("/auth/v1/recover")) return response({});
+  if (String(url).includes("/auth/v1/user") && (options.method || "GET") === "GET") {
+    return response({ id: "user-1", email: "driver@example.com" });
+  }
   if (String(url).includes("/auth/v1/user") && options.method === "PUT") {
     const sent = JSON.parse(options.body || "{}");
     if (sent.password === "short") return response({ error_code: "weak_password", msg: "Password should be at least 6 characters" }, 422);
@@ -51,7 +55,11 @@ async function fetchMock(url, options = {}) {
   throw new Error(`unexpected fetch: ${options.method || "GET"} ${url}`);
 }
 
-const window = { location: { origin: "https://www.occulert.com" } };
+const historyCalls = [];
+const window = {
+  location: { origin: "https://www.occulert.com", pathname: "/login.html", search: "", hash: "" },
+  history: { replaceState(...args) { historyCalls.push(args); } },
+};
 const context = {
   window,
   localStorage,
@@ -64,6 +72,7 @@ const context = {
   Object,
   Promise,
   String,
+  URLSearchParams,
 };
 window.window = window;
 window.localStorage = localStorage;
@@ -78,10 +87,16 @@ assert.equal(backend.authMessage({ body: { error: "invalid_credentials" } }, "si
 assert.equal(backend.authMessage({ body: { message: "User already registered" } }, "signup"), "An account already exists for this email. Use Sign In instead.");
 assert.equal(backend.isEmailRateLimited({ body: { error: "email_rate_limit_exceeded" } }), true);
 assert.equal(backend.authMessage({ body: { error: "internal_server_error" } }, "signup"), "The account could not be created. Please try again.");
+assert.equal(backend.passwordResetMessage({ body: { error: "email_rate_limit_exceeded" } }), "Too many password reset emails were requested. Wait about an hour, then try once more.");
+assert.equal(backend.passwordResetMessage({ body: { error: "invalid_recovery_link" } }), "This password reset link is invalid or expired. Request a new link from the sign-in page.");
 
 assert.equal(await backend.isConfigured(), true);
 assert.equal((await backend.signUp("new@example.com", "password123")).ok, true);
 assert.ok(calls.some((call) => String(call.url).includes("/auth/v1/signup?redirect_to=https%3A%2F%2Fwww.occulert.com%2Flogin.html")));
+assert.equal((await backend.requestPasswordReset("driver@example.com")).ok, true);
+const resetCall = calls.find((call) => String(call.url).includes("/auth/v1/recover"));
+assert.ok(String(resetCall.url).includes("redirect_to=https%3A%2F%2Fwww.occulert.com%2Faccount.html%3Frecovery%3D1"));
+assert.equal(JSON.parse(resetCall.body).email, "driver@example.com");
 const signedIn = await backend.signIn("driver@example.com", "password123");
 assert.equal(signedIn.ok, true);
 assert.equal(backend.currentUser().id, "user-1");
@@ -126,6 +141,19 @@ assert.ok(protectedCalls.every((call) => call.headers.Authorization === "Bearer 
 assert.equal(calls.find((call) => String(call.url).includes("/auth/v1/token")).headers.apikey, "public-key");
 assert.equal(JSON.parse(calls.find((call) => call.url === "/api/fleets" && call.method === "POST").body).company_name, "Safe Transit");
 assert.equal(JSON.parse(calls.find((call) => call.url === "/api/fleet-invitations" && call.method === "DELETE").body).invitation_id, "invite-1");
+
+// Recovery links are verified, removed from the visible URL, and persisted as
+// a short-lived authenticated session before the password can be changed.
+window.location.pathname = "/account.html";
+window.location.search = "?recovery=1";
+window.location.hash = "#access_token=recovery-access&refresh_token=recovery-refresh&type=recovery&expires_in=3600";
+const recovered = await backend.consumeAuthRedirect();
+assert.equal(recovered.handled, true);
+assert.equal(recovered.ok, true);
+assert.equal(backend.currentUser().email, "driver@example.com");
+assert.equal(historyCalls.at(-1).at(-1), "/account.html?recovery=1");
+const recoveryUserCall = calls.find((call) => String(call.url).includes("/auth/v1/user") && (call.method || "GET") === "GET");
+assert.equal(recoveryUserCall.headers.Authorization, "Bearer recovery-access");
 
 backend.signOut();
 assert.equal(backend.currentUser(), null);

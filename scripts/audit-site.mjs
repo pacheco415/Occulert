@@ -140,6 +140,14 @@ assertNotIncludes("login.html", "id=\"fleetId\"", "login must not offer caller-c
 assertIncludes("login.html", "Google and passkey sign-in are coming soon", "login must not present disabled authentication methods as active");
 assertNotIncludes("login.html", "onclick=\"passkeyAuth()\"", "login must not offer a nonfunctional passkey action");
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
+assertIncludes("login.html", "id=\"profileFields\" class=\"hidden\"", "sign-in must hide profile setup fields by default");
+assertIncludes("login.html", "Forgot password?", "login must offer password recovery");
+assertIncludes("login.html", "If an Occulert account uses that email", "password recovery must not reveal whether an email is registered");
+assertIncludes("login.html", "authMode==='signup'?extras():{}", "sign-in must not overwrite profile setup fields");
+assertIncludes("occulert-backend.js", "\"/recover\" + passwordResetRedirect()", "password resets must go through Supabase Auth");
+assertIncludes("occulert-backend.js", "params.get(\"type\") !== \"recovery\"", "auth redirects must accept recovery links only");
+assertIncludes("occulert-backend.js", "window.history.replaceState", "recovery tokens must be removed from the visible URL");
+assertIncludes("account.html", "OcculertBackend.consumeAuthRedirect", "account setup must verify recovery links before allowing a password change");
 assertIncludes("fleet-onboarding.html", "createFleetInvitation", "fleet onboarding must create protected invitations through the API");
 assertIncludes("fleet-onboarding.html", "resendFleetInvitation", "fleet onboarding must support replacing pending invitation links");
 assertIncludes("fleet-onboarding.html", "mailto:", "fleet onboarding must support no-cost sharing through the manager's mail app");
