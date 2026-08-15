@@ -186,7 +186,10 @@ assertIncludes("native-app/app/history.tsx", "Needs review", "native history mus
 assertIncludes("native-app/app/history.tsx", "expanded: isExpanded", "native session review details must expose their expanded state for accessibility");
 assertIncludes("native-app/app/monitor.tsx", "...currentAppBuildInfo()", "native sessions must preserve their exact app version and native build");
 assertIncludes("native-app/lib/appBuildInfo.ts", "Constants.platform?.ios?.buildNumber", "native pilot metadata must use the embedded immutable iOS build number");
+assertIncludes("native-app/lib/appBuildInfo.ts", "formatAppBuildLabel", "native build metadata must expose a reusable display label");
 assertIncludes("native-app/lib/feedback.ts", "Build number:", "native session feedback must include the recorded native build number");
+assertIncludes("native-app/app/settings.tsx", "formatAppBuildLabel(currentAppBuildInfo())", "native Settings must display the installed app version and build");
+assertNotIncludes("native-app/app/settings.tsx", "Occulert™ · v1.0.0", "native Settings must not hardcode the displayed app version");
 assertNotIncludes("native-app/lib/feedback.ts", "App version: 1.0.0", "native feedback must not hardcode an app version");
 assertIncludes("native-app/app/history.tsx", "router.push('/pre-drive')", "native history must route monitoring through the pre-drive safety gate");
 assertIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native iOS builds must explain optional location access to satisfy App Store validation");

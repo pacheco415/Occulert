@@ -11,6 +11,7 @@ import { getWatchAlertsEnabled, setWatchAlertsEnabled } from '../lib/watchPrefer
 import { CloudSyncCard } from '../components/CloudSyncCard';
 import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
+import { currentAppBuildInfo, formatAppBuildLabel } from '../lib/appBuildInfo';
 import {
   IN_EAR_ALERT_PATTERN_KEY,
   parseInEarAlertPattern,
@@ -32,6 +33,7 @@ export default function SettingsScreen() {
   const [watch, setWatch] = useState(false);
   const [watchStatus, setWatchStatus] = useState<WatchStatus>(EMPTY_WATCH_STATUS);
   const watchAvailable = watchStatus.paired && watchStatus.appInstalled;
+  const appBuildLabel = formatAppBuildLabel(currentAppBuildInfo());
 
   useEffect(() => {
     let active = true;
@@ -200,7 +202,9 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>Feedback opens in Mail for your review. No camera video, audio, or location is attached.</Text></View>
         </View>
-        <Text style={s.ver}>Occulert™ · v1.0.0 · San Francisco, CA</Text>
+        <Text accessibilityLabel={`Occulert ${appBuildLabel}`} style={s.ver}>
+          Occulert™ · {appBuildLabel} · San Francisco, CA
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
