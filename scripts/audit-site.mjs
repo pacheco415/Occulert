@@ -174,6 +174,8 @@ assertIncludes("app.html", "Permissions → Camera → Allow", "driver app must 
 assertIncludes("login.html", "src=\"/occulert-backend.js\"", "login must load the Supabase backend client");
 assertNotIncludes("login.html", "id=\"fleetId\"", "login must not offer caller-controlled fleet membership");
 assertIncludes("login.html", "id=\"passkeySignInBtn\"", "login must offer the supported passkey sign-in action");
+assertIncludes("login.html", "id=\"passkeyStatus\"", "passkey results must appear beside the passkey action");
+assertIncludes("login.html", "sign in with email and password first", "first-time passkey users must receive enrollment guidance");
 assertIncludes("login.html", "src=\"/passkey-auth.js\"", "login must load the passkey client");
 assertIncludes("passkey-auth.js", "experimental: { passkey: true }", "passkey support must be explicitly enabled in the Supabase client");
 assertIncludes("passkey-auth.js", "signInWithPasskey", "passkey sign-in must use the Supabase WebAuthn implementation");
@@ -300,6 +302,10 @@ assertIncludes("fleet-dashboard.html", "!fleetMode&&local", "protected fleet das
 assertIncludes("fleet-dashboard.html", "id=\"sessionHistory\"", "fleet dashboard must render protected session history");
 assertIncludes("fleet-dashboard.html", "function exportSessionHistoryCSV()", "protected session history must keep a privacy-safe export");
 assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet exports must neutralize spreadsheet formulas");
+assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
+assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
+assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
+assertIncludes("sw.js", "const CACHE = 'occulert-v27'", "the passkey and mobile navigation repair must advance the offline cache");
 assertIncludes("api/fleet-summary.js", "includes_location: false", "fleet history responses must explicitly exclude location");
 for (const path of ["fleet-onboarding.html", "accept-invite.html"]) assertSingleH1(path);
 assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");

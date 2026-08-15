@@ -38,7 +38,7 @@ function makeElement(id) {
   };
 }
 
-function boot({ resetResult = { ok: true, body: {} } } = {}) {
+function boot({ resetResult = { ok: true, body: {} }, passkeyError = null } = {}) {
   const elements = new Map();
   const calls = { auth: [], reset: [], passkey: 0 };
   const context = {
@@ -72,6 +72,7 @@ function boot({ resetResult = { ok: true, body: {} } } = {}) {
     signOut: () => Promise.resolve(),
     signInPasskey() {
       calls.passkey += 1;
+      if (passkeyError) return Promise.reject(passkeyError);
       return Promise.resolve({ role: 'driver', email: 'driver@example.com', authenticated: true });
     },
     signInEmail(email, password, mode, extra) {
@@ -100,8 +101,20 @@ test('passkey sign-in does not require email or password input', async () => {
 
   assert.equal(calls.passkey, 1);
   assert.equal(calls.auth.length, 0);
-  assert.match(el('status').textContent, /Signed in with your passkey/);
+  assert.match(el('passkeyStatus').textContent, /Signed in with your passkey/);
+  assert.equal(el('status').textContent, '');
   assert.equal(el('passkeySignInBtn').disabled, false);
+});
+
+test('passkey failures stay beside the passkey action instead of below the account notices', async () => {
+  const { context, el } = boot({ passkeyError: new Error('provider detail') });
+  await context.signInPasskey();
+
+  assert.match(el('passkeyStatus').textContent, /mapped passkey failure/);
+  assert.match(el('passkeyStatus').className, /bad/);
+  assert.equal(el('status').textContent, '');
+  assert.ok(source.indexOf('id="passkeyStatus"') > source.indexOf('id="passkeySignInBtn"'));
+  assert.ok(source.indexOf('id="passkeyStatus"') < source.indexOf('id="authForm"'));
 });
 
 test('account creation reveals setup fields and sends them only for signup', async () => {

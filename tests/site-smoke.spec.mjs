@@ -42,6 +42,37 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
 });
 
+test("passkey failures remain visible beside the passkey button", async ({ page }) => {
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => {
+    window.OcculertPasskeys = {
+      ...window.OcculertPasskeys,
+      isSupported: () => true,
+      message: () => "No new Occulert passkey is enrolled. Sign in normally and add one from Account Setup.",
+    };
+    window.OcculertAuth.signInPasskey = async () => { throw new Error("not enrolled"); };
+    initPasskeySignIn();
+  });
+
+  await page.locator("#passkeySignInBtn").click();
+  await expect(page.locator("#passkeyStatus")).toBeVisible();
+  await expect(page.locator("#passkeyStatus")).toContainText("No new Occulert passkey is enrolled");
+  expect(await page.locator("#passkeyStatus").evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector("#authForm")) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+});
+
+test("signed-out mobile fleet dashboard keeps navigation and recovery actions visible", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator("#cloudStatus")).toContainText("Not signed in");
+  await expect(page.locator('.actions[aria-label="Fleet navigation"]')).toBeVisible();
+  await expect(page.locator('.actions[aria-label="Fleet navigation"] a', { hasText: "Home" })).toBeVisible();
+  await expect(page.locator('.actions[aria-label="Fleet navigation"] a', { hasText: "Sign In" })).toBeVisible();
+  await expect(page.locator("#signedOutActions")).toBeVisible();
+  await expect(page.locator("#signedOutActions")).toContainText("Back home");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
 test("driver app external stylesheet preserves layout without moving monitoring scripts", async ({ page }) => {
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
 

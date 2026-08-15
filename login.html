@@ -12,6 +12,8 @@
   <script src="/auth-helper.js"></script>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#0a0e1a;color:#e2e8f0;font-family:Inter,Arial,sans-serif;line-height:1.6}.top{height:68px;background:#111827;border-bottom:1px solid #24324a;display:flex;align-items:center;justify-content:space-between;padding:0 24px}.brand{font-weight:900;color:#fff}.nav{display:flex;gap:10px}.btn{border:1px solid #344d72;background:#1e2d45;color:#e2e8f0;border-radius:10px;padding:10px 14px;text-decoration:none;font-weight:800;font-size:13px;cursor:pointer}.btn:disabled{cursor:not-allowed;opacity:.58}.btn.primary{background:#2563eb;border-color:#2563eb}.btn.passkey{width:100%;background:rgba(14,165,233,.14);border-color:#38bdf8;color:#e0f2fe;font-size:15px;padding:13px 16px}.btn.link{border:0;background:transparent;color:#93c5fd;padding:7px 2px;text-align:left}.wrap{max-width:980px;margin:0 auto;padding:34px 18px}.grid{display:grid;grid-template-columns:1fr 430px;gap:22px;align-items:start}.card{background:#111827;border:1px solid #24324a;border-radius:22px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.28)}h1{font-size:42px;line-height:1.1;margin:0 0 12px;color:#fff}.muted{color:#94a3b8}.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px;background:#0f172a;border:1px solid #24324a;border-radius:14px;margin:18px 0}.auth-tabs .btn{background:transparent;border-color:transparent}.auth-tabs .btn.active{background:#1e3a5f;border-color:#3b82f6;color:#fff}.passkey-entry{display:grid;gap:8px;margin-bottom:16px}.auth-divider{display:flex;align-items:center;gap:10px;color:#64748b;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase}.auth-divider:before,.auth-divider:after{content:"";height:1px;background:#24324a;flex:1}.roles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 13px}.role{width:100%;border:2px solid #24324a;background:#0f172a;color:inherit;border-radius:16px;padding:15px;cursor:pointer;text-align:left}.role.active{border-color:#3b82f6}.role strong{display:block;color:#fff}.role span{font-size:12px;color:#94a3b8}.form{display:grid;gap:13px}.field label{display:block;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px}.field input{width:100%;background:#0f172a;border:1px solid #344d72;color:#e2e8f0;border-radius:12px;padding:13px 14px;font-size:15px}.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.notice{border:1px solid #344d72;border-radius:14px;background:rgba(37,99,235,.08);padding:14px;color:#94a3b8;font-size:13px;margin-top:14px}.status{display:none;border-radius:14px;padding:14px;margin-top:14px;font-weight:800}.status.show{display:block}.good{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);color:#bbf7d0}.bad{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fecaca}.label{font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}.row{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid #24324a;padding:10px 0}.row span:first-child{color:#94a3b8}.row span:last-child{color:#fff;font-weight:800;text-align:right}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.tiny{font-size:12px;color:#94a3b8;margin:0}.hidden{display:none!important}@media(max-width:840px){.grid,.roles,.split{grid-template-columns:1fr}.nav{display:none}h1{font-size:32px}}
+    .passkey-entry .status{margin-top:2px}
+    .pending{background:rgba(14,165,233,.12);border:1px solid rgba(56,189,248,.4);color:#e0f2fe}
   </style>
 <link rel="stylesheet" href="/liquid-glass.css" />
 </head>
@@ -28,7 +30,8 @@
         </div>
         <div class="passkey-entry" id="passkeyEntry">
           <button class="btn passkey" id="passkeySignInBtn" type="button" onclick="signInPasskey()">Sign in with a passkey</button>
-          <p class="tiny" id="passkeyHelp">Use Touch ID, Face ID, your device PIN, or a security key. No email is needed after enrollment.</p>
+          <p class="tiny" id="passkeyHelp">Already added a new Occulert passkey? Use Touch ID, Face ID, your device PIN, or a security key. Otherwise, sign in with email and password first, then choose Account Setup → Add a passkey.</p>
+          <div class="status" id="passkeyStatus" role="status" aria-live="polite"></div>
           <div class="auth-divider"><span>or use email and password</span></div>
         </div>
         <form class="form" id="authForm" onsubmit="submitAuth(event)">
@@ -65,9 +68,11 @@ function setRole(role){selectedRole=role;let driver=document.getElementById('dri
 function extras(){return{role:selectedRole,name:document.getElementById('name').value.trim(),company:document.getElementById('company').value.trim()||'Occulert Pilot Fleet',vehicle:document.getElementById('vehicle').value.trim()}}
 function show(msg,type){let s=document.getElementById('status');s.className='status show '+(type||'good');s.textContent=msg}
 function clearStatus(){let s=document.getElementById('status');s.className='status';s.textContent=''}
+function showPasskey(msg,type){let s=document.getElementById('passkeyStatus');s.className='status show '+(type||'pending');s.textContent=msg}
+function clearPasskeyStatus(){let s=document.getElementById('passkeyStatus');s.className='status';s.textContent=''}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function showAuthMode(mode){
-  authMode=mode;clearStatus();
+  authMode=mode;clearStatus();clearPasskeyStatus();
   let signup=mode==='signup',reset=mode==='reset',password=document.getElementById('password'),submit=document.getElementById('submitBtn');
   document.getElementById('profileFields').classList.toggle('hidden',!signup);
   document.getElementById('passkeyEntry').classList.toggle('hidden',mode!=='signin');
@@ -89,10 +94,11 @@ function showAuthMode(mode){
 function passkeySupported(){return Boolean(window.OcculertPasskeys&&window.OcculertPasskeys.isSupported())}
 function setAuthBusy(busy){let form=document.getElementById('authForm'),submit=document.getElementById('submitBtn'),passkey=document.getElementById('passkeySignInBtn');form.setAttribute('aria-busy',String(busy));submit.disabled=busy||submit.dataset.rateLimited===authMode;passkey.disabled=busy||!passkeySupported();document.getElementById('signInModeBtn').disabled=busy;document.getElementById('signUpModeBtn').disabled=busy;document.getElementById('forgotPasswordBtn').disabled=busy;document.getElementById('backToSignInBtn').disabled=busy}
 async function signInPasskey(){
-  clearStatus();setAuthBusy(true);
+  clearStatus();clearPasskeyStatus();setAuthBusy(true);
   let button=document.getElementById('passkeySignInBtn');button.textContent='Waiting for passkey...';
-  try{let profile=await window.OcculertAuth.signInPasskey();renderProfile(profile);show('Signed in with your passkey. Choose Driver App or Manage Fleet.','good')}
-  catch(err){show(window.OcculertPasskeys?window.OcculertPasskeys.message(err,'signin'):'Passkey sign-in is unavailable. Use email and password.','bad')}
+  showPasskey('Checking this device for a saved Occulert passkey…','pending');
+  try{let profile=await window.OcculertAuth.signInPasskey();renderProfile(profile);showPasskey('Signed in with your passkey. Choose Driver App or Manage Fleet.','good')}
+  catch(err){showPasskey(window.OcculertPasskeys?window.OcculertPasskeys.message(err,'signin'):'Passkey sign-in is unavailable. Use email and password.','bad')}
   finally{button.textContent='Sign in with a passkey';setAuthBusy(false)}
 }
 function initPasskeySignIn(){let button=document.getElementById('passkeySignInBtn'),help=document.getElementById('passkeyHelp');if(passkeySupported())return;button.disabled=true;help.textContent='Passkeys require a supported browser on a secure Occulert page. Email and password remain available.'}
