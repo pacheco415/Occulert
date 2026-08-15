@@ -6,7 +6,7 @@
     "audit:site": "node scripts/audit-site.mjs",
     "test:api": "node scripts/test-api-security.mjs",
     "test:client": "node scripts/test-backend-client.mjs",
-    "test:native-cloud": "node scripts/test-native-cloud-sync.mjs",
+    "test:native-cloud": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-native-cloud-sync.mjs",
     "test:high-fixes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-high-security-fixes.mjs",
     "test:remaining-fixes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-remaining-security-fixes.mjs",
     "test:pilot-insights": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-pilot-insights.mjs",

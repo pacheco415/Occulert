@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createSingleFlightActionRunner } from '../native-app/lib/singleFlightAction.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -12,6 +13,7 @@ const settings = read('native-app/app/settings.tsx');
 const history = read('native-app/app/history.tsx');
 const appConfig = JSON.parse(read('native-app/app.json'));
 const nativePackage = JSON.parse(read('native-app/package.json'));
+const cloudCard = read('native-app/components/CloudSyncCard.tsx');
 
 assert.equal(
   nativePackage.dependencies['expo-secure-store'],
@@ -56,5 +58,57 @@ assert.match(cloud, /Candidate head-nod observations remain local until device v
 assert.match(settings, /<CloudSyncCard \/>/);
 assert.match(history, /This alert rating stays only on this iPhone/);
 assert.match(history, /Does not trigger alerts/);
+
+assert.match(cloudCard, /createSingleFlightActionRunner/);
+assert.match(cloudCard, /could not complete or confirm that change/);
+assert.match(cloudCard, /\.finally\(\(\) =>/);
+assert.doesNotMatch(cloudCard, /applyConsent\([^)]*\)\.catch\(\(\) => \{\}\)/);
+
+const failureBusyStates = [];
+const failureErrors = [];
+let attempts = 0;
+const retryRunner = createSingleFlightActionRunner();
+const failed = await retryRunner.run({
+  action: async () => {
+    attempts += 1;
+    throw new Error('secure storage unavailable');
+  },
+  onBusyChange: busy => failureBusyStates.push(busy),
+  onError: () => failureErrors.push('error'),
+});
+const retried = await retryRunner.run({
+  action: async () => { attempts += 1; },
+  onBusyChange: busy => failureBusyStates.push(busy),
+  onError: () => failureErrors.push('unexpected'),
+});
+assert.equal(failed, false, 'a failed cloud action must report failure');
+assert.equal(retried, true, 'the action runner must allow a retry after failure');
+assert.equal(attempts, 2, 'the retry must execute after busy state recovers');
+assert.deepEqual(failureBusyStates, [true, false, true, false]);
+assert.deepEqual(failureErrors, ['error']);
+
+const overlapBusyStates = [];
+let releaseFirst;
+let markFirstStarted;
+const firstStarted = new Promise(resolve => { markFirstStarted = resolve; });
+const overlapRunner = createSingleFlightActionRunner();
+const first = overlapRunner.run({
+  action: async () => {
+    markFirstStarted();
+    await new Promise(resolve => { releaseFirst = resolve; });
+  },
+  onBusyChange: busy => overlapBusyStates.push(busy),
+  onError: () => assert.fail('the first action should not fail'),
+});
+await firstStarted;
+const duplicate = await overlapRunner.run({
+  action: async () => assert.fail('a duplicate action must not execute'),
+  onBusyChange: busy => overlapBusyStates.push(busy),
+  onError: () => assert.fail('an ignored duplicate must not report an error'),
+});
+assert.equal(duplicate, false, 'a duplicate cloud action must be ignored while busy');
+releaseFirst();
+assert.equal(await first, true);
+assert.deepEqual(overlapBusyStates, [true, false]);
 
 console.log('Occulert native cloud-sync contract tests passed.');
