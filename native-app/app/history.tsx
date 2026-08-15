@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert,
 } from 'react-native';
@@ -13,6 +13,11 @@ import {
   type SessionTestConditions,
 } from '../lib/feedback';
 import { updateSessionHistory } from '../lib/sessionHistory';
+import {
+  commitSessionHistoryEdit,
+  updateMatchingSessionRecord,
+  type SessionRecordMutation,
+} from '../lib/sessionHistoryEdits';
 import { formatPilotCounts, summarizePilotIssues } from '../lib/pilotInsights';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { AmbientBackground } from '../components/GlassSurface';
@@ -156,14 +161,18 @@ export default function HistoryScreen() {
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
+  const historyRevisionRef = useRef(0);
 
   const load = useCallback(async () => {
+    const revision = historyRevisionRef.current;
     try {
       const raw = await AsyncStorage.getItem(HISTORY_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
-      setSessions(Array.isArray(parsed) ? parsed : []);
+      if (historyRevisionRef.current === revision) {
+        setSessions(Array.isArray(parsed) ? parsed : []);
+      }
     } catch {
-      setSessions([]);
+      if (historyRevisionRef.current === revision) setSessions([]);
     } finally {
       setLoaded(true);
     }
@@ -173,60 +182,59 @@ export default function HistoryScreen() {
 
   const saveSessionChanges = async (
     index: number,
-    changes: Partial<SessionRecord>,
+    update: SessionRecordMutation<SessionRecord>,
     errorTitle: string,
     errorMessage: string,
   ) => {
     const target = sessions[index];
     if (!target) return;
 
-    const updated = sessions.map((item, itemIndex) => itemIndex === index ? { ...item, ...changes } : item);
-    setSessions(updated);
-    try {
-      await updateSessionHistory<Record<string, unknown>>(stored => stored.map((item, itemIndex) => {
-        const matches = target.sessionId
-          ? item.sessionId === target.sessionId
-          : target.savedAt
-            ? item.savedAt === target.savedAt
-            : itemIndex === index;
-        return matches ? { ...item, ...changes } : item;
-      }));
-    } catch {
-      await load();
-      Alert.alert(errorTitle, errorMessage);
-    }
+    historyRevisionRef.current += 1;
+    await commitSessionHistoryEdit({
+      update,
+      persist: mutation => updateSessionHistory<SessionRecord>(stored => (
+        updateMatchingSessionRecord(stored, target, index, mutation)
+      )),
+      apply: mutation => setSessions(current => (
+        updateMatchingSessionRecord(current, target, index, mutation)
+      )),
+      onError: () => Alert.alert(errorTitle, errorMessage),
+    });
   };
 
   const saveAssessment = async (index: number, value: AlertAssessment) => {
+    const updatedAt = new Date().toISOString();
     await saveSessionChanges(
       index,
-      { alertAssessment: value, assessmentUpdatedAt: new Date().toISOString() },
+      item => ({ ...item, alertAssessment: value, assessmentUpdatedAt: updatedAt }),
       'Could not save review',
       'Please try rating this session again.',
     );
   };
 
   const saveTestCondition = async (index: number, key: TestConditionKey, value: TestConditionValue) => {
-    const current = sessions[index]?.testConditions || {};
+    const updatedAt = new Date().toISOString();
     await saveSessionChanges(
       index,
-      {
-        testConditions: { ...current, [key]: value } as SessionTestConditions,
-        conditionsUpdatedAt: new Date().toISOString(),
-      },
+      item => ({
+        ...item,
+        testConditions: { ...item.testConditions, [key]: value } as SessionTestConditions,
+        conditionsUpdatedAt: updatedAt,
+      }),
       'Could not save conditions',
       'Please try recording these test conditions again.',
     );
   };
 
   const saveDeviceImpact = async (index: number, key: DeviceImpactKey, value: DeviceImpactValue) => {
-    const current = sessions[index]?.deviceImpact || {};
+    const updatedAt = new Date().toISOString();
     await saveSessionChanges(
       index,
-      {
-        deviceImpact: { ...current, [key]: value } as SessionDeviceImpact,
-        deviceImpactUpdatedAt: new Date().toISOString(),
-      },
+      item => ({
+        ...item,
+        deviceImpact: { ...item.deviceImpact, [key]: value } as SessionDeviceImpact,
+        deviceImpactUpdatedAt: updatedAt,
+      }),
       'Could not save device impact',
       'Please try recording the device impact again.',
     );
