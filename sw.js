@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v24';
+const CACHE = 'occulert-v25';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -18,6 +18,7 @@ const STATIC_ASSETS = [
   '/occulert-logo.png',
   '/occulert-logo-main.png',
   '/homepage.css',
+  '/liquid-glass.css',
   '/homepage.js',
   '/driver-app.css',
   '/lang.js',
