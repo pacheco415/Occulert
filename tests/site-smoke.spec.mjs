@@ -19,7 +19,8 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  expect(await page.locator('link[href="/homepage.css"]').count()).toBe(1);
+  expect(await page.locator('link[href="/homepage.css?v=30"]').count()).toBe(1);
+  expect(await page.locator('link[href="/homepage.css"]').count()).toBe(0);
   expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator("#safetyJourney")).toBeVisible();
