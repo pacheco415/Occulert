@@ -38,9 +38,9 @@ function makeElement(id) {
   };
 }
 
-function boot({ resetResult = { ok: true, body: {} }, passkeyError = null, search = '', savedProfile = null, initialUser = null } = {}) {
+function boot({ resetResult = { ok: true, body: {} }, fleetResult = { status: 404, ok: false, body: { error: 'fleet_not_found' } }, passkeyError = null, search = '', savedProfile = null, initialUser = null } = {}) {
   const elements = new Map();
-  const calls = { auth: [], reset: [], passkey: 0, retry: 0 };
+  const calls = { auth: [], reset: [], fleet: 0, passkey: 0, retry: 0 };
   let currentPasskeyError = passkeyError;
   let signedInUser = initialUser;
   const context = {
@@ -66,6 +66,7 @@ function boot({ resetResult = { ok: true, body: {} }, passkeyError = null, searc
     passwordResetMessage: () => 'mapped reset failure',
     isEmailRateLimited: () => false,
     currentUser: () => signedInUser,
+    getFleet() { calls.fleet += 1; return Promise.resolve(fleetResult); },
   };
   context.window.OcculertPasskeys = {
     isSupported: () => true,
@@ -94,6 +95,7 @@ function boot({ resetResult = { ok: true, body: {} }, passkeyError = null, searc
 }
 
 const preventDefault = () => {};
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 test('sign-in shows only email and password fields', () => {
   const { el } = boot();
@@ -114,17 +116,67 @@ test('a saved local profile is not presented as a signed-in account', () => {
   assert.equal(el('email').value, '');
 });
 
-test('only an active backend session is presented as signed in', () => {
-  const { el } = boot({
+test('only an active backend session is presented as signed in', async () => {
+  const { calls, el } = boot({
     savedProfile: { role: 'driver', email: 'old-local@example.com', authenticated: false },
     initialUser: { id: 'driver-1', email: 'active@example.com' },
   });
+  await settle();
 
   assert.equal(el('profileStateLabel').textContent, 'Signed-in account');
   assert.match(el('profileBox').innerHTML, /active@example\.com/);
+  assert.match(el('profileBox').innerHTML, /Verified role<\/span><span>Driver/);
+  assert.match(el('profileBox').innerHTML, /No owned fleet/);
   assert.match(el('profileBox').innerHTML, /Authenticated<\/span><span>Yes/);
   assert.match(el('profileActions').innerHTML, /Sign Out/);
   assert.equal(el('email').value, 'active@example.com');
+  assert.equal(calls.fleet, 1);
+});
+
+test('server ownership overrides a stale local driver role', async () => {
+  const { calls, el } = boot({
+    fleetResult: { status: 200, ok: true, body: { fleet: { id: 'fleet-1', company_name: 'Testing123' } } },
+    savedProfile: { role: 'driver', email: 'owner@example.com', authenticated: true },
+    initialUser: { id: 'owner-1', email: 'owner@example.com' },
+  });
+  await settle();
+
+  assert.equal(calls.fleet, 1);
+  assert.match(el('profileBox').innerHTML, /Verified role<\/span><span>Fleet Manager/);
+  assert.match(el('profileBox').innerHTML, /Verified owner of Testing123/);
+  assert.doesNotMatch(el('profileBox').innerHTML, /Manager invitation required/);
+});
+
+test('a failed ownership lookup does not guess a manager role', async () => {
+  const { el } = boot({
+    fleetResult: { status: 503, ok: false, body: { error: 'cloud_unavailable' } },
+    savedProfile: { role: 'fleet', email: 'unknown@example.com', authenticated: true },
+    initialUser: { id: 'unknown-1', email: 'unknown@example.com' },
+  });
+  await settle();
+
+  assert.match(el('profileBox').innerHTML, /Verified role<\/span><span>Not verified/);
+  assert.match(el('profileBox').innerHTML, /Server verification unavailable/);
+  assert.doesNotMatch(el('profileBox').innerHTML, /Verified owner/);
+});
+
+test('a late ownership response cannot restore signed-in controls after logout', async () => {
+  let resolveFleet;
+  const fleetResult = new Promise((resolve) => { resolveFleet = resolve; });
+  const { context, el } = boot({
+    fleetResult,
+    savedProfile: { role: 'driver', email: 'owner@example.com', authenticated: true },
+    initialUser: { id: 'owner-1', email: 'owner@example.com' },
+  });
+
+  await context.logout();
+  resolveFleet({ status: 200, ok: true, body: { fleet: { id: 'fleet-1', company_name: 'Testing123' } } });
+  await settle();
+
+  assert.equal(el('profileStateLabel').textContent, 'Account status');
+  assert.match(el('profileBox').innerHTML, /Not signed in/);
+  assert.doesNotMatch(el('profileBox').innerHTML, /Fleet Manager|Verified owner/);
+  assert.doesNotMatch(el('profileActions').innerHTML, /Sign Out/);
 });
 
 test('passkey sign-in does not require email or password input', async () => {

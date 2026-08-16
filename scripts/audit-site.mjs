@@ -216,6 +216,9 @@ assertIncludes("login.html", "id=\"profileStateLabel\">Account status", "signed-
 assertIncludes("login.html", "Forgot password?", "login must offer password recovery");
 assertIncludes("login.html", "If an Occulert account uses that email", "password recovery must not reveal whether an email is registered");
 assertIncludes("login.html", "authMode==='signup'?extras():{}", "sign-in must not overwrite profile setup fields");
+assertIncludes("login.html", "await backend.getFleet()", "signed-in role display must verify server-owned fleet access");
+assertIncludes("login.html", "Verified owner of ", "verified fleet owners must receive a truthful manager status");
+assertNotIncludes("login.html", "Manager invitation required", "login must not infer fleet access from the saved local role");
 assertIncludes("occulert-backend.js", "\"/recover\" + passwordResetRedirect()", "password resets must go through Supabase Auth");
 assertIncludes("occulert-backend.js", "params.get(\"type\") !== \"recovery\"", "auth redirects must accept recovery links only");
 assertIncludes("occulert-backend.js", "window.history.replaceState", "recovery tokens must be removed from the visible URL");
