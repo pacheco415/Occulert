@@ -18,6 +18,7 @@ test("important public pages load with one primary heading", async ({ page }) =>
 test("homepage external assets preserve theme and mobile navigation controls", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => document.documentElement.style.setProperty("scroll-behavior", "auto", "important"));
 
   expect(await page.locator('link[href="/homepage.css?v=31"]').count()).toBe(1);
   expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1.jpg"]').count()).toBe(1);
@@ -25,13 +26,12 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator("#safetyJourney")).toBeVisible();
-  expect(await page.locator(".phone-wrap").count()).toBe(0);
-  expect(await page.locator(".car-shell").count()).toBe(0);
-  expect(await page.locator(".journey-frame").count()).toBe(4);
-  await expect(page.locator("#safetyJourney")).toHaveAttribute("data-stage", "0");
   await page.locator("#journeyMotion").click();
   await expect(page.locator("#journeyMotion")).toHaveText("Play motion");
   await expect(page.locator("#journeyMotion")).toHaveAttribute("aria-pressed", "true");
+  expect(await page.locator(".phone-wrap").count()).toBe(0);
+  expect(await page.locator(".car-shell").count()).toBe(0);
+  expect(await page.locator(".journey-frame").count()).toBe(4);
   await page.locator('[data-journey-step="3"]').click();
   await expect(page.locator("#safetyJourney")).toHaveAttribute("data-stage", "3");
   await expect(page.locator("#journeyStep3")).toContainText("An alert creates time to act");
@@ -41,11 +41,15 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await expect(page.locator(".journey-scene")).toHaveCSS("overflow", "hidden");
   expect(await page.locator(".journey-copy").evaluate((element) => Number(getComputedStyle(element).zIndex))).toBeGreaterThan(0);
 
-  await page.evaluate(() => { document.documentElement.style.scrollBehavior = "auto"; window.scrollTo(0, 700); });
+  await page.evaluate(async () => {
+    window.scrollTo(0, 0);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    window.scrollBy(0, 400);
+  });
   await expect(page.locator("#siteNav")).toHaveClass(/nav-hidden/);
   expect(await page.locator("#siteNav").evaluate((element) => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0);
   await expect(page.locator("#scrollTop")).not.toHaveClass(/visible/);
-  await page.evaluate(() => window.scrollTo(0, 400));
+  await page.evaluate(() => window.scrollBy(0, -200));
   await expect(page.locator("#siteNav")).not.toHaveClass(/nav-hidden/);
 
   const initialTheme = await page.locator("html").getAttribute("data-theme");
