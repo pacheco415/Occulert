@@ -211,6 +211,7 @@ assertIncludes("occulert-backend.js", "refreshAuthConfig", "passkey retry must b
 assertIncludes("login.html", "Passkey biometrics, PINs, and private keys stay", "login must disclose that passkey secrets stay with the user's authenticator");
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
 assertIncludes("login.html", "id=\"profileFields\" class=\"hidden\"", "sign-in must hide profile setup fields by default");
+assertIncludes("login.html", "id=\"profileStateLabel\">Account status", "signed-out login must not claim a signed-in profile");
 assertIncludes("login.html", "Forgot password?", "login must offer password recovery");
 assertIncludes("login.html", "If an Occulert account uses that email", "password recovery must not reveal whether an email is registered");
 assertIncludes("login.html", "authMode==='signup'?extras():{}", "sign-in must not overwrite profile setup fields");
@@ -330,9 +331,10 @@ assertIncludes("fleet-dashboard.html", "id=\"sessionHistory\"", "fleet dashboard
 assertIncludes("fleet-dashboard.html", "function exportSessionHistoryCSV()", "protected session history must keep a privacy-safe export");
 assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet exports must neutralize spreadsheet formulas");
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
+assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigation must expose one contextual primary action");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v31'", "the homepage cinematic journey repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v32'", "the navigation and auth-state repair must advance the offline cache");
 assertIncludes("api/fleet-summary.js", "includes_location: false", "fleet history responses must explicitly exclude location");
 for (const path of ["fleet-onboarding.html", "accept-invite.html"]) assertSingleH1(path);
 assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");
