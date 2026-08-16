@@ -347,3 +347,94 @@ footer{background:rgba(7,17,31,.82);-webkit-backdrop-filter:blur(18px);backdrop-
   .hero p{font-size:16px;line-height:1.65}
   .stats-row{border-radius:22px}
 }
+
+/* Cinematic homepage journey. The four crop-safe frames share one optimized
+   image so the sequence stays fast while camera motion supplies real depth. */
+#siteNav{
+  will-change:transform;
+  transition:transform .32s cubic-bezier(.2,.8,.2,1),background .25s,border-color .25s,box-shadow .25s;
+}
+#siteNav.nav-hidden{transform:translate3d(0,calc(-100% - 20px),0)}
+#siteNav:focus-within{transform:translate3d(0,0,0)}
+.journey-scene{
+  isolation:isolate;
+  background:#061120;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),inset 0 -70px 90px rgba(2,8,18,.52);
+}
+.journey-frame-stack,.journey-frame{position:absolute;inset:0}
+.journey-frame-stack{z-index:1;overflow:hidden;border-radius:inherit;background:#071426}
+.journey-frame{
+  opacity:0;
+  background-image:url('/homepage-journey-cinematic-v1.jpg');
+  background-repeat:no-repeat;
+  background-size:200% 200%;
+  filter:saturate(.96) contrast(1.04);
+  transform:scale(1.08) translate3d(0,0,0);
+  transform-origin:center;
+  transition:opacity .7s ease;
+  will-change:opacity,transform;
+}
+.journey-frame-enter{background-position:0 0}
+.journey-frame-setup{background-position:100% 0}
+.journey-frame-monitor{background-position:0 100%}
+.journey-frame-alert{background-position:100% 100%}
+.journey-card[data-stage="0"] .journey-frame-enter,
+.journey-card[data-stage="1"] .journey-frame-setup,
+.journey-card[data-stage="2"] .journey-frame-monitor,
+.journey-card[data-stage="3"] .journey-frame-alert{
+  z-index:2;
+  opacity:1;
+  animation:journeyCameraMove 5.2s cubic-bezier(.16,.8,.22,1) both;
+}
+.journey-scene::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:3;
+  pointer-events:none;
+  background:linear-gradient(180deg,rgba(2,8,18,.2),transparent 42%,rgba(2,8,18,.62)),radial-gradient(circle at 72% 20%,rgba(76,157,255,.18),transparent 36%);
+}
+.journey-scene::after{
+  content:"";
+  position:absolute;
+  inset:-70% -20%;
+  z-index:4;
+  pointer-events:none;
+  background:linear-gradient(112deg,transparent 37%,rgba(255,255,255,.1) 49%,transparent 60%);
+  transform:translateX(-38%);
+  animation:journeyGlassSweep 6.4s ease-in-out infinite;
+}
+.journey-depth-light{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+.journey-depth-light i{position:absolute;width:5px;height:5px;border-radius:50%;background:#73dfff;box-shadow:0 0 18px #4bbcff;opacity:.46;animation:journeyParticle 4.2s ease-in-out infinite}
+.journey-depth-light i:nth-child(1){left:12%;top:64%}.journey-depth-light i:nth-child(2){left:82%;top:21%;animation-delay:-1.5s}.journey-depth-light i:nth-child(3){left:64%;top:79%;animation-delay:-2.8s}
+.monitor-scan{position:absolute;left:11%;top:18%;z-index:6;width:44%;aspect-ratio:1;border:1px solid rgba(77,229,255,.62);border-radius:48%;opacity:0;transform:scale(.82);transition:opacity .45s ease,transform .65s ease;box-shadow:0 0 34px rgba(55,193,255,.16),inset 0 0 24px rgba(55,193,255,.1)}
+.monitor-scan::before,.monitor-scan::after{content:"";position:absolute;top:45%;width:8px;height:8px;border-radius:50%;background:#67e9ff;box-shadow:0 0 14px #48dfff}.monitor-scan::before{left:31%}.monitor-scan::after{right:31%}
+.monitor-scan i{position:absolute;left:50%;top:50%;border:1px solid rgba(94,224,255,.46);border-radius:50%;transform:translate(-50%,-50%);animation:journeyScan 2.4s ease-out infinite}.monitor-scan i:nth-child(1){width:38%;height:38%}.monitor-scan i:nth-child(2){width:68%;height:68%;animation-delay:.4s}.monitor-scan i:nth-child(3){width:96%;height:96%;animation-delay:.8s}
+.journey-card[data-stage="2"] .monitor-scan{opacity:1;transform:scale(1)}
+.alert-pulse{position:absolute;right:9%;top:19%;z-index:6;width:34%;aspect-ratio:1;opacity:0;transition:opacity .4s ease;pointer-events:none}
+.alert-pulse i{position:absolute;inset:45%;border:2px solid rgba(255,181,69,.92);border-radius:50%;animation:alertRing 1.8s ease-out infinite}.alert-pulse i:nth-child(2){animation-delay:.45s}.alert-pulse i:nth-child(3){animation-delay:.9s}
+.journey-card[data-stage="3"] .alert-pulse{opacity:1}
+.journey-scene>.safe-stop{right:16px;bottom:16px;z-index:8;transform:translate3d(18px,10px,0)}
+.journey-card[data-stage="3"] .journey-scene>.safe-stop{opacity:1;transform:translate3d(0,0,0)}
+.journey-scene>.scene-label{z-index:8;top:14px;left:14px;transform:translate3d(0,-8px,0)}
+.journey-card[data-stage="0"] .scene-label-enter,
+.journey-card[data-stage="1"] .scene-label-setup,
+.journey-card[data-stage="2"] .scene-label-monitor,
+.journey-card[data-stage="3"] .scene-label-alert{transform:translate3d(0,0,0)}
+@keyframes journeyCameraMove{0%{transform:scale(1.1) translate3d(-1.2%,.7%,0)}100%{transform:scale(1.025) translate3d(.8%,-.4%,0)}}
+@keyframes journeyGlassSweep{0%,15%{transform:translateX(-38%)}60%,100%{transform:translateX(48%)}}
+@keyframes journeyParticle{0%,100%{transform:translate3d(0,6px,0) scale(.72);opacity:.18}50%{transform:translate3d(0,-8px,0) scale(1.2);opacity:.62}}
+
+@media(max-width:720px){
+  .journey-scene{height:318px;margin-inline:-6px;transform:none}
+  .journey-frame{background-size:200% 200%}
+  .monitor-scan{left:8%;top:23%;width:48%}
+  .alert-pulse{right:7%;top:24%;width:38%}
+  .journey-scene>.scene-label{top:12px;left:12px;max-width:calc(100% - 24px)}
+  .journey-scene>.safe-stop{right:12px;bottom:12px}
+}
+@media(prefers-reduced-motion:reduce){
+  #siteNav{transform:none!important}
+  .journey-frame{animation:none!important;transform:scale(1.025)!important}
+  .journey-scene::after,.journey-depth-light i,.monitor-scan i,.alert-pulse i{animation:none!important}
+}

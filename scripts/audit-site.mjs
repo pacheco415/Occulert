@@ -63,8 +63,11 @@ for (const file of htmlFiles) {
   }
 }
 
-assertIncludes("index.html", "<link rel=\"stylesheet\" href=\"/homepage.css?v=30\" />", "homepage must load its versioned external stylesheet");
+assertIncludes("index.html", "<link rel=\"stylesheet\" href=\"/homepage.css?v=31\" />", "homepage must load its versioned external stylesheet");
 assertNotIncludes("index.html", "href=\"/homepage.css\"", "homepage must not reuse the previously immutable stylesheet URL");
+assertIncludes("index.html", "href=\"/homepage-journey-cinematic-v1.jpg\"", "homepage must preload its cinematic journey image");
+assertIncludes("index.html", "class=\"journey-frame journey-frame-enter\"", "homepage must render the cinematic enter frame");
+assertNotIncludes("index.html", "class=\"car-shell\"", "homepage must not render the retired flat CSS car");
 assertIncludes("index.html", "<script src=\"/homepage.js\" defer></script>", "homepage must load its external behavior script");
 assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
 const homepageInlineScripts = [...read("index.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
@@ -96,8 +99,9 @@ for (let index = 1; index <= 4; index += 1) {
     if (count !== 8) fail(`translations must include ${key.slice(0, -1)} for all 8 languages (found ${count})`);
   }
 }
-assertIncludes("sw.js", "'/homepage.css?v=30'", "service worker must cache the versioned homepage stylesheet");
+assertIncludes("sw.js", "'/homepage.css?v=31'", "service worker must cache the versioned homepage stylesheet");
 assertNotIncludes("sw.js", "'/homepage.css',", "service worker must not recache the stale unversioned homepage stylesheet");
+assertIncludes("sw.js", "'/homepage-journey-cinematic-v1.jpg'", "service worker must cache the cinematic journey image");
 assertIncludes("sw.js", "'/homepage.js'", "service worker must cache the external homepage behavior script");
 assertIncludes("sw.js", "'/liquid-glass.css'", "service worker must cache the shared Liquid Glass stylesheet");
 for (const path of [
@@ -328,7 +332,7 @@ assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet export
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v30'", "the homepage stylesheet cache repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v31'", "the homepage cinematic journey repair must advance the offline cache");
 assertIncludes("api/fleet-summary.js", "includes_location: false", "fleet history responses must explicitly exclude location");
 for (const path of ["fleet-onboarding.html", "accept-invite.html"]) assertSingleH1(path);
 assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");

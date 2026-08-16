@@ -21,9 +21,35 @@ setTheme(getTheme());
 document.getElementById('themeToggle')?.addEventListener('click',toggleTheme);
 document.getElementById('themeToggleMobile')?.addEventListener('click',()=>{toggleTheme();mobileMenu.classList.remove('open');menuBtn.classList.remove('open')});
 const menuBtn=document.getElementById('menuBtn'),mobileMenu=document.getElementById('mobileMenu');
-if(menuBtn&&mobileMenu){menuBtn.addEventListener('click',()=>{const open=mobileMenu.classList.toggle('open');menuBtn.classList.toggle('open',open)});mobileMenu.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{mobileMenu.classList.remove('open');menuBtn.classList.remove('open')}))}
+const siteNav=document.getElementById('siteNav');
+if(menuBtn&&mobileMenu){menuBtn.addEventListener('click',()=>{const open=mobileMenu.classList.toggle('open');menuBtn.classList.toggle('open',open);siteNav?.classList.remove('nav-hidden')});mobileMenu.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{mobileMenu.classList.remove('open');menuBtn.classList.remove('open')}))}
+if(siteNav){
+  let previousScrollY=window.scrollY;
+  let navFramePending=false;
+  function updateNavVisibility(){
+    const nextScrollY=window.scrollY;
+    const movingDown=nextScrollY>previousScrollY+4;
+    const movingUp=nextScrollY<previousScrollY-4;
+    const keepVisible=nextScrollY<96||movingUp||mobileMenu?.classList.contains('open')||siteNav.matches(':focus-within');
+    if(keepVisible)siteNav.classList.remove('nav-hidden');
+    else if(movingDown)siteNav.classList.add('nav-hidden');
+    previousScrollY=nextScrollY;
+    navFramePending=false;
+  }
+  window.addEventListener('scroll',()=>{
+    if(navFramePending)return;
+    navFramePending=true;
+    window.requestAnimationFrame(updateNavVisibility);
+  },{passive:true});
+}
 const scrollTopBtn=document.getElementById('scrollTop');
-window.addEventListener('scroll',()=>{scrollTopBtn.classList.toggle('visible',window.scrollY>400)});
+function updateScrollTopVisibility(){
+  const journey=document.getElementById('safetyJourney');
+  const journeyBottom=journey?journey.offsetTop+journey.offsetHeight:520;
+  scrollTopBtn.classList.toggle('visible',window.scrollY>Math.max(520,journeyBottom-120));
+}
+window.addEventListener('scroll',updateScrollTopVisibility,{passive:true});
+updateScrollTopVisibility();
 scrollTopBtn.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
 document.querySelectorAll('.faq-q').forEach(btn=>{btn.addEventListener('click',()=>{const item=btn.parentElement;const wasOpen=item.classList.contains('open');document.querySelectorAll('.faq-item').forEach(i=>i.classList.remove('open'));if(!wasOpen)item.classList.add('open')})});
 
