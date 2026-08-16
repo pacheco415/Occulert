@@ -38,10 +38,11 @@ function makeElement(id) {
   };
 }
 
-function boot({ resetResult = { ok: true, body: {} }, passkeyError = null, search = '' } = {}) {
+function boot({ resetResult = { ok: true, body: {} }, passkeyError = null, search = '', savedProfile = null, initialUser = null } = {}) {
   const elements = new Map();
   const calls = { auth: [], reset: [], passkey: 0, retry: 0 };
   let currentPasskeyError = passkeyError;
+  let signedInUser = initialUser;
   const context = {
     console,
     JSON,
@@ -64,6 +65,7 @@ function boot({ resetResult = { ok: true, body: {} }, passkeyError = null, searc
     requestPasswordReset(email) { calls.reset.push(email); return Promise.resolve(resetResult); },
     passwordResetMessage: () => 'mapped reset failure',
     isEmailRateLimited: () => false,
+    currentUser: () => signedInUser,
   };
   context.window.OcculertPasskeys = {
     isSupported: () => true,
@@ -72,16 +74,18 @@ function boot({ resetResult = { ok: true, body: {} }, passkeyError = null, searc
     retry() { calls.retry += 1; currentPasskeyError = null; return Promise.resolve(); },
   };
   context.window.OcculertAuth = {
-    getProfile: () => null,
-    onAuth(callback) { callback(null, null); },
-    signOut: () => Promise.resolve(),
+    getProfile: () => savedProfile,
+    onAuth(callback) { callback(signedInUser, savedProfile); },
+    signOut() { signedInUser = null; return Promise.resolve(); },
     signInPasskey() {
       calls.passkey += 1;
       if (currentPasskeyError) return Promise.reject(currentPasskeyError);
+      signedInUser = { id: 'driver-1', email: 'driver@example.com' };
       return Promise.resolve({ role: 'driver', email: 'driver@example.com', authenticated: true });
     },
     signInEmail(email, password, mode, extra) {
       calls.auth.push({ email, password, mode, extra });
+      signedInUser = { id: 'driver-1', email };
       return Promise.resolve({ role: extra.role || 'driver', email, authenticated: true });
     },
   };
@@ -98,6 +102,29 @@ test('sign-in shows only email and password fields', () => {
   assert.equal(el('submitBtn').textContent, 'Sign In');
   assert.equal(el('forgotPasswordBtn').classList.contains('hidden'), false);
   assert.equal(el('passkeyEntry').classList.contains('hidden'), false);
+});
+
+test('a saved local profile is not presented as a signed-in account', () => {
+  const { el } = boot({ savedProfile: { role: 'driver', email: 'saved@example.com', authenticated: false } });
+
+  assert.equal(el('profileStateLabel').textContent, 'Account status');
+  assert.match(el('profileBox').innerHTML, /Not signed in/);
+  assert.doesNotMatch(el('profileBox').innerHTML, /saved@example\.com/);
+  assert.doesNotMatch(el('profileActions').innerHTML, /Sign Out/);
+  assert.equal(el('email').value, '');
+});
+
+test('only an active backend session is presented as signed in', () => {
+  const { el } = boot({
+    savedProfile: { role: 'driver', email: 'old-local@example.com', authenticated: false },
+    initialUser: { id: 'driver-1', email: 'active@example.com' },
+  });
+
+  assert.equal(el('profileStateLabel').textContent, 'Signed-in account');
+  assert.match(el('profileBox').innerHTML, /active@example\.com/);
+  assert.match(el('profileBox').innerHTML, /Authenticated<\/span><span>Yes/);
+  assert.match(el('profileActions').innerHTML, /Sign Out/);
+  assert.equal(el('email').value, 'active@example.com');
 });
 
 test('passkey sign-in does not require email or password input', async () => {

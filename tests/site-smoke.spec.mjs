@@ -117,6 +117,50 @@ test("the passkey SDK loads through the resilient pinned loader", async ({ page 
   expect(sdkResources.some((name) => name.startsWith("https://cdn.jsdelivr.net/"))).toBe(false);
 });
 
+test("saved local setup is not mislabeled as a signed-in profile", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-profile", JSON.stringify({
+      role: "driver",
+      email: "saved-local@example.com",
+      authenticated: false,
+    }));
+  });
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator("#profileStateLabel")).toHaveText("Account status");
+  await expect(page.locator("#profileBox")).toContainText("Not signed in");
+  await expect(page.locator("#profileBox")).not.toContainText("saved-local@example.com");
+  await expect(page.locator("#profileActions")).not.toContainText("Sign Out");
+  await expect(page.locator("#email")).toHaveValue("");
+});
+
+test("expired browser auth is revalidated before signed-in controls appear", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "expired-access-token",
+      expires_at: 1,
+      user: { id: "stale-user", email: "stale@example.com" },
+    }));
+    localStorage.setItem("occulert-profile", JSON.stringify({
+      role: "driver",
+      email: "stale@example.com",
+      authenticated: true,
+    }));
+  });
+
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#profileStateLabel")).toHaveText("Account status");
+  await expect(page.locator("#profileBox")).toContainText("Not signed in");
+  await expect(page.locator("#profileBox")).not.toContainText("stale@example.com");
+  await expect(page.locator("#profileActions")).not.toContainText("Sign Out");
+  expect(await page.evaluate(() => localStorage.getItem("occulert-auth"))).toBeNull();
+
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#cloudStatus")).toContainText("Not signed in");
+  await expect(page.locator("#fleetPrimaryNav")).toHaveText("Sign In");
+  await expect(page.locator("#fleetPrimaryNav")).toHaveAttribute("href", "/login.html");
+});
+
 test("signed-out mobile fleet dashboard keeps navigation and recovery actions visible", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
@@ -124,10 +168,48 @@ test("signed-out mobile fleet dashboard keeps navigation and recovery actions vi
   await expect(page.locator("#cloudStatus")).toContainText("Not signed in");
   await expect(page.locator('.actions[aria-label="Fleet navigation"]')).toBeVisible();
   await expect(page.locator('.actions[aria-label="Fleet navigation"] a', { hasText: "Home" })).toBeVisible();
+  await expect(page.locator('.actions[aria-label="Fleet navigation"] a', { hasText: "Driver App" })).toBeVisible();
   await expect(page.locator('.actions[aria-label="Fleet navigation"] a', { hasText: "Sign In" })).toBeVisible();
+  await expect(page.locator('.actions[aria-label="Fleet navigation"] a')).toHaveCount(3);
   await expect(page.locator("#signedOutActions")).toBeVisible();
   await expect(page.locator("#signedOutActions")).toContainText("Back home");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test("fleet navigation stays focused and action text does not overlap", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-live-session", JSON.stringify({
+      name: "Local Driver",
+      driverId: "local-driver",
+      status: "SAFE",
+      safetyScore: 100,
+      lastUpdate: new Date().toISOString(),
+    }));
+  });
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#cloudStatus")).toContainText("Not signed in");
+
+  const navigation = page.locator('.actions[aria-label="Fleet navigation"] a');
+  await expect(navigation).toHaveCount(3);
+  expect(await navigation.allTextContents()).toEqual(["Home", "Driver App", "Sign In"]);
+  await expect(page.locator("#actionQueue .ops-row")).toHaveCount(2);
+
+  const layout = await page.locator("#actionQueue .ops-row").evaluateAll((rows) => rows.map((row) => {
+    const label = row.querySelector("span").getBoundingClientRect();
+    const value = row.querySelector("strong").getBoundingClientRect();
+    const bounds = row.getBoundingClientRect();
+    return {
+      labelBottom: label.bottom,
+      valueTop: value.top,
+      valueLeft: value.left,
+      valueRight: value.right,
+      rowLeft: bounds.left,
+      rowRight: bounds.right,
+    };
+  }));
+  expect(layout.every((row) => row.valueTop >= row.labelBottom && row.valueLeft >= row.rowLeft && row.valueRight <= row.rowRight + 1)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
 });
 
 test("driver app external stylesheet preserves layout without moving monitoring scripts", async ({ page }) => {
@@ -394,6 +476,8 @@ test("authenticated fleet dashboards never fall back to unrelated local driver d
 
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
+  await expect(page.locator("#fleetPrimaryNav")).toHaveText("Manage Fleet");
+  await expect(page.locator("#fleetPrimaryNav")).toHaveAttribute("href", "/fleet-onboarding.html");
   await expect(page.locator("#kpiDrivers")).toHaveText("0");
   await expect(page.getByText("Unrelated Local Driver")).toHaveCount(0);
 });
