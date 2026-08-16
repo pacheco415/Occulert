@@ -75,6 +75,8 @@ assertIncludes("index.html", "data-journey-step=\"3\"", "homepage safety journey
 assertNotIncludes("index.html", "class=\"phone-wrap\"", "homepage must not retain the broken phone mockup");
 assertIncludes("homepage.js", "prefers-reduced-motion: reduce", "homepage journey must honor reduced-motion preferences");
 assertIncludes("homepage.js", "aria-selected", "homepage journey controls must expose their selected state");
+assertIncludes("homepage.css", ".journey-scene{position:relative;height:340px;margin:14px -4px 10px;overflow:hidden", "homepage journey must clip its moving road inside the scene");
+assertIncludes("homepage.css", ".journey-copy{position:relative;z-index:2", "homepage journey copy must stay above animated scene layers");
 for (const unsupportedStat of ["1 in 6", "100,000+", "91%", "Crashes involve driver fatigue"]) {
   assertNotIncludes("index.html", unsupportedStat, `homepage must not present the unsupported statistic: ${unsupportedStat}`);
 }

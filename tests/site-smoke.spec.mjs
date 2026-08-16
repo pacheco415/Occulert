@@ -32,6 +32,8 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await expect(page.locator("#safetyJourney")).toHaveAttribute("data-stage", "3");
   await expect(page.locator("#journeyStep3")).toContainText("An alert creates time to act");
   await expect(page.locator(".safe-stop")).toHaveCSS("opacity", "1");
+  await expect(page.locator(".journey-scene")).toHaveCSS("overflow", "hidden");
+  expect(await page.locator(".journey-copy").evaluate((element) => Number(getComputedStyle(element).zIndex))).toBeGreaterThan(0);
 
   const initialTheme = await page.locator("html").getAttribute("data-theme");
   await page.locator("#themeToggle").click();
