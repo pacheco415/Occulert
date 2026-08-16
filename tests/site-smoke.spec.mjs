@@ -161,6 +161,39 @@ test("expired browser auth is revalidated before signed-in controls appear", asy
   await expect(page.locator("#fleetPrimaryNav")).toHaveAttribute("href", "/login.html");
 });
 
+test("login shows server-verified fleet ownership instead of the saved driver role", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "manager-token",
+      refresh_token: "manager-refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "manager-1", email: "manager@example.com" },
+    }));
+    localStorage.setItem("occulert-profile", JSON.stringify({
+      role: "driver",
+      email: "manager@example.com",
+      authenticated: true,
+    }));
+  });
+  await page.route("**/api/fleets", async (route) => {
+    expect(route.request().method()).toBe("GET");
+    expect(route.request().headers().authorization).toBe("Bearer manager-token");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, fleet: { id: "fleet-1", company_name: "Testing123", plan: "trial" } }),
+    });
+  });
+
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator("#profileStateLabel")).toHaveText("Signed-in account");
+  await expect(page.locator("#profileBox")).toContainText("Fleet Manager");
+  await expect(page.locator("#profileBox")).toContainText("Verified owner of Testing123");
+  await expect(page.locator("#profileBox")).not.toContainText("Manager invitation required");
+  await expect(page.locator("#profileActions")).toContainText("Manage Fleet");
+});
+
 test("signed-out mobile fleet dashboard keeps navigation and recovery actions visible", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });

@@ -66,6 +66,7 @@
 <script>
 let selectedRole='driver';
 let authMode='signin';
+let profileRenderVersion=0;
 function setRole(role){selectedRole=role;let driver=document.getElementById('driverRole'),fleet=document.getElementById('fleetRole');driver.classList.toggle('active',role==='driver');fleet.classList.toggle('active',role==='fleet');driver.setAttribute('aria-pressed',String(role==='driver'));fleet.setAttribute('aria-pressed',String(role==='fleet'))}
 function extras(){return{role:selectedRole,name:document.getElementById('name').value.trim(),company:document.getElementById('company').value.trim()||'Occulert Pilot Fleet',vehicle:document.getElementById('vehicle').value.trim()}}
 function show(msg,type){let s=document.getElementById('status');s.className='status show '+(type||'good');s.textContent=msg}
@@ -125,7 +126,28 @@ async function submitAuth(e){
   }finally{setAuthBusy(false)}
 }
 async function logout(){await window.OcculertAuth.signOut();renderProfile(null,window.OcculertAuth.getProfile());show('Signed out on this browser.','good')}
+function profileUserId(user){return String(user&&(user.uid||user.id)||'')}
+function showSignedInProfile(p,role,fleetAccess){
+  let box=document.getElementById('profileBox'),actions=document.getElementById('profileActions');
+  box.innerHTML=`<div class="row"><span>Verified role</span><span>${esc(role)}</span></div><div class="row"><span>Name</span><span>${esc(p.name||'Not set')}</span></div><div class="row"><span>Email</span><span>${esc(p.email||'Not set')}</span></div><div class="row"><span>Company</span><span>${esc(p.company||'Not set')}</span></div><div class="row"><span>Fleet access</span><span>${esc(fleetAccess)}</span></div><div class="row"><span>Authenticated</span><span>Yes</span></div>`;
+  actions.innerHTML='<a class="btn primary" href="/app.html">Driver App</a><a class="btn" href="/fleet-onboarding.html">Manage Fleet</a><button class="btn" onclick="logout()">Sign Out</button>';
+}
+async function verifyManagerRole(user,p,version){
+  let backend=window.OcculertBackend,result=null;
+  try{if(backend&&backend.getFleet)result=await backend.getFleet()}catch(err){}
+  if(version!==profileRenderVersion)return;
+  let active=backend&&backend.currentUser?backend.currentUser():null;
+  if(!active||profileUserId(active)!==profileUserId(user))return;
+  if(result&&result.ok&&result.body&&result.body.fleet){
+    let fleetName=result.body.fleet.company_name||'your fleet';
+    showSignedInProfile(p,'Fleet Manager','Verified owner of '+fleetName);
+    return;
+  }
+  if(result&&result.status===404){showSignedInProfile(p,'Driver','No owned fleet');return}
+  showSignedInProfile(p,'Not verified',result&&result.status===401?'Sign in again to verify':'Server verification unavailable');
+}
 function renderProfile(user,p){
+  let version=++profileRenderVersion;
   let box=document.getElementById('profileBox'),label=document.getElementById('profileStateLabel'),actions=document.getElementById('profileActions');
   if(!user){
     label.textContent='Account status';
@@ -137,8 +159,8 @@ function renderProfile(user,p){
   label.textContent='Signed-in account';
   setRole(p.role||'driver');
   ['name','company','vehicle','email'].forEach(id=>{let el=document.getElementById(id);if(el&&!el.value)el.value=p[id]||''});
-  box.innerHTML=`<div class="row"><span>Role</span><span>${p.role==='fleet'?'Fleet Manager':'Driver'}</span></div><div class="row"><span>Name</span><span>${esc(p.name||'Not set')}</span></div><div class="row"><span>Email</span><span>${esc(p.email||'Not set')}</span></div><div class="row"><span>Company</span><span>${esc(p.company||'Not set')}</span></div><div class="row"><span>Fleet access</span><span>${p.role==='fleet'?'Server ownership required':'Manager invitation required'}</span></div><div class="row"><span>Authenticated</span><span>Yes</span></div>`;
-  actions.innerHTML='<a class="btn primary" href="/app.html">Driver App</a><a class="btn" href="/fleet-onboarding.html">Manage Fleet</a><button class="btn" onclick="logout()">Sign Out</button>';
+  showSignedInProfile(p,'Checking…','Checking server ownership…');
+  verifyManagerRole(user,p,version);
 }
 window.OcculertAuth.onAuth(function(user,profile){renderProfile(user,profile)});
 initPasskeySignIn();
