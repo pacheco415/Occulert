@@ -19,12 +19,15 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  expect(await page.locator('link[href="/homepage.css?v=30"]').count()).toBe(1);
+  expect(await page.locator('link[href="/homepage.css?v=31"]').count()).toBe(1);
+  expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1.jpg"]').count()).toBe(1);
   expect(await page.locator('link[href="/homepage.css"]').count()).toBe(0);
   expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator("#safetyJourney")).toBeVisible();
   expect(await page.locator(".phone-wrap").count()).toBe(0);
+  expect(await page.locator(".car-shell").count()).toBe(0);
+  expect(await page.locator(".journey-frame").count()).toBe(4);
   await expect(page.locator("#safetyJourney")).toHaveAttribute("data-stage", "0");
   await page.locator("#journeyMotion").click();
   await expect(page.locator("#journeyMotion")).toHaveText("Play motion");
@@ -33,8 +36,17 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await expect(page.locator("#safetyJourney")).toHaveAttribute("data-stage", "3");
   await expect(page.locator("#journeyStep3")).toContainText("An alert creates time to act");
   await expect(page.locator(".safe-stop")).toHaveCSS("opacity", "1");
+  await expect(page.locator(".journey-frame-alert")).toHaveCSS("opacity", "1");
+  await expect(page.locator(".journey-frame-enter")).toHaveCSS("opacity", "0");
   await expect(page.locator(".journey-scene")).toHaveCSS("overflow", "hidden");
   expect(await page.locator(".journey-copy").evaluate((element) => Number(getComputedStyle(element).zIndex))).toBeGreaterThan(0);
+
+  await page.evaluate(() => { document.documentElement.style.scrollBehavior = "auto"; window.scrollTo(0, 700); });
+  await expect(page.locator("#siteNav")).toHaveClass(/nav-hidden/);
+  expect(await page.locator("#siteNav").evaluate((element) => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0);
+  await expect(page.locator("#scrollTop")).not.toHaveClass(/visible/);
+  await page.evaluate(() => window.scrollTo(0, 400));
+  await expect(page.locator("#siteNav")).not.toHaveClass(/nav-hidden/);
 
   const initialTheme = await page.locator("html").getAttribute("data-theme");
   await page.locator("#themeToggle").click();

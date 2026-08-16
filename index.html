@@ -42,10 +42,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/homepage.css?v=30" />
+<link rel="preload" as="image" href="/homepage-journey-cinematic-v1.jpg" fetchpriority="high" />
+<link rel="stylesheet" href="/homepage.css?v=31" />
 </head>
 <body>
-<nav>
+<nav id="siteNav">
   <a class="logo" href="/" aria-label="Occulert home"><span class="logo-mark"><svg width="23" height="23" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></span>Occulert</a>
   <div class="nav-links">
     <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a><a href="/app.html" class="launch" data-i18n="nav_launch">Launch App</a>
@@ -75,42 +76,35 @@
     </div>
     <section class="journey-card" id="safetyJourney" data-stage="0" aria-labelledby="journeyTitle">
       <div class="journey-topline">
-        <span><i></i> Illustrated safety journey</span>
+        <span><i></i> Cinematic safety journey</span>
         <button class="journey-motion" id="journeyMotion" type="button" aria-pressed="false">Pause</button>
       </div>
       <div class="journey-scene" aria-hidden="true">
-        <div class="journey-glow"></div>
-        <div class="journey-skyline"><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="journey-road"><span></span></div>
-        <div class="driver-figure"><i class="driver-head"></i><i class="driver-body"></i><i class="driver-arm"></i></div>
-        <div class="car-shadow"></div>
-        <div class="car-shell">
-          <div class="car-glass"></div>
-          <div class="car-seat"></div>
-          <div class="car-driver"><i></i><span></span></div>
-          <div class="car-dash"><span></span></div>
-          <div class="car-wheel"></div>
-          <div class="phone-mount"><div class="phone-eye"><i></i></div></div>
-          <div class="watch-device"><i></i></div>
-          <div class="monitor-beam"><i></i><i></i><i></i></div>
-          <div class="alert-wave"><i></i><i></i><i></i></div>
+        <div class="journey-frame-stack">
+          <div class="journey-frame journey-frame-enter"></div>
+          <div class="journey-frame journey-frame-setup"></div>
+          <div class="journey-frame journey-frame-monitor"></div>
+          <div class="journey-frame journey-frame-alert"></div>
         </div>
+        <div class="journey-depth-light"><i></i><i></i><i></i></div>
+        <div class="monitor-scan"><i></i><i></i><i></i></div>
+        <div class="alert-pulse"><i></i><i></i><i></i></div>
         <div class="safe-stop"><i></i><span>Safe stop</span></div>
-        <div class="scene-label scene-label-enter"><i></i>Ready for the road</div>
-        <div class="scene-label scene-label-setup"><i></i>Phone + watch ready</div>
+        <div class="scene-label scene-label-enter"><i></i>Parked · entering</div>
+        <div class="scene-label scene-label-setup"><i></i>Parked · device setup</div>
         <div class="scene-label scene-label-monitor"><i></i>On-device monitoring</div>
-        <div class="scene-label scene-label-alert"><i></i>Alert → pull over</div>
+        <div class="scene-label scene-label-alert"><i></i>Alert · safely pulled over</div>
       </div>
       <div class="journey-copy">
         <article class="journey-step is-active" id="journeyStep0" role="tabpanel" data-journey-copy="0">
           <span>01 · Enter</span>
           <h2 id="journeyTitle">Get in. Get settled.</h2>
-          <p>Before moving, the driver secures the phone where the front camera has a clear, stable view.</p>
+          <p>While parked, the driver gets settled before setting up any device.</p>
         </article>
         <article class="journey-step" id="journeyStep1" role="tabpanel" data-journey-copy="1" hidden>
           <span>02 · Set up</span>
           <h2>Connect the safety setup.</h2>
-          <p>Occulert checks the camera view and can pair with the driver’s watch for an additional alert surface.</p>
+          <p>Before moving, the driver secures the phone for a clear camera view and checks the optional Watch alert.</p>
         </article>
         <article class="journey-step" id="journeyStep2" role="tabpanel" data-journey-copy="2" hidden>
           <span>03 · Monitor</span>
