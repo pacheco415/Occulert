@@ -26,4 +26,72 @@ const scrollTopBtn=document.getElementById('scrollTop');
 window.addEventListener('scroll',()=>{scrollTopBtn.classList.toggle('visible',window.scrollY>400)});
 scrollTopBtn.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
 document.querySelectorAll('.faq-q').forEach(btn=>{btn.addEventListener('click',()=>{const item=btn.parentElement;const wasOpen=item.classList.contains('open');document.querySelectorAll('.faq-item').forEach(i=>i.classList.remove('open'));if(!wasOpen)item.classList.add('open')})});
+
+const safetyJourney=document.getElementById('safetyJourney');
+if(safetyJourney){
+  const journeyButtons=[...safetyJourney.querySelectorAll('[data-journey-step]')];
+  const journeyCopies=[...safetyJourney.querySelectorAll('[data-journey-copy]')];
+  const journeyMotion=document.getElementById('journeyMotion');
+  const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+  let journeyStage=0;
+  let journeyPaused=reduceMotion.matches;
+  let journeyTimer=null;
+
+  function selectJourneyStage(next,{focus=false,restart=false}={}){
+    journeyStage=(Number(next)+journeyButtons.length)%journeyButtons.length;
+    safetyJourney.dataset.stage=String(journeyStage);
+    journeyButtons.forEach((button,index)=>{
+      const active=index===journeyStage;
+      button.setAttribute('aria-selected',String(active));
+      button.tabIndex=active?0:-1;
+      if(active&&focus)button.focus();
+    });
+    journeyCopies.forEach((copy,index)=>{
+      const active=index===journeyStage;
+      copy.hidden=!active;
+      copy.classList.toggle('is-active',active);
+    });
+    if(restart&&!journeyPaused)startJourneyTimer();
+  }
+
+  function startJourneyTimer(){
+    window.clearInterval(journeyTimer);
+    journeyTimer=journeyPaused?null:window.setInterval(()=>selectJourneyStage(journeyStage+1),5200);
+  }
+
+  function renderJourneyMotion(){
+    journeyMotion.textContent=journeyPaused?'Play motion':'Pause motion';
+    journeyMotion.setAttribute('aria-pressed',String(journeyPaused));
+  }
+
+  journeyButtons.forEach((button,index)=>{
+    button.addEventListener('click',()=>selectJourneyStage(index,{restart:true}));
+    button.addEventListener('keydown',event=>{
+      if(event.key!=='ArrowLeft'&&event.key!=='ArrowRight')return;
+      event.preventDefault();
+      selectJourneyStage(journeyStage+(event.key==='ArrowRight'?1:-1),{focus:true,restart:true});
+    });
+  });
+  journeyMotion.addEventListener('click',()=>{
+    journeyPaused=!journeyPaused;
+    renderJourneyMotion();
+    startJourneyTimer();
+  });
+  safetyJourney.addEventListener('pointermove',event=>{
+    if(reduceMotion.matches||event.pointerType==='touch')return;
+    const box=safetyJourney.getBoundingClientRect();
+    safetyJourney.style.setProperty('--journey-tilt-y',`${((event.clientX-box.left)/box.width-.5)*5}deg`);
+    safetyJourney.style.setProperty('--journey-tilt-x',`${(2-((event.clientY-box.top)/box.height-.5)*4)}deg`);
+  });
+  safetyJourney.addEventListener('pointerleave',()=>{
+    safetyJourney.style.removeProperty('--journey-tilt-x');
+    safetyJourney.style.removeProperty('--journey-tilt-y');
+  });
+  reduceMotion.addEventListener?.('change',event=>{
+    if(event.matches){journeyPaused=true;renderJourneyMotion();startJourneyTimer()}
+  });
+  renderJourneyMotion();
+  selectJourneyStage(0);
+  startJourneyTimer();
+}
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{})}

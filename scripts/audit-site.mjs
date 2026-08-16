@@ -66,7 +66,15 @@ for (const file of htmlFiles) {
 assertIncludes("index.html", "<link rel=\"stylesheet\" href=\"/homepage.css\" />", "homepage must load its external stylesheet");
 assertIncludes("index.html", "<script src=\"/homepage.js\" defer></script>", "homepage must load its external behavior script");
 assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
-assertNotIncludes("index.html", "<script>", "homepage must keep its behavior script out of the HTML document");
+const homepageInlineScripts = [...read("index.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
+if (homepageInlineScripts !== 1) fail(`homepage must contain only the early password-recovery handoff script (found ${homepageInlineScripts})`);
+assertIncludes("index.html", "params.get('type')==='recovery'", "homepage must detect recovery links that fall back to the site root");
+assertIncludes("index.html", "'/account.html?recovery=1'+hash", "homepage must preserve recovery tokens while handing off to Account Setup");
+assertIncludes("index.html", "id=\"safetyJourney\"", "homepage must include the illustrated safety journey");
+assertIncludes("index.html", "data-journey-step=\"3\"", "homepage safety journey must include the alert and safe-stop stage");
+assertNotIncludes("index.html", "class=\"phone-wrap\"", "homepage must not retain the broken phone mockup");
+assertIncludes("homepage.js", "prefers-reduced-motion: reduce", "homepage journey must honor reduced-motion preferences");
+assertIncludes("homepage.js", "aria-selected", "homepage journey controls must expose their selected state");
 for (const unsupportedStat of ["1 in 6", "100,000+", "91%", "Crashes involve driver fatigue"]) {
   assertNotIncludes("index.html", unsupportedStat, `homepage must not present the unsupported statistic: ${unsupportedStat}`);
 }
@@ -133,6 +141,7 @@ assertIncludes("vercel.json", "publickey-credentials-create=(self)", "the produc
 assertIncludes("vercel.json", "publickey-credentials-get=(self)", "the production permissions policy must allow same-origin passkey sign-in");
 assertIncludes("vercel.json", "\"source\": \"/occulert-backend.js\"", "browser auth helper must not be cached across configuration changes");
 assertIncludes("vercel.json", "\"source\": \"/passkey-auth.js\"", "passkey client must not be cached across experimental API changes");
+assertIncludes("vercel.json", "\"source\": \"/(.*).(js|css)\"", "unversioned homepage styles and scripts must be revalidated after deployment");
 assertNotIncludes("occulert-backend.js", "PASTE_ANON_KEY_HERE", "browser backend client must not ship placeholder credentials");
 assertIncludes("occulert-backend.js", "/api/public-config", "browser backend client must load public runtime configuration");
 assertIncludes("occulert-backend.js", "redirect_to=", "signup confirmation emails must return users to the active Occulert site");
@@ -315,7 +324,7 @@ assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet export
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v28'", "the Safari passkey loader repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v29'", "the homepage journey and recovery repair must advance the offline cache");
 assertIncludes("api/fleet-summary.js", "includes_location: false", "fleet history responses must explicitly exclude location");
 for (const path of ["fleet-onboarding.html", "accept-invite.html"]) assertSingleH1(path);
 assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");

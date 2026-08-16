@@ -22,6 +22,16 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   expect(await page.locator('link[href="/homepage.css"]').count()).toBe(1);
   expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
+  await expect(page.locator("#safetyJourney")).toBeVisible();
+  expect(await page.locator(".phone-wrap").count()).toBe(0);
+  await expect(page.locator("#safetyJourney")).toHaveAttribute("data-stage", "0");
+  await page.locator("#journeyMotion").click();
+  await expect(page.locator("#journeyMotion")).toHaveText("Play motion");
+  await expect(page.locator("#journeyMotion")).toHaveAttribute("aria-pressed", "true");
+  await page.locator('[data-journey-step="3"]').click();
+  await expect(page.locator("#safetyJourney")).toHaveAttribute("data-stage", "3");
+  await expect(page.locator("#journeyStep3")).toContainText("An alert creates time to act");
+  await expect(page.locator(".safe-stop")).toHaveCSS("opacity", "1");
 
   const initialTheme = await page.locator("html").getAttribute("data-theme");
   await page.locator("#themeToggle").click();
@@ -40,6 +50,23 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(page.locator(".disclaimer")).toHaveCSS("display", "flex");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
+});
+
+test("forgot password stays on the login surface and opens reset mode", async ({ page }) => {
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+  await page.locator("#forgotPasswordBtn").click();
+
+  await expect(page).toHaveURL(/\/login\.html\?mode=reset$/);
+  await expect(page.locator("#authHeading")).toHaveText("Reset your password");
+  await expect(page.locator("#passwordField")).toHaveClass(/hidden/);
+  await expect(page.locator("#backToSignInBtn")).toHaveAttribute("href", "/login.html");
+});
+
+test("recovery links that land on the homepage hand off to Account Setup", async ({ page }) => {
+  await page.goto("/#access_token=fake-token&refresh_token=fake-refresh&type=recovery&expires_in=3600", { waitUntil: "domcontentloaded" });
+
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/account.html");
+  expect(new URL(page.url()).searchParams.get("recovery")).toBe("1");
 });
 
 test("passkey failures remain visible beside the passkey button", async ({ page }) => {

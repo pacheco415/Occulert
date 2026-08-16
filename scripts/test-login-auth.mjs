@@ -38,7 +38,7 @@ function makeElement(id) {
   };
 }
 
-function boot({ resetResult = { ok: true, body: {} }, passkeyError = null } = {}) {
+function boot({ resetResult = { ok: true, body: {} }, passkeyError = null, search = '' } = {}) {
   const elements = new Map();
   const calls = { auth: [], reset: [], passkey: 0, retry: 0 };
   let currentPasskeyError = passkeyError;
@@ -50,6 +50,7 @@ function boot({ resetResult = { ok: true, body: {} }, passkeyError = null } = {}
     Date,
     Math,
     Promise,
+    URLSearchParams,
     document: {
       getElementById(id) {
         if (!elements.has(id)) elements.set(id, makeElement(id));
@@ -58,6 +59,7 @@ function boot({ resetResult = { ok: true, body: {} }, passkeyError = null } = {}
     },
   };
   context.window = context;
+  context.window.location = { search };
   context.window.OcculertBackend = {
     requestPasswordReset(email) { calls.reset.push(email); return Promise.resolve(resetResult); },
     passwordResetMessage: () => 'mapped reset failure',
@@ -169,4 +171,14 @@ test('password recovery hides the password and returns a privacy-safe message', 
   assert.match(el('status').textContent, /If an Occulert account uses that email/);
   assert.doesNotMatch(el('status').textContent, /registered|not found/i);
   assert.equal(el('submitBtn').disabled, false);
+});
+
+test('password recovery has a stable deep link that opens reset mode directly', () => {
+  const { el } = boot({ search: '?mode=reset' });
+
+  assert.match(source, /id="forgotPasswordBtn" href="\/login\.html\?mode=reset"/);
+  assert.match(source, /id="backToSignInBtn" href="\/login\.html"/);
+  assert.equal(el('authHeading').textContent, 'Reset your password');
+  assert.equal(el('passwordField').classList.contains('hidden'), true);
+  assert.equal(el('backToSignInBtn').classList.contains('hidden'), false);
 });
