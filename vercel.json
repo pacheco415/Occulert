@@ -92,7 +92,7 @@
       ]
     },
     {
-      "source": "/(.*).js",
+      "source": "/(.*).(js|css)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -155,7 +155,7 @@
       ]
     },
     {
-      "source": "/(.*).(png|jpg|jpeg|webp|gif|svg|mp4|webm|css|ico)",
+      "source": "/(.*).(png|jpg|jpeg|webp|gif|svg|mp4|webm|ico)",
       "headers": [
         {
           "key": "Cache-Control",

@@ -28,6 +28,17 @@
 <link rel="icon" type="image/png" href="/occulert-logo-alt.png" />
 <link rel="apple-touch-icon" href="/occulert-logo-main.png" />
 <meta name="theme-color" content="#07101f" />
+<script>
+(function(){
+  try{
+    var hash=window.location.hash||'';
+    var params=new URLSearchParams(hash.slice(1));
+    if(params.get('type')==='recovery'){
+      window.location.replace('/account.html?recovery=1'+hash);
+    }
+  }catch(error){}
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -62,79 +73,64 @@
       </div>
       <div class="trust"><span data-i18n="trust1">✓ No account required</span><span data-i18n="trust2">✓ Runs on your device</span><span data-i18n="trust3">✓ No data sold</span><span style="color:#00ff88;font-weight:700">🔒 No video ever leaves your device</span></div>
     </div>
-    <div class="phone-wrap">
-<div class="phone">
-<div class="phone-titanium"></div>
-<div class="phone-side-vol-up"></div>
-<div class="phone-side-vol-dn"></div>
-<div class="phone-side-cam-ctrl"></div>
-<div class="phone-inner">
-  <div class="phone-island"><div class="phone-island-cam"></div></div>
-  <div class="phone-statusbar">
-    <span class="sb-time">9:41</span>
-    <span class="sb-icons">
-      <svg width="17" height="12" viewBox="0 0 17 12" fill="white"><rect x="0" y="3" width="3" height="9" rx="1"/><rect x="4.5" y="2" width="3" height="10" rx="1"/><rect x="9" y="0.5" width="3" height="11.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg>
-      <svg width="16" height="12" viewBox="0 0 16 12" fill="white"><rect x="1" y="1" width="12" height="10" rx="2" fill="none" stroke="white" stroke-width="1.5"/><rect x="13" y="4" width="2" height="4" rx="1"/><rect x="2.5" y="2.5" width="9" height="7" rx="1.5"/></svg>
-    </span>
-  </div>
-  <div class="camera-view">
-    <div class="face-outline">
-      <div class="eye-dots"><div class="eye-dot"></div><div class="eye-dot"></div></div>
-    </div>
-    <div class="scan-line"></div>
-  </div>
-  <div class="phone-panel">
-    <div class="phone-status"><div class="status-dot"></div><span>Monitoring Active</span></div>
-    <div class="phone-metrics">
-      <div class="phone-metric">
-        <div class="pm-label">Fatigue Score</div>
-        <div class="pm-value">12</div>
-        <div class="pm-bar"><div class="pm-fill" style="width:12%;background:linear-gradient(90deg,#00ff64,#00cc50)"></div></div>
+    <section class="journey-card" id="safetyJourney" data-stage="0" aria-labelledby="journeyTitle">
+      <div class="journey-topline">
+        <span><i></i> Illustrated safety journey</span>
+        <button class="journey-motion" id="journeyMotion" type="button" aria-pressed="false">Pause</button>
       </div>
-      <div class="phone-metric">
-        <div class="pm-label">Tracking</div>
-        <div class="pm-value" style="font-size:15px">Signal OK</div>
-        <div class="pm-bar"><div class="pm-fill" style="width:94%;background:linear-gradient(90deg,#ffd700,#ffaa00)"></div></div>
-      </div>
-      <div class="phone-metric">
-        <div class="pm-label">Status</div>
-        <div class="pm-value" style="color:#00ff64;font-size:15px">SAFE</div>
-      </div>
-      <div class="phone-metric">
-        <div class="pm-label">Session</div>
-        <div class="pm-value" style="font-size:15px">14:22</div>
-      </div>
-    </div>
-  </div>
-  <div class="phone-home"><div class="phone-home-bar"></div></div>
-</div>
-<p class="mockup-note" data-i18n="mockup_note">Illustrative interface. Values shown are examples, not measured results.</p>
-</div>
-<div class="watch-wrap">
-<div class="watch-band-top"></div>
-<div class="watch-case">
-  <div class="watch-lug-top"></div>
-  <div class="watch-body">
-    <div class="watch-crown"></div>
-    <div class="watch-side-btn"></div>
-    <div class="watch-action-btn"></div>
-    <div class="watch-screen-bezel">
-      <div class="watch-screen">
-        <div class="watch-time-row"><div><div class="watch-time">9:41</div><div class="watch-date">Sun Jun 21</div></div></div>
-        <div class="watch-alert-pill"><div class="watch-alert-dot"></div><div class="watch-alert-text">Active</div></div>
-        <div class="watch-eye-icon"></div>
-        <div class="watch-metric-row">
-          <div class="watch-metric"><div class="watch-metric-val">12</div><div class="watch-metric-lbl">Fatigue</div></div>
-          <div class="watch-metric"><div class="watch-metric-val">94%</div><div class="watch-metric-lbl">Conf.</div></div>
+      <div class="journey-scene" aria-hidden="true">
+        <div class="journey-glow"></div>
+        <div class="journey-skyline"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="journey-road"><span></span></div>
+        <div class="driver-figure"><i class="driver-head"></i><i class="driver-body"></i><i class="driver-arm"></i></div>
+        <div class="car-shadow"></div>
+        <div class="car-shell">
+          <div class="car-glass"></div>
+          <div class="car-seat"></div>
+          <div class="car-driver"><i></i><span></span></div>
+          <div class="car-dash"><span></span></div>
+          <div class="car-wheel"></div>
+          <div class="phone-mount"><div class="phone-eye"><i></i></div></div>
+          <div class="watch-device"><i></i></div>
+          <div class="monitor-beam"><i></i><i></i><i></i></div>
+          <div class="alert-wave"><i></i><i></i><i></i></div>
         </div>
+        <div class="safe-stop"><i></i><span>Safe stop</span></div>
+        <div class="scene-label scene-label-enter"><i></i>Ready for the road</div>
+        <div class="scene-label scene-label-setup"><i></i>Phone + watch ready</div>
+        <div class="scene-label scene-label-monitor"><i></i>On-device monitoring</div>
+        <div class="scene-label scene-label-alert"><i></i>Alert → pull over</div>
       </div>
-    </div>
-  </div>
-  <div class="watch-lug-bottom"></div>
-</div>
-<div class="watch-band-bottom"></div>
-</div>
-</div>
+      <div class="journey-copy">
+        <article class="journey-step is-active" id="journeyStep0" role="tabpanel" data-journey-copy="0">
+          <span>01 · Enter</span>
+          <h2 id="journeyTitle">Get in. Get settled.</h2>
+          <p>Before moving, the driver secures the phone where the front camera has a clear, stable view.</p>
+        </article>
+        <article class="journey-step" id="journeyStep1" role="tabpanel" data-journey-copy="1" hidden>
+          <span>02 · Set up</span>
+          <h2>Connect the safety setup.</h2>
+          <p>Occulert checks the camera view and can pair with the driver’s watch for an additional alert surface.</p>
+        </article>
+        <article class="journey-step" id="journeyStep2" role="tabpanel" data-journey-copy="2" hidden>
+          <span>03 · Monitor</span>
+          <h2>Stay focused on the drive.</h2>
+          <p>With the app open, eye-pattern monitoring runs on the phone. Camera video stays on the device.</p>
+        </article>
+        <article class="journey-step" id="journeyStep3" role="tabpanel" data-journey-copy="3" hidden>
+          <span>04 · Respond</span>
+          <h2>An alert creates time to act.</h2>
+          <p>If fatigue is suspected, a supplemental alert can prompt the driver to pull over and rest before conditions worsen.</p>
+        </article>
+      </div>
+      <div class="journey-controls" role="tablist" aria-label="Safety journey steps">
+        <button type="button" role="tab" aria-selected="true" aria-controls="journeyStep0" tabindex="0" data-journey-step="0"><b>1</b><span>Enter</span></button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="journeyStep1" tabindex="-1" data-journey-step="1"><b>2</b><span>Set up</span></button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="journeyStep2" tabindex="-1" data-journey-step="2"><b>3</b><span>Monitor</span></button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="journeyStep3" tabindex="-1" data-journey-step="3"><b>4</b><span>Respond</span></button>
+      </div>
+      <p class="journey-note">Illustrative scenario. Occulert is a supplemental prototype and may miss events or issue false alerts. Never drive tired.</p>
+    </section>
 
 <!-- Privacy Headline Banner -->
 <div class="privacy-banner" style="background:linear-gradient(135deg,rgba(0,255,136,.06),rgba(37,99,235,.06));border:1px solid rgba(0,255,136,.2);border-radius:16px;padding:18px 24px;margin:24px 0;text-align:center">

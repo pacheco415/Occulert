@@ -48,8 +48,8 @@
           <div class="field"><label for="email">Email</label><input id="email" type="email" required autocomplete="email" placeholder="name@email.com"></div>
           <div class="field" id="passwordField"><label for="password">Password</label><input id="password" type="password" required minlength="6" autocomplete="current-password" placeholder="Minimum 6 characters"></div>
           <button class="btn primary" id="submitBtn" type="submit">Sign In</button>
-          <button class="btn link" id="forgotPasswordBtn" type="button" onclick="showAuthMode('reset')">Forgot password?</button>
-          <button class="btn link hidden" id="backToSignInBtn" type="button" onclick="showAuthMode('signin')">Back to sign in</button>
+          <a class="btn link" id="forgotPasswordBtn" href="/login.html?mode=reset">Forgot password?</a>
+          <a class="btn link hidden" id="backToSignInBtn" href="/login.html">Back to sign in</a>
           <p class="tiny" id="modeHelp">Fleet manager? Sign in normally, then choose Manage Fleet. Fleet access is verified by server ownership—not by this form.</p>
         </form>
         <div class="notice"><strong>Passkeys are in beta.</strong> First confirm your Occulert account, then add a passkey from Account Settings. Google sign-in is coming later.</div>
@@ -128,7 +128,9 @@ async function logout(){await window.OcculertAuth.signOut();renderProfile(null);
 function renderProfile(p){p=p||window.OcculertAuth.getProfile();let box=document.getElementById('profileBox');if(!p){box.innerHTML='<div class="notice">No signed-in profile yet.</div>';return}setRole(p.role||'driver');['name','company','vehicle','email'].forEach(id=>{let el=document.getElementById(id);if(el&&!el.value)el.value=p[id]||''});box.innerHTML=`<div class="row"><span>Role</span><span>${p.role==='fleet'?'Fleet Manager':'Driver'}</span></div><div class="row"><span>Name</span><span>${esc(p.name||'Not set')}</span></div><div class="row"><span>Email</span><span>${esc(p.email||'Not set')}</span></div><div class="row"><span>Company</span><span>${esc(p.company||'Not set')}</span></div><div class="row"><span>Fleet access</span><span>${p.role==='fleet'?'Server ownership required':'Manager invitation required'}</span></div><div class="row"><span>Authenticated</span><span>${p.authenticated?'Yes':'Local only'}</span></div>`}
 window.OcculertAuth.onAuth(function(user,profile){renderProfile(profile)});
 initPasskeySignIn();
-showAuthMode('signin');
+let initialMode='signin';
+try{if(new URLSearchParams(window.location.search).get('mode')==='reset')initialMode='reset'}catch(err){}
+showAuthMode(initialMode);
 </script>
 </body>
 </html>
