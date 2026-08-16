@@ -336,6 +336,9 @@ assertIncludes("sw.js", "const CACHE = 'occulert-v31'", "the homepage cinematic 
 assertIncludes("fleet-dashboard.html", "Protected fleet summaries exclude GPS coordinates by design", "fleet dashboard must disclose that protected summaries exclude GPS coordinates");
 assertIncludes("fleet-dashboard.html", "same-browser local data", "fleet dashboard metadata must scope GPS to same-browser local data");
 assertIncludes("fleet-dashboard.html", "Local GPS Drivers", "fleet dashboard must label GPS metrics as local-only");
+assertIncludes("fleet-dashboard.html", "rowHtml('Local GPS shared'", "fleet dashboard coverage must label same-browser GPS as local-only");
+assertIncludes("fleet-dashboard.html", "no local GPS consent", "fleet dashboard actions must describe missing same-browser GPS consent accurately");
+assertIncludes("fleet-dashboard.html", "#actionQueue .ops-row{grid-template-columns:64px minmax(0,1fr)", "fleet dashboard action messages must have a non-overlapping layout");
 assertNotIncludes("fleet-dashboard.html", "View driver fatigue scores, GPS locations", "fleet dashboard metadata must not advertise protected GPS locations");
 assertNotIncludes("fleet-dashboard.html", "GPS and cloud sync only appear when the driver enables them", "fleet dashboard must not imply protected fleet summaries include opted-in GPS");
 assertIncludes("api/fleet-summary.js", "includes_location: false", "fleet history responses must explicitly exclude location");
