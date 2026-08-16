@@ -333,6 +333,11 @@ assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
 assertIncludes("sw.js", "const CACHE = 'occulert-v31'", "the homepage cinematic journey repair must advance the offline cache");
+assertIncludes("fleet-dashboard.html", "Protected fleet summaries exclude GPS coordinates by design", "fleet dashboard must disclose that protected summaries exclude GPS coordinates");
+assertIncludes("fleet-dashboard.html", "same-browser local data", "fleet dashboard metadata must scope GPS to same-browser local data");
+assertIncludes("fleet-dashboard.html", "Local GPS Drivers", "fleet dashboard must label GPS metrics as local-only");
+assertNotIncludes("fleet-dashboard.html", "View driver fatigue scores, GPS locations", "fleet dashboard metadata must not advertise protected GPS locations");
+assertNotIncludes("fleet-dashboard.html", "GPS and cloud sync only appear when the driver enables them", "fleet dashboard must not imply protected fleet summaries include opted-in GPS");
 assertIncludes("api/fleet-summary.js", "includes_location: false", "fleet history responses must explicitly exclude location");
 for (const path of ["fleet-onboarding.html", "accept-invite.html"]) assertSingleH1(path);
 assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");
