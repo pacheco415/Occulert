@@ -197,6 +197,7 @@ assertIncludes("login.html", "src=\"/passkey-auth.js\"", "login must load the pa
 assertIncludes("passkey-auth.js", "experimental: { passkey: true }", "passkey support must be explicitly enabled in the Supabase client");
 assertIncludes("passkey-auth.js", "signInWithPasskey", "passkey sign-in must use the Supabase WebAuthn implementation");
 assertIncludes("auth-helper.js", "signInPasskey:signInPasskey", "the login helper must adopt authenticated passkey sessions");
+assertIncludes("auth-helper.js", "await window.OcculertBackend.getSession()", "account-state rendering must validate or refresh the stored session before showing signed-in controls");
 assertIncludes("login.html", "src=\"/supabase-loader.js\"", "login must use the resilient same-site Supabase loader");
 assertIncludes("account.html", "src=\"/supabase-loader.js\"", "account settings must use the same resilient Supabase loader");
 assertIncludes("supabase-loader.js", "var VERSION = \"2.112.3\"", "the resilient loader must pin a passkey-capable Supabase SDK version");
@@ -332,9 +333,10 @@ assertIncludes("fleet-dashboard.html", "function exportSessionHistoryCSV()", "pr
 assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet exports must neutralize spreadsheet formulas");
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
 assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigation must expose one contextual primary action");
+assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v32'", "the navigation and auth-state repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v33'", "the stale-session repair must advance the offline cache");
 assertIncludes("api/fleet-summary.js", "includes_location: false", "fleet history responses must explicitly exclude location");
 for (const path of ["fleet-onboarding.html", "accept-invite.html"]) assertSingleH1(path);
 assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");

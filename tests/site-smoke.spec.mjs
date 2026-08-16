@@ -134,6 +134,33 @@ test("saved local setup is not mislabeled as a signed-in profile", async ({ page
   await expect(page.locator("#email")).toHaveValue("");
 });
 
+test("expired browser auth is revalidated before signed-in controls appear", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "expired-access-token",
+      expires_at: 1,
+      user: { id: "stale-user", email: "stale@example.com" },
+    }));
+    localStorage.setItem("occulert-profile", JSON.stringify({
+      role: "driver",
+      email: "stale@example.com",
+      authenticated: true,
+    }));
+  });
+
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#profileStateLabel")).toHaveText("Account status");
+  await expect(page.locator("#profileBox")).toContainText("Not signed in");
+  await expect(page.locator("#profileBox")).not.toContainText("stale@example.com");
+  await expect(page.locator("#profileActions")).not.toContainText("Sign Out");
+  expect(await page.evaluate(() => localStorage.getItem("occulert-auth"))).toBeNull();
+
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#cloudStatus")).toContainText("Not signed in");
+  await expect(page.locator("#fleetPrimaryNav")).toHaveText("Sign In");
+  await expect(page.locator("#fleetPrimaryNav")).toHaveAttribute("href", "/login.html");
+});
+
 test("signed-out mobile fleet dashboard keeps navigation and recovery actions visible", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
