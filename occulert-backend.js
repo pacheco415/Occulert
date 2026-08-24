@@ -78,12 +78,17 @@ window.OcculertBackend = (function () {
     return text.indexOf("rate limit") >= 0 || text.indexOf("over_email_send_rate_limit") >= 0 || text.indexOf("email_rate_limit_exceeded") >= 0;
   }
 
+  function needsSignupConfirmation(result) {
+    var text = authErrorText(result);
+    return text.indexOf("email_not_confirmed") >= 0 || text.indexOf("email not confirmed") >= 0;
+  }
+
   function authMessage(result, mode) {
     var text = authErrorText(result);
     if (isEmailRateLimited(result)) return "Too many confirmation emails were requested. Wait about an hour, then try Create Account once.";
     if (text.indexOf("user_already_exists") >= 0 || text.indexOf("email_exists") >= 0 || text.indexOf("already registered") >= 0) return "An account already exists for this email. Use Sign In instead.";
     if (text.indexOf("invalid_credentials") >= 0 || text.indexOf("invalid login credentials") >= 0) return "Email or password is incorrect.";
-    if (text.indexOf("email_not_confirmed") >= 0 || text.indexOf("email not confirmed") >= 0) return "Confirm your email, then return and sign in.";
+    if (needsSignupConfirmation(result)) return "Confirm your email, then return and sign in.";
     if (text.indexOf("weak_password") >= 0 || text.indexOf("password should be") >= 0) return "Use a password with at least 6 characters.";
     if (text.indexOf("signup_disabled") >= 0 || text.indexOf("signups not allowed") >= 0) return "New account creation is temporarily unavailable.";
     if (text.indexOf("cloud_not_configured") >= 0) return "Cloud sign-in is not configured yet. The Driver App is still available in local-only mode.";
@@ -110,15 +115,33 @@ window.OcculertBackend = (function () {
     adoptSession(body);
   }
 
-  function signUp(email, password) {
-    var redirect = "";
+  function signupConfirmationRedirect() {
     try {
-      if (window.location && window.location.origin) redirect = "?redirect_to=" + encodeURIComponent(window.location.origin + "/login.html");
+      if (window.location && window.location.origin) {
+        return "?redirect_to=" + encodeURIComponent(window.location.origin + "/login.html");
+      }
     } catch (e) {}
-    return authFetch("/signup" + redirect, { email: email, password: password }).then(function (result) {
+    return "";
+  }
+
+  function signUp(email, password) {
+    return authFetch("/signup" + signupConfirmationRedirect(), { email: email, password: password }).then(function (result) {
       if (result.ok && result.body.access_token) persistFrom(result.body);
       return result;
     });
+  }
+
+  function resendSignupConfirmation(email) {
+    return authFetch("/resend" + signupConfirmationRedirect(), { type: "signup", email: email });
+  }
+
+  function resendConfirmationMessage(result) {
+    var text = authErrorText(result);
+    if (isEmailRateLimited(result)) return "Too many confirmation emails were requested. Wait about an hour, then try Resend Confirmation once.";
+    if (text.indexOf("invalid") >= 0 && text.indexOf("email") >= 0) return "Enter the exact invited email address, then try again.";
+    if (text.indexOf("cloud_not_configured") >= 0) return "Cloud accounts are not configured yet, so a confirmation email cannot be sent.";
+    if (text.indexOf("cloud_unavailable") >= 0) return "Occulert could not reach the account service. Check your connection and try again.";
+    return "The confirmation email could not be resent. Try again later, or use Forgot Password if this address already has an account.";
   }
 
   function signIn(email, password) {
@@ -356,7 +379,10 @@ window.OcculertBackend = (function () {
     adoptSession: adoptSession,
     authMessage: authMessage,
     isEmailRateLimited: isEmailRateLimited,
+    needsSignupConfirmation: needsSignupConfirmation,
     signUp: signUp,
+    resendSignupConfirmation: resendSignupConfirmation,
+    resendConfirmationMessage: resendConfirmationMessage,
     signIn: signIn,
     requestPasswordReset: requestPasswordReset,
     passwordResetMessage: passwordResetMessage,

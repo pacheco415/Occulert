@@ -378,6 +378,73 @@ test("driver invitation tokens leave the URL immediately and stay in session sto
   expect(await page.evaluate(() => localStorage.getItem("occulert-invite-token"))).toBeNull();
 });
 
+test("driver invitations can resend a missing signup confirmation", async ({ page }) => {
+  let resendUrl = "";
+  let resendBody = null;
+  await page.route("**/api/public-config", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, supabase: { configured: true, url: "https://example.supabase.co", anonKey: "public-key" } }),
+  }));
+  await page.route("**/auth/v1/signup**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ user: { id: "pending-user", email: "driver@example.com" } }),
+  }));
+  await page.route("**/auth/v1/resend**", async (route) => {
+    resendUrl = route.request().url();
+    resendBody = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+  });
+
+  await page.goto(`/accept-invite.html#token=${"b".repeat(43)}`, { waitUntil: "domcontentloaded" });
+  await page.getByLabel("Driver name").fill("Test Driver");
+  await page.getByLabel("Vehicle or route").fill("Van 12");
+  await page.getByLabel("Invited email").fill("driver@example.com");
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Create Account" }).click();
+
+  await expect(page.locator("#result")).toContainText("Confirmation required");
+  await expect(page.getByRole("button", { name: "Resend Confirmation" })).toBeVisible();
+  await page.getByRole("button", { name: "Resend Confirmation" }).click();
+
+  expect(resendUrl).toContain("/auth/v1/resend?redirect_to=");
+  expect(resendBody).toEqual({ type: "signup", email: "driver@example.com" });
+  await expect(page.locator("#result")).toContainText("a new confirmation message is on the way");
+});
+
+test("returning unconfirmed drivers can recover from invitation sign-in", async ({ page }) => {
+  let resendBody = null;
+  await page.route("**/api/public-config", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, supabase: { configured: true, url: "https://example.supabase.co", anonKey: "public-key" } }),
+  }));
+  await page.route("**/auth/v1/token**", (route) => route.fulfill({
+    status: 400,
+    contentType: "application/json",
+    body: JSON.stringify({ error_code: "email_not_confirmed", message: "Email not confirmed" }),
+  }));
+  await page.route("**/auth/v1/resend**", async (route) => {
+    resendBody = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+  });
+
+  await page.goto(`/accept-invite.html#token=${"c".repeat(43)}`, { waitUntil: "domcontentloaded" });
+  await page.getByLabel("Driver name").fill("Returning Driver");
+  await page.getByLabel("Vehicle or route").fill("Van 12");
+  await page.getByLabel("Invited email").fill("driver@example.com");
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Sign In and Accept" }).click();
+
+  await expect(page.locator("#result")).toContainText("Confirm your email");
+  await expect(page.getByRole("button", { name: "Resend Confirmation" })).toBeVisible();
+  await page.getByRole("button", { name: "Resend Confirmation" }).click();
+
+  expect(resendBody).toEqual({ type: "signup", email: "driver@example.com" });
+  await expect(page.locator("#result")).toContainText("a new confirmation message is on the way");
+});
+
 test("verified fleet managers can create a server-owned fleet from onboarding", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("occulert-auth", JSON.stringify({
