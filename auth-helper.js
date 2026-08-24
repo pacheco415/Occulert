@@ -63,9 +63,14 @@
     if(profile){profile.authenticated=false;profile.cloudProfile=false;saveProfile(profile);}
     currentUser=null;
   }
-  function onAuth(cb){
-    var backend=window.OcculertBackend&&window.OcculertBackend.currentUser();
+  async function onAuth(cb){
+    var backend=null;
+    try{
+      var session=window.OcculertBackend&&window.OcculertBackend.getSession?await window.OcculertBackend.getSession():null;
+      backend=session&&session.user;
+    }catch(e){}
     if(backend){currentUser=backendUser(backend);cb(currentUser,getProfile());return;}
+    currentUser=null;
     cb(null,getProfile());
   }
   window.OcculertAuth={getProfile:getProfile,saveProfile:saveProfile,signInEmail:signInEmail,signInPasskey:signInPasskey,signOut:signOut,onAuth:onAuth,mergeUserIntoProfile:mergeUserIntoProfile};

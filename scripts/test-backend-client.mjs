@@ -31,6 +31,7 @@ async function fetchMock(url, options = {}) {
     });
   }
   if (String(url).includes("/auth/v1/signup")) return response({ user: { id: "pending-user", email: "new@example.com" } });
+  if (String(url).includes("/auth/v1/resend")) return response({});
   if (String(url).includes("/auth/v1/recover")) return response({});
   if (String(url).includes("/auth/v1/user") && (options.method || "GET") === "GET") {
     return response({ id: "user-1", email: "driver@example.com" });
@@ -86,6 +87,8 @@ assert.equal(backend.authMessage({ body: { code: "over_email_send_rate_limit", m
 assert.equal(backend.authMessage({ body: { error: "invalid_credentials" } }, "signin"), "Email or password is incorrect.");
 assert.equal(backend.authMessage({ body: { message: "User already registered" } }, "signup"), "An account already exists for this email. Use Sign In instead.");
 assert.equal(backend.isEmailRateLimited({ body: { error: "email_rate_limit_exceeded" } }), true);
+assert.equal(backend.needsSignupConfirmation({ body: { error_code: "email_not_confirmed" } }), true);
+assert.equal(backend.needsSignupConfirmation({ body: { error: "invalid_credentials" } }), false);
 assert.equal(backend.authMessage({ body: { error: "internal_server_error" } }, "signup"), "The account could not be created. Please try again.");
 assert.equal(backend.passwordResetMessage({ body: { error: "email_rate_limit_exceeded" } }), "Too many password reset emails were requested. Wait about an hour, then try once more.");
 assert.equal(backend.passwordResetMessage({ body: { error: "invalid_recovery_link" } }), "This password reset link is invalid or expired. Request a new link from the sign-in page.");
@@ -93,6 +96,12 @@ assert.equal(backend.passwordResetMessage({ body: { error: "invalid_recovery_lin
 assert.equal(await backend.isConfigured(), true);
 assert.equal((await backend.signUp("new@example.com", "password123")).ok, true);
 assert.ok(calls.some((call) => String(call.url).includes("/auth/v1/signup?redirect_to=https%3A%2F%2Fwww.occulert.com%2Flogin.html")));
+assert.equal((await backend.resendSignupConfirmation("new@example.com")).ok, true);
+const resendCall = calls.find((call) => String(call.url).includes("/auth/v1/resend"));
+assert.ok(String(resendCall.url).includes("/auth/v1/resend?redirect_to=https%3A%2F%2Fwww.occulert.com%2Flogin.html"));
+assert.deepEqual(JSON.parse(resendCall.body), { type: "signup", email: "new@example.com" });
+assert.equal(backend.resendConfirmationMessage({ body: { error: "cloud_unavailable" } }), "Occulert could not reach the account service. Check your connection and try again.");
+assert.equal(backend.resendConfirmationMessage({ body: { error_code: "over_email_send_rate_limit" } }), "Too many confirmation emails were requested. Wait about an hour, then try Resend Confirmation once.");
 assert.equal((await backend.requestPasswordReset("driver@example.com")).ok, true);
 const resetCall = calls.find((call) => String(call.url).includes("/auth/v1/recover"));
 assert.ok(String(resetCall.url).includes("redirect_to=https%3A%2F%2Fwww.occulert.com%2Faccount.html%3Frecovery%3D1"));
