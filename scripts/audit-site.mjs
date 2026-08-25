@@ -390,7 +390,11 @@ assertIncludes("fleet-dashboard.html", "Manage drivers", "the roster action must
 assertIncludes("fleet-dashboard.html", "Fleet setup", "fleet onboarding must have a distinct navigation label");
 assertIncludes("fleet-dashboard.html", "class=\"dashboard-content\"", "fleet dashboard sections must support a mobile-specific content order");
 assertIncludes("fleet-dashboard.html", "class=\"grid dashboard-kpis\"", "fleet summary metrics must remain a distinct responsive region");
-assertIncludes("portal.css", '"drivers"\n      "kpis"', "mobile fleet dashboards must place Driver Status before summary metrics");
+const fleetDashboardMarkup = read("fleet-dashboard.html");
+if (!(fleetDashboardMarkup.indexOf('class="main"') < fleetDashboardMarkup.indexOf('class="grid dashboard-kpis"')
+  && fleetDashboardMarkup.indexOf('class="grid dashboard-kpis"') < fleetDashboardMarkup.indexOf('class="panel-details fleet-tools"'))) {
+  fail("fleet dashboard DOM order must place Driver Status before summary metrics and secondary tools");
+}
 assertNotIncludes("fleet-dashboard.html", "View driver fatigue scores, GPS locations", "fleet dashboard metadata must not advertise protected GPS locations");
 assertNotIncludes("fleet-dashboard.html", "GPS and cloud sync only appear when the driver enables them", "fleet dashboard must not imply protected fleet summaries include opted-in GPS");
 assertIncludes("api/fleet-summary.js", "includes_location: false", "fleet history responses must explicitly exclude location");

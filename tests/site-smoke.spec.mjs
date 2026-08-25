@@ -629,6 +629,9 @@ test("authenticated fleet dashboards never fall back to unrelated local driver d
   await expect(page.locator("#driverAppNav")).toBeHidden();
   await expect(page.locator("#kpiDrivers")).toHaveText("0");
   await expect(page.getByText("Unrelated Local Driver")).toHaveCount(0);
+  await page.getByRole("link", { name: "Manage drivers" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#driverSearch")).toBeFocused();
   const driverStatusTop = await page.locator(".main").evaluate((element) => element.getBoundingClientRect().top);
   const summaryMetricsTop = await page.locator(".dashboard-kpis").evaluate((element) => element.getBoundingClientRect().top);
   expect(driverStatusTop).toBeLessThan(summaryMetricsTop);

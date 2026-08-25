@@ -436,9 +436,9 @@ html[data-theme="light"] .account-page .field textarea {
 .dashboard-page .dashboard-content {
   display: grid;
   grid-template-areas:
+    "drivers"
     "kpis"
     "tools"
-    "drivers"
     "history";
 }
 
@@ -581,14 +581,6 @@ html[data-theme="light"] .account-page .field textarea {
 
   .dashboard-page .actions {
     display: grid;
-  }
-
-  .dashboard-page .dashboard-content {
-    grid-template-areas:
-      "drivers"
-      "kpis"
-      "tools"
-      "history";
   }
 
   .dashboard-page .dashboard-kpis {

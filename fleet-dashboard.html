@@ -64,20 +64,6 @@
       <div class="card"><div class="section-title"><h2>Driver roster</h2><a class="btn" href="/driver-profiles.html">Manage drivers</a></div><div class="ops-list" id="rosterSummary"></div></div>
     </section>
     <div class="dashboard-content">
-    <section class="grid dashboard-kpis" aria-label="Fleet summary metrics">
-      <div class="card"><div class="label">Active Drivers</div><div class="kpi" id="kpiDrivers">0</div><div class="sub" id="kpiDriversSub">waiting</div></div>
-      <div class="card"><div class="label">Fleet Safety Score</div><div class="kpi green" id="kpiScore">--</div><div class="sub" id="kpiScoreSub">no sessions</div></div>
-      <div class="card"><div class="label">Drowsy Alerts</div><div class="kpi yellow" id="kpiAlerts">0</div><div class="sub" id="kpiAlertsSub">today</div></div>
-      <div class="card"><div class="label">High Risk</div><div class="kpi red" id="kpiRisk">0</div><div class="sub" id="kpiRiskSub">current</div></div>
-      <div class="card"><div class="label">Stale Sessions</div><div class="kpi blue" id="kpiStale">0</div><div class="sub">older than 5m</div></div>
-    </section>
-    <details class="panel-details fleet-tools">
-      <summary>More fleet tools</summary>
-      <section class="ops ops-secondary">
-        <div class="card"><div class="section-title"><h2>Pilot leads</h2><a class="btn good" href="https://docs.google.com/spreadsheets/d/1XimPQE-X4yv4yDdy6Itwf1tOyQCmq4Gpeoj436E6O1Y/edit" target="_blank" rel="noopener">Open sheet</a></div><div class="ops-list" id="leadSummary"></div></div>
-        <div class="card"><div class="section-title"><h2>Coverage details</h2><a class="btn" href="/session-history.html">History</a></div><div class="ops-list" id="coverageSummary"></div></div>
-      </section>
-    </details>
     <section class="main">
       <div class="card">
         <div class="section-title">
@@ -109,6 +95,20 @@
         </details>
       </aside>
     </section>
+    <section class="grid dashboard-kpis" aria-label="Fleet summary metrics">
+      <div class="card"><div class="label">Active Drivers</div><div class="kpi" id="kpiDrivers">0</div><div class="sub" id="kpiDriversSub">waiting</div></div>
+      <div class="card"><div class="label">Fleet Safety Score</div><div class="kpi green" id="kpiScore">--</div><div class="sub" id="kpiScoreSub">no sessions</div></div>
+      <div class="card"><div class="label">Drowsy Alerts</div><div class="kpi yellow" id="kpiAlerts">0</div><div class="sub" id="kpiAlertsSub">today</div></div>
+      <div class="card"><div class="label">High Risk</div><div class="kpi red" id="kpiRisk">0</div><div class="sub" id="kpiRiskSub">current</div></div>
+      <div class="card"><div class="label">Stale Sessions</div><div class="kpi blue" id="kpiStale">0</div><div class="sub">older than 5m</div></div>
+    </section>
+    <details class="panel-details fleet-tools">
+      <summary>More fleet tools</summary>
+      <section class="ops ops-secondary">
+        <div class="card"><div class="section-title"><h2>Pilot leads</h2><a class="btn good" href="https://docs.google.com/spreadsheets/d/1XimPQE-X4yv4yDdy6Itwf1tOyQCmq4Gpeoj436E6O1Y/edit" target="_blank" rel="noopener">Open sheet</a></div><div class="ops-list" id="leadSummary"></div></div>
+        <div class="card"><div class="section-title"><h2>Coverage details</h2><a class="btn" href="/session-history.html">History</a></div><div class="ops-list" id="coverageSummary"></div></div>
+      </section>
+    </details>
     <details class="panel-details history-details" open>
       <summary>Protected session history</summary>
     <section class="card history-section" aria-labelledby="sessionHistoryTitle">
