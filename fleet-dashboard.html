@@ -34,12 +34,12 @@
   <meta name="apple-mobile-web-app-title" content="Occulert">
   <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>
 <link rel="stylesheet" href="/liquid-glass.css" />
-<link rel="stylesheet" href="/portal.css?v=2" />
+<link rel="stylesheet" href="/portal.css?v=3" />
 </head>
 <body class="portal-page dashboard-page">
   <div class="top">
     <a class="brand" href="/" style="text-decoration:none">Occulert</a>
-    <div class="actions" aria-label="Fleet navigation"><a class="btn mobile-essential" href="/">Home</a><a class="btn mobile-essential" href="/app.html">Driver App</a><a class="btn primary mobile-essential" id="fleetPrimaryNav" href="/login.html">Sign In</a></div>
+    <div class="actions" aria-label="Fleet navigation"><a class="btn mobile-essential" href="/">Home</a><a class="btn mobile-essential" id="driverAppNav" href="/app.html">Driver App</a><a class="btn mobile-essential hidden" id="accountNav" href="/account.html">Account</a><a class="btn primary mobile-essential" id="fleetPrimaryNav" href="/login.html">Sign In</a></div>
   </div>
   <main class="wrap">
     <section class="hero">
@@ -61,16 +61,17 @@
     <div class="empty-actions signed-out-recovery hidden" id="signedOutActions" aria-label="Signed-out fleet actions"><a class="btn primary" href="/login.html">Sign In</a><a class="btn" href="/">Back home</a></div>
     <section class="ops ops-primary" aria-label="Fleet priorities">
       <div class="card"><div class="section-title"><h2>Needs attention</h2><button class="btn" onclick="copyOpsSummary()">Copy</button></div><div class="ops-list" id="actionQueue"></div></div>
-      <div class="card"><div class="section-title"><h2>Driver roster</h2><a class="btn" href="/driver-profiles.html">Manage</a></div><div class="ops-list" id="rosterSummary"></div></div>
+      <div class="card"><div class="section-title"><h2>Driver roster</h2><a class="btn" href="/driver-profiles.html">Manage drivers</a></div><div class="ops-list" id="rosterSummary"></div></div>
     </section>
-    <section class="grid">
+    <div class="dashboard-content">
+    <section class="grid dashboard-kpis" aria-label="Fleet summary metrics">
       <div class="card"><div class="label">Active Drivers</div><div class="kpi" id="kpiDrivers">0</div><div class="sub" id="kpiDriversSub">waiting</div></div>
       <div class="card"><div class="label">Fleet Safety Score</div><div class="kpi green" id="kpiScore">--</div><div class="sub" id="kpiScoreSub">no sessions</div></div>
       <div class="card"><div class="label">Drowsy Alerts</div><div class="kpi yellow" id="kpiAlerts">0</div><div class="sub" id="kpiAlertsSub">today</div></div>
       <div class="card"><div class="label">High Risk</div><div class="kpi red" id="kpiRisk">0</div><div class="sub" id="kpiRiskSub">current</div></div>
       <div class="card"><div class="label">Stale Sessions</div><div class="kpi blue" id="kpiStale">0</div><div class="sub">older than 5m</div></div>
     </section>
-    <details class="panel-details">
+    <details class="panel-details fleet-tools">
       <summary>More fleet tools</summary>
       <section class="ops ops-secondary">
         <div class="card"><div class="section-title"><h2>Pilot leads</h2><a class="btn good" href="https://docs.google.com/spreadsheets/d/1XimPQE-X4yv4yDdy6Itwf1tOyQCmq4Gpeoj436E6O1Y/edit" target="_blank" rel="noopener">Open sheet</a></div><div class="ops-list" id="leadSummary"></div></div>
@@ -119,6 +120,7 @@
       <div class="history-list" id="sessionHistory" role="list"></div>
     </section>
     </details>
+    </div>
   </main>
   <div class="toast" id="toast"></div>
   <footer class="footer"><a href="/">Occulert</a> &nbsp;·&nbsp; <a href="/app.html">Driver App</a> &nbsp;·&nbsp; <a href="/privacy.html">Privacy</a><div style="margin-top:8px">© 2026 Occulert. Prototype only — not a certified safety, medical, emergency, or compliance device.</div></footer>
@@ -191,9 +193,9 @@ function clearDemoData(){cloudRows=[];let live=getLocal();if(live&&String(live.d
 /* fleet-summary-projection:start */
 function rowsFromFleet(summary){let sessions=Array.isArray(summary.sessions)?summary.sessions:[],latest=new Map();sessions.forEach(s=>{if(!latest.has(s.driver_id))latest.set(s.driver_id,s)});return (summary.drivers||[]).map(d=>{let s=latest.get(d.id),active=d.active!==false,hasSafetyScore=!!s&&s.safety_score!==null&&s.safety_score!==undefined&&s.safety_score!==''&&Number.isFinite(Number(s.safety_score)),score=hasSafetyScore?Number(s.safety_score):null,status=!active?'INACTIVE':!s||!hasSafetyScore?'NO DATA':score<50?'ALERT':score<75?'WATCH':'SAFE';return{name:d.name,driverId:d.id,route:d.vehicle_id||'Unassigned vehicle',status,safetyScore:score,hasSafetyScore,hasSession:!!s,active,sessionActive:!!s&&!s.ended_at,fatigue:s&&s.max_fatigue,alerts:s&&s.alert_count,lastUpdate:s&&(s.ended_at||s.started_at),cloudConsent:true,cloudSynced:true}})}
 /* fleet-summary-projection:end */
-function showSignedOutActions(show){document.getElementById('signedOutActions')?.classList.toggle('hidden',!show);let primary=document.getElementById('fleetPrimaryNav');if(primary){primary.href=show?'/login.html':'/fleet-onboarding.html';primary.textContent=show?'Sign In':'Manage Fleet'}}
+function showSignedOutActions(show){document.getElementById('signedOutActions')?.classList.toggle('hidden',!show);document.getElementById('driverAppNav')?.classList.toggle('hidden',!show);document.getElementById('accountNav')?.classList.toggle('hidden',show);let primary=document.getElementById('fleetPrimaryNav');if(primary){primary.href=show?'/login.html':'/fleet-onboarding.html';primary.textContent=show?'Sign In':'Fleet setup'}}
 function resetProtectedFleet(){fleetMode=false;cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedFleetName='';showSignedOutActions(true);syncProtectedControls();document.getElementById('cloudStatus').textContent='Not signed in. Showing same-browser local data only; protected fleet data remains unavailable.';render()}
-async function loadProtectedFleet(){let backend=window.OcculertBackend,session=null;try{session=backend&&backend.getSession?await backend.getSession():null}catch(e){}let user=session&&session.user;if(!user){resetProtectedFleet();return false}showSignedOutActions(false);fleetMode=true;syncProtectedControls();let result=await backend.getFleetSummary();if(!result.ok&&result.status===401){backend.signOut();resetProtectedFleet();return false}if(result.ok){protectedFleetName=result.body.fleet.company_name||'your fleet';protectedDrivers=Array.isArray(result.body.drivers)?result.body.drivers:[];protectedSessions=Array.isArray(result.body.sessions)?result.body.sessions:[];protectedEvents=Array.isArray(result.body.events)?result.body.events:[];cloudRows=rowsFromFleet(result.body);document.getElementById('cloudStatus').textContent='Protected connection active. Showing only '+protectedFleetName+' data authorized for this signed-in owner.'}else{cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedFleetName='';document.getElementById('cloudStatus').textContent=result.body&&result.body.error==='fleet_not_found'?'No owned fleet found. Use Manage Fleet to create one and invite drivers.':'Protected fleet data is unavailable. Sign in as the verified fleet owner and try again.'}render();return true}
+async function loadProtectedFleet(){let backend=window.OcculertBackend,session=null;try{session=backend&&backend.getSession?await backend.getSession():null}catch(e){}let user=session&&session.user;if(!user){resetProtectedFleet();return false}showSignedOutActions(false);fleetMode=true;syncProtectedControls();let result=await backend.getFleetSummary();if(!result.ok&&result.status===401){backend.signOut();resetProtectedFleet();return false}if(result.ok){protectedFleetName=result.body.fleet.company_name||'your fleet';protectedDrivers=Array.isArray(result.body.drivers)?result.body.drivers:[];protectedSessions=Array.isArray(result.body.sessions)?result.body.sessions:[];protectedEvents=Array.isArray(result.body.events)?result.body.events:[];cloudRows=rowsFromFleet(result.body);document.getElementById('cloudStatus').textContent='Protected connection active. Showing only '+protectedFleetName+' data authorized for this signed-in owner.'}else{cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedFleetName='';document.getElementById('cloudStatus').textContent=result.body&&result.body.error==='fleet_not_found'?'No owned fleet found. Use Fleet setup to create one and invite drivers.':'Protected fleet data is unavailable. Sign in as the verified fleet owner and try again.'}render();return true}
 async function boot(){render();setTimeout(loadProtectedFleet,100)}
 boot();setInterval(render,3000);setInterval(()=>{if(fleetMode)loadProtectedFleet()},30000);
 </script>

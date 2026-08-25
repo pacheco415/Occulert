@@ -128,7 +128,10 @@ test('only an active backend session is presented as signed in', async () => {
   assert.match(el('profileBox').innerHTML, /Verified role<\/span><span>Driver/);
   assert.match(el('profileBox').innerHTML, /No owned fleet/);
   assert.match(el('profileBox').innerHTML, /Authenticated<\/span><span>Yes/);
-  assert.match(el('profileActions').innerHTML, /Sign Out/);
+  assert.match(el('profileActions').innerHTML, /Account/);
+  assert.match(el('profileActions').innerHTML, /Use another account/);
+  assert.equal(el('authCard').classList.contains('hidden'), true);
+  assert.equal(el('loginGrid').classList.contains('signed-in'), true);
   assert.equal(el('email').value, 'active@example.com');
   assert.equal(calls.fleet, 1);
 });
@@ -176,7 +179,9 @@ test('a late ownership response cannot restore signed-in controls after logout',
   assert.equal(el('profileStateLabel').textContent, 'Account status');
   assert.match(el('profileBox').innerHTML, /Not signed in/);
   assert.doesNotMatch(el('profileBox').innerHTML, /Fleet Manager|Verified owner/);
-  assert.doesNotMatch(el('profileActions').innerHTML, /Sign Out/);
+  assert.doesNotMatch(el('profileActions').innerHTML, /Use another account/);
+  assert.equal(el('authCard').classList.contains('hidden'), false);
+  assert.equal(el('loginGrid').classList.contains('signed-in'), false);
 });
 
 test('passkey sign-in does not require email or password input', async () => {
