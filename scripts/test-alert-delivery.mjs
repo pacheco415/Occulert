@@ -52,6 +52,16 @@ test('the Watch uses stronger foreground cues and a time-sensitive background al
   const receiver = readFileSync(new URL('../native-app/targets/occulert-watch/AlertReceiver.swift', import.meta.url), 'utf8');
   assert.match(receiver, /playCriticalHapticSequence/);
   assert.match(receiver, /playStandardAlertHapticSequence/);
+  assert.match(receiver, /hapticSequenceTask\?\.cancel\(\)/);
+  assert.match(receiver, /guard !Task\.isCancelled else \{ return \}/);
+  assert.doesNotMatch(receiver, /DispatchQueue\.main\.asyncAfter/);
   assert.match(receiver, /interruptionLevel = \.timeSensitive/);
   assert.match(receiver, /Pull over safely and rest now/);
+});
+
+test('the parked Watch test is single-flight while delivery is pending', () => {
+  const settings = readFileSync(new URL('../native-app/app/settings.tsx', import.meta.url), 'utf8');
+  assert.match(settings, /watchTestRunnerRef\.current\.run/);
+  assert.match(settings, /onBusyChange: setWatchTestBusy/);
+  assert.match(settings, /disabled=\{!watchAvailable \|\| !watch \|\| watchTestBusy\}/);
 });

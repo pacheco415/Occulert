@@ -152,11 +152,14 @@ For the current detailed gap list and near/mid/long-term breakdown, see issue #6
 ## Release path for this milestone
 
 1. Complete automated, responsive-browser, native type, and static Watch checks.
-2. Perform one focused review of the complete diff.
-3. Open one draft pull request only after explicit approval.
-4. Use one final review/merge decision after Preview checks; keep physical
+2. Open one draft pull request only after explicit approval.
+3. Perform a focused review of the complete draft pull request diff.
+4. Repair any findings in the draft, rerun validation, and repeat the focused
+   review until no actionable findings remain.
+5. Mark the pull request ready, complete the final review, and merge only at
+   their separately approved gates; keep physical
    Watch, headphone, camera, and car-audio evidence labeled separately.
-5. Verify the merged website in production. Queue a native build only after a
+6. Verify the merged website in production. Queue a native build only after a
    fresh build-capacity check and separate approval.
 
 Built by Richard Pacheco — San Francisco, CA

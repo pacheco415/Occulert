@@ -321,6 +321,14 @@ assertIncludes("native-app/components/AlertSystem.tsx", "alertDeliveryPlan", "na
 assertIncludes("native-app/components/AlertSystem.tsx", "cancelPendingCues", "native alert output sequences must cancel stale timers");
 assertIncludes("native-app/app/settings.tsx", "centered three-tone critical sequence", "native Settings must explain the parked urgent audio test");
 assertIncludes("native-app/targets/occulert-watch/AlertReceiver.swift", "playCriticalHapticSequence", "the Watch must use the stronger critical wrist sequence");
+assertIncludes("native-app/targets/occulert-watch/AlertReceiver.swift", "hapticSequenceTask?.cancel()", "the Watch must replace a pending haptic sequence when a newer alert arrives");
+assertIncludes("native-app/app/settings.tsx", "watchTestRunnerRef.current.run", "the parked Watch test must reject overlapping sends");
+assertIncludes("liquid-glass.css", ":where(:root) :where(.notice", "shared semantic surfaces must preserve page-level status colors");
+assertIncludes("liquid-glass.css", "[data-theme=\"light\"] :where(.status.show.bad)", "light-theme error status text must retain accessible contrast");
+assertIncludes("liquid-glass.css", "html[data-theme=\"light\"] .dashboard-page .privacy-note", "light-theme fleet privacy warnings must retain accessible contrast");
+assertIncludes("liquid-glass.css", "html[data-theme=\"light\"] .dashboard-page #cloudStatus", "light-theme fleet connection status must retain accessible contrast");
+assertNotIncludes("liquid-glass.css", "backdrop-filter: blur(14px) saturate(135%)", "mobile content cards must not restore expensive backdrop blur");
+assertIncludes("APP_ROADMAP.md", "Open one draft pull request only after explicit approval.\n3. Perform a focused review", "the roadmap must open the draft before reviewing its complete PR diff");
 assertNotIncludes("features.html", "designed to actually wake you up", "public alert copy must not imply that alerts make drowsy driving safe");
 assertIncludes("native-app/components/AlertSystem.tsx", "setTrackingLost(true)", "native monitoring must apply a grace period before warning about tracking loss");
 assertIncludes("native-app/components/AlertSystem.tsx", "TRACKING LOST", "native monitoring must warn after sustained tracking loss");

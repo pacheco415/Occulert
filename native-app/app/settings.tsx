@@ -113,10 +113,12 @@ export default function SettingsScreen() {
     EMPTY_HEADPHONE_MOTION_STATUS,
   );
   const [audioTestBusy, setAudioTestBusy] = useState(false);
+  const [watchTestBusy, setWatchTestBusy] = useState(false);
   // This parked-only test must release the shared iOS audio session when the
   // tone ends so music and navigation audio can return to their normal level.
   const audioTestPlayer = useAudioPlayer(ALERT_SOUND);
   const audioTestRunnerRef = useRef(createSingleFlightActionRunner());
+  const watchTestRunnerRef = useRef(createSingleFlightActionRunner());
   const watchAvailable = watchStatus.paired && watchStatus.appInstalled;
   const appBuildLabel = formatAppBuildLabel(currentAppBuildInfo());
 
@@ -231,17 +233,25 @@ export default function SettingsScreen() {
     });
   };
 
-  const testWatchAlert = async () => {
-    const result = await sendAlertToWatch({ level: 'critical', perclos: 0, at: Date.now() });
-    const status = await getWatchStatus();
-    setWatchStatus(status);
-    if (!result.accepted) {
-      Alert.alert('Watch unavailable', 'Open Occulert on your Apple Watch, then try again.');
-    } else if (result.reachable) {
-      Alert.alert('Watch test sent', 'Check your Apple Watch for the alert and wrist tap.');
-    } else {
-      Alert.alert('Watch test queued', 'Open Occulert on your Apple Watch and enable background alerts. Queued delivery may be delayed.');
-    }
+  const testWatchAlert = () => {
+    void watchTestRunnerRef.current.run({
+      action: async () => {
+        const result = await sendAlertToWatch({ level: 'critical', perclos: 0, at: Date.now() });
+        const status = await getWatchStatus();
+        setWatchStatus(status);
+        if (!result.accepted) {
+          Alert.alert('Watch unavailable', 'Open Occulert on your Apple Watch, then try again.');
+        } else if (result.reachable) {
+          Alert.alert('Watch test sent', 'Check your Apple Watch for the alert and wrist tap.');
+        } else {
+          Alert.alert('Watch test queued', 'Open Occulert on your Apple Watch and enable background alerts. Queued delivery may be delayed.');
+        }
+      },
+      onBusyChange: setWatchTestBusy,
+      onError: () => {
+        Alert.alert('Watch test unavailable', 'Check the Watch connection, then try again while safely parked.');
+      },
+    });
   };
 
   return (
@@ -347,13 +357,17 @@ export default function SettingsScreen() {
           </View>
           <View style={s.div} />
           <TouchableOpacity
+            accessibilityHint="Sends one urgent-pattern test to the paired Apple Watch"
             accessibilityRole="button"
-            disabled={!watchAvailable || !watch}
-            style={[s.testRow, (!watchAvailable || !watch) && s.testRowDisabled]}
+            accessibilityState={{ disabled: !watchAvailable || !watch || watchTestBusy, busy: watchTestBusy }}
+            disabled={!watchAvailable || !watch || watchTestBusy}
+            style={[s.testRow, (!watchAvailable || !watch || watchTestBusy) && s.testRowDisabled]}
             onPress={testWatchAlert}
           >
             <Ionicons name="pulse-outline" size={17} color="#60a5fa" />
-            <Text style={s.testText}>Test Watch alert · urgent pattern</Text>
+            <Text style={s.testText}>
+              {watchTestBusy ? 'SENDING WATCH TEST…' : 'Test Watch alert · urgent pattern'}
+            </Text>
           </TouchableOpacity>
         </View>
         <CloudSyncCard />

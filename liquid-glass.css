@@ -129,13 +129,43 @@ body > nav {
   box-shadow: 0 16px 38px rgba(0, 9, 28, 0.24), inset 0 1px 0 var(--glass-highlight);
 }
 
-:root :is(.notice, .note, .privacy-banner, .privacy-note, .disclaimer, .status.show, .stats-row) {
+:where(:root) :where(.notice, .note, .privacy-banner, .privacy-note, .disclaimer, .status.show, .stats-row) {
   border-color: var(--glass-line);
   border-radius: 20px;
   background: var(--surface2);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: var(--glass-shadow-soft);
+}
+
+[data-theme="light"] :where(.status.show.good) {
+  border-color: #4c9f7c;
+  background: #e7f6ef;
+  color: #145c43;
+}
+
+[data-theme="light"] :where(.status.show.bad) {
+  border-color: #c76b70;
+  background: #fff0f0;
+  color: #8c1d24;
+}
+
+[data-theme="light"] :where(.status.show.pending) {
+  border-color: #5e91b5;
+  background: #eaf6ff;
+  color: #14547a;
+}
+
+html[data-theme="light"] .dashboard-page .privacy-note {
+  border-color: #aa6a12;
+  background: #fff8e8;
+  color: #68400e;
+}
+
+html[data-theme="light"] .dashboard-page #cloudStatus {
+  border-color: #6e99ce;
+  background: #eaf2ff;
+  color: #24528a;
 }
 
 :root :is(.toolbar, .auth-tabs) {
@@ -265,7 +295,5 @@ body > nav {
 
   :root :is(.card, .feature, .step, .item, .history-item, .faq-item, .device-card, .install-section, .contact, .driver) {
     border-radius: 20px;
-    -webkit-backdrop-filter: blur(14px) saturate(135%);
-    backdrop-filter: blur(14px) saturate(135%);
   }
 }

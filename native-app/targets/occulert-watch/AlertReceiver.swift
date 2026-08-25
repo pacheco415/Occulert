@@ -21,6 +21,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
 
   private let statusFreshnessMilliseconds = 12_000.0
   private var statusTimeoutTask: Task<Void, Never>?
+  private var hapticSequenceTask: Task<Void, Never>?
 
   override init() {
     super.init()
@@ -175,6 +176,9 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   }
 
   private func playHaptic(level: String) {
+    hapticSequenceTask?.cancel()
+    hapticSequenceTask = nil
+
     switch level {
     case "critical":
       playCriticalHapticSequence()
@@ -190,14 +194,31 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   private func playCriticalHapticSequence() {
     let device = WKInterfaceDevice.current()
     device.play(.failure)
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { device.play(.failure) }
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { device.play(.failure) }
+    hapticSequenceTask = Task { @MainActor in
+      for _ in 0..<2 {
+        do {
+          try await Task.sleep(nanoseconds: 400_000_000)
+        } catch {
+          return
+        }
+        guard !Task.isCancelled else { return }
+        device.play(.failure)
+      }
+    }
   }
 
   private func playStandardAlertHapticSequence() {
     let device = WKInterfaceDevice.current()
     device.play(.notification)
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { device.play(.notification) }
+    hapticSequenceTask = Task { @MainActor in
+      do {
+        try await Task.sleep(nanoseconds: 450_000_000)
+      } catch {
+        return
+      }
+      guard !Task.isCancelled else { return }
+      device.play(.notification)
+    }
   }
 
   private func scheduleBackgroundAlert(level: String, message: String, sentAt: Double) {
