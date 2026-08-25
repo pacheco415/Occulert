@@ -55,6 +55,7 @@ import {
   type SafeStopKind,
 } from '../lib/safeStopLinks';
 import {
+  shouldAbortMonitoringStart,
   shouldStopMonitoringForAppState,
   stopBeforeNavigation,
 } from '../lib/monitorLifecycle';
@@ -112,6 +113,7 @@ export default function MonitorScreen() {
   const maxFatigueRef = useRef(0);
   const closedSinceRef = useRef<number | null>(null);
   const sessionSensitivityRef = useRef<SensitivityLevel>('medium');
+  const startAttemptRef = useRef(0);
   const startingRef = useRef(false);
   const stoppingRef = useRef(false);
   const isRunningRef = useRef(false);
@@ -191,6 +193,8 @@ export default function MonitorScreen() {
 
   const handleStart = async () => {
     if (startingRef.current || isStopping || !sensitivityLoaded) return;
+    const startAttempt = startAttemptRef.current + 1;
+    startAttemptRef.current = startAttempt;
     startingRef.current = true;
     setIsStarting(true);
     try {
@@ -198,6 +202,10 @@ export default function MonitorScreen() {
         const granted = await requestPermission();
         if (!granted) return;
       }
+      if (shouldAbortMonitoringStart(
+        startAttempt !== startAttemptRef.current,
+        AppState.currentState,
+      )) return;
       if (!consumePreDriveSafety()) {
         router.replace('/pre-drive');
         return;
@@ -223,6 +231,14 @@ export default function MonitorScreen() {
       cloudEventQueueRef.current = Promise.resolve();
 
       const headphoneStatus = await startHeadphoneMotion();
+      if (shouldAbortMonitoringStart(
+        startAttempt !== startAttemptRef.current,
+        AppState.currentState,
+      )) {
+        monitoringActiveRef.current = false;
+        await stopHeadphoneMotion();
+        return;
+      }
       if (headphoneMotionStatusRef.current === 'starting') {
         headphoneMotionStatusRef.current = headphoneStatus.state;
       }
@@ -282,6 +298,9 @@ export default function MonitorScreen() {
   const handleStop = useCallback(async (
     options: StopOptions = {},
   ) => {
+    // Invalidate any sensor start that is awaiting permission or optional
+    // headphone-motion setup before it can activate monitoring.
+    startAttemptRef.current += 1;
     if (stoppingRef.current) return;
     stoppingRef.current = true;
     setIsStopping(true);
@@ -403,7 +422,10 @@ export default function MonitorScreen() {
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (!shouldStopMonitoringForAppState(isRunningRef.current, nextState)) return;
+      if (!shouldStopMonitoringForAppState(
+        isRunningRef.current || startingRef.current,
+        nextState,
+      )) return;
       setSensorFault(
         'Monitoring stopped when Occulert left the foreground. Restart only after you are safely parked.',
       );

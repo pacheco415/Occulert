@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
+  shouldAbortMonitoringStart,
   shouldStopMonitoringForAppState,
   stopBeforeNavigation,
 } from '../native-app/lib/monitorLifecycle.ts';
@@ -11,6 +12,14 @@ test('monitoring stops whenever the app is no longer active', () => {
   assert.equal(shouldStopMonitoringForAppState(true, 'active'), false);
   for (const state of ['inactive', 'background', 'unknown', 'extension']) {
     assert.equal(shouldStopMonitoringForAppState(true, state), true, state);
+  }
+});
+
+test('a pending start cannot finish after cancellation or foreground loss', () => {
+  assert.equal(shouldAbortMonitoringStart(false, 'active'), false);
+  assert.equal(shouldAbortMonitoringStart(true, 'active'), true);
+  for (const state of ['inactive', 'background', 'unknown', 'extension']) {
+    assert.equal(shouldAbortMonitoringStart(false, state), true, state);
   }
 });
 
@@ -50,7 +59,10 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
   const layout = readFileSync(new URL('../native-app/app/_layout.tsx', import.meta.url), 'utf8');
   assert.match(monitor, /AppState\.addEventListener\('change'/);
-  assert.match(monitor, /shouldStopMonitoringForAppState\(isRunningRef\.current, nextState\)/);
+  assert.match(monitor, /isRunningRef\.current \|\| startingRef\.current/);
+  assert.match(monitor, /startAttempt !== startAttemptRef\.current/);
+  assert.match(monitor, /AppState\.currentState/);
+  assert.match(monitor, /startAttemptRef\.current \+= 1/);
   assert.match(monitor, /handleStopRef\.current\(\)/);
   assert.match(monitor, /Monitoring stopped when Occulert left the foreground/);
   assert.match(monitor, /stopBeforeNavigation/);

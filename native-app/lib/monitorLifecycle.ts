@@ -12,6 +12,13 @@ export function shouldStopMonitoringForAppState(
   return isRunning && nextState !== 'active';
 }
 
+export function shouldAbortMonitoringStart(
+  cancelled: boolean,
+  appState: MonitorAppState,
+): boolean {
+  return cancelled || appState !== 'active';
+}
+
 export async function stopBeforeNavigation(
   stop: () => void | Promise<void>,
   navigate: () => void,

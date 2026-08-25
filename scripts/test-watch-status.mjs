@@ -286,6 +286,19 @@ test('background Watch alerts use an authorized notification instead of a silent
   assert.match(settingsScreen, /Queued delivery may be delayed/);
 });
 
+test('opening the Watch app restores the latest iPhone context without replaying feedback', () => {
+  const activationStart = alertReceiver.indexOf('activationDidCompleteWith');
+  const activationEnd = alertReceiver.indexOf('sessionReachabilityDidChange', activationStart);
+  assert.ok(activationStart >= 0 && activationEnd > activationStart, 'activation handler must be present');
+  const activation = alertReceiver.slice(activationStart, activationEnd);
+
+  assert.match(activation, /receivedApplicationContext/);
+  assert.match(activation, /!latestContext\.isEmpty/);
+  assert.match(activation, /handle\(latestContext, shouldDeliverFeedback: false\)/);
+  assert.doesNotMatch(activation, /playHaptic/);
+  assert.doesNotMatch(activation, /scheduleBackgroundAlert/);
+});
+
 test('Watch status expires visibly and cannot play an alert haptic', () => {
   const start = alertReceiver.indexOf('private func handleStatus');
   const end = alertReceiver.indexOf('private func numberValue', start);

@@ -43,6 +43,12 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
         self.connectionText = "Connection error: \(error.localizedDescription)"
       } else if activationState == .activated {
         self.connectionText = session.isReachable ? "iPhone connected" : "Ready — open Occulert on iPhone"
+        let latestContext = session.receivedApplicationContext
+        if !latestContext.isEmpty {
+          // Restore the latest state immediately when the Watch app opens.
+          // Context replay must never repeat an alert haptic or notification.
+          self.handle(latestContext, shouldDeliverFeedback: false)
+        }
       } else {
         self.connectionText = "Connecting to iPhone…"
       }

@@ -98,3 +98,15 @@ test('the alert engine and Settings wire the preference without weakening urgent
   assert.match(settings, /Alternate L\/R/);
   assert.match(settings, /Critical and tracking-loss alerts stay centered/);
 });
+
+test('Settings can verify the current audio route and headphone-motion readiness while parked', () => {
+  const settings = readFileSync(new URL('../native-app/app/settings.tsx', import.meta.url), 'utf8');
+  assert.match(settings, /useAudioPlayer\(ALERT_SOUND/);
+  assert.match(settings, /configureAlertAudioMode/);
+  assert.match(settings, /TEST CURRENT AUDIO OUTPUT/);
+  assert.match(settings, /Use only while parked/);
+  assert.match(settings, /does not change your alert setting/);
+  assert.match(settings, /getHeadphoneMotionStatus/);
+  assert.match(settings, /Compatible headphone motion/);
+  assert.match(settings, /starts automatically with monitoring/);
+});
