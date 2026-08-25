@@ -57,7 +57,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 .page-header{margin-bottom:24px}
 .page-header h1{margin:0 0 6px;color:var(--text);font-size:34px;letter-spacing:-1px;transition:color .25s}
 .page-header p{color:var(--text3);font-size:14px;margin:0}
-.grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+.grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}.grid>*{min-width:0}
 .card{background:var(--card-bg);border:1px solid var(--border);border-radius:20px;padding:22px;margin-bottom:16px;transition:background .25s,border-color .25s}
 .section-label{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:var(--section-label);font-weight:900;margin-bottom:14px;transition:color .25s}
 .form{display:grid;gap:12px}
@@ -73,7 +73,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 .row{display:flex;justify-content:space-between;align-items:center;gap:14px;border-bottom:1px solid var(--divider);padding:11px 0;transition:border-color .25s}
 .row:last-child{border-bottom:none}
 .row span:first-child{color:var(--text3);font-size:13px}
-.row span:last-child{font-weight:800;color:var(--text);text-align:right;font-size:14px}
+.row span:last-child{font-weight:800;color:var(--text);text-align:right;font-size:14px;min-width:0;overflow-wrap:anywhere}
 .badge{font-size:11px;font-weight:900;border-radius:999px;padding:4px 10px;background:var(--badge-bg);color:var(--badge-color);border:1px solid var(--badge-border);transition:background .25s,color .25s,border-color .25s}
 .note{border:1px solid var(--note-border);background:var(--note-bg);border-radius:14px;padding:14px 16px;color:var(--note-color);font-size:13px;line-height:1.6;margin-top:14px;transition:background .25s,border-color .25s,color .25s}
 .note strong{color:#60a5fa}
@@ -111,12 +111,12 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 <section class="grid">
 <div>
   <div class="card">
-    <div class="section-label">Profile</div>
-    <p style="color:var(--text2);font-size:13px;margin:0 0 16px">Name, role, company, fleet ID, and vehicle are saved to this device for the prototype.</p>
+    <div class="section-label">Local app profile</div>
+    <p style="color:var(--text2);font-size:13px;margin:0 0 16px">These driver-app preferences are saved to this device. They do not grant access to a protected fleet.</p>
     <form class="form" onsubmit="saveProfile(event)">
       <div class="split">
         <div class="field"><label>Name</label><input id="name" placeholder="Your name" autocomplete="name"></div>
-        <div class="field"><label>Role</label><select id="role"><option value="driver">Driver</option><option value="fleet">Fleet Manager</option></select></div>
+        <div class="field"><label>Local app role</label><select id="role"><option value="driver">Driver</option><option value="fleet">Fleet Manager</option></select></div>
       </div>
       <div class="split">
         <div class="field"><label>Company</label><input id="company" placeholder="Occulert"></div>
@@ -159,7 +159,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 </div>
 <aside>
   <div class="card">
-    <div class="section-label">Current Account</div>
+    <div class="section-label">Account access</div>
     <div id="profileBox"><div style="color:var(--text3);font-size:13px">Loading profile…</div></div>
     <div class="action-row">
       <a class="btn primary" id="continueBtn" href="/app.html">Continue to App</a>
@@ -203,9 +203,26 @@ function getProfile(){return window.OcculertAuth&&window.OcculertAuth.getProfile
 function setProfile(p){if(window.OcculertAuth&&window.OcculertAuth.saveProfile)return window.OcculertAuth.saveProfile(p);localStorage.setItem('occulert-profile',JSON.stringify(p));localStorage.setItem('occulert-role',p.role);localStorage.setItem('occulert-fleet-id',p.fleetId);return p}
 function load(){let p=getProfile()||{};document.getElementById('name').value=p.name||'';document.getElementById('role').value=p.role||localStorage.getItem('occulert-role')||'driver';document.getElementById('company').value=p.company||'';document.getElementById('fleetId').value=p.fleetId||localStorage.getItem('occulert-fleet-id')||'OCCULERT-DEMO';document.getElementById('vehicle').value=p.vehicle||'';document.getElementById('bio').value=p.bio||'';const dEl=document.getElementById('driverIdDisplay');if(dEl)dEl.textContent=localStorage.getItem('occulert-driver-id')||'--';const cEl=document.getElementById('cloudStatus');if(cEl)cEl.textContent=localStorage.getItem('occulert-cloud-consent')==='true'?'Enabled':'Disabled';render(p)}
 function saveProfile(e){e.preventDefault();let p=getProfile()||{};p.name=document.getElementById('name').value.trim();p.role=document.getElementById('role').value;p.company=document.getElementById('company').value.trim()||'Occulert';p.fleetId=cleanFleet(document.getElementById('fleetId').value);p.vehicle=document.getElementById('vehicle').value.trim();p.bio=document.getElementById('bio').value.trim();p.savedAt=new Date().toISOString();p=setProfile(p);render(p);show('Profile saved successfully.','good')}
-async function signOut(){try{if(window.OcculertAuth)await window.OcculertAuth.signOut();show('Signed out.','good')}catch(e){show('Signed out locally.','good')}renderSecurity()}
+async function signOut(){try{if(window.OcculertAuth)await window.OcculertAuth.signOut();show('Signed out.','good')}catch(e){show('Signed out locally.','good')}verifiedAccountAccess={status:'local'};renderSecurity();render(getProfile()||{})}
 function signedInUser(){return window.OcculertBackend&&window.OcculertBackend.currentUser?window.OcculertBackend.currentUser():null}
 function recoveryRequested(){return /(?:^|[?&])recovery=1(?:&|$)/.test((window.location&&window.location.search)||'')}
+function profileUserId(user){return String(user&&(user.uid||user.id)||'')}
+let accountAccessRenderVersion=0;
+let verifiedAccountAccess={status:'local'};
+async function verifyAccountAccess(user){
+  let version=++accountAccessRenderVersion;
+  if(!user){verifiedAccountAccess={status:'local'};render(getProfile()||{});return}
+  verifiedAccountAccess={status:'checking'};render(getProfile()||{});
+  let backend=window.OcculertBackend,result=null;
+  try{if(backend&&backend.getFleet)result=await backend.getFleet()}catch(err){}
+  if(version!==accountAccessRenderVersion)return;
+  let active=backend&&backend.currentUser?backend.currentUser():null;
+  if(!active||profileUserId(active)!==profileUserId(user))return;
+  if(result&&result.ok&&result.body&&result.body.fleet){verifiedAccountAccess={status:'verified',role:'fleet',fleetName:result.body.fleet.company_name||'your fleet'}}
+  else if(result&&result.status===404){verifiedAccountAccess={status:'verified',role:'driver'}}
+  else{verifiedAccountAccess={status:'unavailable',reauth:!!(result&&result.status===401)}}
+  render(getProfile()||{});
+}
 let passkeysById={};
 let passkeyLoadId=0;
 function validPasskeyId(value){let id=String(value||'');return /^[0-9a-f-]{20,80}$/i.test(id)?id:''}
@@ -286,12 +303,24 @@ async function changePassword(e){
   }catch(err){show('The password could not be updated. Please try again.','bad')}
   finally{setBusy('passwordBtn',false,'Change Password')}
 }
-function render(p){p=p||getProfile()||{};document.getElementById('continueBtn').href=(p.role==='fleet')?'/fleet-dashboard.html':'/app.html';const initials=esc((p.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?');document.getElementById('profileBox').innerHTML='<div class="avatar-row"><div class="avatar">'+initials+'</div><div class="avatar-info"><h3>'+esc(p.name||'No name set')+'</h3><p>'+esc(p.email||'No email set')+'</p></div></div><div class="row"><span>Role</span><span>'+(p.role==='fleet'?'Fleet Manager':'Driver')+'</span></div><div class="row"><span>Company</span><span>'+esc(p.company||'Not set')+'</span></div><div class="row"><span>Fleet ID</span><span style="font-family:monospace;font-size:13px">'+esc(p.fleetId||'OCCULERT-DEMO')+'</span></div><div class="row"><span>Vehicle</span><span>'+esc(p.vehicle||'Not set')+'</span></div><div class="row"><span>Login</span><span class="badge">'+(p.authenticated?'Cloud':'Local')+'</span></div>'}
+function render(p){
+  p=p||getProfile()||{};
+  let user=signedInUser(),access=verifiedAccountAccess||{status:'local'},localRole=p.role==='fleet'?'Fleet Manager':'Driver';
+  let verifiedRole='Not signed in',fleetAccess='Sign in to verify',cloudLogin=!!user;
+  if(access.status==='checking'){verifiedRole='Checking…';fleetAccess='Checking server ownership…'}
+  else if(access.status==='verified'&&access.role==='fleet'){verifiedRole='Fleet Manager';fleetAccess='Verified owner of '+access.fleetName}
+  else if(access.status==='verified'){verifiedRole='Driver';fleetAccess='No owned fleet'}
+  else if(access.status==='unavailable'){verifiedRole='Not verified';fleetAccess=access.reauth?'Sign in again to verify':'Server verification unavailable'}
+  let continueBtn=document.getElementById('continueBtn'),manager=access.status==='verified'&&access.role==='fleet';
+  continueBtn.href=manager?'/fleet-dashboard.html':'/app.html';continueBtn.textContent=manager?'Open Fleet Dashboard':'Open Driver App';
+  const initials=esc((p.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?'),email=esc((user&&user.email)||p.email||'No email set');
+  document.getElementById('profileBox').innerHTML='<div class="avatar-row"><div class="avatar">'+initials+'</div><div class="avatar-info"><h3>'+esc(p.name||'No name set')+'</h3><p>'+email+'</p></div></div><div class="row"><span>Verified role</span><span>'+esc(verifiedRole)+'</span></div><div class="row"><span>Fleet access</span><span>'+esc(fleetAccess)+'</span></div><div class="row"><span>Local app role</span><span>'+esc(localRole)+'</span></div><div class="row"><span>Company</span><span>'+esc(p.company||'Not set')+'</span></div><div class="row"><span>Vehicle</span><span>'+esc(p.vehicle||'Not set')+'</span></div><div class="row"><span>Login</span><span class="badge">'+(cloudLogin?'Cloud':'Local')+'</span></div>'
+}
 async function initAccount(){
   let recovery={handled:false,ok:false};
   try{if(window.OcculertBackend&&window.OcculertBackend.consumeAuthRedirect)recovery=await window.OcculertBackend.consumeAuthRedirect()}catch(err){recovery={handled:true,ok:false,body:{error:'cloud_unavailable'}}}
   document.getElementById('passkeyList')?.addEventListener('click',handlePasskeyAction);
-  if(window.OcculertAuth){window.OcculertAuth.onAuth(function(user,p){load();renderSecurity()})}else{load();renderSecurity()}
+  if(window.OcculertAuth){window.OcculertAuth.onAuth(function(user,p){verifiedAccountAccess=user?{status:'checking'}:{status:'local'};load();renderSecurity();verifyAccountAccess(user)})}else{load();renderSecurity()}
   if(recovery.handled&&recovery.ok){show('Secure reset link verified. Choose a new password below.','good');document.getElementById('newPassword')?.focus()}
   else if(recovery.handled){show(window.OcculertBackend.passwordResetMessage(recovery),'bad')}
   else if(recoveryRequested()&&!signedInUser()){show('This password reset link is missing, invalid, or expired. Request a new one from the sign-in page.','bad')}
