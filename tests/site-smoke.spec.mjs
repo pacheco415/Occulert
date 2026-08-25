@@ -237,6 +237,14 @@ test("account separates server-verified fleet access from the saved local app ro
   const settingsTop = await page.locator(".account-settings").evaluate((element) => element.getBoundingClientRect().top);
   expect(accountTop).toBeLessThan(settingsTop);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  await page.setViewportSize({ width: 1200, height: 900 });
+  const desktopAccess = await page.locator(".account-access").boundingBox();
+  const desktopSettings = await page.locator(".account-settings").boundingBox();
+  expect(desktopAccess.x).toBeLessThan(desktopSettings.x);
+  await page.getByRole("button", { name: "Sign Out" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#name")).toBeFocused();
 });
 
 test("signed-out mobile fleet dashboard keeps navigation and recovery actions visible", async ({ page }) => {

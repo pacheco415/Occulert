@@ -376,6 +376,7 @@ assertIncludes("account.html", "Local app role", "account summaries must disting
 assertIncludes("account.html", "class=\"grid account-grid\"", "account settings must expose the responsive account hierarchy");
 assertIncludes("account.html", "class=\"account-access\"", "verified Account access must be a separately orderable region");
 assertIncludes("account.html", "Driver app settings", "device-only settings must use a clear driver-app label");
+assertIncludes("portal.css", '"access settings"\n    "secondary settings"', "desktop Account layout must follow its keyboard and screen-reader order");
 assertIncludes("account.html", ".grid>*{min-width:0}", "account columns must allow long verified fleet names to shrink on mobile");
 assertIncludes("account.html", "overflow-wrap:anywhere", "account access values must wrap long server-provided text");
 assertNotIncludes("account.html", "document.getElementById('continueBtn').href=(p.role==='fleet')", "account navigation must not trust a saved local role for fleet access");
