@@ -8,5 +8,8 @@ module.exports = () => ({
   colors: {
     $accent: '#2563eb',
   },
+  entitlements: {
+    'com.apple.developer.usernotifications.time-sensitive': true,
+  },
   frameworks: ['SwiftUI', 'UserNotifications', 'WatchConnectivity', 'WatchKit'],
 });
