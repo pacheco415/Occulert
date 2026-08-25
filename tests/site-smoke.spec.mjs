@@ -106,6 +106,30 @@ test("passkey failures remain visible beside the passkey button", async ({ page 
   expect(await page.locator("#passkeyStatus").evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector("#authForm")) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
 });
 
+test("sign-in continuation and account switching preserve keyboard focus", async ({ page }) => {
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => {
+    let user = null;
+    window.OcculertBackend.currentUser = () => user;
+    window.OcculertBackend.getFleet = async () => ({ ok: false, status: 404, body: { error: "fleet_not_found" } });
+    window.OcculertAuth.signInEmail = async (email) => {
+      user = { id: "focus-driver", email };
+      return { role: "driver", email, authenticated: true };
+    };
+    window.OcculertAuth.signOut = async () => { user = null; };
+  });
+
+  await page.locator("#email").fill("focus@example.com");
+  await page.locator("#password").fill("password");
+  await page.locator("#submitBtn").click();
+  await expect(page.locator("#authCard")).toBeHidden();
+  await expect(page.locator("#profileStateLabel")).toBeFocused();
+
+  await page.getByRole("button", { name: "Use another account" }).click();
+  await expect(page.locator("#authCard")).toBeVisible();
+  await expect(page.locator("#email")).toBeFocused();
+});
+
 test("the passkey SDK loads through the resilient pinned loader", async ({ page }) => {
   await page.goto("/login.html", { waitUntil: "domcontentloaded" });
 
@@ -185,13 +209,18 @@ test("login shows server-verified fleet ownership instead of the saved driver ro
     });
   });
 
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/login.html", { waitUntil: "domcontentloaded" });
 
   await expect(page.locator("#profileStateLabel")).toHaveText("Signed-in account");
   await expect(page.locator("#profileBox")).toContainText("Fleet Manager");
   await expect(page.locator("#profileBox")).toContainText("Verified owner of Testing123");
   await expect(page.locator("#profileBox")).not.toContainText("Manager invitation required");
-  await expect(page.locator("#profileActions")).toContainText("Manage Fleet");
+  await expect(page.locator("#authCard")).toBeHidden();
+  await expect(page.locator("#profileActions")).toContainText("Account");
+  await expect(page.locator("#profileActions")).toContainText("Fleet setup");
+  await expect(page.locator("#profileActions")).toContainText("Use another account");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
 test("account separates server-verified fleet access from the saved local app role", async ({ page }) => {
@@ -228,7 +257,18 @@ test("account separates server-verified fleet access from the saved local app ro
   await expect(page.locator("#continueBtn")).toHaveText("Open Fleet Dashboard");
   await expect(page.locator("#continueBtn")).toHaveAttribute("href", "/fleet-dashboard.html");
   await expect(page.locator('label', { hasText: "Local app role" })).toBeVisible();
+  const accountTop = await page.locator(".account-access").evaluate((element) => element.getBoundingClientRect().top);
+  const settingsTop = await page.locator(".account-settings").evaluate((element) => element.getBoundingClientRect().top);
+  expect(accountTop).toBeLessThan(settingsTop);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  await page.setViewportSize({ width: 1200, height: 900 });
+  const desktopAccess = await page.locator(".account-access").boundingBox();
+  const desktopSettings = await page.locator(".account-settings").boundingBox();
+  expect(desktopAccess.x).toBeLessThan(desktopSettings.x);
+  await page.getByRole("button", { name: "Sign Out" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#name")).toBeFocused();
 });
 
 test("signed-out mobile fleet dashboard keeps navigation and recovery actions visible", async ({ page }) => {
@@ -240,7 +280,8 @@ test("signed-out mobile fleet dashboard keeps navigation and recovery actions vi
   await expect(page.locator('.actions[aria-label="Fleet navigation"] a', { hasText: "Home" })).toBeVisible();
   await expect(page.locator('.actions[aria-label="Fleet navigation"] a', { hasText: "Driver App" })).toBeVisible();
   await expect(page.locator('.actions[aria-label="Fleet navigation"] a', { hasText: "Sign In" })).toBeVisible();
-  await expect(page.locator('.actions[aria-label="Fleet navigation"] a')).toHaveCount(3);
+  await expect(page.locator('.actions[aria-label="Fleet navigation"] a:visible')).toHaveCount(3);
+  await expect(page.locator("#accountNav")).toBeHidden();
   await expect(page.locator("#signedOutActions")).toBeVisible();
   await expect(page.locator("#signedOutActions")).toContainText("Back home");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
@@ -260,7 +301,7 @@ test("fleet navigation stays focused and action text does not overlap", async ({
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#cloudStatus")).toContainText("Not signed in");
 
-  const navigation = page.locator('.actions[aria-label="Fleet navigation"] a');
+  const navigation = page.locator('.actions[aria-label="Fleet navigation"] a:visible');
   await expect(navigation).toHaveCount(3);
   expect(await navigation.allTextContents()).toEqual(["Home", "Driver App", "Sign In"]);
   await expect(page.locator("#actionQueue .ops-row")).toHaveCount(2);
@@ -611,12 +652,22 @@ test("authenticated fleet dashboards never fall back to unrelated local driver d
     }),
   }));
 
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
-  await expect(page.locator("#fleetPrimaryNav")).toHaveText("Manage Fleet");
+  await expect(page.locator("#fleetPrimaryNav")).toHaveText("Fleet setup");
   await expect(page.locator("#fleetPrimaryNav")).toHaveAttribute("href", "/fleet-onboarding.html");
+  await expect(page.locator("#accountNav")).toBeVisible();
+  await expect(page.locator("#driverAppNav")).toBeHidden();
   await expect(page.locator("#kpiDrivers")).toHaveText("0");
   await expect(page.getByText("Unrelated Local Driver")).toHaveCount(0);
+  await page.getByRole("link", { name: "Manage drivers" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#driverSearch")).toBeFocused();
+  const driverStatusTop = await page.locator(".main").evaluate((element) => element.getBoundingClientRect().top);
+  const summaryMetricsTop = await page.locator(".dashboard-kpis").evaluate((element) => element.getBoundingClientRect().top);
+  expect(driverStatusTop).toBeLessThan(summaryMetricsTop);
+  expect(await page.locator(".dashboard-kpis").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(2);
 });
 
 test("fleet dashboard does not turn missing or inactive telemetry into active safety scores", async ({ page }) => {

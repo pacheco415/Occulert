@@ -213,7 +213,7 @@ assertIncludes("occulert-backend.js", "refreshAuthConfig", "passkey retry must b
 assertIncludes("login.html", "Passkey biometrics, PINs, and private keys stay", "login must disclose that passkey secrets stay with the user's authenticator");
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
 assertIncludes("login.html", "id=\"profileFields\" class=\"hidden\"", "sign-in must hide profile setup fields by default");
-assertIncludes("login.html", "id=\"profileStateLabel\">Account status", "signed-out login must not claim a signed-in profile");
+assertIncludes("login.html", "id=\"profileStateLabel\" tabindex=\"-1\">Account status", "signed-out login must not claim a signed-in profile");
 assertIncludes("login.html", "Forgot password?", "login must offer password recovery");
 assertIncludes("login.html", "If an Occulert account uses that email", "password recovery must not reveal whether an email is registered");
 assertIncludes("login.html", "authMode==='signup'?extras():{}", "sign-in must not overwrite profile setup fields");
@@ -342,10 +342,10 @@ assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigati
 assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v35'", "the portal contrast repair must advance the offline cache");
-assertIncludes("sw.js", "'/portal.css?v=2'", "the service worker must cache the current shared portal stylesheet");
-assertNotIncludes("sw.js", "occulert-v34", "the portal contrast repair must not reuse the stale offline cache");
-assertNotIncludes("sw.js", "'/portal.css?v=1'", "the service worker must not retain the stale portal stylesheet URL");
+assertIncludes("sw.js", "const CACHE = 'occulert-v36'", "the fleet journey cleanup must advance the offline cache");
+assertIncludes("sw.js", "'/portal.css?v=3'", "the service worker must cache the current shared portal stylesheet");
+assertNotIncludes("sw.js", "occulert-v35", "the fleet journey cleanup must not reuse the stale offline cache");
+assertNotIncludes("sw.js", "'/portal.css?v=2'", "the service worker must not retain the stale portal stylesheet URL");
 assertIncludes("portal.css", "background: var(--portal-surface);", "portal cards must follow the active light or dark theme");
 assertIncludes("portal.css", 'html[data-theme="light"] .portal-page .btn:not(.primary):hover', "light-theme button hover states must preserve readable contrast");
 assertNotIncludes("portal.css", "background: rgba(14, 26, 45, .94);", "portal cards must not force a dark surface in light mode");
@@ -354,8 +354,8 @@ assertIncludes("portal.css", "--portal-icon-text: #20344d;", "light-theme portal
 assertIncludes("portal.css", "color: var(--portal-accent-text);", "portal labels must follow the active theme accent");
 assertIncludes("portal.css", "color: var(--portal-icon-text);", "portal icons must follow the active theme text token");
 for (const path of ["login.html", "fleet-dashboard.html", "fleet-onboarding.html", "account.html", "product-hub.html"]) {
-  assertIncludes(path, '<link rel="stylesheet" href="/portal.css?v=2" />', `${path} must use the current simplified portal design layer`);
-  assertNotIncludes(path, '<link rel="stylesheet" href="/portal.css?v=1" />', `${path} must not reuse the stale portal stylesheet`);
+  assertIncludes(path, '<link rel="stylesheet" href="/portal.css?v=3" />', `${path} must use the current simplified portal design layer`);
+  assertNotIncludes(path, '<link rel="stylesheet" href="/portal.css?v=2" />', `${path} must not reuse the stale portal stylesheet`);
   assertIncludes(path, "portal-page", `${path} must opt into the simplified portal layout`);
 }
 assertIncludes("fleet-dashboard.html", "Needs attention", "fleet managers must see the action-focused heading first");
@@ -365,9 +365,21 @@ assertIncludes("fleet-dashboard.html", "Saved driver profiles", "signed-out flee
 assertIncludes("fleet-dashboard.html", "Local sessions", "signed-out fleet summaries must label same-browser sessions directly");
 assertIncludes("fleet-dashboard.html", "Fresh now", "signed-out fleet summaries must avoid presenting a raw session count as fleet coverage");
 assertIncludes("login.html", "Privacy and account security", "sign-in privacy details must remain available without dominating the form");
+assertIncludes("login.html", "id=\"authCard\"", "signed-in continuation must be able to hide the redundant authentication form");
+assertIncludes("login.html", "id=\"profileStateLabel\" tabindex=\"-1\"", "signed-in continuation must accept programmatic focus");
+assertIncludes("login.html", "focusSignInContinuation()", "interactive sign-in must hand focus to the continuation state");
+assertIncludes("login.html", "focusSignInForm()", "account switching must return focus to the sign-in form");
+assertIncludes("login.html", "setSignedInLayout(Boolean(user)&&authMode==='signin')", "signed-in continuation must depend on an active authenticated user");
+assertIncludes("login.html", "href=\"/account.html\">Account</a>", "signed-in users must receive a direct Account action");
+assertIncludes("login.html", "Use another account", "signed-in users must receive an explicit account-switch action");
+assertNotIncludes("login.html", "Account Setup →", "passkey guidance must use the current Account label");
 assertIncludes("account.html", "await backend.getFleet()", "account access must verify server-owned fleet access");
 assertIncludes("account.html", "Verified role", "account summaries must label the server-authoritative role");
 assertIncludes("account.html", "Local app role", "account summaries must distinguish device-only role preferences");
+assertIncludes("account.html", "class=\"grid account-grid\"", "account settings must expose the responsive account hierarchy");
+assertIncludes("account.html", "class=\"account-access\"", "verified Account access must be a separately orderable region");
+assertIncludes("account.html", "Driver app settings", "device-only settings must use a clear driver-app label");
+assertIncludes("portal.css", '"access settings"\n    "secondary settings"', "desktop Account layout must follow its keyboard and screen-reader order");
 assertIncludes("account.html", ".grid>*{min-width:0}", "account columns must allow long verified fleet names to shrink on mobile");
 assertIncludes("account.html", "overflow-wrap:anywhere", "account access values must wrap long server-provided text");
 assertNotIncludes("account.html", "document.getElementById('continueBtn').href=(p.role==='fleet')", "account navigation must not trust a saved local role for fleet access");
@@ -377,6 +389,16 @@ assertIncludes("fleet-dashboard.html", "Local GPS Drivers", "fleet dashboard mus
 assertIncludes("fleet-dashboard.html", "rowHtml('Local GPS shared'", "fleet dashboard coverage must label same-browser GPS as local-only");
 assertIncludes("fleet-dashboard.html", "no local GPS consent", "fleet dashboard actions must describe missing same-browser GPS consent accurately");
 assertIncludes("fleet-dashboard.html", "#actionQueue .ops-row{grid-template-columns:1fr;gap:4px}", "fleet dashboard action messages must preserve the current non-overlapping layout");
+assertIncludes("fleet-dashboard.html", "id=\"accountNav\"", "signed-in fleet navigation must expose Account directly");
+assertIncludes("fleet-dashboard.html", "Manage drivers", "the roster action must name the object it manages");
+assertIncludes("fleet-dashboard.html", "Fleet setup", "fleet onboarding must have a distinct navigation label");
+assertIncludes("fleet-dashboard.html", "class=\"dashboard-content\"", "fleet dashboard sections must support a mobile-specific content order");
+assertIncludes("fleet-dashboard.html", "class=\"grid dashboard-kpis\"", "fleet summary metrics must remain a distinct responsive region");
+const fleetDashboardMarkup = read("fleet-dashboard.html");
+if (!(fleetDashboardMarkup.indexOf('class="main"') < fleetDashboardMarkup.indexOf('class="grid dashboard-kpis"')
+  && fleetDashboardMarkup.indexOf('class="grid dashboard-kpis"') < fleetDashboardMarkup.indexOf('class="panel-details fleet-tools"'))) {
+  fail("fleet dashboard DOM order must place Driver Status before summary metrics and secondary tools");
+}
 assertNotIncludes("fleet-dashboard.html", "View driver fatigue scores, GPS locations", "fleet dashboard metadata must not advertise protected GPS locations");
 assertNotIncludes("fleet-dashboard.html", "GPS and cloud sync only appear when the driver enables them", "fleet dashboard must not imply protected fleet summaries include opted-in GPS");
 assertIncludes("api/fleet-summary.js", "includes_location: false", "fleet history responses must explicitly exclude location");

@@ -99,7 +99,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 </style>
 <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>
 <link rel="stylesheet" href="/liquid-glass.css" />
-<link rel="stylesheet" href="/portal.css?v=2" />
+<link rel="stylesheet" href="/portal.css?v=3" />
 </head>
 <body class="portal-page account-page">
 <div class="top">
@@ -108,11 +108,21 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 </div>
 <main class="wrap">
 <div class="page-header"><p class="eyebrow">Your account</p><h1>Account</h1><p>Manage your profile, sign-in methods, and app preferences.</p></div>
-<section class="grid">
-<div>
+<section class="grid account-grid">
+<aside class="account-access">
   <div class="card">
-    <div class="section-label">Local app profile</div>
-    <p style="color:var(--text2);font-size:13px;margin:0 0 16px">These driver-app preferences are saved to this device. They do not grant access to a protected fleet.</p>
+    <div class="section-label">Account access</div>
+    <div id="profileBox"><div style="color:var(--text3);font-size:13px">Loading profile…</div></div>
+    <div class="action-row">
+      <a class="btn primary" id="continueBtn" href="/app.html">Continue to App</a>
+      <button class="btn red" onclick="signOut()">Sign Out</button>
+    </div>
+  </div>
+</aside>
+<div class="account-settings">
+  <div class="card">
+    <div class="section-label">Driver app settings</div>
+    <p style="color:var(--text2);font-size:13px;margin:0 0 16px">These device-only driver app settings do not grant access to a protected fleet.</p>
     <form class="form" onsubmit="saveProfile(event)">
       <div class="split">
         <div class="field"><label>Name</label><input id="name" placeholder="Your name" autocomplete="name"></div>
@@ -157,15 +167,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
     <div class="status" id="status"></div>
   </div>
 </div>
-<aside>
-  <div class="card">
-    <div class="section-label">Account access</div>
-    <div id="profileBox"><div style="color:var(--text3);font-size:13px">Loading profile…</div></div>
-    <div class="action-row">
-      <a class="btn primary" id="continueBtn" href="/app.html">Continue to App</a>
-      <button class="btn red" onclick="signOut()">Sign Out</button>
-    </div>
-  </div>
+<aside class="account-secondary">
   <div class="card">
     <div class="section-label">App preferences</div>
     <div class="row"><span>App version</span><span class="badge">v3 AI</span></div>

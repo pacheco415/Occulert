@@ -53,8 +53,13 @@ function boot({ resetResult = { ok: true, body: {} }, fleetResult = { status: 40
     Promise,
     URLSearchParams,
     document: {
+      activeElement: null,
       getElementById(id) {
-        if (!elements.has(id)) elements.set(id, makeElement(id));
+        if (!elements.has(id)) {
+          const element = makeElement(id);
+          element.focus = () => { context.document.activeElement = element; };
+          elements.set(id, element);
+        }
         return elements.get(id);
       },
     },
@@ -128,7 +133,10 @@ test('only an active backend session is presented as signed in', async () => {
   assert.match(el('profileBox').innerHTML, /Verified role<\/span><span>Driver/);
   assert.match(el('profileBox').innerHTML, /No owned fleet/);
   assert.match(el('profileBox').innerHTML, /Authenticated<\/span><span>Yes/);
-  assert.match(el('profileActions').innerHTML, /Sign Out/);
+  assert.match(el('profileActions').innerHTML, /Account/);
+  assert.match(el('profileActions').innerHTML, /Use another account/);
+  assert.equal(el('authCard').classList.contains('hidden'), true);
+  assert.equal(el('loginGrid').classList.contains('signed-in'), true);
   assert.equal(el('email').value, 'active@example.com');
   assert.equal(calls.fleet, 1);
 });
@@ -176,7 +184,10 @@ test('a late ownership response cannot restore signed-in controls after logout',
   assert.equal(el('profileStateLabel').textContent, 'Account status');
   assert.match(el('profileBox').innerHTML, /Not signed in/);
   assert.doesNotMatch(el('profileBox').innerHTML, /Fleet Manager|Verified owner/);
-  assert.doesNotMatch(el('profileActions').innerHTML, /Sign Out/);
+  assert.doesNotMatch(el('profileActions').innerHTML, /Use another account/);
+  assert.equal(el('authCard').classList.contains('hidden'), false);
+  assert.equal(el('loginGrid').classList.contains('signed-in'), false);
+  assert.equal(context.document.activeElement.id, 'email');
 });
 
 test('passkey sign-in does not require email or password input', async () => {
@@ -188,6 +199,7 @@ test('passkey sign-in does not require email or password input', async () => {
   assert.match(el('passkeyStatus').textContent, /Signed in with your passkey/);
   assert.equal(el('status').textContent, '');
   assert.equal(el('passkeySignInBtn').disabled, false);
+  assert.equal(context.document.activeElement.id, 'profileStateLabel');
 });
 
 test('passkey failures stay beside the passkey action instead of below the account notices', async () => {
