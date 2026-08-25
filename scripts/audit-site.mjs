@@ -365,6 +365,10 @@ assertIncludes("fleet-dashboard.html", "Saved driver profiles", "signed-out flee
 assertIncludes("fleet-dashboard.html", "Local sessions", "signed-out fleet summaries must label same-browser sessions directly");
 assertIncludes("fleet-dashboard.html", "Fresh now", "signed-out fleet summaries must avoid presenting a raw session count as fleet coverage");
 assertIncludes("login.html", "Privacy and account security", "sign-in privacy details must remain available without dominating the form");
+assertIncludes("account.html", "await backend.getFleet()", "account access must verify server-owned fleet access");
+assertIncludes("account.html", "Verified role", "account summaries must label the server-authoritative role");
+assertIncludes("account.html", "Local app role", "account summaries must distinguish device-only role preferences");
+assertNotIncludes("account.html", "document.getElementById('continueBtn').href=(p.role==='fleet')", "account navigation must not trust a saved local role for fleet access");
 assertIncludes("fleet-dashboard.html", "Protected fleet summaries exclude GPS coordinates by design", "fleet dashboard must disclose that protected summaries exclude GPS coordinates");
 assertIncludes("fleet-dashboard.html", "same-browser local data", "fleet dashboard metadata must scope GPS to same-browser local data");
 assertIncludes("fleet-dashboard.html", "Local GPS Drivers", "fleet dashboard must label GPS metrics as local-only");
