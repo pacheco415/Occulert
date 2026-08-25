@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAudioPlayer } from 'expo-audio';
 import { useFocusEffect } from 'expo-router';
 import { SensitivitySlider, loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { SensitivityLevel } from '../constants/thresholds';
@@ -17,6 +18,12 @@ import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import { currentAppBuildInfo, formatAppBuildLabel } from '../lib/appBuildInfo';
 import { createSettingPersister } from '../lib/settingPersistence';
+import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
+import { configureAlertAudioMode } from '../lib/audioSession';
+import {
+  getHeadphoneMotionStatus,
+  type HeadphoneMotionStatus,
+} from '../lib/headphoneMotion';
 import {
   IN_EAR_ALERT_PATTERN_KEY,
   parseInEarAlertPattern,
@@ -29,6 +36,15 @@ const EMPTY_WATCH_STATUS: WatchStatus = {
   appInstalled: false,
   reachable: false,
 };
+
+const EMPTY_HEADPHONE_MOTION_STATUS: HeadphoneMotionStatus = {
+  state: 'not-built',
+  authorization: 'unavailable',
+  isAvailable: false,
+  isActive: false,
+};
+
+const ALERT_SOUND = require('../assets/alert.wav');
 
 const storedSettingPersister = createSettingPersister(AsyncStorage);
 const watchSettingPersister = createSettingPersister({
@@ -47,6 +63,39 @@ const showSettingSaveError = () => {
   );
 };
 
+const describeHeadphoneMotion = (status: HeadphoneMotionStatus): string => {
+  switch (status.state) {
+    case 'active':
+      return 'Receiving compatible-headphone motion during monitoring';
+    case 'starting':
+      return 'Starting compatible-headphone motion…';
+    case 'stopped':
+      return status.authorization === 'notDetermined'
+        ? 'Available — iOS may request Motion access when monitoring starts'
+        : 'Available — starts automatically with monitoring';
+    case 'denied':
+      return 'Motion access is denied in iPhone Settings';
+    case 'unavailable':
+      return 'Connect compatible AirPods or Beats to enable motion observations';
+    case 'error':
+      return 'Motion status could not be confirmed';
+    default:
+      return 'Headphone motion support is unavailable in this build';
+  }
+};
+
+const labelHeadphoneMotion = (status: HeadphoneMotionStatus): string => {
+  switch (status.state) {
+    case 'active': return 'ACTIVE';
+    case 'starting': return 'STARTING';
+    case 'stopped': return 'READY';
+    case 'denied': return 'DENIED';
+    case 'unavailable': return 'NOT CONNECTED';
+    case 'error': return 'CHECK';
+    default: return 'UNAVAILABLE';
+  }
+};
+
 export default function SettingsScreen() {
   const [sens, setSens] = useState<SensitivityLevel>('medium');
   const [haptic, setHaptic] = useState(true);
@@ -54,6 +103,14 @@ export default function SettingsScreen() {
   const [inEarPattern, setInEarPattern] = useState<InEarAlertPattern>('balanced');
   const [watch, setWatch] = useState(false);
   const [watchStatus, setWatchStatus] = useState<WatchStatus>(EMPTY_WATCH_STATUS);
+  const [headphoneMotionStatus, setHeadphoneMotionStatus] = useState<HeadphoneMotionStatus>(
+    EMPTY_HEADPHONE_MOTION_STATUS,
+  );
+  const [audioTestBusy, setAudioTestBusy] = useState(false);
+  // This parked-only test must release the shared iOS audio session when the
+  // tone ends so music and navigation audio can return to their normal level.
+  const audioTestPlayer = useAudioPlayer(ALERT_SOUND);
+  const audioTestRunnerRef = useRef(createSingleFlightActionRunner());
   const watchAvailable = watchStatus.paired && watchStatus.appInstalled;
   const appBuildLabel = formatAppBuildLabel(currentAppBuildInfo());
 
@@ -79,10 +136,12 @@ export default function SettingsScreen() {
     Promise.all([
       getWatchStatus(),
       getWatchAlertsEnabled(true),
-    ]).then(([status, saved]) => {
+      getHeadphoneMotionStatus(),
+    ]).then(([status, saved, motionStatus]) => {
       if (!active) return;
       setWatchStatus(status);
       setWatch(saved);
+      setHeadphoneMotionStatus(motionStatus);
     }).catch(() => {});
     return () => { active = false; };
   }, []));
@@ -138,6 +197,28 @@ export default function SettingsScreen() {
           ? 'Connected — enable background alerts in the Watch app'
           : 'Companion installed — open it to finish wrist alert setup';
 
+  const headphoneMotionDescription = describeHeadphoneMotion(headphoneMotionStatus);
+  const headphoneMotionLabel = labelHeadphoneMotion(headphoneMotionStatus);
+
+  const testAudioOutput = () => {
+    void audioTestRunnerRef.current.run({
+      action: async () => {
+        await configureAlertAudioMode();
+        audioTestPlayer.pause();
+        await audioTestPlayer.seekTo(0);
+        audioTestPlayer.volume = 0.65;
+        audioTestPlayer.play();
+      },
+      onBusyChange: setAudioTestBusy,
+      onError: () => {
+        Alert.alert(
+          'Audio test unavailable',
+          'Check the iPhone volume and selected audio output, then try again while safely parked.',
+        );
+      },
+    });
+  };
+
   const testWatchAlert = async () => {
     const result = await sendAlertToWatch({ level: 'alert', perclos: 0, at: Date.now() });
     const status = await getWatchStatus();
@@ -175,12 +256,37 @@ export default function SettingsScreen() {
           <View style={s.row}>
             <View style={s.rowL}>
               <Ionicons name="headset-outline" size={18} color="#60a5fa" />
-              <View>
+              <View style={s.rowCopy}>
                 <Text style={s.label}>AirPods / Bluetooth audio</Text>
                 <Text style={s.sub}>Uses the iPhone's current audio output automatically</Text>
               </View>
             </View>
             <Text style={s.status}>AUTOMATIC</Text>
+          </View>
+          <View style={s.div} />
+          <TouchableOpacity
+            accessibilityHint="Plays one alert tone through the iPhone's current audio output"
+            accessibilityRole="button"
+            disabled={audioTestBusy}
+            style={[s.testRow, audioTestBusy && s.testRowDisabled]}
+            onPress={testAudioOutput}
+          >
+            <Ionicons name="volume-high-outline" size={17} color="#60a5fa" />
+            <Text style={s.testText}>
+              {audioTestBusy ? 'PREPARING AUDIO TEST…' : 'TEST CURRENT AUDIO OUTPUT'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={s.testNote}>Use only while parked. This does not change your alert setting.</Text>
+          <View style={s.div} />
+          <View style={s.row}>
+            <View style={s.rowL}>
+              <Ionicons name="pulse-outline" size={18} color="#60a5fa" />
+              <View style={s.rowCopy}>
+                <Text style={s.label}>Compatible headphone motion</Text>
+                <Text style={s.sub}>{headphoneMotionDescription}</Text>
+              </View>
+            </View>
+            <Text style={s.status}>{headphoneMotionLabel}</Text>
           </View>
           <View style={s.div} />
           <View style={s.patternBlock}>
@@ -266,12 +372,14 @@ const s = StyleSheet.create({
   cardTitle:{color:colors.textSecondary,fontSize:11,fontWeight:'800',letterSpacing:0.8,textTransform:'uppercase',padding:14,borderBottomWidth:1,borderColor:'rgba(255,255,255,0.08)'},
   row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:16,paddingVertical:14,gap:12},
   rowL:{flexDirection:'row',alignItems:'center',gap:12,flex:1},
+  rowCopy:{flex:1},
   label:{color:colors.text,fontSize:14,fontWeight:'700'}, sub:{color:colors.textMuted,fontSize:11,marginTop:2},
   status:{color:colors.cyan,fontSize:10,fontWeight:'900',letterSpacing:0.6},
   div:{height:1,backgroundColor:'rgba(255,255,255,0.08)',marginHorizontal:16},
   testRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:13},
   testRowDisabled:{opacity:0.35},
   testText:{color:'#60a5fa',fontSize:13,fontWeight:'800'},
+  testNote:{color:colors.textMuted,fontSize:10,lineHeight:15,textAlign:'center',paddingHorizontal:16,paddingBottom:12},
   patternBlock:{paddingHorizontal:16,paddingVertical:14,gap:12},
   patternOptions:{flexDirection:'row',gap:8},
   patternOption:{flex:1,alignItems:'center',borderWidth:1,borderColor:'rgba(255,255,255,0.12)',borderRadius:radii.small,paddingVertical:10,backgroundColor:'rgba(5,9,19,0.72)'},

@@ -3,6 +3,7 @@ import {
   SENSITIVITY_PRESETS, DEFAULT_SENSITIVITY, PERCLOS_ALERT_THRESHOLD, PERCLOS_WINDOW_MS,
   type SensitivityLevel,
 } from '../constants/thresholds';
+import { RollingClosedFraction } from '../lib/rollingClosedFraction';
 
 // MediaPipe FaceMesh EAR sets, ordered [corner, top, top, corner, bottom, bottom]
 // (kept for compatibility with the web app / any future landmark-based pipeline)
@@ -30,7 +31,8 @@ function ear(lm: Array<{ x: number; y: number }>, idx: number[]): number {
 }
 
 export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY) {
-  const win = useRef<Array<{ ts: number; closed: boolean }>>([]);
+  const win = useRef<RollingClosedFraction | null>(null);
+  const perclosWindow = win.current ??= new RollingClosedFraction(PERCLOS_WINDOW_MS);
   const lastEar = useRef(0.3);
   const preset = SENSITIVITY_PRESETS[level];
 
@@ -44,11 +46,7 @@ export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY) {
       const closed = avgEar < preset.eyeClosedThreshold;
       const watching = !closed && avgEar < preset.eyeWatchThreshold;
 
-      win.current.push({ ts: now, closed });
-      win.current = win.current.filter(e => e.ts > now - PERCLOS_WINDOW_MS);
-
-      const perclos = win.current.length > 0
-        ? win.current.filter(e => e.closed).length / win.current.length : 0;
+      const perclos = perclosWindow.add(now, closed);
 
       const drop = Math.max(0, (preset.eyeWatchThreshold - avgEar) / preset.eyeWatchThreshold);
       // Normalize PERCLOS against its clinical alert threshold so the score reaches
@@ -58,7 +56,7 @@ export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY) {
 
       return { ear: avgEar, perclos, fatigueScore, state: closed ? 'closed' : watching ? 'watch' : 'open' };
     },
-    [preset],
+    [perclosWindow, preset],
   );
 
   /** Landmark path (468-point FaceMesh) — used by the web app and any future
@@ -98,7 +96,7 @@ export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY) {
     return { ear: lastEar.current, perclos: 0, fatigueScore: 0, state: 'noFace' };
   }, []);
 
-  const reset = useCallback(() => { win.current = []; lastEar.current = 0.3; }, []);
+  const reset = useCallback(() => { perclosWindow.reset(); lastEar.current = 0.3; }, [perclosWindow]);
 
   return { processLandmarks, processEyeOpenness, processNoFace, reset };
 }
