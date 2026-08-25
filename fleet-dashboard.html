@@ -34,23 +34,35 @@
   <meta name="apple-mobile-web-app-title" content="Occulert">
   <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>
 <link rel="stylesheet" href="/liquid-glass.css" />
+<link rel="stylesheet" href="/portal.css?v=1" />
 </head>
-<body>
+<body class="portal-page dashboard-page">
   <div class="top">
-    <div class="brand">Occulert Fleet</div>
+    <a class="brand" href="/" style="text-decoration:none">Occulert</a>
     <div class="actions" aria-label="Fleet navigation"><a class="btn mobile-essential" href="/">Home</a><a class="btn mobile-essential" href="/app.html">Driver App</a><a class="btn primary mobile-essential" id="fleetPrimaryNav" href="/login.html">Sign In</a></div>
   </div>
   <main class="wrap">
     <section class="hero">
       <div>
-        <h1>Live fleet dashboard</h1>
-        <p class="muted">Protected driver status, client-reported fatigue risk, escalation level, and pilot operations. GPS coordinates stay out of protected fleet summaries; same-browser local sessions can show opt-in GPS.</p>
+        <p class="eyebrow">Fleet workspace</p>
+        <h1>Fleet overview</h1>
+        <p class="muted">Start with drivers who need attention, then review live status and recent sessions. Protected fleet views never include GPS coordinates or personal media.</p>
       </div>
-      <div class="hero-actions"><button class="btn" onclick="exportFleetCSV()">Export CSV</button><button class="btn warn" onclick="seedDemoData()">Load Demo Data</button><button class="btn ghost" onclick="clearDemoData()">Clear Demo</button></div>
+      <details class="panel-details dashboard-tools">
+        <summary>Dashboard tools</summary>
+        <div class="hero-actions"><button class="btn" onclick="exportFleetCSV()">Export CSV</button><button class="btn warn" onclick="seedDemoData()">Load Demo Data</button><button class="btn ghost" onclick="clearDemoData()">Clear Demo</button></div>
+      </details>
     </section>
-    <div class="notice privacy-note"><strong>Privacy & consent:</strong> Protected fleet summaries exclude GPS coordinates by design. When signed out, this page can show opt-in GPS only from same-browser local sessions or demo data. Protected fleet data is limited to the authenticated server-verified fleet owner. Safety scores and event telemetry are client-reported and not independently verified; do not use them as sole evidence for discipline, compliance, or emergency decisions.</div>
+    <details class="privacy-details privacy-note">
+      <summary>Privacy and data boundaries</summary>
+      <div class="details-body"><div>Protected fleet summaries exclude GPS coordinates by design. When signed out, this page can show opt-in GPS only from same-browser local sessions or demo data.</div><div>Protected fleet data is limited to the authenticated server-verified fleet owner. Safety scores and event telemetry are client-reported and not independently verified; do not use them as sole evidence for discipline, compliance, or emergency decisions.</div></div>
+    </details>
     <div class="notice" id="cloudStatus" style="margin-top:10px">Checking protected fleet access...</div>
-    <div class="empty-actions hidden" id="signedOutActions" aria-label="Signed-out fleet actions"><a class="btn primary" href="/login.html">Sign In</a><a class="btn" href="/">Back home</a></div>
+    <div class="empty-actions signed-out-recovery hidden" id="signedOutActions" aria-label="Signed-out fleet actions"><a class="btn primary" href="/login.html">Sign In</a><a class="btn" href="/">Back home</a></div>
+    <section class="ops ops-primary" aria-label="Fleet priorities">
+      <div class="card"><div class="section-title"><h2>Needs attention</h2><button class="btn" onclick="copyOpsSummary()">Copy</button></div><div class="ops-list" id="actionQueue"></div></div>
+      <div class="card"><div class="section-title"><h2>Driver roster</h2><a class="btn" href="/driver-profiles.html">Manage</a></div><div class="ops-list" id="rosterSummary"></div></div>
+    </section>
     <section class="grid">
       <div class="card"><div class="label">Active Drivers</div><div class="kpi" id="kpiDrivers">0</div><div class="sub" id="kpiDriversSub">waiting</div></div>
       <div class="card"><div class="label">Fleet Safety Score</div><div class="kpi green" id="kpiScore">--</div><div class="sub" id="kpiScoreSub">no sessions</div></div>
@@ -58,12 +70,13 @@
       <div class="card"><div class="label">High Risk</div><div class="kpi red" id="kpiRisk">0</div><div class="sub" id="kpiRiskSub">current</div></div>
       <div class="card"><div class="label">Stale Sessions</div><div class="kpi blue" id="kpiStale">0</div><div class="sub">older than 5m</div></div>
     </section>
-    <section class="ops">
-      <div class="card"><div class="section-title"><h2>Action Queue</h2><button class="btn" onclick="copyOpsSummary()">Copy</button></div><div class="ops-list" id="actionQueue"></div></div>
-      <div class="card"><div class="section-title"><h2>Roster</h2><a class="btn" href="/driver-profiles.html">Manage</a></div><div class="ops-list" id="rosterSummary"></div></div>
-      <div class="card"><div class="section-title"><h2>Pilot Leads</h2><a class="btn good" href="https://docs.google.com/spreadsheets/d/1XimPQE-X4yv4yDdy6Itwf1tOyQCmq4Gpeoj436E6O1Y/edit" target="_blank" rel="noopener">Open Sheet</a></div><div class="ops-list" id="leadSummary"></div></div>
-      <div class="card"><div class="section-title"><h2>Coverage</h2><a class="btn" href="/session-history.html">History</a></div><div class="ops-list" id="coverageSummary"></div></div>
-    </section>
+    <details class="panel-details">
+      <summary>More fleet tools</summary>
+      <section class="ops ops-secondary">
+        <div class="card"><div class="section-title"><h2>Pilot leads</h2><a class="btn good" href="https://docs.google.com/spreadsheets/d/1XimPQE-X4yv4yDdy6Itwf1tOyQCmq4Gpeoj436E6O1Y/edit" target="_blank" rel="noopener">Open sheet</a></div><div class="ops-list" id="leadSummary"></div></div>
+        <div class="card"><div class="section-title"><h2>Coverage details</h2><a class="btn" href="/session-history.html">History</a></div><div class="ops-list" id="coverageSummary"></div></div>
+      </section>
+    </details>
     <section class="main">
       <div class="card">
         <div class="section-title">
@@ -78,17 +91,25 @@
         <div class="drivers" id="drivers"></div>
       </div>
       <aside>
-        <div class="card">
-          <div class="section-title"><h2>Location / Risk View</h2><span class="sub" id="gpsCount">waiting for local GPS</span></div>
+        <details class="panel-details secondary-panel">
+          <summary>Local GPS view</summary>
+          <div class="card">
+          <div class="section-title"><h2>Same-browser locations</h2><span class="sub" id="gpsCount">waiting for local GPS</span></div>
           <div class="map" id="map"><div><strong>No local GPS data yet</strong><p class="sub">Only same-browser opt-in sessions or demo data can place GPS pins here.</p></div></div>
           <div class="mini"><div><div class="label">Local GPS Drivers</div><strong id="gpsDrivers">0</strong></div><div><div class="label">Miles Tracked</div><strong id="milesTracked">0.00</strong></div><div><div class="label">Max Escalation</div><strong id="maxEscalation">0</strong></div></div>
-        </div>
-        <div class="card" style="margin-top:16px">
-          <div class="section-title"><h2>Recent Events</h2><button class="btn" onclick="render()">Refresh</button></div>
+          </div>
+        </details>
+        <details class="panel-details secondary-panel">
+          <summary>Recent events</summary>
+          <div class="card">
+          <div class="section-title"><h2>Recent events</h2><button class="btn" onclick="render()">Refresh</button></div>
           <div id="events"></div>
-        </div>
+          </div>
+        </details>
       </aside>
     </section>
+    <details class="panel-details history-details" open>
+      <summary>Protected session history</summary>
     <section class="card history-section" aria-labelledby="sessionHistoryTitle">
       <div class="section-title">
         <div><h2 id="sessionHistoryTitle">Protected Session History</h2><div class="sub">Recent sessions and events for the signed-in manager's server-verified fleet.</div></div>
@@ -97,6 +118,7 @@
       <div class="notice privacy-note"><strong>Client-reported and unverified:</strong> Session scores and events are operational observations, not independently measured evidence. This history excludes GPS coordinates, camera media, audio, and raw motion.</div>
       <div class="history-list" id="sessionHistory" role="list"></div>
     </section>
+    </details>
   </main>
   <div class="toast" id="toast"></div>
   <footer class="footer"><a href="/">Occulert</a> &nbsp;·&nbsp; <a href="/app.html">Driver App</a> &nbsp;·&nbsp; <a href="/privacy.html">Privacy</a><div style="margin-top:8px">© 2026 Occulert. Prototype only — not a certified safety, medical, emergency, or compliance device.</div></footer>
@@ -126,7 +148,25 @@ function renderMap(rows){let gps=rows.filter(d=>d.location),map=document.getElem
 function filterRows(rows){let f=document.getElementById('riskFilter')?.value||'all',q=(document.getElementById('driverSearch')?.value||'').trim().toLowerCase();return rows.filter(d=>(f==='all'||(f==='danger'&&cls(d.status)==='danger')||(f==='watch'&&cls(d.status)==='watch')||(f==='stale'&&d.active!==false&&d.hasSession&&d.stale)||(f==='gps'&&!fleetMode&&d.location)||(f==='nogps'&&!fleetMode&&d.active!==false&&!d.location))&&(!q||[d.name,d.route,d.status,d.driverId].join(' ').toLowerCase().includes(q)))}
 function syncProtectedControls(){let select=document.getElementById('riskFilter');if(!select)return;Array.from(select.options).forEach(option=>{if(option.value==='gps'||option.value==='nogps')option.disabled=fleetMode});if(fleetMode&&(select.value==='gps'||select.value==='nogps'))select.value='all'}
 function sortRows(rows){let mode=document.getElementById('sortMode')?.value||'risk';return rows.slice().sort((a,b)=>mode==='updated'?timestamp(b)-timestamp(a):mode==='score'?(a.hasSafetyScore?a.safetyScore:Infinity)-(b.hasSafetyScore?b.safetyScore:Infinity):mode==='alerts'?b.alerts-a.alerts:riskRank(b)-riskRank(a)||Number(b.hasSafetyScore)-Number(a.hasSafetyScore)||a.safetyScore-b.safetyScore)}
-function renderOps(rows){let drivers=fleetMode?protectedDrivers:getDrivers(),activeRows=rows.filter(d=>d.active!==false),leads=getLeads(),active=drivers.filter(d=>d.active!==false).length,live=activeRows.filter(d=>d.sessionActive&&!d.stale).length,newLeads=leads.filter(l=>!l.status||l.status==='New'||l.status==='new'||!l.cloudSynced).length,gps=activeRows.filter(r=>r.location).length,high=activeRows.filter(r=>cls(r.status)==='danger').length,watch=activeRows.filter(r=>cls(r.status)==='watch').length,stale=activeRows.filter(r=>r.hasSession&&r.stale).length,noGps=fleetMode?0:activeRows.filter(r=>!r.location).length,coverage=active?Math.min(100,Math.round((live/active)*100)):rows.length?100:0;document.getElementById('rosterSummary').innerHTML=rowHtml(fleetMode?'Protected drivers':'Saved drivers',drivers.length)+rowHtml('Active / training',active)+rowHtml('Live coverage',active?coverage+'%':rows.length)+`<div class="sub">${fleetMode?'Server-scoped to '+esc(protectedFleetName)+'.':'Same-browser local roster.'}</div>`;document.getElementById('leadSummary').innerHTML=rowHtml('Local leads',leads.length)+rowHtml('Needs follow-up',newLeads,newLeads?'yellow':'')+rowHtml('Newest',leads.length?new Date(leads[0].createdAt||Date.now()).toLocaleDateString():'--')+`<div class="sub">Pilot leads are separate from driver invitations.</div>`;document.getElementById('coverageSummary').innerHTML=fleetMode?rowHtml('GPS data','Excluded')+rowHtml('Live sessions',live+'/'+active)+rowHtml('Cloud synced',rows.filter(r=>r.cloudSynced).length+'/'+rows.length):rowHtml('Local GPS shared',gps+'/'+activeRows.length)+rowHtml('No local GPS',noGps,noGps?'yellow':'')+rowHtml('Cloud synced',rows.filter(r=>r.cloudSynced).length+'/'+rows.length);let actions=[];if(high)actions.push(`${high} high-risk driver${high===1?'':'s'} need immediate review.`);if(watch)actions.push(`${watch} driver${watch===1?' is':'s are'} in watch state.`);if(stale)actions.push(`${stale} stale session${stale===1?'':'s'} need check-in.`);if(!fleetMode&&noGps&&activeRows.length)actions.push(`${noGps} active session${noGps===1?' has':'s have'} no local GPS consent.`);if(newLeads)actions.push(`${newLeads} pilot lead${newLeads===1?'':'s'} need follow-up.`);if(!drivers.length)actions.push(fleetMode?'Invite drivers to build your protected roster.':'Add driver profiles before fleet demos.');if(!actions.length)actions.push('No urgent fleet actions.');lastOpsSummary=actions.join('\\n');document.getElementById('actionQueue').innerHTML=actions.map((a,i)=>rowHtml(`Action ${i+1}`,a,i===0&&high?'red':i===0&&watch?'yellow':'' )).join('')}
+function renderOps(rows){
+  let drivers=fleetMode?protectedDrivers:getDrivers(),activeRows=rows.filter(d=>d.active!==false),leads=getLeads(),active=drivers.filter(d=>d.active!==false).length,live=activeRows.filter(d=>d.sessionActive&&!d.stale).length,newLeads=leads.filter(l=>!l.status||l.status==='New'||l.status==='new'||!l.cloudSynced).length,gps=activeRows.filter(r=>r.location).length,high=activeRows.filter(r=>cls(r.status)==='danger').length,watch=activeRows.filter(r=>cls(r.status)==='watch').length,stale=activeRows.filter(r=>r.hasSession&&r.stale).length,noGps=fleetMode?0:activeRows.filter(r=>!r.location).length,coverage=active?Math.min(100,Math.round((live/active)*100)):0;
+  let rosterSummary=fleetMode
+    ? rowHtml('Protected drivers',drivers.length)+rowHtml('Active / training',active)+rowHtml('Live coverage',coverage+'%')+`<div class="sub">Server-scoped to ${esc(protectedFleetName)}.</div>`
+    : rowHtml('Saved driver profiles',drivers.length)+rowHtml('Local sessions',activeRows.length)+rowHtml('Fresh now',live)+`<div class="sub">Same-browser local data.</div>`;
+  document.getElementById('rosterSummary').innerHTML=rosterSummary;
+  document.getElementById('leadSummary').innerHTML=rowHtml('Local leads',leads.length)+rowHtml('Needs follow-up',newLeads,newLeads?'yellow':'')+rowHtml('Newest',leads.length?new Date(leads[0].createdAt||Date.now()).toLocaleDateString():'--')+`<div class="sub">Pilot leads are separate from driver invitations.</div>`;
+  document.getElementById('coverageSummary').innerHTML=fleetMode?rowHtml('GPS data','Excluded')+rowHtml('Live sessions',live+'/'+active)+rowHtml('Cloud synced',rows.filter(r=>r.cloudSynced).length+'/'+rows.length):rowHtml('Local GPS shared',gps+'/'+activeRows.length)+rowHtml('No local GPS',noGps,noGps?'yellow':'')+rowHtml('Cloud synced',rows.filter(r=>r.cloudSynced).length+'/'+rows.length);
+  let actions=[];
+  if(high)actions.push(`${high} high-risk driver${high===1?'':'s'} need immediate review.`);
+  if(watch)actions.push(`${watch} driver${watch===1?' is':'s are'} in watch state.`);
+  if(stale)actions.push(`${stale} stale session${stale===1?'':'s'} need check-in.`);
+  if(!fleetMode&&noGps&&activeRows.length)actions.push(`${noGps} active session${noGps===1?' has':'s have'} no local GPS consent.`);
+  if(newLeads)actions.push(`${newLeads} pilot lead${newLeads===1?'':'s'} need follow-up.`);
+  if(!drivers.length)actions.push(fleetMode?'Invite drivers to build your protected roster.':'Add driver profiles before fleet demos.');
+  if(!actions.length)actions.push('No urgent fleet actions.');
+  lastOpsSummary=actions.join('\\n');
+  document.getElementById('actionQueue').innerHTML=actions.map((a,i)=>rowHtml(`Action ${i+1}`,a,i===0&&high?'red':i===0&&watch?'yellow':'' )).join('')
+}
 function driverRow(d){let c=cls(d.status),rowClass=c==='danger'?'priority':c==='watch'?'watchrow':d.stale&&d.hasSession?'stale':'',age=d.hasSession?ageLabel(d):'not recorded',score=d.hasSafetyScore?d.safetyScore:'--',metrics=d.hasSession?`Fatigue ${d.fatigue}/100<br>Confidence ${d.confidence}%<br>PERCLOS ${d.perclos}%`:'No recorded session metrics';return `<div class="driver ${rowClass}"><div class="avatar">${esc(d.initials)}</div><div><div class="name">${esc(d.name)}</div><div class="sub">${esc(d.route)}<br>${fleetMode?'GPS excluded from protected view':d.location?`GPS <span class="coords">${d.location.lat.toFixed(4)}, ${d.location.lng.toFixed(4)}</span> · ${d.speedMph} mph · ${d.distanceMiles.toFixed(2)} mi`:'GPS not shared'}<br>Updated ${esc(age)}</div></div><div><span class="pill ${c}">${esc(d.status)}</span>${d.stale&&d.hasSession?'<br><span class="pill stale-pill" style="margin-top:6px">STALE</span>':''}</div><div><div class="label">Score</div><strong>${esc(score)}</strong><div class="score"><span style="width:${d.hasSafetyScore?d.safetyScore:0}%"></span></div></div><div class="sub">${metrics}</div><div class="driver-actions"><button class="btn" onclick="copyDriver('${jsArg(d.driverId)}')">Copy</button><a class="btn" href="/session-history.html">History</a></div></div>`}
 function eventRows(rows){let events=rows.filter(d=>d.hasSession);if(!events.length)return '<div class="notice">No recorded session events yet.</div>';return events.slice(0,10).map(d=>`<div class="event"><div class="dot" style="background:${cls(d.status)==='danger'?'#ef4444':cls(d.status)==='watch'?'#f59e0b':'#10b981'}"></div><div><div>${esc(d.name)}: ${esc(d.status)} · score ${esc(d.hasSafetyScore?d.safetyScore:'--')} · alerts ${d.alerts} · esc ${d.escalationLevel}</div><div class="sub">${!fleetMode&&d.location?`GPS ${d.location.lat.toFixed(4)}, ${d.location.lng.toFixed(4)} · `:''}${esc(ageLabel(d))}</div></div></div>`).join('')}
 /* protected-session-history:start */

@@ -55,8 +55,9 @@ main{max-width:1100px;margin:0 auto;padding:52px 28px 80px}
 @media(max-width:600px){main{padding:36px 18px 60px}.grid{grid-template-columns:1fr}}
 </style>
 <link rel="stylesheet" href="/liquid-glass.css" />
+<link rel="stylesheet" href="/portal.css?v=1" />
 </head>
-<body>
+<body class="portal-page hub-page">
 <nav>
   <a class="logo" href="/"><span class="logo-mark"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></span>Occulert</a>
   <div class="nav-actions">
@@ -66,62 +67,66 @@ main{max-width:1100px;margin:0 auto;padding:52px 28px 80px}
 </nav>
 <main>
   <div class="page-header">
-    <div class="page-label">Internal Tools</div>
-    <div class="page-title">Product Hub</div>
-    <p class="page-desc">Central access point for all Occulert products, tools, and resources.</p>
+    <div class="page-label">Occulert workspace</div>
+    <h1 class="page-title">Choose where to continue</h1>
+    <p class="page-desc">The main driving, fleet, account, and history tools in one place.</p>
   </div>
 
-  <div class="section-label">Core Product</div>
+  <div class="section-label">Start here</div>
   <div class="grid">
-    <a class="card" href="/app.html">
-      <div class="card-icon blue">🚗</div>
-      <div><h3>Driver App</h3><p>Real-time on-device drowsiness detection using AI eye tracking. The core Occulert experience.</p></div>
-      <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
-    </a>
     <a class="card" href="/fleet-dashboard.html">
-      <div class="card-icon cyan">📊</div>
-      <div><h3>Fleet Dashboard</h3><p>Monitor driver safety metrics, live session status, and alerts across your entire fleet.</p></div>
+      <div class="card-icon cyan" aria-hidden="true">F</div>
+      <div><h3>Fleet dashboard</h3><p>Review drivers needing attention, live status, and protected session history.</p></div>
       <div class="card-footer"><span class="badge badge-beta">Beta</span><span class="card-arrow">→</span></div>
     </a>
-    <a class="card" href="/session-history.html">
-      <div class="card-icon green">📋</div>
-      <div><h3>Session History</h3><p>View past session reports, fatigue trends, and safety scores over time.</p></div>
-      <div class="card-footer"><span class="badge badge-beta">Beta</span><span class="card-arrow">→</span></div>
+    <a class="card" href="/app.html">
+      <div class="card-icon blue" aria-hidden="true">D</div>
+      <div><h3>Driver app</h3><p>Start the on-device drowsiness monitoring experience.</p></div>
+      <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
     </a>
     <a class="card" href="/account.html">
-      <div class="card-icon purple">⚙️</div>
-      <div><h3>Account Settings</h3><p>Manage your driver profile, preferences, theme, and cloud sync settings.</p></div>
+      <div class="card-icon purple" aria-hidden="true">A</div>
+      <div><h3>Account</h3><p>Manage your profile, password, passkeys, and preferences.</p></div>
       <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
+    </a>
+    <a class="card" href="/session-history.html">
+      <div class="card-icon green" aria-hidden="true">H</div>
+      <div><h3>Session history</h3><p>Review past session reports, fatigue trends, and safety scores.</p></div>
+      <div class="card-footer"><span class="badge badge-beta">Beta</span><span class="card-arrow">→</span></div>
     </a>
   </div>
 
-  <div class="section-label">Growth and Outreach</div>
+  <details class="panel-details hub-details">
+    <summary>Pilot and outreach tools</summary>
   <div class="grid">
     <a class="card" href="/pilot-leads.html">
-      <div class="card-icon rose">🎯</div>
+      <div class="card-icon rose" aria-hidden="true">L</div>
       <div><h3>Pilot Leads</h3><p>View and manage inbound pilot program requests from fleet operators and safety teams.</p></div>
       <div class="card-footer"><span class="badge badge-beta">Beta</span><span class="card-arrow">→</span></div>
     </a>
     <a class="card" href="/pilot-signup.html">
-      <div class="card-icon green">🚀</div>
+      <div class="card-icon green" aria-hidden="true">P</div>
       <div><h3>Pilot Signup</h3><p>Public-facing signup page for organizations interested in joining the Occulert pilot program.</p></div>
       <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
     </a>
   </div>
+  </details>
 
-  <div class="section-label">Legal and Safety</div>
+  <details class="panel-details hub-details">
+    <summary>Privacy and safety information</summary>
   <div class="grid">
     <a class="card" href="/privacy.html">
-      <div class="card-icon purple">🔒</div>
+      <div class="card-icon purple" aria-hidden="true">P</div>
       <div><h3>Privacy Policy</h3><p>How Occulert handles your data, camera access, GPS, and cloud sync preferences.</p></div>
       <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
     </a>
     <a class="card" href="/safety.html">
-      <div class="card-icon rose">⚠️</div>
+      <div class="card-icon rose" aria-hidden="true">S</div>
       <div><h3>Safety Information</h3><p>Important disclaimers, usage guidelines, and limitations of the Occulert prototype.</p></div>
       <div class="card-footer"><span class="badge badge-live">Live</span><span class="card-arrow">→</span></div>
     </a>
   </div>
+  </details>
 </main>
 <script>
 function getTheme(){return localStorage.getItem('occulert-theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}

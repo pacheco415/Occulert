@@ -17,14 +17,16 @@
     .passkey-retry{justify-self:start;margin-top:-2px}
   </style>
 <link rel="stylesheet" href="/liquid-glass.css" />
+<link rel="stylesheet" href="/portal.css?v=1" />
 </head>
-<body>
-  <div class="top"><div class="brand">Occulert Login</div><div class="nav"><a class="btn" href="/">Home</a><a class="btn" href="/app.html">Driver App</a><a class="btn" href="/fleet-dashboard.html">Fleet Dashboard</a></div></div>
+<body class="portal-page login-page">
+  <header class="top"><a class="brand" href="/" style="text-decoration:none">Occulert</a><nav class="nav" aria-label="Account navigation"><a class="btn" href="/">Home</a><a class="btn" href="/safety.html">Safety</a></nav></header>
   <main class="wrap">
     <section class="grid">
-      <div class="card">
+      <div class="card auth-card">
+        <p class="eyebrow">Welcome back</p>
         <h1 id="authHeading">Sign in to Occulert</h1>
-        <p class="muted" id="authIntro">Use the email and password for your existing Occulert account.</p>
+        <p class="portal-intro" id="authIntro">Use the email and password for your existing Occulert account.</p>
         <div class="auth-tabs" aria-label="Account action">
           <button class="btn active" id="signInModeBtn" type="button" aria-pressed="true" onclick="showAuthMode('signin')">Sign In</button>
           <button class="btn" id="signUpModeBtn" type="button" aria-pressed="false" onclick="showAuthMode('signup')">Create Account</button>
@@ -50,13 +52,18 @@
           <button class="btn primary" id="submitBtn" type="submit">Sign In</button>
           <a class="btn link" id="forgotPasswordBtn" href="/login.html?mode=reset">Forgot password?</a>
           <a class="btn link hidden" id="backToSignInBtn" href="/login.html">Back to sign in</a>
-          <p class="tiny" id="modeHelp">Fleet manager? Sign in normally, then choose Manage Fleet. Fleet access is verified by server ownership—not by this form.</p>
+          <p class="tiny" id="modeHelp">Fleet access is verified automatically after you sign in.</p>
         </form>
-        <div class="notice"><strong>Passkeys are in beta.</strong> First confirm your Occulert account, then add a passkey from Account Settings. Google sign-in is coming later.</div>
-        <div class="notice"><strong>Privacy:</strong> Cloud storage is optional. Passwords are handled by Supabase Auth and are never stored by Occulert. Passkey biometrics, PINs, and private keys stay with your device or password manager. Fleet membership still requires protected server ownership or an administrator invitation.</div>
+        <details class="privacy-details">
+          <summary>Privacy and account security</summary>
+          <div class="details-body">
+            <div><strong>Passkeys are in beta.</strong> First confirm your Occulert account, then sign in with email and password first and add a passkey from Account Settings.</div>
+            <div>Cloud storage is optional. Passwords are handled by Supabase Auth and are never stored by Occulert. Passkey biometrics, PINs, and private keys stay with your device or password manager. Fleet membership still requires protected server ownership or an administrator invitation.</div>
+          </div>
+        </details>
         <div class="status" id="status" role="status" aria-live="polite"></div>
       </div>
-      <aside class="card" aria-labelledby="profileStateLabel">
+      <aside class="card login-aside" aria-labelledby="profileStateLabel">
         <div class="label" id="profileStateLabel">Account status</div>
         <div id="profileBox" aria-live="polite"><div class="notice">Checking sign-in status…</div></div>
         <div class="actions" id="profileActions"></div>
@@ -90,7 +97,7 @@ function showAuthMode(mode){
   password.required=!reset;password.autocomplete=signup?'new-password':'current-password';
   document.getElementById('authHeading').textContent=reset?'Reset your password':signup?'Create your Occulert account':'Sign in to Occulert';
   document.getElementById('authIntro').textContent=reset?'Enter your account email. We will send a secure link for choosing a new password.':signup?'Set up your profile, then confirm the email Occulert sends you.':'Use the email and password for your existing Occulert account.';
-  document.getElementById('modeHelp').textContent=reset?'For privacy, the confirmation message is the same whether or not the email is registered.':signup?'Fleet-manager access is verified separately after sign-in; selecting the role here does not grant fleet access.':'Fleet manager? Sign in normally, then choose Manage Fleet. Fleet access is verified by server ownership—not by this form.';
+  document.getElementById('modeHelp').textContent=reset?'For privacy, the confirmation message is the same whether or not the email is registered.':signup?'Fleet-manager access is verified separately after sign-in; selecting the role here does not grant fleet access.':'Fleet access is verified automatically after you sign in.';
   submit.textContent=reset?'Send Reset Link':signup?'Create Account':'Sign In';
   submit.disabled=submit.dataset.rateLimited===mode;
   document.getElementById('email').focus();
@@ -101,7 +108,7 @@ async function signInPasskey(retry){
   clearStatus();clearPasskeyStatus();setPasskeyRetry(false);setAuthBusy(true);
   let button=document.getElementById('passkeySignInBtn');button.textContent='Waiting for passkey...';
   showPasskey('Checking this device for a saved Occulert passkey…','pending');
-  try{if(retry&&window.OcculertPasskeys&&window.OcculertPasskeys.retry)await window.OcculertPasskeys.retry();let profile=await window.OcculertAuth.signInPasskey();renderProfile(window.OcculertBackend&&window.OcculertBackend.currentUser(),profile);showPasskey('Signed in with your passkey. Choose Driver App or Manage Fleet.','good')}
+  try{if(retry&&window.OcculertPasskeys&&window.OcculertPasskeys.retry)await window.OcculertPasskeys.retry();let profile=await window.OcculertAuth.signInPasskey();renderProfile(window.OcculertBackend&&window.OcculertBackend.currentUser(),profile);showPasskey('Signed in with your passkey. Choose where to continue.','good')}
   catch(err){showPasskey(window.OcculertPasskeys?window.OcculertPasskeys.message(err,'signin'):'Passkey sign-in is unavailable. Use email and password.','bad');setPasskeyRetry(Boolean(window.OcculertPasskeys&&window.OcculertPasskeys.canRetry&&window.OcculertPasskeys.canRetry(err)))}
   finally{button.textContent='Sign in with a passkey';setAuthBusy(false)}
 }
@@ -118,7 +125,7 @@ async function submitAuth(e){
     }
     let p=await window.OcculertAuth.signInEmail(email,document.getElementById('password').value,authMode,authMode==='signup'?extras():{});
     renderProfile(window.OcculertBackend&&window.OcculertBackend.currentUser(),p);
-    show(authMode==='signup'?'Account created. Check your email if confirmation is required.':'Signed in. Choose Driver App or Manage Fleet.','good');
+    show(authMode==='signup'?'Account created. Check your email if confirmation is required.':'Signed in. Choose where to continue.','good');
   }catch(err){
     let message=err.message||String(err);
     if(authMode==='signup'&&message.startsWith('Too many confirmation emails'))document.getElementById('submitBtn').dataset.rateLimited='signup';
@@ -130,7 +137,7 @@ function profileUserId(user){return String(user&&(user.uid||user.id)||'')}
 function showSignedInProfile(p,role,fleetAccess){
   let box=document.getElementById('profileBox'),actions=document.getElementById('profileActions');
   box.innerHTML=`<div class="row"><span>Verified role</span><span>${esc(role)}</span></div><div class="row"><span>Name</span><span>${esc(p.name||'Not set')}</span></div><div class="row"><span>Email</span><span>${esc(p.email||'Not set')}</span></div><div class="row"><span>Company</span><span>${esc(p.company||'Not set')}</span></div><div class="row"><span>Fleet access</span><span>${esc(fleetAccess)}</span></div><div class="row"><span>Authenticated</span><span>Yes</span></div>`;
-  actions.innerHTML='<a class="btn primary" href="/app.html">Driver App</a><a class="btn" href="/fleet-onboarding.html">Manage Fleet</a><button class="btn" onclick="logout()">Sign Out</button>';
+  actions.innerHTML=role==='Fleet Manager'?'<a class="btn primary" href="/fleet-dashboard.html">Open Fleet Dashboard</a><a class="btn" href="/fleet-onboarding.html">Manage Fleet</a><a class="btn" href="/app.html">Driver App</a><button class="btn" onclick="logout()">Sign Out</button>':'<a class="btn primary" href="/app.html">Open Driver App</a><button class="btn" onclick="logout()">Sign Out</button>';
 }
 async function verifyManagerRole(user,p,version){
   let backend=window.OcculertBackend,result=null;

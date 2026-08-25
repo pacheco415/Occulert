@@ -342,7 +342,19 @@ assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigati
 assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v33'", "the stale-session repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v34'", "the portal simplification must advance the offline cache");
+assertIncludes("sw.js", "'/portal.css?v=1'", "the service worker must cache the shared portal stylesheet");
+for (const path of ["login.html", "fleet-dashboard.html", "fleet-onboarding.html", "account.html", "product-hub.html"]) {
+  assertIncludes(path, '<link rel="stylesheet" href="/portal.css?v=1" />', `${path} must use the simplified portal design layer`);
+  assertIncludes(path, "portal-page", `${path} must opt into the simplified portal layout`);
+}
+assertIncludes("fleet-dashboard.html", "Needs attention", "fleet managers must see the action-focused heading first");
+assertIncludes("fleet-dashboard.html", "Dashboard tools", "secondary dashboard actions must be grouped away from the primary overview");
+assertIncludes("fleet-dashboard.html", "More fleet tools", "secondary fleet operations must use progressive disclosure");
+assertIncludes("fleet-dashboard.html", "Saved driver profiles", "signed-out fleet summaries must distinguish saved profiles from local sessions");
+assertIncludes("fleet-dashboard.html", "Local sessions", "signed-out fleet summaries must label same-browser sessions directly");
+assertIncludes("fleet-dashboard.html", "Fresh now", "signed-out fleet summaries must avoid presenting a raw session count as fleet coverage");
+assertIncludes("login.html", "Privacy and account security", "sign-in privacy details must remain available without dominating the form");
 assertIncludes("fleet-dashboard.html", "Protected fleet summaries exclude GPS coordinates by design", "fleet dashboard must disclose that protected summaries exclude GPS coordinates");
 assertIncludes("fleet-dashboard.html", "same-browser local data", "fleet dashboard metadata must scope GPS to same-browser local data");
 assertIncludes("fleet-dashboard.html", "Local GPS Drivers", "fleet dashboard must label GPS metrics as local-only");
