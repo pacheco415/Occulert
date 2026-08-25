@@ -347,6 +347,10 @@ assertIncludes("sw.js", "'/portal.css?v=1'", "the service worker must cache the 
 assertIncludes("portal.css", "background: var(--portal-surface);", "portal cards must follow the active light or dark theme");
 assertIncludes("portal.css", 'html[data-theme="light"] .portal-page .btn:not(.primary):hover', "light-theme button hover states must preserve readable contrast");
 assertNotIncludes("portal.css", "background: rgba(14, 26, 45, .94);", "portal cards must not force a dark surface in light mode");
+assertIncludes("portal.css", "--portal-accent-text: #245da8;", "light-theme portal labels must use a readable accent color");
+assertIncludes("portal.css", "--portal-icon-text: #20344d;", "light-theme portal icons must remain visible on tinted surfaces");
+assertIncludes("portal.css", "color: var(--portal-accent-text);", "portal labels must follow the active theme accent");
+assertIncludes("portal.css", "color: var(--portal-icon-text);", "portal icons must follow the active theme text token");
 for (const path of ["login.html", "fleet-dashboard.html", "fleet-onboarding.html", "account.html", "product-hub.html"]) {
   assertIncludes(path, '<link rel="stylesheet" href="/portal.css?v=1" />', `${path} must use the simplified portal design layer`);
   assertIncludes(path, "portal-page", `${path} must opt into the simplified portal layout`);
