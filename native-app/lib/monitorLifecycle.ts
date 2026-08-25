@@ -7,9 +7,13 @@ export type MonitorAppState =
 
 export function shouldStopMonitoringForAppState(
   isRunning: boolean,
+  isStarting: boolean,
+  isRequestingCameraPermission: boolean,
   nextState: MonitorAppState,
 ): boolean {
-  return isRunning && nextState !== 'active';
+  const hasActiveMonitoringWork = isRunning
+    || (isStarting && !isRequestingCameraPermission);
+  return hasActiveMonitoringWork && nextState !== 'active';
 }
 
 export function shouldAbortMonitoringStart(

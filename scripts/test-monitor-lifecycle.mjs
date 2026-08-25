@@ -8,11 +8,28 @@ import {
 } from '../native-app/lib/monitorLifecycle.ts';
 
 test('monitoring stops whenever the app is no longer active', () => {
-  assert.equal(shouldStopMonitoringForAppState(false, 'background'), false);
-  assert.equal(shouldStopMonitoringForAppState(true, 'active'), false);
+  assert.equal(shouldStopMonitoringForAppState(false, false, false, 'background'), false);
+  assert.equal(shouldStopMonitoringForAppState(true, false, false, 'active'), false);
   for (const state of ['inactive', 'background', 'unknown', 'extension']) {
-    assert.equal(shouldStopMonitoringForAppState(true, state), true, state);
+    assert.equal(shouldStopMonitoringForAppState(true, false, false, state), true, state);
+    assert.equal(shouldStopMonitoringForAppState(false, true, false, state), true, state);
   }
+});
+
+test('the expected camera permission prompt does not cancel a pending start', () => {
+  for (const state of ['inactive', 'background', 'unknown', 'extension']) {
+    assert.equal(shouldStopMonitoringForAppState(false, true, true, state), false, state);
+  }
+  assert.equal(
+    shouldStopMonitoringForAppState(true, true, true, 'background'),
+    true,
+    'an already-running session must still stop',
+  );
+  assert.equal(
+    shouldAbortMonitoringStart(false, 'background'),
+    true,
+    'the post-permission guard still blocks startup while backgrounded',
+  );
 });
 
 test('a pending start cannot finish after cancellation or foreground loss', () => {
@@ -59,7 +76,12 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
   const layout = readFileSync(new URL('../native-app/app/_layout.tsx', import.meta.url), 'utf8');
   assert.match(monitor, /AppState\.addEventListener\('change'/);
-  assert.match(monitor, /isRunningRef\.current \|\| startingRef\.current/);
+  assert.match(
+    monitor,
+    /shouldStopMonitoringForAppState\(\s*isRunningRef\.current,\s*startingRef\.current,\s*requestingCameraPermissionRef\.current,\s*nextState/,
+  );
+  assert.match(monitor, /requestingCameraPermissionRef\.current = true/);
+  assert.match(monitor, /requestingCameraPermissionRef\.current = false/);
   assert.match(monitor, /startAttempt !== startAttemptRef\.current/);
   assert.match(monitor, /AppState\.currentState/);
   assert.match(monitor, /startAttemptRef\.current \+= 1/);

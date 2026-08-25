@@ -114,6 +114,7 @@ export default function MonitorScreen() {
   const closedSinceRef = useRef<number | null>(null);
   const sessionSensitivityRef = useRef<SensitivityLevel>('medium');
   const startAttemptRef = useRef(0);
+  const requestingCameraPermissionRef = useRef(false);
   const startingRef = useRef(false);
   const stoppingRef = useRef(false);
   const isRunningRef = useRef(false);
@@ -199,7 +200,13 @@ export default function MonitorScreen() {
     setIsStarting(true);
     try {
       if (!hasPermission) {
-        const granted = await requestPermission();
+        let granted = false;
+        requestingCameraPermissionRef.current = true;
+        try {
+          granted = await requestPermission();
+        } finally {
+          requestingCameraPermissionRef.current = false;
+        }
         if (!granted) return;
       }
       if (shouldAbortMonitoringStart(
@@ -423,7 +430,9 @@ export default function MonitorScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (!shouldStopMonitoringForAppState(
-        isRunningRef.current || startingRef.current,
+        isRunningRef.current,
+        startingRef.current,
+        requestingCameraPermissionRef.current,
         nextState,
       )) return;
       setSensorFault(
