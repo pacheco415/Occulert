@@ -342,8 +342,10 @@ assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigati
 assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v34'", "the portal simplification must advance the offline cache");
-assertIncludes("sw.js", "'/portal.css?v=1'", "the service worker must cache the shared portal stylesheet");
+assertIncludes("sw.js", "const CACHE = 'occulert-v35'", "the portal contrast repair must advance the offline cache");
+assertIncludes("sw.js", "'/portal.css?v=2'", "the service worker must cache the current shared portal stylesheet");
+assertNotIncludes("sw.js", "occulert-v34", "the portal contrast repair must not reuse the stale offline cache");
+assertNotIncludes("sw.js", "'/portal.css?v=1'", "the service worker must not retain the stale portal stylesheet URL");
 assertIncludes("portal.css", "background: var(--portal-surface);", "portal cards must follow the active light or dark theme");
 assertIncludes("portal.css", 'html[data-theme="light"] .portal-page .btn:not(.primary):hover', "light-theme button hover states must preserve readable contrast");
 assertNotIncludes("portal.css", "background: rgba(14, 26, 45, .94);", "portal cards must not force a dark surface in light mode");
@@ -352,7 +354,8 @@ assertIncludes("portal.css", "--portal-icon-text: #20344d;", "light-theme portal
 assertIncludes("portal.css", "color: var(--portal-accent-text);", "portal labels must follow the active theme accent");
 assertIncludes("portal.css", "color: var(--portal-icon-text);", "portal icons must follow the active theme text token");
 for (const path of ["login.html", "fleet-dashboard.html", "fleet-onboarding.html", "account.html", "product-hub.html"]) {
-  assertIncludes(path, '<link rel="stylesheet" href="/portal.css?v=1" />', `${path} must use the simplified portal design layer`);
+  assertIncludes(path, '<link rel="stylesheet" href="/portal.css?v=2" />', `${path} must use the current simplified portal design layer`);
+  assertNotIncludes(path, '<link rel="stylesheet" href="/portal.css?v=1" />', `${path} must not reuse the stale portal stylesheet`);
   assertIncludes(path, "portal-page", `${path} must opt into the simplified portal layout`);
 }
 assertIncludes("fleet-dashboard.html", "Needs attention", "fleet managers must see the action-focused heading first");
