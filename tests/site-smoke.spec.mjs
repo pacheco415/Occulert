@@ -720,6 +720,20 @@ test("fleet dashboard does not turn missing or inactive telemetry into active sa
   await expect(page.locator("#map")).toContainText("GPS is not included");
   await expect(page.locator('#riskFilter option[value="gps"]')).toBeDisabled();
   await expect(page.locator('#riskFilter option[value="nogps"]')).toBeDisabled();
+
+  const copyButton = noSession.getByRole("button", { name: "Copy" });
+  await copyButton.focus();
+  const unchangedRefreshKeptNode = await copyButton.evaluate((element) => {
+    window.refreshDashboardIfNeeded();
+    return element.isConnected && document.activeElement === element;
+  });
+  expect(unchangedRefreshKeptNode).toBe(true);
+
+  await page.evaluate(() => {
+    cloudRows[0] = { ...cloudRows[0], route: "Updated Van 1" };
+    window.refreshDashboardIfNeeded();
+  });
+  await expect(noSession.getByRole("button", { name: "Copy" })).toBeFocused();
 });
 
 test("protected fleet history shows scoped events and exports formula-safe rows without coordinates", async ({ page }) => {
@@ -772,6 +786,9 @@ test("protected fleet history shows scoped events and exports formula-safe rows 
 
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
+  await expect(page.locator(".history-details")).not.toHaveAttribute("open", "");
+  await expect(page.locator("#sessionHistory")).toBeEmpty();
+  await page.locator(".history-details summary").click();
   await expect(page.locator("#sessionHistory")).toContainText("Alex Driver");
   await expect(page.locator("#sessionHistory")).toContainText("drowsy");
   await expect(page.locator("#sessionHistory")).toContainText("Client-reported telemetry");
