@@ -1,35 +1,17 @@
-const CACHE = 'occulert-v36';
+const CACHE = 'occulert-v37';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/app.html',
-  '/product-hub.html',
   '/manifest.json',
-  '/privacy.html',
-  '/safety.html',
-  '/fleet-dashboard.html',
-  '/fleet-onboarding.html',
-  '/accept-invite.html',
-  '/session-history.html',
-  '/driver-profiles.html',
-  '/pilot-signup.html',
   '/favicon.ico',
-  '/occulert-logo-alt.png',
-  '/occulert-logo.png',
-  '/occulert-logo-main.png',
   '/homepage.css?v=31',
-  '/homepage-journey-cinematic-v1.jpg',
   '/liquid-glass.css',
   '/portal.css?v=3',
   '/homepage.js',
   '/driver-app.css',
   '/lang.js',
-  '/security-utils.js',
-  '/faq.html',
-  '/features.html',
-  '/install.html',
-  '/about.html',
-  '/how-it-works.html'
+  '/security-utils.js'
 ];
 
 const NETWORK_ONLY_ASSETS = new Set([
@@ -105,7 +87,7 @@ self.addEventListener('fetch', event => {
         }
         return res;
       }).catch(() => {
-        if (req.destination === 'image') return caches.match('/occulert-logo-main.png');
+        if (req.destination === 'image') return caches.match('/favicon.ico');
         return Response.error();
       });
     })

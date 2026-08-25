@@ -101,7 +101,7 @@ for (let index = 1; index <= 4; index += 1) {
 }
 assertIncludes("sw.js", "'/homepage.css?v=31'", "service worker must cache the versioned homepage stylesheet");
 assertNotIncludes("sw.js", "'/homepage.css',", "service worker must not recache the stale unversioned homepage stylesheet");
-assertIncludes("sw.js", "'/homepage-journey-cinematic-v1.jpg'", "service worker must cache the cinematic journey image");
+assertNotIncludes("sw.js", "'/homepage-journey-cinematic-v1.jpg'", "service worker install must not preload the large cinematic journey image");
 assertIncludes("sw.js", "'/homepage.js'", "service worker must cache the external homepage behavior script");
 assertIncludes("sw.js", "'/liquid-glass.css'", "service worker must cache the shared Liquid Glass stylesheet");
 for (const path of [
@@ -251,6 +251,13 @@ assertIncludes("sw.js", "'/supabase-loader.js'", "the service worker must keep t
 const serviceWorker = read("sw.js");
 const staticAssets = serviceWorker.slice(serviceWorker.indexOf("const STATIC_ASSETS"), serviceWorker.indexOf("];", serviceWorker.indexOf("const STATIC_ASSETS")) + 2);
 const networkOnlyAssets = serviceWorker.slice(serviceWorker.indexOf("const NETWORK_ONLY_ASSETS"), serviceWorker.indexOf("]);", serviceWorker.indexOf("const NETWORK_ONLY_ASSETS")) + 3);
+const staticAssetPaths = [...staticAssets.matchAll(/'([^']+)'/g)].map((match) => match[1]);
+const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
+  const pathname = asset.split(/[?#]/, 1)[0];
+  const file = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");
+  return total + statSync(join(root, file)).size;
+}, 0);
+if (staticAssetBytes > 300_000) fail(`service worker install cache must remain at or below 300 KB (found ${staticAssetBytes} bytes)`);
 if (staticAssets.includes("'/passkey-auth.js'")) fail("the experimental passkey client must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes("'/passkey-auth.js'")) fail("the passkey client must be listed as a network-only asset");
 if (staticAssets.includes("'/supabase-loader.js'")) fail("the resilient Supabase loader must not be stored in the offline static cache");
@@ -335,6 +342,12 @@ assertIncludes("fleet-dashboard.html", "function copyDriver(id)", "fleet dashboa
 assertIncludes("fleet-dashboard.html", "getFleetSummary()", "signed-in fleet dashboards must use the owner-scoped backend summary");
 assertIncludes("fleet-dashboard.html", "!fleetMode&&local", "protected fleet dashboards must not fall back to unrelated local driver data");
 assertIncludes("fleet-dashboard.html", "id=\"sessionHistory\"", "fleet dashboard must render protected session history");
+assertIncludes("fleet-dashboard.html", "ontoggle=\"handleHistoryToggle(event)\"", "protected session history must render only after the manager opens it");
+assertNotIncludes("fleet-dashboard.html", "class=\"panel-details history-details\" open", "protected session history must start collapsed");
+assertIncludes("fleet-dashboard.html", "function refreshDashboardIfNeeded()", "fleet dashboard polling must skip unchanged full-page renders");
+assertIncludes("fleet-dashboard.html", "setInterval(refreshDashboardIfNeeded,3000)", "fleet dashboard must use the focus-stable refresh path");
+assertNotIncludes("fleet-dashboard.html", "setInterval(render,3000)", "fleet dashboard must not rebuild interactive controls every three seconds");
+assertIncludes("fleet-dashboard.html", "data-focus-key=\"driver-copy-", "dynamic driver actions must expose stable focus keys");
 assertIncludes("fleet-dashboard.html", "function exportSessionHistoryCSV()", "protected session history must keep a privacy-safe export");
 assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet exports must neutralize spreadsheet formulas");
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
@@ -342,10 +355,13 @@ assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigati
 assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v36'", "the fleet journey cleanup must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v37'", "the dashboard performance update must advance the offline cache");
 assertIncludes("sw.js", "'/portal.css?v=3'", "the service worker must cache the current shared portal stylesheet");
-assertNotIncludes("sw.js", "occulert-v35", "the fleet journey cleanup must not reuse the stale offline cache");
+assertNotIncludes("sw.js", "occulert-v36", "the dashboard performance update must not reuse the stale offline cache");
 assertNotIncludes("sw.js", "'/portal.css?v=2'", "the service worker must not retain the stale portal stylesheet URL");
+for (const asset of ["'/occulert-logo-alt.png'", "'/occulert-logo.png'", "'/occulert-logo-main.png'"]) {
+  if (staticAssets.includes(asset)) fail(`service worker install cache must not preload ${asset}`);
+}
 assertIncludes("portal.css", "background: var(--portal-surface);", "portal cards must follow the active light or dark theme");
 assertIncludes("portal.css", 'html[data-theme="light"] .portal-page .btn:not(.primary):hover', "light-theme button hover states must preserve readable contrast");
 assertNotIncludes("portal.css", "background: rgba(14, 26, 45, .94);", "portal cards must not force a dark surface in light mode");
