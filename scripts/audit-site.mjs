@@ -344,6 +344,9 @@ assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fl
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
 assertIncludes("sw.js", "const CACHE = 'occulert-v34'", "the portal simplification must advance the offline cache");
 assertIncludes("sw.js", "'/portal.css?v=1'", "the service worker must cache the shared portal stylesheet");
+assertIncludes("portal.css", "background: var(--portal-surface);", "portal cards must follow the active light or dark theme");
+assertIncludes("portal.css", 'html[data-theme="light"] .portal-page .btn:not(.primary):hover', "light-theme button hover states must preserve readable contrast");
+assertNotIncludes("portal.css", "background: rgba(14, 26, 45, .94);", "portal cards must not force a dark surface in light mode");
 for (const path of ["login.html", "fleet-dashboard.html", "fleet-onboarding.html", "account.html", "product-hub.html"]) {
   assertIncludes(path, '<link rel="stylesheet" href="/portal.css?v=1" />', `${path} must use the simplified portal design layer`);
   assertIncludes(path, "portal-page", `${path} must opt into the simplified portal layout`);

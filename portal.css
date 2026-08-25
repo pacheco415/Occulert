@@ -109,6 +109,11 @@ html[data-theme="light"] .portal-page .btn {
   background: #172b46;
 }
 
+html[data-theme="light"] .portal-page .btn:not(.primary):hover {
+  background: #dfeaf5;
+  color: #20344d;
+}
+
 .portal-page .btn:active {
   transform: translateY(1px);
 }
@@ -132,7 +137,7 @@ html[data-theme="light"] .portal-page .btn.primary {
 .portal-page .card {
   border: 1px solid var(--portal-border);
   border-radius: var(--portal-radius);
-  background: rgba(14, 26, 45, .94);
+  background: var(--portal-surface);
   box-shadow: var(--portal-shadow);
 }
 
