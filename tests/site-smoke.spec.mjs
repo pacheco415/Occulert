@@ -106,6 +106,30 @@ test("passkey failures remain visible beside the passkey button", async ({ page 
   expect(await page.locator("#passkeyStatus").evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector("#authForm")) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
 });
 
+test("sign-in continuation and account switching preserve keyboard focus", async ({ page }) => {
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => {
+    let user = null;
+    window.OcculertBackend.currentUser = () => user;
+    window.OcculertBackend.getFleet = async () => ({ ok: false, status: 404, body: { error: "fleet_not_found" } });
+    window.OcculertAuth.signInEmail = async (email) => {
+      user = { id: "focus-driver", email };
+      return { role: "driver", email, authenticated: true };
+    };
+    window.OcculertAuth.signOut = async () => { user = null; };
+  });
+
+  await page.locator("#email").fill("focus@example.com");
+  await page.locator("#password").fill("password");
+  await page.locator("#submitBtn").click();
+  await expect(page.locator("#authCard")).toBeHidden();
+  await expect(page.locator("#profileStateLabel")).toBeFocused();
+
+  await page.getByRole("button", { name: "Use another account" }).click();
+  await expect(page.locator("#authCard")).toBeVisible();
+  await expect(page.locator("#email")).toBeFocused();
+});
+
 test("the passkey SDK loads through the resilient pinned loader", async ({ page }) => {
   await page.goto("/login.html", { waitUntil: "domcontentloaded" });
 

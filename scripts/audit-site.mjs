@@ -213,7 +213,7 @@ assertIncludes("occulert-backend.js", "refreshAuthConfig", "passkey retry must b
 assertIncludes("login.html", "Passkey biometrics, PINs, and private keys stay", "login must disclose that passkey secrets stay with the user's authenticator");
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
 assertIncludes("login.html", "id=\"profileFields\" class=\"hidden\"", "sign-in must hide profile setup fields by default");
-assertIncludes("login.html", "id=\"profileStateLabel\">Account status", "signed-out login must not claim a signed-in profile");
+assertIncludes("login.html", "id=\"profileStateLabel\" tabindex=\"-1\">Account status", "signed-out login must not claim a signed-in profile");
 assertIncludes("login.html", "Forgot password?", "login must offer password recovery");
 assertIncludes("login.html", "If an Occulert account uses that email", "password recovery must not reveal whether an email is registered");
 assertIncludes("login.html", "authMode==='signup'?extras():{}", "sign-in must not overwrite profile setup fields");
@@ -366,6 +366,9 @@ assertIncludes("fleet-dashboard.html", "Local sessions", "signed-out fleet summa
 assertIncludes("fleet-dashboard.html", "Fresh now", "signed-out fleet summaries must avoid presenting a raw session count as fleet coverage");
 assertIncludes("login.html", "Privacy and account security", "sign-in privacy details must remain available without dominating the form");
 assertIncludes("login.html", "id=\"authCard\"", "signed-in continuation must be able to hide the redundant authentication form");
+assertIncludes("login.html", "id=\"profileStateLabel\" tabindex=\"-1\"", "signed-in continuation must accept programmatic focus");
+assertIncludes("login.html", "focusSignInContinuation()", "interactive sign-in must hand focus to the continuation state");
+assertIncludes("login.html", "focusSignInForm()", "account switching must return focus to the sign-in form");
 assertIncludes("login.html", "setSignedInLayout(Boolean(user)&&authMode==='signin')", "signed-in continuation must depend on an active authenticated user");
 assertIncludes("login.html", "href=\"/account.html\">Account</a>", "signed-in users must receive a direct Account action");
 assertIncludes("login.html", "Use another account", "signed-in users must receive an explicit account-switch action");

@@ -64,7 +64,7 @@
         <div class="status" id="status" role="status" aria-live="polite"></div>
       </div>
       <aside class="card login-aside" aria-labelledby="profileStateLabel">
-        <div class="label" id="profileStateLabel">Account status</div>
+        <div class="label" id="profileStateLabel" tabindex="-1">Account status</div>
         <div id="profileBox" aria-live="polite"><div class="notice">Checking sign-in status…</div></div>
         <div class="actions" id="profileActions"></div>
       </aside>
@@ -83,6 +83,8 @@ function clearPasskeyStatus(){let s=document.getElementById('passkeyStatus');s.c
 function setPasskeyRetry(show){let b=document.getElementById('passkeyRetryBtn');b.classList.toggle('hidden',!show)}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function setSignedInLayout(signedIn){document.getElementById('loginGrid').classList.toggle('signed-in',signedIn);document.getElementById('authCard').classList.toggle('hidden',signedIn)}
+function focusSignInContinuation(){document.getElementById('profileStateLabel').focus()}
+function focusSignInForm(){document.getElementById('email').focus()}
 function showAuthMode(mode){
   authMode=mode;clearStatus();clearPasskeyStatus();setPasskeyRetry(false);
   let sessionUser=window.OcculertBackend&&window.OcculertBackend.currentUser?window.OcculertBackend.currentUser():null;
@@ -103,7 +105,7 @@ function showAuthMode(mode){
   document.getElementById('modeHelp').textContent=reset?'For privacy, the confirmation message is the same whether or not the email is registered.':signup?'Fleet-manager access is verified separately after sign-in; selecting the role here does not grant fleet access.':'Fleet access is verified automatically after you sign in.';
   submit.textContent=reset?'Send Reset Link':signup?'Create Account':'Sign In';
   submit.disabled=submit.dataset.rateLimited===mode;
-  document.getElementById('email').focus();
+  if(!document.getElementById('authCard').classList.contains('hidden'))focusSignInForm();
 }
 function passkeySupported(){return Boolean(window.OcculertPasskeys&&window.OcculertPasskeys.isSupported())}
 function setAuthBusy(busy){let form=document.getElementById('authForm'),submit=document.getElementById('submitBtn'),passkey=document.getElementById('passkeySignInBtn'),retry=document.getElementById('passkeyRetryBtn');form.setAttribute('aria-busy',String(busy));submit.disabled=busy||submit.dataset.rateLimited===authMode;passkey.disabled=busy||!passkeySupported();retry.disabled=busy;document.getElementById('signInModeBtn').disabled=busy;document.getElementById('signUpModeBtn').disabled=busy;document.getElementById('forgotPasswordBtn').disabled=busy;document.getElementById('backToSignInBtn').disabled=busy}
@@ -111,7 +113,7 @@ async function signInPasskey(retry){
   clearStatus();clearPasskeyStatus();setPasskeyRetry(false);setAuthBusy(true);
   let button=document.getElementById('passkeySignInBtn');button.textContent='Waiting for passkey...';
   showPasskey('Checking this device for a saved Occulert passkey…','pending');
-  try{if(retry&&window.OcculertPasskeys&&window.OcculertPasskeys.retry)await window.OcculertPasskeys.retry();let profile=await window.OcculertAuth.signInPasskey();renderProfile(window.OcculertBackend&&window.OcculertBackend.currentUser(),profile);showPasskey('Signed in with your passkey. Choose where to continue.','good')}
+  try{if(retry&&window.OcculertPasskeys&&window.OcculertPasskeys.retry)await window.OcculertPasskeys.retry();let profile=await window.OcculertAuth.signInPasskey();renderProfile(window.OcculertBackend&&window.OcculertBackend.currentUser(),profile);showPasskey('Signed in with your passkey. Choose where to continue.','good');focusSignInContinuation()}
   catch(err){showPasskey(window.OcculertPasskeys?window.OcculertPasskeys.message(err,'signin'):'Passkey sign-in is unavailable. Use email and password.','bad');setPasskeyRetry(Boolean(window.OcculertPasskeys&&window.OcculertPasskeys.canRetry&&window.OcculertPasskeys.canRetry(err)))}
   finally{button.textContent='Sign in with a passkey';setAuthBusy(false)}
 }
@@ -129,13 +131,14 @@ async function submitAuth(e){
     let p=await window.OcculertAuth.signInEmail(email,document.getElementById('password').value,authMode,authMode==='signup'?extras():{});
     renderProfile(window.OcculertBackend&&window.OcculertBackend.currentUser(),p);
     show(authMode==='signup'?'Account created. Check your email if confirmation is required.':'Signed in. Choose where to continue.','good');
+    if(authMode==='signin')focusSignInContinuation();
   }catch(err){
     let message=err.message||String(err);
     if(authMode==='signup'&&message.startsWith('Too many confirmation emails'))document.getElementById('submitBtn').dataset.rateLimited='signup';
     show(message,err.code==='confirmation_required'?'good':'bad');
   }finally{setAuthBusy(false)}
 }
-async function logout(){await window.OcculertAuth.signOut();renderProfile(null,window.OcculertAuth.getProfile());show('Signed out on this browser.','good')}
+async function logout(){await window.OcculertAuth.signOut();renderProfile(null,window.OcculertAuth.getProfile());show('Signed out on this browser.','good');focusSignInForm()}
 function profileUserId(user){return String(user&&(user.uid||user.id)||'')}
 function showSignedInProfile(p,role,fleetAccess){
   let box=document.getElementById('profileBox'),actions=document.getElementById('profileActions');
