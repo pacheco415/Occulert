@@ -236,7 +236,7 @@ const s = StyleSheet.create({
   form: { padding: 14, gap: 10 },
   formIntro: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 2 },
   input: { minHeight: 46, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.small, backgroundColor: colors.backgroundRaised, color: colors.text, paddingHorizontal: 12, fontSize: 14 },
-  primaryBtn: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.blue, borderRadius: radii.small },
+  primaryBtn: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.blueStrong, borderRadius: radii.small },
   primaryText: { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 0.6 },
   disabled: { opacity: 0.4 },
   linkBtn: { alignItems: 'center', paddingVertical: 6 },

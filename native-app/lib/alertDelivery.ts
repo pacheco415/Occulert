@@ -31,4 +31,3 @@ const PLANS: Record<AlertLevel, AlertDeliveryPlan> = {
 export function alertDeliveryPlan(level: AlertLevel): AlertDeliveryPlan {
   return PLANS[level];
 }
-

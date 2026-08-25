@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { alertDeliveryPlan } from '../native-app/lib/alertDelivery.ts';
+import { waitForCancellableDelay } from '../native-app/lib/cancellableDelay.ts';
 
 test('alert output escalates in a short bounded sequence', () => {
   assert.deepEqual(alertDeliveryPlan('none'), {
@@ -48,6 +49,14 @@ test('the native alert engine cancels pending cues before a new sequence', () =>
   assert.match(alertSystem, /audioEnabled\.current/);
 });
 
+test('parked-test delays settle immediately when their screen closes', async () => {
+  const controller = new AbortController();
+  const pending = waitForCancellableDelay(60_000, controller.signal);
+  controller.abort();
+  assert.equal(await pending, false);
+  assert.equal(await waitForCancellableDelay(0, new AbortController().signal), true);
+});
+
 test('the Watch uses stronger foreground cues and a time-sensitive background alert', () => {
   const receiver = readFileSync(new URL('../native-app/targets/occulert-watch/AlertReceiver.swift', import.meta.url), 'utf8');
   assert.match(receiver, /playCriticalHapticSequence/);
@@ -62,6 +71,9 @@ test('the Watch uses stronger foreground cues and a time-sensitive background al
 test('the parked Watch test is single-flight while delivery is pending', () => {
   const settings = readFileSync(new URL('../native-app/app/settings.tsx', import.meta.url), 'utf8');
   assert.match(settings, /watchTestRunnerRef\.current\.run/);
-  assert.match(settings, /onBusyChange: setWatchTestBusy/);
+  assert.match(settings, /settingsMountedRef\.current/);
+  assert.match(settings, /audioTestAbortRef\.current\?\.abort\(\)/);
+  assert.match(settings, /waitForCancellableDelay/);
+  assert.doesNotMatch(settings, /onBusyChange: set(?:Audio|Watch)TestBusy/);
   assert.match(settings, /disabled=\{!watchAvailable \|\| !watch \|\| watchTestBusy\}/);
 });

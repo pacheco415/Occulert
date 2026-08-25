@@ -10,6 +10,7 @@ export const colors = {
   textSecondary: '#b3bccb',
   textMuted: '#778399',
   blue: '#5e9cff',
+  blueStrong: '#2563eb',
   cyan: '#64d2ff',
   green: '#30d158',
   amber: '#ffd60a',

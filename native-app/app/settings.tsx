@@ -30,6 +30,7 @@ import {
   type InEarAlertPattern,
 } from '../lib/inEarAlerts';
 import { alertDeliveryPlan } from '../lib/alertDelivery';
+import { waitForCancellableDelay } from '../lib/cancellableDelay';
 
 const EMPTY_WATCH_STATUS: WatchStatus = {
   moduleAvailable: false,
@@ -47,10 +48,6 @@ const EMPTY_HEADPHONE_MOTION_STATUS: HeadphoneMotionStatus = {
 
 const ALERT_SOUND = require('../assets/alert.wav');
 const ALERT_SOUND_DURATION_MS = 800;
-
-const wait = (milliseconds: number) => new Promise<void>(resolve => {
-  setTimeout(resolve, milliseconds);
-});
 
 const storedSettingPersister = createSettingPersister(AsyncStorage);
 const watchSettingPersister = createSettingPersister({
@@ -119,8 +116,20 @@ export default function SettingsScreen() {
   const audioTestPlayer = useAudioPlayer(ALERT_SOUND);
   const audioTestRunnerRef = useRef(createSingleFlightActionRunner());
   const watchTestRunnerRef = useRef(createSingleFlightActionRunner());
+  const settingsMountedRef = useRef(true);
+  const audioTestAbortRef = useRef<AbortController | null>(null);
   const watchAvailable = watchStatus.paired && watchStatus.appInstalled;
   const appBuildLabel = formatAppBuildLabel(currentAppBuildInfo());
+
+  useEffect(() => {
+    settingsMountedRef.current = true;
+    return () => {
+      settingsMountedRef.current = false;
+      audioTestAbortRef.current?.abort();
+      audioTestAbortRef.current = null;
+      try { audioTestPlayer.pause(); } catch {}
+    };
+  }, [audioTestPlayer]);
 
   useEffect(() => {
     let active = true;
@@ -211,20 +220,36 @@ export default function SettingsScreen() {
   const testAudioOutput = () => {
     void audioTestRunnerRef.current.run({
       action: async () => {
-        await configureAlertAudioMode();
-        let previousOffset = 0;
-        for (const offset of alertDeliveryPlan('critical').audioOffsetsMs) {
-          if (offset > previousOffset) await wait(offset - previousOffset);
-          audioTestPlayer.pause();
-          await audioTestPlayer.seekTo(0);
-          audioTestPlayer.volume = 0.85;
-          audioTestPlayer.play();
-          previousOffset = offset;
+        const controller = new AbortController();
+        audioTestAbortRef.current?.abort();
+        audioTestAbortRef.current = controller;
+        try {
+          await configureAlertAudioMode();
+          if (controller.signal.aborted) return;
+          let previousOffset = 0;
+          for (const offset of alertDeliveryPlan('critical').audioOffsetsMs) {
+            if (
+              offset > previousOffset
+              && !await waitForCancellableDelay(offset - previousOffset, controller.signal)
+            ) return;
+            if (controller.signal.aborted) return;
+            audioTestPlayer.pause();
+            await audioTestPlayer.seekTo(0);
+            if (controller.signal.aborted) return;
+            audioTestPlayer.volume = 0.85;
+            audioTestPlayer.play();
+            previousOffset = offset;
+          }
+          await waitForCancellableDelay(ALERT_SOUND_DURATION_MS, controller.signal);
+        } finally {
+          if (audioTestAbortRef.current === controller) audioTestAbortRef.current = null;
         }
-        await wait(ALERT_SOUND_DURATION_MS);
       },
-      onBusyChange: setAudioTestBusy,
+      onBusyChange: busy => {
+        if (settingsMountedRef.current) setAudioTestBusy(busy);
+      },
       onError: () => {
+        if (!settingsMountedRef.current) return;
         Alert.alert(
           'Audio test unavailable',
           'Check the iPhone volume and selected audio output, then try again while safely parked.',
@@ -238,6 +263,7 @@ export default function SettingsScreen() {
       action: async () => {
         const result = await sendAlertToWatch({ level: 'critical', perclos: 0, at: Date.now() });
         const status = await getWatchStatus();
+        if (!settingsMountedRef.current) return;
         setWatchStatus(status);
         if (!result.accepted) {
           Alert.alert('Watch unavailable', 'Open Occulert on your Apple Watch, then try again.');
@@ -247,8 +273,11 @@ export default function SettingsScreen() {
           Alert.alert('Watch test queued', 'Open Occulert on your Apple Watch and enable background alerts. Queued delivery may be delayed.');
         }
       },
-      onBusyChange: setWatchTestBusy,
+      onBusyChange: busy => {
+        if (settingsMountedRef.current) setWatchTestBusy(busy);
+      },
       onError: () => {
+        if (!settingsMountedRef.current) return;
         Alert.alert('Watch test unavailable', 'Check the Watch connection, then try again while safely parked.');
       },
     });
