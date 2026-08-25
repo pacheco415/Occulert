@@ -368,6 +368,8 @@ assertIncludes("login.html", "Privacy and account security", "sign-in privacy de
 assertIncludes("account.html", "await backend.getFleet()", "account access must verify server-owned fleet access");
 assertIncludes("account.html", "Verified role", "account summaries must label the server-authoritative role");
 assertIncludes("account.html", "Local app role", "account summaries must distinguish device-only role preferences");
+assertIncludes("account.html", ".grid>*{min-width:0}", "account columns must allow long verified fleet names to shrink on mobile");
+assertIncludes("account.html", "overflow-wrap:anywhere", "account access values must wrap long server-provided text");
 assertNotIncludes("account.html", "document.getElementById('continueBtn').href=(p.role==='fleet')", "account navigation must not trust a saved local role for fleet access");
 assertIncludes("fleet-dashboard.html", "Protected fleet summaries exclude GPS coordinates by design", "fleet dashboard must disclose that protected summaries exclude GPS coordinates");
 assertIncludes("fleet-dashboard.html", "same-browser local data", "fleet dashboard metadata must scope GPS to same-browser local data");

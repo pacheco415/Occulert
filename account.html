@@ -57,7 +57,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 .page-header{margin-bottom:24px}
 .page-header h1{margin:0 0 6px;color:var(--text);font-size:34px;letter-spacing:-1px;transition:color .25s}
 .page-header p{color:var(--text3);font-size:14px;margin:0}
-.grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+.grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}.grid>*{min-width:0}
 .card{background:var(--card-bg);border:1px solid var(--border);border-radius:20px;padding:22px;margin-bottom:16px;transition:background .25s,border-color .25s}
 .section-label{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:var(--section-label);font-weight:900;margin-bottom:14px;transition:color .25s}
 .form{display:grid;gap:12px}
@@ -73,7 +73,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 .row{display:flex;justify-content:space-between;align-items:center;gap:14px;border-bottom:1px solid var(--divider);padding:11px 0;transition:border-color .25s}
 .row:last-child{border-bottom:none}
 .row span:first-child{color:var(--text3);font-size:13px}
-.row span:last-child{font-weight:800;color:var(--text);text-align:right;font-size:14px}
+.row span:last-child{font-weight:800;color:var(--text);text-align:right;font-size:14px;min-width:0;overflow-wrap:anywhere}
 .badge{font-size:11px;font-weight:900;border-radius:999px;padding:4px 10px;background:var(--badge-bg);color:var(--badge-color);border:1px solid var(--badge-border);transition:background .25s,color .25s,border-color .25s}
 .note{border:1px solid var(--note-border);background:var(--note-bg);border-radius:14px;padding:14px 16px;color:var(--note-color);font-size:13px;line-height:1.6;margin-top:14px;transition:background .25s,border-color .25s,color .25s}
 .note strong{color:#60a5fa}

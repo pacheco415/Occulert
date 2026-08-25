@@ -195,6 +195,7 @@ test("login shows server-verified fleet ownership instead of the saved driver ro
 });
 
 test("account separates server-verified fleet access from the saved local app role", async ({ page }) => {
+  const fleetName = "X".repeat(160);
   await page.addInitScript(() => {
     localStorage.setItem("occulert-auth", JSON.stringify({
       access_token: "manager-token",
@@ -214,18 +215,20 @@ test("account separates server-verified fleet access from the saved local app ro
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ ok: true, fleet: { id: "fleet-1", company_name: "Testing123", plan: "trial" } }),
+      body: JSON.stringify({ ok: true, fleet: { id: "fleet-1", company_name: fleetName, plan: "trial" } }),
     });
   });
 
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/account.html", { waitUntil: "domcontentloaded" });
 
   await expect(page.locator("#profileBox")).toContainText("Verified roleFleet Manager");
-  await expect(page.locator("#profileBox")).toContainText("Verified owner of Testing123");
+  await expect(page.locator("#profileBox")).toContainText(`Verified owner of ${fleetName}`);
   await expect(page.locator("#profileBox")).toContainText("Local app roleDriver");
   await expect(page.locator("#continueBtn")).toHaveText("Open Fleet Dashboard");
   await expect(page.locator("#continueBtn")).toHaveAttribute("href", "/fleet-dashboard.html");
   await expect(page.locator('label', { hasText: "Local app role" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
 test("signed-out mobile fleet dashboard keeps navigation and recovery actions visible", async ({ page }) => {
