@@ -29,6 +29,7 @@ import {
   parseInEarAlertPattern,
   type InEarAlertPattern,
 } from '../lib/inEarAlerts';
+import { alertDeliveryPlan } from '../lib/alertDelivery';
 
 const EMPTY_WATCH_STATUS: WatchStatus = {
   moduleAvailable: false,
@@ -45,6 +46,11 @@ const EMPTY_HEADPHONE_MOTION_STATUS: HeadphoneMotionStatus = {
 };
 
 const ALERT_SOUND = require('../assets/alert.wav');
+const ALERT_SOUND_DURATION_MS = 800;
+
+const wait = (milliseconds: number) => new Promise<void>(resolve => {
+  setTimeout(resolve, milliseconds);
+});
 
 const storedSettingPersister = createSettingPersister(AsyncStorage);
 const watchSettingPersister = createSettingPersister({
@@ -204,10 +210,16 @@ export default function SettingsScreen() {
     void audioTestRunnerRef.current.run({
       action: async () => {
         await configureAlertAudioMode();
-        audioTestPlayer.pause();
-        await audioTestPlayer.seekTo(0);
-        audioTestPlayer.volume = 0.65;
-        audioTestPlayer.play();
+        let previousOffset = 0;
+        for (const offset of alertDeliveryPlan('critical').audioOffsetsMs) {
+          if (offset > previousOffset) await wait(offset - previousOffset);
+          audioTestPlayer.pause();
+          await audioTestPlayer.seekTo(0);
+          audioTestPlayer.volume = 0.85;
+          audioTestPlayer.play();
+          previousOffset = offset;
+        }
+        await wait(ALERT_SOUND_DURATION_MS);
       },
       onBusyChange: setAudioTestBusy,
       onError: () => {
@@ -220,7 +232,7 @@ export default function SettingsScreen() {
   };
 
   const testWatchAlert = async () => {
-    const result = await sendAlertToWatch({ level: 'alert', perclos: 0, at: Date.now() });
+    const result = await sendAlertToWatch({ level: 'critical', perclos: 0, at: Date.now() });
     const status = await getWatchStatus();
     setWatchStatus(status);
     if (!result.accepted) {
@@ -250,6 +262,10 @@ export default function SettingsScreen() {
             <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
             <Switch value={audio} onValueChange={v=>saveBooleanSetting('occulert-audio',v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
+          <View style={s.alertSafetyNote}>
+            <Ionicons name="shield-checkmark-outline" size={15} color={colors.amber} />
+            <Text style={s.alertSafetyText}>Standard alerts repeat twice and critical alerts repeat three times on each enabled output. Alerts cannot make drowsy driving safe—pull over and rest.</Text>
+          </View>
         </View>
         <View style={s.card}>
           <Text style={s.cardTitle}>CONNECTED DEVICES</Text>
@@ -265,7 +281,7 @@ export default function SettingsScreen() {
           </View>
           <View style={s.div} />
           <TouchableOpacity
-            accessibilityHint="Plays one alert tone through the iPhone's current audio output"
+            accessibilityHint="Plays the three-tone urgent alert sequence through the iPhone's current audio output"
             accessibilityRole="button"
             disabled={audioTestBusy}
             style={[s.testRow, audioTestBusy && s.testRowDisabled]}
@@ -276,7 +292,7 @@ export default function SettingsScreen() {
               {audioTestBusy ? 'PREPARING AUDIO TEST…' : 'TEST CURRENT AUDIO OUTPUT'}
             </Text>
           </TouchableOpacity>
-          <Text style={s.testNote}>Use only while parked. This does not change your alert setting.</Text>
+          <Text style={s.testNote}>Use only while parked. This plays the centered three-tone critical sequence and does not change your alert setting.</Text>
           <View style={s.div} />
           <View style={s.row}>
             <View style={s.rowL}>
@@ -293,8 +309,8 @@ export default function SettingsScreen() {
             <View style={s.rowL}>
               <Ionicons name="ear-outline" size={18} color="#60a5fa" />
               <View>
-                <Text style={s.label}>In-ear alert pattern</Text>
-                <Text style={s.sub}>Optional stereo emphasis for early and standard alerts</Text>
+                <Text style={s.label}>Headphone alert pattern</Text>
+                <Text style={s.sub}>Balanced is clearest; optional stereo emphasis is available for early alerts</Text>
               </View>
             </View>
             <View style={s.patternOptions}>
@@ -337,7 +353,7 @@ export default function SettingsScreen() {
             onPress={testWatchAlert}
           >
             <Ionicons name="pulse-outline" size={17} color="#60a5fa" />
-            <Text style={s.testText}>Test Watch alert</Text>
+            <Text style={s.testText}>Test Watch alert · urgent pattern</Text>
           </TouchableOpacity>
         </View>
         <CloudSyncCard />
@@ -368,26 +384,28 @@ const s = StyleSheet.create({
   bg:{flex:1,backgroundColor:colors.background}, scroll:{padding:20,paddingBottom:48},
   eyebrow:{color:colors.cyan,fontSize:10,fontWeight:'800',letterSpacing:1.5,marginTop:6,marginBottom:5},
   title:{color:colors.text,fontSize:32,fontWeight:'800',letterSpacing:-0.8,marginBottom:22},
-  card:{backgroundColor:'rgba(14,26,43,0.94)',borderWidth:1,borderColor:'rgba(255,255,255,0.09)',borderRadius:radii.large,marginBottom:16,overflow:'hidden'},
+  card:{backgroundColor:colors.material,borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.large,marginBottom:16,overflow:'hidden'},
   cardTitle:{color:colors.textSecondary,fontSize:11,fontWeight:'800',letterSpacing:0.8,textTransform:'uppercase',padding:14,borderBottomWidth:1,borderColor:'rgba(255,255,255,0.08)'},
   row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:16,paddingVertical:14,gap:12},
   rowL:{flexDirection:'row',alignItems:'center',gap:12,flex:1},
   rowCopy:{flex:1},
   label:{color:colors.text,fontSize:14,fontWeight:'700'}, sub:{color:colors.textMuted,fontSize:11,marginTop:2},
   status:{color:colors.cyan,fontSize:10,fontWeight:'900',letterSpacing:0.6},
-  div:{height:1,backgroundColor:'rgba(255,255,255,0.08)',marginHorizontal:16},
+  div:{height:1,backgroundColor:colors.glassBorder,marginHorizontal:16},
   testRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:13},
   testRowDisabled:{opacity:0.35},
   testText:{color:'#60a5fa',fontSize:13,fontWeight:'800'},
   testNote:{color:colors.textMuted,fontSize:10,lineHeight:15,textAlign:'center',paddingHorizontal:16,paddingBottom:12},
+  alertSafetyNote:{flexDirection:'row',alignItems:'flex-start',gap:8,paddingHorizontal:16,paddingVertical:13,backgroundColor:'rgba(251,191,36,0.07)',borderTopWidth:1,borderColor:'rgba(251,191,36,0.16)'},
+  alertSafetyText:{flex:1,color:'#f8d98b',fontSize:11,lineHeight:16},
   patternBlock:{paddingHorizontal:16,paddingVertical:14,gap:12},
   patternOptions:{flexDirection:'row',gap:8},
-  patternOption:{flex:1,alignItems:'center',borderWidth:1,borderColor:'rgba(255,255,255,0.12)',borderRadius:radii.small,paddingVertical:10,backgroundColor:'rgba(5,9,19,0.72)'},
-  patternOptionSelected:{borderColor:'#60a5fa',backgroundColor:'rgba(37,99,235,0.2)'},
+  patternOption:{flex:1,alignItems:'center',borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.small,paddingVertical:10,backgroundColor:colors.backgroundRaised},
+  patternOptionSelected:{borderColor:colors.blue,backgroundColor:'rgba(94,156,255,0.18)'},
   patternOptionText:{color:'#7f9ba8',fontSize:12,fontWeight:'800'},
   patternOptionTextSelected:{color:'#bfdbfe'},
   patternNote:{color:colors.textMuted,fontSize:11,lineHeight:16},
-  privNote:{flexDirection:'row',alignItems:'flex-start',gap:8,padding:14,backgroundColor:'rgba(0,0,0,0.2)',borderTopWidth:1,borderColor:'rgba(255,255,255,0.08)'},
+  privNote:{flexDirection:'row',alignItems:'flex-start',gap:8,padding:14,backgroundColor:colors.backgroundRaised,borderTopWidth:1,borderColor:colors.glassBorder},
   privTxt:{color:colors.textMuted,fontSize:11,lineHeight:16,flex:1},
   ver:{textAlign:'center',color:colors.textMuted,fontSize:11,marginTop:8},
 });

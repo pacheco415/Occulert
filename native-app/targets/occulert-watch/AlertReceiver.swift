@@ -159,10 +159,10 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     lastAlertAt = sentAt
     lastLevel = level
     lastMessage = switch level {
-    case "critical": "PULL OVER NOW"
-    case "alert": "Drowsiness detected"
+    case "critical": "High fatigue detected. Pull over safely and rest now."
+    case "alert": "Drowsiness detected. Pull over at the next safe place."
     case "tracking": "Tracking lost — check iPhone safely"
-    case "watch": "Eyes drooping"
+    case "watch": "Drowsiness may be starting. Plan a safe stop."
     default: "Monitoring"
     }
 
@@ -175,13 +175,29 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   }
 
   private func playHaptic(level: String) {
-    let device = WKInterfaceDevice.current()
-    device.play(level == "critical" ? .failure : .notification)
-    if level == "critical" {
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-        device.play(.failure)
-      }
+    switch level {
+    case "critical":
+      playCriticalHapticSequence()
+    case "alert":
+      playStandardAlertHapticSequence()
+    case "tracking":
+      WKInterfaceDevice.current().play(.retry)
+    default:
+      WKInterfaceDevice.current().play(.notification)
     }
+  }
+
+  private func playCriticalHapticSequence() {
+    let device = WKInterfaceDevice.current()
+    device.play(.failure)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { device.play(.failure) }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { device.play(.failure) }
+  }
+
+  private func playStandardAlertHapticSequence() {
+    let device = WKInterfaceDevice.current()
+    device.play(.notification)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { device.play(.notification) }
   }
 
   private func scheduleBackgroundAlert(level: String, message: String, sentAt: Double) {
@@ -189,10 +205,16 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
       guard settings.authorizationStatus == .authorized else { return }
 
       let content = UNMutableNotificationContent()
-      content.title = level == "critical" ? "PULL OVER NOW" : "Occulert alert"
+      content.title = switch level {
+      case "critical": "PULL OVER NOW"
+      case "tracking": "Tracking lost"
+      case "watch": "Eyes drooping"
+      default: "Drowsiness detected"
+      }
       content.body = message
       content.sound = .default
       content.interruptionLevel = .timeSensitive
+      content.relevanceScore = level == "critical" ? 1.0 : 0.8
       content.userInfo = ["level": level, "at": sentAt]
 
       let identifier = "occulert-alert-\(Int64(sentAt))"

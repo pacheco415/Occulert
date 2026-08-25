@@ -21,7 +21,7 @@ export function GlassSurface({
   children,
   interactive = false,
   style,
-  tintColor = 'rgba(25, 48, 76, 0.34)',
+  tintColor = 'rgba(34, 42, 56, 0.34)',
   ...viewProps
 }: GlassSurfaceProps) {
   const supportsLiquidGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable();
@@ -68,23 +68,23 @@ const styles = StyleSheet.create({
     width: 280,
     height: 280,
     borderRadius: 140,
-    opacity: 0.2,
+    opacity: 0.13,
   },
   orbBlue: {
-    backgroundColor: '#246bfe',
+    backgroundColor: '#3478f6',
     top: -90,
     right: -110,
   },
   orbCyan: {
-    backgroundColor: '#00c4e8',
+    backgroundColor: '#32ade6',
     top: 310,
     left: -190,
-    opacity: 0.15,
+    opacity: 0.1,
   },
   orbViolet: {
-    backgroundColor: '#7048e8',
+    backgroundColor: '#af52de',
     bottom: -150,
     right: -150,
-    opacity: 0.13,
+    opacity: 0.08,
   },
 });

@@ -9,40 +9,40 @@
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #06101f;
-  --bg2: #0a1525;
-  --surface: rgba(13, 26, 43, 0.9);
-  --surface2: rgba(16, 31, 50, 0.92);
-  --top-bg: rgba(12, 24, 40, 0.64);
-  --nav-bg: rgba(12, 24, 40, 0.64);
-  --mobile-bg: rgba(10, 22, 38, 0.9);
-  --card-bg: rgba(13, 26, 43, 0.82);
-  --input-bg: rgba(6, 18, 34, 0.74);
+  --bg: #07090e;
+  --bg2: #101722;
+  --surface: #141923;
+  --surface2: #1a202c;
+  --top-bg: rgba(20, 25, 35, 0.66);
+  --nav-bg: rgba(20, 25, 35, 0.66);
+  --mobile-bg: rgba(18, 23, 32, 0.92);
+  --card-bg: #141923;
+  --input-bg: rgba(10, 14, 21, 0.78);
   --border: rgba(255, 255, 255, 0.1);
   --border2: rgba(255, 255, 255, 0.18);
   --input-border: rgba(255, 255, 255, 0.18);
   --text: #f7f9ff;
   --text2: #a9b8cc;
   --text3: #7890aa;
-  --glass: rgba(20, 39, 63, 0.56);
-  --glass-strong: rgba(15, 31, 52, 0.82);
+  --glass: rgba(34, 42, 56, 0.58);
+  --glass-strong: rgba(24, 30, 41, 0.82);
   --glass-line: rgba(255, 255, 255, 0.18);
   --glass-highlight: rgba(255, 255, 255, 0.13);
-  --glass-shadow: 0 24px 70px rgba(0, 8, 23, 0.42), inset 0 1px 0 var(--glass-highlight);
-  --glass-shadow-soft: 0 18px 48px rgba(0, 7, 20, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 18px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 var(--glass-highlight);
+  --glass-shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --focus-ring: #7cb0ff;
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --bg: #eaf3ff;
-  --bg2: #dfeeff;
-  --surface: rgba(250, 253, 255, 0.9);
-  --surface2: rgba(240, 247, 255, 0.94);
-  --top-bg: rgba(244, 249, 255, 0.68);
-  --nav-bg: rgba(244, 249, 255, 0.68);
-  --mobile-bg: rgba(244, 249, 255, 0.94);
-  --card-bg: rgba(250, 253, 255, 0.82);
+  --bg: #f3f5f8;
+  --bg2: #e8edf4;
+  --surface: #ffffff;
+  --surface2: #f5f7fa;
+  --top-bg: rgba(248, 250, 253, 0.7);
+  --nav-bg: rgba(248, 250, 253, 0.7);
+  --mobile-bg: rgba(248, 250, 253, 0.94);
+  --card-bg: #ffffff;
   --input-bg: rgba(255, 255, 255, 0.7);
   --border: rgba(38, 72, 112, 0.13);
   --border2: rgba(38, 72, 112, 0.23);
@@ -67,9 +67,8 @@ html {
 body {
   min-height: 100dvh;
   background:
-    radial-gradient(circle at 86% 7%, rgba(72, 135, 255, 0.23), transparent 31rem),
-    radial-gradient(circle at 3% 38%, rgba(0, 199, 232, 0.14), transparent 28rem),
-    radial-gradient(circle at 82% 76%, rgba(113, 72, 232, 0.11), transparent 30rem),
+    radial-gradient(circle at 84% -4%, rgba(72, 135, 255, 0.18), transparent 34rem),
+    radial-gradient(circle at -8% 42%, rgba(0, 199, 232, 0.09), transparent 30rem),
     linear-gradient(155deg, var(--bg), var(--bg2));
   background-attachment: fixed;
   color: var(--text);
@@ -82,13 +81,8 @@ body::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.32;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 64px 64px;
-  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 76%);
-  mask-image: linear-gradient(to bottom, #000, transparent 76%);
+  opacity: 0.7;
+  background: radial-gradient(circle at 72% 70%, rgba(113, 72, 232, 0.08), transparent 28rem);
 }
 
 :root :is(.top, body > nav, body > header.top) {
@@ -116,28 +110,35 @@ body > nav {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 9px 24px rgba(38, 105, 235, 0.28);
 }
 
-:root :is(.card, .feature, .step, .item, .history-item, .faq-item, .device-card, .install-section, .contact, .driver, .metric, .mini > div) {
+:root :where(.card, .feature, .step, .item, .history-item, .faq-item, .device-card, .install-section, .contact, .driver, .metric, .mini > div) {
   border-color: var(--glass-line);
   border-radius: 24px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.055), transparent 42%),
-    var(--card-bg);
-  -webkit-backdrop-filter: blur(18px) saturate(145%);
-  backdrop-filter: blur(18px) saturate(145%);
+  background: var(--card-bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow: var(--glass-shadow-soft);
 }
 
-:root :is(a.card, .feature, .step, .contact, .driver) {
+:root :where(a.card, .feature, .step, .contact, .driver) {
   transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
 }
 
-:root :is(a.card, .feature, .step, .contact):hover {
-  transform: translateY(-3px);
+:root :where(a.card, .feature, .step, .contact):hover {
+  transform: translateY(-1px);
   border-color: rgba(108, 166, 255, 0.62);
-  box-shadow: 0 24px 60px rgba(0, 9, 28, 0.3), inset 0 1px 0 var(--glass-highlight);
+  box-shadow: 0 16px 38px rgba(0, 9, 28, 0.24), inset 0 1px 0 var(--glass-highlight);
 }
 
-:root :is(.notice, .note, .privacy-banner, .privacy-note, .disclaimer, .status.show, .stats-row, .toolbar, .auth-tabs) {
+:root :is(.notice, .note, .privacy-banner, .privacy-note, .disclaimer, .status.show, .stats-row) {
+  border-color: var(--glass-line);
+  border-radius: 20px;
+  background: var(--surface2);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--glass-shadow-soft);
+}
+
+:root :is(.toolbar, .auth-tabs) {
   border-color: var(--glass-line);
   border-radius: 20px;
   background: var(--glass);

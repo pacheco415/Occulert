@@ -3,6 +3,7 @@ import { Alert, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SENSITIVITY_PRESETS, type SensitivityLevel } from '../constants/thresholds';
 import { createSettingPersister } from '../lib/settingPersistence';
+import { colors, radii } from '../constants/theme';
 
 const SENSITIVITY_PREFERENCE_KEY = 'occulert-sensitivity';
 const LEVELS: SensitivityLevel[] = ['low', 'medium', 'high'];
@@ -34,7 +35,7 @@ export function SensitivitySlider({ value, onChange }: Props) {
   };
   return (
     <View style={s.wrap}>
-      <Text style={s.label}>🎚 Alert Sensitivity</Text>
+      <Text style={s.label}>Alert sensitivity</Text>
       <Text style={s.desc}>{SENSITIVITY_PRESETS[value].description}</Text>
       <View style={s.row}>
         {LEVELS.map(l => (
@@ -46,9 +47,7 @@ export function SensitivitySlider({ value, onChange }: Props) {
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={s.thresh}>
-        closed: {SENSITIVITY_PRESETS[value].eyeClosedThreshold.toFixed(2)}  |  watch: {SENSITIVITY_PRESETS[value].eyeWatchThreshold.toFixed(2)}
-      </Text>
+      <Text style={s.thresh}>Changes when warnings begin. It does not make driving while tired safe.</Text>
     </View>
   );
 }
@@ -62,13 +61,13 @@ export async function loadSavedSensitivity(): Promise<SensitivityLevel> {
 }
 
 const s = StyleSheet.create({
-  wrap:     { backgroundColor:'rgba(37,99,235,0.06)', borderWidth:1, borderColor:'rgba(37,99,235,0.2)', borderRadius:14, padding:16, marginBottom:16 },
-  label:    { color:'#c8e8f0', fontSize:14, fontWeight:'800', marginBottom:4 },
-  desc:     { color:'#94a3b8', fontSize:12, lineHeight:17, marginBottom:12 },
+  wrap:     { backgroundColor:colors.material, borderWidth:1, borderColor:colors.glassBorder, borderRadius:radii.large, padding:16, marginBottom:16 },
+  label:    { color:colors.text, fontSize:15, fontWeight:'800', marginBottom:4 },
+  desc:     { color:colors.textSecondary, fontSize:12, lineHeight:17, marginBottom:12 },
   row:      { flexDirection:'row', gap:8 },
-  btn:      { flex:1, paddingVertical:10, borderRadius:10, borderWidth:1.5, borderColor:'#1a3a4a', backgroundColor:'#0f1e2e', alignItems:'center' },
-  active:   { borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,0.15)' },
-  btnTxt:   { color:'#94a3b8', fontSize:13, fontWeight:'800' },
-  activeTxt:{ color:'#60a5fa' },
-  thresh:   { color:'#4a7a8a', fontSize:11, marginTop:10 },
+  btn:      { flex:1, paddingVertical:10, borderRadius:radii.small, borderWidth:1, borderColor:colors.glassBorder, backgroundColor:colors.backgroundRaised, alignItems:'center' },
+  active:   { borderColor:colors.blue, backgroundColor:'rgba(94,156,255,0.16)' },
+  btnTxt:   { color:colors.textSecondary, fontSize:13, fontWeight:'800' },
+  activeTxt:{ color:'#cfe0ff' },
+  thresh:   { color:colors.textMuted, fontSize:11, lineHeight:16, marginTop:10 },
 });

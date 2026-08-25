@@ -85,6 +85,6 @@ test('roadmap and setup docs distinguish source completion from deployment', () 
   const roadmap = read('APP_ROADMAP.md');
   const setup = read('BACKEND_SETUP.md');
   assert.match(roadmap, /protected session and event history implemented in source/i);
-  assert.match(roadmap, /deployment verification pending/i);
+  assert.match(roadmap, /current mobile hierarchy and hidden-tab performance update awaits Preview review/i);
   assert.match(setup, /manager-scoped session and event history excludes GPS/i);
 });

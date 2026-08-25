@@ -34,6 +34,16 @@ struct ContentView: View {
     }
   }
 
+  private var latestAlertTitle: String {
+    switch receiver.lastLevel {
+    case "critical": return "PULL OVER NOW"
+    case "alert": return "DROWSINESS DETECTED"
+    case "tracking": return "TRACKING LOST"
+    case "watch": return "EYES DROOPING"
+    default: return "LATEST ALERT"
+    }
+  }
+
   private var sessionDuration: String {
     let hours = receiver.sessionSeconds / 3_600
     let minutes = (receiver.sessionSeconds % 3_600) / 60
@@ -86,16 +96,22 @@ struct ContentView: View {
         }
 
         if receiver.lastLevel != "none" {
-          Divider()
-          Text("LATEST ALERT")
-            .font(.caption2)
-            .fontWeight(.bold)
-            .foregroundStyle(.secondary)
-          Text(receiver.lastMessage)
-            .font(.caption)
-            .fontWeight(.bold)
-            .multilineTextAlignment(.center)
-            .foregroundStyle(alertColor)
+          VStack(spacing: 4) {
+            Text(latestAlertTitle)
+              .font(.caption2)
+              .fontWeight(.heavy)
+              .foregroundStyle(alertColor)
+            Text(receiver.lastMessage)
+              .font(.caption2)
+              .fontWeight(.semibold)
+              .multilineTextAlignment(.center)
+              .foregroundStyle(.primary)
+          }
+          .padding(.horizontal, 8)
+          .padding(.vertical, 9)
+          .frame(maxWidth: .infinity)
+          .background(alertColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
+          .accessibilityElement(children: .combine)
         }
 
         if !receiver.backgroundAlertsAuthorized {
