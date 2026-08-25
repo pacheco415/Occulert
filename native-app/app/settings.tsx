@@ -107,7 +107,9 @@ export default function SettingsScreen() {
     EMPTY_HEADPHONE_MOTION_STATUS,
   );
   const [audioTestBusy, setAudioTestBusy] = useState(false);
-  const audioTestPlayer = useAudioPlayer(ALERT_SOUND, { keepAudioSessionActive: true });
+  // This parked-only test must release the shared iOS audio session when the
+  // tone ends so music and navigation audio can return to their normal level.
+  const audioTestPlayer = useAudioPlayer(ALERT_SOUND);
   const audioTestRunnerRef = useRef(createSingleFlightActionRunner());
   const watchAvailable = watchStatus.paired && watchStatus.appInstalled;
   const appBuildLabel = formatAppBuildLabel(currentAppBuildInfo());
