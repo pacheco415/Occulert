@@ -31,3 +31,18 @@ const PLANS: Record<AlertLevel, AlertDeliveryPlan> = {
 export function alertDeliveryPlan(level: AlertLevel): AlertDeliveryPlan {
   return PLANS[level];
 }
+
+/**
+ * Commit a prepared cue only while its delivery sequence is still current.
+ * This closes the race where cancellation happens during an async seek.
+ */
+export async function deliverCueIfCurrent(
+  prepare: () => Promise<void>,
+  isCurrent: () => boolean,
+  deliver: () => void,
+): Promise<boolean> {
+  await prepare();
+  if (!isCurrent()) return false;
+  deliver();
+  return true;
+}

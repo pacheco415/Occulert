@@ -10,7 +10,7 @@
   --portal-accent-text: #9bc1ff;
   --portal-icon-text: #e7effc;
   --portal-blue: #5e9cff;
-  --portal-blue-strong: #397cf2;
+  --portal-blue-strong: #2563eb;
   --portal-green: #30d158;
   --portal-amber: #ffd60a;
   --portal-red: #ff453a;
@@ -136,7 +136,7 @@ html[data-theme="light"] .portal-page .btn.primary {
 
 .portal-page .btn.primary:hover {
   border-color: var(--portal-blue);
-  background: #3c7bed;
+  background: #1d4ed8;
 }
 
 .portal-page .card {

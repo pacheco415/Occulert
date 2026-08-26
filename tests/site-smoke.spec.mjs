@@ -328,6 +328,23 @@ test("light semantic messages stay readable and mobile content cards avoid backd
   await expect(page.locator(".feature").first()).toHaveCSS("backdrop-filter", "none");
 });
 
+test("portal primary actions retain readable normal and hover contrast", async ({ page }) => {
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  const primary = page.locator("#submitBtn");
+
+  const colors = async () => primary.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { foreground: style.color, background: style.backgroundColor };
+  });
+
+  const normal = await colors();
+  expect(contrastRatio(normal.foreground, normal.background)).toBeGreaterThanOrEqual(4.5);
+  await primary.hover();
+  const hovered = await colors();
+  expect(contrastRatio(hovered.foreground, hovered.background)).toBeGreaterThanOrEqual(4.5);
+});
+
 test("fleet navigation stays focused and action text does not overlap", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.addInitScript(() => {

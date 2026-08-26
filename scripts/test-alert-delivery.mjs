@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { alertDeliveryPlan } from '../native-app/lib/alertDelivery.ts';
+import { alertDeliveryPlan, deliverCueIfCurrent } from '../native-app/lib/alertDelivery.ts';
 import { waitForCancellableDelay } from '../native-app/lib/cancellableDelay.ts';
 
 test('alert output escalates in a short bounded sequence', () => {
@@ -45,8 +45,32 @@ test('the native alert engine cancels pending cues before a new sequence', () =>
   assert.match(alertSystem, /cancelPendingCues/);
   assert.match(alertSystem, /cueSequenceVersion/);
   assert.match(alertSystem, /alertDeliveryPlan/);
+  assert.match(alertSystem, /deliverCueIfCurrent/);
   assert.match(alertSystem, /hapticEnabled\.current/);
   assert.match(alertSystem, /audioEnabled\.current/);
+});
+
+test('an invalidated sequence cannot play after asynchronous cue preparation', async () => {
+  let releasePreparation;
+  let current = true;
+  let delivered = false;
+  const pending = deliverCueIfCurrent(
+    () => new Promise(resolve => { releasePreparation = resolve; }),
+    () => current,
+    () => { delivered = true; },
+  );
+
+  current = false;
+  releasePreparation();
+  assert.equal(await pending, false);
+  assert.equal(delivered, false);
+
+  assert.equal(await deliverCueIfCurrent(
+    () => Promise.resolve(),
+    () => true,
+    () => { delivered = true; },
+  ), true);
+  assert.equal(delivered, true);
 });
 
 test('parked-test delays settle immediately when their screen closes', async () => {
