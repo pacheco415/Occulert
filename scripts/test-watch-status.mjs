@@ -281,6 +281,10 @@ test('background Watch alerts use an authorized notification instead of a silent
   assert.match(alertReceiver, /requestAuthorization\(options: \[\.alert, \.sound\]\)/);
   assert.match(alertReceiver, /authorizationStatus == \.authorized/);
   assert.match(targetConfig, /'UserNotifications'/);
+  assert.match(
+    targetConfig,
+    /'com\.apple\.developer\.usernotifications\.time-sensitive': true/,
+  );
   assert.match(contentView, /Enable background alerts/);
   assert.match(contentView, /refreshNotificationAuthorization/);
   assert.match(settingsScreen, /Queued delivery may be delayed/);

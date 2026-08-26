@@ -19,6 +19,7 @@ import {
   type CloudState,
 } from '../lib/cloudSync';
 import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
+import { colors, radii } from '../constants/theme';
 
 const EMPTY_STATE: CloudState = {
   available: true,
@@ -227,28 +228,28 @@ export function CloudSyncCard() {
 }
 
 const s = StyleSheet.create({
-  card: { backgroundColor: '#0f1e2e', borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 14, marginBottom: 16, overflow: 'hidden' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderColor: '#1a3a4a' },
-  cardTitle: { color: '#94a3b8', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
-  status: { color: '#4a7a8a', fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
-  statusOn: { color: '#34d399' },
+  card: { backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, marginBottom: 16, overflow: 'hidden' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderColor: colors.glassBorder },
+  cardTitle: { color: colors.textSecondary, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  status: { color: colors.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
+  statusOn: { color: colors.green },
   form: { padding: 14, gap: 10 },
-  formIntro: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginBottom: 2 },
-  input: { minHeight: 46, borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10, backgroundColor: '#08131e', color: '#fff', paddingHorizontal: 12, fontSize: 14 },
-  primaryBtn: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#2563eb', borderRadius: 10 },
+  formIntro: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 2 },
+  input: { minHeight: 46, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.small, backgroundColor: colors.backgroundRaised, color: colors.text, paddingHorizontal: 12, fontSize: 14 },
+  primaryBtn: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.blueStrong, borderRadius: radii.small },
   primaryText: { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 0.6 },
   disabled: { opacity: 0.4 },
   linkBtn: { alignItems: 'center', paddingVertical: 6 },
-  linkText: { color: '#93c5fd', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  linkText: { color: colors.blue, fontSize: 12, fontWeight: '700', textAlign: 'center' },
   accountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   accountText: { flex: 1 },
-  label: { color: '#c8e8f0', fontSize: 14, fontWeight: '700' },
-  sub: { color: '#4a7a8a', fontSize: 11, marginTop: 2 },
-  signOutBtn: { borderWidth: 1, borderColor: '#334155', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  signOutText: { color: '#cbd5e1', fontSize: 11, fontWeight: '800' },
-  div: { height: 1, backgroundColor: '#1a3a4a', marginHorizontal: 16 },
+  label: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  sub: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  signOutBtn: { borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.small, paddingHorizontal: 12, paddingVertical: 8 },
+  signOutText: { color: colors.textSecondary, fontSize: 11, fontWeight: '800' },
+  div: { height: 1, backgroundColor: colors.glassBorder, marginHorizontal: 16 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   rowL: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  privacy: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 14, backgroundColor: 'rgba(0,0,0,0.2)', borderTopWidth: 1, borderColor: '#1a3a4a' },
-  privacyText: { color: '#4a7a8a', fontSize: 11, lineHeight: 16, flex: 1 },
+  privacy: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 14, backgroundColor: colors.backgroundRaised, borderTopWidth: 1, borderColor: colors.glassBorder },
+  privacyText: { color: colors.textMuted, fontSize: 11, lineHeight: 16, flex: 1 },
 });

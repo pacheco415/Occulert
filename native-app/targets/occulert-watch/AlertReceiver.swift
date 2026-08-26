@@ -21,6 +21,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
 
   private let statusFreshnessMilliseconds = 12_000.0
   private var statusTimeoutTask: Task<Void, Never>?
+  private var hapticSequenceTask: Task<Void, Never>?
 
   override init() {
     super.init()
@@ -159,10 +160,10 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     lastAlertAt = sentAt
     lastLevel = level
     lastMessage = switch level {
-    case "critical": "PULL OVER NOW"
-    case "alert": "Drowsiness detected"
+    case "critical": "High fatigue detected. Pull over safely and rest now."
+    case "alert": "Drowsiness detected. Pull over at the next safe place."
     case "tracking": "Tracking lost — check iPhone safely"
-    case "watch": "Eyes drooping"
+    case "watch": "Drowsiness may be starting. Plan a safe stop."
     default: "Monitoring"
     }
 
@@ -175,12 +176,48 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   }
 
   private func playHaptic(level: String) {
+    hapticSequenceTask?.cancel()
+    hapticSequenceTask = nil
+
+    switch level {
+    case "critical":
+      playCriticalHapticSequence()
+    case "alert":
+      playStandardAlertHapticSequence()
+    case "tracking":
+      WKInterfaceDevice.current().play(.retry)
+    default:
+      WKInterfaceDevice.current().play(.notification)
+    }
+  }
+
+  private func playCriticalHapticSequence() {
     let device = WKInterfaceDevice.current()
-    device.play(level == "critical" ? .failure : .notification)
-    if level == "critical" {
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+    device.play(.failure)
+    hapticSequenceTask = Task { @MainActor in
+      for _ in 0..<2 {
+        do {
+          try await Task.sleep(nanoseconds: 400_000_000)
+        } catch {
+          return
+        }
+        guard !Task.isCancelled else { return }
         device.play(.failure)
       }
+    }
+  }
+
+  private func playStandardAlertHapticSequence() {
+    let device = WKInterfaceDevice.current()
+    device.play(.notification)
+    hapticSequenceTask = Task { @MainActor in
+      do {
+        try await Task.sleep(nanoseconds: 450_000_000)
+      } catch {
+        return
+      }
+      guard !Task.isCancelled else { return }
+      device.play(.notification)
     }
   }
 
@@ -189,10 +226,16 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
       guard settings.authorizationStatus == .authorized else { return }
 
       let content = UNMutableNotificationContent()
-      content.title = level == "critical" ? "PULL OVER NOW" : "Occulert alert"
+      content.title = switch level {
+      case "critical": "PULL OVER NOW"
+      case "tracking": "Tracking lost"
+      case "watch": "Eyes drooping"
+      default: "Drowsiness detected"
+      }
       content.body = message
       content.sound = .default
       content.interruptionLevel = .timeSensitive
+      content.relevanceScore = level == "critical" ? 1.0 : 0.8
       content.userInfo = ["level": level, "at": sentAt]
 
       let identifier = "occulert-alert-\(Int64(sentAt))"

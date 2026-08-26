@@ -1,6 +1,19 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
+function contrastRatio(foreground, background) {
+  const luminance = (color) => {
+    const channels = color.match(/[\d.]+/g).slice(0, 3).map((value) => Number(value) / 255);
+    const linear = channels.map((value) => value <= 0.04045
+      ? value / 12.92
+      : ((value + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  };
+  const lighter = Math.max(luminance(foreground), luminance(background));
+  const darker = Math.min(luminance(foreground), luminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 test("important public pages load with one primary heading", async ({ page }) => {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -287,6 +300,51 @@ test("signed-out mobile fleet dashboard keeps navigation and recovery actions vi
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
+test("light semantic messages stay readable and mobile content cards avoid backdrop blur", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+
+  const fleetMessageColors = await page.locator(".privacy-note, #cloudStatus").evaluateAll((elements) => (
+    elements.map((element) => {
+      const style = getComputedStyle(element);
+      return { foreground: style.color, background: style.backgroundColor };
+    })
+  ));
+  for (const colors of fleetMessageColors) {
+    expect(contrastRatio(colors.foreground, colors.background)).toBeGreaterThanOrEqual(4.5);
+  }
+
+  await page.goto("/account.html", { waitUntil: "domcontentloaded" });
+  const accountErrorColors = await page.locator("#status").evaluate((element) => {
+    document.documentElement.setAttribute("data-theme", "light");
+    element.className = "status show bad";
+    const style = getComputedStyle(element);
+    return { foreground: style.color, background: style.backgroundColor };
+  });
+  expect(contrastRatio(accountErrorColors.foreground, accountErrorColors.background)).toBeGreaterThanOrEqual(4.5);
+
+  await page.goto("/features.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".feature").first()).toHaveCSS("backdrop-filter", "none");
+});
+
+test("portal primary actions retain readable normal and hover contrast", async ({ page }) => {
+  await page.goto("/login.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  const primary = page.locator("#submitBtn");
+
+  const colors = async () => primary.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { foreground: style.color, background: style.backgroundColor };
+  });
+
+  const normal = await colors();
+  expect(contrastRatio(normal.foreground, normal.background)).toBeGreaterThanOrEqual(4.5);
+  await primary.hover();
+  const hovered = await colors();
+  expect(contrastRatio(hovered.foreground, hovered.background)).toBeGreaterThanOrEqual(4.5);
+});
+
 test("fleet navigation stays focused and action text does not overlap", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.addInitScript(() => {
@@ -321,6 +379,21 @@ test("fleet navigation stays focused and action text does not overlap", async ({
   }));
   expect(layout.every((row) => row.valueTop >= row.labelBottom && row.valueLeft >= row.rowLeft && row.valueRight <= row.rowRight + 1)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+});
+
+test("fleet filtering preserves input focus and updates only the visible roster", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+  await page.locator(".dashboard-tools").getByText("Dashboard tools", { exact: true }).click();
+  await page.locator(".dashboard-tools").getByRole("button", { name: "Load Demo Data" }).click();
+  await expect(page.locator(".driver")).toHaveCount(3);
+
+  const search = page.locator("#driverSearch");
+  await search.fill("Mina");
+  await expect(search).toBeFocused();
+  await expect(page.locator(".driver")).toHaveCount(1);
+  await expect(page.locator(".driver")).toContainText("Mina S.");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
 test("driver app external stylesheet preserves layout without moving monitoring scripts", async ({ page }) => {

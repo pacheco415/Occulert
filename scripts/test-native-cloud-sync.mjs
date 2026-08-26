@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSingleFlightActionRunner } from '../native-app/lib/singleFlightAction.ts';
+import { colors } from '../native-app/constants/theme.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -14,6 +15,19 @@ const history = read('native-app/app/history.tsx');
 const appConfig = JSON.parse(read('native-app/app.json'));
 const nativePackage = JSON.parse(read('native-app/package.json'));
 const cloudCard = read('native-app/components/CloudSyncCard.tsx');
+
+const relativeLuminance = hex => {
+  const channels = hex.match(/[0-9a-f]{2}/gi).map(value => parseInt(value, 16) / 255);
+  const [red, green, blue] = channels.map(value => (
+    value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  ));
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+};
+const contrastRatio = (foreground, background) => {
+  const lighter = Math.max(relativeLuminance(foreground), relativeLuminance(background));
+  const darker = Math.min(relativeLuminance(foreground), relativeLuminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
+};
 
 assert.equal(
   nativePackage.dependencies['expo-secure-store'],
@@ -63,6 +77,11 @@ assert.match(cloudCard, /createSingleFlightActionRunner/);
 assert.match(cloudCard, /could not complete or confirm that change/);
 assert.match(cloudCard, /\.finally\(\(\) =>/);
 assert.doesNotMatch(cloudCard, /applyConsent\([^)]*\)\.catch\(\(\) => \{\}\)/);
+assert.match(cloudCard, /backgroundColor: colors\.blueStrong/);
+assert.ok(
+  contrastRatio('#ffffff', colors.blueStrong) >= 4.5,
+  'white primary-button text must retain at least 4.5:1 contrast',
+);
 
 const failureBusyStates = [];
 const failureErrors = [];

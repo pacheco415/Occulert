@@ -19,6 +19,7 @@ import {
   shouldDeliverAlert,
   type AlertLevel,
 } from '../lib/alertPolicy';
+import { alertDeliveryPlan, deliverCueIfCurrent } from '../lib/alertDelivery';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 
 export type { AlertLevel } from '../lib/alertPolicy';
@@ -42,6 +43,8 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
   const audioEnabled = useRef(true);
   const lastDirectionalChannel = useRef<Exclude<AlertAudioChannel, 'balanced'> | null>(null);
   const watchLiveSession = useRef(false);
+  const pendingCueTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const cueSequenceVersion = useRef(0);
   const lastWatchStatusAt = useRef(0);
   const watchStatusSnapshot = useRef({
     state: metrics.state,
@@ -50,6 +53,32 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
     sessionTime,
   });
   const [trackingLost, setTrackingLost] = React.useState(false);
+
+  const cancelPendingCues = useCallback(() => {
+    cueSequenceVersion.current += 1;
+    pendingCueTimers.current.forEach(timer => clearTimeout(timer));
+    pendingCueTimers.current = [];
+  }, []);
+
+  const scheduleCue = useCallback((
+    offsetMs: number,
+    sequenceVersion: number,
+    cue: (isCurrent: () => boolean) => void | Promise<void>,
+  ) => {
+    const isCurrent = () => sequenceVersion === cueSequenceVersion.current;
+    const runCue = () => {
+      if (!isCurrent()) return;
+      void cue(isCurrent);
+    };
+    if (offsetMs === 0) {
+      runCue();
+      return;
+    }
+    const timer = setTimeout(runCue, offsetMs);
+    pendingCueTimers.current.push(timer);
+  }, []);
+
+  React.useEffect(() => cancelPendingCues, [cancelPendingCues]);
 
   // Load persisted alert preferences (set on the Settings screen).
   React.useEffect(() => {
@@ -71,8 +100,9 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
     if (!isRunning) {
       lastAlert.current = { level: 'none', at: 0 };
       lastDirectionalChannel.current = null;
+      cancelPendingCues();
     }
-  }, [isRunning]);
+  }, [cancelPendingCues, isRunning]);
   React.useEffect(() => {
     watchStatusSnapshot.current = {
       state: metrics.state,
@@ -165,6 +195,8 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
     const previous = lastAlert.current;
     if (!shouldDeliverAlert(previous.level, previous.at, lv, now, ALERT_COOLDOWN_MS)) return;
     lastAlert.current = { level: lv, at: now };
+    cancelPendingCues();
+    const sequenceVersion = cueSequenceVersion.current;
 
     // Expo Router can keep this screen mounted while Settings is open. Read
     // all delivery preferences for each alert so enable/disable changes take
@@ -174,6 +206,7 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
       AsyncStorage.getItem('occulert-audio').catch(() => null),
       AsyncStorage.getItem(IN_EAR_ALERT_PATTERN_KEY).catch(() => null),
     ]);
+    if (sequenceVersion !== cueSequenceVersion.current) return;
     if (hapticValue != null) hapticEnabled.current = hapticValue === 'true';
     if (audioValue != null) audioEnabled.current = audioValue === 'true';
 
@@ -184,18 +217,20 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
       Animated.timing(pulse, { toValue: 1,    duration: 110, useNativeDriver: true }),
     ]).start();
 
-    try {
-      if (!hapticEnabled.current) {
-        // haptics disabled in Settings
-      } else if (lv === 'critical') {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error), 350);
-      } else if (lv === 'alert' || lv === 'tracking') {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      } else {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
-    } catch {}
+    const deliveryPlan = alertDeliveryPlan(lv);
+    if (hapticEnabled.current) {
+      deliveryPlan.hapticOffsetsMs.forEach(offsetMs => scheduleCue(offsetMs, sequenceVersion, async () => {
+        try {
+          if (lv === 'critical') {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          } else if (lv === 'alert' || lv === 'tracking') {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          } else {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          }
+        } catch {}
+      }));
+    }
 
     // Read this preference at alert time. Expo Router can keep the monitor
     // mounted while Settings is open, so a value captured only on mount can
@@ -221,14 +256,23 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
         : channel === 'right'
           ? rightPlayer
           : balancedPlayer;
-      balancedPlayer.pause();
-      leftPlayer.pause();
-      rightPlayer.pause();
-      await player.seekTo(0);
-      player.volume = lv === 'critical' ? 1.0 : 0.75;
-      player.play();
+      deliveryPlan.audioOffsetsMs.forEach(offsetMs => scheduleCue(offsetMs, sequenceVersion, async isCurrent => {
+        try {
+          balancedPlayer.pause();
+          leftPlayer.pause();
+          rightPlayer.pause();
+          await deliverCueIfCurrent(
+            () => player.seekTo(0),
+            isCurrent,
+            () => {
+              player.volume = lv === 'critical' ? 1.0 : lv === 'alert' ? 0.88 : 0.75;
+              player.play();
+            },
+          );
+        } catch {}
+      }));
     } catch {}
-  }, [balancedPlayer, leftPlayer, metrics.perclos, pulse, rightPlayer]);
+  }, [balancedPlayer, cancelPendingCues, leftPlayer, metrics.perclos, pulse, rightPlayer, scheduleCue]);
 
   React.useEffect(() => {
     if (level !== 'none') fire(level);
@@ -251,9 +295,9 @@ export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProp
 
 const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;color:string;subColor:string;icon:string;title:string;sub:string }> = {
   tracking: { bg:'rgba(55,31,8,0.96)', border:'#f59e0b', color:'#fbbf24', subColor:'#fef3c7', icon:'📷', title:'TRACKING LOST', sub:'Pull over safely before adjusting the phone or camera.' },
-  watch:    { bg:'rgba(45,35,4,0.92)', border:'#ca8a04', color:'#fde047', subColor:'#fef3c7', icon:'👁',  title:'Eyes Drooping',      sub:'Stay alert. Pull over soon if drowsy.' },
-  alert:    { bg:'rgba(55,8,12,0.94)', border:'#ef4444', color:'#fda4af', subColor:'#ffe4e6', icon:'⚠️', title:'DROWSINESS DETECTED', sub:'Pull over safely when you can.' },
-  critical: { bg:'rgba(55,8,12,0.96)', border:'#ff3344', color:'#ff8a91', subColor:'#fff1f2', icon:'🚨', title:'PULL OVER NOW',       sub:'High fatigue. Find a safe spot immediately.' },
+  watch:    { bg:'rgba(45,35,4,0.92)', border:'#ca8a04', color:'#fde047', subColor:'#fef3c7', icon:'👁',  title:'Eyes drooping',       sub:'Drowsiness may be starting. Plan a safe stop.' },
+  alert:    { bg:'rgba(55,8,12,0.94)', border:'#ef4444', color:'#fda4af', subColor:'#ffe4e6', icon:'⚠️', title:'DROWSINESS DETECTED', sub:'Pull over at the next safe place.' },
+  critical: { bg:'rgba(55,8,12,0.96)', border:'#ff3344', color:'#ff8a91', subColor:'#fff1f2', icon:'🚨', title:'PULL OVER NOW',       sub:'High fatigue detected. Pull over safely and rest now.' },
 };
 
 const s = StyleSheet.create({

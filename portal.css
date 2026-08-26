@@ -1,35 +1,35 @@
 :root {
-  --portal-bg: #07101f;
-  --portal-surface: #0e1a2d;
-  --portal-surface-strong: #13233a;
-  --portal-border: #243750;
-  --portal-border-strong: #365273;
-  --portal-text: #f7fafc;
-  --portal-muted: #9fb0c5;
-  --portal-soft: #6f829a;
-  --portal-accent-text: #83b2ff;
-  --portal-icon-text: #dceaff;
-  --portal-blue: #4d8dff;
-  --portal-blue-strong: #2f6fe4;
-  --portal-green: #35d29a;
-  --portal-amber: #f4b860;
-  --portal-red: #fb7185;
-  --portal-radius: 18px;
-  --portal-shadow: 0 22px 60px rgba(0, 0, 0, .24);
+  --portal-bg: #07090e;
+  --portal-surface: #151a23;
+  --portal-surface-strong: #1c2330;
+  --portal-border: #2a3342;
+  --portal-border-strong: #3d4a5f;
+  --portal-text: #f5f7fa;
+  --portal-muted: #b3bccb;
+  --portal-soft: #778399;
+  --portal-accent-text: #9bc1ff;
+  --portal-icon-text: #e7effc;
+  --portal-blue: #5e9cff;
+  --portal-blue-strong: #2563eb;
+  --portal-green: #30d158;
+  --portal-amber: #ffd60a;
+  --portal-red: #ff453a;
+  --portal-radius: 22px;
+  --portal-shadow: 0 14px 34px rgba(0, 0, 0, .2);
 }
 
 html[data-theme="light"] {
-  --portal-bg: #f3f7fb;
+  --portal-bg: #f3f5f8;
   --portal-surface: #ffffff;
-  --portal-surface-strong: #eaf1f8;
-  --portal-border: #cad6e4;
-  --portal-border-strong: #aabbd0;
-  --portal-text: #122033;
-  --portal-muted: #52677f;
-  --portal-soft: #6f829a;
+  --portal-surface-strong: #f1f4f8;
+  --portal-border: #d8dee8;
+  --portal-border-strong: #bcc6d4;
+  --portal-text: #17202e;
+  --portal-muted: #536174;
+  --portal-soft: #6f7d90;
   --portal-accent-text: #245da8;
-  --portal-icon-text: #20344d;
-  --portal-shadow: 0 20px 50px rgba(31, 51, 74, .1);
+  --portal-icon-text: #26354a;
+  --portal-shadow: 0 12px 30px rgba(31, 51, 74, .08);
 }
 
 * {
@@ -39,7 +39,7 @@ html[data-theme="light"] {
 body.portal-page {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 15% -10%, rgba(77, 141, 255, .14), transparent 34rem),
+    radial-gradient(circle at 15% -10%, rgba(94, 156, 255, .12), transparent 36rem),
     var(--portal-bg);
   color: var(--portal-text);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -48,7 +48,7 @@ body.portal-page {
 
 html[data-theme="light"] body.portal-page {
   background:
-    radial-gradient(circle at 15% -10%, rgba(77, 141, 255, .12), transparent 34rem),
+    radial-gradient(circle at 15% -10%, rgba(94, 156, 255, .1), transparent 36rem),
     var(--portal-bg);
 }
 
@@ -56,14 +56,15 @@ html[data-theme="light"] body.portal-page {
   min-height: 64px;
   height: auto;
   padding: 12px clamp(16px, 4vw, 32px);
-  background: rgba(7, 16, 31, .9);
-  border-bottom: 1px solid rgba(159, 176, 197, .16);
-  backdrop-filter: blur(18px);
+  background: rgba(21, 26, 35, .7);
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
+  -webkit-backdrop-filter: blur(28px) saturate(175%);
+  backdrop-filter: blur(28px) saturate(175%);
 }
 
 html[data-theme="light"] .portal-page .top,
 html[data-theme="light"] .hub-page nav {
-  background: rgba(243, 247, 251, .92);
+  background: rgba(248, 250, 253, .74);
 }
 
 .portal-page .brand {
@@ -93,8 +94,8 @@ html[data-theme="light"] .hub-page nav {
 .portal-page .btn {
   min-height: 40px;
   border: 1px solid var(--portal-border-strong);
-  border-radius: 11px;
-  background: rgba(19, 35, 58, .78);
+  border-radius: 14px;
+  background: rgba(42, 51, 66, .72);
   color: #e9f1fb;
   padding: 9px 14px;
   font-size: 13px;
@@ -104,18 +105,18 @@ html[data-theme="light"] .hub-page nav {
 }
 
 html[data-theme="light"] .portal-page .btn {
-  background: #edf3f9;
-  color: #20344d;
+  background: rgba(255, 255, 255, .78);
+  color: #26354a;
 }
 
 .portal-page .btn:hover {
-  border-color: #6087b5;
-  background: #172b46;
+  border-color: #6980a1;
+  background: #2c3646;
 }
 
 html[data-theme="light"] .portal-page .btn:not(.primary):hover {
-  background: #dfeaf5;
-  color: #20344d;
+  background: #e7edf5;
+  color: #26354a;
 }
 
 .portal-page .btn:active {
@@ -135,7 +136,7 @@ html[data-theme="light"] .portal-page .btn.primary {
 
 .portal-page .btn.primary:hover {
   border-color: var(--portal-blue);
-  background: #3c7bed;
+  background: #1d4ed8;
 }
 
 .portal-page .card {
@@ -143,6 +144,8 @@ html[data-theme="light"] .portal-page .btn.primary {
   border-radius: var(--portal-radius);
   background: var(--portal-surface);
   box-shadow: var(--portal-shadow);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .portal-page .muted,
@@ -176,13 +179,13 @@ html[data-theme="light"] .portal-page .btn.primary {
 .panel-details {
   margin-top: 16px;
   border: 1px solid var(--portal-border);
-  border-radius: 13px;
-  background: rgba(7, 16, 31, .34);
+  border-radius: 18px;
+  background: var(--portal-surface);
 }
 
 html[data-theme="light"] .privacy-details,
 html[data-theme="light"] .panel-details {
-  background: rgba(232, 240, 248, .7);
+  background: var(--portal-surface);
 }
 
 .privacy-details summary,
@@ -221,8 +224,8 @@ html[data-theme="light"] .panel-details summary {
 }
 
 .login-page .grid {
-  grid-template-columns: minmax(0, 1fr) 330px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px;
 }
 
 .login-page .grid.signed-in {
@@ -232,7 +235,7 @@ html[data-theme="light"] .panel-details summary {
 }
 
 .login-page .auth-card {
-  padding: clamp(24px, 4vw, 38px);
+  padding: clamp(24px, 4vw, 36px);
 }
 
 .login-page h1 {
@@ -245,7 +248,7 @@ html[data-theme="light"] .panel-details summary {
   margin: 24px 0 18px;
   padding: 4px;
   border-color: var(--portal-border);
-  background: rgba(7, 16, 31, .56);
+  background: var(--portal-surface-strong);
 }
 
 .login-page .auth-tabs .btn {
@@ -280,8 +283,8 @@ html[data-theme="light"] .panel-details summary {
 .login-page .field input {
   min-height: 46px;
   border-color: var(--portal-border-strong);
-  border-radius: 11px;
-  background: #091426;
+  border-radius: 14px;
+  background: var(--portal-surface-strong);
 }
 
 html[data-theme="light"] .account-page .field input,
@@ -307,7 +310,7 @@ html[data-theme="light"] .account-page .field textarea {
 .login-page .login-aside {
   align-self: start;
   padding: 24px;
-  box-shadow: none;
+  box-shadow: var(--portal-shadow);
 }
 
 .login-page .login-aside .label {
@@ -330,7 +333,7 @@ html[data-theme="light"] .account-page .field textarea {
 
 .login-page .role {
   border-color: var(--portal-border);
-  background: #091426;
+  background: var(--portal-surface-strong);
 }
 
 .login-page .role.active {
@@ -461,7 +464,7 @@ html[data-theme="light"] .account-page .field textarea {
 .dashboard-page .grid .card {
   min-height: 112px;
   padding: 17px;
-  box-shadow: none;
+  box-shadow: var(--portal-shadow);
 }
 
 .dashboard-page .kpi {
@@ -475,7 +478,7 @@ html[data-theme="light"] .account-page .field textarea {
 }
 
 .dashboard-page .ops-primary .card {
-  box-shadow: none;
+  box-shadow: var(--portal-shadow);
 }
 
 .dashboard-page .ops-secondary {
@@ -515,19 +518,20 @@ html[data-theme="light"] .account-page .field textarea {
 .dashboard-page .select {
   min-height: 40px;
   border-color: var(--portal-border-strong);
-  border-radius: 10px;
-  background: #091426;
+  border-radius: 14px;
+  background: var(--portal-surface-strong);
 }
 
 .dashboard-page .driver {
   border-color: var(--portal-border);
-  border-radius: 13px;
-  background: #091426;
+  border-radius: 18px;
+  background: var(--portal-surface-strong);
+  box-shadow: none;
 }
 
 .dashboard-page .map {
   border-color: var(--portal-border);
-  border-radius: 13px;
+  border-radius: 18px;
 }
 
 .dashboard-page .secondary-panel {
@@ -571,6 +575,10 @@ html[data-theme="light"] .account-page .field textarea {
 }
 
 @media (max-width: 720px) {
+  .dashboard-page .top {
+    flex-wrap: wrap;
+  }
+
   .dashboard-page .hero {
     display: grid;
   }
@@ -581,6 +589,13 @@ html[data-theme="light"] .account-page .field textarea {
 
   .dashboard-page .actions {
     display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .dashboard-page .actions .btn {
+    padding-inline: 8px;
+    text-align: center;
   }
 
   .dashboard-page .dashboard-kpis {
@@ -601,6 +616,30 @@ html[data-theme="light"] .account-page .field textarea {
     display: grid;
     justify-content: stretch;
     width: 100%;
+  }
+
+  .dashboard-page .driver {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .dashboard-page .driver-identity {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .dashboard-page .driver-state {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
+  }
+
+  .dashboard-page .driver-score,
+  .dashboard-page .driver-metrics,
+  .dashboard-page .driver-actions {
+    grid-column: 2 / -1;
   }
 }
 
