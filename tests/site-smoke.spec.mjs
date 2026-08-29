@@ -521,6 +521,15 @@ test("pilot request controls use an accessible form", async ({ page }) => {
   await expect(page.getByLabel("Email")).toHaveAttribute("required", "");
 });
 
+test("fleet dashboard paid-rollout path reuses the protected lead form with clear intent", async ({ page }) => {
+  await page.goto("/pilot-signup.html?interest=paid-rollout", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turn your Occulert pilot into an operating plan");
+  await expect(page.locator("form h2")).toHaveText("Discuss a paid rollout");
+  await expect(page.locator("#message")).toHaveValue(/paid Occulert fleet rollout/i);
+  await expect(page.locator("#saveBtn")).toHaveText("Request Rollout Conversation");
+});
+
 test("driver invitation tokens leave the URL immediately and stay in session storage", async ({ page }) => {
   const token = "a".repeat(43);
   await page.goto(`/accept-invite.html#token=${token}`, { waitUntil: "domcontentloaded" });
@@ -780,6 +789,8 @@ test("fleet dashboard does not turn missing or inactive telemetry into active sa
   await expect(page.locator("#kpiDriversSub")).toHaveText("1 live");
   await expect(page.locator("#kpiScore")).toHaveText("64");
   await expect(page.locator("#kpiScoreSub")).toHaveText("1 below 70");
+  await expect(page.locator("#valueCoverage")).toHaveText("50%");
+  await expect(page.locator("#valueCoverageSub")).toHaveText("1 of 2 active drivers reporting");
 
   const noSession = page.locator(".driver").filter({ hasText: "No Session" });
   await expect(noSession).toContainText("NO DATA");
@@ -807,6 +818,70 @@ test("fleet dashboard does not turn missing or inactive telemetry into active sa
     window.refreshDashboardIfNeeded();
   });
   await expect(noSession.getByRole("button", { name: "Copy" })).toBeFocused();
+});
+
+test("fleet dashboard turns recent protected history into an actionable pilot report", async ({ page }) => {
+  const now = Date.now();
+  const isoDaysAgo = (days) => new Date(now - days * 86_400_000).toISOString();
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "manager-token",
+      refresh_token: "manager-refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "manager-1", email: "manager@example.com" },
+    }));
+  });
+  await page.route("**/api/fleet-summary", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      ok: true,
+      fleet: { id: "fleet-1", company_name: "Safe Transit", plan: "trial" },
+      drivers: [
+        { id: "driver-1", name: "Alex Driver", active: true, vehicle_id: "Van 1" },
+        { id: "driver-2", name: '=WEBSERVICE("https://example.invalid")', active: true, vehicle_id: "Van 2" },
+        { id: "driver-3", name: "No Recent Session", active: true, vehicle_id: "Van 3" },
+      ],
+      sessions: [
+        { id: "session-1", driver_id: "driver-1", started_at: isoDaysAgo(2), ended_at: isoDaysAgo(2), safety_score: 60, alert_count: 1, head_nod_count: 2 },
+        { id: "session-2", driver_id: "driver-2", started_at: isoDaysAgo(3), ended_at: isoDaysAgo(3), safety_score: 90, alert_count: 0, head_nod_count: 0 },
+        { id: "session-3", driver_id: "driver-1", started_at: isoDaysAgo(10), ended_at: isoDaysAgo(10), safety_score: 80, alert_count: 0, head_nod_count: 0 },
+        { id: "session-4", driver_id: "driver-3", started_at: isoDaysAgo(40), ended_at: isoDaysAgo(40), safety_score: 95, alert_count: 0, head_nod_count: 0 },
+      ],
+      events: [],
+      telemetry_trust: "unverified_client_report",
+      privacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false },
+    }),
+  }));
+
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
+  await expect(page.locator("#fleetPlanBadge")).toHaveText("trial workspace");
+  await expect(page.locator("#valueSessions")).toHaveText("3");
+  await expect(page.locator("#valueCoverage")).toHaveText("67%");
+  await expect(page.locator("#valueReview")).toHaveText("1");
+  await expect(page.locator("#valueScore")).toHaveText("77");
+  await expect(page.locator("#pilotValueStory")).toContainText("3 sessions across 2 drivers");
+
+  const alexAction = page.locator("#actionQueue .ops-row").filter({ hasText: "Alex Driver" });
+  await expect(alexAction).toContainText("Watch follow-up");
+  await alexAction.getByRole("button", { name: "Open driver" }).click();
+  await expect(page.locator("#driverSearch")).toHaveValue("Alex Driver");
+  await expect(page.locator('.driver[data-driver-key="driver-1"]')).toBeFocused();
+
+  await page.locator("#pilotRange").selectOption("7");
+  await expect(page.locator("#valueSessions")).toHaveText("2");
+  await expect(page.locator("#valueScore")).toHaveText("75");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download pilot report" }).click();
+  const download = await downloadPromise;
+  const csv = await readFile(await download.path(), "utf8");
+  expect(csv).toContain("unverified_client_report");
+  expect(csv).toContain("Alex Driver");
+  expect(csv).toContain("'=WEBSERVICE");
+  expect(csv).not.toMatch(/latitude|longitude|GPS|personal media|raw motion/i);
+  await expect(page.getByRole("link", { name: "Plan a paid rollout" })).toHaveAttribute("href", "/pilot-signup.html?interest=paid-rollout");
 });
 
 test("protected fleet history shows scoped events and exports formula-safe rows without coordinates", async ({ page }) => {

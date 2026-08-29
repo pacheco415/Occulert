@@ -4,12 +4,12 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 ★ = top-priority milestone for each phase
 
-**Last updated: 2026-08-24** — statuses distinguish shipped production work,
+**Last updated: 2026-08-28** — statuses distinguish shipped production work,
 current development source, and physical-device validation. See
 `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`, `SAFE_STOP_HANDOFF.md`, and issue
 #6 for the remaining evidence and product gaps.
 
-## Current milestone · Alerts, Apple-style clarity, and Fleet performance
+## Current milestone · Alerts, Fleet performance, and manager reporting
 
 This milestone is developed and reviewed as one work package. It does not
 queue a native build or publish the website by itself.
@@ -19,8 +19,9 @@ queue a native build or publish the website by itself.
 | Stronger phone and headphone alert delivery | Bounded two-cue standard and three-cue critical sequences implemented; explicit audio and haptic preferences remain authoritative | Physical speaker, AirPods / Bluetooth, car-audio, and interruption testing |
 | Stronger Apple Watch alerts | Severity-specific foreground haptics, time-sensitive background notification copy, and a more prominent latest-alert card implemented | Physical Watch foreground, background, locked-screen, and notification-settings testing |
 | Native visual cleanup | Shared neutral material tokens, calmer depth, simpler headers, and less technical Settings copy implemented | Simulator and physical-device visual review, including larger text and reduced transparency |
-| Website visual cleanup | Shared Apple-inspired material hierarchy implemented across public, sign-in, Account, and fleet surfaces | Preview review in dark/light themes and production verification after merge |
-| Fleet Dashboard performance | Driver-only filter rendering, hidden-tab polling pause, protected-request single-flight guard, and clearer mobile driver hierarchy implemented | Signed-in Preview validation with a populated protected fleet |
+| Website visual cleanup | Shared Apple-inspired material hierarchy implemented across public, sign-in, Account, and fleet surfaces and verified in production | Optional signed-in visual acceptance with a populated protected fleet |
+| Fleet Dashboard performance | Driver-only filter rendering, hidden-tab polling pause, protected-request single-flight guard, and clearer mobile driver hierarchy verified in production | Optional signed-in populated-fleet acceptance |
+| Fleet manager reporting | 7/30-day pilot scorecard, privacy-limited report export, driver-specific action queue, and paid-rollout lead attribution implemented in source | Draft-PR Preview review; pricing and plan entitlements remain separate work |
 
 Safety boundary: stronger alerts are intended to get attention and prompt a
 safe stop. They cannot wake every driver, keep a drowsy driver safely awake, or
@@ -105,7 +106,7 @@ complication remain separate future work.
 |------|----------|--------|
 | Unified confidence model fusing camera + earbud + watch signals | ★ | Not started |
 | Device-agnostic engine (works with any combination of devices) | — | Not started |
-| Fleet dashboard with per-driver device and signal data | — | Protected session and event history implemented in source and verified in production; current mobile hierarchy and hidden-tab performance update awaits Preview review |
+| Fleet dashboard with per-driver device and signal data | — | Protected session history, mobile hierarchy, and hidden-tab performance are production-verified; 7/30-day pilot value reporting, privacy-limited CSV export, driver-specific follow-up actions, and the paid-rollout lead path are implemented in source and await Preview review |
 | Tiered pricing model for fleet operators | — | Not started |
 
 ---

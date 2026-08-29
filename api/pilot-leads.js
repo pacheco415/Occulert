@@ -124,6 +124,7 @@ module.exports = async function handler(request, response) {
     return json(response, 400, { ok: false, error: "invalid_lead" });
   }
 
+  const paidRolloutInterest = body.interest === "paid_rollout";
   const lead = {
     name: clean(body.name, 160),
     role: clean(body.role, 160),
@@ -133,7 +134,7 @@ module.exports = async function handler(request, response) {
     fleet: clean(body.fleet, 80),
     useCase: clean(body.useCase, 120),
     message: clean(body.message, 1200),
-    source: "pilot-signup-page",
+    source: paidRolloutInterest ? "paid-rollout-page" : "pilot-signup-page",
     receivedAt: new Date().toISOString(),
   };
 
