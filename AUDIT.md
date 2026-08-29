@@ -1,9 +1,12 @@
 # Occulert Technical Audit
 
-Last updated: 2026-08-29 (previously 2026-08-04, 2026-07-08, 2026-07-05, 2026-06-14).
+Last updated: 2026-08-29. Last full source and live-site review: 2026-08-04
+(previously 2026-07-08, 2026-07-05, 2026-06-14).
 
-Source statuses below were re-checked on 2026-08-29. Production observations
-remain from the 2026-08-04 live-site review unless a later verification is
+The 2026-08-29 update is limited to verifying the current-source extraction of
+the driver app's behavior into `driver-app.js` and correcting the documented
+homepage inline-script exception. All other source statuses and production
+observations remain from the 2026-08-04 review unless a later verification is
 named explicitly. For the consolidated near/mid/long-term gap list, see issue
 #6.
 
