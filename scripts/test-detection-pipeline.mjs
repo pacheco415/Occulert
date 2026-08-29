@@ -1,5 +1,5 @@
 // Deterministic tests for the driver app's shipped detection pipeline.
-// Runs the REAL inline app.html logic (via scripts/lib/app-page-harness.mjs)
+// Runs the REAL external driver-app.js logic (via scripts/lib/app-page-harness.mjs)
 // against synthetic landmark frames and a fake clock. No camera, no
 // MediaPipe, no browser, no labeled dataset required.
 //

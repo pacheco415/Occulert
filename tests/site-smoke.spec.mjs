@@ -396,11 +396,12 @@ test("fleet filtering preserves input focus and updates only the visible roster"
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
-test("driver app external stylesheet preserves layout without moving monitoring scripts", async ({ page }) => {
+test("driver app external assets preserve layout and monitoring behavior", async ({ page }) => {
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
 
   expect(await page.locator('link[href="/driver-app.css"]').count()).toBe(1);
-  expect(await page.locator("script:not([src])").count()).toBe(2);
+  expect(await page.locator('script[src="/driver-app.js"]').count()).toBe(1);
+  expect(await page.locator("script:not([src])").count()).toBe(0);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator(".top")).toHaveCSS("min-height", "74px");
   await expect(page.locator(".app")).toHaveCSS("display", "grid");
