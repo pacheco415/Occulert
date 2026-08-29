@@ -89,13 +89,15 @@ test('normal eye-state severity behavior remains intact', () => {
 
 test('web copy and runtime disclose and enforce foreground-only monitoring', async () => {
   const howItWorks = readFileSync(new URL('../how-it-works.html', import.meta.url), 'utf8');
-  const app = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
+  const appPage = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../driver-app.js', import.meta.url), 'utf8');
   assert.doesNotMatch(howItWorks, /runs silently in the background/i);
   assert.match(howItWorks, /open in the foreground/i);
   assert.match(app, /async function handleVisibilityChange/);
   assert.match(app, /Monitoring stopped because Occulert left the foreground/);
   assert.match(app, /await stop\(\)/);
   assert.match(app, /Do not interact with the app while driving/);
+  assert.match(appPage, /Supplemental prototype only/);
 
   const handlerSource = app.match(
     /async function handleVisibilityChange\(hidden=document\.visibilityState==='hidden'\)\{.*?return true\}/s,

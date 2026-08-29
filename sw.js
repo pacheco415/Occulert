@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v40';
+const CACHE = 'occulert-v41';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -10,6 +10,7 @@ const STATIC_ASSETS = [
   '/portal.css?v=6',
   '/homepage.js',
   '/driver-app.css',
+  '/driver-app.js',
   '/lang.js',
   '/security-utils.js'
 ];

@@ -54,6 +54,7 @@ Occulert is an assistive prototype. It cannot guarantee crash prevention, driver
 occulert/
 ├── index.html              # Landing page
 ├── app.html                # Driver monitoring app
+├── driver-app.js           # Driver monitoring and alert behavior
 ├── fleet-dashboard.html    # Prototype fleet dashboard
 ├── session-history.html    # Local session history
 ├── privacy.html            # Privacy policy

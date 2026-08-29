@@ -1,17 +1,21 @@
 # Occulert Technical Audit
 
-Last updated: 2026-08-04 (previously 2026-07-08, 2026-07-05, 2026-06-14).
+Last updated: 2026-08-29. Last full source and live-site review: 2026-08-04
+(previously 2026-07-08, 2026-07-05, 2026-06-14).
 
-Every status below was re-checked against the `main` tree and against the live
-site on 2026-08-04, not against the previous revision of this document. For the
-consolidated near/mid/long-term gap list, see issue #6.
+The 2026-08-29 update is limited to verifying the current-source extraction of
+the driver app's behavior into `driver-app.js` and correcting the documented
+homepage inline-script exception. All other source statuses and production
+observations remain from the 2026-08-04 review unless a later verification is
+named explicitly. For the consolidated near/mid/long-term gap list, see issue
+#6.
 
 ## Original high-priority fixes — current status
 
 | Fix | Status | Evidence |
 |---|---|---|
-| Split inline CSS/JS out of `index.html` | Done | PR #54. `index.html` now has no `<style>` and no inline `<script>` |
-| Split inline CSS/JS out of `app.html` | Partly done | PR #55 extracted the styles. Two inline `<script>` blocks remain, starting at line 163 |
+| Split inline CSS/JS out of `index.html` | Done with a bounded exception | PR #54 extracted the homepage assets; one early recovery-link handoff remains inline so URL-fragment credentials are moved before other scripts run |
+| Split inline CSS/JS out of `app.html` | Done in current source | PR #55 extracted the styles; `driver-app.js` now holds the monitoring behavior and `app.html` has no inline script blocks |
 | Full homepage SEO tags | Done | PR #17. Canonical, `og:title/description/image/url/type`, and four `twitter:*` tags |
 | Camera-permission fallback text for iOS Safari vs Android Chrome | Done | PR #60 |
 | Real beta waitlist with reliable storage | Done | `api/pilot-leads.js` writes to Supabase using the service-role key |

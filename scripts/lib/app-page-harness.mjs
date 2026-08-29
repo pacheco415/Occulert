@@ -1,5 +1,5 @@
-// Deterministic harness for the driver app's inline detection pipeline.
-// Loads the REAL inline <script> blocks from app.html into a Node vm
+// Deterministic harness for the driver app's detection pipeline.
+// Loads the REAL external driver-app.js into a Node vm
 // sandbox with a controllable clock and a minimal DOM stub, so the
 // shipped calibration / PERCLOS / fatigue / alert logic can be tested
 // without a camera, MediaPipe, or a browser.
@@ -8,15 +8,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import vm from 'node:vm';
 
-const APP_HTML = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'app.html');
-
-function extractInlineScripts(html) {
-  const scripts = [];
-  const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
-  let m;
-  while ((m = re.exec(html)) !== null) scripts.push(m[1]);
-  return scripts;
-}
+const DRIVER_APP = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'driver-app.js');
 
 function makeClassList(el) {
   const set = new Set();
@@ -144,14 +136,8 @@ export function createAppHarness({ startAt = 1_700_000_000_000 } = {}) {
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
 
-  const html = readFileSync(APP_HTML, 'utf8');
-  const scripts = extractInlineScripts(html);
-  if (scripts.length < 2) {
-    throw new Error('Expected at least 2 inline scripts in app.html, found ' + scripts.length);
-  }
-  for (const [i, code] of scripts.entries()) {
-    vm.runInContext(code, sandbox, { filename: 'app.html#inline-' + i });
-  }
+  const code = readFileSync(DRIVER_APP, 'utf8');
+  vm.runInContext(code, sandbox, { filename: 'driver-app.js' });
 
   const run = (code) => vm.runInContext(code, sandbox, { filename: 'harness-eval' });
 
