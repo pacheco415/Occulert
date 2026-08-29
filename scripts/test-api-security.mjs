@@ -376,6 +376,7 @@ const validLead = {
   name: "Test Driver",
   company: "Test Fleet",
   email: "driver@example.com",
+  source: "browser-controlled-source",
   startedAt: new Date(Date.now() - 3000).toISOString(),
   website: "",
 };
@@ -388,6 +389,10 @@ assert.equal(stored.status, 200);
 assert.equal(stored.body.stored, true);
 assert.equal(storedLead.email, "driver@example.com");
 assert.equal(storedLead.use_case, null);
+assert.equal(storedLead.source, "pilot-signup-page", "browser callers must not choose arbitrary lead sources");
+const paidRollout = await invoke(pilotLeads, request("POST", { ...validLead, interest: "paid_rollout" }, "203.0.113.24"));
+assert.equal(paidRollout.status, 200);
+assert.equal(storedLead.source, "paid-rollout-page", "the server must preserve the allowlisted paid-rollout conversion path");
 
 const unavailableRateLimit = loadHandler("../api/pilot-leads.js", async (table) => {
   assert.equal(table, "rpc/check_pilot_lead_rate_limit");

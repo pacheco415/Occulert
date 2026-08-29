@@ -9,14 +9,21 @@ The current app-to-dashboard sync uses browser localStorage. That is good for a 
 - Verified fleet owners can read their server-scoped roster and recent sessions.
 - Protected fleet history includes recent alert events without GPS coordinates,
   personal media, or raw motion.
+- The manager dashboard turns the 50 most recent protected sessions into a
+  clearly bounded 7- or 30-day pilot snapshot, driver follow-up queue, and
+  formula-safe report export. A paid-rollout interest path reuses the protected
+  pilot contact endpoint and records an allowlisted server-side source label.
 - The dashboard keeps local demo and same-browser fallback data separate from
   authenticated fleet data.
 
 ## Next production upgrade
 
-Verify the protected fleet history in the deployed environment, then add
-manager reporting workflows without weakening driver consent or ownership
-checks.
+The new reporting workflow passed signed-in Preview review for an owner-scoped
+fleet with two active drivers and no recorded sessions; nonzero reporting states
+passed automated browser coverage. After merge, verify production behavior,
+then add durable manager follow-up outcomes, reporting pagination or retention,
+and plan entitlements after pilot pricing is defined. Keep driver consent, fleet
+ownership, and telemetry-trust boundaries unchanged.
 
 Recommended stack options:
 

@@ -367,6 +367,15 @@ assertIncludes("fleet-dashboard.html", "document.hidden", "fleet dashboard polli
 assertIncludes("fleet-dashboard.html", "protectedFleetLoading", "fleet dashboard must prevent overlapping protected-summary requests");
 assertIncludes("fleet-dashboard.html", "data-focus-key=\"driver-copy-", "dynamic driver actions must expose stable focus keys");
 assertIncludes("fleet-dashboard.html", "function exportSessionHistoryCSV()", "protected session history must keep a privacy-safe export");
+assertIncludes("fleet-dashboard.html", "Pilot value snapshot", "fleet managers must receive a time-bounded pilot value summary");
+assertIncludes("fleet-dashboard.html", "Average reported safety score", "fleet value summaries must identify client-reported score data");
+assertNotIncludes("fleet-dashboard.html", "Measured safety score", "fleet value summaries must not imply independent measurement");
+assertIncludes("fleet-dashboard.html", "function exportPilotReport()", "fleet managers must be able to export a manager-ready pilot report");
+assertIncludes("fleet-dashboard.html", "unverified_client_report", "pilot reports must preserve the telemetry trust boundary");
+assertIncludes("fleet-dashboard.html", "interest=paid-rollout", "fleet value summaries must provide a direct paid-rollout conversation path");
+assertIncludes("pilot-signup.html", "rolloutInterest", "the shared fleet lead form must distinguish paid-rollout interest");
+assertIncludes("pilot-signup.html", "What the rollout covers", "the paid-rollout path must explain the commercial offer");
+assertIncludes("pilot-signup.html", "submitting this form does not start a paid service", "the paid-rollout path must set a clear transaction boundary");
 assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet exports must neutralize spreadsheet formulas");
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
 assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigation must expose one contextual primary action");

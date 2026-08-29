@@ -84,7 +84,11 @@ test('fleet projection preserves inactive and unmeasured driver states', () => {
 test('roadmap and setup docs distinguish source completion from deployment', () => {
   const roadmap = read('APP_ROADMAP.md');
   const setup = read('BACKEND_SETUP.md');
-  assert.match(roadmap, /protected session and event history implemented in source/i);
-  assert.match(roadmap, /current mobile hierarchy and hidden-tab performance update awaits Preview review/i);
+  assert.match(roadmap, /protected session history.*production-verified/i);
+  assert.match(roadmap, /Signed-in Preview verified.*two-driver no-session fleet/i);
+  assert.match(roadmap, /production verification after merge remains pending/i);
   assert.match(setup, /manager-scoped session and event history excludes GPS/i);
+  const backendRoadmap = read('BACKEND_ROADMAP.md');
+  assert.match(backendRoadmap, /formula-safe report export/i);
+  assert.match(backendRoadmap, /passed signed-in Preview review[\s\S]*two active drivers and no recorded sessions/i);
 });
