@@ -18,9 +18,11 @@ The current app-to-dashboard sync uses browser localStorage. That is good for a 
 
 ## Next production upgrade
 
-Review the new reporting workflow in a signed-in Preview, then add durable
-manager follow-up outcomes, reporting pagination or retention, and plan
-entitlements after pilot pricing is defined. Keep driver consent, fleet
+The new reporting workflow passed signed-in Preview review for an owner-scoped
+fleet with two active drivers and no recorded sessions; nonzero reporting states
+passed automated browser coverage. After merge, verify production behavior,
+then add durable manager follow-up outcomes, reporting pagination or retention,
+and plan entitlements after pilot pricing is defined. Keep driver consent, fleet
 ownership, and telemetry-trust boundaries unchanged.
 
 Recommended stack options:

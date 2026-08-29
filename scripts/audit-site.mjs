@@ -368,6 +368,8 @@ assertIncludes("fleet-dashboard.html", "protectedFleetLoading", "fleet dashboard
 assertIncludes("fleet-dashboard.html", "data-focus-key=\"driver-copy-", "dynamic driver actions must expose stable focus keys");
 assertIncludes("fleet-dashboard.html", "function exportSessionHistoryCSV()", "protected session history must keep a privacy-safe export");
 assertIncludes("fleet-dashboard.html", "Pilot value snapshot", "fleet managers must receive a time-bounded pilot value summary");
+assertIncludes("fleet-dashboard.html", "Average reported safety score", "fleet value summaries must identify client-reported score data");
+assertNotIncludes("fleet-dashboard.html", "Measured safety score", "fleet value summaries must not imply independent measurement");
 assertIncludes("fleet-dashboard.html", "function exportPilotReport()", "fleet managers must be able to export a manager-ready pilot report");
 assertIncludes("fleet-dashboard.html", "unverified_client_report", "pilot reports must preserve the telemetry trust boundary");
 assertIncludes("fleet-dashboard.html", "interest=paid-rollout", "fleet value summaries must provide a direct paid-rollout conversation path");

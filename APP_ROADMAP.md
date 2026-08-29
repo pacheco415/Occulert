@@ -21,7 +21,7 @@ queue a native build or publish the website by itself.
 | Native visual cleanup | Shared neutral material tokens, calmer depth, simpler headers, and less technical Settings copy implemented | Simulator and physical-device visual review, including larger text and reduced transparency |
 | Website visual cleanup | Shared Apple-inspired material hierarchy implemented across public, sign-in, Account, and fleet surfaces and verified in production | Optional signed-in visual acceptance with a populated protected fleet |
 | Fleet Dashboard performance | Driver-only filter rendering, hidden-tab polling pause, protected-request single-flight guard, and clearer mobile driver hierarchy verified in production | Optional signed-in populated-fleet acceptance |
-| Fleet manager reporting | 7/30-day pilot scorecard, privacy-limited report export, driver-specific action queue, and paid-rollout lead attribution implemented in source | Draft-PR Preview review; pricing and plan entitlements remain separate work |
+| Fleet manager reporting | 7/30-day pilot scorecard, privacy-limited report export, driver-specific action queue, and paid-rollout lead attribution implemented in source | Signed-in Preview verified for owner scoping, a two-driver no-session fleet, and both reporting windows; production verification after merge remains pending. Nonzero results passed automated browser coverage; pricing and plan entitlements remain separate work |
 
 Safety boundary: stronger alerts are intended to get attention and prompt a
 safe stop. They cannot wake every driver, keep a drowsy driver safely awake, or
@@ -106,7 +106,7 @@ complication remain separate future work.
 |------|----------|--------|
 | Unified confidence model fusing camera + earbud + watch signals | ★ | Not started |
 | Device-agnostic engine (works with any combination of devices) | — | Not started |
-| Fleet dashboard with per-driver device and signal data | — | Protected session history, mobile hierarchy, and hidden-tab performance are production-verified; 7/30-day pilot value reporting, privacy-limited CSV export, driver-specific follow-up actions, and the paid-rollout lead path are implemented in source and await Preview review |
+| Fleet dashboard with per-driver device and signal data | — | Protected session history, mobile hierarchy, and hidden-tab performance are production-verified; 7/30-day pilot value reporting, privacy-limited CSV export, driver-specific follow-up actions, and the paid-rollout lead path are implemented in source and verified in a signed-in Preview for a two-driver fleet with no recorded sessions. Nonzero results passed automated browser coverage; production verification remains pending |
 | Tiered pricing model for fleet operators | — | Not started |
 
 ---

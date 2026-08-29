@@ -870,6 +870,7 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
   await expect(page.locator("#valueCoverage")).toHaveText("67%");
   await expect(page.locator("#valueReview")).toHaveText("1");
   await expect(page.locator("#valueScore")).toHaveText("77");
+  await expect(page.locator(".value-metric:has(#valueScore) .label")).toHaveText("Average reported safety score");
   await expect(page.locator("#pilotValueStory")).toContainText("3 sessions across 2 drivers");
 
   const alexAction = page.locator("#actionQueue .ops-row").filter({ hasText: "Alex Driver" });
