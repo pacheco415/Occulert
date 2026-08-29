@@ -100,3 +100,19 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /accessibilityLabel="Open settings and end monitoring"/);
   assert.match(layout, /name="monitor"[\s\S]*gestureEnabled: false/);
 });
+
+test('monitor performance resources stay scoped and stable during a live session', () => {
+  const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  assert.match(
+    monitor,
+    /function MonitoringWakeLock\(\) \{[\s\S]*useKeepAwake\('occulert-active-monitoring'\);[\s\S]*return null;/,
+  );
+  assert.match(monitor, /\{isRunning && <MonitoringWakeLock \/>\}/);
+  assert.doesNotMatch(
+    monitor,
+    /export default function MonitorScreen\(\) \{\s*useKeepAwake\(/,
+  );
+  assert.match(monitor, /const onEyeStateJS = useRunOnJS\(onEyeState, \[onEyeState\]\);/);
+  assert.match(monitor, /const lastSample = useSharedValue\(0\);/);
+  assert.doesNotMatch(monitor, /Worklets\.create(?:RunOnJS|SharedValue)/);
+});

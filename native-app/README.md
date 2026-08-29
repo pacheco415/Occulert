@@ -87,7 +87,7 @@ native-app/
 |-----------|--------|
 | Expo project initialized | Done - scaffold created |
 | Camera + EAR detection running | Done - `useEyeTracking.ts` + dev simulation loop |
-| Foreground camera monitoring (iOS) | Done - `useKeepAwake` + VisionCamera in `monitor.tsx` |
+| Foreground camera monitoring (iOS) | Done - session-scoped `useKeepAwake` + VisionCamera in `monitor.tsx` |
 | Screen-off / app-backgrounded camera monitoring | Not supported - keep the app foregrounded |
 | Sensitivity slider | Done - `SensitivitySlider.tsx` + AsyncStorage |
 | Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-audio |
