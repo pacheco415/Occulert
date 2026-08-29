@@ -524,7 +524,16 @@ test("pilot request controls use an accessible form", async ({ page }) => {
 test("fleet dashboard paid-rollout path reuses the protected lead form with clear intent", async ({ page }) => {
   await page.goto("/pilot-signup.html?interest=paid-rollout", { waitUntil: "domcontentloaded" });
 
+  await expect(page.locator(".brand")).toHaveText("Occulert Fleet Rollout");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turn your Occulert pilot into an operating plan");
+  await expect(page.locator(".steps")).toContainText("1. Review outcomes");
+  await expect(page.locator(".steps")).toContainText("2. Define rollout");
+  await expect(page.locator(".steps")).toContainText("3. Agree on scope");
+  await expect(page.locator(".list")).toContainText("What the rollout covers");
+  await expect(page.locator(".list")).toContainText("What happens next");
+  await expect(page.locator(".list")).toContainText("submitting this form does not start a paid service");
+  await expect(page.locator(".steps")).not.toContainText("Plan pilot");
+  await expect(page.locator(".list")).not.toContainText("Good pilot fit");
   await expect(page.locator("form h2")).toHaveText("Discuss a paid rollout");
   await expect(page.locator("#message")).toHaveValue(/paid Occulert fleet rollout/i);
   await expect(page.locator("#saveBtn")).toHaveText("Request Rollout Conversation");

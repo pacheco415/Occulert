@@ -372,6 +372,8 @@ assertIncludes("fleet-dashboard.html", "function exportPilotReport()", "fleet ma
 assertIncludes("fleet-dashboard.html", "unverified_client_report", "pilot reports must preserve the telemetry trust boundary");
 assertIncludes("fleet-dashboard.html", "interest=paid-rollout", "fleet value summaries must provide a direct paid-rollout conversation path");
 assertIncludes("pilot-signup.html", "rolloutInterest", "the shared fleet lead form must distinguish paid-rollout interest");
+assertIncludes("pilot-signup.html", "What the rollout covers", "the paid-rollout path must explain the commercial offer");
+assertIncludes("pilot-signup.html", "submitting this form does not start a paid service", "the paid-rollout path must set a clear transaction boundary");
 assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet exports must neutralize spreadsheet formulas");
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
 assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigation must expose one contextual primary action");

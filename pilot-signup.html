@@ -15,7 +15,22 @@
 <script>
 const formStartedAt=new Date().toISOString();
 const rolloutInterest=new URLSearchParams(location.search).get('interest')==='paid-rollout';
-if(rolloutInterest){document.title='Plan a Paid Fleet Rollout — Occulert';document.querySelector('.pill').textContent='Paid fleet rollout';document.querySelector('h1').textContent='Turn your Occulert pilot into an operating plan';document.querySelector('.hero>div>.muted').textContent='Review your pilot results with Occulert, define the manager workflow your fleet needs, and plan a supported paid rollout without adding hidden claims or surveillance data.';document.querySelector('form h2').textContent='Discuss a paid rollout';document.getElementById('message').value='I am interested in discussing a paid Occulert fleet rollout based on our pilot needs.';document.getElementById('saveBtn').textContent='Request Rollout Conversation'}
+if(rolloutInterest){
+  const steps=document.querySelectorAll('.step'),items=document.querySelectorAll('.item');
+  document.title='Plan a Paid Fleet Rollout — Occulert';
+  document.querySelector('.brand').textContent='Occulert Fleet Rollout';
+  document.querySelector('.pill').textContent='Paid fleet rollout';
+  document.querySelector('h1').textContent='Turn your Occulert pilot into an operating plan';
+  document.querySelector('.hero>div>.muted').textContent='Use your pilot results to define a practical manager workflow, agree on rollout scope, and move toward a supported paid deployment without adding hidden claims or surveillance data.';
+  steps[0].innerHTML='<strong>1. Review outcomes</strong><br><span class="small">Use the dashboard report to confirm participation, review workload, and operating goals.</span>';
+  steps[1].innerHTML='<strong>2. Define rollout</strong><br><span class="small">Choose the driver group, manager workflow, reporting window, and support needs.</span>';
+  steps[2].innerHTML='<strong>3. Agree on scope</strong><br><span class="small">Confirm the rollout plan and pilot-informed pricing before any paid deployment begins.</span>';
+  items[0].innerHTML='<strong>What the rollout covers</strong><br><span class="muted">Owner-scoped dashboard access, protected driver invitations, 7- and 30-day reporting, privacy-limited exports, and rollout planning with Occulert.</span>';
+  items[1].innerHTML='<strong>What happens next</strong><br><span class="muted">Share your fleet size and use case. Occulert will review the request and follow up by email to discuss scope, support, and pricing; submitting this form does not start a paid service.</span>';
+  document.querySelector('form h2').textContent='Discuss a paid rollout';
+  document.getElementById('message').value='I am interested in discussing a paid Occulert fleet rollout based on our pilot needs.';
+  document.getElementById('saveBtn').textContent='Request Rollout Conversation';
+}
 function val(id){return document.getElementById(id).value.trim()}
 function validEmail(email){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)}
 async function saveLead(event){
