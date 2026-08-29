@@ -23,7 +23,7 @@ import {
   useFaceDetector,
   type FrameFaceDetectionOptions,
 } from 'react-native-vision-camera-face-detector';
-import { Worklets } from 'react-native-worklets-core';
+import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
 import { useKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
 import { useEyeTracking } from '../hooks/useEyeTracking';
@@ -89,9 +89,12 @@ const SAFE_STOP_ICONS: Record<SafeStopKind, React.ComponentProps<typeof Ionicons
   'food-coffee': 'cafe-outline',
 };
 
-export default function MonitorScreen() {
-  useKeepAwake();
+function MonitoringWakeLock() {
+  useKeepAwake('occulert-active-monitoring');
+  return null;
+}
 
+export default function MonitorScreen() {
   const router = useRouter();
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -523,8 +526,11 @@ export default function MonitorScreen() {
     prevAlertingRef.current = alerting;
   }, [processEyeOpenness, processNoFace]);
 
-  const onEyeStateJS = Worklets.createRunOnJS(onEyeState);
-  const lastSample = Worklets.createSharedValue(0);
+  // These native worklet values must outlive ordinary React renders. The
+  // session timer updates once per second, so recreating either value here
+  // would repeatedly rebuild the frame-processor bridge during a drive.
+  const onEyeStateJS = useRunOnJS(onEyeState, [onEyeState]);
+  const lastSample = useSharedValue(0);
 
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
@@ -601,6 +607,7 @@ export default function MonitorScreen() {
 
   return (
     <View style={s.container}>
+      {isRunning && <MonitoringWakeLock />}
       {isRunning ? (
         <Camera
           style={StyleSheet.absoluteFill}
