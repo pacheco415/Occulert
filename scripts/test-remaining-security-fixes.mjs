@@ -33,7 +33,10 @@ test('native cloud writes recheck current consent', () => {
   const finishWrite = cloud.slice(cloud.indexOf('export async function finishCloudSession'));
   assert.match(alertWrite, /if \(!await consentEnabled\(\)\) return false/);
   assert.match(finishWrite, /if \(!await consentEnabled\(\)\) return false/);
-  assert.match(cloud, /consentOverride/);
+  assert.match(cloud, /createCachedBooleanPreference/);
+  assert.match(cloud, /if \(consentRuntimeOverride !== null\) return consentRuntimeOverride/);
+  assert.match(cloud, /if \(!enabled\) consentRuntimeOverride = false/);
+  assert.match(cloud, /cloudSyncPreference\.set\(false\)/);
 });
 
 test('monitoring fails visibly without overlapping the navigation or showing a duplicate modal', () => {

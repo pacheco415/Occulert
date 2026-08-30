@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSingleFlightActionRunner } from '../native-app/lib/singleFlightAction.ts';
+import { createAsyncMutationQueue } from '../native-app/lib/asyncMutationQueue.ts';
+import { createCachedBooleanPreference } from '../native-app/lib/cachedBooleanPreference.ts';
 import { colors } from '../native-app/constants/theme.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -45,12 +47,20 @@ assert.match(cloud, /if \(authCache !== undefined\) return authCache/);
 assert.match(cloud, /if \(!authLoadPromise\)/);
 assert.match(cloud, /readVersion !== authMutationVersion/);
 assert.match(cloud, /A transient keychain or JSON read failure must remain retryable/);
-assert.match(cloud, /writeVersion !== authMutationVersion/);
 assert.match(cloud, /expectedVersion !== authMutationVersion/);
+assert.match(cloud, /authStorageQueue\.run\(async \(\) =>/);
+assert.match(cloud, /authStorageQueue\.run\(\(\) => SecureStore\.deleteItemAsync/);
+assert.doesNotMatch(
+  cloud,
+  /writeVersion !== authMutationVersion[\s\S]{0,120}SecureStore\.deleteItemAsync/,
+  'a stale token writer must never delete a newer queued login',
+);
 assert.match(cloud, /refreshAuth\(auth, refreshVersion\)/);
 assert.match(cloud, /if \(!authRefreshPromise\)/);
 assert.match(cloud, /authCache = auth/);
-assert.match(cloud, /consentOverride = false;\s*authMutationVersion \+= 1;\s*authCache = null;/);
+assert.match(cloud, /consentRuntimeOverride = false;\s*authMutationVersion \+= 1;\s*authCache = null;/);
+assert.match(cloud, /cloudSyncPreference\.set\(false\)/);
+assert.match(cloud, /cloudSyncPreference\.get\(\)/);
 assert.doesNotMatch(
   cloud,
   /SERVICE_ROLE|service.role/i,
@@ -109,6 +119,46 @@ assert.equal((await retryingLoadAuth())?.user.email, 'driver@example.com', 'the 
 assert.equal((await retryingLoadAuth())?.access_token, 'access', 'successful auth should remain cached');
 assert.equal(secureStoreReads, 2, 'only the failed read and one successful retry should reach SecureStore');
 
+const mutationEvents = [];
+let releaseOldTokenWrite;
+const tokenQueue = createAsyncMutationQueue();
+const oldTokenWrite = tokenQueue.run(async () => {
+  mutationEvents.push('old-start');
+  await new Promise(resolve => { releaseOldTokenWrite = resolve; });
+  mutationEvents.push('old-finish');
+});
+const clearToken = tokenQueue.run(async () => { mutationEvents.push('clear'); });
+const saveNewToken = tokenQueue.run(async () => { mutationEvents.push('new'); });
+await new Promise(resolve => setTimeout(resolve, 0));
+assert.deepEqual(mutationEvents, ['old-start']);
+releaseOldTokenWrite();
+await Promise.all([oldTokenWrite, clearToken, saveNewToken]);
+assert.deepEqual(
+  mutationEvents,
+  ['old-start', 'old-finish', 'clear', 'new'],
+  'sign-out and a newer login must persist after an older token write',
+);
+
+let resolveConsentRead;
+let storedConsent = 'true';
+const consentPreference = createCachedBooleanPreference({
+  getItem() {
+    return new Promise(resolve => { resolveConsentRead = resolve; });
+  },
+  async setItem(_key, value) {
+    storedConsent = value;
+  },
+}, 'cloud-consent');
+const staleConsentRead = consentPreference.get();
+const disableConsent = consentPreference.set(false);
+await Promise.resolve();
+assert.equal(typeof resolveConsentRead, 'function');
+resolveConsentRead('true');
+await disableConsent;
+assert.equal(await staleConsentRead, false, 'a delayed read must not restore disabled cloud sync');
+assert.equal(storedConsent, 'false');
+assert.equal(await consentPreference.get(), false);
+
 const eventStart = cloud.indexOf('export async function logCloudAlert');
 const eventEnd = cloud.indexOf('export async function finishCloudSession');
 assert.ok(eventStart >= 0 && eventEnd > eventStart, 'cloud alert function must exist');
@@ -123,6 +173,11 @@ assert.match(monitor, /beginCloudSession\(\)/);
 assert.match(monitor, /logCloudAlert\(sessionId, result\.fatigueScore\)/);
 assert.match(monitor, /finishCloudSession\(cloudSessionId/);
 assert.match(monitor, /cloudSynced: true/);
+assert.match(
+  monitor,
+  /if \(!isRunningRef\.current \|\| stoppingRef\.current\) return;/,
+  'late frame callbacks must not mutate a stopped monitoring session',
+);
 assert.match(monitor, /headNodObservationsRef\.current \+= 1/);
 assert.match(cloud, /Candidate head-nod observations remain local until device validation/);
 assert.match(settings, /<CloudSyncCard \/>/);
