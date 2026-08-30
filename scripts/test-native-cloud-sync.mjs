@@ -44,6 +44,7 @@ assert.match(cloud, /let authCache: StoredAuth \| null \| undefined/);
 assert.match(cloud, /if \(authCache !== undefined\) return authCache/);
 assert.match(cloud, /if \(!authLoadPromise\)/);
 assert.match(cloud, /readVersion !== authMutationVersion/);
+assert.match(cloud, /A transient keychain or JSON read failure must remain retryable/);
 assert.match(cloud, /writeVersion !== authMutationVersion/);
 assert.match(cloud, /expectedVersion !== authMutationVersion/);
 assert.match(cloud, /refreshAuth\(auth, refreshVersion\)/);
@@ -67,6 +68,46 @@ assert.equal(
   'session start, alert logging, and session finish should each check consent once',
 );
 assert.match(cloud, /https:\/\/www\.occulert\.com/);
+
+const loadAuthSource = cloud
+  .slice(cloud.indexOf('async function loadAuth'), cloud.indexOf('async function saveAuth'))
+  .replace('async function loadAuth(): Promise<StoredAuth | null>', 'async function loadAuth()')
+  .replace('const parsed: unknown', 'const parsed');
+assert.ok(loadAuthSource.includes('async function loadAuth'), 'loadAuth must remain directly testable');
+let secureStoreReads = 0;
+const retryingSecureStore = {
+  getItemAsync: async () => {
+    secureStoreReads += 1;
+    if (secureStoreReads === 1) throw new Error('temporary keychain failure');
+    return JSON.stringify({
+      access_token: 'access',
+      refresh_token: 'refresh',
+      expires_at: 4_000_000_000,
+      user: { id: 'user-1', email: 'driver@example.com' },
+    });
+  },
+};
+const makeLoadAuth = new Function(
+  'SecureStore',
+  'AUTH_KEY',
+  'SECURE_OPTIONS',
+  'validStoredAuth',
+  `let authCache;
+   let authLoadPromise = null;
+   let authMutationVersion = 0;
+   ${loadAuthSource}
+   return loadAuth;`,
+);
+const retryingLoadAuth = makeLoadAuth(
+  retryingSecureStore,
+  'occulert-auth',
+  {},
+  value => Boolean(value?.access_token && value?.refresh_token && value?.user?.id && value?.user?.email),
+);
+assert.equal(await retryingLoadAuth(), null, 'a transient storage failure should fail closed');
+assert.equal((await retryingLoadAuth())?.user.email, 'driver@example.com', 'the next auth read must retry and recover');
+assert.equal((await retryingLoadAuth())?.access_token, 'access', 'successful auth should remain cached');
+assert.equal(secureStoreReads, 2, 'only the failed read and one successful retry should reach SecureStore');
 
 const eventStart = cloud.indexOf('export async function logCloudAlert');
 const eventEnd = cloud.indexOf('export async function finishCloudSession');

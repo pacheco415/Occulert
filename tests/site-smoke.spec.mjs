@@ -468,6 +468,31 @@ test("driver monitoring stops instead of appearing active after foreground loss"
   await expect(page.locator("#overlayHint")).toContainText("Foreground required");
 });
 
+test("driver startup stays camera-free when foreground is lost during model loading", async ({ page }) => {
+  await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => {
+    window.__cameraRequests = 0;
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: async () => {
+          window.__cameraRequests += 1;
+          return { getTracks: () => [{ stop: () => {} }] };
+        },
+      },
+    });
+    initModel = () => new Promise((resolve) => { window.__releaseModelLoad = resolve; });
+    void start();
+  });
+  await expect.poll(() => page.evaluate(() => starting)).toBe(true);
+  await page.evaluate(() => handleVisibilityChange(true));
+  await page.evaluate(() => window.__releaseModelLoad());
+  await expect.poll(() => page.evaluate(() => starting)).toBe(false);
+  expect(await page.evaluate(() => window.__cameraRequests)).toBe(0);
+  expect(await page.evaluate(() => running)).toBe(false);
+  await expect(page.locator("#overlayTitle")).toHaveText("Monitoring Paused");
+});
+
 test("opted-in driver sessions use authenticated cloud APIs without sending GPS by default", async ({ page }) => {
   const apiCalls = [];
   await page.addInitScript(() => {

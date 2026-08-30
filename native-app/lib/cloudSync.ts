@@ -149,7 +149,8 @@ async function loadAuth(): Promise<StoredAuth | null> {
       })
       .catch(() => {
         if (readVersion !== authMutationVersion) return authCache ?? null;
-        authCache = null;
+        // A transient keychain or JSON read failure must remain retryable.
+        // Cache null only after a successful read proves no valid auth exists.
         return null;
       })
       .finally(() => {

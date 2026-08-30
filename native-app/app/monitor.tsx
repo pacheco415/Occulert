@@ -32,7 +32,7 @@ import { LiveMetrics } from '../components/LiveMetrics';
 import { GlassSurface } from '../components/GlassSurface';
 import { loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
-import type { SensitivityLevel } from '../constants/thresholds';
+import { PERCLOS_ALERT_THRESHOLD, type SensitivityLevel } from '../constants/thresholds';
 import { updateSessionHistory } from '../lib/sessionHistory';
 import {
   beginCloudSession,
@@ -61,10 +61,11 @@ import {
   stopBeforeNavigation,
 } from '../lib/monitorLifecycle';
 import {
-  MONITOR_UI_UPDATE_INTERVAL_MS,
   createMonitorPerformanceTracker,
   elapsedSessionSeconds,
+  shouldRefreshMonitorMetrics,
 } from '../lib/monitorPerformance';
+import { deriveAlertLevel, type AlertLevel } from '../lib/alertPolicy';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -142,6 +143,7 @@ export default function MonitorScreen() {
   const headphoneMotionStatusRef = useRef<HeadphoneMotionState>('not-built');
   const lastMetricsUiAtRef = useRef(0);
   const displayedMetricsStateRef = useRef<EyeMetrics['state']>('noFace');
+  const displayedAlertLevelRef = useRef<AlertLevel>('none');
   const performanceTrackerRef = useRef(createMonitorPerformanceTracker());
 
   const [metrics, setMetrics] = useState<EyeMetrics>({
@@ -512,10 +514,24 @@ export default function MonitorScreen() {
         ? { ...rawResult, state: 'watch' }
         : rawResult;
 
-    const shouldRefreshDisplay = result.state !== displayedMetricsStateRef.current
-      || now - lastMetricsUiAtRef.current >= MONITOR_UI_UPDATE_INTERVAL_MS;
+    const alertLevel = deriveAlertLevel({
+      isRunning: isRunningRef.current,
+      metrics: result,
+      sessionTime: elapsedSessionSeconds(sessionStartedAtRef.current, now),
+      trackingLostForMs: 0,
+      criticalPerclosThreshold: PERCLOS_ALERT_THRESHOLD,
+    });
+    const shouldRefreshDisplay = shouldRefreshMonitorMetrics({
+      previousState: displayedMetricsStateRef.current,
+      nextState: result.state,
+      previousAlertLevel: displayedAlertLevelRef.current,
+      nextAlertLevel: alertLevel,
+      now,
+      lastUpdatedAt: lastMetricsUiAtRef.current,
+    });
     if (shouldRefreshDisplay) {
       displayedMetricsStateRef.current = result.state;
+      displayedAlertLevelRef.current = alertLevel;
       lastMetricsUiAtRef.current = now;
       performanceTrackerRef.current.recordUiUpdate();
       setMetrics(result);

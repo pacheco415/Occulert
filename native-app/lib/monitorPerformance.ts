@@ -1,4 +1,25 @@
 export const MONITOR_UI_UPDATE_INTERVAL_MS = 250;
+
+export function shouldRefreshMonitorMetrics({
+  previousState,
+  nextState,
+  previousAlertLevel,
+  nextAlertLevel,
+  now,
+  lastUpdatedAt,
+}: {
+  previousState: string;
+  nextState: string;
+  previousAlertLevel: string;
+  nextAlertLevel: string;
+  now: number;
+  lastUpdatedAt: number;
+}): boolean {
+  return nextState !== previousState
+    || nextAlertLevel !== previousAlertLevel
+    || now - lastUpdatedAt >= MONITOR_UI_UPDATE_INTERVAL_MS;
+}
+
 export const MONITOR_PERFORMANCE_WINDOW_SIZE = 120;
 
 export interface MonitorPerformanceSnapshot {

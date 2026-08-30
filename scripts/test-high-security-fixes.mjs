@@ -99,18 +99,25 @@ test('web copy and runtime disclose and enforce foreground-only monitoring', asy
   assert.match(app, /Do not interact with the app while driving/);
   assert.match(appPage, /Supplemental prototype only/);
 
-  const handlerSource = app.match(
-    /async function handleVisibilityChange\(hidden=document\.visibilityState==='hidden'\)\{.*?return true\}/s,
-  )?.[0];
+  const handlerStart = app.indexOf('async function handleVisibilityChange');
+  const handlerEnd = app.indexOf("document.addEventListener('visibilitychange'", handlerStart);
+  const handlerSource = handlerStart >= 0 && handlerEnd > handlerStart
+    ? app.slice(handlerStart, handlerEnd)
+    : '';
   assert.ok(handlerSource, 'foreground-loss handler must remain directly testable');
   const logs = [];
   let stopCount = 0;
   const context = {
     document: { visibilityState: 'hidden' },
     running: true,
+    starting: false,
+    startCancelled: false,
+    stream: null,
+    video: { srcObject: null },
     hiddenAt: 0,
     Date,
     log: (message) => logs.push(message),
+    setOverlay: () => {},
     stop: async () => {
       stopCount += 1;
       context.running = false;
@@ -126,6 +133,17 @@ test('web copy and runtime disclose and enforce foreground-only monitoring', asy
   context.running = true;
   assert.equal(await context.testHandler(false), false);
   assert.equal(stopCount, 1);
+
+  let stoppedTracks = 0;
+  context.running = false;
+  context.starting = true;
+  context.stream = { getTracks: () => [{ stop: () => { stoppedTracks += 1; } }] };
+  context.video.srcObject = context.stream;
+  assert.equal(await context.testHandler(true), true);
+  assert.equal(context.startCancelled, true);
+  assert.equal(context.stream, null);
+  assert.equal(context.video.srcObject, null);
+  assert.equal(stoppedTracks, 1, 'foreground loss must stop a camera stream acquired during startup');
 });
 
 test('native monitoring requires a fresh one-time pre-drive safety confirmation', () => {
