@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { createAsyncMutationQueue } from './asyncMutationQueue';
+import { createCachedBooleanPreference } from './cachedBooleanPreference';
 
 const API_BASE = 'https://www.occulert.com';
 const AUTH_KEY = 'occulert.cloud.auth.v1';
@@ -68,11 +70,17 @@ export interface CloudSignInResult {
 }
 
 let configPromise: Promise<PublicConfig | null> | null = null;
-let consentOverride: boolean | null = null;
+let consentRuntimeOverride: boolean | null = null;
 let authCache: StoredAuth | null | undefined;
 let authLoadPromise: Promise<StoredAuth | null> | null = null;
 let authRefreshPromise: Promise<StoredAuth | null> | null = null;
 let authMutationVersion = 0;
+const authStorageQueue = createAsyncMutationQueue();
+const cloudSyncPreference = createCachedBooleanPreference(
+  AsyncStorage,
+  CONSENT_KEY,
+  false,
+);
 
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
@@ -176,25 +184,23 @@ async function saveAuth(
     expires_at: Math.floor(Date.now() / 1000) + (body.expires_in || 3_600) - 60,
     user: { id: user.id, email: user.email },
   };
-  if (expectedVersion !== authMutationVersion) return null;
-  const writeVersion = expectedVersion;
-  await SecureStore.setItemAsync(AUTH_KEY, JSON.stringify(auth), SECURE_OPTIONS);
-  if (writeVersion !== authMutationVersion) {
-    await SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS).catch(() => {});
-    return null;
-  }
-  authMutationVersion += 1;
-  authCache = auth;
-  return auth;
+  return authStorageQueue.run(async () => {
+    if (expectedVersion !== authMutationVersion) return null;
+    await SecureStore.setItemAsync(AUTH_KEY, JSON.stringify(auth), SECURE_OPTIONS);
+    if (expectedVersion !== authMutationVersion) return null;
+    authMutationVersion += 1;
+    authCache = auth;
+    return auth;
+  });
 }
 
 async function clearAuth(): Promise<void> {
-  consentOverride = false;
+  consentRuntimeOverride = false;
   authMutationVersion += 1;
   authCache = null;
   await Promise.allSettled([
-    SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS),
-    AsyncStorage.setItem(CONSENT_KEY, 'false'),
+    authStorageQueue.run(() => SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS)),
+    cloudSyncPreference.set(false),
   ]);
 }
 
@@ -311,10 +317,9 @@ async function ensureDriverProfile(): Promise<boolean> {
 }
 
 async function consentEnabled(): Promise<boolean> {
-  if (consentOverride !== null) return consentOverride;
+  if (consentRuntimeOverride !== null) return consentRuntimeOverride;
   try {
-    consentOverride = await AsyncStorage.getItem(CONSENT_KEY) === 'true';
-    return consentOverride;
+    return await cloudSyncPreference.get();
   } catch {
     return false;
   }
@@ -377,14 +382,14 @@ export async function signOutOfCloud(): Promise<void> {
 }
 
 export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
-  if (!enabled) consentOverride = false;
+  if (!enabled) consentRuntimeOverride = false;
   if (enabled && !await refreshIfNeeded()) return false;
   try {
-    await AsyncStorage.setItem(CONSENT_KEY, String(enabled));
-    consentOverride = enabled;
+    await cloudSyncPreference.set(enabled);
+    consentRuntimeOverride = enabled;
     return true;
   } catch {
-    if (enabled) consentOverride = false;
+    if (enabled) consentRuntimeOverride = false;
     return false;
   }
 }

@@ -480,6 +480,9 @@ export default function MonitorScreen() {
     rollAngle: number,
     inferenceMs: number,
   ) => {
+    // A frame already crossing the worklet bridge can arrive after Camera is
+    // deactivated. It must not mutate a stopped or newly resetting session.
+    if (!isRunningRef.current || stoppingRef.current) return;
     hasCameraSampleRef.current = true;
     lastSampleAtRef.current = Date.now();
     const now = Date.now();
