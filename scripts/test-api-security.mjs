@@ -451,6 +451,8 @@ for (const [index, invalidFields] of [
   { plan: ["starter"], timeline: "within-30-days", goal: "manager-workflow" },
   { plan: { toString: () => "starter" }, timeline: "within-30-days", goal: "manager-workflow" },
   { plan: "starter", timeline: "", goal: "manager-workflow" },
+  { interest: "free_trial", plan: "starter", timeline: "within-30-days", goal: "manager-workflow" },
+  { interest: "paid_rollout", plan: "free-trial", timeline: "within-30-days", goal: "manager-workflow" },
 ].entries()) {
   const invalidCommercialLead = await invoke(pilotLeads, request("POST", {
     ...validLead,

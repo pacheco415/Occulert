@@ -570,6 +570,19 @@ test("fleet dashboard paid-rollout path reuses the protected lead form with clea
   await expect(page.locator("#saveBtn")).toHaveText("Request Rollout Conversation");
 });
 
+test("fleet lead form rejects contradictory interest and plan URLs", async ({ page }) => {
+  for (const path of [
+    "/pilot-signup.html?interest=paid-rollout&plan=free-trial",
+    "/pilot-signup.html?interest=free-trial&plan=starter",
+  ]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("Interested plan")).toHaveValue("conversation");
+    await expect(page.locator("#saveBtn")).toHaveText("Send Fleet Request");
+    await expect(page.locator(".brand")).not.toHaveText("Occulert Fleet Rollout");
+    await expect(page.locator(".brand")).not.toHaveText("Occulert Free Fleet Trial");
+  }
+});
+
 test("affordable fleet plans preserve a card-free trial handoff", async ({ page }) => {
   await page.goto("/fleet-pricing.html", { waitUntil: "domcontentloaded" });
 
@@ -812,6 +825,55 @@ test("authenticated fleet dashboards never fall back to unrelated local driver d
   const summaryMetricsTop = await page.locator(".dashboard-kpis").evaluate((element) => element.getBoundingClientRect().top);
   expect(driverStatusTop).toBeLessThan(summaryMetricsTop);
   expect(await page.locator(".dashboard-kpis").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(2);
+});
+
+test("fleet dashboard clears protected data before a different account refreshes", async ({ page }) => {
+  let summaryRequests = 0;
+  await page.addInitScript(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "owner-a-token",
+      refresh_token: "owner-a-refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "owner-a", email: "owner-a@example.com" },
+    }));
+  });
+  await page.route("**/api/fleet-summary*", (route) => {
+    summaryRequests += 1;
+    if (summaryRequests === 1) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          fleet: { id: "fleet-a", company_name: "Owner A Transit", plan: "trial" },
+          drivers: [{ id: "driver-a", name: "Owner A Driver", active: true, vehicle_id: "Van A" }],
+          sessions: [],
+        }),
+      });
+    }
+    return route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: false, error: "cloud_unavailable" }),
+    });
+  });
+
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("Owner A Driver")).toBeVisible();
+  await page.evaluate(() => {
+    localStorage.setItem("occulert-auth", JSON.stringify({
+      access_token: "owner-b-token",
+      refresh_token: "owner-b-refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "owner-b", email: "owner-b@example.com" },
+    }));
+  });
+  await page.getByRole("button", { name: "Refresh now" }).click();
+
+  await expect(page.locator("#cloudStatus")).toContainText("temporarily unavailable");
+  await expect(page.getByText("Owner A Driver")).toHaveCount(0);
+  await expect(page.locator("#kpiDrivers")).toHaveText("0");
+  expect(summaryRequests).toBe(2);
 });
 
 test("fleet dashboard does not turn missing or inactive telemetry into active safety scores", async ({ page }) => {

@@ -92,6 +92,8 @@ test('roadmap and setup docs distinguish source completion from deployment', () 
   const setup = read('BACKEND_SETUP.md');
   assert.match(roadmap, /protected session history.*production-verified/i);
   assert.match(roadmap, /signed-in Preview evidence covers.*two-driver no-session fleet/is);
+  assert.match(roadmap, /PR #109 Preview verification covers.*public pricing.*free-trial.*paid-rollout.*signed-out dashboard/is);
+  assert.match(roadmap, /authenticated adaptive-refresh timing.*production verification remain pending/i);
   assert.match(roadmap, /production verification remains pending/i);
   assert.match(setup, /manager-scoped session and event history excludes GPS/i);
   const backendRoadmap = read('BACKEND_ROADMAP.md');

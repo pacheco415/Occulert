@@ -15,6 +15,7 @@ const COMMERCIAL_PLANS = Object.freeze({
   custom: "Custom fleet scope",
   conversation: "Exploratory fleet conversation",
 });
+const PAID_ROLLOUT_PLANS = new Set(["starter", "growth", "custom"]);
 const ROLLOUT_TIMELINES = Object.freeze({
   "within-30-days": "Within 30 days",
   "one-to-three-months": "1–3 months",
@@ -153,10 +154,16 @@ module.exports = async function handler(request, response) {
   const freeTrialInterest = body.interest === "free_trial";
   const paidRolloutInterest = body.interest === "paid_rollout";
   const commercialInterest = freeTrialInterest || paidRolloutInterest;
+  const planKey = typeof body.plan === "string" ? clean(body.plan, 80) : "";
   const planLabel = allowlistedLabel(body.plan, COMMERCIAL_PLANS);
   const timelineLabel = allowlistedLabel(body.timeline, ROLLOUT_TIMELINES);
   const goalLabel = allowlistedLabel(body.goal, OPERATING_GOALS);
-  if (commercialInterest && (!planLabel || !timelineLabel || !goalLabel)) {
+  const validInterestPlan = freeTrialInterest
+    ? planKey === "free-trial"
+    : paidRolloutInterest
+      ? PAID_ROLLOUT_PLANS.has(planKey)
+      : true;
+  if (commercialInterest && (!validInterestPlan || !planLabel || !timelineLabel || !goalLabel)) {
     return json(response, 400, { ok: false, error: "invalid_lead" });
   }
   const qualificationMessage = [
