@@ -24,8 +24,8 @@ queue a native build or publish the website by itself.
 | Native visual cleanup | Shared neutral material tokens, calmer depth, simpler headers, and less technical Settings copy implemented | Simulator and physical-device visual review, including larger text and reduced transparency |
 | Website visual cleanup | Shared Apple-inspired material hierarchy implemented across public, sign-in, Account, and fleet surfaces and verified in production | Optional signed-in visual acceptance with a populated protected fleet |
 | Fleet Dashboard performance | Driver-only filter rendering, hidden-tab polling pause, protected-request single-flight guard, and clearer mobile driver hierarchy verified in production | Optional signed-in populated-fleet acceptance |
-| Runtime and data-loading performance | Native display throttling with unchanged analysis cadence, web inference single-flight, on-demand MediaPipe, conditional fleet-event loading, parallel roster reads, Server-Timing, and native auth caching implemented in current source | Full source review, authenticated Preview/production timings, and physical-device battery, thermal, camera, and accessory validation |
-| Fleet manager reporting | 7/30-day pilot scorecard, privacy-limited report export, driver-specific action queue, and paid-rollout lead attribution implemented in source | Signed-in Preview verified for owner scoping, a two-driver no-session fleet, and both reporting windows; production verification after merge remains pending. Nonzero results passed automated browser coverage; pricing and plan entitlements remain separate work |
+| Runtime and data-loading performance | Native display throttling with unchanged analysis cadence, web inference single-flight, on-demand MediaPipe, adaptive fleet refreshes, two-minute event-history refresh limits, failure backoff, parallel roster reads, Server-Timing, smaller PWA icons, and native auth caching implemented in current source | Full source review, authenticated Preview/production timings, and physical-device battery, thermal, camera, and accessory validation |
+| Fleet manager reporting | 7/30-day pilot scorecard, privacy-limited report export, driver-specific action queue, transparent early-access plan comparison, deliberate rollout qualification, and separate free-trial/post-trial lead attribution implemented in source | Existing signed-in Preview evidence covers owner scoping, a two-driver no-session fleet, and both reporting windows. The new adaptive refresh and affordability package remains local and needs draft-PR Preview verification before production |
 
 Safety boundary: stronger alerts are intended to get attention and prompt a
 safe stop. They cannot wake every driver, keep a drowsy driver safely awake, or
@@ -111,7 +111,7 @@ complication remain separate future work.
 | Unified confidence model fusing camera + earbud + watch signals | ★ | Not started |
 | Device-agnostic engine (works with any combination of devices) | — | Not started |
 | Fleet dashboard with per-driver device and signal data | — | Protected session history, mobile hierarchy, and hidden-tab performance are production-verified; 7/30-day pilot value reporting, privacy-limited CSV export, driver-specific follow-up actions, and the paid-rollout lead path are implemented in source and verified in a signed-in Preview for a two-driver fleet with no recorded sessions. Nonzero results passed automated browser coverage; production verification remains pending |
-| Tiered pricing model for fleet operators | — | Not started |
+| Tiered pricing model for fleet operators | — | Introductory source package defines a card-free 30-day trial for up to five active drivers, a $9/month Starter plan for up to 10, and a $25/month Growth plan for up to 30. Hands-on rollout services remain Custom. No billing, entitlement enforcement, or production offer has been enabled |
 
 ---
 

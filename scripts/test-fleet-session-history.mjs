@@ -44,8 +44,8 @@ test('dashboard keeps protected history separate from its local fallback', () =>
   assert.match(history, /value===null\|\|value===undefined/);
   assert.doesNotMatch(history, /latitude|longitude|\blocation\b|camera media|\baudio\b|raw motion/i);
   assert.match(dashboard, /getFleetSummary\(\{includeEvents\}\)/);
-  assert.match(dashboard, /loadProtectedFleet\(\{includeEvents:true\}\)/);
-  assert.match(dashboard, /includeEvents:protectedHistoryOpen\(\)/);
+  assert.match(dashboard, /refreshProtectedFleetNow\(\{forceEvents:true\}\)/);
+  assert.match(dashboard, /shouldRefreshProtectedEvents\(\{historyOpen:protectedHistoryOpen\(\),lastLoadedAt:protectedEventsLoadedAt\}/);
 });
 
 test('fleet projection preserves inactive and unmeasured driver states', () => {
@@ -91,8 +91,8 @@ test('roadmap and setup docs distinguish source completion from deployment', () 
   const roadmap = read('APP_ROADMAP.md');
   const setup = read('BACKEND_SETUP.md');
   assert.match(roadmap, /protected session history.*production-verified/i);
-  assert.match(roadmap, /Signed-in Preview verified.*two-driver no-session fleet/i);
-  assert.match(roadmap, /production verification after merge remains pending/i);
+  assert.match(roadmap, /signed-in Preview evidence covers.*two-driver no-session fleet/is);
+  assert.match(roadmap, /production verification remains pending/i);
   assert.match(setup, /manager-scoped session and event history excludes GPS/i);
   const backendRoadmap = read('BACKEND_ROADMAP.md');
   assert.match(backendRoadmap, /formula-safe report export/i);

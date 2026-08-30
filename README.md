@@ -56,6 +56,8 @@ occulert/
 ├── app.html                # Driver monitoring app
 ├── driver-app.js           # Driver monitoring and alert behavior
 ├── fleet-dashboard.html    # Prototype fleet dashboard
+├── fleet-pricing.html      # Managed early-access fleet plans
+├── pilot-signup.html       # Pilot and rollout qualification form
 ├── session-history.html    # Local session history
 ├── privacy.html            # Privacy policy
 ├── safety.html             # Safety disclaimer

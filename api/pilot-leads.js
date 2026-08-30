@@ -8,9 +8,35 @@ const DEFAULT_ALLOWED_ORIGINS = new Set([
   "https://www.occulert.com",
   "https://occulert.com",
 ]);
+const COMMERCIAL_PLANS = Object.freeze({
+  "free-trial": "Free Fleet Trial — $0 / 30 days",
+  starter: "Starter — $9 / month",
+  growth: "Growth — $25 / month",
+  custom: "Custom fleet scope",
+  conversation: "Exploratory fleet conversation",
+});
+const ROLLOUT_TIMELINES = Object.freeze({
+  "within-30-days": "Within 30 days",
+  "one-to-three-months": "1–3 months",
+  "three-plus-months": "More than 3 months",
+  exploring: "Exploring options",
+});
+const OPERATING_GOALS = Object.freeze({
+  participation: "Validate driver participation",
+  "manager-workflow": "Reduce manager review time",
+  coaching: "Support coaching conversations",
+  "broader-rollout": "Prepare a broader rollout",
+  other: "Other operating goal",
+});
 
 function clean(value, max = MAX_FIELD_LENGTH) {
   return String(value || "").replace(/\0/g, "").trim().slice(0, max);
+}
+
+function allowlistedLabel(value, labels) {
+  if (typeof value !== "string") return "";
+  const key = clean(value, 80);
+  return Object.hasOwn(labels, key) ? labels[key] : "";
 }
 
 function json(response, status, body) {
@@ -124,7 +150,21 @@ module.exports = async function handler(request, response) {
     return json(response, 400, { ok: false, error: "invalid_lead" });
   }
 
+  const freeTrialInterest = body.interest === "free_trial";
   const paidRolloutInterest = body.interest === "paid_rollout";
+  const commercialInterest = freeTrialInterest || paidRolloutInterest;
+  const planLabel = allowlistedLabel(body.plan, COMMERCIAL_PLANS);
+  const timelineLabel = allowlistedLabel(body.timeline, ROLLOUT_TIMELINES);
+  const goalLabel = allowlistedLabel(body.goal, OPERATING_GOALS);
+  if (commercialInterest && (!planLabel || !timelineLabel || !goalLabel)) {
+    return json(response, 400, { ok: false, error: "invalid_lead" });
+  }
+  const qualificationMessage = [
+    planLabel && `Plan interest: ${planLabel}`,
+    timelineLabel && `Desired start: ${timelineLabel}`,
+    goalLabel && `Primary goal: ${goalLabel}`,
+    clean(body.message, 800),
+  ].filter(Boolean).join("\n");
   const lead = {
     name: clean(body.name, 160),
     role: clean(body.role, 160),
@@ -133,8 +173,12 @@ module.exports = async function handler(request, response) {
     phone: clean(body.phone, 80),
     fleet: clean(body.fleet, 80),
     useCase: clean(body.useCase, 120),
-    message: clean(body.message, 1200),
-    source: paidRolloutInterest ? "paid-rollout-page" : "pilot-signup-page",
+    message: clean(qualificationMessage, 1200),
+    source: freeTrialInterest
+      ? "free-trial-page"
+      : paidRolloutInterest
+        ? "paid-rollout-page"
+        : "pilot-signup-page",
     receivedAt: new Date().toISOString(),
   };
 

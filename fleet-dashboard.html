@@ -14,7 +14,7 @@
   <meta name="theme-color" content="#0a0e1a">
   <link rel="canonical" href="https://www.occulert.com/fleet-dashboard.html">
   <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/occulert-logo-main.png">
+  <link rel="apple-touch-icon" href="/occulert-logo-main-192.png">
   <script defer src="/lang.js"></script>
   <script src="/occulert-backend.js"></script>
   <script src="/security-utils.js"></script>
@@ -51,8 +51,9 @@
   .dashboard-page .value-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}
   .dashboard-page .value-footnote{margin:12px 0 0;color:var(--portal-soft);font-size:11px;line-height:1.5}
   .dashboard-page #actionQueue .action-open{justify-self:start;margin-top:4px}
+  .dashboard-page .status-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:stretch;margin-top:10px}.dashboard-page .status-row .notice{margin:0}.dashboard-page .status-row .btn{min-width:110px}
   @media(max-width:900px){.dashboard-page .value-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-page .value-story{display:grid}.dashboard-page .value-actions{justify-content:flex-start}}
-  @media(max-width:560px){.dashboard-page .value-header{display:grid}.dashboard-page .value-range{width:100%}.dashboard-page .value-grid{grid-template-columns:1fr 1fr}.dashboard-page .value-metric strong{font-size:22px}}
+  @media(max-width:560px){.dashboard-page .value-header{display:grid}.dashboard-page .value-range{width:100%}.dashboard-page .value-grid{grid-template-columns:1fr 1fr}.dashboard-page .value-metric strong{font-size:22px}.dashboard-page .status-row{grid-template-columns:1fr}}
 </style>
 </head>
 <body class="portal-page dashboard-page">
@@ -76,7 +77,7 @@
       <summary>Privacy and data boundaries</summary>
       <div class="details-body"><div>Protected fleet summaries exclude GPS coordinates by design. When signed out, this page can show opt-in GPS only from same-browser local sessions or demo data.</div><div>Protected fleet data is limited to the authenticated server-verified fleet owner. Safety scores and event telemetry are client-reported and not independently verified; do not use them as sole evidence for discipline, compliance, or emergency decisions.</div></div>
     </details>
-    <div class="notice" id="cloudStatus" style="margin-top:10px">Checking protected fleet access...</div>
+    <div class="status-row"><div class="notice" id="cloudStatus">Checking protected fleet access...</div><button class="btn hidden" id="refreshNow" type="button" onclick="refreshProtectedFleetNow()">Refresh now</button></div>
     <div class="empty-actions signed-out-recovery hidden" id="signedOutActions" aria-label="Signed-out fleet actions"><a class="btn primary" href="/login.html">Sign In</a><a class="btn" href="/">Back home</a></div>
     <section class="card value-panel" aria-labelledby="pilotValueTitle">
       <div class="value-header">
@@ -91,7 +92,7 @@
       </div>
       <div class="value-story">
         <p id="pilotValueStory" aria-live="polite">Start recording protected sessions to build a manager-ready pilot report.</p>
-        <div class="value-actions"><button class="btn" type="button" onclick="exportPilotReport()">Download pilot report</button><a class="btn primary" href="/pilot-signup.html?interest=paid-rollout">Plan a paid rollout</a></div>
+        <div class="value-actions"><button class="btn" type="button" onclick="exportPilotReport()">Download pilot report</button><a class="btn" href="/fleet-pricing.html">View affordable plans</a><a class="btn primary" href="/pilot-signup.html?interest=free-trial&amp;plan=free-trial">Start free trial</a></div>
       </div>
       <p class="value-footnote">Decision-support summary only. Metrics use the recent session history available to this dashboard and client-reported, unverified telemetry; GPS, personal media, and raw motion are excluded from protected reports.</p>
     </section>
@@ -161,7 +162,12 @@
   <div class="toast" id="toast"></div>
   <footer class="footer"><a href="/">Occulert</a> &nbsp;·&nbsp; <a href="/app.html">Driver App</a> &nbsp;·&nbsp; <a href="/privacy.html">Privacy</a><div style="margin-top:8px">© 2026 Occulert. Prototype only — not a certified safety, medical, emergency, or compliance device.</div></footer>
 <script>
-let cloudRows=[],lastOpsSummary='',lastRows=[],fleetMode=false,protectedFleetName='',protectedFleetPlan='',protectedSessions=[],protectedEvents=[],protectedDrivers=[],lastDashboardSnapshot='',sessionHistoryDirty=true,driverListFrame=0,protectedFleetLoading=false,protectedEventsRefreshPending=false,dashboardRefreshTimer=0,protectedRefreshTimer=0;
+/* fleet-refresh-policy:start */
+const DASHBOARD_CLOCK_INTERVAL_MS=15000,PROTECTED_ACTIVE_REFRESH_MS=30000,PROTECTED_IDLE_REFRESH_MS=90000,PROTECTED_SAVE_DATA_REFRESH_MS=120000,PROTECTED_EVENTS_REFRESH_MS=120000,PROTECTED_MAX_BACKOFF_MS=300000;
+function protectedRefreshDelay({hasActiveSession=false,failureCount=0,saveData=false}={}){let base=hasActiveSession?PROTECTED_ACTIVE_REFRESH_MS:saveData?PROTECTED_SAVE_DATA_REFRESH_MS:PROTECTED_IDLE_REFRESH_MS,multiplier=2**Math.min(Math.max(0,failureCount),3);return Math.min(PROTECTED_MAX_BACKOFF_MS,base*multiplier)}
+function shouldRefreshProtectedEvents({historyOpen=false,lastLoadedAt=0,now=Date.now(),force=false}={}){return historyOpen&&(force||!lastLoadedAt||now-lastLoadedAt>=PROTECTED_EVENTS_REFRESH_MS)}
+/* fleet-refresh-policy:end */
+let cloudRows=[],lastOpsSummary='',lastRows=[],fleetMode=false,protectedFleetName='',protectedFleetPlan='',protectedSessions=[],protectedEvents=[],protectedDrivers=[],lastDashboardSnapshot='',sessionHistoryDirty=true,driverListFrame=0,protectedFleetLoading=false,protectedEventsRefreshPending=false,dashboardRefreshTimer=0,protectedRefreshTimer=0,protectedEventsLoadedAt=0,protectedLastSuccessfulAt=0,protectedRefreshFailures=0;
 function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function jsArg(v){return encodeURIComponent(String(v??''))}
 function fromArg(v){try{return decodeURIComponent(String(v??''))}catch(e){return String(v??'')}}
@@ -232,7 +238,7 @@ function exportPilotReport(){let metrics=pilotMetrics();if(!metrics.sessions.len
 function eventHistoryHtml(event){let type=String(event.type||'event').replace(/_/g,' ').slice(0,40),fatigue=metricValue(event.fatigue_score??event.fatigueScore,'/100'),confidence=metricValue(event.confidence,'%');return `<div class="history-event"><span class="history-event-type">${esc(type)}</span><span>${esc(dateLabel(event.created_at||event.createdAt))}</span><span class="sub">Fatigue ${esc(fatigue)} · confidence ${esc(confidence)}</span></div>`}
 function renderSessionHistory(){let root=document.getElementById('sessionHistory'),panel=document.querySelector('.history-details');if(!root)return;if(panel&&!panel.open){sessionHistoryDirty=true;return}let sessions=sessionHistoryRows();if(!sessions.length){root.innerHTML=`<div class="notice history-empty">${fleetMode?'No protected sessions have been recorded for this fleet yet.':'Sign in as a verified fleet owner to view protected history. Local-only session history will remain available on this browser.'}</div>`;sessionHistoryDirty=false;return}root.innerHTML=sessions.map(session=>{let events=eventsForSession(session),status=session.endedAt?'Completed':'Active';return `<article class="history-item" role="listitem"><div class="history-head"><div><div class="name">${esc(session.driverName)}</div><div class="sub">Started ${esc(dateLabel(session.startedAt))} · ${esc(durationLabel(session.startedAt,session.endedAt))}</div></div><span class="pill ${session.endedAt?'safe':'watch'}">${esc(status)}</span></div><div class="history-metrics"><div class="history-metric"><div class="label">Safety</div><strong>${esc(metricValue(session.safetyScore))}</strong></div><div class="history-metric"><div class="label">Avg fatigue</div><strong>${esc(metricValue(session.averageFatigue))}</strong></div><div class="history-metric"><div class="label">Max fatigue</div><strong>${esc(metricValue(session.maxFatigue))}</strong></div><div class="history-metric"><div class="label">Alerts</div><strong>${esc(metricValue(session.alertCount))}</strong></div><div class="history-metric"><div class="label">Head nods</div><strong>${esc(metricValue(session.headNodCount))}</strong></div><div class="history-metric"><div class="label">Device</div><strong>${esc(session.device)}</strong></div></div><div class="history-events">${events.length?events.map(eventHistoryHtml).join(''):'<div class="trust-note">No alert events were recorded for this session.</div>'}</div><div class="trust-note">Client-reported telemetry · GPS and personal media excluded</div></article>`}).join('');sessionHistoryDirty=false}
 function protectedHistoryOpen(){return document.querySelector('.history-details')?.open===true}
-function handleHistoryToggle(event){if(!event.currentTarget.open)return;if(sessionHistoryDirty)renderSessionHistory();if(fleetMode)void loadProtectedFleet({includeEvents:true})}
+function handleHistoryToggle(event){if(!event.currentTarget.open)return;if(sessionHistoryDirty)renderSessionHistory();if(fleetMode&&shouldRefreshProtectedEvents({historyOpen:true,lastLoadedAt:protectedEventsLoadedAt}))void refreshProtectedFleetNow({forceEvents:true})}
 function exportSessionHistoryCSV(){let sessions=sessionHistoryRows();if(!sessions.length){toast('No session history to export');return}let header=['driver','started','ended','duration','safety_score','average_fatigue','max_fatigue','alert_count','head_nod_count','device','event_count','telemetry_trust'];let rows=sessions.map(session=>[session.driverName,session.startedAt||'',session.endedAt||'',durationLabel(session.startedAt,session.endedAt),session.safetyScore??'',session.averageFatigue??'',session.maxFatigue??'',session.alertCount??'',session.headNodCount??'',session.device,eventsForSession(session).length,'unverified_client_report']);let csv=[header].concat(rows).map(row=>row.map(value=>`"${OcculertSecurity.csvCell(value).replace(/"/g,'""')}"`).join(',')).join('\n');let blob=new Blob([csv],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='occulert-protected-session-history.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href);toast('Session history CSV exported')}
 /* protected-session-history:end */
 function dashboardDataSnapshot(){let local=fleetMode?null:getLocal(),rawRows=cloudRows.length||fleetMode?cloudRows:local?[local]:[];return JSON.stringify({fleetMode,protectedFleetName,protectedFleetPlan,cloudRows,protectedDrivers,protectedSessions,protectedEvents,local,localDrivers:fleetMode?null:getDrivers(),localHistory:fleetMode?null:getJSON('occulert-session-history',[]),freshness:rawRows.map(row=>[String(row.driverId||row.id||row.name||''),timestamp(row),fresh(row)])})}
@@ -252,8 +258,8 @@ function clearDemoData(){cloudRows=[];let live=getLocal();if(live&&String(live.d
 /* fleet-summary-projection:start */
 function rowsFromFleet(summary){let sessions=Array.isArray(summary.sessions)?summary.sessions:[],latest=new Map();sessions.forEach(s=>{if(!latest.has(s.driver_id))latest.set(s.driver_id,s)});return (summary.drivers||[]).map(d=>{let s=latest.get(d.id),active=d.active!==false,hasSafetyScore=!!s&&s.safety_score!==null&&s.safety_score!==undefined&&s.safety_score!==''&&Number.isFinite(Number(s.safety_score)),score=hasSafetyScore?Number(s.safety_score):null,status=!active?'INACTIVE':!s||!hasSafetyScore?'NO DATA':score<50?'ALERT':score<75?'WATCH':'SAFE';return{name:d.name,driverId:d.id,route:d.vehicle_id||'Unassigned vehicle',status,safetyScore:score,hasSafetyScore,hasSession:!!s,active,sessionActive:!!s&&!s.ended_at,fatigue:s&&s.max_fatigue,alerts:s&&s.alert_count,lastUpdate:s&&(s.ended_at||s.started_at),cloudConsent:true,cloudSynced:true}})}
 /* fleet-summary-projection:end */
-function showSignedOutActions(show){document.getElementById('signedOutActions')?.classList.toggle('hidden',!show);document.getElementById('driverAppNav')?.classList.toggle('hidden',!show);document.getElementById('accountNav')?.classList.toggle('hidden',show);let primary=document.getElementById('fleetPrimaryNav');if(primary){primary.href=show?'/login.html':'/fleet-onboarding.html';primary.textContent=show?'Sign In':'Fleet setup'}}
-function resetProtectedFleet(){fleetMode=false;cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedEventsRefreshPending=false;protectedFleetName='';protectedFleetPlan='';showSignedOutActions(true);syncProtectedControls();document.getElementById('cloudStatus').textContent='Not signed in. Showing same-browser local data only; protected fleet data remains unavailable.';render()}
+function showSignedOutActions(show){document.getElementById('signedOutActions')?.classList.toggle('hidden',!show);document.getElementById('driverAppNav')?.classList.toggle('hidden',!show);document.getElementById('accountNav')?.classList.toggle('hidden',show);document.getElementById('refreshNow')?.classList.toggle('hidden',show);let primary=document.getElementById('fleetPrimaryNav');if(primary){primary.href=show?'/login.html':'/fleet-onboarding.html';primary.textContent=show?'Sign In':'Fleet setup'}}
+function resetProtectedFleet(){fleetMode=false;cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedEventsRefreshPending=false;protectedFleetName='';protectedFleetPlan='';protectedEventsLoadedAt=0;protectedLastSuccessfulAt=0;protectedRefreshFailures=0;showSignedOutActions(true);syncProtectedControls();document.getElementById('cloudStatus').textContent='Not signed in. Showing same-browser local data only; protected fleet data remains unavailable.';render()}
 async function loadProtectedFleet(options={}){
   let includeEvents=options.includeEvents===true;
   if(protectedFleetLoading){if(includeEvents)protectedEventsRefreshPending=true;return false}
@@ -268,17 +274,21 @@ async function loadProtectedFleet(options={}){
     try{result=backend&&backend.getFleetSummary?await backend.getFleetSummary({includeEvents}):{ok:false,status:0,body:{error:'backend_unavailable'}}}
     catch(e){result={ok:false,status:0,body:{error:'network_unavailable'}}}
     if(!result.ok&&result.status===401){backend.signOut();resetProtectedFleet();return false}
-    if(result.ok){protectedFleetName=result.body.fleet.company_name||'your fleet';protectedFleetPlan=String(result.body.fleet.plan||'fleet').slice(0,40);protectedDrivers=Array.isArray(result.body.drivers)?result.body.drivers:[];protectedSessions=Array.isArray(result.body.sessions)?result.body.sessions:[];if(result.body.events_included!==false)protectedEvents=Array.isArray(result.body.events)?result.body.events:[];cloudRows=rowsFromFleet(result.body);document.getElementById('cloudStatus').textContent='Protected connection active. Showing only '+protectedFleetName+' data authorized for this signed-in owner.'}
-    else{cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedFleetName='';protectedFleetPlan='';document.getElementById('cloudStatus').textContent=result.body&&result.body.error==='fleet_not_found'?'No owned fleet found. Use Fleet setup to create one and invite drivers.':'Protected fleet data is unavailable. Check your connection or sign in again.'}
-    refreshDashboardIfNeeded();return true
+    if(result.ok){protectedFleetName=result.body.fleet.company_name||'your fleet';protectedFleetPlan=String(result.body.fleet.plan||'fleet').slice(0,40);protectedDrivers=Array.isArray(result.body.drivers)?result.body.drivers:[];protectedSessions=Array.isArray(result.body.sessions)?result.body.sessions:[];if(result.body.events_included!==false){protectedEvents=Array.isArray(result.body.events)?result.body.events:[];protectedEventsLoadedAt=Date.now()}cloudRows=rowsFromFleet(result.body);protectedLastSuccessfulAt=Date.now();protectedRefreshFailures=0;sessionHistoryDirty=true;document.getElementById('cloudStatus').textContent='Protected connection active for '+protectedFleetName+'. Active sessions refresh every 30 seconds; otherwise the dashboard uses a lower-cost 90-second refresh.'}
+    else if(result.body&&result.body.error==='fleet_not_found'){cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedFleetName='';protectedFleetPlan='';protectedEventsLoadedAt=0;protectedRefreshFailures=0;document.getElementById('cloudStatus').textContent='No owned fleet found. Use Fleet setup to create one and invite drivers.'}
+    else{protectedRefreshFailures=Math.min(4,protectedRefreshFailures+1);let last=protectedLastSuccessfulAt?new Date(protectedLastSuccessfulAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';document.getElementById('cloudStatus').textContent=last?'Connection interrupted. Showing the protected data last updated at '+last+' while automatic retries slow down to reduce data use.':'Protected fleet data is temporarily unavailable. Automatic retries will slow down to reduce data use.'}
+    refreshDashboardIfNeeded();return result.ok
   }finally{let refreshEvents=protectedEventsRefreshPending;protectedEventsRefreshPending=false;protectedFleetLoading=false;if(refreshEvents&&fleetMode)void loadProtectedFleet({includeEvents:true})}
 }
-function stopRefreshTimers(){clearInterval(dashboardRefreshTimer);clearInterval(protectedRefreshTimer);dashboardRefreshTimer=0;protectedRefreshTimer=0}
-function startRefreshTimers(){stopRefreshTimers();if(document.hidden)return;dashboardRefreshTimer=setInterval(refreshDashboardIfNeeded,3000);protectedRefreshTimer=setInterval(()=>{if(fleetMode)void loadProtectedFleet({includeEvents:protectedHistoryOpen()})},30000)}
-function handleVisibilityChange(){if(document.hidden){stopRefreshTimers();return}refreshDashboardIfNeeded();if(fleetMode)void loadProtectedFleet({includeEvents:protectedHistoryOpen()});startRefreshTimers()}
-async function boot(){render();setTimeout(()=>{void loadProtectedFleet()},100);startRefreshTimers()}
-document.addEventListener('visibilitychange',handleVisibilityChange);
-boot();
+function stopRefreshTimers(){clearInterval(dashboardRefreshTimer);clearTimeout(protectedRefreshTimer);dashboardRefreshTimer=0;protectedRefreshTimer=0}
+function scheduleProtectedRefresh(){clearTimeout(protectedRefreshTimer);protectedRefreshTimer=0;if(document.hidden||!fleetMode)return;let hasActiveSession=cloudRows.some(row=>row.sessionActive),saveData=!hasActiveSession&&navigator.connection?.saveData===true,delay=protectedRefreshDelay({hasActiveSession,failureCount:protectedRefreshFailures,saveData});protectedRefreshTimer=setTimeout(()=>{void pollProtectedFleet()},delay)}
+async function pollProtectedFleet(){if(document.hidden||!fleetMode)return;let includeEvents=shouldRefreshProtectedEvents({historyOpen:protectedHistoryOpen(),lastLoadedAt:protectedEventsLoadedAt});await loadProtectedFleet({includeEvents});scheduleProtectedRefresh()}
+function startRefreshTimers(){stopRefreshTimers();if(document.hidden)return;dashboardRefreshTimer=setInterval(refreshDashboardIfNeeded,DASHBOARD_CLOCK_INTERVAL_MS);scheduleProtectedRefresh()}
+async function refreshProtectedFleetNow(options={}){clearTimeout(protectedRefreshTimer);protectedRefreshTimer=0;let includeEvents=shouldRefreshProtectedEvents({historyOpen:protectedHistoryOpen(),lastLoadedAt:protectedEventsLoadedAt,force:options.forceEvents===true});await loadProtectedFleet({includeEvents});scheduleProtectedRefresh()}
+async function handleVisibilityChange(){if(document.hidden){stopRefreshTimers();return}refreshDashboardIfNeeded();if(fleetMode)await refreshProtectedFleetNow();else startRefreshTimers()}
+async function boot(){render();await new Promise(resolve=>setTimeout(resolve,100));await loadProtectedFleet();startRefreshTimers()}
+document.addEventListener('visibilitychange',()=>{void handleVisibilityChange()});
+void boot();
 </script>
 </body>
 </html>

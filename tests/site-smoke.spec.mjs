@@ -18,7 +18,7 @@ test("important public pages load with one primary heading", async ({ page }) =>
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  for (const path of ["/", "/features.html", "/how-it-works.html", "/install.html", "/pilot-signup.html", "/fleet-dashboard.html", "/fleet-onboarding.html", "/accept-invite.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
+  for (const path of ["/", "/features.html", "/how-it-works.html", "/install.html", "/fleet-pricing.html", "/pilot-signup.html", "/fleet-dashboard.html", "/fleet-onboarding.html", "/accept-invite.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
     const response = await page.goto(path, { waitUntil: "domcontentloaded" });
     expect(response?.ok(), `${path} should load`).toBeTruthy();
     expect(await page.locator("h1").count(), `${path} should have one h1`).toBe(1);
@@ -33,7 +33,7 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(() => document.documentElement.style.setProperty("scroll-behavior", "auto", "important"));
 
-  expect(await page.locator('link[href="/homepage.css?v=31"]').count()).toBe(1);
+  expect(await page.locator('link[href="/homepage.css?v=32"]').count()).toBe(1);
   expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1.jpg"]').count()).toBe(1);
   expect(await page.locator('link[href="/homepage.css"]').count()).toBe(0);
   expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
@@ -545,10 +545,15 @@ test("pilot request controls use an accessible form", async ({ page }) => {
   await expect(page.getByLabel("Name")).toHaveAttribute("required", "");
   await expect(page.getByLabel("Company")).toHaveAttribute("required", "");
   await expect(page.getByLabel("Email")).toHaveAttribute("required", "");
+  await expect(page.getByLabel("Interested plan")).toHaveValue("conversation");
+  await expect(page.getByLabel("Desired start")).toHaveAttribute("required", "");
+  await expect(page.getByLabel("Desired start")).toHaveValue("");
+  await expect(page.getByLabel("Primary operating goal")).toHaveAttribute("required", "");
+  await expect(page.getByLabel("Primary operating goal")).toHaveValue("");
 });
 
 test("fleet dashboard paid-rollout path reuses the protected lead form with clear intent", async ({ page }) => {
-  await page.goto("/pilot-signup.html?interest=paid-rollout", { waitUntil: "domcontentloaded" });
+  await page.goto("/pilot-signup.html?interest=paid-rollout&plan=starter", { waitUntil: "domcontentloaded" });
 
   await expect(page.locator(".brand")).toHaveText("Occulert Fleet Rollout");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turn your Occulert pilot into an operating plan");
@@ -561,8 +566,30 @@ test("fleet dashboard paid-rollout path reuses the protected lead form with clea
   await expect(page.locator(".steps")).not.toContainText("Plan pilot");
   await expect(page.locator(".list")).not.toContainText("Good pilot fit");
   await expect(page.locator("form h2")).toHaveText("Discuss a paid rollout");
-  await expect(page.locator("#message")).toHaveValue(/paid Occulert fleet rollout/i);
+  await expect(page.getByLabel("Interested plan")).toHaveValue("starter");
+  await expect(page.locator("#message")).toHaveValue(/affordable Occulert fleet rollout/i);
   await expect(page.locator("#saveBtn")).toHaveText("Request Rollout Conversation");
+});
+
+test("affordable fleet plans preserve a card-free trial handoff", async ({ page }) => {
+  await page.goto("/fleet-pricing.html", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Start small. Keep the cost predictable.");
+  await expect(page.getByText("$0", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("$9", { exact: true })).toBeVisible();
+  await expect(page.getByText("$25", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Fleet plan comparison" })).toBeVisible();
+  const trialLink = page.locator(".pilot-card").getByRole("link", { name: "Start free trial", exact: true });
+  await expect(trialLink).toHaveAttribute("href", "/pilot-signup.html?interest=free-trial&plan=free-trial");
+  await trialLink.click();
+
+  await expect(page.locator(".brand")).toHaveText("Occulert Free Fleet Trial");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Try Occulert free for 30 days");
+  await expect(page.getByLabel("Interested plan")).toHaveValue("free-trial");
+  await expect(page.getByLabel("Desired start")).toHaveValue("");
+  await expect(page.getByLabel("Primary operating goal")).toHaveValue("");
+  await expect(page.locator("#saveBtn")).toHaveText("Start Free Trial");
+  await expect(page.getByText(/no credit card and no automatic renewal/i)).toBeVisible();
 });
 
 test("driver invitation tokens leave the URL immediately and stay in session storage", async ({ page }) => {
@@ -917,7 +944,8 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
   expect(csv).toContain("Alex Driver");
   expect(csv).toContain("'=WEBSERVICE");
   expect(csv).not.toMatch(/latitude|longitude|GPS|personal media|raw motion/i);
-  await expect(page.getByRole("link", { name: "Plan a paid rollout" })).toHaveAttribute("href", "/pilot-signup.html?interest=paid-rollout");
+  await expect(page.getByRole("link", { name: "View affordable plans" })).toHaveAttribute("href", "/fleet-pricing.html");
+  await expect(page.getByRole("link", { name: "Start free trial" })).toHaveAttribute("href", "/pilot-signup.html?interest=free-trial&plan=free-trial");
 });
 
 test("protected fleet history shows scoped events and exports formula-safe rows without coordinates", async ({ page }) => {
@@ -934,8 +962,10 @@ test("protected fleet history shows scoped events and exports formula-safe rows 
       safetyScore: 1,
     }]));
   });
+  let eventRequests = 0;
   await page.route("**/api/fleet-summary*", (route) => {
     const includeEvents = !route.request().url().includes("include_events=0");
+    if (includeEvents) eventRequests += 1;
     return route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -983,6 +1013,11 @@ test("protected fleet history shows scoped events and exports formula-safe rows 
   await expect(page.getByText("Unrelated Local History")).toHaveCount(0);
   await expect(page.locator("#sessionHistory")).not.toContainText("37.7749");
   await expect(page.locator("#sessionHistory")).not.toContainText("-122.4194");
+  expect(eventRequests).toBe(1);
+  await page.locator(".history-details summary").click();
+  await page.locator(".history-details summary").click();
+  await expect(page.locator("#sessionHistory")).toContainText("drowsy");
+  expect(eventRequests).toBe(1);
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Session CSV" }).click();

@@ -15,7 +15,7 @@ accuracy, or safe real-world behavior.
 | Web monitoring | Loads MediaPipe only after Start, rejects overlapping inference, and exposes a bounded local timing snapshot | Camera processing remains local; the snapshot contains counts and durations only |
 | Web startup | Removes the eager MediaPipe request and lazy-loads the hidden install-logo image | No behavior or consent default changes |
 | Fleet API | Runs driver and session reads concurrently, optionally skips event history, and returns `Server-Timing` durations | Existing owner verification and privacy-limited field selection remain unchanged |
-| Fleet dashboard | Uses lightweight 30-second roster refreshes and fetches events when protected history is opened or remains open | Protected and local fallback data remain separate; GPS and personal media stay excluded |
+| Fleet dashboard | Keeps the existing 30-second refresh while a session is active, shifts idle dashboards to 90 seconds, backs off after failures, updates relative-time labels every 15 seconds, and limits open history-event refreshes to every two minutes | Active manager visibility is unchanged; protected and local fallback data remain separate; GPS and personal media stay excluded |
 | Native cloud sync | Reuses the verified SecureStore auth value in memory and deduplicates its initial read | Token writes refresh the cache; sign-out clears it before local deletion/revocation |
 | Regression coverage | Adds deterministic timing, cadence, lazy-loading, overlap, and conditional-history contracts to `npm run verify` | Tests establish code contracts, not physical-device performance |
 
@@ -32,6 +32,7 @@ These are acceptance targets, not measured production claims.
 | Web p95 inference | Below the 135 ms browser analysis interval | Supported iPhone Safari and Android Chrome |
 | Fleet roster API p95 | Under 750 ms for the agreed pilot fleet size | Authenticated Preview and production timing samples |
 | Fleet event query | No query while protected history is closed | API contract and browser request trace |
+| Idle fleet refresh | At most one protected summary request every 90 seconds | Automated policy contract and authenticated browser trace |
 | Thermal and battery | No thermal shutdown or safety-loop stall during a 30-minute session | Physical-device log with model, OS, battery delta, and ambient conditions |
 
 ## Verification sequence
@@ -56,9 +57,9 @@ These are acceptance targets, not measured production claims.
   physical build and devices.
 - Production fleet latency requires a signed-in owner and an agreed read-only
   dataset size.
-- The large source logo is no longer on the normal driver-page startup path,
-  but a smaller pixel asset should come from an exact-brand export rather than
-  an approximate redraw.
+- Exact 96 px, 192 px, and 512 px exports now serve browser shortcuts and PWA
+  install metadata; the original high-resolution logo remains available for
+  social previews and brand use.
 - Pricing, billing activation, plan entitlements, push, pull request, merge,
   deployment, and native-build submission remain separate approval gates.
 

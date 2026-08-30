@@ -13,6 +13,15 @@ import {
 
 const read = relativePath => readFileSync(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
+function markedBlock(source, name) {
+  const startMarker = `/* ${name}:start */`;
+  const endMarker = `/* ${name}:end */`;
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker);
+  assert.ok(start >= 0 && end > start, `${name} block must be present`);
+  return source.slice(start + startMarker.length, end);
+}
+
 test('native monitoring timing stays bounded and deterministic', () => {
   assert.equal(MONITOR_UI_UPDATE_INTERVAL_MS, 250);
   assert.equal(elapsedSessionSeconds(null, 90_000), 0);
@@ -97,10 +106,9 @@ test('web monitoring defers MediaPipe and prevents overlapping inference', async
   assert.equal(harness.get('processedFrames'), 1);
 });
 
-test('service-worker upgrade evicts the stale driver-script cache', async () => {
+test('service-worker upgrade evicts stale website caches', async () => {
   const source = read('sw.js');
-  assert.match(source, /const CACHE = 'occulert-v42'/);
-  assert.doesNotMatch(source, /occulert-v41/);
+  assert.match(source, /const CACHE = 'occulert-v43'/);
 
   const listeners = {};
   const deleted = [];
@@ -111,7 +119,7 @@ test('service-worker upgrade evicts the stale driver-script cache', async () => 
     Set,
     fetch: async () => ({ ok: true, clone: () => ({}) }),
     caches: {
-      keys: async () => ['occulert-v41', 'occulert-v42'],
+      keys: async () => ['occulert-v41', 'occulert-v42', 'occulert-v43'],
       delete: async key => { deleted.push(key); return true; },
       open: async () => ({ add: async () => {}, put: async () => {} }),
       match: async () => null,
@@ -128,17 +136,31 @@ test('service-worker upgrade evicts the stale driver-script cache', async () => 
   let activation;
   listeners.activate({ waitUntil: promise => { activation = promise; } });
   await activation;
-  assert.deepEqual(deleted, ['occulert-v41']);
+  assert.deepEqual(deleted, ['occulert-v41', 'occulert-v42']);
   assert.equal(claimed, true);
 });
 
-test('fleet refreshes skip history events until the protected panel needs them', () => {
+test('fleet refreshes adapt to activity and throttle protected event queries', () => {
   const api = read('api/fleet-summary.js');
   const dashboard = read('fleet-dashboard.html');
+  const policy = markedBlock(dashboard, 'fleet-refresh-policy');
+  const context = {};
+  runInNewContext(`${policy};globalThis.policyForTest={protectedRefreshDelay,shouldRefreshProtectedEvents}`, context);
+  const { protectedRefreshDelay, shouldRefreshProtectedEvents } = context.policyForTest;
+
+  assert.equal(protectedRefreshDelay({ hasActiveSession: true }), 30_000);
+  assert.equal(protectedRefreshDelay(), 90_000);
+  assert.equal(protectedRefreshDelay({ saveData: true }), 120_000);
+  assert.equal(protectedRefreshDelay({ failureCount: 9 }), 300_000);
+  assert.equal(shouldRefreshProtectedEvents({ historyOpen: false, lastLoadedAt: 0, now: 1 }), false);
+  assert.equal(shouldRefreshProtectedEvents({ historyOpen: true, lastLoadedAt: 0, now: 1 }), true);
+  assert.equal(shouldRefreshProtectedEvents({ historyOpen: true, lastLoadedAt: 1_000, now: 120_999 }), false);
+  assert.equal(shouldRefreshProtectedEvents({ historyOpen: true, lastLoadedAt: 1_000, now: 121_000 }), true);
+
   assert.match(api, /Promise\.all\(\[pgFetch\("drivers"/);
   assert.match(api, /if \(includeEvents && sessionIds\.length\)/);
   assert.match(api, /Server-Timing/);
   assert.match(dashboard, /getFleetSummary\(\{includeEvents\}\)/);
-  assert.match(dashboard, /loadProtectedFleet\(\{includeEvents:true\}\)/);
-  assert.match(dashboard, /includeEvents:protectedHistoryOpen\(\)/);
+  assert.match(dashboard, /shouldRefreshProtectedEvents\(\{historyOpen:protectedHistoryOpen\(\),lastLoadedAt:protectedEventsLoadedAt\}\)/);
+  assert.match(dashboard, /setTimeout\(\(\)=>\{void pollProtectedFleet\(\)\},delay\)/);
 });
