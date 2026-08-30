@@ -46,8 +46,10 @@ test('the native alert engine cancels pending cues before a new sequence', () =>
   assert.match(alertSystem, /cueSequenceVersion/);
   assert.match(alertSystem, /alertDeliveryPlan/);
   assert.match(alertSystem, /deliverCueIfCurrent/);
-  assert.match(alertSystem, /hapticEnabled\.current/);
-  assert.match(alertSystem, /audioEnabled\.current/);
+  assert.match(alertSystem, /currentAlertPreferences\(\)/);
+  assert.match(alertSystem, /preferences\.hapticEnabled/);
+  assert.match(alertSystem, /preferences\.audioEnabled/);
+  assert.doesNotMatch(alertSystem, /AsyncStorage/);
 });
 
 test('an invalidated sequence cannot play after asynchronous cue preparation', async () => {

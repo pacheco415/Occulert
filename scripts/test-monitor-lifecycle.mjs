@@ -86,6 +86,8 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /AppState\.currentState/);
   assert.match(monitor, /startAttemptRef\.current \+= 1/);
   assert.match(monitor, /handleStopRef\.current\(\)/);
+  assert.match(monitor, /isRunningRef\.current = true;\s*setIsRunning\(true\)/);
+  assert.match(monitor, /isRunningRef\.current = false;\s*setIsRunning\(false\)/);
   assert.match(monitor, /Monitoring stopped when Occulert left the foreground/);
   assert.match(monitor, /stopBeforeNavigation/);
   assert.equal(

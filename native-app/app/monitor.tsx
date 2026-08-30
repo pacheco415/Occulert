@@ -64,8 +64,11 @@ import {
   createMonitorPerformanceTracker,
   elapsedSessionSeconds,
   shouldRefreshMonitorMetrics,
+  type MonitorPerformanceSnapshot,
 } from '../lib/monitorPerformance';
 import { deriveAlertLevel, type AlertLevel } from '../lib/alertPolicy';
+import { loadAlertPreferences } from '../lib/alertPreferences';
+import { getWatchAlertsEnabled } from '../lib/watchPreferences';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -217,6 +220,14 @@ export default function MonitorScreen() {
         router.replace('/pre-drive');
         return;
       }
+      await Promise.all([
+        loadAlertPreferences(),
+        getWatchAlertsEnabled(),
+      ]);
+      if (shouldAbortMonitoringStart(
+        startAttempt !== startAttemptRef.current,
+        AppState.currentState,
+      )) return;
 
       reset();
       prevAlertingRef.current = false;
@@ -238,28 +249,39 @@ export default function MonitorScreen() {
       cloudEventQueueRef.current = Promise.resolve();
       lastMetricsUiAtRef.current = 0;
       displayedMetricsStateRef.current = 'noFace';
+      displayedAlertLevelRef.current = 'none';
       performanceTrackerRef.current.reset();
 
-      const headphoneStatus = await startHeadphoneMotion();
-      if (shouldAbortMonitoringStart(
-        startAttempt !== startAttemptRef.current,
-        AppState.currentState,
-      )) {
-        monitoringActiveRef.current = false;
-        await stopHeadphoneMotion();
-        return;
-      }
-      if (headphoneMotionStatusRef.current === 'starting') {
-        headphoneMotionStatusRef.current = headphoneStatus.state;
-      }
+      // Headphone motion is optional observation-only input. Start it without
+      // delaying core camera monitoring, and discard any late result after the
+      // session is cancelled or replaced.
+      const headphoneStart = startHeadphoneMotion();
       cloudSessionRef.current = beginCloudSession();
       setAlertCount(0);
       hasCameraSampleRef.current = false;
       lastSampleAtRef.current = Date.now();
       sessionStartedAtRef.current = lastSampleAtRef.current;
+      performanceTrackerRef.current.recordSessionStart(lastSampleAtRef.current);
       setSessionStartedAt(lastSampleAtRef.current);
       setSessionEndedAt(null);
+      isRunningRef.current = true;
       setIsRunning(true);
+      void headphoneStart.then(async (headphoneStatus) => {
+        const stale = startAttempt !== startAttemptRef.current
+          || !monitoringActiveRef.current;
+        if (stale) {
+          if (!monitoringActiveRef.current) await stopHeadphoneMotion();
+          return;
+        }
+        if (headphoneMotionStatusRef.current === 'starting') {
+          headphoneMotionStatusRef.current = headphoneStatus.state;
+        }
+      }).catch(() => {
+        if (
+          startAttempt === startAttemptRef.current
+          && monitoringActiveRef.current
+        ) headphoneMotionStatusRef.current = 'error';
+      });
     } finally {
       startingRef.current = false;
       setIsStarting(false);
@@ -269,6 +291,7 @@ export default function MonitorScreen() {
   const saveSession = useCallback(async (
     durationSec: number,
     alerts: number,
+    monitorPerformance: MonitorPerformanceSnapshot,
   ): Promise<string | null> => {
     if (durationSec <= 0) return null;
     const avgFatigue = fatigueSamplesRef.current
@@ -286,6 +309,7 @@ export default function MonitorScreen() {
       headphoneHeadNodObservations: headphoneHeadNodObservationsRef.current,
       headphoneMotionSamples: headphoneMotionSamplesRef.current,
       headphoneMotionStatus: headphoneMotionStatusRef.current,
+      monitorPerformance,
       sensitivity: sessionSensitivityRef.current,
       ...currentAppBuildInfo(),
     };
@@ -329,16 +353,18 @@ export default function MonitorScreen() {
     const maxFatigue = maxFatigueRef.current;
     const cloudSession = cloudSessionRef.current;
     const pendingEvents = cloudEventQueueRef.current;
+    const monitorPerformance = performanceTrackerRef.current.snapshot(stoppedAt);
 
     monitoringActiveRef.current = false;
     void stopHeadphoneMotion();
     cloudSessionRef.current = null;
     cloudEventQueueRef.current = Promise.resolve();
+    isRunningRef.current = false;
     setIsRunning(false);
     reset();
 
     if (__DEV__ && wasRunning) {
-      console.info('Occulert monitor performance', performanceTrackerRef.current.snapshot());
+      console.info('Occulert monitor performance', monitorPerformance);
     }
 
     const finalizeCloud = async (localSessionId: string | null) => {
@@ -359,7 +385,7 @@ export default function MonitorScreen() {
 
     try {
       if (!wasRunning) return;
-      const localSessionId = await saveSession(durationSec, alerts);
+      const localSessionId = await saveSession(durationSec, alerts, monitorPerformance);
       if (options.deferCloudFinalization) {
         // Optional cloud finalization never delays a safe-stop Maps handoff.
         void finalizeCloud(localSessionId).catch(() => {});
@@ -464,6 +490,7 @@ export default function MonitorScreen() {
     const watchdog = setInterval(() => {
       const timeoutMs = hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS;
       if (stoppingRef.current || Date.now() - lastSampleAtRef.current <= timeoutMs) return;
+      performanceTrackerRef.current.recordCameraStall();
       const message = 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.';
       setSensorFault(message);
       void handleStopRef.current();
@@ -484,8 +511,8 @@ export default function MonitorScreen() {
     // deactivated. It must not mutate a stopped or newly resetting session.
     if (!isRunningRef.current || stoppingRef.current) return;
     hasCameraSampleRef.current = true;
-    lastSampleAtRef.current = Date.now();
     const now = Date.now();
+    lastSampleAtRef.current = now;
     performanceTrackerRef.current.recordSample(now, inferenceMs);
     const headNodResult = headNodDetectorRef.current.update({
       at: now,

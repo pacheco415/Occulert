@@ -29,18 +29,23 @@ test('native monitoring timing stays bounded and deterministic', () => {
   assert.equal(formatSessionTime(61), '01:01');
 
   const tracker = createMonitorPerformanceTracker(3);
+  tracker.recordSessionStart(50);
   tracker.recordSample(100, 10);
   tracker.recordSample(200, 20);
   tracker.recordSample(300, 30);
   tracker.recordSample(400, 40);
   tracker.recordUiUpdate();
   tracker.recordUiUpdate();
-  assert.deepEqual(tracker.snapshot(), {
+  tracker.recordCameraStall();
+  assert.deepEqual(tracker.snapshot(1_050), {
     samples: 4,
     uiUpdates: 2,
     averageInferenceMs: 30,
     p95InferenceMs: 40,
     averageSampleIntervalMs: 100,
+    timeToFirstSampleMs: 50,
+    uiUpdatesPerSecond: 2,
+    cameraStalls: 1,
   });
 });
 
@@ -53,7 +58,13 @@ test('native analysis remains 10 Hz while display-only work is throttled', () =>
   assert.match(monitor, /shouldRefreshMonitorMetrics\(\{/);
   assert.match(monitor, /displayedAlertLevelRef\.current = alertLevel/);
   assert.match(monitor, /performanceTrackerRef\.current\.recordUiUpdate\(\)/);
+  assert.match(monitor, /performanceTrackerRef\.current\.recordSessionStart\(/);
+  assert.match(monitor, /performanceTrackerRef\.current\.recordCameraStall\(\)/);
+  assert.match(monitor, /monitorPerformance,/);
   assert.doesNotMatch(monitor, /setSessionTime|timerRef/);
+  assert.doesNotMatch(monitor, /await startHeadphoneMotion\(\)/);
+  assert.match(monitor, /const headphoneStart = startHeadphoneMotion\(\)/);
+  assert.match(monitor, /await Promise\.all\(\[\s*loadAlertPreferences\(\),\s*getWatchAlertsEnabled\(\),/s);
   assert.match(liveMetrics, /memo\(function LiveMetrics/);
   assert.match(liveMetrics, /setInterval\(updateElapsed, 1_000\)/);
 
@@ -73,6 +84,16 @@ test('native analysis remains 10 Hz while display-only work is throttled', () =>
     now: 100,
     lastUpdatedAt: 0,
   }), true, 'critical threshold crossings must bypass the display throttle');
+});
+
+test('Build 30 pins its iOS toolchain and exposes local aggregate diagnostics', () => {
+  const eas = JSON.parse(read('native-app/eas.json'));
+  const history = read('native-app/app/history.tsx');
+  assert.equal(eas.build.production.ios.image, 'macos-tahoe-26.5-xcode-26.6');
+  assert.match(history, /LOCAL PERFORMANCE DIAGNOSTICS/);
+  assert.match(history, /First camera sample/);
+  assert.match(history, /Inference p95/);
+  assert.match(history, /No camera frames are saved/);
 });
 
 test('web monitoring defers MediaPipe and prevents overlapping inference', async () => {

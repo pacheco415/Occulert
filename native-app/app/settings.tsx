@@ -5,7 +5,6 @@ import { useAudioPlayer } from 'expo-audio';
 import { useFocusEffect } from 'expo-router';
 import { SensitivitySlider, loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { SensitivityLevel } from '../constants/thresholds';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { openFeedback } from '../lib/feedback';
 import { getWatchStatus, sendAlertToWatch, type WatchStatus } from '../lib/watchBridge';
 import {
@@ -25,10 +24,16 @@ import {
   type HeadphoneMotionStatus,
 } from '../lib/headphoneMotion';
 import {
-  IN_EAR_ALERT_PATTERN_KEY,
   parseInEarAlertPattern,
   type InEarAlertPattern,
 } from '../lib/inEarAlerts';
+import {
+  AUDIO_ALERT_PREFERENCE_KEY,
+  HAPTIC_ALERT_PREFERENCE_KEY,
+  IN_EAR_ALERT_PREFERENCE_KEY,
+  alertPreferenceStorage,
+  loadAlertPreferences,
+} from '../lib/alertPreferences';
 import { alertDeliveryPlan } from '../lib/alertDelivery';
 import { waitForCancellableDelay } from '../lib/cancellableDelay';
 
@@ -49,7 +54,7 @@ const EMPTY_HEADPHONE_MOTION_STATUS: HeadphoneMotionStatus = {
 const ALERT_SOUND = require('../assets/alert.wav');
 const ALERT_SOUND_DURATION_MS = 800;
 
-const storedSettingPersister = createSettingPersister(AsyncStorage);
+const storedSettingPersister = createSettingPersister(alertPreferenceStorage);
 const watchSettingPersister = createSettingPersister({
   async getItem() {
     return String(await getWatchAlertsEnabled(true));
@@ -135,15 +140,13 @@ export default function SettingsScreen() {
     let active = true;
     Promise.all([
       loadSavedSensitivity(),
-      AsyncStorage.getItem('occulert-haptic'),
-      AsyncStorage.getItem('occulert-audio'),
-      AsyncStorage.getItem(IN_EAR_ALERT_PATTERN_KEY),
-    ]).then(([savedSensitivity, savedHaptic, savedAudio, savedInEarPattern]) => {
+      loadAlertPreferences(true),
+    ]).then(([savedSensitivity, savedAlerts]) => {
       if (!active) return;
       setSens(savedSensitivity);
-      if (savedHaptic != null) setHaptic(savedHaptic === 'true');
-      if (savedAudio != null) setAudio(savedAudio === 'true');
-      setInEarPattern(parseInEarAlertPattern(savedInEarPattern));
+      setHaptic(savedAlerts.hapticEnabled);
+      setAudio(savedAlerts.audioEnabled);
+      setInEarPattern(savedAlerts.inEarPattern);
     }).catch(() => {});
     return () => { active = false; };
   }, []);
@@ -182,7 +185,7 @@ export default function SettingsScreen() {
 
   const chooseInEarPattern = (pattern: InEarAlertPattern) => {
     void storedSettingPersister.save({
-      key: IN_EAR_ALERT_PATTERN_KEY,
+      key: IN_EAR_ALERT_PREFERENCE_KEY,
       nextValue: pattern,
       previousValue: inEarPattern,
       serialize: String,
@@ -294,12 +297,12 @@ export default function SettingsScreen() {
           <Text style={s.cardTitle}>ALERTS</Text>
           <View style={s.row}>
             <View style={s.rowL}><Ionicons name="phone-portrait-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Haptic vibration</Text><Text style={s.sub}>Vibrate on alert</Text></View></View>
-            <Switch value={haptic} onValueChange={v=>saveBooleanSetting('occulert-haptic',v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <Switch value={haptic} onValueChange={v=>saveBooleanSetting(HAPTIC_ALERT_PREFERENCE_KEY,v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
           <View style={s.row}>
             <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
-            <Switch value={audio} onValueChange={v=>saveBooleanSetting('occulert-audio',v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <Switch value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.alertSafetyNote}>
             <Ionicons name="shield-checkmark-outline" size={15} color={colors.amber} />

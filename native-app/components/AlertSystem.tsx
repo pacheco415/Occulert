@@ -2,16 +2,17 @@ import React, { useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useAudioPlayer } from 'expo-audio';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sendAlertToWatch, sendMonitoringStatusToWatch } from '../lib/watchBridge';
 import { configureAlertAudioMode } from '../lib/audioSession';
 import { getWatchAlertsEnabled } from '../lib/watchPreferences';
 import {
-  IN_EAR_ALERT_PATTERN_KEY,
   nextAlertAudioChannel,
-  parseInEarAlertPattern,
   type AlertAudioChannel,
 } from '../lib/inEarAlerts';
+import {
+  currentAlertPreferences,
+  loadAlertPreferences,
+} from '../lib/alertPreferences';
 import { ALERT_COOLDOWN_MS, PERCLOS_ALERT_THRESHOLD } from '../constants/thresholds';
 import {
   deriveAlertLevel,
@@ -52,8 +53,6 @@ export function AlertSystem({
     ? 0
     : Math.max(0, Math.floor(((sessionEndedAt ?? Date.now()) - sessionStartedAt) / 1_000));
   const lastAlert = useRef<{ level: AlertLevel; at: number }>({ level: 'none', at: 0 });
-  const hapticEnabled = useRef(true);
-  const audioEnabled = useRef(true);
   const lastDirectionalChannel = useRef<Exclude<AlertAudioChannel, 'balanced'> | null>(null);
   const watchLiveSession = useRef(false);
   const pendingCueTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -93,10 +92,10 @@ export function AlertSystem({
 
   React.useEffect(() => cancelPendingCues, [cancelPendingCues]);
 
-  // Load persisted alert preferences (set on the Settings screen).
+  // Preload output preferences before Start. handleStart also awaits this same
+  // deduplicated read so an alert never waits for the native storage bridge.
   React.useEffect(() => {
-    AsyncStorage.getItem('occulert-haptic').then(v => { if (v != null) hapticEnabled.current = v === 'true'; });
-    AsyncStorage.getItem('occulert-audio').then(v => { if (v != null) audioEnabled.current = v === 'true'; });
+    void loadAlertPreferences();
     // iOS routes playback through the active output (speaker, AirPods, or car
     // audio). This is automatic rather than a capability Occulert can toggle.
     configureAlertAudioMode().catch(() => {});
@@ -203,25 +202,14 @@ export function AlertSystem({
     criticalPerclosThreshold: PERCLOS_ALERT_THRESHOLD,
   });
 
-  const fire = useCallback(async (lv: AlertLevel) => {
+  const fire = useCallback((lv: AlertLevel) => {
     const now = Date.now();
     const previous = lastAlert.current;
     if (!shouldDeliverAlert(previous.level, previous.at, lv, now, ALERT_COOLDOWN_MS)) return;
     lastAlert.current = { level: lv, at: now };
     cancelPendingCues();
     const sequenceVersion = cueSequenceVersion.current;
-
-    // Expo Router can keep this screen mounted while Settings is open. Read
-    // all delivery preferences for each alert so enable/disable changes take
-    // effect immediately instead of waiting for a remount.
-    const [hapticValue, audioValue, inEarPatternValue] = await Promise.all([
-      AsyncStorage.getItem('occulert-haptic').catch(() => null),
-      AsyncStorage.getItem('occulert-audio').catch(() => null),
-      AsyncStorage.getItem(IN_EAR_ALERT_PATTERN_KEY).catch(() => null),
-    ]);
-    if (sequenceVersion !== cueSequenceVersion.current) return;
-    if (hapticValue != null) hapticEnabled.current = hapticValue === 'true';
-    if (audioValue != null) audioEnabled.current = audioValue === 'true';
+    const preferences = currentAlertPreferences();
 
     Animated.sequence([
       Animated.timing(pulse, { toValue: 1.04, duration: 110, useNativeDriver: true }),
@@ -231,7 +219,7 @@ export function AlertSystem({
     ]).start();
 
     const deliveryPlan = alertDeliveryPlan(lv);
-    if (hapticEnabled.current) {
+    if (preferences.hapticEnabled) {
       deliveryPlan.hapticOffsetsMs.forEach(offsetMs => scheduleCue(offsetMs, sequenceVersion, async () => {
         try {
           if (lv === 'critical') {
@@ -245,10 +233,9 @@ export function AlertSystem({
       }));
     }
 
-    // Read this preference at alert time. Expo Router can keep the monitor
-    // mounted while Settings is open, so a value captured only on mount can
-    // remain stale after the user enables Watch alerts.
-    getWatchAlertsEnabled(true)
+    // Settings writes through the shared Watch preference cache, so the alert
+    // path can stay storage-free while still seeing confirmed changes.
+    getWatchAlertsEnabled()
       .then((enabled) => {
         if (enabled) {
           return sendAlertToWatch({ level: lv, perclos: metrics.perclos, at: now });
@@ -257,9 +244,9 @@ export function AlertSystem({
       .catch(() => {});
 
     try {
-      if (!audioEnabled.current) return;
+      if (!preferences.audioEnabled) return;
       const channel = nextAlertAudioChannel(
-        parseInEarAlertPattern(inEarPatternValue),
+        preferences.inEarPattern,
         lv,
         lastDirectionalChannel.current,
       );

@@ -52,3 +52,12 @@ test('the optional adapter keeps camera monitoring available without a native mo
   assert.match(adapter, /if \(!nativeModule\) return NOT_BUILT_STATUS/);
   assert.match(adapter, /Monitoring teardown must continue/);
 });
+
+test('optional headphone startup never delays core camera monitoring', () => {
+  const monitor = read('native-app/app/monitor.tsx');
+  assert.match(monitor, /const headphoneStart = startHeadphoneMotion\(\)/);
+  assert.doesNotMatch(monitor, /await startHeadphoneMotion\(\)/);
+  assert.match(monitor, /setIsRunning\(true\);\s*void headphoneStart\.then/s);
+  assert.match(monitor, /startAttempt !== startAttemptRef\.current/);
+  assert.match(monitor, /if \(!monitoringActiveRef\.current\) await stopHeadphoneMotion\(\)/);
+});
