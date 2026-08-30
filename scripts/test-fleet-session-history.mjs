@@ -26,6 +26,9 @@ test('manager history is scoped through fleet sessions and excludes location fie
   assert.match(api, /includes_location: false/);
   assert.match(api, /includes_personal_media: false/);
   assert.match(api, /includes_raw_motion: false/);
+  assert.match(api, /Promise\.all\(\[pgFetch\("drivers"/);
+  assert.match(api, /includeEvents && sessionIds\.length/);
+  assert.match(api, /events_included: includeEvents/);
 });
 
 test('dashboard keeps protected history separate from its local fallback', () => {
@@ -40,6 +43,9 @@ test('dashboard keeps protected history separate from its local fallback', () =>
   assert.match(history, /OcculertSecurity\.csvCell/);
   assert.match(history, /value===null\|\|value===undefined/);
   assert.doesNotMatch(history, /latitude|longitude|\blocation\b|camera media|\baudio\b|raw motion/i);
+  assert.match(dashboard, /getFleetSummary\(\{includeEvents\}\)/);
+  assert.match(dashboard, /loadProtectedFleet\(\{includeEvents:true\}\)/);
+  assert.match(dashboard, /includeEvents:protectedHistoryOpen\(\)/);
 });
 
 test('fleet projection preserves inactive and unmeasured driver states', () => {

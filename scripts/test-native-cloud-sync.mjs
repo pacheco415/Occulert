@@ -40,6 +40,16 @@ assert.ok(
 );
 assert.match(cloud, /SecureStore\.setItemAsync\(AUTH_KEY/);
 assert.match(cloud, /WHEN_UNLOCKED_THIS_DEVICE_ONLY/);
+assert.match(cloud, /let authCache: StoredAuth \| null \| undefined/);
+assert.match(cloud, /if \(authCache !== undefined\) return authCache/);
+assert.match(cloud, /if \(!authLoadPromise\)/);
+assert.match(cloud, /readVersion !== authMutationVersion/);
+assert.match(cloud, /writeVersion !== authMutationVersion/);
+assert.match(cloud, /expectedVersion !== authMutationVersion/);
+assert.match(cloud, /refreshAuth\(auth, refreshVersion\)/);
+assert.match(cloud, /if \(!authRefreshPromise\)/);
+assert.match(cloud, /authCache = auth/);
+assert.match(cloud, /consentOverride = false;\s*authMutationVersion \+= 1;\s*authCache = null;/);
 assert.doesNotMatch(
   cloud,
   /SERVICE_ROLE|service.role/i,
@@ -51,6 +61,11 @@ assert.doesNotMatch(
   'pilot review observations and build metadata must not be added to cloud sync',
 );
 assert.match(cloud, /if \(!await consentEnabled\(\) \|\| !await ensureDriverProfile\(\)\) return null;/);
+assert.equal(
+  [...cloud.matchAll(/if \(!await consentEnabled\(\)/g)].length,
+  3,
+  'session start, alert logging, and session finish should each check consent once',
+);
 assert.match(cloud, /https:\/\/www\.occulert\.com/);
 
 const eventStart = cloud.indexOf('export async function logCloudAlert');

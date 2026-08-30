@@ -346,7 +346,7 @@ assertIncludes("native-app/app/monitor.tsx", "sensorFault: { position: 'absolute
 assertNotIncludes("native-app/app/monitor.tsx", "Alert.alert('Monitoring stopped'", "native sensor faults must not stack a blocking modal over the in-app warning");
 assertIncludes("native-app/app/monitor.tsx", "SENSOR_STARTUP_GRACE_MS = 10_000", "native camera startup must have a distinct first-frame grace period");
 assertIncludes("native-app/app/monitor.tsx", "hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS", "native camera watchdog must distinguish startup from an active-pipeline stall");
-assertIncludes("native-app/app/monitor.tsx", "<View style={s.ctrl}>\n          {isRunning && (\n            <View style={s.metrics}>", "native metrics must share the control layout flow so alert actions cannot overlap them");
+assertIncludes("native-app/app/monitor.tsx", "<View style={s.ctrl}>\n          {isRunning && (\n            <LiveMetrics", "native metrics must share the control layout flow so alert actions cannot overlap them");
 assertNotIncludes("native-app/app/monitor.tsx", "metrics: {\n    position: 'absolute'", "native metrics must not rely on a fixed bottom offset that can overlap added controls");
 assertIncludes("native-app/lib/watchBridge.ts", "getIsWatchAppInstalled", "Apple Watch controls must require the companion app, not pairing alone");
 assertIncludes("native-app/app/settings.tsx", "AUTOMATIC", "connected audio settings must describe iPhone output routing truthfully");
@@ -363,7 +363,7 @@ assertIncludes("fleet-dashboard.html", "id=\"driverSearch\"", "fleet dashboard m
 assertIncludes("fleet-dashboard.html", "function exportFleetCSV()", "fleet dashboard must keep CSV export");
 assertIncludes("fleet-dashboard.html", "function seedDemoData()", "fleet dashboard must keep demo data loading");
 assertIncludes("fleet-dashboard.html", "function copyDriver(id)", "fleet dashboard must keep per-driver copy summaries");
-assertIncludes("fleet-dashboard.html", "getFleetSummary()", "signed-in fleet dashboards must use the owner-scoped backend summary");
+assertIncludes("fleet-dashboard.html", "getFleetSummary({includeEvents})", "signed-in fleet dashboards must use the owner-scoped backend summary");
 assertIncludes("fleet-dashboard.html", "!fleetMode&&local", "protected fleet dashboards must not fall back to unrelated local driver data");
 assertIncludes("fleet-dashboard.html", "id=\"sessionHistory\"", "fleet dashboard must render protected session history");
 assertIncludes("fleet-dashboard.html", "ontoggle=\"handleHistoryToggle(event)\"", "protected session history must render only after the manager opens it");

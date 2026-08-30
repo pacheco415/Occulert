@@ -39,6 +39,7 @@ test('other platforms use a portable web search URL', () => {
 
 test('the monitor stops and saves before handing off to Maps', () => {
   const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  const liveMetrics = readFileSync(new URL('../native-app/components/LiveMetrics.tsx', import.meta.url), 'utf8');
   assert.match(monitor, /alertCount > 0/);
   assert.match(monitor, /Only use this after you are safely parked/);
   assert.match(monitor, /await handleStop\(\{ deferCloudFinalization: true \}\)/);
@@ -49,8 +50,8 @@ test('the monitor stops and saves before handing off to Maps', () => {
   assert.match(monitor, /does not read, store, or upload your location/i);
 
   const controlsStart = monitor.indexOf('<View style={s.ctrl}>');
-  const metricsStart = monitor.indexOf('<View style={s.metrics}>');
+  const metricsStart = monitor.indexOf('<LiveMetrics');
   const safeStopStart = monitor.indexOf('style={s.safeStopBtn}', controlsStart);
   assert.ok(controlsStart < metricsStart && metricsStart < safeStopStart);
-  assert.doesNotMatch(monitor, /metrics:\s*\{\s*position:\s*'absolute'/);
+  assert.doesNotMatch(liveMetrics, /metrics:\s*\{\s*position:\s*'absolute'/);
 });
