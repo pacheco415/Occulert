@@ -625,6 +625,21 @@ test("affordable fleet plans preserve a card-free trial handoff", async ({ page 
   await expect(page.getByText(/no credit card and no automatic renewal/i)).toBeVisible();
 });
 
+test("monthly plan anchor clears the sticky fleet navigation", async ({ page }) => {
+  for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/fleet-pricing.html", { waitUntil: "domcontentloaded" });
+    await page.getByRole("link", { name: "Compare Monthly Plans" }).click();
+
+    const position = await page.locator("#monthly-plans").evaluate((section) => ({
+      sectionTop: section.getBoundingClientRect().top,
+      navigationBottom: document.querySelector(".top")?.getBoundingClientRect().bottom ?? 0,
+    }));
+    expect(position.sectionTop).toBeGreaterThan(position.navigationBottom);
+    await expect(page.getByRole("heading", { name: "Choose the smallest plan that fits the active roster." })).toBeVisible();
+  }
+});
+
 test("driver invitation tokens leave the URL immediately and stay in session storage", async ({ page }) => {
   const token = "a".repeat(43);
   await page.goto(`/accept-invite.html#token=${token}`, { waitUntil: "domcontentloaded" });
