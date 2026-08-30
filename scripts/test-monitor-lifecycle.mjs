@@ -103,6 +103,17 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(layout, /name="monitor"[\s\S]*gestureEnabled: false/);
 });
 
+test('an immediate background stop uses the running ref before React state commits', () => {
+  const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  assert.match(monitor, /const wasRunning = isRunningRef\.current;/);
+  assert.doesNotMatch(monitor, /const wasRunning = isRunning;/);
+  assert.equal(
+    shouldStopMonitoringForAppState(true, true, false, 'background'),
+    true,
+    'a session marked running by the immediate ref must stop and reach finalization',
+  );
+});
+
 test('monitor performance resources stay scoped and stable during a live session', () => {
   const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
   assert.match(

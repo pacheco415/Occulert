@@ -342,7 +342,9 @@ export default function MonitorScreen() {
     stoppingRef.current = true;
     setIsStopping(true);
 
-    const wasRunning = isRunning;
+    // The ref becomes authoritative before React commits the visible running
+    // state, so AppState shutdown in that gap must still save and finalize.
+    const wasRunning = isRunningRef.current;
     const stoppedAt = Date.now();
     setSessionEndedAt(stoppedAt);
     const durationSec = elapsedSessionSeconds(sessionStartedAtRef.current, stoppedAt);
