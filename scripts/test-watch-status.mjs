@@ -10,6 +10,7 @@ const watchPreferences = readFileSync(
   'utf8',
 );
 const alertSystem = readFileSync(new URL('../native-app/components/AlertSystem.tsx', import.meta.url), 'utf8');
+const monitorScreen = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
 const alertReceiver = readFileSync(
   new URL('../native-app/targets/occulert-watch/AlertReceiver.swift', import.meta.url),
   'utf8',
@@ -137,7 +138,8 @@ test('immediate alerts always refresh reachability instead of using the status c
 test('the native monitor publishes live state and an explicit stop update', () => {
   assert.match(alertSystem, /sendMonitoringStatusToWatch/);
   assert.match(alertSystem, /const enabled = await getWatchAlertsEnabled\(\)/);
-  assert.match(alertSystem, /getWatchAlertsEnabled\(true\)/);
+  assert.doesNotMatch(alertSystem, /getWatchAlertsEnabled\(true\)/);
+  assert.match(monitorScreen, /getWatchAlertsEnabled\(\)/);
   assert.doesNotMatch(alertSystem, /AsyncStorage\.getItem\('occulert-watch'\)/);
   const intervalMatch = alertSystem.match(/WATCH_STATUS_SYNC_INTERVAL_MS\s*=\s*([\d_]+)/);
   assert.ok(intervalMatch, 'Watch status interval must be explicit');
