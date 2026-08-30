@@ -1,6 +1,6 @@
 # Occulert Performance Roadmap
 
-Last updated: 2026-08-29
+Last updated: 2026-08-30
 
 This roadmap separates source optimizations from physical-device, live-service,
 and accuracy evidence. A green source check means the implementation is ready
@@ -17,6 +17,10 @@ accuracy, or safe real-world behavior.
 | Fleet API | Runs driver and session reads concurrently, optionally skips event history, and returns `Server-Timing` durations | Existing owner verification and privacy-limited field selection remain unchanged |
 | Fleet dashboard | Keeps the existing 30-second refresh while a session is active, shifts idle dashboards to 90 seconds, backs off after failures, updates relative-time labels every 15 seconds, and limits open history-event refreshes to every two minutes | Active manager visibility is unchanged; protected and local fallback data remain separate; GPS and personal media stay excluded |
 | Native cloud sync | Reuses the verified SecureStore auth value in memory and deduplicates its initial read | Token writes refresh the cache; sign-out clears it before local deletion/revocation |
+| Native alert delivery | Preloads confirmed haptic, audio, in-ear, and Watch preferences before monitoring so alert cues do not wait for storage reads | Detection thresholds, cooldowns, cue plans, and user-confirmed settings remain unchanged |
+| Optional headphone motion | Starts observation-only headphone motion without delaying camera activation | Late accessory results are discarded after cancellation; headphone data never changes scores or alerts |
+| Device evidence | Saves aggregate first-sample, inference, cadence, UI-rate, and stall measurements in the local session record | No frames are saved or uploaded; measurements are evidence, not accuracy claims |
+| Build reproducibility | Pins the Build 30 production profile to the validated SDK 57/Xcode 26.6 EAS image | Queueing, TestFlight submission, and device validation remain separate gates |
 | Regression coverage | Adds deterministic timing, cadence, lazy-loading, overlap, and conditional-history contracts to `npm run verify` | Tests establish code contracts, not physical-device performance |
 
 ## Performance budgets
@@ -27,6 +31,7 @@ These are acceptance targets, not measured production claims.
 |---|---:|---|
 | Native analysis cadence | One eligible sample every 100 ms | Timing snapshot plus a 30-minute physical iPhone run |
 | Native display refresh | At most 4 routine updates per second | Automated contract and simulator profiler |
+| Native first camera sample | Record the exact delay without a source-only pass claim | Local Build 30 session record on each tested iPhone |
 | Native p95 inference | Below the 100 ms analysis budget | Supported physical iPhone, day/night and eyewear slices |
 | Web overlapping inference | Zero concurrent sends | Automated contract plus Safari and Chrome camera runs |
 | Web p95 inference | Below the 135 ms browser analysis interval | Supported iPhone Safari and Android Chrome |

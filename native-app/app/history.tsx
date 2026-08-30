@@ -22,6 +22,7 @@ import { formatPilotCounts, summarizePilotIssues } from '../lib/pilotInsights';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
+import type { MonitorPerformanceSnapshot } from '../lib/monitorPerformance';
 
 const HISTORY_KEY = 'occulert-session-history';
 const CHECKPOINT_TARGET = 10;
@@ -33,6 +34,7 @@ interface SessionRecord extends FeedbackSession {
   assessmentUpdatedAt?: string;
   conditionsUpdatedAt?: string;
   deviceImpactUpdatedAt?: string;
+  monitorPerformance?: MonitorPerformanceSnapshot;
 }
 
 type TestConditionKey = keyof SessionTestConditions;
@@ -403,6 +405,25 @@ export default function HistoryScreen() {
             <Text style={s.buildInfo}>
               App {item.appVersion || 'not recorded'} · Build {item.appBuildNumber || 'not recorded'}
             </Text>
+            {item.monitorPerformance && (
+              <View style={s.performanceBox}>
+                <Text style={s.performanceTitle}>LOCAL PERFORMANCE DIAGNOSTICS</Text>
+                <Text style={s.performanceInfo}>
+                  First camera sample: {item.monitorPerformance.timeToFirstSampleMs == null
+                    ? 'not observed'
+                    : `${item.monitorPerformance.timeToFirstSampleMs} ms`}
+                </Text>
+                <Text style={s.performanceInfo}>
+                  Inference p95: {item.monitorPerformance.p95InferenceMs} ms · Average sample interval: {item.monitorPerformance.averageSampleIntervalMs} ms
+                </Text>
+                <Text style={s.performanceInfo}>
+                  Display updates: {item.monitorPerformance.uiUpdatesPerSecond}/sec · Camera stalls: {item.monitorPerformance.cameraStalls}
+                </Text>
+                <Text style={s.performanceCaution}>
+                  Aggregate timings stay in this session record on this iPhone. No camera frames are saved.
+                </Text>
+              </View>
+            )}
             {(item.headNodObservations != null || item.headphoneMotionStatus != null) && (
               <View style={s.observationBox}>
                 <Text style={s.observationTitle}>EXPERIMENTAL HEAD-MOTION DIAGNOSTICS</Text>
@@ -605,6 +626,10 @@ const s = StyleSheet.create({
   storageText: { color: '#4a7a8a', fontSize: 10, fontWeight: '700' },
   storageTextSynced: { color: '#34d399' },
   buildInfo: { color: '#6592a5', fontSize: 10, fontWeight: '700', marginTop: 7 },
+  performanceBox: { backgroundColor: 'rgba(14,165,233,0.06)', borderWidth: 1, borderColor: '#164e63', borderRadius: 9, marginTop: 9, padding: 10 },
+  performanceTitle: { color: '#67e8f9', fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  performanceInfo: { color: '#bae6fd', fontSize: 10, lineHeight: 15, marginTop: 4 },
+  performanceCaution: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 6 },
   observationBox: { backgroundColor: 'rgba(37,99,235,0.06)', borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 9, marginTop: 9, padding: 10 },
   observationTitle: { color: '#60a5fa', fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   observationInfo: { color: '#bae6fd', fontSize: 10, lineHeight: 15, marginTop: 4 },

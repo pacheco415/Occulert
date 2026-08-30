@@ -63,11 +63,13 @@ test('native brand assets keep store-safe square dimensions', () => {
   assert.equal(appConfig.expo.ios.icon, './assets/icon.png');
 });
 
-test('audio and haptic preferences are read when each alert fires', () => {
+test('audio and haptic preferences are cached before alert delivery', () => {
   const alertSystem = read('native-app/components/AlertSystem.tsx');
   const fire = alertSystem.slice(alertSystem.indexOf('const fire'), alertSystem.indexOf("React.useEffect(() => {\n    if (level"));
-  assert.match(fire, /AsyncStorage\.getItem\('occulert-haptic'\)/);
-  assert.match(fire, /AsyncStorage\.getItem\('occulert-audio'\)/);
+  assert.match(alertSystem, /loadAlertPreferences\(\)/);
+  assert.match(fire, /currentAlertPreferences\(\)/);
+  assert.match(fire, /getWatchAlertsEnabled\(\)/);
+  assert.doesNotMatch(fire, /AsyncStorage|getWatchAlertsEnabled\(true\)/);
 });
 
 test('native Settings reports persistence failures and restores the confirmed value', () => {
@@ -77,6 +79,7 @@ test('native Settings reports persistence failures and restores the confirmed va
   assert.match(settings, /previous setting is still active/);
   assert.match(settings, /storedSettingPersister\.save/);
   assert.match(settings, /watchSettingPersister\.save/);
+  assert.match(settings, /createSettingPersister\(alertPreferenceStorage\)/);
   assert.doesNotMatch(settings, /set\(val\); await AsyncStorage\.setItem/);
 });
 

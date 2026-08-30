@@ -86,6 +86,8 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /AppState\.currentState/);
   assert.match(monitor, /startAttemptRef\.current \+= 1/);
   assert.match(monitor, /handleStopRef\.current\(\)/);
+  assert.match(monitor, /isRunningRef\.current = true;\s*setIsRunning\(true\)/);
+  assert.match(monitor, /isRunningRef\.current = false;\s*setIsRunning\(false\)/);
   assert.match(monitor, /Monitoring stopped when Occulert left the foreground/);
   assert.match(monitor, /stopBeforeNavigation/);
   assert.equal(
@@ -99,6 +101,17 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /if \(stoppingRef\.current\) return Promise\.resolve\(\)/);
   assert.match(monitor, /accessibilityLabel="Open settings and end monitoring"/);
   assert.match(layout, /name="monitor"[\s\S]*gestureEnabled: false/);
+});
+
+test('an immediate background stop uses the running ref before React state commits', () => {
+  const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  assert.match(monitor, /const wasRunning = isRunningRef\.current;/);
+  assert.doesNotMatch(monitor, /const wasRunning = isRunning;/);
+  assert.equal(
+    shouldStopMonitoringForAppState(true, true, false, 'background'),
+    true,
+    'a session marked running by the immediate ref must stop and reach finalization',
+  );
 });
 
 test('monitor performance resources stay scoped and stable during a live session', () => {
