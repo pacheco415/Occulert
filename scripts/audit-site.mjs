@@ -377,7 +377,7 @@ assertIncludes("fleet-dashboard.html", "document.hidden", "fleet dashboard polli
 assertIncludes("fleet-dashboard.html", "protectedFleetLoading", "fleet dashboard must prevent overlapping protected-summary requests");
 assertIncludes("fleet-dashboard.html", "data-focus-key=\"driver-copy-", "dynamic driver actions must expose stable focus keys");
 assertIncludes("fleet-dashboard.html", "function exportSessionHistoryCSV()", "protected session history must keep a privacy-safe export");
-assertIncludes("fleet-dashboard.html", "Pilot value snapshot", "fleet managers must receive a time-bounded pilot value summary");
+assertIncludes("fleet-dashboard.html", "Trial value snapshot", "fleet managers must receive a time-bounded trial value summary");
 assertIncludes("fleet-dashboard.html", "Average reported safety score", "fleet value summaries must identify client-reported score data");
 assertNotIncludes("fleet-dashboard.html", "Measured safety score", "fleet value summaries must not imply independent measurement");
 assertIncludes("fleet-dashboard.html", "function exportPilotReport()", "fleet managers must be able to export a manager-ready pilot report");
@@ -400,14 +400,14 @@ assertIncludes("fleet-pricing.html", "No credit card required", "the free trial 
 assertIncludes("fleet-pricing.html", "No automatic renewal", "the free trial must disclose that it does not renew automatically");
 assertIncludes("fleet-pricing.html", "does not collect payment or start a subscription", "fleet pricing must disclose the transaction boundary");
 assertIncludes("fleet-pricing.html", "interest=free-trial&amp;plan=free-trial", "free-trial CTAs must open the initial trial journey");
-assertIncludes("fleet-pricing.html", "interest=paid-rollout&amp;plan=starter", "monthly plans must keep the post-pilot rollout journey");
+assertIncludes("fleet-pricing.html", "interest=paid-rollout&amp;plan=starter", "monthly plans must keep the post-trial rollout journey");
 assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet exports must neutralize spreadsheet formulas");
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
 assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigation must expose one contextual primary action");
 assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v43'", "the performance and pricing package must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v44'", "the Preview wording repair must advance the offline cache");
 assertNotIncludes("sw.js", "occulert-v41", "the performance repair must not reuse the stale driver-script cache");
 assertIncludes("sw.js", "'/portal.css?v=6'", "the service worker must cache the current shared portal stylesheet");
 assertNotIncludes("sw.js", "occulert-v40", "the external driver script must not reuse the previous offline cache");

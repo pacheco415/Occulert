@@ -556,15 +556,14 @@ test("fleet dashboard paid-rollout path reuses the protected lead form with clea
   await page.goto("/pilot-signup.html?interest=paid-rollout&plan=starter", { waitUntil: "domcontentloaded" });
 
   await expect(page.locator(".brand")).toHaveText("Occulert Fleet Rollout");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turn your Occulert pilot into an operating plan");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turn your Occulert trial into an operating plan");
   await expect(page.locator(".steps")).toContainText("1. Review outcomes");
   await expect(page.locator(".steps")).toContainText("2. Define rollout");
   await expect(page.locator(".steps")).toContainText("3. Agree on scope");
   await expect(page.locator(".list")).toContainText("What the rollout covers");
   await expect(page.locator(".list")).toContainText("What happens next");
   await expect(page.locator(".list")).toContainText("submitting this form does not start a paid service");
-  await expect(page.locator(".steps")).not.toContainText("Plan pilot");
-  await expect(page.locator(".list")).not.toContainText("Good pilot fit");
+  await expect(page.locator("main")).not.toContainText(/\bpilot\b/i);
   await expect(page.locator("form h2")).toHaveText("Discuss a paid rollout");
   await expect(page.getByLabel("Interested plan")).toHaveValue("starter");
   await expect(page.locator("#message")).toHaveValue(/affordable Occulert fleet rollout/i);
@@ -579,6 +578,7 @@ test("affordable fleet plans preserve a card-free trial handoff", async ({ page 
   await expect(page.getByText("$9", { exact: true })).toBeVisible();
   await expect(page.getByText("$25", { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Fleet plan comparison" })).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(/\bpilot\b/i);
   const trialLink = page.locator(".pilot-card").getByRole("link", { name: "Start free trial", exact: true });
   await expect(trialLink).toHaveAttribute("href", "/pilot-signup.html?interest=free-trial&plan=free-trial");
   await trialLink.click();
@@ -937,7 +937,7 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
   await expect(page.locator("#valueScore")).toHaveText("75");
 
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download pilot report" }).click();
+  await page.getByRole("button", { name: "Download trial report" }).click();
   const download = await downloadPromise;
   const csv = await readFile(await download.path(), "utf8");
   expect(csv).toContain("unverified_client_report");

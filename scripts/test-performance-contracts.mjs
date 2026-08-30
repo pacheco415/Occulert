@@ -108,7 +108,7 @@ test('web monitoring defers MediaPipe and prevents overlapping inference', async
 
 test('service-worker upgrade evicts stale website caches', async () => {
   const source = read('sw.js');
-  assert.match(source, /const CACHE = 'occulert-v43'/);
+  assert.match(source, /const CACHE = 'occulert-v44'/);
 
   const listeners = {};
   const deleted = [];
@@ -136,7 +136,7 @@ test('service-worker upgrade evicts stale website caches', async () => {
   let activation;
   listeners.activate({ waitUntil: promise => { activation = promise; } });
   await activation;
-  assert.deepEqual(deleted, ['occulert-v41', 'occulert-v42']);
+  assert.deepEqual(deleted, ['occulert-v41', 'occulert-v42', 'occulert-v43']);
   assert.equal(claimed, true);
 });
 

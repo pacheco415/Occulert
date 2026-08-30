@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v43';
+const CACHE = 'occulert-v44';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
