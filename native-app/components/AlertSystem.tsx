@@ -29,7 +29,12 @@ const ALERT_SOUND_LEFT = require('../assets/alert-left.wav');
 const ALERT_SOUND_RIGHT = require('../assets/alert-right.wav');
 const WATCH_STATUS_SYNC_INTERVAL_MS = 2_000;
 
-interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; sessionTime: number; }
+interface AlertSystemProps {
+  metrics: EyeMetrics;
+  isRunning: boolean;
+  sessionStartedAt: number | null;
+  sessionEndedAt: number | null;
+}
 
 /**
  * AlertSystem — Week 2
@@ -37,7 +42,15 @@ interface AlertSystemProps { metrics: EyeMetrics; isRunning: boolean; sessionTim
  *   - expo-haptics vibration (impact/notification style per severity)
  *   - expo-audio alert tone (with cooldown so it doesn't spam)
  */
-export function AlertSystem({ metrics, isRunning, sessionTime }: AlertSystemProps) {
+export function AlertSystem({
+  metrics,
+  isRunning,
+  sessionStartedAt,
+  sessionEndedAt,
+}: AlertSystemProps) {
+  const sessionTime = sessionStartedAt === null
+    ? 0
+    : Math.max(0, Math.floor(((sessionEndedAt ?? Date.now()) - sessionStartedAt) / 1_000));
   const lastAlert = useRef<{ level: AlertLevel; at: number }>({ level: 'none', at: 0 });
   const hapticEnabled = useRef(true);
   const audioEnabled = useRef(true);

@@ -15,6 +15,17 @@ response.setHeader("Cache-Control", "no-store");
 response.end(JSON.stringify(body));
 }
 
+function shouldIncludeEvents(request) {
+let value = request.query && request.query.include_events;
+if (Array.isArray(value)) value = value[0];
+if (value === undefined && request.url) {
+try {
+value = new URL(request.url, "https://www.occulert.com").searchParams.get("include_events");
+} catch (error) {}
+}
+return value !== "0" && value !== "false";
+}
+
 module.exports = async function handler(request, response) {
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
 return json(response, 501, {
@@ -35,6 +46,7 @@ return json(response, 401, { ok: false, error: "unauthorized" });
 }
 
 try {
+const requestStartedAt = Date.now();
 const fleets = await pgFetch("fleets", {
 params: { select: "id,company_name,plan", owner_user_id: "eq." + user.id, limit: "1" },
 });
@@ -42,25 +54,30 @@ const fleet = fleets[0];
 if (!fleet) {
 return json(response, 403, { ok: false, error: "fleet_not_found" });
 }
+const fleetLookupMs = Date.now() - requestStartedAt;
 
-const drivers = await pgFetch("drivers", {
+const rosterStartedAt = Date.now();
+const rosterResults = await Promise.all([pgFetch("drivers", {
 params: { select: "id,name,active,vehicle_id", fleet_id: "eq." + fleet.id },
-});
-
-const sessions = await pgFetch("sessions", {
+}), pgFetch("sessions", {
 params: {
 select: "id,driver_id,started_at,ended_at,average_fatigue,max_fatigue,safety_score,alert_count,head_nod_count",
 fleet_id: "eq." + fleet.id,
 order: "started_at.desc",
 limit: "50",
 },
-});
+})]);
+const drivers = rosterResults[0];
+const sessions = rosterResults[1];
+const rosterLookupMs = Date.now() - rosterStartedAt;
 
+const includeEvents = shouldIncludeEvents(request);
 const sessionIds = sessions
 .map(function (session) { return String(session.id || ""); })
 .filter(function (id) { return UUID_PATTERN.test(id); });
 let events = [];
-if (sessionIds.length) {
+const eventsStartedAt = Date.now();
+if (includeEvents && sessionIds.length) {
 const eventRows = await pgFetch("events", {
 params: {
 select: "id,session_id,type,fatigue_score,confidence,created_at",
@@ -80,6 +97,13 @@ created_at: event.created_at,
 };
 });
 }
+const eventsLookupMs = Date.now() - eventsStartedAt;
+
+response.setHeader("Server-Timing", [
+"fleet;dur=" + fleetLookupMs,
+"roster;dur=" + rosterLookupMs,
+"events;dur=" + eventsLookupMs,
+].join(", "));
 
 return json(response, 200, {
 ok: true,
@@ -87,6 +111,7 @@ fleet: fleet,
 drivers: drivers,
 sessions: sessions,
 events: events,
+events_included: includeEvents,
 telemetry_trust: "unverified_client_report",
 privacy: {
 includes_location: false,

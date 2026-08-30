@@ -345,7 +345,10 @@ window.OcculertBackend = (function () {
     return api("POST", "/api/events", Object.assign({ session_id: sessionId, type: type }, extra || {}));
   }
 
-  function getFleetSummary() { return api("GET", "/api/fleet-summary"); }
+  function getFleetSummary(options) {
+    var includeEvents = !options || options.includeEvents !== false;
+    return api("GET", "/api/fleet-summary" + (includeEvents ? "" : "?include_events=0"));
+  }
 
   function getFleet() { return api("GET", "/api/fleets"); }
 

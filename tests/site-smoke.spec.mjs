@@ -468,6 +468,31 @@ test("driver monitoring stops instead of appearing active after foreground loss"
   await expect(page.locator("#overlayHint")).toContainText("Foreground required");
 });
 
+test("driver startup stays camera-free when foreground is lost during model loading", async ({ page }) => {
+  await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => {
+    window.__cameraRequests = 0;
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: async () => {
+          window.__cameraRequests += 1;
+          return { getTracks: () => [{ stop: () => {} }] };
+        },
+      },
+    });
+    initModel = () => new Promise((resolve) => { window.__releaseModelLoad = resolve; });
+    void start();
+  });
+  await expect.poll(() => page.evaluate(() => starting)).toBe(true);
+  await page.evaluate(() => handleVisibilityChange(true));
+  await page.evaluate(() => window.__releaseModelLoad());
+  await expect.poll(() => page.evaluate(() => starting)).toBe(false);
+  expect(await page.evaluate(() => window.__cameraRequests)).toBe(0);
+  expect(await page.evaluate(() => running)).toBe(false);
+  await expect(page.locator("#overlayTitle")).toHaveText("Monitoring Paused");
+});
+
 test("opted-in driver sessions use authenticated cloud APIs without sending GPS by default", async ({ page }) => {
   const apiCalls = [];
   await page.addInitScript(() => {
@@ -733,7 +758,7 @@ test("authenticated fleet dashboards never fall back to unrelated local driver d
       lastUpdate: new Date().toISOString(),
     }));
   });
-  await page.route("**/api/fleet-summary", (route) => route.fulfill({
+  await page.route("**/api/fleet-summary*", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
     body: JSON.stringify({
@@ -772,7 +797,7 @@ test("fleet dashboard does not turn missing or inactive telemetry into active sa
       user: { id: "manager-1", email: "manager@example.com" },
     }));
   });
-  await page.route("**/api/fleet-summary", (route) => route.fulfill({
+  await page.route("**/api/fleet-summary*", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
     body: JSON.stringify({
@@ -841,7 +866,7 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
       user: { id: "manager-1", email: "manager@example.com" },
     }));
   });
-  await page.route("**/api/fleet-summary", (route) => route.fulfill({
+  await page.route("**/api/fleet-summary*", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
     body: JSON.stringify({
@@ -909,10 +934,12 @@ test("protected fleet history shows scoped events and exports formula-safe rows 
       safetyScore: 1,
     }]));
   });
-  await page.route("**/api/fleet-summary", (route) => route.fulfill({
-    status: 200,
-    contentType: "application/json",
-    body: JSON.stringify({
+  await page.route("**/api/fleet-summary*", (route) => {
+    const includeEvents = !route.request().url().includes("include_events=0");
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
       ok: true,
       fleet: { id: "fleet-1", company_name: "Safe Transit", plan: "trial" },
       drivers: [{ id: "driver-1", name: "Alex Driver", active: true, vehicle_id: "Van 12" }],
@@ -928,7 +955,7 @@ test("protected fleet history shows scoped events and exports formula-safe rows 
         head_nod_count: 2,
         device: '=WEBSERVICE("https://example.invalid")',
       }],
-      events: [{
+      events: includeEvents ? [{
         id: "event-1",
         session_id: "11111111-1111-4111-8111-111111111111",
         type: "drowsy",
@@ -937,11 +964,13 @@ test("protected fleet history shows scoped events and exports formula-safe rows 
         created_at: "2026-08-01T16:12:00.000Z",
         latitude: 37.7749,
         longitude: -122.4194,
-      }],
+      }] : [],
+      events_included: includeEvents,
       telemetry_trust: "unverified_client_report",
       privacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false },
-    }),
-  }));
+      }),
+    });
+  });
 
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");

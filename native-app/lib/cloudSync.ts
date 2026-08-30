@@ -69,6 +69,10 @@ export interface CloudSignInResult {
 
 let configPromise: Promise<PublicConfig | null> | null = null;
 let consentOverride: boolean | null = null;
+let authCache: StoredAuth | null | undefined;
+let authLoadPromise: Promise<StoredAuth | null> | null = null;
+let authRefreshPromise: Promise<StoredAuth | null> | null = null;
+let authMutationVersion = 0;
 
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
@@ -133,16 +137,35 @@ function validStoredAuth(value: unknown): value is StoredAuth {
 }
 
 async function loadAuth(): Promise<StoredAuth | null> {
-  try {
-    const raw = await SecureStore.getItemAsync(AUTH_KEY, SECURE_OPTIONS);
-    const parsed: unknown = raw ? JSON.parse(raw) : null;
-    return validStoredAuth(parsed) ? parsed : null;
-  } catch {
-    return null;
+  if (authCache !== undefined) return authCache;
+  if (!authLoadPromise) {
+    const readVersion = authMutationVersion;
+    const pending = SecureStore.getItemAsync(AUTH_KEY, SECURE_OPTIONS)
+      .then(raw => {
+        if (readVersion !== authMutationVersion) return authCache ?? null;
+        const parsed: unknown = raw ? JSON.parse(raw) : null;
+        authCache = validStoredAuth(parsed) ? parsed : null;
+        return authCache;
+      })
+      .catch(() => {
+        if (readVersion !== authMutationVersion) return authCache ?? null;
+        // A transient keychain or JSON read failure must remain retryable.
+        // Cache null only after a successful read proves no valid auth exists.
+        return null;
+      })
+      .finally(() => {
+        if (authLoadPromise === pending) authLoadPromise = null;
+      });
+    authLoadPromise = pending;
   }
+  return authLoadPromise;
 }
 
-async function saveAuth(body: AuthResponse, previous?: StoredAuth | null): Promise<StoredAuth | null> {
+async function saveAuth(
+  body: AuthResponse,
+  previous?: StoredAuth | null,
+  expectedVersion = authMutationVersion,
+): Promise<StoredAuth | null> {
   const accessToken = body.access_token;
   const refreshToken = body.refresh_token || previous?.refresh_token;
   const user = body.user || previous?.user;
@@ -153,12 +176,22 @@ async function saveAuth(body: AuthResponse, previous?: StoredAuth | null): Promi
     expires_at: Math.floor(Date.now() / 1000) + (body.expires_in || 3_600) - 60,
     user: { id: user.id, email: user.email },
   };
+  if (expectedVersion !== authMutationVersion) return null;
+  const writeVersion = expectedVersion;
   await SecureStore.setItemAsync(AUTH_KEY, JSON.stringify(auth), SECURE_OPTIONS);
+  if (writeVersion !== authMutationVersion) {
+    await SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS).catch(() => {});
+    return null;
+  }
+  authMutationVersion += 1;
+  authCache = auth;
   return auth;
 }
 
 async function clearAuth(): Promise<void> {
   consentOverride = false;
+  authMutationVersion += 1;
+  authCache = null;
   await Promise.allSettled([
     SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS),
     AsyncStorage.setItem(CONSENT_KEY, 'false'),
@@ -214,11 +247,11 @@ function authMessage(result: ApiResult<AuthResponse>): string {
   return 'Sign-in failed. Check your email and password, then try again.';
 }
 
-async function refreshAuth(previous: StoredAuth): Promise<StoredAuth | null> {
+async function refreshAuth(previous: StoredAuth, expectedVersion: number): Promise<StoredAuth | null> {
   const result = await authFetch('/token?grant_type=refresh_token', {
     refresh_token: previous.refresh_token,
   });
-  if (result.ok) return saveAuth(result.body, previous);
+  if (result.ok) return saveAuth(result.body, previous, expectedVersion);
   if (result.status === 400 || result.status === 401) await clearAuth();
   return null;
 }
@@ -227,7 +260,14 @@ async function refreshIfNeeded(force = false): Promise<StoredAuth | null> {
   const auth = await loadAuth();
   if (!auth) return null;
   if (!force && auth.expires_at > Math.floor(Date.now() / 1000)) return auth;
-  return refreshAuth(auth);
+  if (!authRefreshPromise) {
+    const refreshVersion = authMutationVersion;
+    const pending = refreshAuth(auth, refreshVersion).finally(() => {
+      if (authRefreshPromise === pending) authRefreshPromise = null;
+    });
+    authRefreshPromise = pending;
+  }
+  return authRefreshPromise;
 }
 
 async function backendApi<T>(
@@ -351,7 +391,6 @@ export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
 
 export async function beginCloudSession(): Promise<string | null> {
   if (!await consentEnabled() || !await ensureDriverProfile()) return null;
-  if (!await consentEnabled()) return null;
   const result = await backendApi<{ session?: { id?: string } }>('POST', '/api/sessions', {
     device: `${Platform.OS} ${String(Platform.Version)}`.slice(0, 120),
     browser: `Occulert native app (${Platform.OS})`,

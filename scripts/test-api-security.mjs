@@ -340,6 +340,8 @@ assert.equal(fleetSummaryCalls[3].table, "events");
 assert.equal(fleetSummaryCalls[3].options.params.session_id, `in.(${fleetSessionId})`);
 assert.doesNotMatch(fleetSummaryCalls[3].options.params.select, /latitude|longitude/i);
 assert.equal(fleetSummaryResult.body.telemetry_trust, "unverified_client_report");
+assert.equal(fleetSummaryResult.body.events_included, true);
+assert.match(fleetSummaryResult.headers["server-timing"], /fleet;dur=\d+, roster;dur=\d+, events;dur=\d+/);
 assert.deepEqual(fleetSummaryResult.body.privacy, {
   includes_location: false,
   includes_personal_media: false,
@@ -347,6 +349,22 @@ assert.deepEqual(fleetSummaryResult.body.privacy, {
 });
 assert.equal(Object.hasOwn(fleetSummaryResult.body.events[0], "latitude"), false);
 assert.equal(Object.hasOwn(fleetSummaryResult.body.events[0], "longitude"), false);
+
+const lightweightSummaryCalls = [];
+const lightweightSummary = loadHandler("../api/fleet-summary.js", async (table) => {
+  lightweightSummaryCalls.push(table);
+  if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
+  if (table === "drivers") return [];
+  if (table === "sessions") return [{ id: fleetSessionId, driver_id: "driver-1" }];
+  throw new Error("a lightweight fleet refresh must not query events");
+});
+const lightweightRequest = request("GET");
+lightweightRequest.url = "/api/fleet-summary?include_events=0";
+const lightweightResult = await invoke(lightweightSummary, lightweightRequest);
+assert.equal(lightweightResult.status, 200);
+assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions"]);
+assert.equal(lightweightResult.body.events_included, false);
+assert.deepEqual(lightweightResult.body.events, []);
 
 const publicConfigPath = require.resolve("../api/public-config.js");
 delete require.cache[publicConfigPath];

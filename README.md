@@ -69,6 +69,7 @@ occulert/
 ├── auth-helper.js          # Profile and session helper
 ├── api/                    # Vercel serverless endpoints
 ├── db/schema.sql           # Database schema and RLS policies
+├── PERFORMANCE_ROADMAP.md  # Runtime budgets and evidence gates
 └── BACKEND_SETUP.md        # Backend configuration guide
 ```
 

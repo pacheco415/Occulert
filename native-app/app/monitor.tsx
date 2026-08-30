@@ -28,10 +28,11 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
 import { useEyeTracking } from '../hooks/useEyeTracking';
 import { AlertSystem } from '../components/AlertSystem';
+import { LiveMetrics } from '../components/LiveMetrics';
 import { GlassSurface } from '../components/GlassSurface';
 import { loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
-import type { SensitivityLevel } from '../constants/thresholds';
+import { PERCLOS_ALERT_THRESHOLD, type SensitivityLevel } from '../constants/thresholds';
 import { updateSessionHistory } from '../lib/sessionHistory';
 import {
   beginCloudSession,
@@ -59,6 +60,12 @@ import {
   shouldStopMonitoringForAppState,
   stopBeforeNavigation,
 } from '../lib/monitorLifecycle';
+import {
+  createMonitorPerformanceTracker,
+  elapsedSessionSeconds,
+  shouldRefreshMonitorMetrics,
+} from '../lib/monitorPerformance';
+import { deriveAlertLevel, type AlertLevel } from '../lib/alertPolicy';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -104,12 +111,13 @@ export default function MonitorScreen() {
   const [sensitivity, setSensitivity] = useState<SensitivityLevel>('medium');
   const [sensitivityLoaded, setSensitivityLoaded] = useState(false);
   const [sensorFault, setSensorFault] = useState<string | null>(null);
-  const [sessionTime, setSessionTime] = useState(0);
+  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
+  const [sessionEndedAt, setSessionEndedAt] = useState<number | null>(null);
   const [alertCount, setAlertCount] = useState(0);
   const [safeStopOpen, setSafeStopOpen] = useState(false);
   const [safeStopBusy, setSafeStopBusy] = useState(false);
 
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionStartedAtRef = useRef<number | null>(null);
   const prevAlertingRef = useRef(false);
   const fatigueSumRef = useRef(0);
   const fatigueSamplesRef = useRef(0);
@@ -133,6 +141,10 @@ export default function MonitorScreen() {
   const headphoneHeadNodObservationsRef = useRef(0);
   const headphoneMotionSamplesRef = useRef(0);
   const headphoneMotionStatusRef = useRef<HeadphoneMotionState>('not-built');
+  const lastMetricsUiAtRef = useRef(0);
+  const displayedMetricsStateRef = useRef<EyeMetrics['state']>('noFace');
+  const displayedAlertLevelRef = useRef<AlertLevel>('none');
+  const performanceTrackerRef = useRef(createMonitorPerformanceTracker());
 
   const [metrics, setMetrics] = useState<EyeMetrics>({
     ear: 0.3,
@@ -177,23 +189,8 @@ export default function MonitorScreen() {
   }, []);
 
   useEffect(() => {
-    if (isRunning) {
-      timerRef.current = setInterval(() => setSessionTime((time) => time + 1), 1_000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-      setSessionTime(0);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isRunning]);
-
-  useEffect(() => {
     if (!isRunning && !safeStopBusy) setSafeStopOpen(false);
   }, [isRunning, safeStopBusy]);
-
-  const fmt = (seconds: number) =>
-    `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
   const handleStart = async () => {
     if (startingRef.current || isStopping || !sensitivityLoaded) return;
@@ -239,6 +236,9 @@ export default function MonitorScreen() {
       setSafeStopBusy(false);
       sessionSensitivityRef.current = sensitivity;
       cloudEventQueueRef.current = Promise.resolve();
+      lastMetricsUiAtRef.current = 0;
+      displayedMetricsStateRef.current = 'noFace';
+      performanceTrackerRef.current.reset();
 
       const headphoneStatus = await startHeadphoneMotion();
       if (shouldAbortMonitoringStart(
@@ -256,6 +256,9 @@ export default function MonitorScreen() {
       setAlertCount(0);
       hasCameraSampleRef.current = false;
       lastSampleAtRef.current = Date.now();
+      sessionStartedAtRef.current = lastSampleAtRef.current;
+      setSessionStartedAt(lastSampleAtRef.current);
+      setSessionEndedAt(null);
       setIsRunning(true);
     } finally {
       startingRef.current = false;
@@ -316,7 +319,9 @@ export default function MonitorScreen() {
     setIsStopping(true);
 
     const wasRunning = isRunning;
-    const durationSec = sessionTime;
+    const stoppedAt = Date.now();
+    setSessionEndedAt(stoppedAt);
+    const durationSec = elapsedSessionSeconds(sessionStartedAtRef.current, stoppedAt);
     const alerts = alertCount;
     const averageFatigue = fatigueSamplesRef.current
       ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
@@ -331,6 +336,10 @@ export default function MonitorScreen() {
     cloudEventQueueRef.current = Promise.resolve();
     setIsRunning(false);
     reset();
+
+    if (__DEV__ && wasRunning) {
+      console.info('Occulert monitor performance', performanceTrackerRef.current.snapshot());
+    }
 
     const finalizeCloud = async (localSessionId: string | null) => {
       const cloudSessionId = cloudSession ? await cloudSession.catch(() => null) : null;
@@ -361,7 +370,7 @@ export default function MonitorScreen() {
       stoppingRef.current = false;
       setIsStopping(false);
     }
-  }, [alertCount, isRunning, markSessionSynced, reset, saveSession, sessionTime]);
+  }, [alertCount, isRunning, markSessionSynced, reset, saveSession]);
 
   // App-state and hardware-back listeners stay registered across timer ticks,
   // while these refs always expose the latest session snapshot to them.
@@ -469,10 +478,12 @@ export default function MonitorScreen() {
     pitchAngle: number,
     yawAngle: number,
     rollAngle: number,
+    inferenceMs: number,
   ) => {
     hasCameraSampleRef.current = true;
     lastSampleAtRef.current = Date.now();
     const now = Date.now();
+    performanceTrackerRef.current.recordSample(now, inferenceMs);
     const headNodResult = headNodDetectorRef.current.update({
       at: now,
       faceFound,
@@ -503,7 +514,28 @@ export default function MonitorScreen() {
         ? { ...rawResult, state: 'watch' }
         : rawResult;
 
-    setMetrics(result);
+    const alertLevel = deriveAlertLevel({
+      isRunning: isRunningRef.current,
+      metrics: result,
+      sessionTime: elapsedSessionSeconds(sessionStartedAtRef.current, now),
+      trackingLostForMs: 0,
+      criticalPerclosThreshold: PERCLOS_ALERT_THRESHOLD,
+    });
+    const shouldRefreshDisplay = shouldRefreshMonitorMetrics({
+      previousState: displayedMetricsStateRef.current,
+      nextState: result.state,
+      previousAlertLevel: displayedAlertLevelRef.current,
+      nextAlertLevel: alertLevel,
+      now,
+      lastUpdatedAt: lastMetricsUiAtRef.current,
+    });
+    if (shouldRefreshDisplay) {
+      displayedMetricsStateRef.current = result.state;
+      displayedAlertLevelRef.current = alertLevel;
+      lastMetricsUiAtRef.current = now;
+      performanceTrackerRef.current.recordUiUpdate();
+      setMetrics(result);
+    }
     if (faceFound) {
       fatigueSumRef.current += result.fatigueScore;
       fatigueSamplesRef.current += 1;
@@ -526,9 +558,8 @@ export default function MonitorScreen() {
     prevAlertingRef.current = alerting;
   }, [processEyeOpenness, processNoFace]);
 
-  // These native worklet values must outlive ordinary React renders. The
-  // session timer updates once per second, so recreating either value here
-  // would repeatedly rebuild the frame-processor bridge during a drive.
+  // These native worklet values must outlive ordinary React renders so the
+  // frame-processor bridge stays stable throughout a drive.
   const onEyeStateJS = useRunOnJS(onEyeState, [onEyeState]);
   const lastSample = useSharedValue(0);
 
@@ -538,9 +569,11 @@ export default function MonitorScreen() {
     if (now - lastSample.value < 100) return;
     lastSample.value = now;
 
+    const inferenceStartedAt = Date.now();
     const faces = detectFaces(frame);
+    const inferenceMs = Date.now() - inferenceStartedAt;
     if (faces.length === 0) {
-      onEyeStateJS(-1, -1, false, 0, 0, 0);
+      onEyeStateJS(-1, -1, false, 0, 0, 0, inferenceMs);
       return;
     }
 
@@ -560,6 +593,7 @@ export default function MonitorScreen() {
       face.pitchAngle,
       face.yawAngle,
       face.rollAngle,
+      inferenceMs,
     );
   }, [detectFaces, lastSample, onEyeStateJS]);
 
@@ -720,36 +754,22 @@ export default function MonitorScreen() {
           </View>
         )}
 
-        <AlertSystem metrics={metrics} isRunning={isRunning} sessionTime={sessionTime} />
+        <AlertSystem
+          metrics={metrics}
+          isRunning={isRunning}
+          sessionStartedAt={sessionStartedAt}
+          sessionEndedAt={sessionEndedAt}
+        />
 
         <View style={s.ctrl}>
           {isRunning && (
-            <View style={s.metrics}>
-              {[
-                { label: 'EYE', value: metrics.ear.toFixed(3), color: stateColor },
-                {
-                  label: 'PERCLOS',
-                  value: `${(metrics.perclos * 100).toFixed(0)}%`,
-                  color: metrics.perclos > 0.15 ? '#f87171' : '#c8e8f0',
-                },
-                {
-                  label: 'SCORE',
-                  value: String(metrics.fatigueScore),
-                  color: metrics.fatigueScore > 60 ? '#f87171' : '#00ff88',
-                },
-                { label: 'TIME', value: fmt(sessionTime), color: '#c8e8f0' },
-                {
-                  label: 'ALERTS',
-                  value: String(alertCount),
-                  color: alertCount > 0 ? '#fbbf24' : '#c8e8f0',
-                },
-              ].map(({ label, value, color }) => (
-                <View key={label} style={s.card}>
-                  <Text style={s.cardLbl}>{label}</Text>
-                  <Text style={[s.cardVal, { color }]}>{value}</Text>
-                </View>
-              ))}
-            </View>
+            <LiveMetrics
+              metrics={metrics}
+              alertCount={alertCount}
+              isRunning={isRunning}
+              sessionStartedAt={sessionStartedAt}
+              sessionEndedAt={sessionEndedAt}
+            />
           )}
 
           {isRunning && alertCount > 0 && (
@@ -840,23 +860,6 @@ const s = StyleSheet.create({
   sensorFault: { position: 'absolute', top: 132, left: 16, right: 16, zIndex: 4, backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
   sensorFaultTitle: { color: '#fecaca', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
   sensorFaultText: { color: '#fff1f2', fontSize: 12, lineHeight: 18, marginTop: 4 },
-  metrics: {
-    flexDirection: 'row',
-    gap: 6,
-    justifyContent: 'center',
-  },
-  card: {
-    flex: 1,
-    backgroundColor: 'rgba(21,26,35,0.9)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 7,
-    alignItems: 'center',
-  },
-  cardLbl: { color: '#4a7a8a', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-  cardVal: { color: '#c8e8f0', fontSize: 16, fontWeight: '900', marginTop: 2 },
   ctrl: { padding: 20, gap: 10 },
   startBtn: {
     flexDirection: 'row',
