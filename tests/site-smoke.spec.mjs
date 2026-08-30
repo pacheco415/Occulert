@@ -553,6 +553,11 @@ test("pilot request controls use an accessible form", async ({ page }) => {
 });
 
 test("fleet dashboard paid-rollout path reuses the protected lead form with clear intent", async ({ page }) => {
+  let submittedLead = null;
+  await page.route("**/api/pilot-leads", async (route) => {
+    submittedLead = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, stored: true }) });
+  });
   await page.goto("/pilot-signup.html?interest=paid-rollout&plan=starter", { waitUntil: "domcontentloaded" });
 
   await expect(page.locator(".brand")).toHaveText("Occulert Fleet Rollout");
@@ -566,8 +571,19 @@ test("fleet dashboard paid-rollout path reuses the protected lead form with clea
   await expect(page.locator("main")).not.toContainText(/\bpilot\b/i);
   await expect(page.locator("form h2")).toHaveText("Discuss a paid rollout");
   await expect(page.getByLabel("Interested plan")).toHaveValue("starter");
+  await expect(page.locator('#plan option[value="free-trial"]')).toBeDisabled();
+  await expect(page.locator('#plan option[value="conversation"]')).toBeDisabled();
   await expect(page.locator("#message")).toHaveValue(/affordable Occulert fleet rollout/i);
   await expect(page.locator("#saveBtn")).toHaveText("Request Rollout Conversation");
+  await page.getByLabel("Interested plan").selectOption("growth");
+  await page.getByLabel("Name").fill("Fleet Owner");
+  await page.getByLabel("Company").fill("Safe Transit");
+  await page.getByLabel("Email").fill("owner@example.com");
+  await page.getByLabel("Desired start").selectOption("within-30-days");
+  await page.getByLabel("Primary operating goal").selectOption("manager-workflow");
+  await page.locator("#saveBtn").click();
+  await expect(page.locator("#success")).toContainText("Rollout conversation requested");
+  expect(submittedLead).toMatchObject({ interest: "paid_rollout", plan: "growth" });
 });
 
 test("fleet lead form rejects contradictory interest and plan URLs", async ({ page }) => {
@@ -599,6 +615,10 @@ test("affordable fleet plans preserve a card-free trial handoff", async ({ page 
   await expect(page.locator(".brand")).toHaveText("Occulert Free Fleet Trial");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Try Occulert free for 30 days");
   await expect(page.getByLabel("Interested plan")).toHaveValue("free-trial");
+  await expect(page.locator('#plan option[value="conversation"]')).toBeDisabled();
+  await expect(page.locator('#plan option[value="starter"]')).toBeDisabled();
+  await expect(page.locator('#plan option[value="growth"]')).toBeDisabled();
+  await expect(page.locator('#plan option[value="custom"]')).toBeDisabled();
   await expect(page.getByLabel("Desired start")).toHaveValue("");
   await expect(page.getByLabel("Primary operating goal")).toHaveValue("");
   await expect(page.locator("#saveBtn")).toHaveText("Start Free Trial");
@@ -827,7 +847,7 @@ test("authenticated fleet dashboards never fall back to unrelated local driver d
   expect(await page.locator(".dashboard-kpis").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(2);
 });
 
-test("fleet dashboard clears protected data before a different account refreshes", async ({ page }) => {
+test("fleet dashboard clears protected data when auth changes in another tab", async ({ page }) => {
   let summaryRequests = 0;
   await page.addInitScript(() => {
     localStorage.setItem("occulert-auth", JSON.stringify({
@@ -860,7 +880,9 @@ test("fleet dashboard clears protected data before a different account refreshes
 
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Owner A Driver")).toBeVisible();
-  await page.evaluate(() => {
+  const accountSwitchPage = await page.context().newPage();
+  await accountSwitchPage.goto("/", { waitUntil: "domcontentloaded" });
+  await accountSwitchPage.evaluate(() => {
     localStorage.setItem("occulert-auth", JSON.stringify({
       access_token: "owner-b-token",
       refresh_token: "owner-b-refresh",
@@ -868,12 +890,12 @@ test("fleet dashboard clears protected data before a different account refreshes
       user: { id: "owner-b", email: "owner-b@example.com" },
     }));
   });
-  await page.getByRole("button", { name: "Refresh now" }).click();
 
   await expect(page.locator("#cloudStatus")).toContainText("temporarily unavailable");
   await expect(page.getByText("Owner A Driver")).toHaveCount(0);
   await expect(page.locator("#kpiDrivers")).toHaveText("0");
   expect(summaryRequests).toBe(2);
+  await accountSwitchPage.close();
 });
 
 test("fleet dashboard does not turn missing or inactive telemetry into active safety scores", async ({ page }) => {

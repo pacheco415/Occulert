@@ -167,7 +167,7 @@ const DASHBOARD_CLOCK_INTERVAL_MS=15000,PROTECTED_ACTIVE_REFRESH_MS=30000,PROTEC
 function protectedRefreshDelay({hasActiveSession=false,failureCount=0,saveData=false}={}){let base=hasActiveSession?PROTECTED_ACTIVE_REFRESH_MS:saveData?PROTECTED_SAVE_DATA_REFRESH_MS:PROTECTED_IDLE_REFRESH_MS,multiplier=2**Math.min(Math.max(0,failureCount),3);return Math.min(PROTECTED_MAX_BACKOFF_MS,base*multiplier)}
 function shouldRefreshProtectedEvents({historyOpen=false,lastLoadedAt=0,now=Date.now(),force=false}={}){return historyOpen&&(force||!lastLoadedAt||now-lastLoadedAt>=PROTECTED_EVENTS_REFRESH_MS)}
 /* fleet-refresh-policy:end */
-let cloudRows=[],lastOpsSummary='',lastRows=[],fleetMode=false,protectedUserId='',protectedFleetName='',protectedFleetPlan='',protectedSessions=[],protectedEvents=[],protectedDrivers=[],lastDashboardSnapshot='',sessionHistoryDirty=true,driverListFrame=0,protectedFleetLoading=false,protectedEventsRefreshPending=false,dashboardRefreshTimer=0,protectedRefreshTimer=0,protectedEventsLoadedAt=0,protectedLastSuccessfulAt=0,protectedRefreshFailures=0;
+let cloudRows=[],lastOpsSummary='',lastRows=[],fleetMode=false,protectedUserId='',protectedFleetName='',protectedFleetPlan='',protectedSessions=[],protectedEvents=[],protectedDrivers=[],lastDashboardSnapshot='',sessionHistoryDirty=true,driverListFrame=0,protectedFleetLoading=false,protectedEventsRefreshPending=false,protectedAccountRefreshPending=false,dashboardRefreshTimer=0,protectedRefreshTimer=0,protectedEventsLoadedAt=0,protectedLastSuccessfulAt=0,protectedRefreshFailures=0;
 function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function jsArg(v){return encodeURIComponent(String(v??''))}
 function fromArg(v){try{return decodeURIComponent(String(v??''))}catch(e){return String(v??'')}}
@@ -260,7 +260,7 @@ function rowsFromFleet(summary){let sessions=Array.isArray(summary.sessions)?sum
 /* fleet-summary-projection:end */
 function showSignedOutActions(show){document.getElementById('signedOutActions')?.classList.toggle('hidden',!show);document.getElementById('driverAppNav')?.classList.toggle('hidden',!show);document.getElementById('accountNav')?.classList.toggle('hidden',show);document.getElementById('refreshNow')?.classList.toggle('hidden',show);let primary=document.getElementById('fleetPrimaryNav');if(primary){primary.href=show?'/login.html':'/fleet-onboarding.html';primary.textContent=show?'Sign In':'Fleet setup'}}
 function clearProtectedFleetCache(){cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedEventsRefreshPending=false;protectedFleetName='';protectedFleetPlan='';protectedEventsLoadedAt=0;protectedLastSuccessfulAt=0;protectedRefreshFailures=0;sessionHistoryDirty=true;lastDashboardSnapshot=''}
-function resetProtectedFleet(){fleetMode=false;protectedUserId='';clearProtectedFleetCache();showSignedOutActions(true);syncProtectedControls();document.getElementById('cloudStatus').textContent='Not signed in. Showing same-browser local data only; protected fleet data remains unavailable.';render()}
+function resetProtectedFleet(){fleetMode=false;protectedUserId='';protectedAccountRefreshPending=false;clearProtectedFleetCache();showSignedOutActions(true);syncProtectedControls();document.getElementById('cloudStatus').textContent='Not signed in. Showing same-browser local data only; protected fleet data remains unavailable.';render()}
 async function loadProtectedFleet(options={}){
   let includeEvents=options.includeEvents===true;
   if(protectedFleetLoading){if(includeEvents)protectedEventsRefreshPending=true;return false}
@@ -283,16 +283,21 @@ async function loadProtectedFleet(options={}){
     else if(result.body&&result.body.error==='fleet_not_found'){clearProtectedFleetCache();document.getElementById('cloudStatus').textContent='No owned fleet found. Use Fleet setup to create one and invite drivers.'}
     else{protectedRefreshFailures=Math.min(4,protectedRefreshFailures+1);let last=protectedLastSuccessfulAt?new Date(protectedLastSuccessfulAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';document.getElementById('cloudStatus').textContent=last?'Connection interrupted. Showing the protected data last updated at '+last+' while automatic retries slow down to reduce data use.':'Protected fleet data is temporarily unavailable. Automatic retries will slow down to reduce data use.'}
     refreshDashboardIfNeeded();return result.ok
-  }finally{let refreshEvents=protectedEventsRefreshPending;protectedEventsRefreshPending=false;protectedFleetLoading=false;if(refreshEvents&&fleetMode)void loadProtectedFleet({includeEvents:true})}
+  }finally{let refreshEvents=protectedEventsRefreshPending,refreshAccount=protectedAccountRefreshPending;protectedEventsRefreshPending=false;protectedAccountRefreshPending=false;protectedFleetLoading=false;if((refreshAccount||refreshEvents)&&fleetMode)void refreshProtectedFleetNow({forceEvents:refreshEvents})}
 }
+/* fleet-refresh-scheduling:start */
 function stopRefreshTimers(){clearInterval(dashboardRefreshTimer);clearTimeout(protectedRefreshTimer);dashboardRefreshTimer=0;protectedRefreshTimer=0}
+function startDashboardClock(){clearInterval(dashboardRefreshTimer);dashboardRefreshTimer=0;if(!document.hidden)dashboardRefreshTimer=setInterval(refreshDashboardIfNeeded,DASHBOARD_CLOCK_INTERVAL_MS)}
 function scheduleProtectedRefresh(){clearTimeout(protectedRefreshTimer);protectedRefreshTimer=0;if(document.hidden||!fleetMode)return;let hasActiveSession=cloudRows.some(row=>row.sessionActive),saveData=!hasActiveSession&&navigator.connection?.saveData===true,delay=protectedRefreshDelay({hasActiveSession,failureCount:protectedRefreshFailures,saveData});protectedRefreshTimer=setTimeout(()=>{void pollProtectedFleet()},delay)}
 async function pollProtectedFleet(){if(document.hidden||!fleetMode)return;let includeEvents=shouldRefreshProtectedEvents({historyOpen:protectedHistoryOpen(),lastLoadedAt:protectedEventsLoadedAt});await loadProtectedFleet({includeEvents});scheduleProtectedRefresh()}
-function startRefreshTimers(){stopRefreshTimers();if(document.hidden)return;dashboardRefreshTimer=setInterval(refreshDashboardIfNeeded,DASHBOARD_CLOCK_INTERVAL_MS);scheduleProtectedRefresh()}
+function startRefreshTimers(){stopRefreshTimers();if(document.hidden)return;startDashboardClock();scheduleProtectedRefresh()}
 async function refreshProtectedFleetNow(options={}){clearTimeout(protectedRefreshTimer);protectedRefreshTimer=0;let includeEvents=shouldRefreshProtectedEvents({historyOpen:protectedHistoryOpen(),lastLoadedAt:protectedEventsLoadedAt,force:options.forceEvents===true});await loadProtectedFleet({includeEvents});scheduleProtectedRefresh()}
-async function handleVisibilityChange(){if(document.hidden){stopRefreshTimers();return}refreshDashboardIfNeeded();if(fleetMode)await refreshProtectedFleetNow();else startRefreshTimers()}
+async function handleVisibilityChange(){if(document.hidden){stopRefreshTimers();return}startDashboardClock();refreshDashboardIfNeeded();if(fleetMode)await refreshProtectedFleetNow();else scheduleProtectedRefresh()}
+/* fleet-refresh-scheduling:end */
+async function handleAuthStorageChange(event){if(event.key!==null&&event.key!=='occulert-auth')return;let backend=window.OcculertBackend,currentUser=backend&&backend.currentUser?backend.currentUser():null,currentUserId=typeof currentUser?.id==='string'?currentUser.id:'';if(currentUserId===protectedUserId)return;if(!currentUserId){resetProtectedFleet();startRefreshTimers();return}clearProtectedFleetCache();protectedUserId=currentUserId;fleetMode=true;showSignedOutActions(false);syncProtectedControls();document.getElementById('cloudStatus').textContent='Signed-in account changed. Loading the new account’s protected fleet data.';render();if(protectedFleetLoading){protectedAccountRefreshPending=true;return}await refreshProtectedFleetNow()}
 async function boot(){render();await new Promise(resolve=>setTimeout(resolve,100));await loadProtectedFleet();startRefreshTimers()}
 document.addEventListener('visibilitychange',()=>{void handleVisibilityChange()});
+window.addEventListener('storage',event=>{void handleAuthStorageChange(event)});
 void boot();
 </script>
 </body>

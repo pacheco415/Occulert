@@ -164,3 +164,37 @@ test('fleet refreshes adapt to activity and throttle protected event queries', (
   assert.match(dashboard, /shouldRefreshProtectedEvents\(\{historyOpen:protectedHistoryOpen\(\),lastLoadedAt:protectedEventsLoadedAt\}\)/);
   assert.match(dashboard, /setTimeout\(\(\)=>\{void pollProtectedFleet\(\)\},delay\)/);
 });
+
+test('fleet dashboard restarts its relative-time clock after returning to a visible tab', async () => {
+  const dashboard = read('fleet-dashboard.html');
+  const scheduling = markedBlock(dashboard, 'fleet-refresh-scheduling');
+  let intervalCalls = 0;
+  const context = {
+    DASHBOARD_CLOCK_INTERVAL_MS: 15_000,
+    cloudRows: [],
+    dashboardRefreshTimer: 7,
+    document: { hidden: true },
+    fleetMode: true,
+    navigator: { connection: {} },
+    protectedEventsLoadedAt: 0,
+    protectedRefreshFailures: 0,
+    protectedRefreshTimer: 8,
+    clearInterval: () => {},
+    clearTimeout: () => {},
+    loadProtectedFleet: async () => true,
+    protectedHistoryOpen: () => false,
+    protectedRefreshDelay: () => 90_000,
+    refreshDashboardIfNeeded: () => {},
+    setInterval: () => { intervalCalls += 1; return 11; },
+    setTimeout: () => 12,
+    shouldRefreshProtectedEvents: () => false,
+  };
+  runInNewContext(`${scheduling};globalThis.schedulingForTest={handleVisibilityChange}`, context);
+
+  await context.schedulingForTest.handleVisibilityChange();
+  assert.equal(intervalCalls, 0, 'hidden dashboards must keep timers stopped');
+  context.document.hidden = false;
+  await context.schedulingForTest.handleVisibilityChange();
+  assert.equal(intervalCalls, 1, 'visible dashboards must restart the relative-time interval');
+  assert.equal(context.dashboardRefreshTimer, 11);
+});
