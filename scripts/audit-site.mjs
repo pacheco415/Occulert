@@ -63,7 +63,7 @@ for (const file of htmlFiles) {
   }
 }
 
-assertIncludes("index.html", "<link rel=\"stylesheet\" href=\"/homepage.css?v=31\" />", "homepage must load its versioned external stylesheet");
+assertIncludes("index.html", "<link rel=\"stylesheet\" href=\"/homepage.css?v=32\" />", "homepage must load its versioned external stylesheet");
 assertNotIncludes("index.html", "href=\"/homepage.css\"", "homepage must not reuse the previously immutable stylesheet URL");
 assertIncludes("index.html", "href=\"/homepage-journey-cinematic-v1.jpg\"", "homepage must preload its cinematic journey image");
 assertIncludes("index.html", "class=\"journey-frame journey-frame-enter\"", "homepage must render the cinematic enter frame");
@@ -99,7 +99,7 @@ for (let index = 1; index <= 4; index += 1) {
     if (count !== 8) fail(`translations must include ${key.slice(0, -1)} for all 8 languages (found ${count})`);
   }
 }
-assertIncludes("sw.js", "'/homepage.css?v=31'", "service worker must cache the versioned homepage stylesheet");
+assertIncludes("sw.js", "'/homepage.css?v=32'", "service worker must cache the versioned homepage stylesheet");
 assertNotIncludes("sw.js", "'/homepage.css',", "service worker must not recache the stale unversioned homepage stylesheet");
 assertNotIncludes("sw.js", "'/homepage-journey-cinematic-v1.jpg'", "service worker install must not preload the large cinematic journey image");
 assertIncludes("sw.js", "'/homepage.js'", "service worker must cache the external homepage behavior script");
@@ -117,6 +117,7 @@ for (const path of [
   "features.html",
   "fleet-dashboard.html",
   "fleet-onboarding.html",
+  "fleet-pricing.html",
   "how-it-works.html",
   "install.html",
   "login.html",
@@ -369,29 +370,44 @@ assertIncludes("fleet-dashboard.html", "id=\"sessionHistory\"", "fleet dashboard
 assertIncludes("fleet-dashboard.html", "ontoggle=\"handleHistoryToggle(event)\"", "protected session history must render only after the manager opens it");
 assertNotIncludes("fleet-dashboard.html", "class=\"panel-details history-details\" open", "protected session history must start collapsed");
 assertIncludes("fleet-dashboard.html", "function refreshDashboardIfNeeded()", "fleet dashboard polling must skip unchanged full-page renders");
-assertIncludes("fleet-dashboard.html", "setInterval(refreshDashboardIfNeeded,3000)", "fleet dashboard must use the focus-stable refresh path");
-assertNotIncludes("fleet-dashboard.html", "setInterval(render,3000)", "fleet dashboard must not rebuild interactive controls every three seconds");
+assertIncludes("fleet-dashboard.html", "setInterval(refreshDashboardIfNeeded,DASHBOARD_CLOCK_INTERVAL_MS)", "fleet dashboard must use the focus-stable low-frequency clock refresh path");
+assertNotIncludes("fleet-dashboard.html", "setInterval(render,3000)", "fleet dashboard must not rebuild interactive controls on a high-frequency timer");
 assertIncludes("fleet-dashboard.html", "function queueDriverListRender()", "fleet dashboard filtering must update only the driver list");
 assertIncludes("fleet-dashboard.html", "document.hidden", "fleet dashboard polling must pause while the page is hidden");
 assertIncludes("fleet-dashboard.html", "protectedFleetLoading", "fleet dashboard must prevent overlapping protected-summary requests");
 assertIncludes("fleet-dashboard.html", "data-focus-key=\"driver-copy-", "dynamic driver actions must expose stable focus keys");
 assertIncludes("fleet-dashboard.html", "function exportSessionHistoryCSV()", "protected session history must keep a privacy-safe export");
-assertIncludes("fleet-dashboard.html", "Pilot value snapshot", "fleet managers must receive a time-bounded pilot value summary");
+assertIncludes("fleet-dashboard.html", "Trial value snapshot", "fleet managers must receive a time-bounded trial value summary");
 assertIncludes("fleet-dashboard.html", "Average reported safety score", "fleet value summaries must identify client-reported score data");
 assertNotIncludes("fleet-dashboard.html", "Measured safety score", "fleet value summaries must not imply independent measurement");
 assertIncludes("fleet-dashboard.html", "function exportPilotReport()", "fleet managers must be able to export a manager-ready pilot report");
 assertIncludes("fleet-dashboard.html", "unverified_client_report", "pilot reports must preserve the telemetry trust boundary");
-assertIncludes("fleet-dashboard.html", "interest=paid-rollout", "fleet value summaries must provide a direct paid-rollout conversation path");
+assertIncludes("fleet-dashboard.html", "href=\"/fleet-pricing.html\"", "fleet value summaries must expose transparent fleet plans");
+assertIncludes("fleet-dashboard.html", "interest=free-trial", "fleet value summaries must provide a direct free-trial request path");
 assertIncludes("pilot-signup.html", "rolloutInterest", "the shared fleet lead form must distinguish paid-rollout interest");
+assertIncludes("pilot-signup.html", "freeTrialInterest", "the shared fleet lead form must distinguish the free trial from a post-trial rollout");
 assertIncludes("pilot-signup.html", "What the rollout covers", "the paid-rollout path must explain the commercial offer");
 assertIncludes("pilot-signup.html", "submitting this form does not start a paid service", "the paid-rollout path must set a clear transaction boundary");
+assertIncludes("pilot-signup.html", "id=\"plan\"", "the fleet lead form must capture the selected affordable plan");
+assertIncludes("pilot-signup.html", "Choose a start window", "the fleet lead form must require a deliberate start-window choice");
+assertIncludes("pilot-signup.html", "Choose a primary goal", "the fleet lead form must require a deliberate operating-goal choice");
+assertIncludes("api/pilot-leads.js", "typeof value !== \"string\"", "commercial plan codes must reject non-string values");
+assertIncludes("api/pilot-leads.js", "Object.hasOwn(labels, key)", "commercial plan codes must resolve only declared allowlist keys");
+assertIncludes("fleet-pricing.html", "$0", "fleet pricing must make the free trial price explicit");
+assertIncludes("fleet-pricing.html", "$9", "fleet pricing must make the Starter price explicit");
+assertIncludes("fleet-pricing.html", "$25", "fleet pricing must make the Growth price explicit");
+assertIncludes("fleet-pricing.html", "No credit card required", "the free trial must disclose that no card is required");
+assertIncludes("fleet-pricing.html", "No automatic renewal", "the free trial must disclose that it does not renew automatically");
+assertIncludes("fleet-pricing.html", "does not collect payment or start a subscription", "fleet pricing must disclose the transaction boundary");
+assertIncludes("fleet-pricing.html", "interest=free-trial&amp;plan=free-trial", "free-trial CTAs must open the initial trial journey");
+assertIncludes("fleet-pricing.html", "interest=paid-rollout&amp;plan=starter", "monthly plans must keep the post-trial rollout journey");
 assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet exports must neutralize spreadsheet formulas");
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
 assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigation must expose one contextual primary action");
 assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v42'", "the performance repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v44'", "the Preview wording repair must advance the offline cache");
 assertNotIncludes("sw.js", "occulert-v41", "the performance repair must not reuse the stale driver-script cache");
 assertIncludes("sw.js", "'/portal.css?v=6'", "the service worker must cache the current shared portal stylesheet");
 assertNotIncludes("sw.js", "occulert-v40", "the external driver script must not reuse the previous offline cache");
@@ -400,6 +416,10 @@ assertNotIncludes("sw.js", "'/portal.css?v=5'", "the service worker must not ret
 for (const asset of ["'/occulert-logo-alt.png'", "'/occulert-logo.png'", "'/occulert-logo-main.png'"]) {
   if (staticAssets.includes(asset)) fail(`service worker install cache must not preload ${asset}`);
 }
+assertIncludes("manifest.json", "/occulert-logo-main-96.png", "PWA shortcuts must use the exact 96px logo export");
+assertIncludes("manifest.json", "/occulert-logo-main-192.png", "PWA install metadata must use the exact 192px logo export");
+assertIncludes("manifest.json", "/occulert-logo-main-512.png", "PWA install metadata must use the exact 512px logo export");
+assertIncludes("index.html", "href=\"/favicon.ico\" sizes=\"48x48\"", "homepage startup must use the compact favicon instead of the source logo");
 assertIncludes("portal.css", "background: var(--portal-surface);", "portal cards must follow the active light or dark theme");
 assertIncludes("portal.css", 'html[data-theme="light"] .portal-page .btn:not(.primary):hover', "light-theme button hover states must preserve readable contrast");
 assertNotIncludes("portal.css", "background: rgba(14, 26, 45, .94);", "portal cards must not force a dark surface in light mode");

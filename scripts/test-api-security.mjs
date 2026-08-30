@@ -408,9 +408,59 @@ assert.equal(stored.body.stored, true);
 assert.equal(storedLead.email, "driver@example.com");
 assert.equal(storedLead.use_case, null);
 assert.equal(storedLead.source, "pilot-signup-page", "browser callers must not choose arbitrary lead sources");
-const paidRollout = await invoke(pilotLeads, request("POST", { ...validLead, interest: "paid_rollout" }, "203.0.113.24"));
+const paidRollout = await invoke(pilotLeads, request("POST", {
+  ...validLead,
+  interest: "paid_rollout",
+  plan: "starter",
+  timeline: "within-30-days",
+  goal: "manager-workflow",
+  message: "We want a small-fleet rollout.",
+}, "203.0.113.24"));
 assert.equal(paidRollout.status, 200);
 assert.equal(storedLead.source, "paid-rollout-page", "the server must preserve the allowlisted paid-rollout conversion path");
+assert.match(storedLead.message, /Starter — \$9 \/ month/);
+assert.match(storedLead.message, /Desired start: Within 30 days/);
+assert.match(storedLead.message, /Primary goal: Reduce manager review time/);
+assert.match(storedLead.message, /We want a small-fleet rollout\./);
+
+const freeTrial = await invoke(pilotLeads, request("POST", {
+  ...validLead,
+  interest: "free_trial",
+  plan: "free-trial",
+  timeline: "one-to-three-months",
+  goal: "participation",
+}, "203.0.113.25"));
+assert.equal(freeTrial.status, 200);
+assert.equal(storedLead.source, "free-trial-page");
+assert.match(storedLead.message, /Free Fleet Trial — \$0 \/ 30 days/);
+
+const inheritedQualification = Object.assign(Object.create({
+  plan: "constructor",
+  timeline: "__proto__",
+  goal: "toString",
+}), validLead, { message: "Customer note only." });
+const genericPilot = await invoke(pilotLeads, request("POST", inheritedQualification, "203.0.113.26"));
+assert.equal(genericPilot.status, 200, "generic pilot requests must not coerce inherited qualification keys");
+assert.equal(storedLead.message, "Customer note only.");
+
+for (const [index, invalidFields] of [
+  { plan: "enterprise", timeline: "within-30-days", goal: "manager-workflow" },
+  { plan: "constructor", timeline: "within-30-days", goal: "manager-workflow" },
+  { plan: "starter", timeline: "__proto__", goal: "manager-workflow" },
+  { plan: "starter", timeline: "within-30-days", goal: "toString" },
+  { plan: ["starter"], timeline: "within-30-days", goal: "manager-workflow" },
+  { plan: { toString: () => "starter" }, timeline: "within-30-days", goal: "manager-workflow" },
+  { plan: "starter", timeline: "", goal: "manager-workflow" },
+  { interest: "free_trial", plan: "starter", timeline: "within-30-days", goal: "manager-workflow" },
+  { interest: "paid_rollout", plan: "free-trial", timeline: "within-30-days", goal: "manager-workflow" },
+].entries()) {
+  const invalidCommercialLead = await invoke(pilotLeads, request("POST", {
+    ...validLead,
+    interest: "paid_rollout",
+    ...invalidFields,
+  }, `203.0.113.${40 + index}`));
+  assert.equal(invalidCommercialLead.status, 400, `commercial qualification case ${index + 1} must be rejected`);
+}
 
 const unavailableRateLimit = loadHandler("../api/pilot-leads.js", async (table) => {
   assert.equal(table, "rpc/check_pilot_lead_rate_limit");
