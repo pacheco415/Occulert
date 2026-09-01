@@ -1,6 +1,6 @@
 # Occulert Performance Roadmap
 
-Last updated: 2026-08-30
+Last updated: 2026-09-01
 
 This roadmap separates source optimizations from physical-device, live-service,
 and accuracy evidence. A green source check means the implementation is ready
@@ -20,7 +20,10 @@ accuracy, or safe real-world behavior.
 | Native alert delivery | Preloads confirmed haptic, audio, in-ear, and Watch preferences before monitoring so alert cues do not wait for storage reads | Detection thresholds, cooldowns, cue plans, and user-confirmed settings remain unchanged |
 | Optional headphone motion | Starts observation-only headphone motion without delaying camera activation | Late accessory results are discarded after cancellation; headphone data never changes scores or alerts |
 | Device evidence | Saves aggregate first-sample, inference, cadence, UI-rate, and stall measurements in the local session record | No frames are saved or uploaded; measurements are evidence, not accuracy claims |
-| Build reproducibility | Pins the Build 30 production profile to the validated SDK 57/Xcode 26.6 EAS image | Queueing, TestFlight submission, and device validation remain separate gates |
+| Parked camera setup | Reuses the on-device face detector in an optional preview to guide framing, mount angle, and eye visibility at no more than four interface updates per second | Setup samples return before fatigue scoring and alert delivery; no frames or setup samples are stored |
+| Interrupted-session recovery | Writes a serialized local summary checkpoint every 15 seconds and converts a recent interrupted checkpoint into a clearly labeled partial Session History record | Checkpoints contain aggregate session values only; normal completion clears the matching checkpoint and recovered records are never presented as complete cloud sessions |
+| Connected-device readiness | Refreshes independent Watch preference, Watch status, and headphone-motion status reads concurrently behind a single-flight control | Primary phone alerts remain independent of optional accessory availability |
+| Build reproducibility | Pins the production profile to the validated SDK 57/Xcode 26.6 EAS image | Queueing, TestFlight submission, and device validation remain separate gates |
 | Regression coverage | Adds deterministic timing, cadence, lazy-loading, overlap, and conditional-history contracts to `npm run verify` | Tests establish code contracts, not physical-device performance |
 
 ## Performance budgets
@@ -31,7 +34,7 @@ These are acceptance targets, not measured production claims.
 |---|---:|---|
 | Native analysis cadence | One eligible sample every 100 ms | Timing snapshot plus a 30-minute physical iPhone run |
 | Native display refresh | At most 4 routine updates per second | Automated contract and simulator profiler |
-| Native first camera sample | Record the exact delay without a source-only pass claim | Local Build 30 session record on each tested iPhone |
+| Native first camera sample | Record the exact delay without a source-only pass claim | Local session record from the exact tested native build on each iPhone |
 | Native p95 inference | Below the 100 ms analysis budget | Supported physical iPhone, day/night and eyewear slices |
 | Web overlapping inference | Zero concurrent sends | Automated contract plus Safari and Chrome camera runs |
 | Web p95 inference | Below the 135 ms browser analysis interval | Supported iPhone Safari and Android Chrome |
@@ -60,6 +63,8 @@ These are acceptance targets, not measured production claims.
   is claimed by this performance work.
 - Battery, thermal, camera, Watch, headphone, and car-audio results require a
   physical build and devices.
+- Camera-setup framing and interrupted-session recovery require physical
+  preview plus force-quit/relaunch checks on the exact native build.
 - Production fleet latency requires a signed-in owner and an agreed read-only
   dataset size.
 - Exact 96 px, 192 px, and 512 px exports now serve browser shortcuts and PWA

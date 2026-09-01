@@ -99,7 +99,7 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /leaveMonitor\(\(\) => router\.push\('\/settings'\)\)/);
   assert.match(monitor, /BackHandler\.addEventListener\('hardwareBackPress'/);
   assert.match(monitor, /if \(stoppingRef\.current\) return Promise\.resolve\(\)/);
-  assert.match(monitor, /accessibilityLabel="Open settings and end monitoring"/);
+  assert.match(monitor, /accessibilityLabel=\{isRunning \? 'Open settings and end monitoring' : 'Open settings'\}/);
   assert.match(layout, /name="monitor"[\s\S]*gestureEnabled: false/);
 });
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -12,6 +12,12 @@ import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { AmbientBackground, GlassSurface } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
+import { updateSessionHistory } from '../lib/sessionHistory';
+import { clearActiveSessionCheckpoint, loadActiveSessionCheckpoint } from '../lib/sessionRecovery';
+import {
+  prependRecoveredSession,
+  recoveredSessionFromCheckpoint,
+} from '../lib/sessionRecoveryModel';
 
 interface QuickLinkProps {
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -47,6 +53,32 @@ function QuickLink({ icon, label, detail, href }: QuickLinkProps) {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [recoveredDrive, setRecoveredDrive] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const recoverInterruptedDrive = async () => {
+      const checkpoint = await loadActiveSessionCheckpoint();
+      if (!checkpoint) return;
+      const recovered = recoveredSessionFromCheckpoint(checkpoint);
+      if (!recovered) {
+        await clearActiveSessionCheckpoint(checkpoint.sessionId);
+        return;
+      }
+      let insertedRecovery = false;
+      await updateSessionHistory<Record<string, unknown>>(sessions => {
+        // A force-quit between the final history write and checkpoint cleanup
+        // must never replace the complete record with an older partial copy.
+        const result = prependRecoveredSession(sessions, recovered);
+        insertedRecovery = result.inserted;
+        return result.sessions;
+      });
+      await clearActiveSessionCheckpoint(recovered.sessionId);
+      if (active && insertedRecovery) setRecoveredDrive(true);
+    };
+    void recoverInterruptedDrive().catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -78,6 +110,25 @@ export default function HomeScreen() {
             Set up only while parked. Mount the phone facing you, then keep Occulert in the foreground.
           </Text>
         </View>
+
+        {recoveredDrive && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Previous interrupted drive recovered. Open session history"
+            activeOpacity={0.8}
+            onPress={() => router.push('/history')}
+            style={styles.recoveryBox}
+          >
+            <View style={styles.recoveryIcon}>
+              <Ionicons name="refresh-circle" size={20} color={colors.green} />
+            </View>
+            <View style={styles.recoveryCopy}>
+              <Text style={styles.recoveryTitle}>Previous drive recovered</Text>
+              <Text style={styles.recoveryDetail}>A local checkpoint was saved after monitoring ended unexpectedly. Review it in Session History.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
 
         <GlassSurface
           interactive
@@ -172,6 +223,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(251, 191, 36, 0.1)',
   },
   safetyText: { flex: 1, color: '#f8d98b', fontSize: 13, lineHeight: 19, paddingTop: 1 },
+  recoveryBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    backgroundColor: 'rgba(48, 209, 88, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(48, 209, 88, 0.28)',
+    borderRadius: radii.medium,
+    padding: 14,
+    marginBottom: 16,
+  },
+  recoveryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(48, 209, 88, 0.1)',
+  },
+  recoveryCopy: { flex: 1 },
+  recoveryTitle: { color: '#b7f7cb', fontSize: 13, fontWeight: '800' },
+  recoveryDetail: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 3 },
   startSurface: {
     borderRadius: radii.large,
     overflow: 'hidden',
