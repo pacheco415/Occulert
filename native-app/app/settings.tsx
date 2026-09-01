@@ -116,11 +116,13 @@ export default function SettingsScreen() {
   );
   const [audioTestBusy, setAudioTestBusy] = useState(false);
   const [watchTestBusy, setWatchTestBusy] = useState(false);
+  const [deviceRefreshBusy, setDeviceRefreshBusy] = useState(false);
   // This parked-only test must release the shared iOS audio session when the
   // tone ends so music and navigation audio can return to their normal level.
   const audioTestPlayer = useAudioPlayer(ALERT_SOUND);
   const audioTestRunnerRef = useRef(createSingleFlightActionRunner());
   const watchTestRunnerRef = useRef(createSingleFlightActionRunner());
+  const deviceRefreshRunnerRef = useRef(createSingleFlightActionRunner());
   const settingsMountedRef = useRef(true);
   const audioTestAbortRef = useRef<AbortController | null>(null);
   const watchAvailable = watchStatus.paired && watchStatus.appInstalled;
@@ -219,6 +221,34 @@ export default function SettingsScreen() {
 
   const headphoneMotionDescription = describeHeadphoneMotion(headphoneMotionStatus);
   const headphoneMotionLabel = labelHeadphoneMotion(headphoneMotionStatus);
+  const deviceReadinessSummary = watchAvailable
+    ? watch
+      ? 'Phone alert tests available · Watch alerts enabled'
+      : 'Phone alert tests available · Watch available but disabled'
+    : 'Phone alert tests available · Watch is optional and needs setup';
+
+  const refreshConnectedDevices = () => {
+    void deviceRefreshRunnerRef.current.run({
+      action: async () => {
+        const [status, saved, motionStatus] = await Promise.all([
+          getWatchStatus(),
+          getWatchAlertsEnabled(true),
+          getHeadphoneMotionStatus(),
+        ]);
+        if (!settingsMountedRef.current) return;
+        setWatchStatus(status);
+        setWatch(saved);
+        setHeadphoneMotionStatus(motionStatus);
+      },
+      onBusyChange: busy => {
+        if (settingsMountedRef.current) setDeviceRefreshBusy(busy);
+      },
+      onError: () => {
+        if (!settingsMountedRef.current) return;
+        Alert.alert('Connections could not refresh', 'Check the optional devices and try again while parked.');
+      },
+    });
+  };
 
   const testAudioOutput = () => {
     void audioTestRunnerRef.current.run({
@@ -297,12 +327,12 @@ export default function SettingsScreen() {
           <Text style={s.cardTitle}>ALERTS</Text>
           <View style={s.row}>
             <View style={s.rowL}><Ionicons name="phone-portrait-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Haptic vibration</Text><Text style={s.sub}>Vibrate on alert</Text></View></View>
-            <Switch value={haptic} onValueChange={v=>saveBooleanSetting(HAPTIC_ALERT_PREFERENCE_KEY,v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <Switch accessibilityLabel="Haptic vibration alerts" value={haptic} onValueChange={v=>saveBooleanSetting(HAPTIC_ALERT_PREFERENCE_KEY,v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
           <View style={s.row}>
             <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
-            <Switch value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <Switch accessibilityLabel="Audio tone alerts" value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.alertSafetyNote}>
             <Ionicons name="shield-checkmark-outline" size={15} color={colors.amber} />
@@ -311,6 +341,27 @@ export default function SettingsScreen() {
         </View>
         <View style={s.card}>
           <Text style={s.cardTitle}>CONNECTED DEVICES</Text>
+          <View accessibilityLiveRegion="polite" style={s.deviceSummary}>
+            <View style={s.deviceSummaryIcon}>
+              <Ionicons name="checkmark-done-outline" size={18} color={colors.green} />
+            </View>
+            <View style={s.deviceSummaryCopy}>
+              <Text style={s.deviceSummaryTitle}>Parked readiness check</Text>
+              <Text style={s.deviceSummaryText}>{deviceReadinessSummary}</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityHint="Refreshes Apple Watch and compatible headphone connection status"
+            accessibilityState={{ disabled: deviceRefreshBusy, busy: deviceRefreshBusy }}
+            disabled={deviceRefreshBusy}
+            onPress={refreshConnectedDevices}
+            style={[s.refreshRow, deviceRefreshBusy && s.testRowDisabled]}
+          >
+            <Ionicons name="refresh" size={16} color={colors.cyan} />
+            <Text style={s.refreshText}>{deviceRefreshBusy ? 'REFRESHING CONNECTIONS…' : 'REFRESH CONNECTIONS'}</Text>
+          </TouchableOpacity>
+          <View style={s.div} />
           <View style={s.row}>
             <View style={s.rowL}>
               <Ionicons name="headset-outline" size={18} color="#60a5fa" />
@@ -385,7 +436,7 @@ export default function SettingsScreen() {
                 <Text style={s.sub}>{watchDescription}</Text>
               </View>
             </View>
-            <Switch disabled={!watchAvailable} value={watch && watchAvailable} onValueChange={changeWatchAlerts} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
+            <Switch accessibilityLabel="Apple Watch alerts" disabled={!watchAvailable} value={watch && watchAvailable} onValueChange={changeWatchAlerts} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
           </View>
           <View style={s.div} />
           <TouchableOpacity
@@ -437,6 +488,13 @@ const s = StyleSheet.create({
   rowCopy:{flex:1},
   label:{color:colors.text,fontSize:14,fontWeight:'700'}, sub:{color:colors.textMuted,fontSize:11,marginTop:2},
   status:{color:colors.cyan,fontSize:10,fontWeight:'900',letterSpacing:0.6},
+  deviceSummary:{flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:16,paddingTop:14,paddingBottom:10,backgroundColor:'rgba(48,209,88,0.05)'},
+  deviceSummaryIcon:{width:34,height:34,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(48,209,88,0.1)'},
+  deviceSummaryCopy:{flex:1},
+  deviceSummaryTitle:{color:'#bbf7d0',fontSize:12,fontWeight:'900'},
+  deviceSummaryText:{color:colors.textSecondary,fontSize:10,lineHeight:15,marginTop:2},
+  refreshRow:{minHeight:44,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingHorizontal:16},
+  refreshText:{color:colors.cyan,fontSize:11,fontWeight:'900',letterSpacing:0.55},
   div:{height:1,backgroundColor:colors.glassBorder,marginHorizontal:16},
   testRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:13},
   testRowDisabled:{opacity:0.35},

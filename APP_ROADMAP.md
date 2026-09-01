@@ -4,7 +4,7 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 ★ = top-priority milestone for each phase
 
-**Last updated: 2026-08-29** — statuses distinguish shipped production work,
+**Last updated: 2026-09-01** — statuses distinguish shipped production work,
 current development source, and physical-device validation. See
 `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`, `SAFE_STOP_HANDOFF.md`, and issue
 #6 for the remaining evidence and product gaps.
@@ -25,6 +25,8 @@ queue a native build or publish the website by itself.
 | Website visual cleanup | Shared Apple-inspired material hierarchy implemented across public, sign-in, Account, and fleet surfaces and verified in production | Optional signed-in visual acceptance with a populated protected fleet |
 | Fleet Dashboard performance | Driver-only filter rendering, hidden-tab polling pause, protected-request single-flight guard, and clearer mobile driver hierarchy verified in production | Optional signed-in populated-fleet acceptance |
 | Runtime and data-loading performance | Native display throttling with unchanged analysis cadence, web inference single-flight, on-demand MediaPipe, adaptive fleet refreshes, two-minute event-history refresh limits, failure backoff, parallel roster reads, Server-Timing, smaller PWA icons, and native auth caching implemented in current source | Full source review, authenticated Preview/production timings, and physical-device battery, thermal, camera, and accessory validation |
+| Parked setup and session recovery | Optional on-device camera preview now gives framing, mount-angle, and eye-visibility guidance without changing fatigue scoring. Active drives keep a private local checkpoint every 15 seconds and restore a clearly labeled partial summary after an unexpected interruption | Physical-device preview, force-quit/relaunch, larger-text, and recovery-boundary validation |
+| Connected-device readiness | Settings summarizes primary phone and optional Watch readiness, refreshes Watch/headphone status through a single-flight action, and preserves the existing direct audio and Watch tests | Physical Watch, AirPods/Bluetooth, and car-audio confirmation |
 | Fleet manager reporting | 7/30-day pilot scorecard, privacy-limited report export, driver-specific action queue, transparent early-access plan comparison, deliberate rollout qualification, and separate free-trial/post-trial lead attribution implemented in source | Existing signed-in Preview evidence covers owner scoping, a two-driver no-session fleet, and both reporting windows. PR #109 Preview verification covers the public pricing, free-trial, paid-rollout, and signed-out dashboard journeys; authenticated adaptive-refresh timing and production verification remain pending |
 
 Safety boundary: stronger alerts are intended to get attention and prompt a
@@ -43,7 +45,7 @@ bounded, and the existing cooldown remains in force.
 | Validate detection accuracy against ground-truth drowsiness data | ★ | Pilot feedback capture ready; formal dataset validation not started |
 | Add user-controlled sensitivity slider (low / medium / high) | — | Done |
 | Capture structured correct / false / missed alert feedback | — | Done in private TestFlight build 13 |
-| Audit background reliability (screen-off, app-backgrounded) | — | Partial |
+| Audit background reliability (screen-off, app-backgrounded) | — | Foreground loss stops and saves; 15-second local recovery checkpoints are implemented for unexpected interruption. Physical force-quit/relaunch validation remains pending |
 | Offer a safe-stop Maps handoff after a confirmed alert | — | Implemented in source; physical-device verification pending |
 | Land a pilot fleet (rideshare, delivery, or trucking partner) | ★ | Not started |
 | Tighten safety disclaimers and credibility documentation | — | Done |

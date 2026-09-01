@@ -35,6 +35,8 @@ interface SessionRecord extends FeedbackSession {
   conditionsUpdatedAt?: string;
   deviceImpactUpdatedAt?: string;
   monitorPerformance?: MonitorPerformanceSnapshot;
+  recoveredFromInterruption?: boolean;
+  recoveryNote?: string;
 }
 
 type TestConditionKey = keyof SessionTestConditions;
@@ -242,7 +244,8 @@ export default function HistoryScreen() {
     );
   };
 
-  const reviewedMedium = sessions.filter(
+  const evidenceSessions = sessions.filter(item => !item.recoveredFromInterruption);
+  const reviewedMedium = evidenceSessions.filter(
     item => item.sensitivity === 'medium' && Boolean(item.alertAssessment),
   );
   const checkpointProgress = Math.min(reviewedMedium.length, CHECKPOINT_TARGET);
@@ -264,7 +267,7 @@ export default function HistoryScreen() {
   const completeDeviceImpactCount = reviewedMedium.filter(item => (
     Boolean(item.deviceImpact?.batteryImpact) && Boolean(item.deviceImpact?.phoneHeat)
   )).length;
-  const issueInsights = summarizePilotIssues(sessions);
+  const issueInsights = summarizePilotIssues(evidenceSessions);
   const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
 
   return (
@@ -305,7 +308,7 @@ export default function HistoryScreen() {
               <Text style={s.checkpointStat}>{missedAlertCount} missed</Text>
             </View>
             <Text style={s.checkpointNote}>
-              Only reviewed sessions recorded on Medium count here. Ratings stay on this iPhone.
+              Only complete reviewed sessions recorded on Medium count here. Recovered partial sessions are excluded. Ratings stay on this iPhone.
             </Text>
             <View style={s.coverageSummary}>
               <Text style={s.coverageTitle}>TEST CONDITION COVERAGE</Text>
@@ -392,6 +395,17 @@ export default function HistoryScreen() {
                 <Text style={s.statLbl}>Sensitivity</Text>
               </View>
             </View>
+            {item.recoveredFromInterruption && (
+              <View accessibilityRole="alert" style={s.recoveryNote}>
+                <Ionicons name="refresh-circle-outline" size={16} color="#86efac" />
+                <View style={s.recoveryNoteCopy}>
+                  <Text style={s.recoveryNoteTitle}>Recovered local checkpoint</Text>
+                  <Text style={s.recoveryNoteText}>
+                    Monitoring ended unexpectedly. This partial summary may not include the final moments of the drive.
+                  </Text>
+                </View>
+              </View>
+            )}
             <View style={s.storageRow}>
               <Ionicons
                 name={item.cloudSynced ? 'cloud-done-outline' : 'phone-portrait-outline'}
@@ -618,6 +632,10 @@ const s = StyleSheet.create({
   date: { color: '#c8e8f0', fontSize: 13, fontWeight: '700' },
   dur: { color: '#60a5fa', fontSize: 13, fontWeight: '800' },
   stats: { flexDirection: 'row', gap: 12 },
+  recoveryNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, backgroundColor: 'rgba(48,209,88,0.08)', borderWidth: 1, borderColor: 'rgba(48,209,88,0.24)', borderRadius: 12, padding: 11, marginTop: 12 },
+  recoveryNoteCopy: { flex: 1 },
+  recoveryNoteTitle: { color: '#bbf7d0', fontSize: 11, fontWeight: '900' },
+  recoveryNoteText: { color: colors.textSecondary, fontSize: 10, lineHeight: 15, marginTop: 2 },
   stat: { flex: 1, alignItems: 'center', backgroundColor: colors.backgroundRaised, borderRadius: radii.small, paddingVertical: 10 },
   statVal: { color: '#fff', fontSize: 16, fontWeight: '900' },
   statValSmall: { color: '#fff', fontSize: 12, fontWeight: '900' },

@@ -31,6 +31,13 @@ before changing detection thresholds or making accuracy claims.
   readings are discarded; only source status, sample count, and candidate
   head-nod count are saved. This signal is not calibrated and does not affect
   scores, alerts, Watch haptics, or cloud sync.
+- Current source adds an optional parked camera check for face framing, mount
+  angle, and eye visibility. The check is on-device, stores no frames, and
+  returns before fatigue scoring or alert delivery.
+- Active monitoring stores an aggregate local checkpoint every 15 seconds. If
+  the app ends unexpectedly, the next launch can restore a clearly labeled
+  partial Session History record without treating it as a complete cloud
+  session.
 - Independent development may continue while this checkpoint is deferred, but
   detection-threshold changes and accuracy claims remain blocked on reviewed
   evidence.
@@ -57,6 +64,8 @@ safe conditions before changing thresholds:
 3. Prescription glasses or sunglasses while parked.
 4. Passenger-seat testing on a normal trip.
 5. Different safe phone positions before the vehicle moves.
+6. Parked camera setup preview in daylight and low light, including a deliberate
+   off-center position to verify the guidance changes.
 
 ## Safety rule
 
@@ -78,6 +87,9 @@ sleepy.
 8. Brief natural head turns
 9. Passenger-seat observation
 10. Stationary controlled eye-closure test
+11. Parked interruption-recovery test: begin monitoring, wait at least 20
+    seconds, force close the app, relaunch, and confirm the partial recovered
+    record is clearly labeled
 
 ## Data to record
 

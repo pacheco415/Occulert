@@ -347,7 +347,9 @@ assertIncludes("native-app/app/monitor.tsx", "sensorFault: { position: 'absolute
 assertNotIncludes("native-app/app/monitor.tsx", "Alert.alert('Monitoring stopped'", "native sensor faults must not stack a blocking modal over the in-app warning");
 assertIncludes("native-app/app/monitor.tsx", "SENSOR_STARTUP_GRACE_MS = 10_000", "native camera startup must have a distinct first-frame grace period");
 assertIncludes("native-app/app/monitor.tsx", "hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS", "native camera watchdog must distinguish startup from an active-pipeline stall");
-assertIncludes("native-app/app/monitor.tsx", "<View style={s.ctrl}>\n          {isRunning && (\n            <LiveMetrics", "native metrics must share the control layout flow so alert actions cannot overlap them");
+assertIncludes("native-app/app/monitor.tsx", "<View style={s.ctrl}>", "native monitoring controls must stay in one layout flow");
+assertIncludes("native-app/app/monitor.tsx", "<CameraSetupGuide", "the parked camera guide must share the monitoring control layout flow");
+assertIncludes("native-app/app/monitor.tsx", "<LiveMetrics", "native metrics must share the control layout flow so alert actions cannot overlap them");
 assertNotIncludes("native-app/app/monitor.tsx", "metrics: {\n    position: 'absolute'", "native metrics must not rely on a fixed bottom offset that can overlap added controls");
 assertIncludes("native-app/lib/watchBridge.ts", "getIsWatchAppInstalled", "Apple Watch controls must require the companion app, not pairing alone");
 assertIncludes("native-app/app/settings.tsx", "AUTOMATIC", "connected audio settings must describe iPhone output routing truthfully");
