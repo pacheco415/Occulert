@@ -300,10 +300,22 @@ export default function SettingsScreen() {
         setWatchStatus(status);
         if (!result.accepted) {
           Alert.alert('Watch unavailable', 'Open Occulert on your Apple Watch, then try again.');
+        } else if (result.acknowledged) {
+          const timing = result.roundTripMs === null ? '' : ` in ${result.roundTripMs} ms`;
+          Alert.alert(
+            'Watch test received',
+            `Your Apple Watch acknowledged the live alert${timing}. The iPhone remains the primary safety alert.`,
+          );
         } else if (result.reachable) {
-          Alert.alert('Watch test sent', 'Check your Apple Watch for the alert and wrist tap.');
+          Alert.alert(
+            'Watch test sent',
+            'The Watch was reachable but did not acknowledge the live message. Treat the iPhone as the primary alert.',
+          );
         } else {
-          Alert.alert('Watch test queued', 'Open Occulert on your Apple Watch and enable background alerts. Queued delivery may be delayed.');
+          Alert.alert(
+            'Watch backup queued',
+            'Queued delivery may be delayed. Open Occulert on your Apple Watch for live wrist alerts; the iPhone remains primary.',
+          );
         }
       },
       onBusyChange: busy => {
@@ -336,7 +348,7 @@ export default function SettingsScreen() {
           </View>
           <View style={s.alertSafetyNote}>
             <Ionicons name="shield-checkmark-outline" size={15} color={colors.amber} />
-            <Text style={s.alertSafetyText}>Standard alerts repeat twice and critical alerts repeat three times on each enabled output. Alerts cannot make drowsy driving safe—pull over and rest.</Text>
+            <Text style={s.alertSafetyText}>A continuous closed-eye reading reaches the prominent alert at about 0.6 seconds and, after the startup warmup, the stronger stage at 1.2 seconds. Standard alerts repeat twice and critical alerts repeat three times on each enabled output. Audio and haptic choices also control the foreground-loss warning; keep at least one enabled. Alerts cannot make drowsy driving safe—pull over and rest.</Text>
           </View>
         </View>
         <View style={s.card}>

@@ -52,10 +52,20 @@ export const DEFAULT_SENSITIVITY: SensitivityLevel = 'medium';
 export const PERCLOS_ALERT_THRESHOLD = 0.15;
 
 /**
- * Rolling window size in milliseconds for PERCLOS calculation.
- * 10 seconds is the standard clinical definition.
+ * Rolling window size in milliseconds for this prototype's responsive PERCLOS
+ * estimate. PERCLOS research uses multiple window lengths; this product value
+ * is not a clinical definition or an accuracy claim.
  */
 export const PERCLOS_WINDOW_MS = 10_000;
+
+/**
+ * A normal blink is brief. Escalate a continuously closed-eye reading to the
+ * standard audible alert after 600 ms, while retaining the stronger critical
+ * stage for a longer closure. This preserves a short noise/blink guard without
+ * making the driver wait 1.2 seconds for the first prominent warning.
+ */
+export const EARLY_CLOSED_ALERT_MS = 600;
+export const CRITICAL_CLOSED_ALERT_MS = 1_200;
 
 /**
  * Minimum time between consecutive audio/haptic alerts (ms).

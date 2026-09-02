@@ -23,7 +23,7 @@ A native app removes all of these blockers.
 - **ML Kit face pose** - experimental pitch-cycle observations for future
   head-nod validation
 - **React Native HealthKit** (iOS) - optional read-only HRV and sleep context
-- **Expo Notifications** - push alert support
+- **Watch UserNotifications** - explicit opt-in backup wrist notifications
 - **Expo Haptics** - vibration alerts
 
 ## Setup
@@ -91,6 +91,8 @@ native-app/
 | Screen-off / app-backgrounded camera monitoring | Not supported - keep the app foregrounded |
 | Sensitivity slider | Done - `SensitivitySlider.tsx` + AsyncStorage |
 | Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-audio |
+| Earlier sustained-closure escalation | Source complete - prominent alert at 600 ms, stronger stage at 1.2 s; physical calibration pending |
+| Foreground-loss spoken warning | Source complete - camera stops and a local warning begins immediately; physical validation pending |
 | Apple Watch companion + wrist haptics | Done - private TestFlight build 15 validated |
 | Per-session pre-drive safety confirmation | Done - required before monitoring |
 | Structured session alert review | Done - local correct / false / missed labels |
@@ -236,9 +238,12 @@ alerts in the Watch app. Silent Mode still permits the notification haptic;
 Focus and the user's notification settings remain authoritative.
 
 The phone uses an immediate message when the Watch app is reachable and a
-queued fallback when it is not. Queued WatchConnectivity delivery can be
-delayed, so the iPhone alert remains the primary fail-safe and Occulert must not
-promise a guaranteed background wrist alert. Critical live alerts use a
+queued fallback when it is not. The live message is dispatched before
+reachability checks and records acknowledgement round-trip timing in the local
+session diagnostics. Queued WatchConnectivity delivery can be delayed; queued
+messages older than two seconds update the Watch display without producing a
+late wrist tap. The iPhone alert remains primary and Occulert must not promise a
+guaranteed background wrist alert. Critical live alerts use a
 stronger repeated direct haptic. Settings only enables the Watch switch when
 iOS confirms that the companion is installed and includes a direct Watch alert
 test. Expo Go remains a safe no-op because it cannot contain the Watch target.
@@ -248,6 +253,23 @@ physical devices, open the Occulert Watch app, enable background alerts, confirm
 the iPhone reports the companion as installed, opt into Watch alerts, and test
 both the active-app haptic and the background notification. Verify the phone
 alert still works as the fallback.
+
+### Background camera and reduced-mode boundary
+
+iOS stops ordinary front-camera capture after Occulert leaves the foreground or
+the screen locks. Occulert therefore ends and saves the session, starts a
+distinct spoken/haptic warning, and shows an explicit stopped state when the app
+returns. It does not claim that face monitoring continued invisibly.
+
+Compatible-headphone motion remains an observation-only foreground diagnostic.
+It is not presented as a reduced background detector because it has not been
+validated as a drowsiness signal and iOS does not provide a general-purpose
+background camera path for this app. A truly independent background face signal
+would require supported dedicated camera hardware and separate validation.
+
+Critical Alerts are also a separate Apple entitlement gate. Source must not add
+or claim that entitlement until Apple approves the use case and a signed build
+can be verified. See `CRITICAL_ALERTS_READINESS.md`.
 
 ### Android (Wear OS)
 

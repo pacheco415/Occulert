@@ -13,7 +13,11 @@ import {
   currentAlertPreferences,
   loadAlertPreferences,
 } from '../lib/alertPreferences';
-import { ALERT_COOLDOWN_MS, PERCLOS_ALERT_THRESHOLD } from '../constants/thresholds';
+import {
+  ALERT_COOLDOWN_MS,
+  CRITICAL_CLOSED_ALERT_MS,
+  PERCLOS_ALERT_THRESHOLD,
+} from '../constants/thresholds';
 import {
   deriveAlertLevel,
   SENSOR_LOSS_GRACE_MS,
@@ -35,7 +39,19 @@ interface AlertSystemProps {
   isRunning: boolean;
   sessionStartedAt: number | null;
   sessionEndedAt: number | null;
+  onTimingEvent?: (event: AlertTimingEvent) => void;
 }
+
+export type AlertTimingEvent =
+  | { kind: 'decision'; at: number }
+  | { kind: 'phone-dispatch'; decisionAt: number; dispatchedAt: number }
+  | {
+      kind: 'watch-result';
+      decisionAt: number;
+      accepted: boolean;
+      acknowledged: boolean;
+      roundTripMs: number | null;
+    };
 
 /**
  * AlertSystem — Week 2
@@ -48,6 +64,7 @@ export function AlertSystem({
   isRunning,
   sessionStartedAt,
   sessionEndedAt,
+  onTimingEvent,
 }: AlertSystemProps) {
   const sessionTime = sessionStartedAt === null
     ? 0
@@ -200,6 +217,7 @@ export function AlertSystem({
     sessionTime,
     trackingLostForMs: trackingLost ? SENSOR_LOSS_GRACE_MS : 0,
     criticalPerclosThreshold: PERCLOS_ALERT_THRESHOLD,
+    criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
   });
 
   const fire = useCallback((lv: AlertLevel) => {
@@ -207,6 +225,7 @@ export function AlertSystem({
     const previous = lastAlert.current;
     if (!shouldDeliverAlert(previous.level, previous.at, lv, now, ALERT_COOLDOWN_MS)) return;
     lastAlert.current = { level: lv, at: now };
+    onTimingEvent?.({ kind: 'decision', at: now });
     cancelPendingCues();
     const sequenceVersion = cueSequenceVersion.current;
     const preferences = currentAlertPreferences();
@@ -219,6 +238,9 @@ export function AlertSystem({
     ]).start();
 
     const deliveryPlan = alertDeliveryPlan(lv);
+    if (preferences.hapticEnabled || preferences.audioEnabled) {
+      onTimingEvent?.({ kind: 'phone-dispatch', decisionAt: now, dispatchedAt: Date.now() });
+    }
     if (preferences.hapticEnabled) {
       deliveryPlan.hapticOffsetsMs.forEach(offsetMs => scheduleCue(offsetMs, sequenceVersion, async () => {
         try {
@@ -238,7 +260,16 @@ export function AlertSystem({
     getWatchAlertsEnabled()
       .then((enabled) => {
         if (enabled) {
-          return sendAlertToWatch({ level: lv, perclos: metrics.perclos, at: now });
+          return sendAlertToWatch({ level: lv, perclos: metrics.perclos, at: now })
+            .then((result) => {
+              onTimingEvent?.({
+                kind: 'watch-result',
+                decisionAt: now,
+                accepted: result.accepted,
+                acknowledged: result.acknowledged,
+                roundTripMs: result.roundTripMs,
+              });
+            });
         }
       })
       .catch(() => {});
@@ -272,7 +303,7 @@ export function AlertSystem({
         } catch {}
       }));
     } catch {}
-  }, [balancedPlayer, cancelPendingCues, leftPlayer, metrics.perclos, pulse, rightPlayer, scheduleCue]);
+  }, [balancedPlayer, cancelPendingCues, leftPlayer, metrics.perclos, onTimingEvent, pulse, rightPlayer, scheduleCue]);
 
   React.useEffect(() => {
     if (level !== 'none') fire(level);

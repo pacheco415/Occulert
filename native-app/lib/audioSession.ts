@@ -5,7 +5,8 @@ import { setAudioModeAsync } from 'expo-audio';
  *
  * Goals for a driving safety app:
  *  - Alerts must be audible even when the phone is on silent (iOS mute switch).
- *  - Alerts must keep playing while the app is backgrounded during a drive.
+ *  - A foreground-loss warning that already started may finish while iOS
+ *    transitions the app away from the active camera screen.
  *  - Audio should route to the active Bluetooth output (AirPods / car audio)
  *    when one is connected. iOS/Android route to the connected output device
  *    automatically; we only need the correct session category + options.
@@ -18,7 +19,8 @@ export async function configureAlertAudioMode(): Promise<void> {
   await setAudioModeAsync({
     // Play through the earpiece/speaker/Bluetooth even when the ringer is silenced.
     playsInSilentMode: true,
-    // Keep the session alive so background alerts still fire while driving.
+    // Let a foreground alert or monitoring-paused warning finish during an app
+    // state transition. Face detection itself stops outside the foreground.
     shouldPlayInBackground: true,
     // We are not recording; keep this false so playback isn't forced to the
     // receiver and can route to AirPods / speaker.

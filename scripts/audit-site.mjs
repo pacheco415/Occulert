@@ -313,7 +313,9 @@ assertNotIncludes("native-app/app/settings.tsx", "Occulert™ · v1.0.0", "nativ
 assertNotIncludes("native-app/lib/feedback.ts", "App version: 1.0.0", "native feedback must not hardcode an app version");
 assertIncludes("native-app/app/history.tsx", "router.push('/pre-drive')", "native history must route monitoring through the pre-drive safety gate");
 assertIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native iOS builds must explain optional location access to satisfy App Store validation");
-assertIncludes("native-app/app/monitor.tsx", "CLOSED_CONFIRM_MS = 1_200", "native monitoring must confirm sustained eye closure before a full alert");
+assertIncludes("native-app/constants/thresholds.ts", "EARLY_CLOSED_ALERT_MS = 600", "native monitoring must issue a prominent warning after a prolonged blink threshold");
+assertIncludes("native-app/constants/thresholds.ts", "CRITICAL_CLOSED_ALERT_MS = 1_200", "native monitoring must retain a stronger prolonged-closure stage");
+assertIncludes("native-app/app/monitor.tsx", "monitoring-paused.wav", "native monitoring must package an audible foreground-loss warning");
 assertIncludes("native-app/app/monitor.tsx", "headNodObservationsRef.current += 1", "native monitoring must store candidate head-nod observations locally");
 assertIncludes("native-app/app/history.tsx", "Does not trigger alerts", "experimental head-nod observations must not be presented as an alert signal");
 assertNotIncludes("native-app/components/AlertSystem.tsx", "headNod", "unvalidated head-nod observations must not affect alert delivery");
