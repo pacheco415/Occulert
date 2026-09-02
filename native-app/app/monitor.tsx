@@ -25,15 +25,22 @@ import {
 } from 'react-native-vision-camera-face-detector';
 import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
 import { useKeepAwake } from 'expo-keep-awake';
+import { useAudioPlayer } from 'expo-audio';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useEyeTracking } from '../hooks/useEyeTracking';
-import { AlertSystem } from '../components/AlertSystem';
+import { AlertSystem, type AlertTimingEvent } from '../components/AlertSystem';
 import { CameraSetupGuide } from '../components/CameraSetupGuide';
 import { LiveMetrics } from '../components/LiveMetrics';
 import { GlassSurface } from '../components/GlassSurface';
 import { loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
-import { PERCLOS_ALERT_THRESHOLD, type SensitivityLevel } from '../constants/thresholds';
+import {
+  CRITICAL_CLOSED_ALERT_MS,
+  EARLY_CLOSED_ALERT_MS,
+  PERCLOS_ALERT_THRESHOLD,
+  type SensitivityLevel,
+} from '../constants/thresholds';
 import { updateSessionHistory } from '../lib/sessionHistory';
 import {
   beginCloudSession,
@@ -67,8 +74,12 @@ import {
   shouldRefreshMonitorMetrics,
   type MonitorPerformanceSnapshot,
 } from '../lib/monitorPerformance';
-import { deriveAlertLevel, type AlertLevel } from '../lib/alertPolicy';
-import { loadAlertPreferences } from '../lib/alertPreferences';
+import {
+  confirmedEyeStateForAlert,
+  deriveAlertLevel,
+  type AlertLevel,
+} from '../lib/alertPolicy';
+import { currentAlertPreferences, loadAlertPreferences } from '../lib/alertPreferences';
 import { getWatchAlertsEnabled } from '../lib/watchPreferences';
 import {
   assessCameraSetup,
@@ -94,7 +105,7 @@ const FACE_DETECTOR_OPTIONS: FrameFaceDetectionOptions = {
   cameraFacing: 'front',
 };
 
-const CLOSED_CONFIRM_MS = 1_200;
+const MONITORING_PAUSED_SOUND = require('../assets/monitoring-paused.wav');
 const SENSOR_STARTUP_GRACE_MS = 10_000;
 const SENSOR_STALL_MS = 5_000;
 const CAMERA_SETUP_UI_INTERVAL_MS = 250;
@@ -170,11 +181,41 @@ export default function MonitorScreen() {
     ear: 0.3,
     perclos: 0,
     fatigueScore: 0,
+    closedDurationMs: 0,
     state: 'noFace',
+  });
+
+  const monitoringPausedPlayer = useAudioPlayer(MONITORING_PAUSED_SOUND, {
+    keepAudioSessionActive: true,
   });
 
   const { processEyeOpenness, processNoFace, reset } = useEyeTracking(sensitivity);
   const { detectFaces } = useFaceDetector(FACE_DETECTOR_OPTIONS);
+
+  const deliverMonitoringPausedCue = useCallback(() => {
+    const preferences = currentAlertPreferences();
+    if (preferences.hapticEnabled) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    }
+    if (!preferences.audioEnabled) return;
+    try {
+      monitoringPausedPlayer.pause();
+      void monitoringPausedPlayer.seekTo(0).then(() => {
+        monitoringPausedPlayer.volume = 1;
+        monitoringPausedPlayer.play();
+      }).catch(() => {});
+    } catch {}
+  }, [monitoringPausedPlayer]);
+
+  const recordAlertTiming = useCallback((event: AlertTimingEvent) => {
+    if (event.kind === 'decision') {
+      performanceTrackerRef.current.recordAlertDecision(event.at);
+    } else if (event.kind === 'phone-dispatch') {
+      performanceTrackerRef.current.recordPhoneDispatch(event.decisionAt, event.dispatchedAt);
+    } else {
+      performanceTrackerRef.current.recordWatchDelivery(event.decisionAt, event);
+    }
+  }, []);
 
   useEffect(() => {
     loadSavedSensitivity()
@@ -557,17 +598,21 @@ export default function MonitorScreen() {
         requestingCameraPermissionRef.current,
         nextState,
       )) return;
+      // iOS stops the camera when Occulert leaves the foreground. Deliver a
+      // distinct local cue before teardown so the driver is never left with
+      // the false impression that face monitoring continued behind another app.
+      deliverMonitoringPausedCue();
       setSensorFault(
-        'Monitoring stopped when Occulert left the foreground. Restart only after you are safely parked.',
+        'Face monitoring paused. Monitoring stopped when Occulert left the foreground. Restart only after you are safely parked.',
       );
       void handleStopRef.current({ deferCloudFinalization: true }).catch(() => {
         setSensorFault(
-          'Monitoring stopped when Occulert left the foreground, but this drive could not be saved.',
+          'Face monitoring paused. Monitoring stopped when Occulert left the foreground, but this drive could not be saved.',
         );
       });
     });
     return () => subscription.remove();
-  }, []);
+  }, [deliverMonitoringPausedCue]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -655,14 +700,19 @@ export default function MonitorScreen() {
     }
 
     // Do not turn a blink or one noisy frame into a driver alert.
-    const confirmedClosed = rawResult.state === 'closed'
+    const closedDurationMs = rawResult.state === 'closed'
       && closedSinceRef.current !== null
-      && now - closedSinceRef.current >= CLOSED_CONFIRM_MS;
-    const result: EyeMetrics = confirmedClosed
-      ? rawResult
-      : rawResult.state === 'closed'
-        ? { ...rawResult, state: 'watch' }
-        : rawResult;
+      ? now - closedSinceRef.current
+      : 0;
+    const result: EyeMetrics = {
+      ...rawResult,
+      closedDurationMs,
+      state: confirmedEyeStateForAlert(
+        rawResult.state,
+        closedDurationMs,
+        EARLY_CLOSED_ALERT_MS,
+      ),
+    };
 
     const alertLevel = deriveAlertLevel({
       isRunning: isRunningRef.current,
@@ -670,6 +720,7 @@ export default function MonitorScreen() {
       sessionTime: elapsedSessionSeconds(sessionStartedAtRef.current, now),
       trackingLostForMs: 0,
       criticalPerclosThreshold: PERCLOS_ALERT_THRESHOLD,
+      criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
     });
     const shouldRefreshDisplay = shouldRefreshMonitorMetrics({
       previousState: displayedMetricsStateRef.current,
@@ -949,6 +1000,7 @@ export default function MonitorScreen() {
           isRunning={isRunning}
           sessionStartedAt={sessionStartedAt}
           sessionEndedAt={sessionEndedAt}
+          onTimingEvent={recordAlertTiming}
         />
 
         <View style={s.ctrl}>

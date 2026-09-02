@@ -3,10 +3,15 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 import {
+  confirmedEyeStateForAlert,
   deriveAlertLevel,
   SENSOR_LOSS_GRACE_MS,
   shouldDeliverAlert,
 } from '../native-app/lib/alertPolicy.ts';
+import {
+  CRITICAL_CLOSED_ALERT_MS,
+  EARLY_CLOSED_ALERT_MS,
+} from '../native-app/constants/thresholds.ts';
 import {
   clearPreDriveSafetyConfirmation,
   confirmPreDriveSafety,
@@ -14,10 +19,11 @@ import {
   PRE_DRIVE_CONFIRMATION_TTL_MS,
 } from '../native-app/lib/preDriveGate.ts';
 
-const noFace = { ear: 0.3, perclos: 0, fatigueScore: 0, state: 'noFace' };
-const open = { ear: 0.3, perclos: 0, fatigueScore: 0, state: 'open' };
-const watch = { ear: 0.2, perclos: 0.1, fatigueScore: 35, state: 'watch' };
-const closed = { ear: 0.1, perclos: 0.5, fatigueScore: 90, state: 'closed' };
+const noFace = { ear: 0.3, perclos: 0, fatigueScore: 0, closedDurationMs: 0, state: 'noFace' };
+const open = { ear: 0.3, perclos: 0, fatigueScore: 0, closedDurationMs: 0, state: 'open' };
+const watch = { ear: 0.2, perclos: 0.1, fatigueScore: 35, closedDurationMs: 0, state: 'watch' };
+const closed = { ear: 0.1, perclos: 0.5, fatigueScore: 90, closedDurationMs: 1_200, state: 'closed' };
+const earlyClosed = { ...closed, perclos: 0.1, closedDurationMs: 600 };
 const criticalPerclosThreshold = 0.15;
 
 test('sustained tracking loss becomes an explicit warning without startup noise', () => {
@@ -27,6 +33,7 @@ test('sustained tracking loss becomes an explicit warning without startup noise'
     sessionTime: 0,
     trackingLostForMs: SENSOR_LOSS_GRACE_MS,
     criticalPerclosThreshold,
+    criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
   }), 'none');
   assert.equal(deriveAlertLevel({
     isRunning: true,
@@ -34,6 +41,7 @@ test('sustained tracking loss becomes an explicit warning without startup noise'
     sessionTime: 3,
     trackingLostForMs: SENSOR_LOSS_GRACE_MS - 1,
     criticalPerclosThreshold,
+    criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
   }), 'none');
   assert.equal(deriveAlertLevel({
     isRunning: true,
@@ -41,6 +49,7 @@ test('sustained tracking loss becomes an explicit warning without startup noise'
     sessionTime: 3,
     trackingLostForMs: SENSOR_LOSS_GRACE_MS,
     criticalPerclosThreshold,
+    criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
   }), 'tracking');
   assert.equal(deriveAlertLevel({
     isRunning: true,
@@ -48,6 +57,7 @@ test('sustained tracking loss becomes an explicit warning without startup noise'
     sessionTime: 3,
     trackingLostForMs: 0,
     criticalPerclosThreshold,
+    criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
   }), 'none');
 });
 
@@ -64,12 +74,15 @@ test('upward severity escalation and tracking loss bypass the shared cooldown', 
 });
 
 test('normal eye-state severity behavior remains intact', () => {
+  assert.equal(EARLY_CLOSED_ALERT_MS, 600);
+  assert.equal(CRITICAL_CLOSED_ALERT_MS, 1_200);
   assert.equal(deriveAlertLevel({
     isRunning: true,
     metrics: watch,
     sessionTime: 3,
     trackingLostForMs: 0,
     criticalPerclosThreshold,
+    criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
   }), 'watch');
   assert.equal(deriveAlertLevel({
     isRunning: true,
@@ -77,13 +90,42 @@ test('normal eye-state severity behavior remains intact', () => {
     sessionTime: 3,
     trackingLostForMs: 0,
     criticalPerclosThreshold,
+    criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
   }), 'alert');
+  assert.equal(deriveAlertLevel({
+    isRunning: true,
+    metrics: earlyClosed,
+    sessionTime: 12,
+    trackingLostForMs: 0,
+    criticalPerclosThreshold,
+    criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
+  }), 'alert', 'the first prominent alert must not wait for the critical closure duration');
   assert.equal(deriveAlertLevel({
     isRunning: true,
     metrics: closed,
     sessionTime: 12,
     trackingLostForMs: 0,
     criticalPerclosThreshold,
+    criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
+  }), 'critical');
+});
+
+test('a prolonged blink crosses into the prominent alert at 600 ms', () => {
+  assert.equal(confirmedEyeStateForAlert('closed', 0, EARLY_CLOSED_ALERT_MS), 'watch');
+  assert.equal(confirmedEyeStateForAlert('closed', 599, EARLY_CLOSED_ALERT_MS), 'watch');
+  assert.equal(confirmedEyeStateForAlert('closed', 600, EARLY_CLOSED_ALERT_MS), 'closed');
+  assert.equal(confirmedEyeStateForAlert('watch', 5_000, EARLY_CLOSED_ALERT_MS), 'watch');
+  assert.equal(confirmedEyeStateForAlert('open', 5_000, EARLY_CLOSED_ALERT_MS), 'open');
+});
+
+test('repeated closures can escalate through PERCLOS before one long closure', () => {
+  assert.equal(deriveAlertLevel({
+    isRunning: true,
+    metrics: { ...earlyClosed, perclos: criticalPerclosThreshold },
+    sessionTime: 12,
+    trackingLostForMs: 0,
+    criticalPerclosThreshold,
+    criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
   }), 'critical');
 });
 

@@ -89,6 +89,10 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /isRunningRef\.current = true;\s*setIsRunning\(true\)/);
   assert.match(monitor, /isRunningRef\.current = false;\s*setIsRunning\(false\)/);
   assert.match(monitor, /Monitoring stopped when Occulert left the foreground/);
+  assert.match(monitor, /MONITORING_PAUSED_SOUND/);
+  assert.match(monitor, /deliverMonitoringPausedCue\(\)/);
+  assert.match(monitor, /Face monitoring paused/);
+  assert.match(monitor, /currentAlertPreferences\(\)/);
   assert.match(monitor, /stopBeforeNavigation/);
   assert.equal(
     [...monitor.matchAll(/handleStopRef\.current\(\{ deferCloudFinalization: true \}\)/g)].length,
@@ -101,6 +105,15 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /if \(stoppingRef\.current\) return Promise\.resolve\(\)/);
   assert.match(monitor, /accessibilityLabel=\{isRunning \? 'Open settings and end monitoring' : 'Open settings'\}/);
   assert.match(layout, /name="monitor"[\s\S]*gestureEnabled: false/);
+});
+
+test('foreground loss has a packaged spoken warning and explicit visible limitation', () => {
+  const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  const pausedAudio = readFileSync(
+    new URL('../native-app/assets/monitoring-paused.wav', import.meta.url),
+  );
+  assert.ok(pausedAudio.length > 10_000, 'the spoken monitoring-paused cue must be packaged');
+  assert.match(monitor, /Screen kept on · Keep app in foreground/);
 });
 
 test('an immediate background stop uses the running ref before React state commits', () => {

@@ -31,6 +31,17 @@ export interface MonitorPerformanceSnapshot {
   timeToFirstSampleMs: number | null;
   uiUpdatesPerSecond: number;
   cameraStalls: number;
+  alertTiming: {
+    alertsTriggered: number;
+    phoneDispatches: number;
+    averagePhoneDispatchMs: number;
+    maxPhoneDispatchMs: number;
+    watchResults: number;
+    watchLiveAcknowledgements: number;
+    averageWatchRoundTripMs: number;
+    maxWatchRoundTripMs: number;
+    watchQueuedFallbacks: number;
+  };
 }
 
 export interface MonitorPerformanceTracker {
@@ -38,6 +49,12 @@ export interface MonitorPerformanceTracker {
   recordSample: (at: number, inferenceMs: number) => void;
   recordUiUpdate: () => void;
   recordCameraStall: () => void;
+  recordAlertDecision: (at: number) => void;
+  recordPhoneDispatch: (decisionAt: number, dispatchedAt: number) => void;
+  recordWatchDelivery: (
+    decisionAt: number,
+    outcome: { accepted: boolean; acknowledged: boolean; roundTripMs: number | null },
+  ) => void;
   reset: () => void;
   snapshot: (at?: number) => MonitorPerformanceSnapshot;
 }
@@ -76,6 +93,12 @@ export function createMonitorPerformanceTracker(
   let samples = 0;
   let uiUpdates = 0;
   let cameraStalls = 0;
+  let alertsTriggered = 0;
+  let watchResults = 0;
+  let watchLiveAcknowledgements = 0;
+  let watchQueuedFallbacks = 0;
+  const phoneDispatchDurations: number[] = [];
+  const watchRoundTripDurations: number[] = [];
   let sessionStartedAt = 0;
   let firstSampleAt: number | null = null;
   let lastSampleAt = 0;
@@ -107,12 +130,41 @@ export function createMonitorPerformanceTracker(
     recordCameraStall() {
       cameraStalls += 1;
     },
+    recordAlertDecision(at) {
+      if (!Number.isFinite(at) || at < sessionStartedAt) return;
+      alertsTriggered += 1;
+    },
+    recordPhoneDispatch(decisionAt, dispatchedAt) {
+      if (
+        !Number.isFinite(decisionAt)
+        || !Number.isFinite(dispatchedAt)
+        || decisionAt < sessionStartedAt
+        || dispatchedAt < decisionAt
+      ) return;
+      appendBounded(phoneDispatchDurations, dispatchedAt - decisionAt);
+    },
+    recordWatchDelivery(decisionAt, outcome) {
+      if (!Number.isFinite(decisionAt) || decisionAt < sessionStartedAt) return;
+      watchResults += 1;
+      if (outcome.acknowledged && outcome.roundTripMs !== null) {
+        watchLiveAcknowledgements += 1;
+        appendBounded(watchRoundTripDurations, outcome.roundTripMs);
+      } else if (outcome.accepted) {
+        watchQueuedFallbacks += 1;
+      }
+    },
     reset() {
       inferenceDurations.length = 0;
       sampleIntervals.length = 0;
       samples = 0;
       uiUpdates = 0;
       cameraStalls = 0;
+      alertsTriggered = 0;
+      watchResults = 0;
+      watchLiveAcknowledgements = 0;
+      watchQueuedFallbacks = 0;
+      phoneDispatchDurations.length = 0;
+      watchRoundTripDurations.length = 0;
       sessionStartedAt = 0;
       firstSampleAt = null;
       lastSampleAt = 0;
@@ -132,6 +184,21 @@ export function createMonitorPerformanceTracker(
           : Math.round((firstSampleAt - sessionStartedAt) * 10) / 10,
         uiUpdatesPerSecond: roundedRate(uiUpdates, durationMs),
         cameraStalls,
+        alertTiming: {
+          alertsTriggered,
+          phoneDispatches: phoneDispatchDurations.length,
+          averagePhoneDispatchMs: roundedAverage(phoneDispatchDurations),
+          maxPhoneDispatchMs: phoneDispatchDurations.length
+            ? Math.max(...phoneDispatchDurations)
+            : 0,
+          watchResults,
+          watchLiveAcknowledgements,
+          averageWatchRoundTripMs: roundedAverage(watchRoundTripDurations),
+          maxWatchRoundTripMs: watchRoundTripDurations.length
+            ? Math.max(...watchRoundTripDurations)
+            : 0,
+          watchQueuedFallbacks,
+        },
       };
     },
   };

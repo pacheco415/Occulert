@@ -123,7 +123,7 @@ test('live status uses latest-state delivery and never queues every update', () 
   assert.doesNotMatch(sender, /transferUserInfo/);
 });
 
-test('immediate alerts always refresh reachability instead of using the status cache', () => {
+test('immediate alerts send before reachability checks and report live acknowledgement timing', () => {
   const start = watchBridge.indexOf('export async function sendAlertToWatch');
   const end = watchBridge.indexOf('/**\n * Mirror the latest monitoring state', start);
   assert.ok(start >= 0 && end > start, 'alert sender must be present');
@@ -133,6 +133,13 @@ test('immediate alerts always refresh reachability instead of using the status c
   assert.doesNotMatch(sender, /WATCH_STATUS_CACHE_MS/);
   assert.match(sender, /transferUserInfo/);
   assert.match(sender, /sendMessage/);
+  assert.ok(
+    sender.indexOf('mod.sendMessage') < sender.indexOf('getWatchStatus()'),
+    'the live message must not wait behind reachability queries',
+  );
+  assert.match(sender, /WATCH_LIVE_ACK_TIMEOUT_MS/);
+  assert.match(sender, /acknowledged/);
+  assert.match(sender, /roundTripMs/);
 });
 
 test('the native monitor publishes live state and an explicit stop update', () => {
@@ -282,14 +289,18 @@ test('background Watch alerts use an authorized notification instead of a silent
   assert.match(alertReceiver, /interruptionLevel = \.timeSensitive/);
   assert.match(alertReceiver, /requestAuthorization\(options: \[\.alert, \.sound\]\)/);
   assert.match(alertReceiver, /authorizationStatus == \.authorized/);
+  assert.match(alertReceiver, /queuedAlertFeedbackFreshnessMilliseconds = 2_000/);
+  assert.match(alertReceiver, /"receivedAt"/);
   assert.match(targetConfig, /'UserNotifications'/);
   assert.match(
     targetConfig,
     /'com\.apple\.developer\.usernotifications\.time-sensitive': true/,
   );
   assert.match(contentView, /Enable background alerts/);
+  assert.match(contentView, /iPhone alert is primary/);
   assert.match(contentView, /refreshNotificationAuthorization/);
   assert.match(settingsScreen, /Queued delivery may be delayed/);
+  assert.match(settingsScreen, /result\.roundTripMs/);
 });
 
 test('opening the Watch app restores the latest iPhone context without replaying feedback', () => {

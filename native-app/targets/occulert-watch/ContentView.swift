@@ -135,7 +135,7 @@ struct ContentView: View {
           .multilineTextAlignment(.center)
           .foregroundStyle(.secondary)
 
-        Text("Open this Watch app for the fastest live status and wrist alerts.")
+        Text("The iPhone alert is primary. Keep this Watch app open for the fastest backup wrist alert; delayed queued delivery updates status without a late tap.")
           .font(.caption2)
           .multilineTextAlignment(.center)
           .foregroundStyle(.secondary)

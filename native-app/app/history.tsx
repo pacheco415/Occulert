@@ -433,8 +433,24 @@ export default function HistoryScreen() {
                 <Text style={s.performanceInfo}>
                   Display updates: {item.monitorPerformance.uiUpdatesPerSecond}/sec · Camera stalls: {item.monitorPerformance.cameraStalls}
                 </Text>
+                {item.monitorPerformance.alertTiming?.alertsTriggered > 0 && (
+                  <>
+                    <Text style={s.performanceInfo}>
+                      Phone software dispatch: {item.monitorPerformance.alertTiming.averagePhoneDispatchMs} ms average · {item.monitorPerformance.alertTiming.maxPhoneDispatchMs} ms max
+                    </Text>
+                    <Text style={s.performanceInfo}>
+                      Watch live acknowledgements: {item.monitorPerformance.alertTiming.watchLiveAcknowledgements}/{item.monitorPerformance.alertTiming.watchResults}
+                      {item.monitorPerformance.alertTiming.watchLiveAcknowledgements > 0
+                        ? ` · ${item.monitorPerformance.alertTiming.averageWatchRoundTripMs} ms average round trip`
+                        : ''}
+                      {item.monitorPerformance.alertTiming.watchQueuedFallbacks > 0
+                        ? ` · ${item.monitorPerformance.alertTiming.watchQueuedFallbacks} queued backup`
+                        : ''}
+                    </Text>
+                  </>
+                )}
                 <Text style={s.performanceCaution}>
-                  Aggregate timings stay in this session record on this iPhone. No camera frames are saved.
+                  Aggregate camera and alert timings stay in this session record on this iPhone. Phone dispatch is measured before hardware sound begins; Watch timing is message acknowledgement, not haptic onset. No camera frames are saved.
                 </Text>
               </View>
             )}

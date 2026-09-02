@@ -19,6 +19,7 @@ export interface EyeMetrics {
   ear: number;
   perclos: number;
   fatigueScore: number;
+  closedDurationMs: number;
   state: 'open' | 'watch' | 'closed' | 'noFace';
 }
 
@@ -54,7 +55,13 @@ export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY) {
       const perclosRatio = Math.min(1, perclos / PERCLOS_ALERT_THRESHOLD);
       const fatigueScore = Math.min(100, Math.round(drop * 50 + perclosRatio * 50));
 
-      return { ear: avgEar, perclos, fatigueScore, state: closed ? 'closed' : watching ? 'watch' : 'open' };
+      return {
+        ear: avgEar,
+        perclos,
+        fatigueScore,
+        closedDurationMs: 0,
+        state: closed ? 'closed' : watching ? 'watch' : 'open',
+      };
     },
     [perclosWindow, preset],
   );
@@ -64,7 +71,13 @@ export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY) {
   const processLandmarks = useCallback(
     (lm: Array<{ x: number; y: number }> | null): EyeMetrics => {
       if (!lm || lm.length < 468) {
-        return { ear: lastEar.current, perclos: 0, fatigueScore: 0, state: 'noFace' };
+        return {
+          ear: lastEar.current,
+          perclos: 0,
+          fatigueScore: 0,
+          closedDurationMs: 0,
+          state: 'noFace',
+        };
       }
       const avgEar = (ear(lm, LEFT_EYE) + ear(lm, RIGHT_EYE)) / 2;
       return scoreFromEar(avgEar);
@@ -82,7 +95,13 @@ export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY) {
         typeof p === 'number' && p >= 0 && p <= 1;
 
       if (!valid(leftProb) && !valid(rightProb)) {
-        return { ear: lastEar.current, perclos: 0, fatigueScore: 0, state: 'noFace' };
+        return {
+          ear: lastEar.current,
+          perclos: 0,
+          fatigueScore: 0,
+          closedDurationMs: 0,
+          state: 'noFace',
+        };
       }
       const probs = [leftProb, rightProb].filter(valid);
       const avgProb = probs.reduce((a, b) => a + b, 0) / probs.length;
@@ -93,7 +112,13 @@ export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY) {
 
   /** Explicit no-face signal for frames where the detector finds no face. */
   const processNoFace = useCallback((): EyeMetrics => {
-    return { ear: lastEar.current, perclos: 0, fatigueScore: 0, state: 'noFace' };
+    return {
+      ear: lastEar.current,
+      perclos: 0,
+      fatigueScore: 0,
+      closedDurationMs: 0,
+      state: 'noFace',
+    };
   }, []);
 
   const reset = useCallback(() => { perclosWindow.reset(); lastEar.current = 0.3; }, [perclosWindow]);

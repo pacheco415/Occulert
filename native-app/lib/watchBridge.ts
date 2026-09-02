@@ -38,12 +38,15 @@ export interface WatchStatus {
 export interface WatchDeliveryResult {
   accepted: boolean;
   reachable: boolean;
+  acknowledged: boolean;
+  roundTripMs: number | null;
 }
 
 let watch: WatchModule | null = null;
 let triedLoad = false;
 const WATCH_STATUS_CACHE_MS = 5_000;
 let cachedWatchStatus: { value: WatchStatus; checkedAt: number } | null = null;
+const WATCH_LIVE_ACK_TIMEOUT_MS = 1_500;
 
 function loadWatchModule(): WatchModule | null {
   if (triedLoad) return watch;
@@ -68,10 +71,8 @@ function loadWatchModule(): WatchModule | null {
  */
 export async function sendAlertToWatch(payload: WatchAlertPayload): Promise<WatchDeliveryResult> {
   const mod = loadWatchModule();
-  if (!mod) return { accepted: false, reachable: false };
-  const status = await getWatchStatus();
-  if (!status.paired || !status.appInstalled) {
-    return { accepted: false, reachable: false };
+  if (!mod) {
+    return { accepted: false, reachable: false, acknowledged: false, roundTripMs: null };
   }
   const message = {
     type: 'occulert-alert',
@@ -80,6 +81,8 @@ export async function sendAlertToWatch(payload: WatchAlertPayload): Promise<Watc
     at: payload.at,
   };
   let accepted = false;
+  // Queue the durable fallbacks before any asynchronous reachability query.
+  // These calls are best-effort and never sit in front of the iPhone cue.
   try {
     // Latest-state channel: survives app being backgrounded on the watch.
     mod.updateApplicationContext(message);
@@ -97,16 +100,44 @@ export async function sendAlertToWatch(payload: WatchAlertPayload): Promise<Watc
   } catch {
     // ignore
   }
-  if (status.reachable) {
+
+  // Attempt the live channel immediately. Waiting for three native status
+  // queries before sendMessage added avoidable latency to the wrist path.
+  const liveStartedAt = Date.now();
+  const liveAcknowledgement = new Promise<{ acknowledged: boolean; roundTripMs: number | null }>((resolve) => {
+    let settled = false;
+    const settle = (acknowledged: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve({
+        acknowledged,
+        roundTripMs: acknowledged ? Math.max(0, Date.now() - liveStartedAt) : null,
+      });
+    };
+    const timeout = setTimeout(() => settle(false), WATCH_LIVE_ACK_TIMEOUT_MS);
     try {
-      // Live channel for an immediate haptic when the watch app is reachable.
-      mod.sendMessage(message);
-      accepted = true;
+      mod.sendMessage(
+        message,
+        () => settle(true),
+        () => settle(false),
+      );
     } catch {
-      // ignore
+      settle(false);
     }
-  }
-  return { accepted, reachable: status.reachable };
+  });
+
+  const [status, live] = await Promise.all([
+    getWatchStatus(),
+    liveAcknowledgement,
+  ]);
+  const available = status.paired && status.appInstalled;
+  return {
+    accepted: available && (accepted || live.acknowledged),
+    reachable: status.reachable,
+    acknowledged: live.acknowledged,
+    roundTripMs: live.roundTripMs,
+  };
 }
 
 /**
@@ -119,13 +150,15 @@ export async function sendMonitoringStatusToWatch(
   payload: WatchMonitoringPayload,
 ): Promise<WatchDeliveryResult> {
   const mod = loadWatchModule();
-  if (!mod) return { accepted: false, reachable: false };
+  if (!mod) {
+    return { accepted: false, reachable: false, acknowledged: false, roundTripMs: null };
+  }
   // Live metrics are informational and frequent, so briefly reuse the paired /
   // installed / reachable snapshot instead of crossing the native bridge three
   // times for every status update. Alert delivery above always checks fresh.
   const status = await getWatchStatus(WATCH_STATUS_CACHE_MS);
   if (!status.paired || !status.appInstalled) {
-    return { accepted: false, reachable: false };
+    return { accepted: false, reachable: false, acknowledged: false, roundTripMs: null };
   }
 
   const message: Record<string, unknown> = {
@@ -146,7 +179,12 @@ export async function sendMonitoringStatusToWatch(
       // ignore
     }
   }
-  return { accepted, reachable: status.reachable };
+  return {
+    accepted,
+    reachable: status.reachable,
+    acknowledged: false,
+    roundTripMs: null,
+  };
 }
 
 /**

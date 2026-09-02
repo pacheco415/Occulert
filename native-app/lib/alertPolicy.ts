@@ -1,4 +1,5 @@
 export type AlertLevel = 'none' | 'tracking' | 'watch' | 'alert' | 'critical';
+export type MonitoredEyeState = 'open' | 'watch' | 'closed' | 'noFace';
 
 export const CRITICAL_WARMUP_SECONDS = 10;
 export const SENSOR_LOSS_GRACE_MS = 3_000;
@@ -7,11 +8,22 @@ interface AlertLevelInput {
   isRunning: boolean;
   metrics: {
     perclos: number;
-    state: 'open' | 'watch' | 'closed' | 'noFace';
+    closedDurationMs: number;
+    state: MonitoredEyeState;
   };
   sessionTime: number;
   trackingLostForMs: number;
   criticalPerclosThreshold: number;
+  criticalClosedDurationMs: number;
+}
+
+export function confirmedEyeStateForAlert(
+  rawState: MonitoredEyeState,
+  closedDurationMs: number,
+  earlyClosedAlertMs: number,
+): MonitoredEyeState {
+  if (rawState !== 'closed') return rawState;
+  return closedDurationMs >= earlyClosedAlertMs ? 'closed' : 'watch';
 }
 
 export function deriveAlertLevel({
@@ -20,6 +32,7 @@ export function deriveAlertLevel({
   sessionTime,
   trackingLostForMs,
   criticalPerclosThreshold,
+  criticalClosedDurationMs,
 }: AlertLevelInput): AlertLevel {
   if (!isRunning) return 'none';
   if (metrics.state === 'noFace') {
@@ -28,7 +41,10 @@ export function deriveAlertLevel({
   if (
     metrics.state === 'closed'
     && sessionTime >= CRITICAL_WARMUP_SECONDS
-    && metrics.perclos >= criticalPerclosThreshold
+    && (
+      metrics.closedDurationMs >= criticalClosedDurationMs
+      || metrics.perclos >= criticalPerclosThreshold
+    )
   ) return 'critical';
   if (metrics.state === 'closed') return 'alert';
   if (metrics.state === 'watch') return 'watch';

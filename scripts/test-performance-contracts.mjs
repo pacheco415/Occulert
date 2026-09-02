@@ -37,6 +37,10 @@ test('native monitoring timing stays bounded and deterministic', () => {
   tracker.recordUiUpdate();
   tracker.recordUiUpdate();
   tracker.recordCameraStall();
+  tracker.recordAlertDecision(500);
+  tracker.recordPhoneDispatch(500, 506);
+  tracker.recordWatchDelivery(500, { accepted: true, acknowledged: true, roundTripMs: 44 });
+  tracker.recordWatchDelivery(600, { accepted: true, acknowledged: false, roundTripMs: null });
   assert.deepEqual(tracker.snapshot(1_050), {
     samples: 4,
     uiUpdates: 2,
@@ -46,6 +50,17 @@ test('native monitoring timing stays bounded and deterministic', () => {
     timeToFirstSampleMs: 50,
     uiUpdatesPerSecond: 2,
     cameraStalls: 1,
+    alertTiming: {
+      alertsTriggered: 1,
+      phoneDispatches: 1,
+      averagePhoneDispatchMs: 6,
+      maxPhoneDispatchMs: 6,
+      watchResults: 2,
+      watchLiveAcknowledgements: 1,
+      averageWatchRoundTripMs: 44,
+      maxWatchRoundTripMs: 44,
+      watchQueuedFallbacks: 1,
+    },
   });
 });
 
@@ -93,6 +108,9 @@ test('Build 30 pins its iOS toolchain and exposes local aggregate diagnostics', 
   assert.match(history, /LOCAL PERFORMANCE DIAGNOSTICS/);
   assert.match(history, /First camera sample/);
   assert.match(history, /Inference p95/);
+  assert.match(history, /Phone software dispatch/);
+  assert.match(history, /Watch live acknowledgements/);
+  assert.match(history, /not haptic onset/);
   assert.match(history, /No camera frames are saved/);
 });
 
