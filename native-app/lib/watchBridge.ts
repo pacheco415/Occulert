@@ -22,7 +22,6 @@ export interface WatchAlertPayload {
 type WatchModule = {
   sendMessage: (message: Record<string, unknown>, reply?: (r: unknown) => void, err?: (e: unknown) => void) => void;
   updateApplicationContext: (context: Record<string, unknown>) => void;
-  transferUserInfo?: (userInfo: Record<string, unknown>) => void;
   getIsPaired?: () => Promise<boolean>;
   getIsWatchAppInstalled?: () => Promise<boolean>;
   getReachability?: () => Promise<boolean>;
@@ -81,22 +80,13 @@ export async function sendAlertToWatch(payload: WatchAlertPayload): Promise<Watc
     at: payload.at,
   };
   let accepted = false;
-  // Queue the durable fallbacks before any asynchronous reachability query.
-  // These calls are best-effort and never sit in front of the iPhone cue.
+  // Save only the latest fallback before any asynchronous reachability query.
+  // transferUserInfo is intentionally avoided: its native error callback can
+  // receive a missing payload and terminate the iPhone app.
   try {
     // Latest-state channel: survives app being backgrounded on the watch.
     mod.updateApplicationContext(message);
     accepted = true;
-  } catch {
-    // ignore
-  }
-  try {
-    // Reliable queued delivery if the Watch app is not reachable at the exact
-    // moment of the alert. The Watch receiver deduplicates by timestamp.
-    if (mod.transferUserInfo) {
-      mod.transferUserInfo(message);
-      accepted = true;
-    }
   } catch {
     // ignore
   }

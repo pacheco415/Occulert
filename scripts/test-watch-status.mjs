@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import {
+  hardenedUserInfoErrorCallback,
+  patchWatchConnectivitySource,
+  vulnerableUserInfoErrorCallback,
+} from '../native-app/scripts/patch-watch-connectivity.mjs';
 import { createCachedBooleanPreference } from '../native-app/lib/cachedBooleanPreference.ts';
 import { createWatchMonitoringMessage } from '../native-app/lib/watchMessages.ts';
 
@@ -27,6 +32,10 @@ const settingsScreen = readFileSync(
   new URL('../native-app/app/settings.tsx', import.meta.url),
   'utf8',
 );
+const nativePackage = JSON.parse(readFileSync(
+  new URL('../native-app/package.json', import.meta.url),
+  'utf8',
+));
 
 test('monitoring messages normalize live metrics for the Watch contract', () => {
   const message = createWatchMonitoringMessage({
@@ -131,7 +140,8 @@ test('immediate alerts send before reachability checks and report live acknowled
 
   assert.match(sender, /getWatchStatus\(\)/);
   assert.doesNotMatch(sender, /WATCH_STATUS_CACHE_MS/);
-  assert.match(sender, /transferUserInfo/);
+  assert.match(sender, /updateApplicationContext/);
+  assert.doesNotMatch(sender, /mod\.transferUserInfo/);
   assert.match(sender, /sendMessage/);
   assert.ok(
     sender.indexOf('mod.sendMessage') < sender.indexOf('getWatchStatus()'),
@@ -140,6 +150,28 @@ test('immediate alerts send before reachability checks and report live acknowled
   assert.match(sender, /WATCH_LIVE_ACK_TIMEOUT_MS/);
   assert.match(sender, /acknowledged/);
   assert.match(sender, /roundTripMs/);
+});
+
+test('the native Watch transfer error callback is patched safely after install', () => {
+  assert.equal(
+    nativePackage.scripts.postinstall,
+    'node ./scripts/patch-watch-connectivity.mjs',
+  );
+  const fixture = `before\n${vulnerableUserInfoErrorCallback}\nafter`;
+  const firstPass = patchWatchConnectivitySource(fixture);
+  assert.equal(firstPass.changed, true);
+  assert.match(firstPass.source, /NSDictionary<NSString \*, id> \*userInfo/);
+  assert.match(firstPass.source, /if \(userInfo != nil\)/);
+  assert.doesNotMatch(firstPass.source, /body:@\{@"userInfo"/);
+
+  const secondPass = patchWatchConnectivitySource(firstPass.source);
+  assert.equal(secondPass.changed, false);
+  assert.equal(secondPass.source, firstPass.source);
+  assert.ok(secondPass.source.includes(hardenedUserInfoErrorCallback));
+  assert.throws(
+    () => patchWatchConnectivitySource('upstream implementation changed'),
+    /cannot safely patch/i,
+  );
 });
 
 test('the native monitor publishes live state and an explicit stop update', () => {
@@ -289,7 +321,7 @@ test('background Watch alerts use an authorized notification instead of a silent
   assert.match(alertReceiver, /interruptionLevel = \.timeSensitive/);
   assert.match(alertReceiver, /requestAuthorization\(options: \[\.alert, \.sound\]\)/);
   assert.match(alertReceiver, /authorizationStatus == \.authorized/);
-  assert.match(alertReceiver, /queuedAlertFeedbackFreshnessMilliseconds = 2_000/);
+  assert.match(alertReceiver, /backgroundAlertFeedbackFreshnessMilliseconds = 2_000/);
   assert.match(alertReceiver, /"receivedAt"/);
   assert.match(targetConfig, /'UserNotifications'/);
   assert.match(
@@ -299,7 +331,7 @@ test('background Watch alerts use an authorized notification instead of a silent
   assert.match(contentView, /Enable background alerts/);
   assert.match(contentView, /iPhone alert is primary/);
   assert.match(contentView, /refreshNotificationAuthorization/);
-  assert.match(settingsScreen, /Queued delivery may be delayed/);
+  assert.match(settingsScreen, /Background delivery may be delayed/);
   assert.match(settingsScreen, /result\.roundTripMs/);
 });
 
