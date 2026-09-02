@@ -8,6 +8,7 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
+    "postinstall": "node ./scripts/patch-watch-connectivity.mjs",
     "check:dependencies": "expo install --check",
     "typecheck": "tsc --noEmit",
     "verify": "npm run check:dependencies && npm run typecheck",

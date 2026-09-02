@@ -237,12 +237,15 @@ Sensitive local notification after the tester explicitly enables background
 alerts in the Watch app. Silent Mode still permits the notification haptic;
 Focus and the user's notification settings remain authoritative.
 
-The phone uses an immediate message when the Watch app is reachable and a
-queued fallback when it is not. The live message is dispatched before
-reachability checks and records acknowledgement round-trip timing in the local
-session diagnostics. Queued WatchConnectivity delivery can be delayed; queued
-messages older than two seconds update the Watch display without producing a
-late wrist tap. The iPhone alert remains primary and Occulert must not promise a
+The phone uses an immediate message when the Watch app is reachable and saves
+the latest alert as application context when it is not. The live message is
+dispatched before reachability checks and records acknowledgement round-trip
+timing in the local session diagnostics. Background WatchConnectivity delivery
+can be delayed; messages older than two seconds update the Watch display without
+producing a late wrist tap. Occulert does not use the separate user-info transfer
+queue because its native error callback can receive a missing payload. A
+post-install guard also makes that callback nil-safe for transfers left by an
+older build. The iPhone alert remains primary and Occulert must not promise a
 guaranteed background wrist alert. Critical live alerts use a
 stronger repeated direct haptic. Settings only enables the Watch switch when
 iOS confirms that the companion is installed and includes a direct Watch alert

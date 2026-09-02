@@ -313,8 +313,8 @@ export default function SettingsScreen() {
           );
         } else {
           Alert.alert(
-            'Watch backup queued',
-            'Queued delivery may be delayed. Open Occulert on your Apple Watch for live wrist alerts; the iPhone remains primary.',
+            'Watch backup saved',
+            'Background delivery may be delayed. Open Occulert on your Apple Watch for live wrist alerts; the iPhone remains primary.',
           );
         }
       },

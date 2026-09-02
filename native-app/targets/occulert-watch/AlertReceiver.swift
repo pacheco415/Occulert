@@ -20,7 +20,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   @Published private(set) var backgroundAlertsText = "Checking background alerts…"
 
   private let statusFreshnessMilliseconds = 12_000.0
-  private let queuedAlertFeedbackFreshnessMilliseconds = 2_000.0
+  private let backgroundAlertFeedbackFreshnessMilliseconds = 2_000.0
   private var statusTimeoutTask: Task<Void, Never>?
   private var hapticSequenceTask: Task<Void, Never>?
 
@@ -89,7 +89,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
       self.handle(
         applicationContext,
         shouldDeliverFeedback: ageMilliseconds >= 0
-          && ageMilliseconds < self.queuedAlertFeedbackFreshnessMilliseconds
+          && ageMilliseconds < self.backgroundAlertFeedbackFreshnessMilliseconds
       )
     }
   }
@@ -101,7 +101,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
       self.handle(
         userInfo,
         shouldDeliverFeedback: ageMilliseconds >= 0
-          && ageMilliseconds < self.queuedAlertFeedbackFreshnessMilliseconds
+          && ageMilliseconds < self.backgroundAlertFeedbackFreshnessMilliseconds
       )
     }
   }
