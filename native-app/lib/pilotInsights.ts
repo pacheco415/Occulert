@@ -4,7 +4,7 @@ import type {
 } from './feedback';
 import type { SensitivityLevel } from '../constants/thresholds';
 
-export type PilotIssueAssessment = Extract<AlertAssessment, 'false_alert' | 'missed_alert'>;
+export type PilotIssueAssessment = Extract<AlertAssessment, 'false_alert' | 'missed_alert' | 'late_alert'>;
 
 export interface PilotInsightSession {
   alertAssessment?: AlertAssessment;
@@ -29,6 +29,7 @@ export interface PilotIssueSummary {
 const ISSUE_LABELS: Record<PilotIssueAssessment, string> = {
   false_alert: 'False alerts',
   missed_alert: 'Missed alerts',
+  late_alert: 'Late alerts',
 };
 
 const SENSITIVITY_LABELS: Array<{ value: SensitivityLevel; label: string }> = [
@@ -67,7 +68,7 @@ function countMatching(
 export function summarizePilotIssues(sessions: PilotInsightSession[]): PilotIssueSummary[] {
   const reviewed = sessions.filter(session => Boolean(session.alertAssessment));
 
-  return (['false_alert', 'missed_alert'] as const).map((assessment) => {
+  return (['false_alert', 'missed_alert', 'late_alert'] as const).map((assessment) => {
     const matching = reviewed.filter(session => session.alertAssessment === assessment);
     return {
       assessment,

@@ -2,7 +2,7 @@ import { Linking, Platform } from 'react-native';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { currentAppBuildInfo } from './appBuildInfo';
 
-export type AlertAssessment = 'accurate' | 'false_alert' | 'missed_alert';
+export type AlertAssessment = 'accurate' | 'false_alert' | 'missed_alert' | 'late_alert';
 export type LightingCondition = 'daylight' | 'low_light';
 export type EyewearCondition = 'none' | 'glasses' | 'sunglasses';
 export type PhonePosition = 'high' | 'center' | 'low';
@@ -50,6 +50,7 @@ function assessmentLabel(value?: AlertAssessment): string {
   if (value === 'accurate') return 'Alerts felt right';
   if (value === 'false_alert') return 'False alert reported';
   if (value === 'missed_alert') return 'Missed alert reported';
+  if (value === 'late_alert') return 'Late alert reported';
   return '-';
 }
 
