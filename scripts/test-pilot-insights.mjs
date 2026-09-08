@@ -28,6 +28,7 @@ test('pilot issue summaries group reviewed problems without turning counts into 
       testConditions: { lighting: 'low_light', eyewear: 'glasses', phonePosition: 'high' },
     },
     { sensitivity: 'low', testConditions: { lighting: 'daylight' } },
+    { alertAssessment: 'late_alert', sensitivity: 'medium', testConditions: { lighting: 'daylight' } },
   ]);
 
   assert.deepEqual(summaries, [
@@ -58,6 +59,14 @@ test('pilot issue summaries group reviewed problems without turning counts into 
         { label: 'Low light', count: 1 },
         { label: 'Glasses', count: 1 },
       ],
+    },
+    {
+      assessment: 'late_alert',
+      label: 'Late alerts',
+      total: 1,
+      completeConditionCount: 0,
+      sensitivities: [{ label: 'Medium sensitivity', count: 1 }],
+      conditions: [{ label: 'Daylight', count: 1 }],
     },
   ]);
 });

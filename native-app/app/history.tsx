@@ -63,8 +63,9 @@ const ASSESSMENT_OPTIONS: Array<{
   icon: React.ComponentProps<typeof Ionicons>['name'];
 }> = [
   { value: 'accurate', label: 'Felt right', icon: 'checkmark-circle-outline' },
-  { value: 'false_alert', label: 'False alert', icon: 'alert-circle-outline' },
+  { value: 'false_alert', label: 'Unnecessary', icon: 'alert-circle-outline' },
   { value: 'missed_alert', label: 'Missed alert', icon: 'eye-off-outline' },
+  { value: 'late_alert', label: 'Too late', icon: 'time-outline' },
 ];
 
 const TEST_CONDITION_GROUPS: TestConditionGroup[] = [
@@ -164,6 +165,7 @@ export default function HistoryScreen() {
   const router = useRouter();
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const historyRevisionRef = useRef(0);
 
@@ -252,6 +254,7 @@ export default function HistoryScreen() {
   const accurateCount = reviewedMedium.filter(item => item.alertAssessment === 'accurate').length;
   const falseAlertCount = reviewedMedium.filter(item => item.alertAssessment === 'false_alert').length;
   const missedAlertCount = reviewedMedium.filter(item => item.alertAssessment === 'missed_alert').length;
+  const lateAlertCount = reviewedMedium.filter(item => item.alertAssessment === 'late_alert').length;
   const completeConditionCount = reviewedMedium.filter(item => (
     Boolean(item.testConditions?.lighting)
     && Boolean(item.testConditions?.eyewear)
@@ -277,10 +280,24 @@ export default function HistoryScreen() {
         <Text style={s.title}>Session History</Text>
 
         {loaded && sessions.length > 0 && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showReviewProgress }}
+            style={s.reviewToggle}
+            onPress={() => setShowReviewProgress(current => !current)}
+          >
+            <Text style={s.reviewToggleText}>
+              {showReviewProgress ? 'Hide review progress' : 'Show review progress'}
+            </Text>
+            <Ionicons name={showReviewProgress ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
+          </TouchableOpacity>
+        )}
+
+        {loaded && sessions.length > 0 && showReviewProgress && (
           <View style={s.checkpoint}>
             <View style={s.checkpointHeader}>
               <View style={s.checkpointHeaderCopy}>
-                <Text style={s.checkpointEyebrow}>FIRST ACCURACY CHECKPOINT</Text>
+                <Text style={s.checkpointEyebrow}>DRIVE REVIEW PROGRESS</Text>
                 <Text style={s.checkpointTitle}>
                   {checkpointProgress} of {CHECKPOINT_TARGET} Medium sessions reviewed
                 </Text>
@@ -306,6 +323,7 @@ export default function HistoryScreen() {
               <Text style={s.checkpointStat}>{accurateCount} felt right</Text>
               <Text style={s.checkpointStat}>{falseAlertCount} false</Text>
               <Text style={s.checkpointStat}>{missedAlertCount} missed</Text>
+              <Text style={s.checkpointStat}>{lateAlertCount} late</Text>
             </View>
             <Text style={s.checkpointNote}>
               Only complete reviewed sessions recorded on Medium count here. Recovered partial sessions are excluded. Ratings stay on this iPhone.
@@ -374,7 +392,7 @@ export default function HistoryScreen() {
         {sessions.map((item, i) => {
           const sessionKey = item.sessionId || `${item.savedAt || item.updatedAt || 'session'}-${i}`;
           const reviewComplete = hasCompleteReview(item);
-          const isExpanded = expandedSessions[sessionKey] ?? !reviewComplete;
+          const isExpanded = expandedSessions[sessionKey] ?? false;
           return (
           <View key={sessionKey} style={s.card}>
             <View style={s.rowBetween}>
@@ -419,7 +437,7 @@ export default function HistoryScreen() {
             <Text style={s.buildInfo}>
               App {item.appVersion || 'not recorded'} · Build {item.appBuildNumber || 'not recorded'}
             </Text>
-            {item.monitorPerformance && (
+            {isExpanded && item.monitorPerformance && (
               <View style={s.performanceBox}>
                 <Text style={s.performanceTitle}>LOCAL PERFORMANCE DIAGNOSTICS</Text>
                 <Text style={s.performanceInfo}>
@@ -454,7 +472,7 @@ export default function HistoryScreen() {
                 </Text>
               </View>
             )}
-            {(item.headNodObservations != null || item.headphoneMotionStatus != null) && (
+            {isExpanded && (item.headNodObservations != null || item.headphoneMotionStatus != null) && (
               <View style={s.observationBox}>
                 <Text style={s.observationTitle}>EXPERIMENTAL HEAD-MOTION DIAGNOSTICS</Text>
                 <Text style={s.observationInfo}>
@@ -477,7 +495,7 @@ export default function HistoryScreen() {
                   color={reviewComplete ? '#86efac' : '#fbbf24'}
                 />
                 <Text style={[s.reviewBadgeText, reviewComplete ? s.reviewBadgeTextComplete : s.reviewBadgeTextNeeded]}>
-                  {reviewComplete ? 'Review complete' : 'Needs review'}
+                  {reviewComplete ? 'Review complete' : item.alertAssessment ? 'Rating saved' : 'Needs review'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -487,17 +505,20 @@ export default function HistoryScreen() {
                 style={s.reviewToggle}
                 onPress={() => setExpandedSessions(current => ({
                   ...current,
-                  [sessionKey]: !(current[sessionKey] ?? !reviewComplete),
+                  [sessionKey]: !(current[sessionKey] ?? false),
                 }))}
               >
                 <Text style={s.reviewToggleText}>{isExpanded ? 'Hide details' : 'Show details'}</Text>
                 <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
               </TouchableOpacity>
             </View>
-            {isExpanded && (
-              <>
             <View style={s.review}>
-              <Text style={s.reviewTitle}>How accurate were the alerts?</Text>
+              <Text style={s.reviewTitle}>How did the alerts feel?</Text>
+              {item.alertAssessment && (
+                <Text accessibilityLiveRegion="polite" style={s.reviewPrivacy}>
+                  Saved: {ASSESSMENT_OPTIONS.find(option => option.value === item.alertAssessment)?.label || 'Reviewed'}
+                </Text>
+              )}
               <View style={s.reviewOptions}>
                 {ASSESSMENT_OPTIONS.map((option) => {
                   const selected = item.alertAssessment === option.value;
@@ -519,9 +540,11 @@ export default function HistoryScreen() {
                 })}
               </View>
               <Text style={s.reviewPrivacy}>
-                This alert rating stays only on this iPhone. It is included only if you choose to send feedback.
+                Choose the best match after parking. Your rating saves on this iPhone and is included only if you choose to send feedback.
               </Text>
             </View>
+            {isExpanded && (
+              <>
             <View style={s.conditions}>
               <Text style={s.conditionsTitle}>Test conditions</Text>
               <Text style={s.conditionsSafety}>Record only after you are safely parked.</Text>
@@ -589,6 +612,8 @@ export default function HistoryScreen() {
                 Device-impact observations stay on this iPhone unless you choose Send session feedback.
               </Text>
             </View>
+              </>
+            )}
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Send feedback about this session"
@@ -602,8 +627,6 @@ export default function HistoryScreen() {
               <Ionicons name="chatbubble-ellipses-outline" size={16} color="#93c5fd" />
               <Text style={s.feedbackTxt}>Send session feedback</Text>
             </TouchableOpacity>
-              </>
-            )}
           </View>
           );
         })}
@@ -680,8 +703,8 @@ const s = StyleSheet.create({
   reviewToggleText: { color: '#93c5fd', fontSize: 11, fontWeight: '800' },
   review: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewTitle: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', marginBottom: 10 },
-  reviewOptions: { flexDirection: 'row', gap: 7 },
-  reviewOption: { flex: 1, minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 7 },
+  reviewOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  reviewOption: { flexGrow: 1, flexBasis: '45%', minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 7 },
   reviewOptionSelected: { borderColor: '#3b82f6', backgroundColor: 'rgba(37,99,235,0.22)' },
   reviewOptionText: { color: '#4a7a8a', fontSize: 10, fontWeight: '800', textAlign: 'center' },
   reviewOptionTextSelected: { color: '#dbeafe' },
