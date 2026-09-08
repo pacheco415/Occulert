@@ -540,7 +540,7 @@ export default function HistoryScreen() {
                 })}
               </View>
               <Text style={s.reviewPrivacy}>
-                Choose the best match after parking. Your rating saves on this iPhone and is included only if you choose to send feedback.
+                This alert rating stays only on this iPhone. Choose the best match after parking. It is included only if you choose to send feedback.
               </Text>
             </View>
             {isExpanded && (
