@@ -1,14 +1,14 @@
 # Occulert Technical Audit
 
-Last updated: 2026-08-29. Last full source and live-site review: 2026-08-04
+Last updated: 2026-09-08. Last full source and live-site review: 2026-08-04
 (previously 2026-07-08, 2026-07-05, 2026-06-14).
 
-The 2026-08-29 update is limited to verifying the current-source extraction of
-the driver app's behavior into `driver-app.js` and correcting the documented
-homepage inline-script exception. All other source statuses and production
-observations remain from the 2026-08-04 review unless a later verification is
-named explicitly. For the consolidated near/mid/long-term gap list, see issue
-#6.
+The 2026-09-08 update re-verified the current merged source at `c481817`,
+including the full repository suite and 37 local browser checks. Production
+was not re-inspected on that date. It also records the previously observed Build 36 TestFlight and
+user-feedback evidence below. This does not replace a new regression run when
+the next native change is made. For the consolidated near/mid/long-term gap
+list, see issue #6.
 
 ## Original high-priority fixes — current status
 
@@ -56,6 +56,22 @@ directional in-ear alerts (PR #52), a packaged Apple Watch companion (PR #33,
 #34) with live monitoring status (PR #61), a pre-drive safety gate (PR #44), and
 local-only head-nod and headphone-motion observation (PR #48, #51). It is
 tracked in issue #6, not here.
+
+## Native reliability and release evidence
+
+The current merged native source includes the Expo SDK 57 compatibility update
+(PR #111), parked camera setup plus interrupted-session recovery (PR #112), and
+the WatchConnectivity transfer nil-safety repair (PR #114). Normal iPhone
+camera monitoring remains foreground-only: foreground loss stops the session,
+and an unexpected interruption can restore only a clearly labeled partial local
+summary. Those safeguards do not change fatigue thresholds or turn incomplete
+sessions into accuracy evidence.
+
+Build `1.0.0 (36)` was built from `c481817` with the iPhone and Apple Watch
+targets, reached the `Occulert Internal` TestFlight group, and later received
+positive user-level iPhone/Watch feedback. That is useful release evidence for
+this specific build, but it is not a substitute for automated device regression
+coverage or a future retest after native changes.
 
 ## Accuracy: the one unvalidated claim
 
