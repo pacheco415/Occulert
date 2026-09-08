@@ -47,3 +47,13 @@ export function parseAlertSound(value: string | null | undefined): AlertSound {
 export function alertSoundProfile(sound: AlertSound): AlertSoundProfile {
   return PROFILES[sound] ?? PROFILES[DEFAULT_ALERT_SOUND];
 }
+
+export function configureAlertSound(
+  player: { shouldCorrectPitch: boolean; setPlaybackRate(rate: number): void },
+  sound: AlertSound,
+): void {
+  const profile = alertSoundProfile(sound);
+  // iOS chooses the pitch algorithm inside setPlaybackRate.
+  player.shouldCorrectPitch = profile.shouldCorrectPitch;
+  player.setPlaybackRate(profile.playbackRate);
+}

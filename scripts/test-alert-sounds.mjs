@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   ALERT_SOUND_OPTIONS,
   alertSoundProfile,
+  configureAlertSound,
   parseAlertSound,
 } from '../native-app/lib/alertSound.ts';
 
@@ -26,9 +27,18 @@ test('the selected sound is wired through Settings and phone alert playback', ()
   assert.match(soundModule, /Classic/);
   assert.match(soundModule, /Lower/);
   assert.match(soundModule, /Higher/);
-  assert.match(settings, /audioTestPlayer\.playbackRate/);
+  assert.match(settings, /configureAlertSound\(audioTestPlayer, alertSound\)/);
   assert.match(alertSystem, /preferences\.alertSound/);
-  assert.match(alertSystem, /player\.playbackRate/);
-  assert.match(alertSystem, /player\.shouldCorrectPitch/);
+  assert.match(alertSystem, /configureAlertSound\(player, preferences.alertSound\)/);
   assert.match(settings, /centered three-tone critical sequence/);
+});
+
+test('native pitch algorithm is selected before rate changes, including return to Classic', () => {
+  const applied = [];
+  const player = {
+    shouldCorrectPitch: true,
+    setPlaybackRate(rate) { applied.push([rate, this.shouldCorrectPitch]); },
+  };
+  for (const sound of ['lower', 'higher', 'classic']) configureAlertSound(player, sound);
+  assert.deepEqual(applied, [[0.84, false], [1.18, false], [1, true]]);
 });

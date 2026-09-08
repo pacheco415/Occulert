@@ -13,7 +13,7 @@ import {
   currentAlertPreferences,
   loadAlertPreferences,
 } from '../lib/alertPreferences';
-import { alertSoundProfile } from '../lib/alertSound';
+import { configureAlertSound } from '../lib/alertSound';
 import {
   ALERT_COOLDOWN_MS,
   CRITICAL_CLOSED_ALERT_MS,
@@ -288,7 +288,6 @@ export function AlertSystem({
         : channel === 'right'
           ? rightPlayer
           : balancedPlayer;
-      const soundProfile = alertSoundProfile(preferences.alertSound);
       deliveryPlan.audioOffsetsMs.forEach(offsetMs => scheduleCue(offsetMs, sequenceVersion, async isCurrent => {
         try {
           balancedPlayer.pause();
@@ -299,8 +298,7 @@ export function AlertSystem({
             isCurrent,
             () => {
               player.volume = lv === 'critical' ? 1.0 : lv === 'alert' ? 0.88 : 0.75;
-              player.playbackRate = soundProfile.playbackRate;
-              player.shouldCorrectPitch = soundProfile.shouldCorrectPitch;
+              configureAlertSound(player, preferences.alertSound);
               player.play();
             },
           );

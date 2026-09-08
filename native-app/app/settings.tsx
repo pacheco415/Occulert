@@ -38,6 +38,7 @@ import {
 import {
   ALERT_SOUND_OPTIONS,
   alertSoundProfile,
+  configureAlertSound,
   parseAlertSound,
   type AlertSound,
 } from '../lib/alertSound';
@@ -290,14 +291,12 @@ export default function SettingsScreen() {
             audioTestPlayer.pause();
             await audioTestPlayer.seekTo(0);
             if (controller.signal.aborted) return;
-            const soundProfile = alertSoundProfile(alertSound);
-            audioTestPlayer.playbackRate = soundProfile.playbackRate;
-            audioTestPlayer.shouldCorrectPitch = soundProfile.shouldCorrectPitch;
+            configureAlertSound(audioTestPlayer, alertSound);
             audioTestPlayer.volume = 0.85;
             audioTestPlayer.play();
             previousOffset = offset;
           }
-          await waitForCancellableDelay(ALERT_SOUND_DURATION_MS, controller.signal);
+          await waitForCancellableDelay(ALERT_SOUND_DURATION_MS / alertSoundProfile(alertSound).playbackRate, controller.signal);
         } finally {
           if (audioTestAbortRef.current === controller) audioTestAbortRef.current = null;
         }
