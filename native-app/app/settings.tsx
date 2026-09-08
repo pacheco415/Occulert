@@ -29,11 +29,18 @@ import {
 } from '../lib/inEarAlerts';
 import {
   AUDIO_ALERT_PREFERENCE_KEY,
+  ALERT_SOUND_PREFERENCE_KEY,
   HAPTIC_ALERT_PREFERENCE_KEY,
   IN_EAR_ALERT_PREFERENCE_KEY,
   alertPreferenceStorage,
   loadAlertPreferences,
 } from '../lib/alertPreferences';
+import {
+  ALERT_SOUND_OPTIONS,
+  alertSoundProfile,
+  parseAlertSound,
+  type AlertSound,
+} from '../lib/alertSound';
 import { alertDeliveryPlan } from '../lib/alertDelivery';
 import { waitForCancellableDelay } from '../lib/cancellableDelay';
 
@@ -108,6 +115,7 @@ export default function SettingsScreen() {
   const [sens, setSens] = useState<SensitivityLevel>('medium');
   const [haptic, setHaptic] = useState(true);
   const [audio, setAudio] = useState(true);
+  const [alertSound, setAlertSound] = useState<AlertSound>('classic');
   const [inEarPattern, setInEarPattern] = useState<InEarAlertPattern>('balanced');
   const [watch, setWatch] = useState(false);
   const [watchStatus, setWatchStatus] = useState<WatchStatus>(EMPTY_WATCH_STATUS);
@@ -148,6 +156,7 @@ export default function SettingsScreen() {
       setSens(savedSensitivity);
       setHaptic(savedAlerts.hapticEnabled);
       setAudio(savedAlerts.audioEnabled);
+      setAlertSound(savedAlerts.alertSound);
       setInEarPattern(savedAlerts.inEarPattern);
     }).catch(() => {});
     return () => { active = false; };
@@ -193,6 +202,18 @@ export default function SettingsScreen() {
       serialize: String,
       parse: parseInEarAlertPattern,
       apply: setInEarPattern,
+      onError: showSettingSaveError,
+    });
+  };
+
+  const chooseAlertSound = (sound: AlertSound) => {
+    void storedSettingPersister.save({
+      key: ALERT_SOUND_PREFERENCE_KEY,
+      nextValue: sound,
+      previousValue: alertSound,
+      serialize: String,
+      parse: parseAlertSound,
+      apply: setAlertSound,
       onError: showSettingSaveError,
     });
   };
@@ -269,6 +290,9 @@ export default function SettingsScreen() {
             audioTestPlayer.pause();
             await audioTestPlayer.seekTo(0);
             if (controller.signal.aborted) return;
+            const soundProfile = alertSoundProfile(alertSound);
+            audioTestPlayer.playbackRate = soundProfile.playbackRate;
+            audioTestPlayer.shouldCorrectPitch = soundProfile.shouldCorrectPitch;
             audioTestPlayer.volume = 0.85;
             audioTestPlayer.play();
             previousOffset = offset;
@@ -346,6 +370,35 @@ export default function SettingsScreen() {
             <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
             <Switch accessibilityLabel="Audio tone alerts" value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
+          <View style={s.div}/>
+          <View style={s.soundBlock}>
+            <View style={s.rowL}>
+              <Ionicons name="musical-notes-outline" size={18} color="#60a5fa" />
+              <View style={s.rowCopy}>
+                <Text style={s.label}>Alert sound</Text>
+                <Text style={s.sub}>Choose the tone profile used for phone alerts</Text>
+              </View>
+            </View>
+            <View style={s.soundOptions}>
+              {ALERT_SOUND_OPTIONS.map(([value, profile]) => {
+                const selected = alertSound === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    accessibilityLabel={`${profile.label} alert sound`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={[s.soundOption, selected && s.soundOptionSelected]}
+                    onPress={() => chooseAlertSound(value)}
+                  >
+                    <Text style={[s.soundOptionText, selected && s.soundOptionTextSelected]}>{profile.label}</Text>
+                    <Text style={s.soundOptionSub}>{profile.description}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={s.soundNote}>This changes the tone profile only. Alert timing, severity, and centered critical delivery stay the same.</Text>
+          </View>
           <View style={s.alertSafetyNote}>
             <Ionicons name="shield-checkmark-outline" size={15} color={colors.amber} />
             <Text style={s.alertSafetyText}>A continuous closed-eye reading reaches the prominent alert at about 0.6 seconds and, after the startup warmup, the stronger stage at 1.2 seconds. Standard alerts repeat twice and critical alerts repeat three times on each enabled output. Audio and haptic choices also control the foreground-loss warning; keep at least one enabled. Alerts cannot make drowsy driving safe—pull over and rest.</Text>
@@ -397,7 +450,7 @@ export default function SettingsScreen() {
               {audioTestBusy ? 'PREPARING AUDIO TEST…' : 'TEST CURRENT AUDIO OUTPUT'}
             </Text>
           </TouchableOpacity>
-          <Text style={s.testNote}>Use only while parked. This plays the centered three-tone critical sequence and does not change your alert setting.</Text>
+          <Text style={s.testNote}>Use only while parked. This plays the selected sound as the centered three-tone critical sequence and does not change your alert setting.</Text>
           <View style={s.div} />
           <View style={s.row}>
             <View style={s.rowL}>
@@ -521,6 +574,14 @@ const s = StyleSheet.create({
   patternOptionText:{color:'#7f9ba8',fontSize:12,fontWeight:'800'},
   patternOptionTextSelected:{color:'#bfdbfe'},
   patternNote:{color:colors.textMuted,fontSize:11,lineHeight:16},
+  soundBlock:{paddingHorizontal:16,paddingVertical:14,gap:12},
+  soundOptions:{flexDirection:'row',gap:8},
+  soundOption:{flex:1,borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.small,paddingVertical:10,paddingHorizontal:8,backgroundColor:colors.backgroundRaised},
+  soundOptionSelected:{borderColor:colors.blue,backgroundColor:'rgba(94,156,255,0.18)'},
+  soundOptionText:{color:'#7f9ba8',fontSize:12,fontWeight:'800',textAlign:'center'},
+  soundOptionTextSelected:{color:'#bfdbfe'},
+  soundOptionSub:{color:colors.textMuted,fontSize:9,lineHeight:12,textAlign:'center',marginTop:3},
+  soundNote:{color:colors.textMuted,fontSize:11,lineHeight:16},
   privNote:{flexDirection:'row',alignItems:'flex-start',gap:8,padding:14,backgroundColor:colors.backgroundRaised,borderTopWidth:1,borderColor:colors.glassBorder},
   privTxt:{color:colors.textMuted,fontSize:11,lineHeight:16,flex:1},
   ver:{textAlign:'center',color:colors.textMuted,fontSize:11,marginTop:8},

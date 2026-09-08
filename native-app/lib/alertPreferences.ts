@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AUDIO_ALERT_PREFERENCE_KEY,
+  ALERT_SOUND_PREFERENCE_KEY,
   HAPTIC_ALERT_PREFERENCE_KEY,
   IN_EAR_ALERT_PREFERENCE_KEY,
   createAlertPreferenceStore,
@@ -10,10 +11,12 @@ const alertPreferences = createAlertPreferenceStore(AsyncStorage);
 
 export {
   AUDIO_ALERT_PREFERENCE_KEY,
+  ALERT_SOUND_PREFERENCE_KEY,
   HAPTIC_ALERT_PREFERENCE_KEY,
   IN_EAR_ALERT_PREFERENCE_KEY,
 };
 export type { AlertPreferenceSnapshot } from './alertPreferenceStore';
+export type { AlertSound } from './alertSound.ts';
 
 export const alertPreferenceStorage = alertPreferences.storage;
 
