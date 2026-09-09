@@ -13,6 +13,7 @@ import {
   currentAlertPreferences,
   loadAlertPreferences,
 } from '../lib/alertPreferences';
+import { configureAlertSound } from '../lib/alertSound';
 import {
   ALERT_COOLDOWN_MS,
   CRITICAL_CLOSED_ALERT_MS,
@@ -297,6 +298,7 @@ export function AlertSystem({
             isCurrent,
             () => {
               player.volume = lv === 'critical' ? 1.0 : lv === 'alert' ? 0.88 : 0.75;
+              configureAlertSound(player, preferences.alertSound);
               player.play();
             },
           );

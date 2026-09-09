@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   AUDIO_ALERT_PREFERENCE_KEY,
+  ALERT_SOUND_PREFERENCE_KEY,
   HAPTIC_ALERT_PREFERENCE_KEY,
   IN_EAR_ALERT_PREFERENCE_KEY,
   createAlertPreferenceStore,
@@ -34,6 +35,7 @@ test('alert preferences load once and stay synchronously available', async () =>
     [HAPTIC_ALERT_PREFERENCE_KEY]: 'false',
     [AUDIO_ALERT_PREFERENCE_KEY]: 'true',
     [IN_EAR_ALERT_PREFERENCE_KEY]: 'alternating',
+    [ALERT_SOUND_PREFERENCE_KEY]: 'lower',
   });
   const store = createAlertPreferenceStore(memory.storage);
 
@@ -44,12 +46,13 @@ test('alert preferences load once and stay synchronously available', async () =>
     hapticEnabled: false,
     audioEnabled: true,
     inEarPattern: 'alternating',
+    alertSound: 'lower',
   });
   assert.deepEqual(store.current(), await second);
-  assert.deepEqual(memory.counts(), { reads: 3, writes: 0 });
+  assert.deepEqual(memory.counts(), { reads: 4, writes: 0 });
 
   await store.get();
-  assert.deepEqual(memory.counts(), { reads: 3, writes: 0 });
+  assert.deepEqual(memory.counts(), { reads: 4, writes: 0 });
 });
 
 test('confirmed Settings writes update the alert fast-path snapshot', async () => {
@@ -60,13 +63,15 @@ test('confirmed Settings writes update the alert fast-path snapshot', async () =
   await store.storage.setItem(AUDIO_ALERT_PREFERENCE_KEY, 'false');
   await store.storage.setItem(HAPTIC_ALERT_PREFERENCE_KEY, 'false');
   await store.storage.setItem(IN_EAR_ALERT_PREFERENCE_KEY, 'alternating');
+  await store.storage.setItem(ALERT_SOUND_PREFERENCE_KEY, 'higher');
 
   assert.deepEqual(store.current(), {
     hapticEnabled: false,
     audioEnabled: false,
     inEarPattern: 'alternating',
+    alertSound: 'higher',
   });
-  assert.deepEqual(memory.counts(), { reads: 3, writes: 3 });
+  assert.deepEqual(memory.counts(), { reads: 4, writes: 4 });
 });
 
 test('failed Settings writes do not replace the confirmed alert snapshot', async () => {
@@ -84,4 +89,5 @@ test('failed Settings writes do not replace the confirmed alert snapshot', async
     /storage unavailable/,
   );
   assert.equal(store.current().audioEnabled, true);
+  assert.equal(store.current().alertSound, 'classic');
 });

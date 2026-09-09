@@ -1,18 +1,27 @@
+import {
+  DEFAULT_ALERT_SOUND,
+  parseAlertSound,
+  type AlertSound,
+} from './alertSound.ts';
+
 export const HAPTIC_ALERT_PREFERENCE_KEY = 'occulert-haptic';
 export const AUDIO_ALERT_PREFERENCE_KEY = 'occulert-audio';
 export const IN_EAR_ALERT_PREFERENCE_KEY = 'occulert-in-ear-alert-pattern';
+export const ALERT_SOUND_PREFERENCE_KEY = 'occulert-alert-sound';
 
 export type AlertInEarPattern = 'balanced' | 'alternating';
 
 export type AlertPreferenceKey =
   | typeof HAPTIC_ALERT_PREFERENCE_KEY
   | typeof AUDIO_ALERT_PREFERENCE_KEY
-  | typeof IN_EAR_ALERT_PREFERENCE_KEY;
+  | typeof IN_EAR_ALERT_PREFERENCE_KEY
+  | typeof ALERT_SOUND_PREFERENCE_KEY;
 
 export interface AlertPreferenceSnapshot {
   hapticEnabled: boolean;
   audioEnabled: boolean;
   inEarPattern: AlertInEarPattern;
+  alertSound: AlertSound;
 }
 
 export interface AlertPreferenceStorage {
@@ -30,6 +39,7 @@ const DEFAULT_PREFERENCES: AlertPreferenceSnapshot = {
   hapticEnabled: true,
   audioEnabled: true,
   inEarPattern: 'balanced',
+  alertSound: DEFAULT_ALERT_SOUND,
 };
 
 function parseInEarAlertPattern(value: string | null | undefined): AlertInEarPattern {
@@ -39,18 +49,21 @@ function parseInEarAlertPattern(value: string | null | undefined): AlertInEarPat
 function isPreferenceKey(key: string): key is AlertPreferenceKey {
   return key === HAPTIC_ALERT_PREFERENCE_KEY
     || key === AUDIO_ALERT_PREFERENCE_KEY
-    || key === IN_EAR_ALERT_PREFERENCE_KEY;
+    || key === IN_EAR_ALERT_PREFERENCE_KEY
+    || key === ALERT_SOUND_PREFERENCE_KEY;
 }
 
 function parseSnapshot(
   haptic: string | null,
   audio: string | null,
   inEarPattern: string | null,
+  alertSound: string | null,
 ): AlertPreferenceSnapshot {
   return {
     hapticEnabled: haptic == null ? DEFAULT_PREFERENCES.hapticEnabled : haptic === 'true',
     audioEnabled: audio == null ? DEFAULT_PREFERENCES.audioEnabled : audio === 'true',
     inEarPattern: parseInEarAlertPattern(inEarPattern),
+    alertSound: parseAlertSound(alertSound),
   };
 }
 
@@ -60,7 +73,8 @@ function serializedPreference(
 ): string {
   if (key === HAPTIC_ALERT_PREFERENCE_KEY) return String(snapshot.hapticEnabled);
   if (key === AUDIO_ALERT_PREFERENCE_KEY) return String(snapshot.audioEnabled);
-  return snapshot.inEarPattern;
+  if (key === IN_EAR_ALERT_PREFERENCE_KEY) return snapshot.inEarPattern;
+  return snapshot.alertSound;
 }
 
 function withPreference(
@@ -74,7 +88,10 @@ function withPreference(
   if (key === AUDIO_ALERT_PREFERENCE_KEY) {
     return { ...snapshot, audioEnabled: value === 'true' };
   }
-  return { ...snapshot, inEarPattern: parseInEarAlertPattern(value) };
+  if (key === IN_EAR_ALERT_PREFERENCE_KEY) {
+    return { ...snapshot, inEarPattern: parseInEarAlertPattern(value) };
+  }
+  return { ...snapshot, alertSound: parseAlertSound(value) };
 }
 
 /**
@@ -100,10 +117,11 @@ export function createAlertPreferenceStore(
       backingStorage.getItem(HAPTIC_ALERT_PREFERENCE_KEY),
       backingStorage.getItem(AUDIO_ALERT_PREFERENCE_KEY),
       backingStorage.getItem(IN_EAR_ALERT_PREFERENCE_KEY),
+      backingStorage.getItem(ALERT_SOUND_PREFERENCE_KEY),
     ])
-      .then(([haptic, audio, inEarPattern]) => {
+      .then(([haptic, audio, inEarPattern, alertSound]) => {
         if (readVersion !== mutationVersion) return current();
-        cached = parseSnapshot(haptic, audio, inEarPattern);
+        cached = parseSnapshot(haptic, audio, inEarPattern, alertSound);
         return cached;
       })
       .catch(() => current())
