@@ -37,7 +37,7 @@ function makeElement(id) {
   };
 }
 
-function boot({ user, updateEmail, updatePassword }) {
+function boot({ user, updateEmail, updatePassword, deleteAccount, confirm = () => true, signOut }) {
   const elements = new Map();
   const store = new Map();
   const context = {
@@ -48,6 +48,7 @@ function boot({ user, updateEmail, updatePassword }) {
     Date,
     Math,
     Promise,
+    setTimeout() {},
     document: {
       documentElement: makeElement('html'),
       getElementById(id) {
@@ -59,6 +60,8 @@ function boot({ user, updateEmail, updatePassword }) {
       addEventListener() {},
     },
     localStorage: {
+      get length() { return store.size; },
+      key: (i) => [...store.keys()][i],
       getItem: (k) => (store.has(k) ? store.get(k) : null),
       setItem: (k, v) => store.set(k, String(v)),
       removeItem: (k) => store.delete(k),
@@ -70,17 +73,68 @@ function boot({ user, updateEmail, updatePassword }) {
     currentUser: () => user,
     updateEmail,
     updatePassword,
+    deleteAccount,
     accountMessage: (result, mode) => `mapped:${mode}:${(result.body && result.body.error) || 'unknown'}`,
   };
-  context.window.OcculertAuth = null;
+  context.window.confirm = confirm;
+  context.window.OcculertAuth = signOut ? { signOut, onAuth() {} } : null;
 
   vm.runInNewContext(inline, context);
   const el = (id) => context.document.getElementById(id);
-  return { context, el };
+  return { context, el, store };
 }
 
 const noCall = () => { throw new Error('backend must not be called'); };
 const preventDefault = () => {};
+
+test('account deletion requires sign-in, exact confirmation, and confirmation dialog', async () => {
+  for (const scenario of [
+    { user: null, confirmation: 'DELETE' },
+    { user: { id: 'u1' }, confirmation: 'delete' },
+    { user: { id: 'u1' }, confirmation: 'DELETE', confirm: () => false },
+  ]) {
+    const { context, el } = boot({ ...scenario, deleteAccount: noCall });
+    el('deleteConfirmation').value = scenario.confirmation;
+    await context.deleteAccount({ preventDefault });
+  }
+});
+
+test('successful deletion signs out SDK and removes only Occulert local data', async () => {
+  let signedOut = false;
+  const { context, el, store } = boot({
+    user: { id: 'u1' }, deleteAccount: async () => ({ ok: true }),
+    signOut: async () => { signedOut = true; },
+  });
+  store.set('occulert-auth', 'session');
+  store.set('occulert-sessions', 'history');
+  store.set('unrelated', 'preserve');
+  el('deleteConfirmation').value = 'DELETE';
+  await context.deleteAccount({ preventDefault });
+  assert.equal(signedOut, true);
+  assert.equal(store.has('occulert-auth'), false);
+  assert.equal(store.has('occulert-sessions'), false);
+  assert.equal(store.get('unrelated'), 'preserve');
+  assert.match(el('deleteStatus').textContent, /permanently deleted/);
+});
+
+test('unconfirmed deletion keeps local data and allows retry without double submission', async () => {
+  let calls = 0;
+  let finish;
+  const { context, el, store } = boot({ user: { id: 'u1' }, deleteAccount: () => {
+    calls++;
+    return new Promise((resolve) => { finish = resolve; });
+  } });
+  el('deleteConfirmation').value = 'DELETE';
+  store.set('occulert-sessions', 'history');
+  const pending = context.deleteAccount({ preventDefault });
+  await context.deleteAccount({ preventDefault });
+  assert.equal(calls, 1);
+  finish({ ok: false });
+  await pending;
+  assert.equal(store.get('occulert-sessions'), 'history');
+  assert.match(el('deleteStatus').textContent, /not confirmed/);
+  assert.equal(el('deleteAccountBtn').disabled, false);
+});
 
 test('credential forms stay hidden until a session exists', () => {
   const { el } = boot({ user: null, updateEmail: noCall, updatePassword: noCall });

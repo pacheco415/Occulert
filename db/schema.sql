@@ -8,7 +8,7 @@ create extension if not exists "pgcrypto";
 create table if not exists fleets (
   id uuid primary key default gen_random_uuid(),
   company_name text not null,
-  owner_user_id uuid not null references auth.users(id),
+  owner_user_id uuid not null references auth.users(id) on delete cascade,
   plan text not null default 'trial',
   created_at timestamptz not null default now()
   );
@@ -18,8 +18,8 @@ on fleets(owner_user_id);
 
 create table if not exists drivers (
   id uuid primary key default gen_random_uuid(),
-  fleet_id uuid references fleets(id) on delete cascade,
-  user_id uuid references auth.users(id),
+  fleet_id uuid references fleets(id) on delete set null,
+  user_id uuid references auth.users(id) on delete cascade,
   name text not null,
   email text,
   vehicle_id text,
@@ -35,10 +35,10 @@ create table if not exists fleet_invitations (
   fleet_id uuid not null references fleets(id) on delete cascade,
   email text not null,
   token_hash text not null unique,
-  invited_by uuid not null references auth.users(id),
+  invited_by uuid not null references auth.users(id) on delete cascade,
   expires_at timestamptz not null,
   accepted_at timestamptz,
-  accepted_by uuid references auth.users(id),
+  accepted_by uuid references auth.users(id) on delete cascade,
   revoked_at timestamptz,
   created_at timestamptz not null default now()
   );
@@ -49,7 +49,7 @@ on fleet_invitations(fleet_id, created_at desc);
 create table if not exists sessions (
   id uuid primary key default gen_random_uuid(),
   driver_id uuid not null references drivers(id) on delete cascade,
-  fleet_id uuid references fleets(id) on delete cascade,
+  fleet_id uuid references fleets(id) on delete set null,
   started_at timestamptz not null default now(),
   ended_at timestamptz,
   average_fatigue numeric,

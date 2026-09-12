@@ -2,7 +2,7 @@
 
 This guide turns the backend routes in `api/profile.js`, `api/sessions.js`,
 `api/events.js`, `api/fleets.js`, `api/fleet-invitations.js`,
-`api/accept-invitation.js`, `api/fleet-summary.js`, and `api/_lib/supabase.js` into a working real
+`api/accept-invitation.js`, `api/fleet-summary.js`, `api/account.js`, and `api/_lib/supabase.js` into a working real
 backend, replacing the localStorage-only prototype described in
 BACKEND_ROADMAP.md.
 
@@ -87,6 +87,18 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 `pilot_leads` table when the two server-side Supabase variables are present.
 Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the browser keeps only its
 local fallback copy and the API reports `stored: false`.
+
+The signed-in Account Settings page uses `DELETE /api/account` for permanent
+account deletion. Apply `supabase/migrations/20260912170153_atomic_account_deletion.sql`
+before deploying the route. The route verifies the bearer token and deletes only
+that Supabase Auth user with the server-only service-role key. Foreign keys remove
+the user's driver, sessions, events, invitations, and owned fleet in the same
+transaction. Other fleet members and their history survive with no fleet assigned.
+A database constraint or Storage ownership failure rolls everything back; never
+pre-delete data to work around such failures. No Storage uploads are currently used.
+Protected APIs verify the user through Auth, so a deleted user's unexpired JWT is
+rejected. Successful deletion clears local app state and signs out the browser SDK.
+Keep the service-role key on the server; it is never sent to the browser.
 
 Invitation creation returns the one-time link only to the verified manager.
 The dashboard can open a pre-addressed message in the manager's existing mail

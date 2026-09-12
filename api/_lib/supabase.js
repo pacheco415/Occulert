@@ -77,10 +77,26 @@ if (!response.ok) return null;
 return response.json();
 }
 
+// Deletes an Auth user with the server-only service-role key. Callers must
+// verify the user's access token before invoking this helper.
+async function deleteAuthUser(userId) {
+const response = await fetch(supabaseUrl() + "/auth/v1/admin/users/" + encodeURIComponent(userId), {
+method: "DELETE",
+headers: serviceHeaders(),
+});
+if (!response.ok) {
+const text = await response.text();
+const error = new Error("supabase_auth_delete_failed");
+error.status = response.status;
+error.details = text;
+throw error;
+}
+}
+
 function bearerToken(request) {
 const header = request.headers.authorization || "";
 const match = /^Bearer\s+(.+)$/i.exec(header);
 return match ? match[1] : null;
 }
 
-module.exports = { pgFetch: pgFetch, verifyAccessToken: verifyAccessToken, bearerToken: bearerToken };
+module.exports = { pgFetch: pgFetch, verifyAccessToken: verifyAccessToken, deleteAuthUser: deleteAuthUser, bearerToken: bearerToken };
