@@ -2,7 +2,7 @@
 
 This guide turns the backend routes in `api/profile.js`, `api/sessions.js`,
 `api/events.js`, `api/fleets.js`, `api/fleet-invitations.js`,
-`api/accept-invitation.js`, `api/fleet-summary.js`, and `api/_lib/supabase.js` into a working real
+`api/accept-invitation.js`, `api/fleet-summary.js`, `api/account.js`, and `api/_lib/supabase.js` into a working real
 backend, replacing the localStorage-only prototype described in
 BACKEND_ROADMAP.md.
 
@@ -87,6 +87,12 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 `pilot_leads` table when the two server-side Supabase variables are present.
 Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the browser keeps only its
 local fallback copy and the API reports `stored: false`.
+
+The signed-in Account Settings page uses `DELETE /api/account` for permanent
+account deletion. The route verifies the bearer token, removes the user's
+driver, session, event, invitation, and owned-fleet rows, then deletes the
+Supabase Auth user with the server-only service-role key. Keep that key on the
+server; it is never sent to the browser.
 
 Invitation creation returns the one-time link only to the verified manager.
 The dashboard can open a pre-addressed message in the manager's existing mail

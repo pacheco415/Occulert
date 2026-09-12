@@ -374,6 +374,10 @@ window.OcculertBackend = (function () {
     return api("POST", "/api/accept-invitation", { token: token });
   }
 
+  function deleteAccount() {
+    return api("DELETE", "/api/account", { confirm: "DELETE" });
+  }
+
   return {
     isConfigured: isConfigured,
     getAuthConfig: loadConfig,
@@ -407,5 +411,6 @@ window.OcculertBackend = (function () {
     resendFleetInvitation: resendFleetInvitation,
     revokeFleetInvitation: revokeFleetInvitation,
     acceptFleetInvitation: acceptFleetInvitation,
+    deleteAccount: deleteAccount,
   };
 })();
