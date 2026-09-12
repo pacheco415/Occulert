@@ -8,6 +8,8 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
 
 const calls = [];
 let deletedUser = null;
+let authFailure = false;
+let deleteFailure = false;
 const handlerPath = require.resolve("../api/account.js");
 delete require.cache[handlerPath];
 require.cache[libPath] = {
@@ -16,16 +18,16 @@ require.cache[libPath] = {
   loaded: true,
   exports: {
     bearerToken: (request) => String(request.headers.authorization || "").replace(/^Bearer\s+/i, ""),
-    verifyAccessToken: async (token) => token === "valid-token" ? { id: "user-1", email: "driver@example.com" } : null,
-    deleteAuthUser: async (id) => { deletedUser = id; calls.push(["auth", id]); },
+    verifyAccessToken: async (token) => {
+      if (authFailure) throw new Error("auth unavailable");
+      return token === "valid-token" ? { id: "user-1", email: "driver@example.com" } : null;
+    },
+    deleteAuthUser: async (id) => {
+      if (deleteFailure) throw new Error("database or Storage constraint");
+      deletedUser = id; calls.push(["auth", id]);
+    },
     pgFetch: async (table, options = {}) => {
-      calls.push([table, options.method || "GET", options.params || {}]);
-      if (table === "drivers" && !options.method) return [{ id: "driver-1" }];
-      if (table === "fleets" && !options.method) return [{ id: "fleet-1" }];
-      if (table === "sessions" && !options.method) return [{ id: "session-1" }];
-      if (table === "fleet_invitations" && !options.method && options.params.or) return [{ id: "invite-user" }];
-      if (table === "fleet_invitations" && !options.method && options.params.fleet_id) return [{ id: "invite-fleet" }];
-      return [];
+      throw new Error("Account deletion must never pre-delete application data");
     },
   },
 };
@@ -46,16 +48,30 @@ assert.equal(result.statusCode, 400);
 assert.equal(result.body.error, "confirmation_required");
 assert.equal(calls.length, 0);
 
-result = await invoke(request({ confirm: "DELETE" }));
+result = await invoke(request({ confirm: "DELETE", user_id: "someone-else" }));
 assert.equal(result.statusCode, 200);
 assert.equal(result.body.deleted, true);
 assert.equal(deletedUser, "user-1");
-assert.equal(calls.at(-1)[0], "auth", "Auth deletion must happen after user-owned rows are removed");
-assert.ok(calls.some(([table, method]) => table === "events" && method === "DELETE"));
-assert.ok(calls.some(([table, method]) => table === "drivers" && method === "DELETE"));
-assert.ok(calls.some(([table, method]) => table === "fleets" && method === "DELETE"));
+assert.deepEqual(calls, [["auth", "user-1"]], "Only the verified identity may be deleted, in one transaction");
 
 result = await invoke(request({ confirm: "DELETE" }, "bad-token"));
 assert.equal(result.statusCode, 401);
+assert.equal(calls.length, 1);
+authFailure = true;
+result = await invoke(request({ confirm: "DELETE" }));
+assert.equal(result.statusCode, 502);
+authFailure = false;
+deleteFailure = true;
+result = await invoke(request({ confirm: "DELETE" }));
+assert.equal(result.statusCode, 502);
+assert.equal(result.body.deleted, undefined);
+assert.equal(calls.length, 1);
+deleteFailure = false;
+result = await invoke({ ...request({ confirm: "DELETE" }), method: "GET" });
+assert.equal(result.statusCode, 405);
+assert.equal(result.headers.Allow, "DELETE");
+result = await invoke({ ...request({ confirm: "DELETE" }), headers: { "content-type": "text/plain" } });
+assert.equal(result.statusCode, 400);
+assert.equal(result.headers["Cache-Control"], "no-store");
 
 console.log("Occulert account deletion tests passed.");

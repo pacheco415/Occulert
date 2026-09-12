@@ -78,7 +78,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
 .note{border:1px solid var(--note-border);background:var(--note-bg);border-radius:14px;padding:14px 16px;color:var(--note-color);font-size:13px;line-height:1.6;margin-top:14px;transition:background .25s,border-color .25s,color .25s}
 .note strong{color:#60a5fa}
 .danger-zone{border-color:rgba(239,68,68,.45)}
-.danger-zone h2{color:#fecaca;font-size:18px;margin:0 0 8px}
+.danger-zone h2{color:var(--text);font-size:18px;margin:0 0 8px}
 .danger-zone p{color:var(--text2);font-size:13px;line-height:1.55;margin:0 0 14px}
 .security-divider{height:1px;background:var(--divider);margin:20px 0;transition:background .25s}
 .passkey-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
@@ -172,7 +172,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,san
   <div class="card danger-zone" aria-labelledby="deleteAccountHeading">
     <div class="section-label">Danger zone</div>
     <h2 id="deleteAccountHeading">Delete your account</h2>
-    <p>This permanently deletes your Occulert sign-in, driver profile, sessions, alerts, invitations, and any fleet you own. This cannot be undone.</p>
+    <p>This permanently deletes your Occulert sign-in, driver profile, sessions, alerts, invitations, and any fleet you own. Other fleet members keep their accounts and driving history, without fleet membership. This cannot be undone.</p>
     <form class="form" onsubmit="deleteAccount(event)">
       <div class="field"><label for="deleteConfirmation">Type DELETE to confirm</label><input id="deleteConfirmation" autocomplete="off" spellcheck="false" placeholder="DELETE" required></div>
       <button class="btn red" id="deleteAccountBtn" type="submit">Delete account permanently</button>
@@ -220,21 +220,25 @@ function setProfile(p){if(window.OcculertAuth&&window.OcculertAuth.saveProfile)r
 function load(){let p=getProfile()||{};document.getElementById('name').value=p.name||'';document.getElementById('role').value=p.role||localStorage.getItem('occulert-role')||'driver';document.getElementById('company').value=p.company||'';document.getElementById('fleetId').value=p.fleetId||localStorage.getItem('occulert-fleet-id')||'OCCULERT-DEMO';document.getElementById('vehicle').value=p.vehicle||'';document.getElementById('bio').value=p.bio||'';const dEl=document.getElementById('driverIdDisplay');if(dEl)dEl.textContent=localStorage.getItem('occulert-driver-id')||'--';const cEl=document.getElementById('cloudStatus');if(cEl)cEl.textContent=localStorage.getItem('occulert-cloud-consent')==='true'?'Enabled':'Disabled';render(p)}
 function saveProfile(e){e.preventDefault();let p=getProfile()||{};p.name=document.getElementById('name').value.trim();p.role=document.getElementById('role').value;p.company=document.getElementById('company').value.trim()||'Occulert';p.fleetId=cleanFleet(document.getElementById('fleetId').value);p.vehicle=document.getElementById('vehicle').value.trim();p.bio=document.getElementById('bio').value.trim();p.savedAt=new Date().toISOString();p=setProfile(p);render(p);show('Profile saved successfully.','good')}
 async function signOut(){try{if(window.OcculertAuth)await window.OcculertAuth.signOut();show('Signed out.','good')}catch(e){show('Signed out locally.','good')}verifiedAccountAccess={status:'local'};renderSecurity();render(getProfile()||{})}
+let deletionInProgress=false;
 async function deleteAccount(e){
   e.preventDefault();
+  if(deletionInProgress)return;
   if(!signedInUser())return showDelete('Sign in before deleting your account.','bad');
   const confirmation=document.getElementById('deleteConfirmation').value.trim();
   if(confirmation!=='DELETE')return showDelete('Type DELETE exactly to confirm permanent deletion.','bad');
-  if(!window.confirm('Permanently delete your Occulert account and all associated cloud data? This cannot be undone.'))return;
+  if(!window.confirm('Permanently delete your Occulert sign-in, personal driving history, invitations, and any fleet you own? Other fleet members keep their accounts and driving history. This cannot be undone.'))return;
+  deletionInProgress=true;
   setBusy('deleteAccountBtn',true,'Delete account permanently');
   try{
     const result=await window.OcculertBackend.deleteAccount();
-    if(!result.ok)return showDelete(result.body&&result.body.error==='account_deletion_failed'?'The account could not be deleted. No confirmation was recorded; try again or contact support.':'The account could not be deleted. Please try again.','bad');
+    if(!result.ok)return showDelete('Deletion was not confirmed. Try signing in again to check your account, or contact support.','bad');
+    try{if(window.OcculertAuth)await window.OcculertAuth.signOut()}catch(err){}
     try{for(let i=localStorage.length-1;i>=0;i--){const key=localStorage.key(i);if(key&&key.indexOf('occulert-')===0)localStorage.removeItem(key)}}catch(err){}
     showDelete('Your account was permanently deleted. Redirecting to sign in…','good');
     setTimeout(()=>{window.location.href='/login.html'},900);
-  }catch(err){showDelete('The account could not be deleted. Please try again.','bad')}
-  finally{setBusy('deleteAccountBtn',false,'Delete account permanently')}
+  }catch(err){showDelete('Deletion was not confirmed. Try signing in again to check your account, or contact support.','bad')}
+  finally{deletionInProgress=false;setBusy('deleteAccountBtn',false,'Delete account permanently')}
 }
 function signedInUser(){return window.OcculertBackend&&window.OcculertBackend.currentUser?window.OcculertBackend.currentUser():null}
 function recoveryRequested(){return /(?:^|[?&])recovery=1(?:&|$)/.test((window.location&&window.location.search)||'')}

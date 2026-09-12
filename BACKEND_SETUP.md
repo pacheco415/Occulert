@@ -89,10 +89,16 @@ Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the browser keeps only its
 local fallback copy and the API reports `stored: false`.
 
 The signed-in Account Settings page uses `DELETE /api/account` for permanent
-account deletion. The route verifies the bearer token, removes the user's
-driver, session, event, invitation, and owned-fleet rows, then deletes the
-Supabase Auth user with the server-only service-role key. Keep that key on the
-server; it is never sent to the browser.
+account deletion. Apply `supabase/migrations/20260912170153_atomic_account_deletion.sql`
+before deploying the route. The route verifies the bearer token and deletes only
+that Supabase Auth user with the server-only service-role key. Foreign keys remove
+the user's driver, sessions, events, invitations, and owned fleet in the same
+transaction. Other fleet members and their history survive with no fleet assigned.
+A database constraint or Storage ownership failure rolls everything back; never
+pre-delete data to work around such failures. No Storage uploads are currently used.
+Protected APIs verify the user through Auth, so a deleted user's unexpired JWT is
+rejected. Successful deletion clears local app state and signs out the browser SDK.
+Keep the service-role key on the server; it is never sent to the browser.
 
 Invitation creation returns the one-time link only to the verified manager.
 The dashboard can open a pre-addressed message in the manager's existing mail
