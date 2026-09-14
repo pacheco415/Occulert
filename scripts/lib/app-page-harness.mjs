@@ -70,7 +70,7 @@ function makeElement(id) {
   return el;
 }
 
-export function createAppHarness({ startAt = 1_700_000_000_000 } = {}) {
+export function createAppHarness({ startAt = 1_700_000_000_000, initialStorage = {}, sandboxOverrides = {} } = {}) {
   const clock = {
     now: startAt,
     advance(ms) { this.now += ms; },
@@ -90,7 +90,7 @@ export function createAppHarness({ startAt = 1_700_000_000_000 } = {}) {
     return elements.get(id);
   };
 
-  const storage = new Map();
+  const storage = new Map(Object.entries(initialStorage).map(([key, value]) => [key, String(value)]));
   const localStorage = {
     getItem: (k) => (storage.has(k) ? storage.get(k) : null),
     setItem: (k, v) => storage.set(k, String(v)),
@@ -134,6 +134,7 @@ export function createAppHarness({ startAt = 1_700_000_000_000 } = {}) {
   sandbox.window.addEventListener = () => {};
   sandbox.window.removeEventListener = () => {};
   sandbox.globalThis = sandbox;
+  Object.assign(sandbox, sandboxOverrides);
   vm.createContext(sandbox);
 
   const code = readFileSync(DRIVER_APP, 'utf8');

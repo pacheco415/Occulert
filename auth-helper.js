@@ -4,12 +4,17 @@
   function read(k,f){try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(f));}catch(e){return f;}}
   function write(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
   function cleanId(v,prefix){var s=String(v||'').trim().replace(/[^a-zA-Z0-9_-]/g,'-').slice(0,80);return s||((prefix||'id')+'-'+Date.now());}
+  function createLocalDriverId(){try{if(globalThis.crypto&&typeof globalThis.crypto.randomUUID==='function')return'local-'+globalThis.crypto.randomUUID();if(globalThis.crypto&&typeof globalThis.crypto.getRandomValues==='function'){var bytes=new Uint8Array(16);globalThis.crypto.getRandomValues(bytes);return'local-'+Array.from(bytes,function(value){return value.toString(16).padStart(2,'0');}).join('');}}catch(e){}return'local-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);}
+  function normalizeLocalDriverId(value){var id=String(value||'').trim();if(!id||/^D-\d{3}$/.test(id))return createLocalDriverId();return cleanId(id,'driver');}
+  function rewriteStoredDriverId(key,oldId,newId){try{var value=JSON.parse(localStorage.getItem(key)||'null'),changed=false;if(Array.isArray(value)){value.forEach(function(item){if(item&&item.driverId===oldId){item.driverId=newId;changed=true;}});}else if(value&&value.driverId===oldId){value.driverId=newId;changed=true;}if(changed)localStorage.setItem(key,JSON.stringify(value));}catch(e){}}
+  function migrateLocalDriverReferences(oldId,newId){if(!oldId||oldId===newId)return;['occulert-profile','occulert-live-session','occulert-session-history','occulert-drivers'].forEach(function(key){rewriteStoredDriverId(key,oldId,newId);});}
+  function resolveLocalDriverId(profileId,storedId){var profileValue=String(profileId||'').trim(),storedValue=String(storedId||'').trim(),legacyProfile=/^D-\d{3}$/.test(profileValue),legacyStored=/^D-\d{3}$/.test(storedValue),id=legacyProfile&&storedValue&&!legacyStored?normalizeLocalDriverId(storedValue):normalizeLocalDriverId(profileValue||storedValue);if(legacyProfile)migrateLocalDriverReferences(profileValue,id);if(legacyStored)migrateLocalDriverReferences(storedValue,id);return id;}
   function getProfile(){return read('occulert-profile',null);}
   function saveProfile(profile){
     profile=profile||{};
     profile.role=profile.role||localStorage.getItem('occulert-role')||'driver';
     profile.fleetId=cleanId(profile.fleetId||localStorage.getItem('occulert-fleet-id')||'OCCULERT-DEMO','fleet');
-    profile.driverId=cleanId(profile.driverId||localStorage.getItem('occulert-driver-id')||('D-'+Math.floor(Math.random()*900+100)),'driver');
+    profile.driverId=resolveLocalDriverId(profile.driverId,localStorage.getItem('occulert-driver-id'));
     profile.savedAt=profile.savedAt||new Date().toISOString();
     localStorage.setItem('occulert-driver-id',profile.driverId);
     localStorage.setItem('occulert-role',profile.role);

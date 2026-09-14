@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v44';
+const CACHE = 'occulert-v45';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -21,12 +21,75 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passkey-auth.js',
   '/supabase-loader.js',
 ]);
+const NETWORK_FIRST_ASSETS = new Set([
+  '/driver-app.js',
+]);
+const CRITICAL_OFFLINE_ASSETS = [
+  '/app.html',
+  '/driver-app.css',
+  '/driver-app.js',
+];
+const NETWORK_FIRST_TIMEOUT_MS = 2500;
+const CACHE_WRITE_TIMEOUT_MS = 1000;
+
+function settleWithin(promise, timeoutMs, fallback = null) {
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(fallback), timeoutMs);
+    Promise.resolve(promise).then(finish, () => finish(fallback));
+  });
+}
+
+function fetchWithDeadline(request, timeoutMs = NETWORK_FIRST_TIMEOUT_MS) {
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const requestPromise = Promise.resolve().then(() => fetch(request, controller ? { signal: controller.signal } : undefined));
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = response => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(response);
+    };
+    const timer = setTimeout(() => {
+      if (controller) controller.abort();
+      finish(null);
+    }, timeoutMs);
+    requestPromise.then(finish, () => finish(null));
+  });
+}
+
+function cacheResponseBestEffort(request, response, timeoutMs = CACHE_WRITE_TIMEOUT_MS) {
+  let copy;
+  try {
+    copy = response.clone();
+  } catch (error) {
+    return Promise.resolve();
+  }
+  const update = caches.open(CACHE).then(cache => cache.put(request, copy));
+  return settleWithin(update, timeoutMs);
+}
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE)
-      .then(cache => Promise.allSettled(STATIC_ASSETS.map(url => cache.add(url))))
-      .then(() => self.skipWaiting())
+    (async () => {
+      try {
+        const cache = await caches.open(CACHE);
+        await Promise.allSettled(STATIC_ASSETS.map(url => cache.add(url)));
+        const criticalResponses = await Promise.all(CRITICAL_OFFLINE_ASSETS.map(url => cache.match(url)));
+        if (criticalResponses.some(response => !response)) throw new Error('Critical offline assets were not cached');
+        await self.skipWaiting();
+      } catch (error) {
+        await caches.delete(CACHE);
+        throw error;
+      }
+    })()
   );
 });
 
@@ -60,6 +123,21 @@ self.addEventListener('fetch', event => {
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
   if (url.origin === self.location.origin && NETWORK_ONLY_ASSETS.has(url.pathname)) {
     event.respondWith(fetch(req, { cache: 'no-store' }));
+    return;
+  }
+  if (url.origin === self.location.origin && NETWORK_FIRST_ASSETS.has(url.pathname)) {
+    const networkAttempt = fetchWithDeadline(req);
+    const cacheUpdate = networkAttempt
+      .then(response => response && response.ok ? cacheResponseBestEffort(req, response) : null)
+      .catch(() => null);
+    if (typeof event.waitUntil === 'function') event.waitUntil(cacheUpdate);
+    event.respondWith((async () => {
+      const networkResponse = await networkAttempt;
+      if (networkResponse && networkResponse.ok) return networkResponse;
+      const cachedResponse = await caches.match(req);
+      if (cachedResponse) return cachedResponse;
+      return networkResponse || Response.error();
+    })());
     return;
   }
 

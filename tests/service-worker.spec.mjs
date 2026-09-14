@@ -11,9 +11,21 @@ test('the service worker installs its offline shell', async ({ page, context, br
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
   await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
   await expect.poll(() => page.evaluate(async () => {
-    const cache = await caches.open('occulert-v44');
+    const cache = await caches.open('occulert-v45');
     return Boolean(await cache.match('/app.html'));
   })).toBe(true);
+  const refreshedScript = await page.evaluate(async () => {
+    const cache = await caches.open('occulert-v45');
+    await cache.put('/driver-app.js', new Response('stale-driver-script'));
+    return fetch('/driver-app.js').then(response => response.text());
+  });
+  expect(refreshedScript).toContain("FACE_MESH_VERSION='0.4.1633559619'");
+  expect(refreshedScript).not.toContain('stale-driver-script');
+  await expect.poll(() => page.evaluate(async () => {
+    const cache = await caches.open('occulert-v45');
+    const response = await cache.match('/driver-app.js');
+    return response ? response.text() : '';
+  })).toContain("FACE_MESH_VERSION='0.4.1633559619'");
 
   // Playwright's WebKit offline emulation fails requests before its service
   // worker can handle them. WebKit still verifies registration and cache
@@ -22,11 +34,12 @@ test('the service worker installs its offline shell', async ({ page, context, br
   await context.setOffline(true);
   try {
     const offlineShell = await page.evaluate(async () => {
-      const response = await fetch('/app.html');
-      return { ok: response.ok, text: await response.text() };
+      const [response, driverScript] = await Promise.all([fetch('/app.html'), fetch('/driver-app.js')]);
+      return { ok: response.ok, text: await response.text(), driverText: await driverScript.text() };
     });
     expect(offlineShell.ok).toBe(true);
     expect(offlineShell.text).toContain('id="alertTitle"');
+    expect(offlineShell.driverText).toContain("FACE_MESH_VERSION='0.4.1633559619'");
   } finally {
     await context.setOffline(false);
   }
