@@ -165,6 +165,7 @@ assertIncludes("vercel.json", "font-src 'self' https://fonts.gstatic.com", "verc
 assertIncludes("vercel.json", "https://*.supabase.co", "vercel.json CSP must allow configured Supabase Auth requests");
 assertIncludes("vercel.json", "'wasm-unsafe-eval'", "vercel.json CSP must permit MediaPipe WebAssembly compilation");
 assertIncludes("vercel.json", "connect-src 'self' https://cdn.jsdelivr.net", "vercel.json CSP must permit the pinned MediaPipe model graph fetch");
+assertIncludes("vercel.json", "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net", "vercel.json CSP must permit the pinned MediaPipe runtime to create its generated helper functions");
 assertIncludes("vercel.json", "webp|avif|gif", "optimized AVIF assets must receive immutable cache headers");
 assertIncludes("vercel.json", "publickey-credentials-create=(self)", "the production permissions policy must allow same-origin passkey enrollment");
 assertIncludes("vercel.json", "publickey-credentials-get=(self)", "the production permissions policy must allow same-origin passkey sign-in");

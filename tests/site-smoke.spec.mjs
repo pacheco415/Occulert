@@ -450,8 +450,10 @@ test("driver startup self-test verifies WebAssembly and the pinned model graph",
   });
   const response = await page.goto("/app.html", { waitUntil: "domcontentloaded" });
   const contentSecurityPolicy = response?.headers()["content-security-policy"] || "";
+  expect(contentSecurityPolicy).toContain("'unsafe-eval'");
   expect(contentSecurityPolicy).toContain("'wasm-unsafe-eval'");
   expect(contentSecurityPolicy).toContain("https://cdn.jsdelivr.net");
+  expect(await page.evaluate(() => new Function("return 7")())).toBe(7);
   expect(await page.evaluate(() => verifyDetectionRuntime())).toBe(true);
   expect(graphRequests).toBe(1);
   expect(await page.evaluate(() => FACE_MESH_SCRIPT_URL)).toContain("@mediapipe/face_mesh@0.4.1633559619/face_mesh.js");
