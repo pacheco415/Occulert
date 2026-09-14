@@ -208,6 +208,11 @@ assertIncludes("driver-app.js", "window.OcculertBackend.startSession()", "driver
 assertIncludes("driver-app.js", "window.OcculertBackend.endSession", "driver app must finish protected cloud sessions when opted in");
 assertIncludes("driver-app.js", "queueBackendEvent", "driver app must queue protected alert events when opted in");
 assertIncludes("driver-app.js", "function cameraRecoveryGuidance", "driver app must keep camera failure recovery guidance available");
+assertIncludes("app.html", "id=\"cameraSourceSelect\"", "desktop driver setup must provide an explicit camera picker");
+assertIncludes("driver-app.js", "CAMERA_DEVICE_STORAGE_KEY='occulert-camera-device-id'", "desktop camera choice must remain origin-local and persistent");
+assertIncludes("driver-app.js", "videoConstraints.deviceId={exact:deviceId}", "an explicit desktop camera choice must use an exact device constraint");
+assertIncludes("driver-app.js", "function isMobileCaptureDevice", "mobile monitoring must keep its dedicated front-camera path");
+assertIncludes("driver-app.js", "CameraSelectionError", "a missing selected camera must fail closed instead of silently switching devices");
 assertIncludes("driver-app.js", "const recovery=cameraRecoveryGuidance(e)", "driver app must show recovery guidance after camera startup failures");
 assertIncludes("driver-app.js", "Website Settings → Camera → Allow", "driver app must explain iPhone and iPad camera recovery");
 assertIncludes("driver-app.js", "Permissions → Camera → Allow", "driver app must explain Android camera recovery");
@@ -435,7 +440,7 @@ assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigati
 assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v45'", "the detector startup repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v46'", "the camera-selection repair must advance the offline cache");
 assertNotIncludes("sw.js", "occulert-v41", "the performance repair must not reuse the stale driver-script cache");
 assertIncludes("sw.js", "'/portal.css?v=6'", "the service worker must cache the current shared portal stylesheet");
 assertNotIncludes("sw.js", "occulert-v40", "the external driver script must not reuse the previous offline cache");

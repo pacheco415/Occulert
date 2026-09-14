@@ -139,7 +139,7 @@ test('web monitoring defers MediaPipe and prevents overlapping inference', async
   assert.equal((driver.match(/async function loop\(/g) || []).length, 1);
   assert.match(driver, /faceMeshScriptPromise=null;script\.remove\(\)/);
   assert.match(driver, /if\(processingFrame\)\{busyFrameSkips\+\+;return\}lastFrame=ts/);
-  assert.match(driver, /await initModel\(\);\s*requireForegroundStart\(\);\s*stream=await navigator\.mediaDevices\.getUserMedia/s);
+  assert.match(driver, /await initModel\(\);\s*requireForegroundStart\(\);\s*stream=await openSelectedCamera\(\)/s);
   assert.match(driver, /await video\.play\(\);\s*requireForegroundStart\(\);\s*await verifyFirstInference\(\);\s*requireForegroundStart\(\)/s);
   assert.match(driver, /PERFORMANCE_WINDOW_SIZE=120/);
   assert.match(driver, /window\.OcculertPerformance=Object\.freeze/);
@@ -277,7 +277,7 @@ test('legacy local driver identity migrates once across the driver app and accou
 
 test('service-worker upgrade evicts stale website caches', async () => {
   const source = read('sw.js');
-  assert.match(source, /const CACHE = 'occulert-v45'/);
+  assert.match(source, /const CACHE = 'occulert-v46'/);
   assert.match(source, /const NETWORK_FIRST_ASSETS = new Set\(\[/);
   assert.match(source, /'\/driver-app\.js'/);
   assert.match(source, /const NETWORK_FIRST_TIMEOUT_MS = 2500/);
@@ -346,7 +346,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await assert.rejects(installation, /Critical offline assets were not cached/);
   assert.equal(skipped, false);
-  assert.deepEqual(deleted, ['occulert-v45']);
+  assert.deepEqual(deleted, ['occulert-v46']);
 });
 
 test('service-worker bounds network and cache writes while preserving a known-good detector', async () => {

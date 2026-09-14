@@ -41,7 +41,7 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
 })();
 // ─────────────────────────────────────────────────────────────────
 
-const $=id=>document.getElementById(id),video=$('video'),canvas=$('canvas'),ctx=canvas.getContext('2d'),statusEl=$('status'),startBtn=$('startBtn'),demoBtn=$('demoBtn'),overlay=$('overlay'),overlayTitle=$('overlayTitle'),overlayText=$('overlayText'),overlayHint=$('overlayHint'),stateCard=$('stateCard'),driveStateEl=$('driveState'),driveHintEl=$('driveHint'),fatigueEl=$('fatigue'),confidenceEl=$('confidence'),calibrationEl=$('calibration'),calibrationFill=$('calibrationFill'),faceStateEl=$('faceState'),earEl=$('ear'),alertsEl=$('alerts'),riskEl=$('risk'),riskDetailEl=$('riskDetail'),fatigueFill=$('fatigueFill'),confidenceFill=$('confidenceFill'),alertScreen=$('alertScreen'),alertTitle=$('alertTitle'),alertSub=$('alertSub'),logEl=$('log'),reportEl=$('report'),nodsEl=$('nods'),syncEl=$('sync'),gpsEl=$('gps'),locationEl=$('location'),perclosEl=$('perclos'),microsleepsEl=$('microsleeps'),distractionEl=$('distraction'),escalationEl=$('escalation'),gpsConsent=$('gpsConsent'),cloudConsent=$('cloudConsent'),sessionTimerEl=$('sessionTimer'),nightOpacity=$('nightOpacity'),nightVal=$('nightVal'),phoneGuide=$('phoneGuide'),calHint=$('calHint');
+const $=id=>document.getElementById(id),video=$('video'),canvas=$('canvas'),ctx=canvas.getContext('2d'),statusEl=$('status'),startBtn=$('startBtn'),demoBtn=$('demoBtn'),overlay=$('overlay'),overlayTitle=$('overlayTitle'),overlayText=$('overlayText'),overlayHint=$('overlayHint'),stateCard=$('stateCard'),driveStateEl=$('driveState'),driveHintEl=$('driveHint'),fatigueEl=$('fatigue'),confidenceEl=$('confidence'),calibrationEl=$('calibration'),calibrationFill=$('calibrationFill'),faceStateEl=$('faceState'),earEl=$('ear'),alertsEl=$('alerts'),riskEl=$('risk'),riskDetailEl=$('riskDetail'),fatigueFill=$('fatigueFill'),confidenceFill=$('confidenceFill'),alertScreen=$('alertScreen'),alertTitle=$('alertTitle'),alertSub=$('alertSub'),logEl=$('log'),reportEl=$('report'),nodsEl=$('nods'),syncEl=$('sync'),gpsEl=$('gps'),locationEl=$('location'),perclosEl=$('perclos'),microsleepsEl=$('microsleeps'),distractionEl=$('distraction'),escalationEl=$('escalation'),gpsConsent=$('gpsConsent'),cloudConsent=$('cloudConsent'),sessionTimerEl=$('sessionTimer'),nightOpacity=$('nightOpacity'),nightVal=$('nightVal'),phoneGuide=$('phoneGuide'),calHint=$('calHint'),cameraSourceRow=$('cameraSourceRow'),cameraSourceSelect=$('cameraSourceSelect'),cameraSourceHint=$('cameraSourceHint'),cameraRefreshBtn=$('cameraRefreshBtn');
 
 // Night mode opacity control
 nightOpacity.addEventListener('input',()=>{
@@ -69,6 +69,78 @@ function createLocalDriverId(){try{if(globalThis.crypto&&typeof globalThis.crypt
 function normalizeLocalDriverId(value){const id=String(value||'').trim().replace(/[^a-zA-Z0-9_-]/g,'-').slice(0,80);return!id||/^D-\d{3}$/.test(id)?createLocalDriverId():id}
 function rewriteStoredDriverId(key,oldId,newId){try{const value=JSON.parse(localStorage.getItem(key)||'null');let changed=false;if(Array.isArray(value))value.forEach(item=>{if(item&&item.driverId===oldId){item.driverId=newId;changed=true}});else if(value&&value.driverId===oldId){value.driverId=newId;changed=true}if(changed)localStorage.setItem(key,JSON.stringify(value))}catch(e){}}
 function migrateLocalDriverIdentity(value){const oldId=String(value||'').trim(),newId=normalizeLocalDriverId(oldId);if(oldId&&oldId!==newId)['occulert-profile','occulert-live-session','occulert-session-history','occulert-drivers'].forEach(key=>rewriteStoredDriverId(key,oldId,newId));localStorage.setItem('occulert-driver-id',newId);return newId}
+const CAMERA_DEVICE_STORAGE_KEY='occulert-camera-device-id';
+let availableCameraDevices=[],cameraLabelsRevealed=false,unavailableCameraDeviceId='',guardedCameraTrack=null,cameraMuteTimer=null,cameraFailureStopping=false;
+function isMobileCaptureDevice(nav=navigator){const userAgent=String(nav&&nav.userAgent||'').toLowerCase(),platform=String(nav&&nav.platform||'').toLowerCase(),touchPoints=Number(nav&&nav.maxTouchPoints)||0;return/android|iphone|ipad|ipod|mobile/.test(userAgent)||(platform==='macintel'&&touchPoints>1)}
+function buildCameraConstraints(deviceId='',nav=navigator){const videoConstraints={width:{ideal:480},height:{ideal:360},frameRate:{ideal:12,max:16}};if(deviceId&&!isMobileCaptureDevice(nav))videoConstraints.deviceId={exact:deviceId};else videoConstraints.facingMode={ideal:'user'};return{video:videoConstraints,audio:false}}
+function cameraSelectionError(cause){const error=new Error('The selected camera is no longer available.');error.name='CameraSelectionError';if(cause)error.cause=cause;return error}
+function cameraOptionLabel(device,index){return String(device&&device.label||'').trim()||'Camera '+(index+1)}
+function savedCameraDeviceId(){try{return localStorage.getItem(CAMERA_DEVICE_STORAGE_KEY)||''}catch(error){return''}}
+function rememberCameraDeviceId(deviceId){try{if(deviceId)localStorage.setItem(CAMERA_DEVICE_STORAGE_KEY,deviceId);else localStorage.removeItem(CAMERA_DEVICE_STORAGE_KEY)}catch(error){}}
+function setCameraControlsDisabled(disabled){if(cameraSourceSelect)cameraSourceSelect.disabled=!!disabled;if(cameraRefreshBtn)cameraRefreshBtn.disabled=!!disabled}
+function updateCameraSourceHint(activeDeviceId=''){
+  if(!cameraSourceHint||!cameraSourceSelect)return;
+  const selectedId=cameraSourceSelect.value,shownId=selectedId||activeDeviceId,device=availableCameraDevices.find(candidate=>candidate.deviceId===shownId);
+  if(selectedId&&unavailableCameraDeviceId===selectedId){cameraSourceHint.textContent='The saved camera is unavailable. Choose another camera before starting.';return}
+  if(selectedId&&device&&cameraLabelsRevealed){cameraSourceHint.textContent='Selected: '+cameraOptionLabel(device,availableCameraDevices.indexOf(device))+'. Occulert will remember this choice on this browser.';return}
+  if(selectedId&&!cameraLabelsRevealed){cameraSourceHint.textContent='Your saved camera will be verified when monitoring starts. Choose Find cameras to see its name.';return}
+  if(selectedId){cameraSourceHint.textContent='The saved camera is unavailable. Choose another camera before starting.';return}
+  if(activeDeviceId&&device&&cameraLabelsRevealed){cameraSourceHint.textContent='This browser is using '+cameraOptionLabel(device,availableCameraDevices.indexOf(device))+'. Stop monitoring before changing cameras.';return}
+  if(cameraLabelsRevealed){cameraSourceHint.textContent='Choose your Mac camera to keep Safari from using your iPhone.';return}
+  cameraSourceHint.textContent='Choose Find cameras and allow access once to see the camera names.'
+}
+async function refreshCameraChoices(activeDeviceId=''){
+  if(!cameraSourceRow||!cameraSourceSelect)return[];
+  const mediaDevices=navigator.mediaDevices;
+  if(isMobileCaptureDevice()||!mediaDevices||typeof mediaDevices.enumerateDevices!=='function'){cameraSourceRow.hidden=true;return[]}
+  cameraSourceRow.hidden=false;
+  let devices=[];
+  try{devices=(await mediaDevices.enumerateDevices()).filter(device=>device.kind==='videoinput')}catch(error){devices=[]}
+  availableCameraDevices=devices;
+  cameraLabelsRevealed=devices.some(device=>String(device.label||'').trim());
+  const savedId=savedCameraDeviceId();
+  cameraSourceSelect.replaceChildren();
+  const automatic=document.createElement('option');automatic.value='';automatic.textContent='Automatic (browser choice)';cameraSourceSelect.appendChild(automatic);
+  if(cameraLabelsRevealed)devices.forEach((device,index)=>{if(!device.deviceId)return;const option=document.createElement('option');option.value=device.deviceId;option.textContent=cameraOptionLabel(device,index);cameraSourceSelect.appendChild(option)});
+  if(savedId){
+    const savedDeviceAvailable=devices.some(device=>device.deviceId===savedId);
+    if(cameraLabelsRevealed&&savedDeviceAvailable)unavailableCameraDeviceId='';
+    else if(cameraLabelsRevealed)unavailableCameraDeviceId=savedId;
+    if(!cameraLabelsRevealed||!savedDeviceAvailable){const missing=document.createElement('option');missing.value=savedId;missing.textContent=unavailableCameraDeviceId===savedId?'Saved camera (unavailable)':'Saved camera (camera access required)';cameraSourceSelect.appendChild(missing)}
+    cameraSourceSelect.value=savedId;
+  }
+  updateCameraSourceHint(activeDeviceId);
+  return devices
+}
+async function findCameraChoices(){
+  if(!navigator.mediaDevices||typeof navigator.mediaDevices.getUserMedia!=='function')return;
+  setCameraControlsDisabled(true);
+  if(cameraSourceHint)cameraSourceHint.textContent='Safari may connect briefly while it reveals the camera names.';
+  let probe=null;
+  try{
+    const devices=await refreshCameraChoices();
+    if(!devices.some(device=>String(device.label||'').trim()))probe=await navigator.mediaDevices.getUserMedia(buildCameraConstraints());
+    await refreshCameraChoices();
+  }catch(error){const recovery=cameraRecoveryGuidance(error);if(cameraSourceHint)cameraSourceHint.textContent=recovery.title+': '+recovery.text}
+  finally{if(probe)probe.getTracks().forEach(track=>track.stop());setCameraControlsDisabled(running||starting)}
+}
+async function openSelectedCamera(){
+  const mediaDevices=navigator.mediaDevices,isMobile=isMobileCaptureDevice(),selectedId=isMobile?'':(cameraSourceSelect&&cameraSourceSelect.value||savedCameraDeviceId());
+  try{
+    const cameraStream=await mediaDevices.getUserMedia(buildCameraConstraints(selectedId));
+    unavailableCameraDeviceId='';
+    try{const track=cameraStream.getVideoTracks&&cameraStream.getVideoTracks()[0],activeDeviceId=track&&track.getSettings?track.getSettings().deviceId||'':'';await refreshCameraChoices(activeDeviceId)}catch(error){}
+    return cameraStream
+  }catch(error){
+    if(selectedId&&error&&(error.name==='NotFoundError'||error.name==='OverconstrainedError')){unavailableCameraDeviceId=selectedId;try{await refreshCameraChoices()}catch(refreshError){}throw cameraSelectionError(error)}
+    throw error
+  }
+}
+function clearCameraTrackGuards(){if(cameraMuteTimer!==null)clearTimeout(cameraMuteTimer);cameraMuteTimer=null;if(guardedCameraTrack){guardedCameraTrack.removeEventListener('ended',handleCameraTrackEnded);guardedCameraTrack.removeEventListener('mute',handleCameraTrackMuted);guardedCameraTrack.removeEventListener('unmute',handleCameraTrackUnmuted)}guardedCameraTrack=null}
+function handleCameraTrackEnded(){void haltForCameraFailure(Object.assign(new Error('The camera disconnected.'),{name:'CameraDisconnectedError'}))}
+function handleCameraTrackMuted(){if(cameraMuteTimer!==null)clearTimeout(cameraMuteTimer);cameraMuteTimer=setTimeout(()=>{if(guardedCameraTrack&&guardedCameraTrack.muted)void haltForCameraFailure(Object.assign(new Error('The camera paused.'),{name:'CameraPausedError'}))},2500)}
+function handleCameraTrackUnmuted(){if(cameraMuteTimer!==null)clearTimeout(cameraMuteTimer);cameraMuteTimer=null}
+function attachCameraTrackGuards(cameraStream){clearCameraTrackGuards();const track=cameraStream&&cameraStream.getVideoTracks&&cameraStream.getVideoTracks()[0];if(!track||typeof track.addEventListener!=='function')return;guardedCameraTrack=track;track.addEventListener('ended',handleCameraTrackEnded);track.addEventListener('mute',handleCameraTrackMuted);track.addEventListener('unmute',handleCameraTrackUnmuted);if(track.readyState==='ended')handleCameraTrackEnded();else if(track.muted)handleCameraTrackMuted()}
 let wakeLock=null,running=false,starting=false,startCancelled=false,stream=null,faceMesh=null,faceMeshScriptPromise=null,detectionRuntimePromise=null,processingFrame=false,detectorFailureStopping=false,consecutiveInferenceFailures=0,lastDetectionResultAt=0,detectionResultGeneration=0,detectionResultWaiters=[],raf=null,lastFrame=0,lastAlert=0,lastRender=0,alerts=0,fatigue=0,confidence=0,earHistory=[],sessionStart=0,maxFatigue=0,fatigueSamples=[],noseYHistory=[],headNods=0,lastNod=0,lastFleetPush=0,cloudReady=false,backendSessionId=null,backendSessionPromise=null,backendEventQueue=Promise.resolve(),backendSessionGeneration=0,driverId=migrateLocalDriverIdentity(localStorage.getItem('occulert-driver-id')),gpsWatch=null,lastPosition=null,routePoints=[],distanceMeters=0,perclosWindow=[],eyesClosedSince=0,microsleeps=0,lastMicro=0,turnedSince=0,totalDistractionMs=0,escalationLevel=0,lastEscalation=0,calibrating=false,calibrated=false,calibrationUntil=0,calibrationSamples=[],baselineEAR=.28,baseClosedThreshold=.18,baseWatchThreshold=.22,eyeClosedThreshold=.18,eyeWatchThreshold=.22,noFaceSince=0,lastFaceSeen=0,hiddenAt=0,performanceSamples=[],processedFrames=0,busyFrameSkips=0,performanceSessionStart=0;const LEFT=[362,385,387,263,373,380],RIGHT=[33,160,158,133,153,144],PROCESS_INTERVAL=135,RENDER_INTERVAL=180,FLEET_PUSH_INTERVAL=5000,CALIBRATION_MS=3200,PERFORMANCE_WINDOW_SIZE=120,DETECTION_STARTUP_TIMEOUT_MS=12000,DETECTION_INFERENCE_TIMEOUT_MS=3000,DETECTION_RESULT_TIMEOUT_MS=6000,DETECTION_CLOSE_TIMEOUT_MS=750,MAX_CONSECUTIVE_INFERENCE_FAILURES=3,FACE_MESH_VERSION='0.4.1633559619',FACE_MESH_ASSET_BASE='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@'+FACE_MESH_VERSION+'/',FACE_MESH_SCRIPT_URL=FACE_MESH_ASSET_BASE+'face_mesh.js',FACE_MESH_GRAPH_URL=FACE_MESH_ASSET_BASE+'face_mesh.binarypb',FACE_MESH_SCRIPT_INTEGRITY='sha384-nKiz5QrpRlMQLw5nrZcprT7N9vmmAcIgV8TuGuep4x91V4JIPsXa+D44Wxj0guoa';
 function recordFramePerformance(durationMs){processedFrames++;if(Number.isFinite(durationMs)&&durationMs>=0)performanceSamples.push(durationMs);if(performanceSamples.length>PERFORMANCE_WINDOW_SIZE)performanceSamples.shift()}
 function resetFramePerformance(){performanceSamples=[];processedFrames=0;busyFrameSkips=0;performanceSessionStart=sessionStart}
@@ -113,6 +185,9 @@ function cameraRecoveryGuidance(error,nav=navigator){
   const isIOS=/iphone|ipad|ipod/.test(userAgent)||(platform==='macintel'&&touchPoints>1);
   const isAndroid=/android/.test(userAgent);
   const cameraText='Occulert needs the front camera to detect eye closure and fatigue.';
+  if(name==='CameraSelectionError')return{title:'Selected Camera Unavailable',text:'Occulert could not open the camera saved for this browser.',hint:'Choose another camera above, then press Start Monitoring again while parked.'};
+  if(name==='CameraDisconnectedError')return{title:'Camera Disconnected',text:'Monitoring stopped because the selected camera disconnected.',hint:'Reconnect the camera or choose another one, then restart only while parked.'};
+  if(name==='CameraPausedError')return{title:'Camera Paused',text:'Monitoring stopped because the selected camera stopped sending video.',hint:'Resume or reconnect the camera, then restart only while parked.'};
   if(name==='DetectionRuntimeError')return{title:'AI Monitoring Unavailable',text:'Occulert cannot run monitoring because the on-device detector failed or stopped responding.',hint:'Pull over safely, check your connection, reload this page, and try again while parked. Monitoring remains off until the detector passes.'};
   if(name==='NotAllowedError'||name==='SecurityError'){
     if(isIOS)return{title:'Camera Access Blocked',text:cameraText,hint:'<strong>On iPhone or iPad:</strong> open Safari\'s Page Menu, choose More, then Website Settings → Camera → Allow, and reload this page.'};
@@ -122,6 +197,25 @@ function cameraRecoveryGuidance(error,nav=navigator){
   if(name==='NotReadableError'||name==='AbortError')return{title:'Camera Is Busy',text:'Occulert could not open the front camera.',hint:'<strong>Try:</strong> close any other app or browser tab using the camera, then reload this page.'};
   if(name==='NotFoundError'||name==='DevicesNotFoundError')return{title:'Front Camera Not Found',text:cameraText,hint:'<strong>Try:</strong> confirm the camera is enabled and available, then reload this page.'};
   return{title:'Camera Could Not Start',text:cameraText,hint:'<strong>Try:</strong> use Safari or Chrome over HTTPS, confirm camera access, then reload this page.'};
+}
+async function haltForCameraFailure(error){
+  if(cameraFailureStopping||!running)return;
+  cameraFailureStopping=true;
+  const recovery=cameraRecoveryGuidance(error);
+  setOverlay(recovery.title,recovery.text,recovery.hint,false);
+  startBtn.disabled=true;
+  tone(660,300,.22);
+  speak('Camera monitoring stopped. Pull over safely before restarting.');
+  log(recovery.title+' - monitoring stopped');
+  try{
+    const stopPromise=stop({preserveOverlay:true});
+    if(stopPromise&&typeof stopPromise.catch==='function')stopPromise.catch(()=>{});
+    await refreshCameraChoices()
+  }finally{
+    cameraFailureStopping=false;
+    startBtn.disabled=false;
+    setCameraControlsDisabled(false)
+  }
 }
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}function calcEAR(lm,idx){let p1=lm[idx[0]],p2=lm[idx[1]],p3=lm[idx[2]],p4=lm[idx[3]],p5=lm[idx[4]],p6=lm[idx[5]],h=dist(p1,p4);return h<.001?.28:(dist(p2,p6)+dist(p3,p5))/(2*h)}function smooth(v){earHistory.push(v);if(earHistory.length>6)earHistory.shift();return earHistory.reduce((a,b)=>a+b,0)/earHistory.length}function headTurn(lm){let n=lm[4],l=lm[234],r=lm[454],w=Math.abs(r.x-l.x);return w<.05?true:Math.abs((n.x-(l.x+r.x)/2)/w)>.34}function detectHeadNod(lm){let y=lm[4].y;noseYHistory.push({y,t:Date.now()});if(noseYHistory.length>10)noseYHistory.shift();if(noseYHistory.length<6)return false;let now=Date.now();if(noseYHistory.length<8)return false;let midPt=noseYHistory[Math.floor(noseYHistory.length/2)],earliest=noseYHistory[0],latest=noseYHistory[noseYHistory.length-1],dip=midPt.y-earliest.y,recover=midPt.y-latest.y;if(dip>.04&&recover>.018&&now-lastNod>1800){lastNod=now;headNods++;nodsEl.textContent=headNods;log('Head nod detected');queueBackendEvent('head_nod');return true}return false}
 function miles(m){return(m/1609.344).toFixed(2)}function hav(a,b){let R=6371000,toRad=x=>x*Math.PI/180,dLat=toRad(b.lat-a.lat),dLon=toRad(b.lng-a.lng),s=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(s))}function startGPS(){if(!gpsConsent.checked){gpsEl.textContent='OFF';locationEl.textContent='--';return}if(!navigator.geolocation){gpsEl.textContent='NO';gpsEl.className='value gps warn';return}gpsEl.textContent='ASK';gpsEl.className='value gps warn';gpsWatch=navigator.geolocation.watchPosition(pos=>{let p={lat:+pos.coords.latitude.toFixed(6),lng:+pos.coords.longitude.toFixed(6),accuracy:Math.round(pos.coords.accuracy||0),speed:pos.coords.speed?Math.round(pos.coords.speed*2.23694):0,ts:new Date().toISOString()};if(lastPosition){let d=hav(lastPosition,p);if(d>2&&d<1000)distanceMeters+=d}lastPosition=p;routePoints.push(p);routePoints=routePoints.slice(-80);gpsEl.textContent='ON';gpsEl.className='value gps on';locationEl.textContent=p.lat.toFixed(2)+','+p.lng.toFixed(2)},err=>{gpsEl.textContent='OFF';gpsEl.className='value gps warn';log('GPS unavailable: '+err.message)},{enableHighAccuracy:true,maximumAge:5000,timeout:12000})}function stopGPS(){if(gpsWatch!==null)navigator.geolocation.clearWatch(gpsWatch);gpsWatch=null;gpsEl.textContent=lastPosition?'SAVED':'OFF';gpsEl.className='value gps '+(lastPosition?'on':'warn')}
@@ -144,18 +238,19 @@ if(typeof updateTrackingState==='function'){const earOk=ear>.05&&ear<.65;updateT
 drawEyes(lm,fatigue>=60?'#ff3344':fatigue>=35?'#ffaa00':'#00ff88');render(ear);if(!calibrating&&confidence>=45&&fatigue>=80)trigger('Fatigue');else if(!calibrating&&confidence>=45&&turnedSince&&Date.now()-turnedSince>6500)trigger('Distraction')}async function initCloud(){if(!cloudConsent.checked){cloudReady=false;syncEl.textContent='LOCAL';return}try{const configured=window.OcculertBackend&&await window.OcculertBackend.isConfigured();const user=configured&&window.OcculertBackend.currentUser();cloudReady=!!user;syncEl.textContent=cloudReady?'ON':'LOCAL';log(cloudReady?'Protected cloud sync ready':configured?'Sign in before enabling cloud sync':'Cloud sync is not configured - using local mode')}catch(e){cloudReady=false;syncEl.textContent='LOCAL';log('Cloud sync unavailable - using local mode')}}
 function requireForegroundStart(){if(!startCancelled&&!document.hidden)return;const error=new Error('Monitoring start cancelled because Occulert left the foreground.');error.name='AbortError';throw error}
 async function start(){
-  if(starting||detectorFailureStopping)return;
+  if(starting||detectorFailureStopping||cameraFailureStopping)return;
   primeAlertAudio();
   starting=true;
   startCancelled=false;
   startBtn.disabled=true;
   startBtn.textContent='STARTING...';
+  setCameraControlsDisabled(true);
   setOverlay('Preparing Monitoring','Occulert is preparing the on-device model before opening the camera.','GPS and cloud sync are optional. Enable them above before starting if needed.',false);
   try{
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('Camera is not supported in this browser. Try Safari or Chrome on HTTPS.');
     await initModel();
     requireForegroundStart();
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:480},height:{ideal:360},frameRate:{ideal:12,max:16}},audio:false});
+    stream=await openSelectedCamera();
     requireForegroundStart();
     video.srcObject=stream;
     await video.play();
@@ -165,6 +260,7 @@ async function start(){
     await initCloud();
     requireForegroundStart();
     running=true;
+    attachCameraTrackGuards(stream);
     sessionStart=Date.now();
     startTimer();
     try{if('wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen');log('Screen wake lock active')}}catch(e){log('Wake lock unavailable - keep screen unlocked')}
@@ -179,9 +275,9 @@ async function start(){
       const recovery=cameraRecoveryGuidance(e);setOverlay(recovery.title,recovery.text,recovery.hint,false);if(e&&e.name==='DetectionRuntimeError')await discardFaceMesh();log((e&&e.name==='DetectionRuntimeError'?'Detector':'Camera')+' error: '+(e.message||e.name||e));
     }
     startBtn.textContent='START MONITORING';startBtn.className='btn primary'
-  }finally{starting=false;startBtn.disabled=false;render()}
+  }finally{starting=false;startBtn.disabled=false;setCameraControlsDisabled(running||cameraFailureStopping);render()}
 }
-async function stop(options={}){const preserveOverlay=!!options.preserveOverlay;running=false;calibrating=false;stopTimer();const rb3=document.getElementById('recalBtn');if(rb3)rb3.style.display='none';if(wakeLock){const heldWakeLock=wakeLock;wakeLock=null;Promise.resolve().then(()=>heldWakeLock.release()).catch(()=>{})}if(raf)cancelAnimationFrame(raf);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;stopGPS();ctx.clearRect(0,0,canvas.width,canvas.height);if(!preserveOverlay)setOverlay('AI Fatigue Monitoring','Supplemental prototype only. Keep your attention on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.','<strong>Foreground required:</strong> monitoring stops if this tab is hidden or the screen locks. Pull over safely before restarting.',true);startBtn.textContent='START MONITORING';startBtn.className='btn primary';let p=fleetPayload(),mins=sessionStart?((Date.now()-sessionStart)/60000).toFixed(1):'0.0';render(.001);pushFleet(true);reportEl.style.display='block';reportEl.textContent='OCCULERT SESSION REPORT\n\nStatus: '+p.status+'\nDuration: '+mins+' min\nSafety Score: '+p.safetyScore+'/100\n\nCalibration: '+(calibrated?'Personalized':'Default')+'\nOpen-eye EAR: '+baselineEAR.toFixed(3)+'\nClosed-eye threshold: '+eyeClosedThreshold.toFixed(3)+'\n\nAlerts Triggered: '+alerts+'\nEscalation Level: '+escalationLevel+'\nHead Nods Detected: '+headNods+'\nMicrosleeps Detected: '+microsleeps+'\nPERCLOS: '+p.perclos+'%\nDistraction Time: '+p.distractionSeconds+'s\nAverage Fatigue: '+p.avgFatigue+'/100\nMax Fatigue: '+p.maxFatigue+'/100\n\nGPS Enabled: '+(p.gpsEnabled?'Yes':'No')+'\nDistance: '+p.distanceMiles+' mi\nLast Location: '+(p.location?p.location.lat+', '+p.location.lng:'Not available')+'\n\nSync Mode: '+(cloudConsent.checked&&cloudReady?'Cloud + Local':'Local only')+'\nSaved: '+new Date().toLocaleString()+'\n\nSafety and liability: Occulert is a supplemental prototype only. It may miss drowsiness, may trigger false alerts, and is not a certified safety, medical, emergency, legal, employment, fleet compliance, or transportation compliance device. Do not interact with the app while driving. If tired or unsafe, pull over and rest.';try{if(cloudConsent.checked&&cloudReady&&window.OcculertSync)await window.OcculertSync.saveSessionHistory(p)}catch(e){}log('Session ended')}
+async function stop(options={}){const preserveOverlay=!!options.preserveOverlay;running=false;calibrating=false;stopTimer();clearCameraTrackGuards();const rb3=document.getElementById('recalBtn');if(rb3)rb3.style.display='none';if(wakeLock){const heldWakeLock=wakeLock;wakeLock=null;Promise.resolve().then(()=>heldWakeLock.release()).catch(()=>{})}if(raf)cancelAnimationFrame(raf);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;stopGPS();ctx.clearRect(0,0,canvas.width,canvas.height);if(!preserveOverlay)setOverlay('AI Fatigue Monitoring','Supplemental prototype only. Keep your attention on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.','<strong>Foreground required:</strong> monitoring stops if this tab is hidden or the screen locks. Pull over safely before restarting.',true);startBtn.textContent='START MONITORING';startBtn.className='btn primary';setCameraControlsDisabled(false);void refreshCameraChoices();let p=fleetPayload(),mins=sessionStart?((Date.now()-sessionStart)/60000).toFixed(1):'0.0';render(.001);pushFleet(true);reportEl.style.display='block';reportEl.textContent='OCCULERT SESSION REPORT\n\nStatus: '+p.status+'\nDuration: '+mins+' min\nSafety Score: '+p.safetyScore+'/100\n\nCalibration: '+(calibrated?'Personalized':'Default')+'\nOpen-eye EAR: '+baselineEAR.toFixed(3)+'\nClosed-eye threshold: '+eyeClosedThreshold.toFixed(3)+'\n\nAlerts Triggered: '+alerts+'\nEscalation Level: '+escalationLevel+'\nHead Nods Detected: '+headNods+'\nMicrosleeps Detected: '+microsleeps+'\nPERCLOS: '+p.perclos+'%\nDistraction Time: '+p.distractionSeconds+'s\nAverage Fatigue: '+p.avgFatigue+'/100\nMax Fatigue: '+p.maxFatigue+'/100\n\nGPS Enabled: '+(p.gpsEnabled?'Yes':'No')+'\nDistance: '+p.distanceMiles+' mi\nLast Location: '+(p.location?p.location.lat+', '+p.location.lng:'Not available')+'\n\nSync Mode: '+(cloudConsent.checked&&cloudReady?'Cloud + Local':'Local only')+'\nSaved: '+new Date().toLocaleString()+'\n\nSafety and liability: Occulert is a supplemental prototype only. It may miss drowsiness, may trigger false alerts, and is not a certified safety, medical, emergency, legal, employment, fleet compliance, or transportation compliance device. Do not interact with the app while driving. If tired or unsafe, pull over and rest.';try{if(cloudConsent.checked&&cloudReady&&window.OcculertSync)await window.OcculertSync.saveSessionHistory(p)}catch(e){}log('Session ended')}
 const startLocalSession=start;
 start=async function(){await startLocalSession();if(running)backendSessionPromise=beginBackendSession()};
 const stopLocalSession=stop;
@@ -208,6 +304,10 @@ async function handleVisibilityChange(hidden=document.visibilityState==='hidden'
   return true
 }
 document.addEventListener('visibilitychange',()=>{void handleVisibilityChange()});cloudConsent.addEventListener('change',initCloud);
+if(cameraSourceSelect)cameraSourceSelect.addEventListener('change',()=>{const deviceId=cameraSourceSelect.value;unavailableCameraDeviceId='';rememberCameraDeviceId(deviceId);updateCameraSourceHint()});
+if(cameraRefreshBtn)cameraRefreshBtn.addEventListener('click',()=>{void findCameraChoices()});
+if(navigator.mediaDevices&&typeof navigator.mediaDevices.addEventListener==='function')navigator.mediaDevices.addEventListener('devicechange',()=>{void refreshCameraChoices()});
+void refreshCameraChoices();
 
 // ═══════════════════════════════════════════════════════════════════
 // OCCULERT v1.2 UPGRADE — Feature Pack (injected into main scope)
