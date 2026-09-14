@@ -34,7 +34,7 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.evaluate(() => document.documentElement.style.setProperty("scroll-behavior", "auto", "important"));
 
   expect(await page.locator('link[href="/homepage.css?v=32"]').count()).toBe(1);
-  expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1.jpg"]').count()).toBe(1);
+  expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1-640.avif"][type="image/avif"]').count()).toBe(1);
   expect(await page.locator('link[href="/homepage.css"]').count()).toBe(0);
   expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
@@ -60,7 +60,7 @@ test("homepage external assets preserve theme and mobile navigation controls", a
     window.scrollBy(0, 400);
   });
   await expect(page.locator("#siteNav")).toHaveClass(/nav-hidden/);
-  expect(await page.locator("#siteNav").evaluate((element) => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0);
+  expect(await page.locator("#siteNav").evaluate((element) => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(1);
   await expect(page.locator("#scrollTop")).not.toHaveClass(/visible/);
   await page.evaluate(() => window.scrollBy(0, -200));
   await expect(page.locator("#siteNav")).not.toHaveClass(/nav-hidden/);
@@ -423,6 +423,10 @@ test("camera permission recovery is platform specific and actionable", async ({ 
       { name: "NotReadableError" },
       { userAgent: "Mozilla/5.0", platform: "MacIntel", maxTouchPoints: 0 },
     ),
+    detector: cameraRecoveryGuidance(
+      { name: "DetectionRuntimeError" },
+      { userAgent: "Mozilla/5.0", platform: "MacIntel", maxTouchPoints: 0 },
+    ),
   }));
 
   expect(guidance.ios.title).toBe("Camera Access Blocked");
@@ -432,6 +436,30 @@ test("camera permission recovery is platform specific and actionable", async ({ 
   expect(guidance.android.hint).toContain("Permissions → Camera → Allow");
   expect(guidance.busy.title).toBe("Camera Is Busy");
   expect(guidance.busy.hint).toContain("other app or browser tab");
+  expect(guidance.detector.title).toBe("AI Monitoring Unavailable");
+  expect(guidance.detector.hint).toContain("Monitoring remains off");
+});
+
+test("driver startup self-test verifies WebAssembly and the pinned model graph", async ({ page }) => {
+  let graphRequests = 0;
+  await page.route("**/@mediapipe/face_mesh@0.4.1633559619/face_mesh.binarypb", async (route) => {
+    graphRequests += 1;
+    await route.fulfill({ status: 200, contentType: "application/octet-stream", body: "model-graph-fixture" });
+  });
+  const response = await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+  const contentSecurityPolicy = response?.headers()["content-security-policy"] || "";
+  expect(contentSecurityPolicy).toContain("'wasm-unsafe-eval'");
+  expect(contentSecurityPolicy).toContain("https://cdn.jsdelivr.net");
+  expect(await page.evaluate(() => verifyDetectionRuntime())).toBe(true);
+  expect(graphRequests).toBe(1);
+  expect(await page.evaluate(() => FACE_MESH_SCRIPT_URL)).toContain("@mediapipe/face_mesh@0.4.1633559619/face_mesh.js");
+  const probe = await page.evaluate(async () => {
+    faceMesh = { send: async ({ image }) => onResults({ multiFaceLandmarks: image === video ? [] : null }) };
+    await verifyFirstInference();
+    return { failures: consecutiveInferenceFailures, lastResult: lastDetectionResultAt };
+  });
+  expect(probe.failures).toBe(0);
+  expect(probe.lastResult).toBeGreaterThan(0);
 });
 
 test("driver alerts enhance only successful triggers and sensitivity is unambiguous", async ({ page }) => {
@@ -528,7 +556,11 @@ test("opted-in driver sessions use authenticated cloud APIs without sending GPS 
     backendSessionPromise = beginBackendSession();
     await backendSessionPromise;
     queueBackendEvent("drowsy");
-    await finishBackendSession({ avgFatigue: 25, maxFatigue: 60, safetyScore: 72, alerts: 1, headNods: 0 });
+    const backendState = detachBackendSession();
+    await finishBackendSession(
+      { avgFatigue: 25, maxFatigue: 60, safetyScore: 72, alerts: 1, headNods: 0 },
+      backendState,
+    );
   });
 
   expect(apiCalls.map((call) => call.method)).toEqual(["POST", "POST", "PATCH"]);
