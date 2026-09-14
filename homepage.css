@@ -367,6 +367,7 @@ footer{background:rgba(7,17,31,.82);-webkit-backdrop-filter:blur(18px);backdrop-
 .journey-frame{
   opacity:0;
   background-image:url('/homepage-journey-cinematic-v1.jpg');
+  background-image:image-set(url('/homepage-journey-cinematic-v1.avif') type('image/avif'),url('/homepage-journey-cinematic-v1.jpg') type('image/jpeg'));
   background-repeat:no-repeat;
   background-size:200% 200%;
   filter:saturate(.96) contrast(1.04);
@@ -375,6 +376,7 @@ footer{background:rgba(7,17,31,.82);-webkit-backdrop-filter:blur(18px);backdrop-
   transition:opacity .7s ease;
   will-change:opacity,transform;
 }
+@media(max-width:720px){.journey-frame{background-image:url('/homepage-journey-cinematic-v1-640.jpg');background-image:image-set(url('/homepage-journey-cinematic-v1-640.avif') type('image/avif'),url('/homepage-journey-cinematic-v1-640.jpg') type('image/jpeg'))}}
 .journey-frame-enter{background-position:0 0}
 .journey-frame-setup{background-position:100% 0}
 .journey-frame-monitor{background-position:0 100%}

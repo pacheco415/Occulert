@@ -63,6 +63,16 @@
       ⚠️ <strong>Screen locked or app backgrounded</strong> — Occulert may have paused. Return to this tab and keep your screen on.
     </div>
 
+    <div class="camera-source-row" id="cameraSourceRow" hidden>
+      <label for="cameraSourceSelect">Camera</label>
+      <div class="camera-source-controls">
+        <select id="cameraSourceSelect" aria-describedby="cameraSourceHint">
+          <option value="">Automatic (browser choice)</option>
+        </select>
+        <button type="button" id="cameraRefreshBtn">Find cameras</button>
+      </div>
+      <p class="camera-source-hint" id="cameraSourceHint" aria-live="polite">Choose your Mac camera to keep Safari from using your iPhone.</p>
+    </div>
     <button class="btn primary" id="startBtn">START MONITORING</button>
     <div class="timer-card" id="timerCard"><span class="timer-label">Session Time</span><span class="timer-value" id="sessionTimer">00:00</span></div>
 <button class="btn" id="recalBtn" style="background:rgba(6,182,212,.08);border-color:rgba(6,182,212,.35);color:#06b6d4;display:none;margin-bottom:12px;font-size:13px;padding:11px 15px;letter-spacing:.5px" title="Recalibrate to personalize detection for your eyes">↻ Recalibrate Eyes</button>
@@ -168,7 +178,7 @@
   <div style="background:#0f1e2e;border:1px solid #1a3a4a;border-radius:20px 20px 0 0;padding:28px 24px 32px;width:100%;max-width:480px;position:relative">
     <button onclick="closeIOSInstallModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1">✕</button>
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
-      <img src="/occulert-logo-main.png" width="52" height="52" loading="lazy" decoding="async" style="width:52px;height:52px;border-radius:12px" alt="Occulert">
+      <img src="/occulert-logo-main-192.png" width="52" height="52" loading="lazy" decoding="async" style="width:52px;height:52px;border-radius:12px" alt="Occulert">
       <div>
         <div style="font-weight:900;font-size:17px;color:#fff">Add Occulert to Home Screen</div>
         <div style="font-size:13px;color:#94a3b8;margin-top:3px">Install for the best experience</div>

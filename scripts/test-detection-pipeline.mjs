@@ -156,6 +156,16 @@ test('face loss decays confidence and never counts as drowsiness', () => {
   assert.equal(s.microsleeps, 0);
 });
 
+test('sustained tracking loss warns separately without counting a fatigue alert', () => {
+  const h = calibrated();
+  h.feed({ face: false }, 6_000);
+  assert.equal(h.state().alerts, 0);
+  const warnings = h.run("document.getElementById('log').children.filter(entry => entry.textContent.includes('Tracking lost'))");
+  assert.equal(warnings.length, 1);
+  h.feed({ face: false }, 10_000);
+  assert.equal(h.run("document.getElementById('log').children.filter(entry => entry.textContent.includes('Tracking lost')).length"), 1);
+});
+
 test('recovery after tracking loss cannot fire an instant alert', () => {
   const h = calibrated();
   h.feed({ ear: CLOSED }, 500);         // eyes closing as tracking drops
