@@ -104,6 +104,7 @@ test("recovery links that land on the homepage hand off to Account Setup", async
 test("passkey failures remain visible beside the passkey button", async ({ page }) => {
   await page.goto("/login.html", { waitUntil: "domcontentloaded" });
   await page.evaluate(() => {
+    document.getElementById("passkeySignInBtn").disabled = true;
     window.OcculertPasskeys = {
       ...window.OcculertPasskeys,
       isSupported: () => true,
@@ -113,6 +114,7 @@ test("passkey failures remain visible beside the passkey button", async ({ page 
     initPasskeySignIn();
   });
 
+  await expect(page.locator("#passkeySignInBtn")).toBeEnabled();
   await page.locator("#passkeySignInBtn").click();
   await expect(page.locator("#passkeyStatus")).toBeVisible();
   await expect(page.locator("#passkeyStatus")).toContainText("No new Occulert passkey is enrolled");

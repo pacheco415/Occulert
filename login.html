@@ -117,7 +117,7 @@ async function signInPasskey(retry){
   catch(err){showPasskey(window.OcculertPasskeys?window.OcculertPasskeys.message(err,'signin'):'Passkey sign-in is unavailable. Use email and password.','bad');setPasskeyRetry(Boolean(window.OcculertPasskeys&&window.OcculertPasskeys.canRetry&&window.OcculertPasskeys.canRetry(err)))}
   finally{button.textContent='Sign in with a passkey';setAuthBusy(false)}
 }
-function initPasskeySignIn(){let button=document.getElementById('passkeySignInBtn'),help=document.getElementById('passkeyHelp');if(passkeySupported())return;button.disabled=true;help.textContent='Passkeys require a supported browser on a secure Occulert page. Email and password remain available.'}
+function initPasskeySignIn(){let button=document.getElementById('passkeySignInBtn'),help=document.getElementById('passkeyHelp');if(passkeySupported()){button.disabled=false;return}button.disabled=true;help.textContent='Passkeys require a supported browser on a secure Occulert page. Email and password remain available.'}
 async function submitAuth(e){
   e.preventDefault();setAuthBusy(true);
   let email=document.getElementById('email').value.trim();
