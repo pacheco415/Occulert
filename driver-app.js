@@ -72,7 +72,7 @@ function migrateLocalDriverIdentity(value){const oldId=String(value||'').trim(),
 const CAMERA_DEVICE_STORAGE_KEY='occulert-camera-device-id';
 let availableCameraDevices=[],cameraLabelsRevealed=false,unavailableCameraDeviceId='',guardedCameraTrack=null,cameraMuteTimer=null,cameraFailureStopping=false;
 function isMobileCaptureDevice(nav=navigator){const userAgent=String(nav&&nav.userAgent||'').toLowerCase(),platform=String(nav&&nav.platform||'').toLowerCase(),touchPoints=Number(nav&&nav.maxTouchPoints)||0;return/android|iphone|ipad|ipod|mobile/.test(userAgent)||(platform==='macintel'&&touchPoints>1)}
-function buildCameraConstraints(deviceId='',nav=navigator){const videoConstraints={width:{ideal:480},height:{ideal:360},frameRate:{ideal:12,max:16}};if(deviceId&&!isMobileCaptureDevice(nav))videoConstraints.deviceId={exact:deviceId};else videoConstraints.facingMode={ideal:'user'};return{video:videoConstraints,audio:false}}
+function buildCameraConstraints(deviceId='',nav=navigator){const videoConstraints={width:{ideal:480},height:{ideal:360},frameRate:{ideal:12,max:16}};if(deviceId&&!isMobileCaptureDevice(nav))videoConstraints.deviceId={exact:deviceId};else videoConstraints.facingMode='user';return{video:videoConstraints,audio:false}}
 function cameraSelectionError(cause){const error=new Error('The selected camera is no longer available.');error.name='CameraSelectionError';if(cause)error.cause=cause;return error}
 function cameraOptionLabel(device,index){return String(device&&device.label||'').trim()||'Camera '+(index+1)}
 function savedCameraDeviceId(){try{return localStorage.getItem(CAMERA_DEVICE_STORAGE_KEY)||''}catch(error){return''}}

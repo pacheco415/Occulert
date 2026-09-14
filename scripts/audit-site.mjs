@@ -211,6 +211,7 @@ assertIncludes("driver-app.js", "function cameraRecoveryGuidance", "driver app m
 assertIncludes("app.html", "id=\"cameraSourceSelect\"", "desktop driver setup must provide an explicit camera picker");
 assertIncludes("driver-app.js", "CAMERA_DEVICE_STORAGE_KEY='occulert-camera-device-id'", "desktop camera choice must remain origin-local and persistent");
 assertIncludes("driver-app.js", "videoConstraints.deviceId={exact:deviceId}", "an explicit desktop camera choice must use an exact device constraint");
+assertIncludes("driver-app.js", "videoConstraints.facingMode='user'", "automatic and mobile camera requests must retain the Safari-compatible front-camera constraint");
 assertIncludes("driver-app.js", "function isMobileCaptureDevice", "mobile monitoring must keep its dedicated front-camera path");
 assertIncludes("driver-app.js", "CameraSelectionError", "a missing selected camera must fail closed instead of silently switching devices");
 assertIncludes("driver-app.js", "const recovery=cameraRecoveryGuidance(e)", "driver app must show recovery guidance after camera startup failures");

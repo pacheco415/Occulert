@@ -74,7 +74,7 @@ test("automatic desktop camera choice remains available", async ({ page }) => {
     return window.__cameraCalls.at(-1);
   });
   expect(request.video.deviceId).toBeUndefined();
-  expect(request.video.facingMode).toEqual({ ideal: "user" });
+  expect(request.video.facingMode).toBe("user");
   expect(await page.evaluate(() => localStorage.getItem("occulert-camera-device-id"))).toBeNull();
 });
 
@@ -88,7 +88,7 @@ test("mobile keeps the front-camera request and ignores a desktop preference", a
     return window.__cameraCalls.at(-1);
   });
   expect(request.video.deviceId).toBeUndefined();
-  expect(request.video.facingMode).toEqual({ ideal: "user" });
+  expect(request.video.facingMode).toBe("user");
 });
 
 test("iPad desktop mode keeps the mobile front-camera path", async ({ page }) => {
@@ -101,7 +101,7 @@ test("iPad desktop mode keeps the mobile front-camera path", async ({ page }) =>
     return window.__cameraCalls.at(-1);
   });
   expect(request.video.deviceId).toBeUndefined();
-  expect(request.video.facingMode).toEqual({ ideal: "user" });
+  expect(request.video.facingMode).toBe("user");
 });
 
 test("hidden Safari labels are revealed before cameras become selectable", async ({ page }) => {
