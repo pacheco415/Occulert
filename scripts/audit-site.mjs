@@ -185,6 +185,10 @@ assertIncludes("api/sessions.js", "driver_id: \"eq.\" + driver.id", "session upd
 assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes must verify the session belongs to the authenticated driver");
 assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event GPS latitude must be range validated");
 assertIncludes("api/sessions.js", "MAX_BODY_LENGTH", "session API must reject oversized JSON bodies");
+assertIncludes("api/session-cancel-v1.js", "request.method !== 'DELETE'", "cleanup capability endpoint must accept deletion only");
+assertIncludes("api/session-cancel-v1.js", "validId(body.cancel_token)", "cleanup capability endpoint must validate its secret");
+assertIncludes("api/session-cancel-v1.js", "validId(body.cleanup_token)", "cleanup endpoint must validate the driver-bound capability");
+assertIncludes("api/session-cancel-v1.js", "rpc/cancel_session_sync_token_v1", "cleanup capability endpoint must use the restricted database function");
 assertIncludes("api/pilot-leads.js", "body.website", "pilot lead API must include honeypot spam filtering");
 assertIncludes("pilot-signup.html", "startedAt:formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
 assertIncludes("api/pilot-leads.js", "rateLimitState(request)", "pilot lead API must use durable distributed rate limiting");
@@ -371,7 +375,7 @@ assertIncludes("fleet-dashboard.html", "id=\"driverSearch\"", "fleet dashboard m
 assertIncludes("fleet-dashboard.html", "function exportFleetCSV()", "fleet dashboard must keep CSV export");
 assertIncludes("fleet-dashboard.html", "function seedDemoData()", "fleet dashboard must keep demo data loading");
 assertIncludes("fleet-dashboard.html", "function copyDriver(id)", "fleet dashboard must keep per-driver copy summaries");
-assertIncludes("fleet-dashboard.html", "getFleetSummary({includeEvents})", "signed-in fleet dashboards must use the owner-scoped backend summary");
+assertIncludes("fleet-dashboard.html", "getFleetSummary({includeEvents,reportDays})", "signed-in fleet dashboards must use the owner-scoped backend summary");
 assertIncludes("fleet-dashboard.html", "!fleetMode&&local", "protected fleet dashboards must not fall back to unrelated local driver data");
 assertIncludes("fleet-dashboard.html", "id=\"sessionHistory\"", "fleet dashboard must render protected session history");
 assertIncludes("fleet-dashboard.html", "ontoggle=\"handleHistoryToggle(event)\"", "protected session history must render only after the manager opens it");

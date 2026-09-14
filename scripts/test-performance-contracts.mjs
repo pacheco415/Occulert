@@ -199,7 +199,8 @@ test('fleet refreshes adapt to activity and throttle protected event queries', (
   assert.match(api, /Promise\.all\(\[pgFetch\("drivers"/);
   assert.match(api, /if \(includeEvents && sessionIds\.length\)/);
   assert.match(api, /Server-Timing/);
-  assert.match(dashboard, /getFleetSummary\(\{includeEvents\}\)/);
+  assert.match(dashboard, /getFleetSummary\(\{includeEvents,reportDays\}\)/);
+  assert.match(dashboard, /PROTECTED_REPORT_REFRESH_MS=300000/);
   assert.match(dashboard, /shouldRefreshProtectedEvents\(\{historyOpen:protectedHistoryOpen\(\),lastLoadedAt:protectedEventsLoadedAt\}\)/);
   assert.match(dashboard, /setTimeout\(\(\)=>\{void pollProtectedFleet\(\)\},delay\)/);
 });
@@ -208,19 +209,25 @@ test('fleet dashboard restarts its relative-time clock after returning to a visi
   const dashboard = read('fleet-dashboard.html');
   const scheduling = markedBlock(dashboard, 'fleet-refresh-scheduling');
   let intervalCalls = 0;
+  let now = 1_000_000;
+  const loadOptions = [];
   const context = {
     DASHBOARD_CLOCK_INTERVAL_MS: 15_000,
+    PROTECTED_REPORT_REFRESH_MS: 300_000,
+    Date: { now: () => now },
     cloudRows: [],
     dashboardRefreshTimer: 7,
     document: { hidden: true },
     fleetMode: true,
     navigator: { connection: {} },
     protectedEventsLoadedAt: 0,
+    protectedReportLoadedAt: now,
     protectedRefreshFailures: 0,
     protectedRefreshTimer: 8,
     clearInterval: () => {},
     clearTimeout: () => {},
-    loadProtectedFleet: async () => true,
+    loadProtectedFleet: async options => { loadOptions.push(options); return true; },
+    pilotWindowDays: () => 30,
     protectedHistoryOpen: () => false,
     protectedRefreshDelay: () => 90_000,
     refreshDashboardIfNeeded: () => {},
@@ -228,7 +235,7 @@ test('fleet dashboard restarts its relative-time clock after returning to a visi
     setTimeout: () => 12,
     shouldRefreshProtectedEvents: () => false,
   };
-  runInNewContext(`${scheduling};globalThis.schedulingForTest={handleVisibilityChange}`, context);
+  runInNewContext(`${scheduling};globalThis.schedulingForTest={handleVisibilityChange,pollProtectedFleet}`, context);
 
   await context.schedulingForTest.handleVisibilityChange();
   assert.equal(intervalCalls, 0, 'hidden dashboards must keep timers stopped');
@@ -236,4 +243,14 @@ test('fleet dashboard restarts its relative-time clock after returning to a visi
   await context.schedulingForTest.handleVisibilityChange();
   assert.equal(intervalCalls, 1, 'visible dashboards must restart the relative-time interval');
   assert.equal(context.dashboardRefreshTimer, 11);
+  loadOptions.length = 0;
+  await context.schedulingForTest.pollProtectedFleet();
+  assert.equal(loadOptions.at(-1).reportDays, 0, 'routine status polls must reuse the recent full report');
+  context.shouldRefreshProtectedEvents = () => true;
+  await context.schedulingForTest.pollProtectedFleet();
+  assert.equal(loadOptions.at(-1).reportDays, 30, 'event refreshes must use the same selected report window as displayed history');
+  context.shouldRefreshProtectedEvents = () => false;
+  now += 300_000;
+  await context.schedulingForTest.pollProtectedFleet();
+  assert.equal(loadOptions.at(-1).reportDays, 30, 'the full report should refresh only after its longer interval');
 });

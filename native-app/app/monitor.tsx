@@ -111,8 +111,6 @@ const SENSOR_STALL_MS = 5_000;
 const CAMERA_SETUP_UI_INTERVAL_MS = 250;
 const SESSION_CHECKPOINT_INTERVAL_MS = 15_000;
 
-type StopOptions = { deferCloudFinalization?: boolean };
-
 const SAFE_STOP_ICONS: Record<SafeStopKind, React.ComponentProps<typeof Ionicons>['name']> = {
   'rest-area': 'bed-outline',
   'gas-station': 'car-outline',
@@ -156,7 +154,7 @@ export default function MonitorScreen() {
   const startingRef = useRef(false);
   const stoppingRef = useRef(false);
   const isRunningRef = useRef(false);
-  const handleStopRef = useRef<(options?: StopOptions) => Promise<void>>(async () => {});
+  const handleStopRef = useRef<() => Promise<void>>(async () => {});
   const cloudSessionRef = useRef<Promise<string | null> | null>(null);
   const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastSampleAtRef = useRef(0);
@@ -402,8 +400,10 @@ export default function MonitorScreen() {
     durationSec: number,
     alerts: number,
     monitorPerformance: MonitorPerformanceSnapshot,
-  ): Promise<string | null> => {
-    if (durationSec <= 0) return null;
+  ): Promise<string> => {
+    // Keep even a same-second stop in local History. Cloud sync starts with
+    // monitoring, so dropping this record would leave a server summary with no
+    // on-device record or user-visible sync state.
     const avgFatigue = fatigueSamplesRef.current
       ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
       : 0;
@@ -429,23 +429,7 @@ export default function MonitorScreen() {
     return sessionId;
   }, []);
 
-  const markSessionSynced = useCallback(async (
-    localSessionId: string,
-    cloudSessionId: string,
-  ) => {
-    try {
-      await updateSessionHistory<Record<string, unknown>>((sessions) => sessions.map((item) =>
-        item?.sessionId === localSessionId
-          ? { ...item, cloudSynced: true, cloudSessionId }
-          : item));
-    } catch {
-      // Keep the local session intact if its cloud badge cannot update.
-    }
-  }, []);
-
-  const handleStop = useCallback(async (
-    options: StopOptions = {},
-  ) => {
+  const handleStop = useCallback(async () => {
     // Invalidate any sensor start that is awaiting permission or optional
     // headphone-motion setup before it can activate monitoring.
     startAttemptRef.current += 1;
@@ -486,15 +470,13 @@ export default function MonitorScreen() {
       if (!cloudSessionId) return;
       await pendingEvents.catch(() => {});
       const safetyScore = Math.max(0, 100 - Math.round(maxFatigue * 0.65) - alerts * 8);
-      const synced = await finishCloudSession(cloudSessionId, {
+      const queued = await finishCloudSession(cloudSessionId, {
         averageFatigue,
         maxFatigue,
         safetyScore,
         alertCount: alerts,
-      });
-      if (synced && localSessionId) {
-        await markSessionSynced(localSessionId, cloudSessionId);
-      }
+      }, localSessionId ?? undefined, new Date(stoppedAt).toISOString());
+      if (!queued) throw new Error('cloud_summary_not_persisted');
     };
 
     try {
@@ -502,26 +484,31 @@ export default function MonitorScreen() {
       const localSessionId = activeSessionId
         ? await saveSession(activeSessionId, durationSec, alerts, monitorPerformance)
         : null;
+      // Keep the recovery checkpoint until the completed summary is recoverable
+      // from both local history and the durable cloud outbox. All awaited work
+      // here is local storage; network delivery remains in the background.
+      await finalizeCloud(localSessionId);
       if (activeSessionId) {
         await clearActiveSessionCheckpoint(activeSessionId).catch(() => {});
         if (activeSessionIdRef.current === activeSessionId) activeSessionIdRef.current = null;
       }
-      if (options.deferCloudFinalization) {
-        // Optional cloud finalization never delays a safe-stop Maps handoff.
-        void finalizeCloud(localSessionId).catch(() => {});
-        return;
-      }
-      await finalizeCloud(localSessionId);
     } finally {
       stoppingRef.current = false;
       setIsStopping(false);
     }
-  }, [markSessionSynced, reset, saveSession]);
+  }, [reset, saveSession]);
 
   // App-state and hardware-back listeners stay registered across timer ticks,
   // while these refs always expose the latest session snapshot to them.
   isRunningRef.current = isRunning;
   handleStopRef.current = handleStop;
+
+  const showDriveSaveFailure = useCallback(() => {
+    Alert.alert(
+      'Drive may not be fully saved',
+      'Monitoring has stopped, but Occulert could not finish saving this drive.',
+    );
+  }, []);
 
   const handleSafeStopChoice = useCallback(async (kind: SafeStopKind) => {
     if (safeStopBusy || stoppingRef.current) return;
@@ -530,7 +517,7 @@ export default function MonitorScreen() {
       // Camera monitoring cannot continue reliably after Maps backgrounds the
       // app. End and save first so the UI never implies hidden protection.
       try {
-        await handleStop({ deferCloudFinalization: true });
+        await handleStop();
       } catch {
         // A local storage problem must not trap a fatigued driver inside
         // Occulert. Monitoring has already been disarmed before saving starts.
@@ -565,16 +552,11 @@ export default function MonitorScreen() {
   const leaveMonitor = useCallback((navigate: () => void) => {
     if (stoppingRef.current) return Promise.resolve();
     return stopBeforeNavigation(
-      () => handleStopRef.current({ deferCloudFinalization: true }),
+      () => handleStopRef.current(),
       navigate,
-      () => {
-        Alert.alert(
-          'Drive may not be fully saved',
-          'Monitoring has stopped, but Occulert could not finish saving this drive.',
-        );
-      },
+      showDriveSaveFailure,
     );
-  }, []);
+  }, [showDriveSaveFailure]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -605,7 +587,7 @@ export default function MonitorScreen() {
       setSensorFault(
         'Face monitoring paused. Monitoring stopped when Occulert left the foreground. Restart only after you are safely parked.',
       );
-      void handleStopRef.current({ deferCloudFinalization: true }).catch(() => {
+      void handleStopRef.current().catch(() => {
         setSensorFault(
           'Face monitoring paused. Monitoring stopped when Occulert left the foreground, but this drive could not be saved.',
         );
@@ -622,10 +604,10 @@ export default function MonitorScreen() {
       performanceTrackerRef.current.recordCameraStall();
       const message = 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.';
       setSensorFault(message);
-      void handleStopRef.current();
+      void handleStopRef.current().catch(showDriveSaveFailure);
     }, 500);
     return () => clearInterval(watchdog);
-  }, [isRunning]);
+  }, [isRunning, showDriveSaveFailure]);
 
   const onEyeState = useCallback((
     leftProb: number,
@@ -1067,7 +1049,7 @@ export default function MonitorScreen() {
               accessibilityLabel="Stop monitoring and save this drive"
               style={s.stopBtn}
               onPress={() => {
-                void handleStop();
+                void handleStop().catch(showDriveSaveFailure);
               }}
             >
               <Ionicons name="stop-circle" size={22} color="#fff" />

@@ -13,6 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import {
   getCloudState,
+  retryCloudUploads,
+  pendingCloudSessionIds,
   setCloudSyncEnabled,
   signInToCloud,
   signOutOfCloud,
@@ -30,16 +32,25 @@ const EMPTY_STATE: CloudState = {
 
 export function CloudSyncCard() {
   const [state, setState] = useState<CloudState>(EMPTY_STATE);
+  const [pendingCount, setPendingCount] = useState(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const mountedRef = useRef(true);
+  const refreshGenerationRef = useRef(0);
   const actionRunnerRef = useRef(createSingleFlightActionRunner());
+  const retryRunnerRef = useRef(createSingleFlightActionRunner());
 
   const refresh = useCallback(async () => {
-    const nextState = await getCloudState();
-    if (!mountedRef.current) return;
+    const generation = ++refreshGenerationRef.current;
+    const [nextState, pending] = await Promise.all([
+      getCloudState(),
+      pendingCloudSessionIds().catch(() => []),
+    ]);
+    if (!mountedRef.current || generation !== refreshGenerationRef.current) return;
     setState(nextState);
+    setPendingCount(pending.length);
   }, []);
 
   useEffect(() => {
@@ -108,12 +119,29 @@ export function CloudSyncCard() {
     }
     Alert.alert(
       'Share session summaries?',
-      'Occulert will send timestamps, fatigue scores, and alert counts to your protected account. Camera images, video, audio, location, and alert ratings stay off the server.',
+      'Occulert will send timestamps, fatigue scores, and alert counts to your protected account. Uploads retry while Occulert is open. Turning sharing off or signing out cancels pending uploads. Camera images, video, audio, location, and alert ratings stay off the server.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Enable', onPress: () => { applyConsent(true); } },
       ],
     );
+  };
+
+  const retrySync = () => {
+    void retryRunnerRef.current.run({
+      action: async () => {
+        await retryCloudUploads(true);
+        await refresh();
+      },
+      onBusyChange: nextSyncing => {
+        if (mountedRef.current) setSyncing(nextSyncing);
+      },
+      onError: () => {
+        if (mountedRef.current) {
+          Alert.alert('Cloud sync unavailable', 'Occulert could not retry pending uploads. Please check your connection and try again.');
+        }
+      },
+    });
   };
 
   const openAccountPage = async () => {
@@ -135,7 +163,7 @@ export function CloudSyncCard() {
     <View style={s.card}>
       <View style={s.titleRow}>
         <Text style={s.cardTitle}>CLOUD SESSION SYNC</Text>
-        {busy
+        {busy || syncing
           ? <ActivityIndicator size="small" color="#60a5fa" />
           : <Text style={[s.status, state.signedIn && s.statusOn]}>
               {state.signedIn ? 'SIGNED IN' : state.available ? 'OPTIONAL' : 'UNAVAILABLE'}
@@ -196,6 +224,11 @@ export function CloudSyncCard() {
               <Text style={s.signOutText}>Sign Out</Text>
             </TouchableOpacity>
           </View>
+          <TouchableOpacity accessibilityRole="button" disabled={busy || syncing || !state.syncEnabled}
+            onPress={retrySync}
+            style={[s.linkBtn, (busy || syncing || !state.syncEnabled) && s.disabled]}>
+            <Text style={s.linkText}>{pendingCount ? `${pendingCount} summaries waiting · Retry sync` : 'Check for pending uploads'}</Text>
+          </TouchableOpacity>
           <View style={s.div} />
           <View style={s.row}>
             <View style={s.rowL}>

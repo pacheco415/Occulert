@@ -11,7 +11,13 @@ const baseline = tables.replaceAll('references auth.users(id) on delete cascade'
   .replaceAll('references fleets(id) on delete set null', 'references fleets(id) on delete cascade');
 const migration = readFileSync(new URL('../supabase/migrations/20260912170153_atomic_account_deletion.sql', import.meta.url), 'utf8');
 try {
-  await db.exec('create schema auth; create table auth.users(id uuid primary key);');
+  await db.exec(`
+    create role anon;
+    create role authenticated;
+    create role service_role;
+    create schema auth;
+    create table auth.users(id uuid primary key);
+  `);
   await db.exec(baseline);
   await db.exec(migration);
   await db.exec(`

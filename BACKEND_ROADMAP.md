@@ -1,97 +1,24 @@
 # Occulert Backend Roadmap
 
-The current app-to-dashboard sync uses browser localStorage. That is good for a prototype, but real fleet operations need a backend.
+Updated 2026-09-13. Source status is separate from deployment verification.
 
-## Current implementation
+## Implemented foundation
 
-- Signed-in drivers can opt into protected session and event writes through the
-  Supabase-backed API; localStorage remains the fallback.
-- Verified fleet owners can read their server-scoped roster and recent sessions.
-- Protected fleet history includes recent alert events without GPS coordinates,
-  personal media, or raw motion.
-- The manager dashboard turns the 50 most recent protected sessions into a
-  clearly bounded 7- or 30-day pilot snapshot, driver follow-up queue, and
-  formula-safe report export. A paid-rollout interest path reuses the protected
-  pilot contact endpoint and records an allowlisted server-side source label.
-- The dashboard keeps local demo and same-browser fallback data separate from
-  authenticated fleet data.
+Occulert uses Supabase-backed APIs for authenticated profiles, fleets, invitations, consent-based session/event writes, owner-scoped reporting, pilot requests, and self-service account deletion. Browser local storage is an intentional local/demo fallback. Selecting a new backend or rebuilding accounts is unnecessary.
 
-## Next production upgrade
+The current development package adds stable session/event IDs for owner-scoped retry deduplication and original client timestamps for offline uploads. It requires `20260913_native_sync_guards.sql`, which adds atomic interrupted-session cancellation, a stable private driver cleanup capability, per-session cleanup tokens, and a server-issued fleet sync token. Driver-bound cleanup remains retryable after sign-out without retaining account credentials, handles absent creates and late finalization, and records idempotent receipts that cascade with account deletion. The fleet token rotates when fleet membership changes, and session start validates it while holding the membership row through the insert; delayed uploads with an old token remain visible only to the authenticated driver account. The new native client waits for the backend's opt-in session-sync capability marker before uploading.
 
-The new reporting workflow passed signed-in Preview review for an owner-scoped
-fleet with two active drivers and no recorded sessions; nonzero reporting states
-passed automated browser coverage. After merge, verify production behavior,
-then add durable manager follow-up outcomes, reporting pagination or retention,
-and plan entitlements after pilot pricing is defined. Keep driver consent, fleet
-ownership, and telemetry-trust boundaries unchanged.
+Fleet reports now request 7/30-day windows through the single-snapshot database function in `20260913_session_report_snapshot.sql`. The function returns at most 2,000 completed sessions from one PostgreSQL snapshot and states whether the window is complete. A separate bounded query retains current active-drive status for the live dashboard. A compatibility fallback returns at most 50 completed rows and never claims completeness. The UI keeps the selected window aligned with the server response and blocks complete, formula-safe report export unless the server confirms the requested snapshot. Detailed events remain a bounded recent sample; summary alert counts cover the returned sessions. All telemetry remains unverified client reports.
 
-Recommended stack options:
+The earlier reporting workflow passed signed-in Preview review with an owner-scoped fleet containing two active drivers and no recorded sessions. Current authenticated timing and production verification remain pending for this expanded report path.
 
-1. Firebase
-   - Fastest for MVP
-   - Auth, database, hosting, realtime updates
+## Next work
 
-2. Supabase
-   - Good open-source style option
-   - Postgres database, auth, realtime channels
+1. Apply both 2026-09-13 migrations, deploy with the capability flag off, verify the versioned upload routes, cleanup route, live active status, and snapshot report, then enable the flag and recheck the public capability marker.
+2. Verify delayed uploads, membership changes, and complete/partial report behavior on a populated owner-scoped fleet.
+3. Persist manager follow-up outcomes with owner-scoped authorization and clear retention rules.
+4. Measure report latency and load before adopting database aggregates or increasing reporting limits.
+5. Define account data export and retention workflows.
+6. Add billing and plan entitlements after pilot demand and commercial terms are validated.
 
-3. Custom Node/Express API
-   - More control
-   - More maintenance
-
-## Data tables needed
-
-### fleets
-- id
-- company_name
-- owner_user_id
-- plan
-- created_at
-
-### drivers
-- id
-- fleet_id
-- name
-- email
-- vehicle_id
-- active
-- created_at
-
-### sessions
-- id
-- driver_id
-- fleet_id
-- started_at
-- ended_at
-- average_fatigue
-- max_fatigue
-- safety_score
-- alert_count
-- head_nod_count
-- device
-- browser
-
-### events
-- id
-- session_id
-- type
-- fatigue_score
-- confidence
-- latitude
-- longitude
-- created_at
-
-## Privacy requirements
-
-- Do not upload live camera video unless a future policy explicitly supports it.
-- Store fatigue scores and event metadata, not raw face video.
-- Ask permission before collecting GPS.
-- Make fleet use transparent to drivers.
-
-## Immediate implementation order
-
-1. Add backend account system.
-2. Add driver login or driver code.
-3. Save sessions to database.
-4. Show realtime fleet dashboard updates.
-5. Add exportable reports for fleet managers.
+Driver consent, server-verified ownership, and exclusion of camera media, audio, location, and raw motion from protected reports remain required.

@@ -12,6 +12,7 @@ import {
   type SessionDeviceImpact,
   type SessionTestConditions,
 } from '../lib/feedback';
+import { pendingCloudSessionIds, retryCloudUploads } from '../lib/cloudSync';
 import { updateSessionHistory } from '../lib/sessionHistory';
 import {
   commitSessionHistoryEdit,
@@ -30,6 +31,7 @@ const CHECKPOINT_TARGET = 10;
 interface SessionRecord extends FeedbackSession {
   driverId?: string;
   cloudSynced?: boolean;
+  cloudSyncNeedsReview?: boolean;
   cloudSessionId?: string;
   assessmentUpdatedAt?: string;
   conditionsUpdatedAt?: string;
@@ -164,27 +166,42 @@ function hasCompleteReview(item: SessionRecord): boolean {
 export default function HistoryScreen() {
   const router = useRouter();
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const historyRevisionRef = useRef(0);
+  const loadGenerationRef = useRef(0);
 
   const load = useCallback(async () => {
     const revision = historyRevisionRef.current;
+    const generation = ++loadGenerationRef.current;
     try {
-      const raw = await AsyncStorage.getItem(HISTORY_KEY);
+      const [raw, pending] = await Promise.all([AsyncStorage.getItem(HISTORY_KEY), pendingCloudSessionIds().catch(() => [])]);
       const parsed = raw ? JSON.parse(raw) : [];
-      if (historyRevisionRef.current === revision) {
+      if (historyRevisionRef.current === revision && loadGenerationRef.current === generation) {
         setSessions(Array.isArray(parsed) ? parsed : []);
+        setPendingIds(pending);
       }
     } catch {
-      if (historyRevisionRef.current === revision) setSessions([]);
+      if (historyRevisionRef.current === revision && loadGenerationRef.current === generation) setSessions([]);
     } finally {
-      setLoaded(true);
+      if (historyRevisionRef.current === revision && loadGenerationRef.current === generation) setLoaded(true);
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void load();
+    void retryCloudUploads().catch(() => {}).finally(() => { if (active) void load(); });
+    const timer = setInterval(() => { void load(); }, 5000);
+    return () => {
+      active = false;
+      historyRevisionRef.current += 1;
+      loadGenerationRef.current += 1;
+      clearInterval(timer);
+    };
+  }, [load]));
 
   const saveSessionChanges = async (
     index: number,
@@ -426,12 +443,18 @@ export default function HistoryScreen() {
             )}
             <View style={s.storageRow}>
               <Ionicons
-                name={item.cloudSynced ? 'cloud-done-outline' : 'phone-portrait-outline'}
+                name={item.cloudSynced ? 'cloud-done-outline' : item.cloudSyncNeedsReview ? 'cloud-offline-outline' : 'phone-portrait-outline'}
                 size={14}
-                color={item.cloudSynced ? '#34d399' : '#4a7a8a'}
+                color={item.cloudSynced ? '#34d399' : item.cloudSyncNeedsReview ? '#fbbf24' : '#4a7a8a'}
               />
               <Text style={[s.storageText, item.cloudSynced && s.storageTextSynced]}>
-                {item.cloudSynced ? 'Summary synced to your protected account' : 'Saved only on this iPhone'}
+                {item.cloudSynced
+                  ? 'Summary synced to your protected account'
+                  : item.cloudSyncNeedsReview
+                    ? 'Saved on this iPhone · cloud sync could not complete'
+                    : pendingIds.includes(item.sessionId || '')
+                      ? 'Saved on this iPhone · waiting to sync'
+                      : 'Saved only on this iPhone'}
               </Text>
             </View>
             <Text style={s.buildInfo}>

@@ -7,6 +7,18 @@ const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const MAX_BODY_LENGTH = 2048;
+const DRIVER_FIELDS = [
+  "id", "user_id", "name", "email", "vehicle_id", "fleet_id", "active",
+  "fleet_sync_token", "session_cleanup_token",
+];
+
+function publicDriver(row) {
+  const result = {};
+  for (const field of DRIVER_FIELDS) {
+    if (row && Object.prototype.hasOwnProperty.call(row, field)) result[field] = row[field];
+  }
+  return result;
+}
 
 function json(response, status, body) {
   response.statusCode = status;
@@ -30,24 +42,28 @@ module.exports = async function handler(request, response) {
     return json(response, 501, { ok: false, error: "backend_not_configured" });
   }
 
-  if (request.method !== "POST") {
-    response.setHeader("Allow", "POST");
+  if (request.method !== "GET" && request.method !== "POST") {
+    response.setHeader("Allow", "GET, POST");
     return json(response, 405, { ok: false, error: "method_not_allowed" });
   }
 
   const user = await verifyAccessToken(bearerToken(request));
   if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
-  if (!validBody(request)) return json(response, 415, { ok: false, error: "invalid_json_body" });
-
-  const body = request.body || {};
-  const email = clean(user.email, 240).toLowerCase();
-  const name = clean(body.name, 160) || email.split("@")[0] || "Occulert Driver";
-  const vehicleId = clean(body.vehicle, 120) || null;
+  if (request.method === "POST" && !validBody(request)) return json(response, 415, { ok: false, error: "invalid_json_body" });
 
   try {
     const existing = await pgFetch("drivers", {
-      params: { select: "id,user_id,name,email,vehicle_id,fleet_id,active", user_id: "eq." + user.id, limit: "1" },
+      params: { select: DRIVER_FIELDS.join(","), user_id: "eq." + user.id, limit: "1" },
     });
+    if (request.method === "GET") {
+      if (!existing.length) return json(response, 404, { ok: false, error: "driver_profile_not_found" });
+      return json(response, 200, { ok: true, driver: publicDriver(existing[0]) });
+    }
+
+    const body = request.body || {};
+    const email = clean(user.email, 240).toLowerCase();
+    const name = clean(body.name, 160) || email.split("@")[0] || "Occulert Driver";
+    const vehicleId = clean(body.vehicle, 120) || null;
     const values = { name, email: email || null, vehicle_id: vehicleId, active: true };
     let rows;
 
@@ -65,7 +81,7 @@ module.exports = async function handler(request, response) {
     }
 
     if (!rows.length) return json(response, 502, { ok: false, error: "profile_not_saved" });
-    return json(response, 200, { ok: true, driver: rows[0] });
+    return json(response, 200, { ok: true, driver: publicDriver(rows[0]) });
   } catch {
     return json(response, 502, { ok: false, error: "supabase_error" });
   }

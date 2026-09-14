@@ -8,9 +8,11 @@ export default defineConfig({
   // closed" on an arbitrary test. Retrying relaunches the browser and clears it.
   // Local runs keep retries off so real failures stay obvious.
   retries: process.env.CI ? 2 : 0,
+  projects: [{ name: "chromium", use: { browserName: "chromium" } }, { name: "webkit", use: { browserName: "webkit" } }],
   use: {
+    // Network fixtures must not be bypassed by the PWA service worker.
+    serviceWorkers: "block",
     baseURL: "http://127.0.0.1:4173",
-    browserName: "chromium",
     trace: "retain-on-failure",
   },
   webServer: {

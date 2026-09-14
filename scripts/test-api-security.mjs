@@ -59,27 +59,28 @@ async function invoke(handler, req) {
 let allowSessionUpdate = false;
 let sessionPatchParams;
 let patchedSession;
+const ownedSessionId = "11111111-1111-4111-8111-111111111111";
 const sessions = loadHandler("../api/sessions.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
   if (table === "sessions" && options.method === "PATCH") {
     sessionPatchParams = options.params;
     patchedSession = options.body;
-    return allowSessionUpdate ? [{ id: "session-1" }] : [];
+    return allowSessionUpdate ? [{ id: ownedSessionId }] : [];
   }
   throw new Error(`unexpected sessions call: ${table}`);
 });
 
-const patchBody = { session_id: "session-1", average_fatigue: 30, max_fatigue: 60, safety_score: 80 };
+const patchBody = { session_id: ownedSessionId, average_fatigue: 30, max_fatigue: 60, safety_score: 80 };
 const deniedPatch = await invoke(sessions, request("PATCH", patchBody));
 assert.equal(deniedPatch.status, 404, "a session not owned by the authenticated driver must stay hidden");
-assert.deepEqual(sessionPatchParams, { id: "eq.session-1", driver_id: "eq.driver-1" });
+assert.deepEqual(sessionPatchParams, { id: "eq." + ownedSessionId, driver_id: "eq.driver-1" });
 
 allowSessionUpdate = true;
 const allowedPatch = await invoke(sessions, request("PATCH", patchBody));
 assert.equal(allowedPatch.status, 200, "the authenticated driver must still be able to finish their own session");
 
 const blankMetricsPatch = await invoke(sessions, request("PATCH", {
-  session_id: "session-1",
+  session_id: ownedSessionId,
   average_fatigue: null,
   max_fatigue: "",
   safety_score: false,
@@ -93,7 +94,7 @@ let allowEventSession = false;
 let insertedEvent;
 const events = loadHandler("../api/events.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1" }];
-  if (table === "sessions") return allowEventSession ? [{ id: "session-1" }] : [];
+  if (table === "sessions") return allowEventSession ? [{ id: ownedSessionId }] : [];
   if (table === "events") {
     insertedEvent = options.body;
     return [{ id: "event-1", ...options.body }];
@@ -101,7 +102,7 @@ const events = loadHandler("../api/events.js", async (table, options = {}) => {
   throw new Error(`unexpected events call: ${table}`);
 });
 
-const eventBody = { session_id: "session-1", type: "drowsy", fatigue_score: 140, confidence: -5, latitude: 120, longitude: -240 };
+const eventBody = { session_id: ownedSessionId, type: "drowsy", fatigue_score: 140, confidence: -5, latitude: 120, longitude: -240 };
 const deniedEvent = await invoke(events, request("POST", eventBody));
 assert.equal(deniedEvent.status, 404, "events must not be written to another driver's session");
 
@@ -115,7 +116,7 @@ assert.equal(insertedEvent.latitude, 90);
 assert.equal(insertedEvent.longitude, -180);
 
 const eventWithoutLocation = await invoke(events, request("POST", {
-  session_id: "session-1",
+  session_id: ownedSessionId,
   type: "drowsy",
   fatigue_score: 25,
   latitude: null,
@@ -145,6 +146,28 @@ assert.equal(savedProfile.status, 200);
 assert.equal(insertedProfile.user_id, "user-1");
 assert.equal(insertedProfile.fleet_id, null, "drivers must not self-assign fleet membership");
 assert.equal(Object.hasOwn(insertedProfile, "role"), false, "privileged roles must not be accepted from the browser");
+
+let profileReadOptions;
+const readProfile = loadHandler("../api/profile.js", async (table, options = {}) => {
+  assert.equal(table, "drivers");
+  profileReadOptions = options;
+  return [{
+    id: "driver-1",
+    user_id: "user-1",
+    name: "Manager Assigned Name",
+    vehicle_id: "Van 12",
+    active: false,
+    fleet_sync_token: "77777777-7777-4777-8777-777777777777",
+    session_cleanup_token: "88888888-8888-4888-8888-888888888888",
+  }];
+});
+const profileRead = await invoke(readProfile, request("GET"));
+assert.equal(profileRead.status, 200);
+assert.equal(profileRead.body.driver.name, "Manager Assigned Name");
+assert.equal(profileRead.body.driver.active, false);
+assert.equal(profileRead.body.driver.fleet_sync_token, "77777777-7777-4777-8777-777777777777");
+assert.equal(profileRead.body.driver.session_cleanup_token, "88888888-8888-4888-8888-888888888888");
+assert.equal(profileReadOptions.method, undefined, "profile refresh must remain read-only");
 
 let insertedFleet;
 const fleets = loadHandler("../api/fleets.js", async (table, options = {}) => {
@@ -366,15 +389,57 @@ assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions"]);
 assert.equal(lightweightResult.body.events_included, false);
 assert.deepEqual(lightweightResult.body.events, []);
 
+const activeSessionId = "22222222-2222-4222-8222-222222222222";
+const completedSessionId = "33333333-3333-4333-8333-333333333333";
+let liveSessionOptions;
+let reportRpcOptions;
+const reportSummary = loadHandler("../api/fleet-summary.js", async (table, options = {}) => {
+  if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
+  if (table === "drivers") return [{ id: "driver-1", name: "Driver", active: true }];
+  if (table === "sessions") {
+    liveSessionOptions = options;
+    return [{ id: activeSessionId, driver_id: "driver-1", started_at: "2026-09-12T01:00:00Z", ended_at: null }];
+  }
+  if (table === "rpc/fleet_session_report_v1") {
+    reportRpcOptions = options;
+    return {
+      sessions: [{ id: completedSessionId, driver_id: "driver-1", started_at: "2026-09-11T01:00:00Z", ended_at: "2026-09-11T02:00:00Z" }],
+      complete: true,
+    };
+  }
+  throw new Error(`unexpected report summary call: ${table}`);
+});
+const reportRequest = request("GET");
+reportRequest.url = "/api/fleet-summary?include_events=0&report_days=30";
+const reportSummaryResult = await invoke(reportSummary, reportRequest);
+assert.equal(reportSummaryResult.status, 200);
+assert.equal(reportSummaryResult.body.sessions[0].id, activeSessionId, "live status must retain an unfinished active session");
+assert.equal(reportSummaryResult.body.report_sessions[0].id, completedSessionId, "export history must use the completed snapshot rows");
+assert.equal(Object.hasOwn(liveSessionOptions.params, "ended_at"), false, "the live dashboard query must include active sessions");
+assert.equal(reportRpcOptions.body.p_fleet_id, "fleet-1");
+assert.deepEqual(reportSummaryResult.body.report_window, {
+  days: 30,
+  from: reportRpcOptions.body.p_from,
+  through: reportRpcOptions.body.p_through,
+  complete: true,
+  snapshot: true,
+});
+
 const publicConfigPath = require.resolve("../api/public-config.js");
 delete require.cache[publicConfigPath];
 const publicConfig = require(publicConfigPath);
 const configResult = await invoke(publicConfig, request("GET"));
 assert.equal(configResult.status, 200);
+assert.equal(configResult.body.session_sync_version, 0, "native sync must stay gated until the migration and routes are verified");
 assert.equal(configResult.body.supabase.configured, true);
 assert.equal(configResult.body.supabase.url, "https://example.supabase.co");
 assert.equal(configResult.body.supabase.anonKey, "test-public-anon-key");
 assert.equal(JSON.stringify(configResult.body).includes("test-service-role"), false, "public config must never expose the service-role key");
+process.env.OCCULERT_SESSION_SYNC_V1_ENABLED = "true";
+delete require.cache[publicConfigPath];
+const enabledConfigResult = await invoke(require(publicConfigPath), request("GET"));
+assert.equal(enabledConfigResult.body.session_sync_version, 1);
+delete process.env.OCCULERT_SESSION_SYNC_V1_ENABLED;
 
 let storedLead;
 const pilotRateCounts = new Map();

@@ -94,10 +94,13 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /Face monitoring paused/);
   assert.match(monitor, /currentAlertPreferences\(\)/);
   assert.match(monitor, /stopBeforeNavigation/);
+  assert.match(monitor, /const showDriveSaveFailure = useCallback/);
+  assert.match(monitor, /void handleStop\(\)\.catch\(showDriveSaveFailure\)/);
+  assert.match(monitor, /void handleStopRef\.current\(\)\.catch\(showDriveSaveFailure\)/);
   assert.equal(
-    [...monitor.matchAll(/handleStopRef\.current\(\{ deferCloudFinalization: true \}\)/g)].length,
-    2,
-    'navigation and AppState shutdown must not wait for optional cloud finalization',
+    [...monitor.matchAll(/handleStopRef\.current\(\)/g)].length,
+    3,
+    'navigation, AppState shutdown, and the camera-stall watchdog must use the durable finalization path',
   );
   assert.match(monitor, /drive could not be saved/);
   assert.match(monitor, /leaveMonitor\(\(\) => router\.push\('\/settings'\)\)/);

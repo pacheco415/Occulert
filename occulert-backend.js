@@ -347,7 +347,10 @@ window.OcculertBackend = (function () {
 
   function getFleetSummary(options) {
     var includeEvents = !options || options.includeEvents !== false;
-    return api("GET", "/api/fleet-summary" + (includeEvents ? "" : "?include_events=0"));
+    var query = [];
+    if (!includeEvents) query.push("include_events=0");
+    if (options && (options.reportDays === 7 || options.reportDays === 30)) query.push("report_days=" + options.reportDays);
+    return api("GET", "/api/fleet-summary" + (query.length ? "?" + query.join("&") : ""));
   }
 
   function getFleet() { return api("GET", "/api/fleets"); }

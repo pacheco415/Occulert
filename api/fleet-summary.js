@@ -6,6 +6,7 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
+const { readFleetReport } = require("./_lib/fleet-report");
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function json(response, status, body) {
@@ -56,6 +57,11 @@ return json(response, 403, { ok: false, error: "fleet_not_found" });
 }
 const fleetLookupMs = Date.now() - requestStartedAt;
 
+const reportValue = new URL(request.url || '/', 'https://www.occulert.com').searchParams.get('report_days') || request.query?.report_days;
+if (reportValue !== undefined && reportValue !== null && reportValue !== '7' && reportValue !== '30') {
+return json(response, 400, { ok: false, error: 'invalid_report_days' });
+}
+const reportDays = reportValue ? Number(reportValue) : null;
 const rosterStartedAt = Date.now();
 const rosterResults = await Promise.all([pgFetch("drivers", {
 params: { select: "id,name,active,vehicle_id", fleet_id: "eq." + fleet.id },
@@ -66,13 +72,15 @@ fleet_id: "eq." + fleet.id,
 order: "started_at.desc",
 limit: "50",
 },
-})]);
+}), reportDays ? readFleetReport(pgFetch, fleet.id, reportDays, requestStartedAt) : null]);
 const drivers = rosterResults[0];
 const sessions = rosterResults[1];
+const report = rosterResults[2];
 const rosterLookupMs = Date.now() - rosterStartedAt;
 
 const includeEvents = shouldIncludeEvents(request);
-const sessionIds = sessions
+const eventSessions = report ? report.sessions : sessions;
+const sessionIds = eventSessions.slice(0, 50)
 .map(function (session) { return String(session.id || ""); })
 .filter(function (id) { return UUID_PATTERN.test(id); });
 let events = [];
@@ -110,6 +118,14 @@ ok: true,
 fleet: fleet,
 drivers: drivers,
 sessions: sessions,
+report_sessions: report ? report.sessions : null,
+report_window: report ? {
+days: report.days,
+from: report.from,
+through: report.through,
+complete: report.complete,
+snapshot: report.compatibility === 'snapshot_v1',
+} : null,
 events: events,
 events_included: includeEvents,
 telemetry_trust: "unverified_client_report",

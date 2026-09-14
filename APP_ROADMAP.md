@@ -4,10 +4,12 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 ★ = top-priority milestone for each phase
 
-**Last updated: 2026-09-01** — statuses distinguish shipped production work,
+**Last updated: 2026-09-13** — statuses distinguish shipped production work,
 current development source, and physical-device validation. See
 `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`, `SAFE_STOP_HANDOFF.md`, and issue
 #6 for the remaining evidence and product gaps.
+
+See `DEVELOPMENT_CHECKPOINT.md` for the current offline-sync, reporting, dependency, and cross-browser development package, plus the separate Apple integration branch. These changes are not yet deployment or native-build evidence.
 
 The current source-level runtime budgets, upgrades, and evidence gates are in
 `PERFORMANCE_ROADMAP.md`.

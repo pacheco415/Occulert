@@ -35,7 +35,7 @@ test('native cloud writes recheck current consent', () => {
   assert.match(finishWrite, /if \(!await consentEnabled\(\)\) return false/);
   assert.match(cloud, /createCachedBooleanPreference/);
   assert.match(cloud, /if \(consentRuntimeOverride !== null\) return consentRuntimeOverride/);
-  assert.match(cloud, /if \(!enabled\) consentRuntimeOverride = false/);
+  assert.match(cloud, /if \(!enabled\) \{\s*consentRuntimeOverride = false/);
   assert.match(cloud, /cloudSyncPreference\.set\(false\)/);
 });
 
@@ -303,6 +303,7 @@ test('History commits after persistence and ignores loads started before a newer
   assert.match(history, /persist: mutation => updateSessionHistory/);
   assert.match(history, /apply: mutation => setSessions\(current/);
   assert.match(history, /historyRevisionRef\.current === revision/);
+  assert.match(history, /loadGenerationRef\.current === generation/);
   assert.doesNotMatch(history, /const updated = sessions\.map/);
   assert.match(storage, /const operation = historyQueue\.then/);
   assert.match(storage, /historyQueue = operation\.catch/);

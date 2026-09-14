@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Linking,
   Platform,
   SafeAreaView,
@@ -11,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   clearStoredHealthReadiness,
   isAppleHealthAvailable,
@@ -20,6 +21,7 @@ import {
 } from '../lib/appleHealth';
 import type { HealthReadinessSnapshot } from '../lib/healthReadiness';
 import { confirmPreDriveSafety } from '../lib/preDriveGate';
+import { refreshCloudFleetGrant } from '../lib/cloudSync';
 import { AmbientBackground, GlassSurface } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 
@@ -67,7 +69,22 @@ export default function PreDriveScreen() {
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthNotice, setHealthNotice] = useState<string | null>(null);
   const [healthSnapshot, setHealthSnapshot] = useState<HealthReadinessSnapshot | null>(null);
+  const [cloudCheckLoading, setCloudCheckLoading] = useState(false);
+  const cloudCheckGenerationRef = useRef(0);
+  const cloudCheckInFlightRef = useRef(false);
+  const checklistReadyRef = useRef(false);
+  const checkedRef = useRef(checked);
   const ready = useMemo(() => checked.every(Boolean), [checked]);
+
+  useFocusEffect(useCallback(() => {
+    cloudCheckGenerationRef.current += 1;
+    cloudCheckInFlightRef.current = false;
+    setCloudCheckLoading(false);
+    return () => {
+      cloudCheckGenerationRef.current += 1;
+      cloudCheckInFlightRef.current = false;
+    };
+  }, []));
 
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
@@ -82,9 +99,15 @@ export default function PreDriveScreen() {
   }, []);
 
   const toggle = (index: number) => {
-    setChecked(current => current.map((value, itemIndex) => (
+    cloudCheckGenerationRef.current += 1;
+    cloudCheckInFlightRef.current = false;
+    setCloudCheckLoading(false);
+    const next = checkedRef.current.map((value, itemIndex) => (
       itemIndex === index ? !value : value
-    )));
+    ));
+    checkedRef.current = next;
+    checklistReadyRef.current = next.every(Boolean);
+    setChecked(next);
   };
 
   const refreshHealth = async () => {
@@ -111,6 +134,40 @@ export default function PreDriveScreen() {
     } catch {
       setHealthNotice('The local Apple Health summary could not be removed. Try again.');
     }
+  };
+
+  const continueToMonitoring = () => {
+    if (!checklistReadyRef.current) return;
+    confirmPreDriveSafety();
+    router.replace('/monitor');
+  };
+
+  const startMonitoring = async () => {
+    if (!checklistReadyRef.current || cloudCheckInFlightRef.current) return;
+    const checkGeneration = ++cloudCheckGenerationRef.current;
+    cloudCheckInFlightRef.current = true;
+    setCloudCheckLoading(true);
+    const fleetGrantReady = await refreshCloudFleetGrant().catch(() => false);
+    if (checkGeneration !== cloudCheckGenerationRef.current) return;
+    cloudCheckInFlightRef.current = false;
+    setCloudCheckLoading(false);
+    if (fleetGrantReady && checklistReadyRef.current) {
+      continueToMonitoring();
+      return;
+    }
+    Alert.alert(
+      'Fleet sync unavailable',
+      'Occulert could not confirm your latest fleet access. Monitoring can still start, but this drive may stay only in your account and not appear on the fleet dashboard.',
+      [
+        { text: 'Try Again', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: () => {
+            if (checkGeneration === cloudCheckGenerationRef.current) continueToMonitoring();
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -236,23 +293,24 @@ export default function PreDriveScreen() {
         </View>
 
         <GlassSurface
-          interactive={ready}
-          style={[styles.continueSurface, !ready && styles.continueButtonDisabled]}
+          interactive={ready && !cloudCheckLoading}
+          style={[styles.continueSurface, (!ready || cloudCheckLoading) && styles.continueButtonDisabled]}
           tintColor="rgba(42, 105, 244, 0.58)"
         >
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityState={{ disabled: !ready }}
-            disabled={!ready}
+            accessibilityState={{ disabled: !ready || cloudCheckLoading }}
+            disabled={!ready || cloudCheckLoading}
             activeOpacity={0.85}
-            onPress={() => {
-              confirmPreDriveSafety();
-              router.replace('/monitor');
-            }}
+            onPress={startMonitoring}
             style={styles.continueButton}
           >
-            <Ionicons name="eye" size={22} color="#fff" />
-            <Text style={styles.continueText}>CONTINUE TO MONITORING</Text>
+            {cloudCheckLoading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="eye" size={22} color="#fff" />}
+            <Text style={styles.continueText}>
+              {cloudCheckLoading ? 'CHECKING CLOUD SYNC' : 'CONTINUE TO MONITORING'}
+            </Text>
           </TouchableOpacity>
         </GlassSurface>
 

@@ -1,7 +1,9 @@
 # Backend Setup Guide (Supabase)
 
 This guide turns the backend routes in `api/profile.js`, `api/sessions.js`,
-`api/events.js`, `api/fleets.js`, `api/fleet-invitations.js`,
+`api/events.js`, `api/session-sync-v1.js`, `api/event-sync-v1.js`,
+`api/session-cancel-v1.js`,
+`api/fleets.js`, `api/fleet-invitations.js`,
 `api/accept-invitation.js`, `api/fleet-summary.js`, `api/account.js`, and `api/_lib/supabase.js` into a working real
 backend, replacing the localStorage-only prototype described in
 BACKEND_ROADMAP.md.
@@ -27,9 +29,17 @@ rate-limit confirmation messages across the project. A custom SMTP provider
 is optional if pilot volume later grows.
 
 For an existing Occulert project that already has the core tables, review and
-run only `db/migrations/20260719_secure_fleet_invitations.sql`. It adds the
-one-fleet-per-owner constraint, protected invitation table, and atomic
-service-role-only acceptance function without recreating existing policies.
+apply the migrations it has not yet received, in this order:
+
+1. `db/migrations/20260719_secure_fleet_invitations.sql` adds the
+   one-fleet-per-owner constraint, protected invitation table, and atomic
+   service-role-only acceptance function.
+2. `db/migrations/20260913_native_sync_guards.sql` adds rotating fleet sync
+   tokens and atomic service-role-only session start/cancellation functions.
+3. `db/migrations/20260913_session_report_snapshot.sql` adds the fleet report
+   index and bounded single-snapshot report function.
+
+The account-deletion migration described below remains a separate requirement.
 
 ### Passkey authentication (experimental)
 
@@ -77,6 +87,8 @@ In your Vercel project settings -> Environment Variables, add:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_ANON_KEY` (if the frontend will call Supabase Auth directly)
+- `OCCULERT_SESSION_SYNC_V1_ENABLED` (leave unset or `false` during the first
+  deployment of the versioned native-sync package)
 
 Redeploy after adding these. Until they are set, `api/sessions.js`,
 `api/profile.js`, `api/events.js`, `api/fleets.js`, the invitation routes, and
@@ -87,6 +99,23 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 `pilot_leads` table when the two server-side Supabase variables are present.
 Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the browser keeps only its
 local fallback copy and the API reports `stored: false`.
+
+### Safe native-sync rollout
+
+1. Apply both 2026-09-13 migrations before deploying the matching API source.
+2. Deploy with `OCCULERT_SESSION_SYNC_V1_ENABLED` unset or `false`. Existing
+   browser and native behavior can continue while version 1 remains hidden.
+3. With an authenticated test account, verify `GET /api/profile`, stable-ID
+   uploads through `/api/session-sync-v1` and `/api/event-sync-v1`, anonymous
+   driver-bound per-session cleanup through `/api/session-cancel-v1`, active-session status,
+   and a 7/30-day fleet report whose
+   `report_window.snapshot` is `true`.
+4. Set `OCCULERT_SESSION_SYNC_V1_ENABLED=true`, redeploy, and confirm
+   `/api/public-config` returns `session_sync_version: 1` before distributing a
+   native build that depends on version 1.
+
+If the flag is turned off again, compatible native clients retain queued data
+and wait; they do not fall back to non-idempotent session creation.
 
 The signed-in Account Settings page uses `DELETE /api/account` for permanent
 account deletion. Apply `supabase/migrations/20260912170153_atomic_account_deletion.sql`
@@ -124,11 +153,11 @@ owned by the access-token user.
 
 ## 5. Seed fleets and drivers
 
-`api/profile.js` safely creates a driver row for the authenticated user with
-no fleet membership. It does not accept a caller-provided fleet ID. Only the
-atomic invitation acceptance function can assign that row to a fleet. Run the
-full current `db/schema.sql` for a new project or the dated migration above
-for the existing project before enabling fleet onboarding.
+`api/profile.js` safely reads or creates a driver row for the authenticated
+user with no caller-provided fleet membership. Only the atomic invitation
+acceptance function can assign that row to a fleet. Run the full current
+`db/schema.sql` for a new project or all applicable dated migrations above for
+an existing project before enabling fleet onboarding or native sync.
 
 ## Status
 
@@ -146,6 +175,10 @@ for the existing project before enabling fleet onboarding.
 - [x] Row Level Security and service-role invitation boundaries independently verified
 - [x] Trusted fleet invitation/administration flow implemented in code
 - [x] Secure fleet invitation migration applied and independently verified
+- [ ] Native sync guard migration applied to the production Supabase project
+- [ ] Single-snapshot fleet report migration applied to production Supabase
+- [ ] Versioned upload and per-session cleanup routes verified with the capability flag off
+- [ ] `OCCULERT_SESSION_SYNC_V1_ENABLED=true` advertised only after route verification
 - [x] No-cost invitation sharing through the manager's mail app and copy-link fallback
 - [x] Manager-scoped session and event history excludes GPS, personal media, and raw motion
 - [ ] Protected session-history deployment and signed-in manager verification

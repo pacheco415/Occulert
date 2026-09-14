@@ -60,7 +60,7 @@ test("homepage external assets preserve theme and mobile navigation controls", a
     window.scrollBy(0, 400);
   });
   await expect(page.locator("#siteNav")).toHaveClass(/nav-hidden/);
-  expect(await page.locator("#siteNav").evaluate((element) => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0);
+  await expect.poll(() => page.locator("#siteNav").evaluate((element) => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0);
   await expect(page.locator("#scrollTop")).not.toHaveClass(/visible/);
   await page.evaluate(() => window.scrollBy(0, -200));
   await expect(page.locator("#siteNav")).not.toHaveClass(/nav-hidden/);
@@ -938,6 +938,7 @@ test("fleet dashboard does not turn missing or inactive telemetry into active sa
         { id: "session-inactive", driver_id: "driver-inactive", started_at: now, ended_at: now, safety_score: 91 },
         { id: "session-measured", driver_id: "driver-measured", started_at: now, ended_at: null, safety_score: 64, max_fatigue: 58, alert_count: 1 },
       ],
+      report_window: { days: 30, complete: true, snapshot: true },
       events: [],
       telemetry_trust: "unverified_client_report",
       privacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false },
@@ -984,6 +985,13 @@ test("fleet dashboard does not turn missing or inactive telemetry into active sa
 test("fleet dashboard turns recent protected history into an actionable pilot report", async ({ page }) => {
   const now = Date.now();
   const isoDaysAgo = (days) => new Date(now - days * 86_400_000).toISOString();
+  let failThirtyDayRefresh = false;
+  const sessions = [
+    { id: "session-1", driver_id: "driver-1", started_at: isoDaysAgo(2), ended_at: isoDaysAgo(2), safety_score: 60, alert_count: 1, head_nod_count: 2 },
+    { id: "session-2", driver_id: "driver-2", started_at: isoDaysAgo(3), ended_at: isoDaysAgo(3), safety_score: 90, alert_count: 0, head_nod_count: 0 },
+    { id: "session-3", driver_id: "driver-1", started_at: isoDaysAgo(10), ended_at: isoDaysAgo(10), safety_score: 80, alert_count: 0, head_nod_count: 0 },
+    { id: "session-4", driver_id: "driver-3", started_at: isoDaysAgo(40), ended_at: isoDaysAgo(40), safety_score: 95, alert_count: 0, head_nod_count: 0 },
+  ];
   await page.addInitScript(() => {
     localStorage.setItem("occulert-auth", JSON.stringify({
       access_token: "manager-token",
@@ -992,10 +1000,17 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
       user: { id: "manager-1", email: "manager@example.com" },
     }));
   });
-  await page.route("**/api/fleet-summary*", (route) => route.fulfill({
-    status: 200,
-    contentType: "application/json",
-    body: JSON.stringify({
+  await page.route("**/api/fleet-summary*", (route) => {
+    const days = Number(new URL(route.request().url()).searchParams.get("report_days")) || 30;
+    if (failThirtyDayRefresh && days === 30) return route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: false, error: "temporarily_unavailable" }),
+    });
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
       ok: true,
       fleet: { id: "fleet-1", company_name: "Safe Transit", plan: "trial" },
       drivers: [
@@ -1003,17 +1018,14 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
         { id: "driver-2", name: '=WEBSERVICE("https://example.invalid")', active: true, vehicle_id: "Van 2" },
         { id: "driver-3", name: "No Recent Session", active: true, vehicle_id: "Van 3" },
       ],
-      sessions: [
-        { id: "session-1", driver_id: "driver-1", started_at: isoDaysAgo(2), ended_at: isoDaysAgo(2), safety_score: 60, alert_count: 1, head_nod_count: 2 },
-        { id: "session-2", driver_id: "driver-2", started_at: isoDaysAgo(3), ended_at: isoDaysAgo(3), safety_score: 90, alert_count: 0, head_nod_count: 0 },
-        { id: "session-3", driver_id: "driver-1", started_at: isoDaysAgo(10), ended_at: isoDaysAgo(10), safety_score: 80, alert_count: 0, head_nod_count: 0 },
-        { id: "session-4", driver_id: "driver-3", started_at: isoDaysAgo(40), ended_at: isoDaysAgo(40), safety_score: 95, alert_count: 0, head_nod_count: 0 },
-      ],
+      sessions: sessions.filter(session => Date.parse(session.started_at) >= now - days * 86_400_000),
+      report_window: { days, complete: true, snapshot: true },
       events: [],
       telemetry_trust: "unverified_client_report",
       privacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false },
-    }),
-  }));
+      }),
+    });
+  });
 
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
@@ -1045,6 +1057,11 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
   expect(csv).not.toMatch(/latitude|longitude|GPS|personal media|raw motion/i);
   await expect(page.getByRole("link", { name: "View affordable plans" })).toHaveAttribute("href", "/fleet-pricing.html");
   await expect(page.getByRole("link", { name: "Start free trial" })).toHaveAttribute("href", "/pilot-signup.html?interest=free-trial&plan=free-trial");
+
+  failThirtyDayRefresh = true;
+  await page.locator("#pilotRange").selectOption("30");
+  await expect(page.locator("#valueSessions")).toHaveText("--");
+  await expect(page.locator("#pilotWindowLabel")).toContainText("waiting for selected report");
 });
 
 test("protected fleet history shows scoped events and exports formula-safe rows without coordinates", async ({ page }) => {
@@ -1095,6 +1112,7 @@ test("protected fleet history shows scoped events and exports formula-safe rows 
         longitude: -122.4194,
       }] : [],
       events_included: includeEvents,
+      report_window: { days: 30, complete: true, snapshot: true },
       telemetry_trust: "unverified_client_report",
       privacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false },
       }),
@@ -1127,4 +1145,54 @@ test("protected fleet history shows scoped events and exports formula-safe rows 
   expect(csv).toContain("Alex Driver");
   expect(csv).toContain("'=WEBSERVICE");
   expect(csv).not.toMatch(/latitude|longitude|37\.7749|-122\.4194/i);
+});
+
+test('fleet report includes more than 50 sessions and refuses to export a capped window', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('occulert-auth', JSON.stringify({ access_token: 'report-token', refresh_token: 'refresh', expires_at: 4000000000, user: { id: 'owner', email: 'owner@example.invalid' } }));
+  });
+  let complete = true;
+  let snapshot = true;
+  let reportWindowAvailable = true;
+  await page.route('**/api/fleet-summary*', route => {
+    expect(new URL(route.request().url()).searchParams.get('report_days')).toBe('30');
+    return route.fulfill({ json: { ok: true,
+      fleet: { id: 'fleet', company_name: 'Report Fleet', plan: 'trial' },
+      drivers: [{ id: 'driver', name: 'Report Driver', active: true }],
+      sessions: Array.from({length: 75}, (_, i) => ({ id: `session-${i}`, driver_id: 'driver', started_at: new Date(Date.now()-86400000-i*1000).toISOString(), ended_at: new Date(Date.now()-86400000).toISOString(), alert_count: 0, safety_score: 90 })),
+      ...(reportWindowAvailable ? { report_window: { days: 30, complete, snapshot } } : {}), events: [] } });
+  });
+  await page.goto('/fleet-dashboard.html');
+  await expect(page.locator('#valueSessions')).toHaveText('75');
+  await expect(page.locator('#pilotWindowLabel')).not.toContainText('partial');
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download trial report' }).click();
+  const download = await downloading;
+  const csv = await readFile(await download.path(), 'utf8');
+  expect(csv.split('\n')).toHaveLength(76);
+  complete = false;
+  await page.reload();
+  await expect(page.locator('#pilotWindowLabel')).toContainText('partial report');
+  let downloads = 0;
+  page.on('download', () => downloads++);
+  await page.getByRole('button', { name: 'Download trial report' }).click();
+  await expect(page.locator('#toast')).toContainText('complete export is unavailable');
+  expect(downloads).toBe(0);
+  complete = true;
+  snapshot = false;
+  await page.reload();
+  await expect(page.locator('#valueSessions')).toHaveText('75');
+  await page.getByRole('button', { name: 'Download trial report' }).click();
+  await expect(page.locator('#toast')).toContainText('reporting upgrade is active');
+  expect(downloads).toBe(0);
+  reportWindowAvailable = false;
+  await page.evaluate(() => loadProtectedFleet({ reportDays: 30 }));
+  await expect(page.locator('#pilotWindowLabel')).toContainText('waiting for selected report');
+  await page.getByRole('button', { name: 'Download trial report' }).click();
+  await expect(page.locator('#toast')).toContainText('reporting service confirms the selected window');
+  await page.evaluate(() => exportSessionHistoryCSV());
+  await expect(page.locator('#toast')).toContainText('reporting service confirms the selected window');
+  await page.evaluate(() => exportFleetCSV());
+  await expect(page.locator('#toast')).toContainText('reporting service confirms the selected window');
+  expect(downloads).toBe(0);
 });

@@ -7,6 +7,7 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
+const telemetry = require("./_lib/client-telemetry");
 const MAX_BODY_LENGTH = 4096;
 
 function json(response, status, body) {
@@ -57,10 +58,21 @@ module.exports = async function handler(request, response) {
 
   const body = typeof request.body === "object" && request.body ? request.body : {};
   const type = String(body.type || "");
-  if (!body.session_id || ALLOWED_TYPES.indexOf(type) === -1) {
+  if (!telemetry.validId(body.session_id)) {
+    return json(response, 400, { ok: false, error: "invalid_session_id" });
+  }
+  if (ALLOWED_TYPES.indexOf(type) === -1) {
     return json(response, 400, { ok: false, error: "invalid_event" });
   }
 
+  const clientId = body.client_event_id;
+  const createdAt = clientId ? telemetry.timestamp(body.created_at) : new Date().toISOString();
+  if (request.occulertSyncVersion === 1 && clientId === undefined) {
+    return json(response, 400, { ok: false, error: "missing_client_event_id" });
+  }
+  if (clientId !== undefined && (!telemetry.validId(clientId) || !createdAt)) {
+    return json(response, 400, { ok: false, error: "invalid_client_event" });
+  }
   try {
     const drivers = await pgFetch("drivers", {
       params: { select: "id", user_id: "eq." + user.id, limit: "1" },
@@ -77,20 +89,18 @@ module.exports = async function handler(request, response) {
       return json(response, 404, { ok: false, error: "session_not_found" });
     }
 
-    const created = await pgFetch("events", {
-      method: "POST",
-      body: {
-        session_id: body.session_id,
-        type: type,
-        fatigue_score: numberOrNull(body.fatigue_score, 0, 100),
-        confidence: numberOrNull(body.confidence, 0, 100),
-        // GPS is opt-in only; omit lat/lng entirely unless the driver has
-        // explicitly enabled location sharing on the client.
-        latitude: numberOrNull(body.latitude, -90, 90),
-        longitude: numberOrNull(body.longitude, -180, 180),
-        created_at: new Date().toISOString(),
-      },
-    });
+    const created = await telemetry.insertOnce(pgFetch, "events", {
+      ...(clientId ? { id: clientId } : {}),
+      session_id: body.session_id,
+      type: type,
+      fatigue_score: numberOrNull(body.fatigue_score, 0, 100),
+      confidence: numberOrNull(body.confidence, 0, 100),
+      // GPS is opt-in only; omit lat/lng entirely unless the driver has
+      // explicitly enabled location sharing on the client.
+      latitude: numberOrNull(body.latitude, -90, 90),
+      longitude: numberOrNull(body.longitude, -180, 180),
+      created_at: createdAt,
+    }, { session_id: "eq." + body.session_id });
     return json(response, 200, {
       ok: true,
       event: created[0],
@@ -98,6 +108,9 @@ module.exports = async function handler(request, response) {
       message: "Client-reported telemetry is not independently measured or attested.",
     });
   } catch (error) {
+    if (error && error.status === 409 && error.details?.code === "23505") {
+      return json(response, 409, { ok: false, error: "event_id_conflict" });
+    }
     return json(response, 502, { ok: false, error: "supabase_error" });
   }
 };

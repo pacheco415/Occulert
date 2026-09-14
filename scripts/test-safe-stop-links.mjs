@@ -42,9 +42,20 @@ test('the monitor stops and saves before handing off to Maps', () => {
   const liveMetrics = readFileSync(new URL('../native-app/components/LiveMetrics.tsx', import.meta.url), 'utf8');
   assert.match(monitor, /alertCount > 0/);
   assert.match(monitor, /Only use this after you are safely parked/);
-  assert.match(monitor, /await handleStop\(\{ deferCloudFinalization: true \}\)/);
-  assert.match(monitor, /Optional cloud finalization never delays a safe-stop Maps handoff/);
-  assert.match(monitor, /void finalizeCloud\(localSessionId\)\.catch\(\(\) => \{\}\)/);
+  assert.match(monitor, /await handleStop\(\)/);
+  assert.match(monitor, /await finalizeCloud\(localSessionId\)/);
+  assert.doesNotMatch(monitor, /void finalizeCloud\(/);
+  assert.doesNotMatch(
+    monitor,
+    /if \(durationSec <= 0\) return null/,
+    'a same-second stop must remain visible in local History before cloud finalization',
+  );
+  assert.match(monitor, /if \(!queued\) throw new Error\('cloud_summary_not_persisted'\)/);
+  assert.ok(
+    monitor.indexOf('await finalizeCloud(localSessionId)')
+      < monitor.indexOf('await clearActiveSessionCheckpoint(activeSessionId)'),
+    'the durable cloud summary must be recorded before its recovery checkpoint is cleared',
+  );
   assert.match(monitor, /buildSafeStopSearchUrls\(Platform\.OS, kind\)/);
   assert.match(monitor, /Linking\.openURL\(url\)/);
   assert.match(monitor, /does not read, store, or upload your location/i);

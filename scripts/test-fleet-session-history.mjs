@@ -43,9 +43,10 @@ test('dashboard keeps protected history separate from its local fallback', () =>
   assert.match(history, /OcculertSecurity\.csvCell/);
   assert.match(history, /value===null\|\|value===undefined/);
   assert.doesNotMatch(history, /latitude|longitude|\blocation\b|camera media|\baudio\b|raw motion/i);
-  assert.match(dashboard, /getFleetSummary\(\{includeEvents\}\)/);
+  assert.match(dashboard, /getFleetSummary\(\{includeEvents,reportDays\}\)/);
   assert.match(dashboard, /refreshProtectedFleetNow\(\{forceEvents:true\}\)/);
   assert.match(dashboard, /shouldRefreshProtectedEvents\(\{historyOpen:protectedHistoryOpen\(\),lastLoadedAt:protectedEventsLoadedAt\}/);
+  assert.match(dashboard, /protectedEventsLoadedAt=Date\.now\(\);sessionHistoryDirty=true/);
 });
 
 test('fleet projection preserves inactive and unmeasured driver states', () => {

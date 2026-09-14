@@ -29,9 +29,13 @@ module.exports = function handler(request, response) {
   const url = validSupabaseUrl(process.env.SUPABASE_URL);
   const anonKey = String(process.env.SUPABASE_ANON_KEY || "").trim();
   const configured = Boolean(url && anonKey);
+  const sessionSyncEnabled = String(process.env.OCCULERT_SESSION_SYNC_V1_ENABLED || "").toLowerCase() === "true";
 
   return json(response, 200, {
     ok: true,
+    // Keep native uploads paused until the database migration and versioned
+    // upload and cleanup routes have been deployed and verified together.
+    session_sync_version: sessionSyncEnabled ? 1 : 0,
     supabase: configured ? { configured: true, url, anonKey } : { configured: false },
   });
 };

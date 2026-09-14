@@ -14,9 +14,14 @@ const cloud = read('native-app/lib/cloudSync.ts');
 const monitor = read('native-app/app/monitor.tsx');
 const settings = read('native-app/app/settings.tsx');
 const history = read('native-app/app/history.tsx');
+const preDrive = read('native-app/app/pre-drive.tsx');
+const rootLayout = read('native-app/app/_layout.tsx');
 const appConfig = JSON.parse(read('native-app/app.json'));
 const nativePackage = JSON.parse(read('native-app/package.json'));
 const cloudCard = read('native-app/components/CloudSyncCard.tsx');
+const sessionSyncRoute = read('api/session-sync-v1.js');
+const eventSyncRoute = read('api/event-sync-v1.js');
+const sessionCancelRoute = read('api/session-cancel-v1.js');
 
 const relativeLuminance = hex => {
   const channels = hex.match(/[0-9a-f]{2}/gi).map(value => parseInt(value, 16) / 255);
@@ -33,7 +38,7 @@ const contrastRatio = (foreground, background) => {
 
 assert.equal(
   nativePackage.dependencies['expo-secure-store'],
-  '~57.0.3',
+  '~57.0.4',
   'native auth tokens must use the SDK-compatible SecureStore package',
 );
 assert.ok(
@@ -58,9 +63,33 @@ assert.doesNotMatch(
 assert.match(cloud, /refreshAuth\(auth, refreshVersion\)/);
 assert.match(cloud, /if \(!authRefreshPromise\)/);
 assert.match(cloud, /authCache = auth/);
-assert.match(cloud, /consentRuntimeOverride = false;\s*authMutationVersion \+= 1;\s*authCache = null;/);
+assert.match(cloud, /consentRuntimeOverride = false;\s*authMutationVersion \+= 1;[\s\S]{0,100}sharingEpoch \+= 1;/);
 assert.match(cloud, /cloudSyncPreference\.set\(false\)/);
 assert.match(cloud, /cloudSyncPreference\.get\(\)/);
+assert.match(cloud, /await sessionOutbox\.clear\(\)/);
+const clearAuthStart = cloud.indexOf('async function clearAuth');
+const clearAuthEnd = cloud.indexOf('async function authFetch', clearAuthStart);
+const clearAuthSource = cloud.slice(clearAuthStart, clearAuthEnd);
+assert.ok(
+  clearAuthSource.indexOf('consentRuntimeOverride = false') < clearAuthSource.indexOf('await loadAuth()'),
+  'account clearing must revoke the runtime before reading storage',
+);
+assert.match(clearAuthSource, /const cleanup = flushCloudUploads\(auth\)\.then\(\(\) => flushCloudUploads\(auth\)\)/);
+const revokeConsent = cloud.indexOf('await cloudSyncPreference.set(false)', clearAuthStart);
+const revokeOutbox = cloud.indexOf('await sessionOutbox.clear', revokeConsent);
+const revokeCredential = cloud.indexOf('SecureStore.deleteItemAsync', revokeOutbox);
+const revokeCache = cloud.indexOf('authCache = null', revokeCredential);
+assert.ok(
+  revokeConsent >= 0 && revokeConsent < revokeOutbox && revokeOutbox < revokeCredential && revokeCredential < revokeCache,
+  'sign-out must persist consent, persist cleanup tombstones, then remove credentials',
+);
+const disableStart = cloud.indexOf('export async function setCloudSyncEnabled');
+const disableEnd = cloud.indexOf('async function sendOutboxRequest', disableStart);
+const disableSource = cloud.slice(disableStart, disableEnd);
+assert.ok(
+  disableSource.indexOf('consentRuntimeOverride = false') < disableSource.indexOf('await loadAuth()'),
+  'disabling sharing must revoke the runtime before reading storage',
+);
 assert.doesNotMatch(
   cloud,
   /SERVICE_ROLE|service.role/i,
@@ -71,12 +100,49 @@ assert.doesNotMatch(
   /testConditions|lighting|eyewear|phonePosition|deviceImpact|batteryImpact|phoneHeat|appVersion|appBuildNumber|headNodObservations/,
   'pilot review observations and build metadata must not be added to cloud sync',
 );
-assert.match(cloud, /if \(!await consentEnabled\(\) \|\| !await ensureDriverProfile\(\)\) return null;/);
-assert.equal(
-  [...cloud.matchAll(/if \(!await consentEnabled\(\)/g)].length,
-  3,
-  'session start, alert logging, and session finish should each check consent once',
-);
+assert.match(cloud, /auth.user.id !== expectedOwner/);
+assert.match(cloud, /expectedSharingEpoch !== sharingEpoch/);
+assert.match(cloud, /sessionOutbox.clear\(/);
+assert.match(cloud, /sessionOutbox.add\(/);
+assert.match(cloud, /const sessionCreate = method === 'POST' && path === '\/api\/sessions'/);
+assert.match(cloud, /loadConfig\(sessionCreate\)/);
+assert.match(cloud, /'\/api\/sessions': '\/api\/session-sync-v1'/);
+assert.match(cloud, /'\/api\/events': '\/api\/event-sync-v1'/);
+assert.match(cloud, /'\/api\/session-cancel-v1'/);
+assert.match(cloud, /cancel_token: cancelToken/);
+const tokenCancelStart = cloud.indexOf('async function cancelPendingCloudSessionByToken');
+const tokenCancelEnd = cloud.indexOf('async function clearAuth', tokenCancelStart);
+const tokenCancelSource = cloud.slice(tokenCancelStart, tokenCancelEnd);
+assert.match(tokenCancelSource, /method: 'DELETE'/);
+assert.match(tokenCancelSource, /session_id: sessionId,[\s\S]*cancel_token: cancelToken,[\s\S]*cleanup_token: cleanupToken/);
+assert.doesNotMatch(tokenCancelSource, /Authorization/);
+assert.match(cloud, /returnedId !== expectedId/);
+assert.match(cloud, /sessionsWithUploadGaps\.has\(sessionId\)/);
+assert.match(cloud, /sessionOutbox.markPartial\(sessionId\)/);
+assert.match(cloud, /result\.body\.cancellation_recorded !== true/);
+assert.match(cloud, /fleet_sync_token: auth\.fleet_sync_token \|\| null/);
+assert.match(cloud, /expectedGeneration !== fleetGrantRequestGeneration/);
+assert.match(cloud, /profile_refresh_superseded/);
+assert.match(cloud, /requestDriverProfile\('GET', owner/);
+assert.match(cloud, /if \(result\.status === 404/);
+assert.match(cloud, /requestDriverProfile\('POST', owner/);
+assert.match(preDrive, /await refreshCloudFleetGrant\(\)/);
+assert.match(preDrive, /Fleet sync unavailable/);
+assert.match(preDrive, /may stay only in your account/);
+assert.match(preDrive, /checkGeneration !== cloudCheckGenerationRef\.current/);
+assert.match(preDrive, /cloudCheckGenerationRef\.current \+= 1;/);
+assert.match(preDrive, /if \(!checklistReadyRef\.current\) return;/);
+assert.match(preDrive, /if \(!checklistReadyRef\.current \|\| cloudCheckInFlightRef\.current\) return;/);
+assert.match(preDrive, /useFocusEffect/);
+assert.match(rootLayout, /refreshCloudFleetGrant\(\)/);
+assert.match(sessionSyncRoute, /require\('\.\/sessions'\)/);
+assert.match(eventSyncRoute, /require\('\.\/events'\)/);
+assert.match(sessionCancelRoute, /request\.method !== 'DELETE'/);
+assert.match(sessionCancelRoute, /validId\(body\.session_id\)/);
+assert.match(sessionCancelRoute, /validId\(body\.cancel_token\)/);
+assert.match(sessionCancelRoute, /validId\(body\.cleanup_token\)/);
+assert.match(sessionCancelRoute, /rpc\/cancel_session_sync_token_v1/);
+assert.match(cloud, /configPromise = null;\s*nextUploadAttempt = Date\.now\(\) \+ 60_000;/);
 assert.match(cloud, /https:\/\/www\.occulert\.com/);
 
 const loadAuthSource = cloud
@@ -172,7 +238,8 @@ assert.doesNotMatch(
 assert.match(monitor, /beginCloudSession\(\)/);
 assert.match(monitor, /logCloudAlert\(sessionId, result\.fatigueScore\)/);
 assert.match(monitor, /finishCloudSession\(cloudSessionId/);
-assert.match(monitor, /cloudSynced: true/);
+assert.match(cloud, /cloudSynced: !partial/);
+assert.match(cloud, /cloudSyncNeedsReview: partial/);
 assert.match(
   monitor,
   /if \(!isRunningRef\.current \|\| stoppingRef\.current\) return;/,
@@ -185,8 +252,16 @@ assert.match(history, /This alert rating stays only on this iPhone/);
 assert.match(history, /Does not trigger alerts/);
 
 assert.match(cloudCard, /createSingleFlightActionRunner/);
+assert.match(cloudCard, /pendingCloudSessionIds\(\)\.catch\(\(\) => \[\]\)/);
+assert.match(cloudCard, /const generation = \+\+refreshGenerationRef\.current/);
+assert.match(cloudCard, /generation !== refreshGenerationRef\.current/);
 assert.match(cloudCard, /could not complete or confirm that change/);
 assert.match(cloudCard, /\.finally\(\(\) =>/);
+assert.match(cloudCard, /retryRunnerRef\.current\.run\(/);
+assert.match(cloudCard, /onPress=\{retrySync\}/);
+assert.match(cloudCard, /disabled=\{busy \|\| syncing \|\| !state\.syncEnabled\}/);
+assert.match(cloudCard, /disabled=\{busy\} onPress=\{signOut\}/);
+assert.match(cloudCard, /accessibilityLabel="Share session summaries"\s*disabled=\{busy\}/);
 assert.doesNotMatch(cloudCard, /applyConsent\([^)]*\)\.catch\(\(\) => \{\}\)/);
 assert.match(cloudCard, /backgroundColor: colors\.blueStrong/);
 assert.ok(
