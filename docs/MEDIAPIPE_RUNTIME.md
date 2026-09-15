@@ -40,9 +40,11 @@ For an update, choose a **new immutable directory/patch revision**; never overwr
 
 ## Cache behavior and cost
 
-Cache v48 verifies all nine runtime assets using Fetch integrity during installation. Missing files, bad hashes, download errors or storage failures reject installation and delete only the incomplete new cache. The prior cache remains active. Activation removes old caches only after the new critical bundle is complete.
+Cache v49 probes SIMD with the pinned runtime’s 29-byte WebAssembly feature probe and verifies only the matching runtime assets using Fetch integrity during installation. Missing files, bad hashes, download errors or storage failures reject installation and delete only the incomplete new cache. The prior cache remains active. Activation removes old caches only after the new critical bundle is complete.
 
-Both runtime variants are downloaded for the offline bundle; JavaScript executes only when monitoring initializes. This adds approximately **16 MiB uncompressed** to the first service-worker install on the homepage. Both variants are kept so a browser capability change does not strand an offline installation. Subsequent requests use immutable URLs and the verified local cache. Cached runtime misses also use integrity-checked fetches.
+The first homepage installation caches approximately **10.06 MiB (SIMD)** or **9.99 MiB (scalar)** of uncompressed detector assets, instead of both builds (~16 MiB). Neither the unused JavaScript wrapper nor its WASM file is requested. The upstream empty SIMD data file remains pinned and is included only for the SIMD path; its empty digest is intentional. Published runtime bytes and hashes are unchanged.
+
+Both variants remain available on the server. If a later browser update changes SIMD support, the missing variant can be fetched online with integrity verification; it is not guaranteed to be available offline until downloaded. An unavailable variant fails visibly rather than reporting a ready detector. Subsequent requests use immutable URLs and the verified cache.
 
 Directly opening the monitor without first completing a homepage service-worker install does not establish offline readiness. Storage eviction, private browsing and browser restrictions can still remove or prevent offline storage. GPS map links and cloud sync require a connection. Offline capability is not an accuracy or safety certification.
 

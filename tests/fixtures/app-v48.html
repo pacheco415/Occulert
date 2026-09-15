@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html data-base="driver" lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Occulert — AI Drowsiness Detection</title>
+<meta name="description" content="Occulert uses on-device AI eye tracking to help detect driver fatigue. GPS and cloud fleet sync are optional and require user consent." />
+<meta name="theme-color" content="#050a0f" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Occulert" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
+<!-- The supported cloud path uses authenticated Occulert API endpoints. -->
+<link rel="stylesheet" href="/driver-app.v47.css" />
+<link rel="stylesheet" href="/liquid-glass.v47.css" />
+</head>
+<body>
+<div class="top">
+  <div class="brandrow">
+    <a class="brand" href="/" aria-label="Occulert home">
+      <span class="brand-mark"><svg width="23" height="23" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></span>Occulert
+    </a>
+    <div class="navlinks">
+      <a href="/">Home</a>
+      <a class="active" href="/app.html">Driver App</a>
+      <a href="/fleet-dashboard.html">Fleet Dashboard</a>
+      <a href="/session-history.html">History</a>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="intensity-btn" id="intensityToggle" aria-label="Change display brightness" title="Display intensity: Dim / Standard / Bright">
+      <span class="intensity-icon" id="intensityIcon">🔆</span>
+      <span class="intensity-label" id="intensityLabel">Standard</span>
+    </button>
+    <div class="status" id="status">OFFLINE</div>
+  </div>
+</div>
+<div class="app">
+  <div class="camera">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    <div class="overlay" id="overlay"><div>
+      <h2 id="overlayTitle" style="font-size:22px;font-weight:900;letter-spacing:-0.5px">AI Fatigue Monitoring</h2>
+      <p class="small" id="overlayText">Supplemental prototype only. Keep your eyes on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.</p>
+      <div class="phone-guide" id="phoneGuide">
+        <div class="guide-step"><div class="guide-icon">&#128241;</div><div class="guide-label">Mount on dash</div></div>
+        <div class="guide-arrow">&#8594;</div>
+        <div class="guide-step"><div class="guide-icon">&#128065;</div><div class="guide-label">Face centered</div></div>
+        <div class="guide-arrow">&#8594;</div>
+        <div class="guide-step"><div class="guide-icon">&#9728;</div><div class="guide-label">Good lighting</div></div>
+        <div class="guide-arrow">&#8594;</div>
+        <div class="guide-step"><div class="guide-icon">&#128274;</div><div class="guide-label">Screen on</div></div>
+      </div>
+      <div class="hint" id="overlayHint"><strong>iPhone tip:</strong> Keep Safari open, screen unlocked, and Low Power Mode off for best reliability.</div>
+    </div></div>
+    <div class="alertScreen" id="alertScreen"><div><h1 id="alertTitle">DROWSY ALERT</h1><p id="alertSub">Pull over safely</p></div></div>
+  </div>
+  <aside class="panel" aria-label="Occulert controls and metrics">
+
+    <!-- ── Background / Screen-Lock Warning ─────────────────────────────── -->
+    <div class="screen-warning" id="screenWarning" style="display:none">
+      ⚠️ <strong>Screen locked or app backgrounded</strong> — Occulert may have paused. Return to this tab and keep your screen on.
+    </div>
+
+    <div class="camera-source-row" id="cameraSourceRow" hidden>
+      <label for="cameraSourceSelect">Camera</label>
+      <div class="camera-source-controls">
+        <select id="cameraSourceSelect" aria-describedby="cameraSourceHint">
+          <option value="">Automatic (browser choice)</option>
+        </select>
+        <button type="button" id="cameraRefreshBtn">Find cameras</button>
+      </div>
+      <p class="camera-source-hint" id="cameraSourceHint" aria-live="polite">Choose your Mac camera to keep Safari from using your iPhone.</p>
+    </div>
+    <button class="btn primary" id="startBtn">START MONITORING</button>
+    <div class="timer-card" id="timerCard"><span class="timer-label">Session Time</span><span class="timer-value" id="sessionTimer">00:00</span></div>
+<button class="btn" id="recalBtn" style="background:rgba(6,182,212,.08);border-color:rgba(6,182,212,.35);color:#06b6d4;display:none;margin-bottom:12px;font-size:13px;padding:11px 15px;letter-spacing:.5px" title="Recalibrate to personalize detection for your eyes">↻ Recalibrate Eyes</button>
+    <div class="card state-card" id="stateCard"><div class="label">Driving Status</div><div class="state-value" id="driveState">READY</div><p class="metric-note" id="driveHint">Start monitoring, keep your face centered, and let Occulert calibrate for a few seconds.</p></div>
+    <div class="card notice-card"><div class="label">Safety Notice</div><p class="small">Occulert is a supplemental prototype only, not a certified safety, medical, emergency, insurance, legal, employment, fleet compliance, or transportation compliance device. It may miss drowsiness and may trigger false alerts. If you feel tired or unsafe, pull over safely and rest.</p></div>
+
+    <!-- Display Intensity Controls -->
+    <div class="intensity-row">
+      <label>&#128261; Display Intensity</label>
+      <div class="intensity-presets">
+        <button class="preset-btn" data-intensity="dim" id="presetDim">Dim</button>
+        <button class="preset-btn active" data-intensity="standard" id="presetStandard">Standard</button>
+        <button class="preset-btn" data-intensity="bright" id="presetBright">Bright</button>
+      </div>
+    </div>
+
+    <!-- ── Sensitivity Control ──────────────────────────────────────────── -->
+    <div class="intensity-row" id="sensitivityRow">
+      <label>🎚 Alert Sensitivity</label>
+      <div class="intensity-presets">
+        <button class="preset-btn" data-sensitivity="low" id="sensitivityLow" title="Low: triggers only on sustained eye closure">Low</button>
+        <button class="preset-btn active" data-sensitivity="medium" id="sensitivityMedium" title="Medium: balanced detection (default)">Med</button>
+        <button class="preset-btn" data-sensitivity="high" id="sensitivityHigh" title="High: triggers earlier, more sensitive">High</button>
+      </div>
+    </div>
+
+
+    <div class="night-row"><label>&#127761; Night Alert Brightness<span style="font-size:10px;color:var(--text3);margin-left:6px;font-weight:400;font-style:italic">Alert screen opacity</span></label><div class="night-slider"><input type="range" id="nightOpacity" min="30" max="95" value="72" step="1"><span class="night-val" id="nightVal">72%</span></div></div>
+    <div class="card privacy-card"><div class="label">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b>Enable GPS for this session</b><br><span class="small">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b>Enable cloud session sync</b><br><span class="small">Requires sign-in and saves session totals plus alerts. Camera images are never uploaded. Otherwise data stays local.</span></span></label></div>
+    <div class="card"><div class="label">Calibration</div><div class="value" id="calibration">READY</div><div class="cal-bar-wrap"><div class="cal-bar-fill" id="calibrationFill"></div></div><p class="metric-note" id="calHint">Keep your face centered and eyes open during calibration.</p></div>
+    <div class="grid">
+      <div class="card"><div class="label">Fatigue</div><div class="value" id="fatigue">0</div><div class="bar"><div class="fill" id="fatigueFill"></div></div></div>
+      <div class="card"><div class="label">Confidence</div><div class="value" id="confidence">0%</div><div class="bar"><div class="fill" id="confidenceFill"></div></div></div>
+      <div class="card"><div class="label">Face</div><div class="value" id="faceState">--</div></div>
+      <div class="card"><div class="label">EAR</div><div class="value" id="ear">--</div></div>
+      <div class="card"><div class="label">PERCLOS</div><div class="value" id="perclos">0%</div></div>
+      <div class="card"><div class="label">Risk</div><div class="value" id="risk">SAFE</div></div>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="label">Microsleeps</div><div class="value" id="microsleeps">0</div></div>
+      <div class="card"><div class="label">Head Nods</div><div class="value" id="nods">0</div></div>
+      <div class="card"><div class="label">Distraction</div><div class="value" id="distraction">0s</div></div>
+      <div class="card"><div class="label">GPS</div><div class="value gps" id="gps">OFF</div></div>
+    </div>
+    <div class="card"><div class="label">Risk State</div><div class="value" id="riskDetail">SAFE</div><p class="metric-note">Weighted score combines PERCLOS, microsleeps, eye closure, head movement, distraction time, confidence, and repeated alerts. GPS is optional.</p></div>
+    <div class="grid">
+      <div class="card"><div class="label">Alerts</div><div class="value" id="alerts">0</div></div>
+      <div class="card"><div class="label">Escalation</div><div class="value" id="escalation">0</div></div>
+      <div class="card"><div class="label">Cloud Sync</div><div class="value" id="sync">LOCAL</div></div>
+      <div class="card"><div class="label">Location</div><div class="value" id="location">--</div></div>
+    </div>
+    <details class="dev-tools"><summary>Developer Tools</summary><button class="btn demo" id="demoBtn">Simulate Drowsy Alert</button><button class="btn" id="resetBtn" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8;margin-top:8px;margin-bottom:0;font-size:12px;padding:10px">Reset Session Data</button></details>
+    <div class="card"><div class="label">Session Report</div><div class="report" id="report"></div></div>
+    <div class="card"><div class="label">Event Log</div><div id="log"></div></div>
+  
+    <!-- ── NEW FEATURE UI BLOCKS ─────────────────────────────────── -->
+
+    <!-- Break Banner -->
+    <div id="breakBanner" style="display:none;background:rgba(255,170,0,.12);border:1px solid #ffaa00;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13px;color:#ffcc44;font-weight:700;line-height:1.5;"></div>
+
+    <!-- Yawn Card -->
+    <div class="grid" style="margin-bottom:10px">
+      <div class="card"><div class="label">Yawns</div><div class="value" id="yawnCountEl">0</div></div>
+      <div class="card"><div class="label">MAR Signal</div><div class="value" style="font-size:12px;color:var(--text2)" id="marEl">--</div></div>
+    </div>
+
+    <!-- Tracking Quality + Light Badge row -->
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center">
+      <span id="trackingBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(0,255,136,.08);border:1px solid currentColor;white-space:nowrap">✓ Tracking Good</span>
+      <span id="lightBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,170,0,.08);border:1px solid currentColor;white-space:nowrap">⚠️ Low Light</span>
+      <span id="batteryBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,68,68,.08);border:1px solid currentColor;color:#ff6666;white-space:nowrap"></span>
+    </div>
+
+    <!-- Alertness Mini-Chart -->
+    <div class="card" style="padding:10px 12px;margin-bottom:10px">
+      <div class="label" style="margin-bottom:6px">Alertness Over Time</div>
+      <canvas id="alertnessChart" style="width:100%;height:60px;display:block;border-radius:6px;background:rgba(0,0,0,.3)"></canvas>
+    </div>
+
+    <!-- Controls: Voice, Snooze, CSV Export, PWA Install -->
+    <div class="card" style="padding:12px 14px;margin-bottom:10px">
+      <div class="label" style="margin-bottom:10px">Controls</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button id="voiceToggleBtn" onclick="typeof toggleVoice==='function'&&toggleVoice()" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">🔇 Voice OFF</button>
+        <span style="font-size:11px;color:#94a3b8">Safety alerts cannot be snoozed while monitoring.</span>
+      </div>
+    </div>
+
+    <!-- Export + Install row -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button onclick="typeof exportCSV==='function'&&exportCSV()" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
+      <button id="pwaInstallBtn" onclick="typeof triggerPWAInstall==='function'&&triggerPWAInstall()" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
+    </div>
+</aside>
+</div>
+<script src="/occulert-backend.v47.js"></script>
+<script src="/security-utils.v47.js"></script>
+<script src="/driver-app.v48.js"></script>
+<script src="/lang.v47.js" defer></script>
+
+<!-- iOS Add to Home Screen Modal -->
+<div id="iosInstallModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom)">
+  <div style="background:#0f1e2e;border:1px solid #1a3a4a;border-radius:20px 20px 0 0;padding:28px 24px 32px;width:100%;max-width:480px;position:relative">
+    <button onclick="closeIOSInstallModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1">✕</button>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+      <img src="/occulert-logo-main-192.png" width="52" height="52" loading="lazy" decoding="async" style="width:52px;height:52px;border-radius:12px" alt="Occulert">
+      <div>
+        <div style="font-weight:900;font-size:17px;color:#fff">Add Occulert to Home Screen</div>
+        <div style="font-size:13px;color:#94a3b8;margin-top:3px">Install for the best experience</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:22px">
+      <div style="display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px 14px">
+        <span style="font-size:26px;flex-shrink:0">1️⃣</span>
+        <span style="font-size:14px;color:#c8e8f0">Tap the <strong style="color:#fff">Share</strong> button <span style="font-size:18px">⎋</span> at the bottom of Safari</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px 14px">
+        <span style="font-size:26px;flex-shrink:0">2️⃣</span>
+        <span style="font-size:14px;color:#c8e8f0">Scroll down and tap <strong style="color:#fff">Add to Home Screen</strong></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px 14px">
+        <span style="font-size:26px;flex-shrink:0">3️⃣</span>
+        <span style="font-size:14px;color:#c8e8f0">Tap <strong style="color:#fff">Add</strong> in the top right corner</span>
+      </div>
+    </div>
+    <div style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#94a3b8;text-align:center">
+      ✅ Once installed, Occulert runs fullscreen with faster startup and notification support
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -269,7 +269,7 @@ test('legacy local driver identity migrates once across the driver app and accou
   assert.equal(harness.get("JSON.parse(localStorage.getItem('occulert-session-history'))[1].driverId"), 'demo-other');
   assert.equal(harness.get("JSON.parse(localStorage.getItem('occulert-drivers'))[0].driverId"), migratedId);
 
-  harness.run(read('auth-helper.v47.js'));
+  harness.run(read('auth-helper.v49.js'));
   harness.run('window.OcculertAuth.saveProfile(window.OcculertAuth.getProfile())');
   assert.equal(harness.get("localStorage.getItem('occulert-driver-id')"), migratedId);
   assert.equal(harness.get("JSON.parse(localStorage.getItem('occulert-profile')).driverId"), migratedId);
@@ -277,7 +277,7 @@ test('legacy local driver identity migrates once across the driver app and accou
 
 test('service-worker upgrade evicts stale website caches', async () => {
   const source = read('sw.js');
-  assert.match(source, /const CACHE = 'occulert-v48'/);
+  assert.match(source, /const CACHE = 'occulert-v49'/);
   assert.match(source, /const NETWORK_FIRST_ASSETS = new Set\(\[/);
   assert.match(source, /'\/driver-app\.v48\.js'/);
   assert.match(source, /const NETWORK_FIRST_TIMEOUT_MS = 2500/);
@@ -349,7 +349,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await assert.rejects(installation, /Critical offline assets were not cached/);
   assert.equal(skipped, false);
-  assert.deepEqual(deleted, ['occulert-v48']);
+  assert.deepEqual(deleted, ['occulert-v49']);
 });
 
 test('service-worker bounds network and cache writes while preserving a known-good detector', async () => {

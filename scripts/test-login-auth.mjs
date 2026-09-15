@@ -5,7 +5,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../login.html', import.meta.url), 'utf8');
-const inline = readFileSync(new URL('../login-page-1.v47.js', import.meta.url), 'utf8');
+const inline = readFileSync(new URL('../login-page-1.v49.js', import.meta.url), 'utf8');
 
 assert.ok(inline, 'login.html must load the account mode script');
 
@@ -71,6 +71,7 @@ function boot({ resetResult = { ok: true, body: {} }, fleetResult = { status: 40
     currentUser: () => signedInUser,
     getFleet() { calls.fleet += 1; return Promise.resolve(fleetResult); },
   };
+  context.window.OcculertPasswordless = { start(email, extra) { calls.auth.push({email, mode: 'signup', extra}); return Promise.resolve(); }, consumeRedirect: () => null };
   context.window.OcculertPasskeys = {
     isSupported: () => true,
     message: () => 'mapped passkey failure',
@@ -240,6 +241,9 @@ test('account creation reveals setup fields and sends them only for signup', asy
   assert.equal(el('profileFields').classList.contains('hidden'), false);
   assert.equal(el('passkeyEntry').classList.contains('hidden'), true);
   assert.equal(calls.auth[0].mode, 'signup');
+  assert.equal(calls.auth[0].password, undefined);
+  assert.equal(el('password').required, false);
+  assert.equal(el('passwordField').classList.contains('hidden'), true);
   assert.equal(JSON.stringify(calls.auth[0].extra), JSON.stringify({ role: 'fleet', name: 'Fleet Owner', company: 'Pilot Fleet', vehicle: 'Route 12' }));
 
   context.showAuthMode('signin');

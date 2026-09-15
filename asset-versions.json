@@ -4,9 +4,9 @@
   "liquid-glass.css": "liquid-glass.v47.css",
   "portal.css": "portal.v47.css",
   "driver-app.js": "driver-app.v48.js",
-  "auth-helper.js": "auth-helper.v47.js",
+  "auth-helper.js": "auth-helper.v49.js",
   "occulert-backend.js": "occulert-backend.v47.js",
-  "passkey-auth.js": "passkey-auth.v47.js",
+  "passkey-auth.js": "passkey-auth.v49.js",
   "security-utils.js": "security-utils.v47.js",
   "supabase-loader.js": "supabase-loader.v47.js",
   "lang.js": "lang.v47.js",
@@ -14,7 +14,7 @@
   "account-page-2.js": "account-page-2.v47.js",
   "login-page-1.css": "login-page-1.v47.css",
   "install-page-1.js": "install-page-1.v47.js",
-  "login-page-1.js": "login-page-1.v47.js",
+  "login-page-1.js": "login-page-1.v49.js",
   "driver-profiles-page-2.js": "driver-profiles-page-2.v47.js",
   "fleet-pricing-page-1.css": "fleet-pricing-page-1.v47.css",
   "features-page-1.js": "features-page-1.v47.js",
@@ -48,5 +48,6 @@
   "driver-profiles-page-1.js": "driver-profiles-page-1.v47.js",
   "session-history-page-1.css": "session-history-page-1.v47.css",
   "install-page-1.css": "install-page-1.v47.css",
-  "safety-page-1.js": "safety-page-1.v47.js"
+  "safety-page-1.js": "safety-page-1.v47.js",
+  "passwordless-auth.js": "passwordless-auth.v49.js"
 }
