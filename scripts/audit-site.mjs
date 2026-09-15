@@ -1,4 +1,5 @@
 import "./audit-assets.mjs";
+import "./audit-mediapipe.mjs";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 
@@ -8,7 +9,7 @@ const htmlFiles = [];
 
 function walk(dir) {
   for (const entry of readdirSync(dir)) {
-    if ([".git", "node_modules", "native-app", "test-results", "playwright-report"].includes(entry)) continue;
+    if ([".git", "node_modules", "native-app", "test-results", "playwright-report", "tests"].includes(entry)) continue;
     const path = join(dir, entry);
     const stat = statSync(path);
     if (stat.isDirectory()) walk(path);
@@ -46,7 +47,7 @@ function assertSingleH1(path) {
 
 walk(root);
 
-for (const scriptPath of ["driver-app.v47.js", "homepage.js", "lang.v47.js", "passkey-auth.v47.js", "supabase-loader.v47.js"]) {
+for (const scriptPath of ["driver-app.v48.js", "homepage.js", "lang.v47.js", "passkey-auth.v47.js", "supabase-loader.v47.js"]) {
   try { new Function(read(scriptPath)); }
   catch (error) { fail(`${scriptPath} does not parse (${error.message})`); }
 }
@@ -146,11 +147,11 @@ for (const accessibilityBoundary of [
 }
 assertIncludes("app.html", "<link rel=\"stylesheet\" href=\"/driver-app.v47.css\" />", "driver app must load its external stylesheet");
 assertNotIncludes("app.html", "<style>", "driver app must keep its styles out of the HTML document");
-assertIncludes("app.html", "<script src=\"/driver-app.v47.js\"></script>", "driver app must load its external behavior script");
+assertIncludes("app.html", "<script src=\"/driver-app.v48.js\"></script>", "driver app must load its external behavior script");
 const driverAppInlineScripts = [...read("app.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
 if (driverAppInlineScripts !== 0) fail(`driver app must keep its scripts out of the HTML document (found ${driverAppInlineScripts})`);
 const driverAppPage = read("app.html");
-const driverAppDependencies = ["/occulert-backend.v47.js", "/security-utils.v47.js", "/driver-app.v47.js"].map((path) => driverAppPage.indexOf(`src=\"${path}\"`));
+const driverAppDependencies = ["/occulert-backend.v47.js", "/security-utils.v47.js", "/driver-app.v48.js"].map((path) => driverAppPage.indexOf(`src=\"${path}\"`));
 if (driverAppDependencies.some((index) => index < 0) || driverAppDependencies.some((index, position) => position > 0 && index <= driverAppDependencies[position - 1])) {
   fail("driver app dependencies must load before the external monitoring behavior in their original order");
 }
@@ -162,15 +163,13 @@ assertNotIncludes("app.html", "/occulert-logo-main.png", "driver app must not do
 if (statSync(join(root, "homepage-journey-cinematic-v1.avif")).size > 100_000) fail("desktop AVIF journey asset must remain below 100 KB");
 if (statSync(join(root, "homepage-journey-cinematic-v1-640.avif")).size > 50_000) fail("mobile AVIF journey asset must remain below 50 KB");
 assertIncludes("sw.js", "'/driver-app.v47.css'", "service worker must cache the external driver app stylesheet");
-assertIncludes("sw.js", "'/driver-app.v47.js'", "service worker must cache the external driver app behavior");
+assertIncludes("sw.js", "'/driver-app.v48.js'", "service worker must cache the external driver app behavior");
 assertIncludes("sw.js", "const NETWORK_FIRST_ASSETS", "service worker must refresh safety-critical driver logic before using its offline copy");
 assertIncludes("vercel.json", "\"key\": \"Content-Security-Policy\"", "vercel.json must enforce its tested CSP");
 assertIncludes("vercel.json", "https://fonts.googleapis.com", "vercel.json CSP must allow Google Fonts stylesheets used by marketing pages");
 assertIncludes("vercel.json", "font-src 'self' https://fonts.gstatic.com", "vercel.json CSP must allow Google Fonts font files");
 assertIncludes("vercel.json", "https://*.supabase.co", "vercel.json CSP must allow configured Supabase Auth requests");
 assertIncludes("vercel.json", "'wasm-unsafe-eval'", "vercel.json CSP must permit MediaPipe WebAssembly compilation");
-assertIncludes("vercel.json", "connect-src 'self' https://cdn.jsdelivr.net", "vercel.json CSP must permit the pinned MediaPipe model graph fetch");
-assertIncludes("vercel.json", "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net", "vercel.json CSP must permit the pinned MediaPipe runtime to create its generated helper functions");
 assertIncludes("vercel.json", "webp|avif|gif", "optimized AVIF assets must receive immutable cache headers");
 assertIncludes("vercel.json", "publickey-credentials-create=(self)", "the production permissions policy must allow same-origin passkey enrollment");
 assertIncludes("vercel.json", "publickey-credentials-get=(self)", "the production permissions policy must allow same-origin passkey sign-in");
@@ -205,31 +204,31 @@ assertIncludes("api/pilot-leads.js", "rateLimitState(request)", "pilot lead API 
 assertIncludes("api/pilot-leads.js", "pgFetch(\"pilot_leads\"", "pilot lead API must support durable Supabase storage");
 assertIncludes("db/schema.sql", "create table if not exists pilot_leads", "database schema must include pilot lead storage");
 assertIncludes("pilot-signup.html", "<form class=\"card\"", "pilot signup controls must use a semantic form");
-assertIncludes("driver-app.v47.js", "trigger=_patched", "enhanced alert behavior must replace the active trigger function");
-assertIncludes("driver-app.v47.js", "if(alerts===previousAlerts)return", "enhanced alert behavior must respect alert cooldowns");
-assertIncludes("driver-app.v47.js", "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
-assertIncludes("driver-app.v47.js", "window.OcculertBackend.endSession", "driver app must finish protected cloud sessions when opted in");
-assertIncludes("driver-app.v47.js", "queueBackendEvent", "driver app must queue protected alert events when opted in");
-assertIncludes("driver-app.v47.js", "function cameraRecoveryGuidance", "driver app must keep camera failure recovery guidance available");
+assertIncludes("driver-app.v48.js", "trigger=_patched", "enhanced alert behavior must replace the active trigger function");
+assertIncludes("driver-app.v48.js", "if(alerts===previousAlerts)return", "enhanced alert behavior must respect alert cooldowns");
+assertIncludes("driver-app.v48.js", "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
+assertIncludes("driver-app.v48.js", "window.OcculertBackend.endSession", "driver app must finish protected cloud sessions when opted in");
+assertIncludes("driver-app.v48.js", "queueBackendEvent", "driver app must queue protected alert events when opted in");
+assertIncludes("driver-app.v48.js", "function cameraRecoveryGuidance", "driver app must keep camera failure recovery guidance available");
 assertIncludes("app.html", "id=\"cameraSourceSelect\"", "desktop driver setup must provide an explicit camera picker");
-assertIncludes("driver-app.v47.js", "CAMERA_DEVICE_STORAGE_KEY='occulert-camera-device-id'", "desktop camera choice must remain origin-local and persistent");
-assertIncludes("driver-app.v47.js", "videoConstraints.deviceId={exact:deviceId}", "an explicit desktop camera choice must use an exact device constraint");
-assertIncludes("driver-app.v47.js", "videoConstraints.facingMode='user'", "automatic and mobile camera requests must retain the Safari-compatible front-camera constraint");
-assertIncludes("driver-app.v47.js", "function isMobileCaptureDevice", "mobile monitoring must keep its dedicated front-camera path");
-assertIncludes("driver-app.v47.js", "CameraSelectionError", "a missing selected camera must fail closed instead of silently switching devices");
-assertIncludes("driver-app.v47.js", "const recovery=cameraRecoveryGuidance(e)", "driver app must show recovery guidance after camera startup failures");
-assertIncludes("driver-app.v47.js", "Website Settings → Camera → Allow", "driver app must explain iPhone and iPad camera recovery");
-assertIncludes("driver-app.v47.js", "Permissions → Camera → Allow", "driver app must explain Android camera recovery");
-assertIncludes("driver-app.v47.js", "function createLocalDriverId", "local-only driver labels must use a collision-resistant identifier");
-assertIncludes("driver-app.v47.js", "function normalizeLocalDriverId", "driver app must migrate legacy three-digit driver labels");
-assertIncludes("driver-app.v47.js", "function migrateLocalDriverIdentity", "driver app must migrate same-browser references with a legacy driver label");
+assertIncludes("driver-app.v48.js", "CAMERA_DEVICE_STORAGE_KEY='occulert-camera-device-id'", "desktop camera choice must remain origin-local and persistent");
+assertIncludes("driver-app.v48.js", "videoConstraints.deviceId={exact:deviceId}", "an explicit desktop camera choice must use an exact device constraint");
+assertIncludes("driver-app.v48.js", "videoConstraints.facingMode='user'", "automatic and mobile camera requests must retain the Safari-compatible front-camera constraint");
+assertIncludes("driver-app.v48.js", "function isMobileCaptureDevice", "mobile monitoring must keep its dedicated front-camera path");
+assertIncludes("driver-app.v48.js", "CameraSelectionError", "a missing selected camera must fail closed instead of silently switching devices");
+assertIncludes("driver-app.v48.js", "const recovery=cameraRecoveryGuidance(e)", "driver app must show recovery guidance after camera startup failures");
+assertIncludes("driver-app.v48.js", "Website Settings → Camera → Allow", "driver app must explain iPhone and iPad camera recovery");
+assertIncludes("driver-app.v48.js", "Permissions → Camera → Allow", "driver app must explain Android camera recovery");
+assertIncludes("driver-app.v48.js", "function createLocalDriverId", "local-only driver labels must use a collision-resistant identifier");
+assertIncludes("driver-app.v48.js", "function normalizeLocalDriverId", "driver app must migrate legacy three-digit driver labels");
+assertIncludes("driver-app.v48.js", "function migrateLocalDriverIdentity", "driver app must migrate same-browser references with a legacy driver label");
 assertIncludes("auth-helper.v47.js", "function createLocalDriverId", "sign-in must use the collision-resistant local driver identifier");
 assertIncludes("auth-helper.v47.js", "function normalizeLocalDriverId", "sign-in must migrate legacy three-digit driver labels");
 assertNotIncludes("auth-helper.v47.js", "Math.floor(Math.random()*900+100)", "sign-in must not restore collision-prone three-digit driver labels");
-assertIncludes("driver-app.v47.js", "function warnTrackingLoss", "driver app must provide a distinct degraded-tracking warning");
-assertIncludes("driver-app.v47.js", "function verifyFirstInference", "driver app must complete one camera inference before monitoring becomes active");
-assertIncludes("driver-app.v47.js", "function haltForDetectionFailure", "driver app must stop visibly when the detector stalls or repeatedly fails");
-assertIncludes("driver-app.v47.js", "function primeAlertAudio", "driver app must unlock alert audio from the Start gesture");
+assertIncludes("driver-app.v48.js", "function warnTrackingLoss", "driver app must provide a distinct degraded-tracking warning");
+assertIncludes("driver-app.v48.js", "function verifyFirstInference", "driver app must complete one camera inference before monitoring becomes active");
+assertIncludes("driver-app.v48.js", "function haltForDetectionFailure", "driver app must stop visibly when the detector stalls or repeatedly fails");
+assertIncludes("driver-app.v48.js", "function primeAlertAudio", "driver app must unlock alert audio from the Start gesture");
 assertIncludes("login.html", "src=\"/occulert-backend.v47.js\"", "login must load the Supabase backend client");
 assertNotIncludes("login.html", "id=\"fleetId\"", "login must not offer caller-controlled fleet membership");
 assertIncludes("login.html", "id=\"passkeySignInBtn\"", "login must offer the supported passkey sign-in action");
@@ -444,7 +443,7 @@ assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigati
 assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v47'", "the camera-selection repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v48'", "the camera-selection repair must advance the offline cache");
 assertNotIncludes("sw.js", "occulert-v41", "the performance repair must not reuse the stale driver-script cache");
 assertIncludes("sw.js", "'/portal.v47.css'", "the service worker must cache the current shared portal stylesheet");
 assertNotIncludes("sw.js", "occulert-v40", "the external driver script must not reuse the previous offline cache");
@@ -525,8 +524,8 @@ for (const workflow of [".github/workflows/browser-smoke.yml", ".github/workflow
 assertIncludes("package.json", "\"node\": \"24.x\"", "Vercel functions and local checks must use the verified Node 24 runtime");
 assertNotIncludes("how-it-works.html", "runs silently in the background", "public copy must not claim unsupported background monitoring");
 assertIncludes("how-it-works.html", "open in the foreground", "public copy must disclose that monitoring requires the foreground");
-assertIncludes("driver-app.v47.js", "async function handleVisibilityChange", "web monitoring must handle foreground loss explicitly");
-assertIncludes("driver-app.v47.js", "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
+assertIncludes("driver-app.v48.js", "async function handleVisibilityChange", "web monitoring must handle foreground loss explicitly");
+assertIncludes("driver-app.v48.js", "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
 
 if (failures.length) {
   console.error("Occulert site audit failed:");

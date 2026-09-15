@@ -24,6 +24,12 @@ CSS comparison found different theme-specific card/footer rules rather than iden
 
 Local validation for this follow-up: `npm run verify` passed; the expanded browser suite passed 139/140 checks, with one WebKit navigation assertion reading during a CSS transition. After changing that assertion to wait for its final position, the focused homepage checks passed 6/6 (three repetitions in each browser). A before/after computed-style comparison passed all 20 desktop/mobile and light/dark scenarios. These are local checks; production deployment and real-device validation are separate.
 
+## 2026-09-14 — MediaPipe runtime self-hosting (#119)
+
+The proposed follow-up pins and self-hosts all nine MediaPipe runtime assets, patches three dynamic-code helpers in both JavaScript variants, removes JavaScript `unsafe-eval`, and removes the detector CDN from the monitor's CSP. Model and WebAssembly bytes are unchanged. The driver advances to `driver-app.v48.js`; the published v47 driver remains available with identical bytes.
+
+Cache v48 verifies the complete runtime before activation and preserves the prior cache on missing or corrupt downloads. This adds about 16 MiB to the first offline installation. Reproduction, licensing, remaining CSP allowances and offline boundaries are documented in [MEDIAPIPE_RUNTIME.md](MEDIAPIPE_RUNTIME.md). Browser and unit tests cover both runtime variants, CSP enforcement, failed fresh installs, failed upgrades, successful recovery and offline inference; these do not establish physical-device behavior or detection accuracy. This entry describes the proposed source change, not a production deployment.
+
 ## Original high-priority fixes — current status
 
 | Fix | Status | Evidence |

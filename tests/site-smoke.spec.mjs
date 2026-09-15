@@ -407,7 +407,7 @@ test("driver app external assets preserve layout and monitoring behavior", async
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
 
   expect(await page.locator('link[href="/driver-app.v47.css"]').count()).toBe(1);
-  expect(await page.locator('script[src="/driver-app.v47.js"]').count()).toBe(1);
+  expect(await page.locator('script[src="/driver-app.v48.js"]').count()).toBe(1);
   expect(await page.locator("script:not([src])").count()).toBe(0);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator(".top")).toHaveCSS("min-height", "74px");
@@ -449,19 +449,18 @@ test("camera permission recovery is platform specific and actionable", async ({ 
 
 test("driver startup self-test verifies WebAssembly and the pinned model graph", async ({ page }) => {
   let graphRequests = 0;
-  await page.route("**/@mediapipe/face_mesh@0.4.1633559619/face_mesh.binarypb", async (route) => {
+  await page.route("**/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh.binarypb", async (route) => {
     graphRequests += 1;
     await route.fulfill({ status: 200, contentType: "application/octet-stream", body: "model-graph-fixture" });
   });
   const response = await page.goto("/app.html", { waitUntil: "domcontentloaded" });
   const contentSecurityPolicy = response?.headers()["content-security-policy"] || "";
-  expect(contentSecurityPolicy).toContain("'unsafe-eval'");
+  expect(contentSecurityPolicy).not.toContain("'unsafe-eval'");
+  expect(contentSecurityPolicy).not.toContain("https://cdn.jsdelivr.net");
   expect(contentSecurityPolicy).toContain("'wasm-unsafe-eval'");
-  expect(contentSecurityPolicy).toContain("https://cdn.jsdelivr.net");
-  expect(await page.evaluate(() => new Function("return 7")())).toBe(7);
   expect(await page.evaluate(() => verifyDetectionRuntime())).toBe(true);
   expect(graphRequests).toBe(1);
-  expect(await page.evaluate(() => FACE_MESH_SCRIPT_URL)).toContain("@mediapipe/face_mesh@0.4.1633559619/face_mesh.js");
+  expect(await page.evaluate(() => FACE_MESH_SCRIPT_URL)).toContain("/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh.js");
   const probe = await page.evaluate(async () => {
     faceMesh = { send: async ({ image }) => onResults({ multiFaceLandmarks: image === video ? [] : null }) };
     await verifyFirstInference();
