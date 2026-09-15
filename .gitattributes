@@ -1,0 +1,4 @@
+# Preserve upstream runtime/license bytes and the historical upgrade fixture.
+# Readable patch sources in scripts/mediapipe retain normal whitespace checks.
+vendor/mediapipe/** -whitespace linguist-vendored=true
+tests/fixtures/app-v47.html -whitespace

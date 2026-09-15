@@ -1,0 +1,2 @@
+# Browser fixtures and test-only scripts are not production site assets.
+tests/

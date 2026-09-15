@@ -1,46 +1,5 @@
-const CACHE = 'occulert-v48';
-// Both variants are required: a later browser update may change SIMD support.
-const RUNTIME_ASSETS = [
-  {
-    "url": "/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh.binarypb",
-    "integrity": "sha256-E5VGvwWuuzPiYRtrlF86FinDFsqSTjPOwVR8hd3vn1M="
-  },
-  {
-    "url": "/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh.js",
-    "integrity": "sha256-XbhVWsgMoq1zZvuz6lPA0JWWCfyau3uL43p07BrEupw="
-  },
-  {
-    "url": "/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh_solution_packed_assets.data",
-    "integrity": "sha256-2+WQXFgsBGLNrqF+fm7OqS7aqMzMUVxeLnKR8su1+5k="
-  },
-  {
-    "url": "/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh_solution_packed_assets_loader.js",
-    "integrity": "sha256-5d6GhbKZGEgT987GaOSZAjk3rlIbcPYM0PxIMpMERuA="
-  },
-  {
-    "url": "/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh_solution_simd_wasm_bin.data",
-    "integrity": "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
-  },
-  {
-    "url": "/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh_solution_simd_wasm_bin.js",
-    "integrity": "sha256-dZNXRJl3mk8xwM8oKjB3RwDP4euZBtJhb1nNUeQmtF8="
-  },
-  {
-    "url": "/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh_solution_simd_wasm_bin.wasm",
-    "integrity": "sha256-+56c/ouDqRTkDqsu/TsNkqYfgqfJaFifIjqyp+Mx0xQ="
-  },
-  {
-    "url": "/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh_solution_wasm_bin.js",
-    "integrity": "sha256-zjGcQRxldU6Pmr+RH/JxYiv+WF4CfQM9OyYT7Tx+yiI="
-  },
-  {
-    "url": "/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh_solution_wasm_bin.wasm",
-    "integrity": "sha256-VFIvolxQW/CUJC+Wm05JGRJesNrcy1aPKvFxu9ZYZfk="
-  }
-];
-const RUNTIME_INTEGRITY = new Map(RUNTIME_ASSETS.map(asset => [asset.url, asset.integrity]));
+const CACHE = 'occulert-v47';
 const STATIC_ASSETS = [
-  ...RUNTIME_ASSETS.map(asset => asset.url),
   '/',
   '/index.html',
   '/base.v47.css',
@@ -52,7 +11,7 @@ const STATIC_ASSETS = [
   '/portal.v47.css',
   '/homepage.js',
   '/driver-app.v47.css',
-  '/driver-app.v48.js',
+  '/driver-app.v47.js',
   '/lang.v47.js',
   '/security-utils.v47.js'
 ];
@@ -64,14 +23,13 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/supabase-loader.v47.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
-  '/driver-app.v48.js',
+  '/driver-app.v47.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
-  ...RUNTIME_ASSETS.map(asset => asset.url),
   '/base.v47.css',
   '/app.html',
   '/driver-app.v47.css',
-  '/driver-app.v48.js',
+  '/driver-app.v47.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;
@@ -125,10 +83,7 @@ self.addEventListener('install', event => {
     (async () => {
       try {
         const cache = await caches.open(CACHE);
-        await Promise.allSettled(STATIC_ASSETS.map(url => {
-          const integrity = RUNTIME_INTEGRITY.get(url);
-          return cache.add(integrity ? new Request(new URL(url, self.location.origin), { integrity }) : url);
-        }));
+        await Promise.allSettled(STATIC_ASSETS.map(url => cache.add(url)));
         const criticalResponses = await Promise.all(CRITICAL_OFFLINE_ASSETS.map(url => cache.match(url)));
         if (criticalResponses.some(response => !response)) throw new Error('Critical offline assets were not cached');
         await self.skipWaiting();
@@ -206,8 +161,7 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(req).then(match => {
       if (match) return match;
-      const integrity = url.origin === self.location.origin && RUNTIME_INTEGRITY.get(url.pathname);
-      return fetch(integrity ? new Request(req, { integrity }) : req).then(res => {
+      return fetch(req).then(res => {
         if (res && res.ok && req.url.startsWith(self.location.origin)) {
           const copy = res.clone();
           caches.open(CACHE).then(cache => cache.put(req, copy));

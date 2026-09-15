@@ -1,0 +1,15 @@
+MediaPipe Face Mesh 0.4.1633559619
+Copyright Google LLC and the MediaPipe contributors.
+Package: https://www.npmjs.com/package/@mediapipe/face_mesh/v/0.4.1633559619
+Source: https://github.com/google-ai-edge/mediapipe
+License: Apache License 2.0; see LICENSE. Upstream copyright notices remain in the JavaScript files.
+
+The generated runtime includes Emscripten code; its MIT and NCSA notices are
+retained in EMSCRIPTEN-LICENSE (license text from upstream tag 2.0.32; the npm
+package does not identify its exact compiler version).
+
+Occulert modifications (patch revision 1):
+The scalar and SIMD Emscripten JavaScript runtimes replace createNamedFunction,
+craftInvokerFunction, and __emval_get_method_caller with closure-based equivalents.
+No model, graph, WebAssembly, or packed data bytes were changed.
+Reproduction, hashes, and maintenance guidance: docs/MEDIAPIPE_RUNTIME.md.

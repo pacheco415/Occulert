@@ -10,6 +10,8 @@
 - [Accuracy Benchmark](ACCURACY_BENCHMARK.md)
 - [Audit](AUDIT.md)
 
+- [Self-hosted MediaPipe runtime](MEDIAPIPE_RUNTIME.md)
+
 ## Asset versions
 
 `asset-versions.json` maps source names to immutable filenames. When editing an immutable asset, give it a new version suffix, update every reference (including imports, service-worker lists, Vercel header rules and tests), and update `asset-integrity.json`. Never publish different bytes at an existing immutable URL. Keep older deployed assets available when supporting clients still holding old documents. `npm run audit:site` verifies asset integrity, references, font preconnects and extracted-page boundaries. HTML, manifest.json and sw.js always revalidate.

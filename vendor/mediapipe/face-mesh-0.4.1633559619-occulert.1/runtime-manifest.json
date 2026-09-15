@@ -1,0 +1,19 @@
+{
+  "package": "@mediapipe/face_mesh",
+  "version": "0.4.1633559619",
+  "tarball": "https://registry.npmjs.org/@mediapipe/face_mesh/-/face_mesh-0.4.1633559619.tgz",
+  "integrity": "sha512-Vc8cdjxS5+O2gnjWH9KncYpUCVXT0h714KlWAsyqJvJbIgUJBqpppbIx8yWcAzBDxm/5cYSuBI5p5ySIPxzcEg==",
+  "license": "Apache-2.0",
+  "files": {
+    "face_mesh.binarypb": "139546bf05aebb33e2611b6b945f3a1629c316ca924e33cec1547c85ddef9f53",
+    "face_mesh.js": "5db8555ac80ca2ad7366fbb3ea53c0d0959609fc9abb7b8be37a74ec1ac4ba9c",
+    "face_mesh_solution_packed_assets.data": "dbe5905c582c0462cdaea17e7e6ecea92edaa8cccc515c5e2e7291f2cbb5fb99",
+    "face_mesh_solution_packed_assets_loader.js": "e5de8685b299184813f7cec668e499023937ae521b70f60cd0fc4832930446e0",
+    "face_mesh_solution_simd_wasm_bin.data": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "face_mesh_solution_simd_wasm_bin.js": "7593574499779a4f31c0cf282a30774700cfe1eb9906d2616f59cd51e426b45f",
+    "face_mesh_solution_simd_wasm_bin.wasm": "fb9e9cfe8b83a914e40eab2efd3b0d92a61f82a7c968589f223ab2a7e331d314",
+    "face_mesh_solution_wasm_bin.js": "ce319c411c65754e8f9abf911ff271622bfe585e027d033d3b2613ed3c7eca22",
+    "face_mesh_solution_wasm_bin.wasm": "54522fa25c505bf094242f969b4e4919125eb0dadccb568f2af171bbd65865f9"
+  },
+  "patchRevision": 1
+}

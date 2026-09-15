@@ -116,7 +116,7 @@ test('Build 30 pins its iOS toolchain and exposes local aggregate diagnostics', 
 
 test('web monitoring defers MediaPipe and prevents overlapping inference', async () => {
   const app = read('app.html');
-  const driver = read('driver-app.v47.js');
+  const driver = read('driver-app.v48.js');
   assert.doesNotMatch(app, /<script[^>]+@mediapipe\/face_mesh/);
   assert.match(app, /loading="lazy"/);
   assert.match(driver, /function loadFaceMeshScript\(\)/);
@@ -277,9 +277,9 @@ test('legacy local driver identity migrates once across the driver app and accou
 
 test('service-worker upgrade evicts stale website caches', async () => {
   const source = read('sw.js');
-  assert.match(source, /const CACHE = 'occulert-v47'/);
+  assert.match(source, /const CACHE = 'occulert-v48'/);
   assert.match(source, /const NETWORK_FIRST_ASSETS = new Set\(\[/);
-  assert.match(source, /'\/driver-app\.v47\.js'/);
+  assert.match(source, /'\/driver-app\.v48\.js'/);
   assert.match(source, /const NETWORK_FIRST_TIMEOUT_MS = 2500/);
   assert.match(source, /event\.waitUntil\(cacheUpdate\)/);
 
@@ -288,6 +288,7 @@ test('service-worker upgrade evicts stale website caches', async () => {
   let claimed = false;
   const context = {
     URL,
+    Request,
     Promise,
     Set,
     fetch: async () => ({ ok: true, clone: () => ({}) }),
@@ -321,13 +322,15 @@ test('service-worker install cannot replace a usable cache without its detector'
   let skipped = false;
   const cache = {
     add: async url => {
-      if (url === '/driver-app.v47.js') throw new Error('transient detector download failure');
+      url = typeof url === 'string' ? url : new URL(url.url).pathname;
+      if (url === '/driver-app.v48.js') throw new Error('transient detector download failure');
       cached.add(url);
     },
     match: async url => cached.has(url) ? { ok: true } : null,
   };
   const context = {
     URL,
+    Request,
     Promise,
     Set,
     caches: {
@@ -346,7 +349,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await assert.rejects(installation, /Critical offline assets were not cached/);
   assert.equal(skipped, false);
-  assert.deepEqual(deleted, ['occulert-v47']);
+  assert.deepEqual(deleted, ['occulert-v48']);
 });
 
 test('service-worker bounds network and cache writes while preserving a known-good detector', async () => {
@@ -359,6 +362,7 @@ test('service-worker bounds network and cache writes while preserving a known-go
   const context = {
     AbortController,
     URL,
+    Request,
     Promise,
     Response: { error: () => ({ source: 'network-error', ok: false }) },
     Set,
@@ -382,7 +386,7 @@ test('service-worker bounds network and cache writes while preserving a known-go
     },
   };
   runInNewContext(source, context);
-  const request = { method: 'GET', mode: 'same-origin', url: 'https://www.occulert.com/driver-app.v47.js' };
+  const request = { method: 'GET', mode: 'same-origin', url: 'https://www.occulert.com/driver-app.v48.js' };
   let responsePromise;
   let lifetimePromise;
   const dispatch = () => listeners.fetch({

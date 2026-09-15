@@ -14,6 +14,7 @@ const externalRewrites = new Map(
     .map(({ source, destination }) => [source, destination]),
 );
 const types = {
+  ".wasm": "application/wasm",
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".ico": "image/x-icon",
