@@ -1,33 +1,35 @@
-const CACHE = 'occulert-v46';
+const CACHE = 'occulert-v47';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  '/base.v47.css',
   '/app.html',
   '/manifest.json',
   '/favicon.ico',
-  '/homepage.css?v=32',
-  '/liquid-glass.css?v=3',
-  '/portal.css?v=6',
+  '/homepage.v47.css',
+  '/liquid-glass.v47.css',
+  '/portal.v47.css',
   '/homepage.js',
-  '/driver-app.css',
-  '/driver-app.js',
-  '/lang.js',
-  '/security-utils.js'
+  '/driver-app.v47.css',
+  '/driver-app.v47.js',
+  '/lang.v47.js',
+  '/security-utils.v47.js'
 ];
 
 const NETWORK_ONLY_ASSETS = new Set([
-  '/auth-helper.js',
-  '/occulert-backend.js',
-  '/passkey-auth.js',
-  '/supabase-loader.js',
+  '/auth-helper.v47.js',
+  '/occulert-backend.v47.js',
+  '/passkey-auth.v47.js',
+  '/supabase-loader.v47.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
-  '/driver-app.js',
+  '/driver-app.v47.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
+  '/base.v47.css',
   '/app.html',
-  '/driver-app.css',
-  '/driver-app.js',
+  '/driver-app.v47.css',
+  '/driver-app.v47.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;

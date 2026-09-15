@@ -65,33 +65,6 @@
       ]
     },
     {
-      "source": "/auth-helper.js",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store"
-        }
-      ]
-    },
-    {
-      "source": "/occulert-backend.js",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store"
-        }
-      ]
-    },
-    {
-      "source": "/passkey-auth.js",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store"
-        }
-      ]
-    },
-    {
       "source": "/(.*).(js|css)",
       "headers": [
         {
@@ -156,6 +129,15 @@
     },
     {
       "source": "/(.*).(png|jpg|jpeg|webp|avif|gif|svg|mp4|webm|ico)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).v47.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",

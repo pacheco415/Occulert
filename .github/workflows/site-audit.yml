@@ -15,4 +15,6 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Audit every site change
+        run: npm run audit:site
       - run: npm run verify

@@ -1,6 +1,6 @@
 # Occulert Technical Audit
 
-Last updated: 2026-09-08. Last full source and live-site review: 2026-08-04
+Last updated: 2026-09-14. Last full source and live-site review: 2026-08-04
 (previously 2026-07-08, 2026-07-05, 2026-06-14).
 
 The 2026-09-08 update re-verified the current merged source at `c481817`,
@@ -9,6 +9,20 @@ was not re-inspected on that date. It also records the previously observed Build
 user-feedback evidence below. This does not replace a new regression run when
 the next native change is made. For the consolidated near/mid/long-term gap
 list, see issue #6.
+
+## 2026-09-14 — Browser startup release and asset delivery
+
+PR #118 (merged as `483a987a1b6013f8bfdbaa68f010b1a9622eac08`) pinned the detector and model graph, checked the first result, added explicit desktop camera selection and missing-device recovery, adjusted CSP for the MediaPipe auxiliary runtime, advanced the service-worker cache to v46, and repaired passkey initialization. Its PR records passing Site Audit and Chromium/WebKit checks; further Safari validation was explicitly deferred.
+
+MediaPipe auxiliary runtime self-hosting and CSP tightening is tracked in [issue #119](https://github.com/pacheco415/Occulert/issues/119).
+
+The follow-up asset-delivery changes use `.v47` filenames for shared JS/CSS and extracted page assets, preserve revalidation for HTML/manifest/service worker, and advance the offline cache to v47. Google Fonts remains hosted by Google with both preconnects. All 17 requested non-monitoring pages now use external styles and scripts in their original execution order. None loads MediaPipe; only Login and Account load the Supabase SDK, and both need it for authentication/passkeys. Other pages use the lightweight backend helper where required.
+
+Live route inspection on 2026-09-14 confirmed `app.html` is the supported monitor; `app-v2.html` and `app-ai-v3.html` served retirement notices. The obsolete notices and robots entries are removed. Neither was in sitemap or active navigation. Issue #9 is already closed; the existing unfiltered Site Audit workflow runs `audit:site` through `verify`, and now exposes a separate audit step.
+
+CSS comparison found different theme-specific card/footer rules rather than identical copies. Shared box sizing, button primitives, and nav alignment move to `base.v47.css`; visual overrides remain in their original layers. The base is imported by all four shared stylesheets and included in the offline precache.
+
+Local validation for this follow-up: `npm run verify` passed; the expanded browser suite passed 139/140 checks, with one WebKit navigation assertion reading during a CSS transition. After changing that assertion to wait for its final position, the focused homepage checks passed 6/6 (three repetitions in each browser). A before/after computed-style comparison passed all 20 desktop/mobile and light/dark scenarios. These are local checks; production deployment and real-device validation are separate.
 
 ## Original high-priority fixes — current status
 

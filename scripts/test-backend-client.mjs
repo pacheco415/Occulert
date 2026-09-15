@@ -80,7 +80,7 @@ window.localStorage = localStorage;
 window.navigator = context.navigator;
 window.fetch = fetchMock;
 
-vm.runInNewContext(readFileSync(new URL("../occulert-backend.js", import.meta.url), "utf8"), context);
+vm.runInNewContext(readFileSync(new URL("../occulert-backend.v47.js", import.meta.url), "utf8"), context);
 const backend = window.OcculertBackend;
 
 assert.equal(backend.authMessage({ body: { code: "over_email_send_rate_limit", message: "email rate limit exceeded" } }, "signup"), "Too many confirmation emails were requested. Wait about an hour, then try Create Account once.");

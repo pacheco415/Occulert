@@ -17,14 +17,14 @@ const pngSize = path => {
 };
 
 test('spreadsheet exports neutralize formula cells', () => {
-  const { csvCell } = require('../security-utils.js');
+  const { csvCell } = require('../security-utils.v47.js');
   for (const prefix of ['=', '+', '-', '@']) {
     assert.equal(csvCell(`${prefix}SUM(1,1)`), `'${prefix}SUM(1,1)`);
     assert.equal(csvCell(`  ${prefix}SUM(1,1)`), `  '${prefix}SUM(1,1)`);
   }
   assert.equal(csvCell('Driver One'), 'Driver One');
   assert.match(read('fleet-dashboard.html'), /OcculertSecurity\.csvCell/);
-  assert.match(read('driver-app.js'), /OcculertSecurity\.csvCell/);
+  assert.match(read('driver-app.v47.js'), /OcculertSecurity\.csvCell/);
 });
 
 test('native cloud writes recheck current consent', () => {
@@ -309,7 +309,7 @@ test('History commits after persistence and ignores loads started before a newer
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
-  const app = read('driver-app.js');
+  const app = read('driver-app.v47.js');
   assert.doesNotMatch(app, /Snooze 5m|function isSnoozed|Alert snoozed/);
   assert.doesNotMatch(app, /alerts will show on Apple Watch/i);
   assert.match(app, /Watch delivery depends on/i);
@@ -321,7 +321,7 @@ test('fleet telemetry is explicitly labeled client-reported and unverified', () 
 });
 
 test('pilot contacts are server-only and disclosed accurately', () => {
-  const signup = read('pilot-signup.html');
+  const signup = read('pilot-signup.html') + read('pilot-signup-page-1.v47.js') + read('pilot-signup-page-2.v47.js');
   const viewer = read('pilot-leads.html');
   const privacy = read('privacy.html');
   assert.doesNotMatch(signup, /occulert-pilot-leads|savePilotLead|firebase/i);
@@ -348,23 +348,23 @@ test('invitation replacement is created before the old link is revoked', () => {
 });
 
 test('legacy monitors are retired and stale auth helpers are never cached', () => {
-  assert.match(read('app-v2.html'), /Legacy monitor retired/i);
-  assert.match(read('app-ai-v3.html'), /Legacy monitor retired/i);
+  assert.throws(() => read('app-v2.html'), /ENOENT/);
+  assert.throws(() => read('app-ai-v3.html'), /ENOENT/);
   const sw = read('sw.js');
   const assetList = sw.slice(sw.indexOf('const STATIC_ASSETS'), sw.indexOf('];') + 2);
-  assert.doesNotMatch(assetList, /occulert-backend\.js|auth-helper\.js/);
+  assert.doesNotMatch(assetList, /occulert-backend\.v47\.js|auth-helper\.v47\.js/);
   assert.match(sw, /NETWORK_ONLY_ASSETS/);
 });
 
 test('claims, outreach, offline wording, and localized safety copy are bounded', () => {
-  const outreach = read('PILOT_OUTREACH.md');
+  const outreach = read('docs/PILOT_OUTREACH.md');
   assert.doesNotMatch(outreach, /alert you before it becomes dangerous|before an incident occurs/i);
   assert.match(outreach, /may miss/i);
   assert.match(outreach, /pull over/i);
   assert.doesNotMatch(read('faq.html'), /core AI runs fully offline/i);
   assert.doesNotMatch(read('features.html'), /before they become dangerous/i);
   assert.doesNotMatch(read('about.html'), /Built to Save Lives/i);
-  const lang = read('lang.js');
+  const lang = read('lang.v47.js');
   assert.match(lang, /trust3: "Keine Daten verkauft"/);
   assert.match(lang, /English safety wording pending professional translation/);
 });

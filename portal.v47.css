@@ -1,3 +1,4 @@
+@import url("/base.v47.css");
 :root {
   --portal-bg: #07090e;
   --portal-surface: #151a23;
@@ -32,9 +33,7 @@ html[data-theme="light"] {
   --portal-shadow: 0 12px 30px rgba(31, 51, 74, .08);
 }
 
-* {
-  box-sizing: border-box;
-}
+
 
 body.portal-page {
   min-height: 100vh;

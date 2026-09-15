@@ -1,16 +1,13 @@
-// Executes account.html's inline script against a stub DOM so the credential
+// Executes Account's external script against a stub DOM so the credential
 // flows are tested as behavior, not just as source patterns.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../account.html', import.meta.url), 'utf8');
-const inline = [...source.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
-  .map((match) => match[1])
-  .find((body) => body.includes('function changeEmail'));
+const inline = readFileSync(new URL('../account-page-2.v47.js', import.meta.url), 'utf8');
 
-assert.ok(inline, 'account.html must contain the credential script');
+assert.ok(inline, 'account.html must load the credential script');
 
 function makeElement(id) {
   const classes = new Set(id === 'securityForms' ? ['hidden'] : []);

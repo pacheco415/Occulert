@@ -14,26 +14,31 @@ function contrastRatio(foreground, background) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-test("important public pages load with one primary heading", async ({ page }) => {
-  const pageErrors = [];
-  page.on("pageerror", (error) => pageErrors.push(error.message));
-
-  for (const path of ["/", "/features.html", "/how-it-works.html", "/install.html", "/fleet-pricing.html", "/pilot-signup.html", "/fleet-dashboard.html", "/fleet-onboarding.html", "/accept-invite.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
+for (const path of ["/account.html", "/login.html", "/driver-profiles.html", "/faq.html", "/about.html", "/product-hub.html", "/pilot-leads.html", "/", "/features.html", "/how-it-works.html", "/install.html", "/fleet-pricing.html", "/pilot-signup.html", "/fleet-dashboard.html", "/fleet-onboarding.html", "/accept-invite.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
+  test(`important public page ${path} loads without script errors`, async ({ page }) => {
+    const pageErrors = [];
+    page.on("pageerror", error => pageErrors.push(error.message));
     const response = await page.goto(path, { waitUntil: "domcontentloaded" });
     expect(response?.ok(), `${path} should load`).toBeTruthy();
-    expect(await page.locator("h1").count(), `${path} should have one h1`).toBe(1);
-    expect(await page.locator('link[rel="canonical"]').count(), `${path} should have a canonical URL`).toBe(1);
-  }
-
-  expect(pageErrors).toEqual([]);
-});
+    if (['/faq.html', '/about.html'].includes(path)) {
+      await expect(page.locator('main .section-title')).toBeVisible();
+    } else {
+      expect(await page.locator("h1").count(), `${path} should have one h1`).toBe(1);
+    }
+    const robots = await page.locator('meta[name="robots"]').evaluateAll(elements => elements[0]?.content || '');
+    if (path !== '/login.html' && !robots?.includes('noindex')) {
+      expect(await page.locator('link[rel="canonical"]').count(), `${path} should have a canonical URL`).toBe(1);
+    }
+    expect(pageErrors).toEqual([]);
+  });
+}
 
 test("homepage external assets preserve theme and mobile navigation controls", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(() => document.documentElement.style.setProperty("scroll-behavior", "auto", "important"));
 
-  expect(await page.locator('link[href="/homepage.css?v=32"]').count()).toBe(1);
+  expect(await page.locator('link[href="/homepage.v47.css"]').count()).toBe(1);
   expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1-640.avif"][type="image/avif"]').count()).toBe(1);
   expect(await page.locator('link[href="/homepage.css"]').count()).toBe(0);
   expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
@@ -60,7 +65,7 @@ test("homepage external assets preserve theme and mobile navigation controls", a
     window.scrollBy(0, 400);
   });
   await expect(page.locator("#siteNav")).toHaveClass(/nav-hidden/);
-  expect(await page.locator("#siteNav").evaluate((element) => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(1);
+  await expect.poll(() => page.locator("#siteNav").evaluate((element) => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(1);
   await expect(page.locator("#scrollTop")).not.toHaveClass(/visible/);
   await page.evaluate(() => window.scrollBy(0, -200));
   await expect(page.locator("#siteNav")).not.toHaveClass(/nav-hidden/);
@@ -401,8 +406,8 @@ test("fleet filtering preserves input focus and updates only the visible roster"
 test("driver app external assets preserve layout and monitoring behavior", async ({ page }) => {
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
 
-  expect(await page.locator('link[href="/driver-app.css"]').count()).toBe(1);
-  expect(await page.locator('script[src="/driver-app.js"]').count()).toBe(1);
+  expect(await page.locator('link[href="/driver-app.v47.css"]').count()).toBe(1);
+  expect(await page.locator('script[src="/driver-app.v47.js"]').count()).toBe(1);
   expect(await page.locator("script:not([src])").count()).toBe(0);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator(".top")).toHaveCSS("min-height", "74px");

@@ -43,6 +43,12 @@ createServer(async (req, res) => {
     if (!file.startsWith(root)) throw new Error("invalid_path");
     if (!(await stat(file)).isFile()) throw new Error("not_found");
     for (const [name, value] of Object.entries(globalHeaders)) res.setHeader(name, value);
+    // Apply the same ordered static-header rules used by this site's Vercel config.
+    for (const rule of vercel.headers || []) {
+      if (new RegExp(`^${rule.source}$`).test(pathname)) {
+        for (const { key, value } of rule.headers) res.setHeader(key, value);
+      }
+    }
     res.setHeader("Content-Type", types[extname(file)] || "application/octet-stream");
     res.end(await readFile(file));
   } catch {

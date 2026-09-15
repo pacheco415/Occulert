@@ -1,0 +1,26 @@
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0e1a;--sf:#121c2e;--bd:#25344f;--tx:#e2e8f0;--mu:#94a3b8;--di:#64748b;--bl:#3b82f6;--wb:rgba(245,158,11,.08);--wbr:rgba(245,158,11,.25);--rb:rgba(239,68,68,.07);--rbr:rgba(239,68,68,.2);--gb:rgba(34,197,94,.07);--gbr:rgba(34,197,94,.2)}
+html{scroll-behavior:smooth}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--tx);line-height:1.7}
+nav{position:fixed;top:0;left:0;right:0;height:64px;background:rgba(10,14,26,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;padding:0 32px;z-index:50}
+.logo{font-weight:900;font-size:20px;color:var(--tx);text-decoration:none}
+.back{color:var(--mu);font-size:14px;text-decoration:none}
+main{max-width:800px;margin:0 auto;padding:96px 24px 64px}
+h1{font-size:clamp(22px,4vw,34px);font-weight:800;margin-bottom:8px}
+.sub{color:var(--mu);font-size:14px;margin-bottom:36px;padding-bottom:20px;border-bottom:1px solid var(--bd)}
+.sec{margin-bottom:36px;padding-bottom:28px;border-bottom:1px solid var(--bd)}
+.sec:last-of-type{border-bottom:none}
+h2{font-size:17px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.n{font-size:11px;font-weight:600;color:var(--bl);background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:4px;padding:2px 6px}
+p{color:var(--mu);margin-bottom:10px;font-size:15px}
+ul{color:var(--mu);font-size:15px;padding-left:20px;margin-bottom:10px}
+li{margin-bottom:5px}
+.box{border-radius:10px;padding:14px 18px;margin-bottom:14px;font-size:14px;line-height:1.6}
+.warn{background:var(--wb);border:1px solid var(--wbr);color:#fbbf24}
+.danger{background:var(--rb);border:1px solid var(--rbr);color:#f87171}
+.info{background:var(--gb);border:1px solid var(--gbr);color:#4ade80}
+.box b{display:block;margin-bottom:3px;font-size:12px;text-transform:uppercase;letter-spacing:.7px}
+.hl{background:var(--sf);border:1px solid var(--bd);border-left:3px solid var(--bl);border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:14px;color:var(--mu)}
+footer{border-top:1px solid var(--bd);padding:28px 24px;text-align:center;color:var(--di);font-size:13px;margin-top:40px}
+footer a{color:var(--di);text-decoration:none}
+@media(max-width:600px){nav{padding:0 16px}main{padding:84px 16px 48px}}

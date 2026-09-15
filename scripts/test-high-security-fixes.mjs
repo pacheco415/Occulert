@@ -132,7 +132,7 @@ test('repeated closures can escalate through PERCLOS before one long closure', (
 test('web copy and runtime disclose and enforce foreground-only monitoring', async () => {
   const howItWorks = readFileSync(new URL('../how-it-works.html', import.meta.url), 'utf8');
   const appPage = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
-  const app = readFileSync(new URL('../driver-app.js', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../driver-app.v47.js', import.meta.url), 'utf8');
   assert.doesNotMatch(howItWorks, /runs silently in the background/i);
   assert.match(howItWorks, /open in the foreground/i);
   assert.match(app, /async function handleVisibilityChange/);
