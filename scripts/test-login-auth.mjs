@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
+const source = readFileSync(new URL('../login.html', import.meta.url), 'utf8');
 const inline = readFileSync(new URL('../login-page-1.v47.js', import.meta.url), 'utf8');
 
 assert.ok(inline, 'login.html must load the account mode script');
