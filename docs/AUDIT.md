@@ -122,3 +122,11 @@ dashboard, GPS tracking, driver safety scoring, incident history, and a pilot
 program for local fleet operators. The backend for this now exists rather than
 being planned, which moves the constraint from engineering to evidence: the
 pilot program and any accuracy claim both depend on #65.
+
+
+## 2026-09-14 — Passwordless profile onboarding and selective offline runtime (proposed)
+
+- Create Account sends a Supabase email confirmation link, then offers passkey creation directly; no password required. Email-link sign-in provides recovery. Session identity is checked with Auth before profile creation or enrollment. Display metadata never grants fleet access.
+- Added cancellation/retry, unsupported-browser fallback, rate-limit feedback, token-fragment removal and visible partial profile-sync status. Existing password sign-in remains available. Previously published JS bytes remain unchanged; revised scripts use v49 URLs.
+- Cache v49 installs only the SIMD or scalar runtime selected by WebAssembly.validate. The other build stays available for integrity-checked online fetches. Tests cover both paths, corrupt downloads, v48 rollback and real offline inference.
+- Local browser fixtures do not establish production email delivery, redirect allowlist behavior, or physical-device passkey creation. Those remain release acceptance checks. No production Auth settings changed.

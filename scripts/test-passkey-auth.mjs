@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../passkey-auth.v47.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../passkey-auth.v49.js', import.meta.url), 'utf8');
 
-function boot({ supported = true, signInError = null, sdkAvailable = true, configAvailable = true } = {}) {
+function boot({ supported = true, signInError = null, sdkAvailable = true, configAvailable = true, storageFailure = false } = {}) {
   const calls = { create: [], adopted: [], sessions: [], register: 0, list: 0, update: [], remove: [], signOut: [], loader: 0, refreshConfig: 0 };
   const session = {
     access_token: 'existing-access',
@@ -68,7 +68,7 @@ function boot({ supported = true, signInError = null, sdkAvailable = true, confi
       getAuthConfig: async () => configAvailable ? ({ configured: true, url: 'https://example.supabase.co', anonKey: 'public-key' }) : null,
       refreshAuthConfig: async () => { calls.refreshConfig += 1; return configAvailable ? ({ configured: true, url: 'https://example.supabase.co', anonKey: 'public-key' }) : null; },
       getSession: async () => session,
-      adoptSession(value) { calls.adopted.push(value); return value; },
+      adoptSession(value) { calls.adopted.push(value); return storageFailure ? session : value; },
     },
   };
   const context = { window, navigator: window.navigator, Error, Boolean, Array, Number, String, Promise };
@@ -140,3 +140,8 @@ test('missing browser SDK and runtime auth settings report distinct retryable fa
   const missingConfig = boot({ configAvailable: false });
   await assert.rejects(missingConfig.passkeys.signIn(), /auth_config_unavailable/);
 });
+
+ test('failed session storage cannot silently reuse a previous account session', async () => {
+ const { passkeys } = boot({ storageFailure: true });
+ await assert.rejects(passkeys.signIn(), /webauthn_verification_failed/);
+ });

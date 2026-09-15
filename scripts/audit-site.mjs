@@ -47,7 +47,7 @@ function assertSingleH1(path) {
 
 walk(root);
 
-for (const scriptPath of ["driver-app.v48.js", "homepage.js", "lang.v47.js", "passkey-auth.v47.js", "supabase-loader.v47.js"]) {
+for (const scriptPath of ["driver-app.v48.js", "homepage.js", "lang.v47.js", "passkey-auth.v49.js", "supabase-loader.v47.js"]) {
   try { new Function(read(scriptPath)); }
   catch (error) { fail(`${scriptPath} does not parse (${error.message})`); }
 }
@@ -222,9 +222,9 @@ assertIncludes("driver-app.v48.js", "Permissions → Camera → Allow", "driver 
 assertIncludes("driver-app.v48.js", "function createLocalDriverId", "local-only driver labels must use a collision-resistant identifier");
 assertIncludes("driver-app.v48.js", "function normalizeLocalDriverId", "driver app must migrate legacy three-digit driver labels");
 assertIncludes("driver-app.v48.js", "function migrateLocalDriverIdentity", "driver app must migrate same-browser references with a legacy driver label");
-assertIncludes("auth-helper.v47.js", "function createLocalDriverId", "sign-in must use the collision-resistant local driver identifier");
-assertIncludes("auth-helper.v47.js", "function normalizeLocalDriverId", "sign-in must migrate legacy three-digit driver labels");
-assertNotIncludes("auth-helper.v47.js", "Math.floor(Math.random()*900+100)", "sign-in must not restore collision-prone three-digit driver labels");
+assertIncludes("auth-helper.v49.js", "function createLocalDriverId", "sign-in must use the collision-resistant local driver identifier");
+assertIncludes("auth-helper.v49.js", "function normalizeLocalDriverId", "sign-in must migrate legacy three-digit driver labels");
+assertNotIncludes("auth-helper.v49.js", "Math.floor(Math.random()*900+100)", "sign-in must not restore collision-prone three-digit driver labels");
 assertIncludes("driver-app.v48.js", "function warnTrackingLoss", "driver app must provide a distinct degraded-tracking warning");
 assertIncludes("driver-app.v48.js", "function verifyFirstInference", "driver app must complete one camera inference before monitoring becomes active");
 assertIncludes("driver-app.v48.js", "function haltForDetectionFailure", "driver app must stop visibly when the detector stalls or repeatedly fails");
@@ -233,12 +233,12 @@ assertIncludes("login.html", "src=\"/occulert-backend.v47.js\"", "login must loa
 assertNotIncludes("login.html", "id=\"fleetId\"", "login must not offer caller-controlled fleet membership");
 assertIncludes("login.html", "id=\"passkeySignInBtn\"", "login must offer the supported passkey sign-in action");
 assertIncludes("login.html", "id=\"passkeyStatus\"", "passkey results must appear beside the passkey action");
-assertIncludes("login.html", "sign in with email and password first", "first-time passkey users must receive enrollment guidance");
-assertIncludes("login.html", "src=\"/passkey-auth.v47.js\"", "login must load the passkey client");
-assertIncludes("passkey-auth.v47.js", "experimental: { passkey: true }", "passkey support must be explicitly enabled in the Supabase client");
-assertIncludes("passkey-auth.v47.js", "signInWithPasskey", "passkey sign-in must use the Supabase WebAuthn implementation");
-assertIncludes("auth-helper.v47.js", "signInPasskey:signInPasskey", "the login helper must adopt authenticated passkey sessions");
-assertIncludes("auth-helper.v47.js", "await window.OcculertBackend.getSession()", "account-state rendering must validate or refresh the stored session before showing signed-in controls");
+assertIncludes("login.html", "Confirm your email once, then create a passkey", "first-time passkey users must receive enrollment guidance");
+assertIncludes("login.html", "src=\"/passkey-auth.v49.js\"", "login must load the passkey client");
+assertIncludes("passkey-auth.v49.js", "experimental: { passkey: true }", "passkey support must be explicitly enabled in the Supabase client");
+assertIncludes("passkey-auth.v49.js", "signInWithPasskey", "passkey sign-in must use the Supabase WebAuthn implementation");
+assertIncludes("auth-helper.v49.js", "signInPasskey:signInPasskey", "the login helper must adopt authenticated passkey sessions");
+assertIncludes("auth-helper.v49.js", "await window.OcculertBackend.getSession()", "account-state rendering must validate or refresh the stored session before showing signed-in controls");
 assertIncludes("login.html", "src=\"/supabase-loader.v47.js\"", "login must use the resilient same-site Supabase loader");
 assertIncludes("account.html", "src=\"/supabase-loader.v47.js\"", "account settings must use the same resilient Supabase loader");
 assertIncludes("supabase-loader.v47.js", "var VERSION = \"2.112.3\"", "the resilient loader must pin a passkey-capable Supabase SDK version");
@@ -247,8 +247,8 @@ assertIncludes("supabase-loader.v47.js", "/vendor/supabase-", "the Supabase load
 assertIncludes("vercel.json", "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js", "the same-origin proxy must target the pinned SDK artifact");
 assertIncludes("login.html", "id=\"passkeyRetryBtn\"", "login must offer recovery after a retryable Safari loader failure");
 assertIncludes("account.html", "id=\"passkeyRetryBtn\"", "account settings must offer recovery after a retryable passkey setup failure");
-assertIncludes("passkey-auth.v47.js", "sdk_load_failed", "passkey errors must distinguish an SDK delivery failure");
-assertIncludes("passkey-auth.v47.js", "auth_config_unavailable", "passkey errors must distinguish unavailable runtime account settings");
+assertIncludes("passkey-auth.v49.js", "sdk_load_failed", "passkey errors must distinguish an SDK delivery failure");
+assertIncludes("passkey-auth.v49.js", "auth_config_unavailable", "passkey errors must distinguish unavailable runtime account settings");
 assertIncludes("occulert-backend.v47.js", "refreshAuthConfig", "passkey retry must be able to refresh a transient runtime configuration failure");
 assertIncludes("login.html", "Passkey biometrics, PINs, and private keys stay", "login must disclose that passkey secrets stay with the user's authenticator");
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
@@ -282,11 +282,11 @@ assertIncludes("account-page-2.v47.js", "OcculertBackend.updateEmail", "account 
 assertIncludes("account-page-2.v47.js", "OcculertBackend.updatePassword", "account password changes must go through Supabase Auth");
 assertIncludes("account.html", "id=\"registerPasskeyBtn\"", "signed-in account settings must offer passkey enrollment");
 assertIncludes("account-page-2.v47.js", "data-passkey-action=\"remove\"", "account settings must allow users to revoke their own passkeys");
-assertIncludes("account.html", "Keep password recovery available as a backup", "passkey enrollment must preserve the recovery fallback");
-assertIncludes("passkey-auth.v47.js", "client.auth.registerPasskey", "passkey registration must use the authenticated Supabase ceremony");
-assertIncludes("passkey-auth.v47.js", "client.auth.passkey.delete", "passkey deletion must use the authenticated Supabase account API");
-assertIncludes("passkey-auth.v47.js", "signOut({ scope: \"local\" })", "sign-out must clear the passkey SDK's current browser session without signing out other devices");
-assertIncludes("sw.js", "'/passkey-auth.v47.js'", "the service worker must keep the passkey client network-only");
+assertIncludes("account.html", "Use an email sign-in link if your passkey is unavailable", "passkey enrollment must preserve the recovery fallback");
+assertIncludes("passkey-auth.v49.js", "client.auth.registerPasskey", "passkey registration must use the authenticated Supabase ceremony");
+assertIncludes("passkey-auth.v49.js", "client.auth.passkey.delete", "passkey deletion must use the authenticated Supabase account API");
+assertIncludes("passkey-auth.v49.js", "signOut({ scope: \"local\" })", "sign-out must clear the passkey SDK's current browser session without signing out other devices");
+assertIncludes("sw.js", "'/passkey-auth.v49.js'", "the service worker must keep the passkey client network-only");
 assertIncludes("sw.js", "'/supabase-loader.v47.js'", "the service worker must keep the resilient Supabase loader network-only");
 const serviceWorker = read("sw.js");
 const staticAssets = serviceWorker.slice(serviceWorker.indexOf("const STATIC_ASSETS"), serviceWorker.indexOf("];", serviceWorker.indexOf("const STATIC_ASSETS")) + 2);
@@ -298,8 +298,8 @@ const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
   return total + statSync(join(root, file)).size;
 }, 0);
 if (staticAssetBytes > 300_000) fail(`service worker install cache must remain at or below 300 KB (found ${staticAssetBytes} bytes)`);
-if (staticAssets.includes("'/passkey-auth.v47.js'")) fail("the experimental passkey client must not be stored in the offline static cache");
-if (!networkOnlyAssets.includes("'/passkey-auth.v47.js'")) fail("the passkey client must be listed as a network-only asset");
+if (staticAssets.includes("'/passkey-auth.v49.js'")) fail("the experimental passkey client must not be stored in the offline static cache");
+if (!networkOnlyAssets.includes("'/passkey-auth.v49.js'")) fail("the passkey client must be listed as a network-only asset");
 if (staticAssets.includes("'/supabase-loader.v47.js'")) fail("the resilient Supabase loader must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes("'/supabase-loader.v47.js'")) fail("the resilient Supabase loader must be listed as a network-only asset");
 assertIncludes("privacy.html", "passkey private key stay with your device", "privacy terms must disclose that Occulert does not receive passkey private keys or biometrics");
@@ -443,7 +443,7 @@ assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigati
 assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v48'", "the camera-selection repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v49'", "the camera-selection repair must advance the offline cache");
 assertNotIncludes("sw.js", "occulert-v41", "the performance repair must not reuse the stale driver-script cache");
 assertIncludes("sw.js", "'/portal.v47.css'", "the service worker must cache the current shared portal stylesheet");
 assertNotIncludes("sw.js", "occulert-v40", "the external driver script must not reuse the previous offline cache");

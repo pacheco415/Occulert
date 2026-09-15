@@ -1,5 +1,5 @@
-const CACHE = 'occulert-v49';
-// Keep integrity pins for both variants, but install only the supported one.
+const CACHE = 'occulert-v48';
+// Both variants are required: a later browser update may change SIMD support.
 const RUNTIME_ASSETS = [
   {
     "url": "/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/face_mesh.binarypb",
@@ -39,18 +39,8 @@ const RUNTIME_ASSETS = [
   }
 ];
 const RUNTIME_INTEGRITY = new Map(RUNTIME_ASSETS.map(asset => [asset.url, asset.integrity]));
-function selectedRuntimeAssets() {
-  let simd = false;
-  try { simd = WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11])); } catch (_) {}
-  return RUNTIME_ASSETS.filter(asset => {
-    if (asset.url.includes('solution_simd_wasm_bin.')) return simd;
-    if (asset.url.includes('solution_wasm_bin.')) return !simd;
-    return true;
-  });
-}
-const SELECTED_RUNTIME_ASSETS = selectedRuntimeAssets();
 const STATIC_ASSETS = [
-  ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
+  ...RUNTIME_ASSETS.map(asset => asset.url),
   '/',
   '/index.html',
   '/base.v47.css',
@@ -69,18 +59,15 @@ const STATIC_ASSETS = [
 
 const NETWORK_ONLY_ASSETS = new Set([
   '/auth-helper.v47.js',
-  '/passkey-auth.v47.js',
-  '/auth-helper.v49.js',
   '/occulert-backend.v47.js',
-  '/passkey-auth.v49.js',
+  '/passkey-auth.v47.js',
   '/supabase-loader.v47.js',
-  '/passwordless-auth.v49.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
   '/driver-app.v48.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
-  ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
+  ...RUNTIME_ASSETS.map(asset => asset.url),
   '/base.v47.css',
   '/app.html',
   '/driver-app.v47.css',
