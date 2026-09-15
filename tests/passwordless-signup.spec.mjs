@@ -21,7 +21,17 @@ async function setup(page, options = {}) {
         return { data: { id: 'passkey-1' } };
       },
     } }; } };
-    if (options.unsupported) Object.defineProperty(window, 'PublicKeyCredential', { value: undefined });
+    // These are UI/session orchestration fixtures, not a real WebAuthn ceremony.
+    // Linux WebKit does not expose the same passkey APIs as macOS WebKit, so
+    // define the capability under test instead of inheriting the host's APIs.
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      configurable: true,
+      value: options.unsupported ? undefined : function TestPublicKeyCredential() {},
+    });
+    Object.defineProperty(navigator, 'credentials', {
+      configurable: true,
+      value: options.unsupported ? undefined : {},
+    });
   }, options);
 }
 const callback = '/login.html?enroll=passkey#type=magiclink&access_token=email-access&refresh_token=email-refresh';
