@@ -1,0 +1,4 @@
+/* Shared structural primitives; page themes retain their visual overrides. */
+:where(html[data-base="driver"], html[data-base="portal"]) * { box-sizing: border-box; }
+:where(html[data-base="driver"], html[data-base="home"]) .btn { cursor: pointer; border-radius: 12px; }
+:where(html[data-base="driver"] .navlinks, html[data-base="home"] .nav-links) { display: flex; align-items: center; gap: 6px; }

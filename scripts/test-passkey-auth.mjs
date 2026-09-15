@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../passkey-auth.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../passkey-auth.v47.js', import.meta.url), 'utf8');
 
 function boot({ supported = true, signInError = null, sdkAvailable = true, configAvailable = true } = {}) {
   const calls = { create: [], adopted: [], sessions: [], register: 0, list: 0, update: [], remove: [], signOut: [], loader: 0, refreshConfig: 0 };

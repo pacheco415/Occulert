@@ -5,6 +5,8 @@ on:
     paths:
       - "**.html"
       - "**.js"
+      - "**.css"
+      - "scripts/**"
       - "package.json"
       - "package-lock.json"
       - "playwright.config.mjs"
@@ -15,6 +17,8 @@ on:
     paths:
       - "**.html"
       - "**.js"
+      - "**.css"
+      - "scripts/**"
       - "package.json"
       - "package-lock.json"
       - "playwright.config.mjs"
