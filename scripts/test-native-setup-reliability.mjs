@@ -160,13 +160,37 @@ test('parked dual-camera probe measures an Apple capture graph without starting 
     'native-app/modules/occulert-device-condition/ios/OcculertDeviceConditionModule.swift',
   );
   const sources = read('native-app/lib/deviceReadinessSources.ts');
+  const probeStart = nativeProbe.indexOf('private static func probeMultiCamConfiguration');
+  const probeEnd = nativeProbe.indexOf('private static func runMultiCamStabilityTest', probeStart);
+  const probeFunction = nativeProbe.slice(probeStart, probeEnd);
 
-  assert.match(nativeProbe, /probeMultiCamConfiguration/);
-  assert.match(nativeProbe, /AVCaptureMultiCamSession\(\)/);
-  assert.match(nativeProbe, /AVCaptureVideoDataOutput\(\)/);
-  assert.match(nativeProbe, /session\.hardwareCost/);
-  assert.match(nativeProbe, /session\.systemPressureCost/);
-  assert.doesNotMatch(nativeProbe, /startRunning\(\)/);
+  assert.ok(probeStart >= 0 && probeEnd > probeStart, 'configuration probe must be present');
+  assert.match(probeFunction, /buildMultiCamGraph\(\)/);
+  assert.match(probeFunction, /session\.hardwareCost/);
+  assert.match(probeFunction, /session\.systemPressureCost/);
+  assert.doesNotMatch(probeFunction, /startRunning\(\)/);
   assert.match(sources, /Camera\.getCameraPermissionStatus\(\) === 'granted'/);
   assert.match(sources, /await probeMultiCamConfiguration\(\)/);
+});
+
+test('live parked test is bounded, counts both streams, and protects the driver camera', () => {
+  const nativeProbe = read(
+    'native-app/modules/occulert-device-condition/ios/OcculertDeviceConditionModule.swift',
+  );
+  const readinessCard = read('native-app/components/ParkedReadinessCard.tsx');
+  const start = nativeProbe.indexOf('private static func runMultiCamStabilityTest');
+  const end = nativeProbe.indexOf('private static func buildMultiCamGraph', start);
+  const stabilityFunction = nativeProbe.slice(start, end);
+
+  assert.ok(start >= 0 && end > start, 'stability test must be present');
+  assert.match(stabilityFunction, /min\(max\(requestedDurationMs, 3_000\), 10_000\)/);
+  assert.match(stabilityFunction, /session\.startRunning\(\)/);
+  assert.match(stabilityFunction, /session\.stopRunning\(\)/);
+  assert.match(stabilityFunction, /backConnection\.isEnabled = false/);
+  assert.match(stabilityFunction, /frontCounter\.count == 0/);
+  assert.match(stabilityFunction, /roadStreamStayedEnabled/);
+  assert.match(nativeProbe, /OcculertFrameCounter/);
+  assert.match(readinessCard, /Run parked camera test/);
+  assert.match(readinessCard, /No images or video are saved/);
+  assert.match(readinessCard, /Testing for 5 seconds/);
 });
