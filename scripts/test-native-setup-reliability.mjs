@@ -154,3 +154,19 @@ test('connected-device readiness refresh remains single-flight', () => {
   assert.match(settings, /REFRESH CONNECTIONS/);
   assert.match(settings, /Promise\.all\(\[\s*getWatchStatus\(\),\s*getWatchAlertsEnabled\(true\),\s*getHeadphoneMotionStatus\(\)/);
 });
+
+test('parked dual-camera probe measures an Apple capture graph without starting capture', () => {
+  const nativeProbe = read(
+    'native-app/modules/occulert-device-condition/ios/OcculertDeviceConditionModule.swift',
+  );
+  const sources = read('native-app/lib/deviceReadinessSources.ts');
+
+  assert.match(nativeProbe, /probeMultiCamConfiguration/);
+  assert.match(nativeProbe, /AVCaptureMultiCamSession\(\)/);
+  assert.match(nativeProbe, /AVCaptureVideoDataOutput\(\)/);
+  assert.match(nativeProbe, /session\.hardwareCost/);
+  assert.match(nativeProbe, /session\.systemPressureCost/);
+  assert.doesNotMatch(nativeProbe, /startRunning\(\)/);
+  assert.match(sources, /Camera\.getCameraPermissionStatus\(\) === 'granted'/);
+  assert.match(sources, /await probeMultiCamConfiguration\(\)/);
+});

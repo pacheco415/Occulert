@@ -1,5 +1,6 @@
 import type { HeadphoneMotionStatus } from './headphoneMotion';
 import type { WatchStatus } from './watchBridge';
+import type { MultiCamConfigurationProbe } from './deviceCondition';
 
 export const READINESS_MAX_AGE_MS = 30_000;
 export const READINESS_TIMEOUT_MS = 3_000;
@@ -11,6 +12,7 @@ export interface CameraReadiness {
   backPhysicalDevices: string[];
   multiCamSupported: boolean | null;
   frontBackMultiCamSupported: boolean | null;
+  multiCamProbe: MultiCamConfigurationProbe;
 }
 
 export interface OutputReadiness {
@@ -101,16 +103,31 @@ export function describeDeviceReadiness(snapshot: DeviceReadinessSnapshot, now: 
       : camera.permission !== 'granted'
         ? row('camera', 'Access needed', 'Camera access is not granted. Continue to camera setup to review access.', true)
         : row('camera', 'Access granted', 'Check framing and eye visibility in the camera preview before starting.');
+  const multiCamCostDetail = camera
+    && camera.multiCamProbe.hardwareCost != null
+    && camera.multiCamProbe.systemPressureCost != null
+    ? ` Hardware ${Math.round(camera.multiCamProbe.hardwareCost * 100)}%; pressure ${Math.round(camera.multiCamProbe.systemPressureCost * 100)}%.`
+    : '';
   const roadCameraRow = !camera
     ? row('roadCamera', 'Not confirmed', 'Road-camera compatibility could not be read. Driver monitoring remains independent.')
     : !camera.backAvailable
       ? row('roadCamera', 'Unavailable', 'No rear camera was reported. Front-camera driver monitoring remains available.')
       : camera.frontBackMultiCamSupported === true
-        ? row(
-            'roadCamera',
-            'Hardware capable',
-            `${camera.backPhysicalDevices.length || 1} rear camera type${camera.backPhysicalDevices.length === 1 ? '' : 's'} reported. This confirms Apple multi-camera support only; road monitoring is not active yet.`,
-          )
+        ? camera.multiCamProbe.state === 'withinBudget'
+          ? row(
+              'roadCamera',
+              'Load check passed',
+              `Apple accepted a front-and-rear configuration within its resource budgets.${multiCamCostDetail} Road monitoring is still planned and was not activated.`,
+            )
+          : camera.multiCamProbe.state === 'overBudget'
+            ? row('roadCamera', 'Over budget', 'The front-and-rear configuration exceeded Apple’s current camera resource budget. Driver monitoring keeps priority.', true)
+            : camera.multiCamProbe.state === 'configurationFailed'
+              ? row('roadCamera', 'Load check failed', 'Apple reports compatible cameras, but a front-and-rear configuration could not be prepared. Driver monitoring remains available.', true)
+              : row(
+                  'roadCamera',
+                  'Hardware capable',
+                  `${camera.backPhysicalDevices.length || 1} rear camera type${camera.backPhysicalDevices.length === 1 ? '' : 's'} reported. A parked load result is not available yet; road monitoring is not active.`,
+                )
         : camera.multiCamSupported === false || camera.frontBackMultiCamSupported === false
           ? row('roadCamera', 'Single camera only', 'This iPhone does not report Apple simultaneous multi-camera support. Driver monitoring keeps priority.')
           : row('roadCamera', 'Support unknown', 'A rear camera is available, but simultaneous Apple multi-camera support was not confirmed.');

@@ -18,6 +18,10 @@ const baseline = () => ({
     backPhysicalDevices: ['ultra-wide-angle-camera', 'wide-angle-camera'],
     multiCamSupported: true,
     frontBackMultiCamSupported: true,
+    multiCamProbe: {
+      state: 'withinBudget', hardwareCost: 0.7, systemPressureCost: 0.6,
+      frontDeviceType: 'front', backDeviceType: 'back',
+    },
   },
   outputs: { audio: true, haptic: true, watch: false },
   watch: { moduleAvailable: false, paired: false, appInstalled: false, reachable: false },
@@ -49,8 +53,15 @@ test('camera access is not evidence of face tracking, and missing access gets ac
 
 test('road-camera readiness reports hardware facts without activating or promising detection', () => {
   const snapshot = baseline();
+  assert.equal(row(snapshot, 'roadCamera').status, 'Load check passed');
+  assert.match(row(snapshot, 'roadCamera').detail, /not activated/);
+  snapshot.camera.multiCamProbe.state = 'overBudget';
+  assert.equal(row(snapshot, 'roadCamera').status, 'Over budget');
+  assert.equal(row(snapshot, 'roadCamera').attention, true);
+  snapshot.camera.multiCamProbe.state = 'configurationFailed';
+  assert.equal(row(snapshot, 'roadCamera').status, 'Load check failed');
+  snapshot.camera.multiCamProbe.state = 'notAvailable';
   assert.equal(row(snapshot, 'roadCamera').status, 'Hardware capable');
-  assert.match(row(snapshot, 'roadCamera').detail, /not active yet/);
   snapshot.camera.multiCamSupported = false;
   snapshot.camera.frontBackMultiCamSupported = false;
   assert.equal(row(snapshot, 'roadCamera').status, 'Single camera only');
