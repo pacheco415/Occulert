@@ -1,6 +1,6 @@
 # Occulert Backend Roadmap
 
-The current app-to-dashboard sync uses browser localStorage. That is good for a prototype, but real fleet operations need a backend.
+App-to-dashboard sync supports protected Supabase sessions, with browser localStorage retained for local fallback and demos.
 
 ## Current implementation
 
@@ -21,8 +21,9 @@ The current app-to-dashboard sync uses browser localStorage. That is good for a 
 The new reporting workflow passed signed-in Preview review for an owner-scoped
 fleet with two active drivers and no recorded sessions; nonzero reporting states
 passed automated browser coverage. After merge, verify production behavior,
-then add durable manager follow-up outcomes, reporting pagination or retention,
-and plan entitlements after pilot pricing is defined. Keep driver consent, fleet
+then roll out [saved manager follow-up outcomes](FLEET_FOLLOWUPS.md) after its
+migration and signed-in preview checks. Reporting pagination or retention and
+plan entitlements remain next steps after pilot pricing is defined. Keep driver consent, fleet
 ownership, and telemetry-trust boundaries unchanged.
 
 Recommended stack options:
