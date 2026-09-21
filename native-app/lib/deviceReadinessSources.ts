@@ -5,7 +5,7 @@ import { WATCH_ALERTS_PREFERENCE_KEY } from './watchPreferences';
 import { getWatchStatus } from './watchBridge';
 import { getHeadphoneMotionStatus } from './headphoneMotion';
 import type { ReadinessSources } from './deviceReadiness';
-import { getDeviceCondition } from './deviceCondition';
+import { getDeviceCondition, probeMultiCamConfiguration } from './deviceCondition';
 
 // Read persisted choices directly: a failed read must be "not confirmed", not
 // the delivery layer's cached/default fallback presented as verified settings.
@@ -14,6 +14,16 @@ export const deviceReadinessSources: ReadinessSources = {
     const devices = Camera.getAvailableCameraDevices();
     const condition = await getDeviceCondition();
     const backDevices = devices.filter(device => device.position === 'back');
+    const multiCamProbe = Camera.getCameraPermissionStatus() === 'granted'
+      && condition.frontBackMultiCamSupported
+      ? await probeMultiCamConfiguration()
+      : {
+          state: Camera.getCameraPermissionStatus() === 'granted' ? 'notAvailable' : 'permissionRequired',
+          hardwareCost: null,
+          systemPressureCost: null,
+          frontDeviceType: null,
+          backDeviceType: null,
+        } as const;
     return {
       permission: Camera.getCameraPermissionStatus(),
       frontAvailable: devices.some(device => device.position === 'front'),
@@ -21,6 +31,7 @@ export const deviceReadinessSources: ReadinessSources = {
       backPhysicalDevices: [...new Set(backDevices.flatMap(device => device.physicalDevices))].sort(),
       multiCamSupported: condition.multiCamSupported,
       frontBackMultiCamSupported: condition.frontBackMultiCamSupported,
+      multiCamProbe,
     };
   },
   async outputs() {
