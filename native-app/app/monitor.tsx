@@ -96,6 +96,8 @@ import {
   type DeviceThermalState,
 } from '../lib/cameraResilience';
 import { getDeviceCondition } from '../lib/deviceCondition';
+import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
+import { modalAnimationType } from '../lib/accessibilityPreferencesModel';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -136,6 +138,7 @@ function MonitoringWakeLock() {
 
 export default function MonitorScreen() {
   const router = useRouter();
+  const { reduceMotion } = useAccessibilityPreferences();
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
   const [isRunning, setIsRunning] = useState(false);
@@ -1003,7 +1006,7 @@ export default function MonitorScreen() {
       )}
 
       <Modal
-        animationType="fade"
+        animationType={modalAnimationType(reduceMotion)}
         transparent
         visible={safeStopOpen}
         onRequestClose={() => {

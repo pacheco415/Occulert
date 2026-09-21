@@ -14,6 +14,10 @@ import {
   normalizeHistoryFilter,
   sortIndexedSessionsNewest,
 } from '../native-app/lib/historyPreferences.ts';
+import {
+  modalAnimationType,
+  shouldUseGlassEffect,
+} from '../native-app/lib/accessibilityPreferencesModel.ts';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -220,6 +224,33 @@ test('Home and Settings allow key rows to grow with larger text', () => {
   assert.match(settings, /rowL:\{minWidth:0/);
   assert.match(settings, /rowCopy:\{minWidth:0,flex:1\}/);
   assert.match(settings, /localDataAction:\{minHeight:64/);
+});
+
+test('system accessibility preferences disable decorative glass and motion only', () => {
+  assert.equal(shouldUseGlassEffect(true, false), true);
+  assert.equal(shouldUseGlassEffect(true, true), false);
+  assert.equal(shouldUseGlassEffect(false, false), false);
+  assert.equal(modalAnimationType(false), 'fade');
+  assert.equal(modalAnimationType(true), 'none');
+
+  const hook = read('native-app/hooks/useAccessibilityPreferences.ts');
+  const glass = read('native-app/components/GlassSurface.tsx');
+  const alerts = read('native-app/components/AlertSystem.tsx');
+  const monitor = read('native-app/app/monitor.tsx');
+  assert.match(hook, /isReduceMotionEnabled\(\)/);
+  assert.match(hook, /isReduceTransparencyEnabled\(\)/);
+  assert.match(hook, /motionRevision === initialMotionRevision/);
+  assert.match(hook, /transparencyRevision === initialTransparencyRevision/);
+  assert.match(hook, /motionSubscription\.remove\(\)/);
+  assert.match(hook, /transparencySubscription\.remove\(\)/);
+  assert.match(glass, /shouldUseGlassEffect/);
+  assert.match(glass, /reduceTransparency && styles\.opaqueFallback/);
+  assert.match(glass, /!reduceTransparency && <View style=\{\[styles\.orb/);
+  assert.match(alerts, /if \(reduceMotion\) \{\s*pulse\.stopAnimation\(\);\s*pulse\.setValue\(1\)/);
+  assert.match(alerts, /const deliveryPlan = alertDeliveryPlan\(lv\)/);
+  assert.match(alerts, /preferences\.hapticEnabled/);
+  assert.match(alerts, /preferences\.audioEnabled/);
+  assert.match(monitor, /animationType=\{modalAnimationType\(reduceMotion\)\}/);
 });
 
 test('safe-stop choices remain readable and accessible at larger text sizes', () => {

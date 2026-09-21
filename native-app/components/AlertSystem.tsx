@@ -27,6 +27,7 @@ import {
 } from '../lib/alertPolicy';
 import { alertDeliveryPlan, deliverCueIfCurrent } from '../lib/alertDelivery';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
+import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
 
 export type { AlertLevel } from '../lib/alertPolicy';
 
@@ -67,6 +68,7 @@ export function AlertSystem({
   sessionEndedAt,
   onTimingEvent,
 }: AlertSystemProps) {
+  const { reduceMotion } = useAccessibilityPreferences();
   const sessionTime = sessionStartedAt === null
     ? 0
     : Math.max(0, Math.floor(((sessionEndedAt ?? Date.now()) - sessionStartedAt) / 1_000));
@@ -231,12 +233,17 @@ export function AlertSystem({
     const sequenceVersion = cueSequenceVersion.current;
     const preferences = currentAlertPreferences();
 
-    Animated.sequence([
-      Animated.timing(pulse, { toValue: 1.04, duration: 110, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 1,    duration: 110, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 1.04, duration: 110, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 1,    duration: 110, useNativeDriver: true }),
-    ]).start();
+    if (reduceMotion) {
+      pulse.stopAnimation();
+      pulse.setValue(1);
+    } else {
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.04, duration: 110, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1,    duration: 110, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1.04, duration: 110, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1,    duration: 110, useNativeDriver: true }),
+      ]).start();
+    }
 
     const deliveryPlan = alertDeliveryPlan(lv);
     if (preferences.hapticEnabled || preferences.audioEnabled) {
@@ -305,7 +312,13 @@ export function AlertSystem({
         } catch {}
       }));
     } catch {}
-  }, [balancedPlayer, cancelPendingCues, leftPlayer, metrics.perclos, onTimingEvent, pulse, rightPlayer, scheduleCue]);
+  }, [balancedPlayer, cancelPendingCues, leftPlayer, metrics.perclos, onTimingEvent, pulse, reduceMotion, rightPlayer, scheduleCue]);
+
+  React.useEffect(() => {
+    if (!reduceMotion) return;
+    pulse.stopAnimation();
+    pulse.setValue(1);
+  }, [pulse, reduceMotion]);
 
   React.useEffect(() => {
     if (level !== 'none') fire(level);
