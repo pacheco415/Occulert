@@ -124,8 +124,10 @@ export function describeDeviceReadiness(snapshot: DeviceReadinessSnapshot, now: 
     ? row('watch', 'Not confirmed', 'The saved Watch alert setting could not be read.', true)
     : !outputs.watch
       ? row('watch', 'Alerts off', 'Optional wrist alerts are off. You can enable and test them in Settings.')
-      : !watch || !watch.moduleAvailable || !watch.paired || !watch.appInstalled
-        ? row('watch', 'Setup needed', 'Wrist alerts are enabled, but a paired Occulert Watch companion is not confirmed. Check Settings.', true)
+      : !watch || !watch.moduleAvailable
+        ? row('watch', 'Not confirmed', 'The Watch connection could not be checked in this build. Phone alerts remain available.', true)
+        : !watch.paired || !watch.appInstalled
+          ? row('watch', 'Open Watch app', 'Open Occulert on your Watch, then refresh this check. If it is still not found, verify the companion installation.', true)
         : !watch.reachable
           ? row('watch', 'Not reachable', 'Open Occulert on your Watch and test it. Background delivery can be delayed.', true)
           : row('watch', 'Reachable', 'Wrist alerts are enabled. A connection does not confirm that you felt an alert; test while parked.');

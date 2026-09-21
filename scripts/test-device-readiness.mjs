@@ -83,9 +83,10 @@ test('all phone-output combinations reflect preferences without claiming success
 test('Watch preference, pairing, installation, and reachability are separate requirements', () => {
   const snapshot = baseline();
   snapshot.outputs.watch = true;
-  assert.equal(row(snapshot, 'watch').status, 'Setup needed');
-  snapshot.watch = { moduleAvailable: true, paired: true, appInstalled: false, reachable: true };
-  assert.equal(row(snapshot, 'watch').status, 'Setup needed');
+  assert.equal(row(snapshot, 'watch').status, 'Not confirmed');
+  snapshot.watch = { moduleAvailable: true, paired: true, appInstalled: false, reachable: false };
+  assert.equal(row(snapshot, 'watch').status, 'Open Watch app');
+  assert.match(row(snapshot, 'watch').detail, /then refresh/);
   snapshot.watch.appInstalled = true;
   snapshot.watch.reachable = false;
   assert.equal(row(snapshot, 'watch').status, 'Not reachable');
