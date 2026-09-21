@@ -38,10 +38,12 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(() => document.documentElement.style.setProperty("scroll-behavior", "auto", "important"));
 
-  expect(await page.locator('link[href="/homepage.v47.css"]').count()).toBe(1);
+  expect(await page.locator('link[href="/homepage.v51.css"]').count()).toBe(1);
   expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1-640.avif"][type="image/avif"]').count()).toBe(1);
   expect(await page.locator('link[href="/homepage.css"]').count()).toBe(0);
   expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
+  await page.locator(".skip-link").focus();
+  await expect(page.locator(".skip-link")).toBeFocused();
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator("#safetyJourney")).toBeVisible();
   await page.locator("#journeyMotion").click();
@@ -74,8 +76,15 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.locator("#themeToggle").click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", initialTheme === "light" ? "dark" : "light");
 
+  await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "false");
   await page.locator("#menuBtn").click();
   await expect(page.locator("#mobileMenu")).toHaveClass(/open/);
+  await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "false");
+  await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#mobileMenu")).not.toHaveClass(/open/);
+  await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator("#menuBtn")).toBeFocused();
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   expect(await page.locator(".disclaimer > .disclaimer-content").count()).toBe(1);

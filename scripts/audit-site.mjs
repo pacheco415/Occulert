@@ -72,7 +72,7 @@ for (const file of htmlFiles) {
   }
 }
 
-assertIncludes("index.html", "<link rel=\"stylesheet\" href=\"/homepage.v47.css\" />", "homepage must load its versioned external stylesheet");
+assertIncludes("index.html", "<link rel=\"stylesheet\" href=\"/homepage.v51.css\" />", "homepage must load its versioned external stylesheet");
 assertNotIncludes("index.html", "href=\"/homepage.css\"", "homepage must not reuse the previously immutable stylesheet URL");
 assertIncludes("index.html", "href=\"/homepage-journey-cinematic-v1.avif\"", "homepage must preload its optimized cinematic journey image");
 assertIncludes("index.html", "class=\"journey-frame journey-frame-enter\"", "homepage must render the cinematic enter frame");
@@ -88,8 +88,13 @@ assertIncludes("index.html", "data-journey-step=\"3\"", "homepage safety journey
 assertNotIncludes("index.html", "class=\"phone-wrap\"", "homepage must not retain the broken phone mockup");
 assertIncludes("homepage.js", "prefers-reduced-motion: reduce", "homepage journey must honor reduced-motion preferences");
 assertIncludes("homepage.js", "aria-selected", "homepage journey controls must expose their selected state");
-assertIncludes("homepage.v47.css", ".journey-scene{position:relative;height:340px;margin:14px -4px 10px;overflow:hidden", "homepage journey must clip its moving road inside the scene");
-assertIncludes("homepage.v47.css", ".journey-copy{position:relative;z-index:2", "homepage journey copy must stay above animated scene layers");
+assertIncludes("index.html", "class=\"skip-link\"", "homepage must provide a keyboard skip link");
+assertIncludes("index.html", "aria-controls=\"mobileMenu\"", "homepage menu button must identify its controlled menu");
+assertIncludes("homepage.js", "setAttribute('aria-expanded',String(open))", "homepage menu must announce expanded state");
+assertIncludes("homepage.js", "event.key==='Escape'", "homepage menu must close with Escape");
+assertIncludes("homepage.js", "querySelector('.faq-q')?.setAttribute('aria-expanded','false')", "homepage FAQ must announce expanded state");
+assertIncludes("homepage.v51.css", ".journey-scene{position:relative;height:340px;margin:14px -4px 10px;overflow:hidden", "homepage journey must clip its moving road inside the scene");
+assertIncludes("homepage.v51.css", ".journey-copy{position:relative;z-index:2", "homepage journey copy must stay above animated scene layers");
 for (const unsupportedStat of ["1 in 6", "100,000+", "91%", "Crashes involve driver fatigue"]) {
   assertNotIncludes("index.html", unsupportedStat, `homepage must not present the unsupported statistic: ${unsupportedStat}`);
 }
@@ -108,7 +113,7 @@ for (let index = 1; index <= 4; index += 1) {
     if (count !== 8) fail(`translations must include ${key.slice(0, -1)} for all 8 languages (found ${count})`);
   }
 }
-assertIncludes("sw.js", "'/homepage.v47.css'", "service worker must cache the versioned homepage stylesheet");
+assertIncludes("sw.js", "'/homepage.v51.css'", "service worker must cache the versioned homepage stylesheet");
 assertNotIncludes("sw.js", "'/homepage.css',", "service worker must not recache the stale unversioned homepage stylesheet");
 assertNotIncludes("sw.js", "'/homepage-journey-cinematic-v1.jpg'", "service worker install must not preload the large cinematic journey image");
 assertIncludes("sw.js", "'/homepage.js'", "service worker must cache the external homepage behavior script");
@@ -156,8 +161,8 @@ if (driverAppDependencies.some((index) => index < 0) || driverAppDependencies.so
   fail("driver app dependencies must load before the external monitoring behavior in their original order");
 }
 assertIncludes("driver-app.v47.css", "--overlay-dim", "driver app stylesheet must preserve display-intensity controls");
-assertIncludes("homepage.v47.css", "homepage-journey-cinematic-v1.avif", "homepage journey must prefer the optimized AVIF asset");
-assertIncludes("homepage.v47.css", "homepage-journey-cinematic-v1-640.avif", "mobile homepage journey must use the smaller AVIF asset");
+assertIncludes("homepage.v51.css", "homepage-journey-cinematic-v1.avif", "homepage journey must prefer the optimized AVIF asset");
+assertIncludes("homepage.v51.css", "homepage-journey-cinematic-v1-640.avif", "mobile homepage journey must use the smaller AVIF asset");
 assertIncludes("index.html", "type=\"image/avif\"", "homepage must preload the supported optimized hero format");
 assertNotIncludes("app.html", "/occulert-logo-main.png", "driver app must not download the full-size source logo");
 if (statSync(join(root, "homepage-journey-cinematic-v1.avif")).size > 100_000) fail("desktop AVIF journey asset must remain below 100 KB");

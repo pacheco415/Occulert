@@ -53,16 +53,22 @@ function QuickLink({ icon, label, detail, href }: QuickLinkProps) {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [recoveredDrive, setRecoveredDrive] = useState(false);
+  const [recoveryState, setRecoveryState] = useState<'checking' | 'idle' | 'recovered' | 'error'>('checking');
+  const [recoveryAttempt, setRecoveryAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
     const recoverInterruptedDrive = async () => {
+      if (active) setRecoveryState('checking');
       const checkpoint = await loadActiveSessionCheckpoint();
-      if (!checkpoint) return;
+      if (!checkpoint) {
+        if (active) setRecoveryState('idle');
+        return;
+      }
       const recovered = recoveredSessionFromCheckpoint(checkpoint);
       if (!recovered) {
         await clearActiveSessionCheckpoint(checkpoint.sessionId);
+        if (active) setRecoveryState('idle');
         return;
       }
       let insertedRecovery = false;
@@ -74,11 +80,13 @@ export default function HomeScreen() {
         return result.sessions;
       });
       await clearActiveSessionCheckpoint(recovered.sessionId);
-      if (active && insertedRecovery) setRecoveredDrive(true);
+      if (active) setRecoveryState(insertedRecovery ? 'recovered' : 'idle');
     };
-    void recoverInterruptedDrive().catch(() => {});
+    void recoverInterruptedDrive().catch(() => {
+      if (active) setRecoveryState('error');
+    });
     return () => { active = false; };
-  }, []);
+  }, [recoveryAttempt]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -111,7 +119,7 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {recoveredDrive && (
+        {recoveryState === 'recovered' && (
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Previous interrupted drive recovered. Open session history"
@@ -128,6 +136,26 @@ export default function HomeScreen() {
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
+        )}
+
+        {recoveryState === 'error' && (
+          <View accessibilityRole="alert" style={styles.recoveryErrorBox}>
+            <View style={styles.recoveryErrorIcon}>
+              <Ionicons name="warning" size={19} color={colors.amber} />
+            </View>
+            <View style={styles.recoveryCopy}>
+              <Text style={styles.recoveryErrorTitle}>Couldn’t check the previous drive</Text>
+              <Text style={styles.recoveryDetail}>Your local history stays on this iPhone. Try the recovery check again before starting another session.</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Retry previous drive recovery"
+                onPress={() => setRecoveryAttempt(attempt => attempt + 1)}
+                style={styles.recoveryRetry}
+              >
+                <Text style={styles.recoveryRetryText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
 
         <GlassSurface
@@ -245,6 +273,28 @@ const styles = StyleSheet.create({
   recoveryCopy: { flex: 1 },
   recoveryTitle: { color: '#b7f7cb', fontSize: 13, fontWeight: '800' },
   recoveryDetail: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  recoveryErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 11,
+    backgroundColor: 'rgba(255, 214, 10, 0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 214, 10, 0.24)',
+    borderRadius: radii.medium,
+    padding: 14,
+    marginBottom: 16,
+  },
+  recoveryErrorIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 214, 10, 0.1)',
+  },
+  recoveryErrorTitle: { color: '#ffe895', fontSize: 13, fontWeight: '800' },
+  recoveryRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: 5, paddingRight: 16 },
+  recoveryRetryText: { color: colors.cyan, fontSize: 12, fontWeight: '800' },
   startSurface: {
     borderRadius: radii.large,
     overflow: 'hidden',

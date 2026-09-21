@@ -142,6 +142,9 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(home, /Previous drive recovered/);
   assert.match(home, /prependRecoveredSession\(sessions, recovered\)/);
   assert.match(home, /must never replace the complete record with an older partial copy/);
+  assert.match(home, /setRecoveryState\('error'\)/, 'a failed recovery check must become visible');
+  assert.match(home, /accessibilityLabel="Retry previous drive recovery"/, 'failed recovery must provide an accessible retry');
+  assert.doesNotMatch(home, /recoverInterruptedDrive\(\)\.catch\(\(\) => \{\}\)/, 'recovery failures must not be silently swallowed');
   assert.match(history, /Recovered local checkpoint/);
   assert.match(history, /sessions\.filter\(item => !item\.recoveredFromInterruption\)/);
   assert.match(history, /Recovered partial sessions are excluded/);

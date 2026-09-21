@@ -57,7 +57,7 @@ const STATIC_ASSETS = [
   '/app.html',
   '/manifest.json',
   '/favicon.ico',
-  '/homepage.v47.css',
+  '/homepage.v51.css',
   '/liquid-glass.v47.css',
   '/portal.v47.css',
   '/homepage.js',
