@@ -33,6 +33,17 @@ person-identifiable footage to this repository.
 
 The runner accepts precomputed, labeled Eye Aspect Ratio samples:
 
+Measurements must be finite, non-negative numbers; blank measurements are
+invalid, while an explicitly measured zero is accepted. Labels must be `awake`,
+`drowsy`, or `high_fatigue` (the legacy `sleepy` alias is also accepted by the
+runner). Unknown labels fail validation instead of counting as awake. Dataset
+preparation excludes invalid measurements and records their count in its
+manifest even when no custom exclusion rule is configured.
+
+Both input paths support quoted commas, escaped quotes, and multiline fields.
+Malformed quoting, duplicate or blank column names, and inconsistent column
+counts stop processing so corrupted metadata cannot silently affect results.
+
 ```csv
 label,ear
 awake,0.31

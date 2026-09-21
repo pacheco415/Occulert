@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { parseTable, validEar } from "./csv.mjs";
 
 export const THRESHOLDS = { low: 0.15, medium: 0.18, high: 0.21 };
 const DROWSY_LABELS = new Set(["drowsy", "high_fatigue", "sleepy"]);
@@ -9,19 +10,15 @@ const DROWSY_LABELS = new Set(["drowsy", "high_fatigue", "sleepy"]);
 // prepare-dataset.mjs (label,ear,participant,clip,split,<slices...>). Extra
 // columns are preserved so results can be sliced without a second parse.
 export function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/);
-  const headers = lines.shift().split(",").map((value) => value.trim().toLowerCase());
-  const labelIndex = headers.indexOf("label");
-  const earIndex = headers.indexOf("ear");
-  if (labelIndex < 0 || earIndex < 0) throw new Error("CSV must contain label and ear columns");
-  return lines.filter(Boolean).map((line, index) => {
-    const cells = line.split(",").map((value) => value.trim());
-    const ear = Number(cells[earIndex]);
-    if (!Number.isFinite(ear)) throw new Error(`Invalid EAR value on row ${index + 2}`);
-    const row = { label: cells[labelIndex].toLowerCase(), ear };
-    headers.forEach((header, position) => {
-      if (position !== labelIndex && position !== earIndex) row[header] = cells[position] ?? "";
-    });
+  const table = parseTable(text);
+  const headers = table.headers.map(header => header.toLowerCase());
+  if (!headers.includes("label") || !headers.includes("ear")) throw new Error("CSV must contain label and ear columns");
+  return table.rows.map((source, index) => {
+    const row = Object.fromEntries(Object.entries(source).map(([key, value]) => [key.toLowerCase(), value]));
+    if (!validEar(row.ear)) throw new Error(`Invalid EAR value on record ${index + 2}`);
+    row.ear = Number(row.ear);
+    row.label = row.label.trim().toLowerCase();
+    if (row.label !== "awake" && !DROWSY_LABELS.has(row.label)) throw new Error(`Unknown label on record ${index + 2}: ${row.label}`);
     return row;
   });
 }
