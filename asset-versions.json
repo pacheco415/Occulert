@@ -49,5 +49,6 @@
   "session-history-page-1.css": "session-history-page-1.v47.css",
   "install-page-1.css": "install-page-1.v47.css",
   "safety-page-1.js": "safety-page-1.v47.js",
-  "passwordless-auth.js": "passwordless-auth.v49.js"
+  "passwordless-auth.js": "passwordless-auth.v49.js",
+  "fleet-followups.js": "fleet-followups.v50.js"
 }

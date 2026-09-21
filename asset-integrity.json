@@ -52,5 +52,6 @@
   "login-page-1.v49.js": "7cda6f812b143b6b71fa6eb304bc9715eaa28fe49f4cdb35fce34d0d5143530a",
   "passwordless-auth.v49.js": "6b5bcd61f8e2c7289b15097194706d1c93b90a4d31aeebc507789991a2cee439",
   "passkey-auth.v49.js": "a65ca39834c823fc5daf0e05bed0f19ace8425a61973fb8bea4759ea83b9ba57",
-  "auth-helper.v49.js": "d7147382e004dc5f21e5c978f2138dc04b299a6ed84f91456969c1613e6819fd"
+  "auth-helper.v49.js": "d7147382e004dc5f21e5c978f2138dc04b299a6ed84f91456969c1613e6819fd",
+  "fleet-followups.v50.js": "56203644b9d618acb30c1d91b1bf573716b459d84edef25d9f883ba3c06605be"
 }
