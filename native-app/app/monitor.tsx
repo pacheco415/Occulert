@@ -1011,7 +1011,11 @@ export default function MonitorScreen() {
         }}
       >
         <View style={s.safeStopBackdrop}>
-          <View style={s.safeStopSheet} accessibilityViewIsModal>
+          <View
+            accessibilityLabel="Safe stop options"
+            accessibilityViewIsModal
+            style={s.safeStopSheet}
+          >
             <View style={s.safeStopHeader}>
               <View style={s.safeStopIconWrap}>
                 <Ionicons name="navigate" size={24} color="#7dd3fc" />
@@ -1034,6 +1038,9 @@ export default function MonitorScreen() {
                 <TouchableOpacity
                   key={option.kind}
                   accessibilityRole="button"
+                  accessibilityLabel={`Find ${option.label.toLowerCase()}`}
+                  accessibilityHint={`${option.detail}. Ends monitoring, saves this drive, then opens Maps.`}
+                  accessibilityState={{ disabled: safeStopBusy, busy: safeStopBusy }}
                   disabled={safeStopBusy}
                   style={[s.safeStopOption, safeStopBusy && s.disabledBtn]}
                   onPress={() => {
@@ -1054,6 +1061,8 @@ export default function MonitorScreen() {
 
             <TouchableOpacity
               accessibilityRole="button"
+              accessibilityLabel={safeStopBusy ? 'Ending and saving drive' : 'Cancel safe stop search'}
+              accessibilityState={{ disabled: safeStopBusy, busy: safeStopBusy }}
               disabled={safeStopBusy}
               style={s.safeStopCancel}
               onPress={() => setSafeStopOpen(false)}
@@ -1138,6 +1147,8 @@ export default function MonitorScreen() {
           {isRunning && alertCount > 0 && (
             <TouchableOpacity
               accessibilityRole="button"
+              accessibilityLabel="Find a safe place to stop"
+              accessibilityHint="Open parked-only rest area, gas, food, and coffee options"
               style={s.safeStopBtn}
               onPress={() => setSafeStopOpen(true)}
             >
@@ -1177,6 +1188,7 @@ export default function MonitorScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Stop monitoring and save this drive"
+              accessibilityHint="Ends camera monitoring and saves the local session summary"
               style={s.stopBtn}
               onPress={() => {
                 void handleStop();
@@ -1307,6 +1319,7 @@ const s = StyleSheet.create({
   safeStopPrivacy: { color: '#7c9eab', fontSize: 12, lineHeight: 18, marginTop: 8 },
   safeStopOptions: { gap: 9, marginTop: 18 },
   safeStopOption: {
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -1327,7 +1340,7 @@ const s = StyleSheet.create({
   safeStopOptionText: { flex: 1 },
   safeStopOptionTitle: { color: '#f0f9ff', fontSize: 15, fontWeight: '800' },
   safeStopOptionDetail: { color: '#7c9eab', fontSize: 11, lineHeight: 16, marginTop: 2 },
-  safeStopCancel: { alignItems: 'center', paddingTop: 18, paddingBottom: 2 },
+  safeStopCancel: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingTop: 10, paddingBottom: 2 },
   safeStopCancelText: { color: '#7dd3fc', fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
   permBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   permIcon: { fontSize: 48, marginBottom: 16 },

@@ -52,6 +52,22 @@ for (const scriptPath of ["driver-app.v48.js", "homepage.js", "lang.v47.js", "pa
   catch (error) { fail(`${scriptPath} does not parse (${error.message})`); }
 }
 
+for (const retiredDuplicate of [
+  "privacy-page-1.v47.js",
+  "safety-page-1.v47.js",
+  "fleet-pricing-page-1.v47.js",
+  "product-hub-page-1.v47.js",
+  "driver-profiles-page-1.v47.js",
+  "pilot-signup-page-1.v47.js",
+  "session-history-page-1.v47.js",
+]) {
+  for (const file of htmlFiles) {
+    if (readFileSync(file, "utf8").includes(retiredDuplicate)) {
+      fail(`${file}: active page must not load retired duplicate ${retiredDuplicate}`);
+    }
+  }
+}
+
 for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
   const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
@@ -230,7 +246,7 @@ assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes 
 assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event GPS latitude must be range validated");
 assertIncludes("api/sessions.js", "MAX_BODY_LENGTH", "session API must reject oversized JSON bodies");
 assertIncludes("api/pilot-leads.js", "body.website", "pilot lead API must include honeypot spam filtering");
-assertIncludes("pilot-signup-page-2.v47.js", "startedAt:formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
+assertIncludes("pilot-signup-page-2.v53.js", "startedAt:formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
 assertIncludes("api/pilot-leads.js", "rateLimitState(request)", "pilot lead API must use durable distributed rate limiting");
 assertIncludes("api/pilot-leads.js", "pgFetch(\"pilot_leads\"", "pilot lead API must support durable Supabase storage");
 assertIncludes("db/schema.sql", "create table if not exists pilot_leads", "database schema must include pilot lead storage");
@@ -451,10 +467,12 @@ assertIncludes("fleet-dashboard.html", "function exportPilotReport()", "fleet ma
 assertIncludes("fleet-dashboard.html", "unverified_client_report", "pilot reports must preserve the telemetry trust boundary");
 assertIncludes("fleet-dashboard.html", "href=\"/fleet-pricing.html\"", "fleet value summaries must expose transparent fleet plans");
 assertIncludes("fleet-dashboard.html", "interest=free-trial", "fleet value summaries must provide a direct free-trial request path");
-assertIncludes("pilot-signup-page-2.v47.js", "rolloutInterest", "the shared fleet lead form must distinguish paid-rollout interest");
-assertIncludes("pilot-signup-page-2.v47.js", "freeTrialInterest", "the shared fleet lead form must distinguish the free trial from a post-trial rollout");
-assertIncludes("pilot-signup-page-2.v47.js", "What the rollout covers", "the paid-rollout path must explain the commercial offer");
-assertIncludes("pilot-signup-page-2.v47.js", "submitting this form does not start a paid service", "the paid-rollout path must set a clear transaction boundary");
+assertIncludes("pilot-signup-page-2.v53.js", "rolloutInterest", "the shared fleet lead form must distinguish paid-rollout interest");
+assertIncludes("pilot-signup-page-2.v53.js", "freeTrialInterest", "the shared fleet lead form must distinguish the free trial from a post-trial rollout");
+assertIncludes("pilot-signup-page-2.v53.js", "What the rollout covers", "the paid-rollout path must explain the commercial offer");
+assertIncludes("pilot-signup-page-2.v53.js", "submitting this form does not start a paid service", "the paid-rollout path must set a clear transaction boundary");
+assertIncludes("pilot-signup-page-2.v53.js", "aria-invalid", "fleet request validation must identify the field that needs attention");
+assertIncludes("pilot-signup-page-2.v53.js", "field?.focus()", "fleet request validation must move focus to the field that needs attention");
 assertIncludes("pilot-signup.html", "id=\"plan\"", "the fleet lead form must capture the selected affordable plan");
 assertIncludes("pilot-signup.html", "Choose a start window", "the fleet lead form must require a deliberate start-window choice");
 assertIncludes("pilot-signup.html", "Choose a primary goal", "the fleet lead form must require a deliberate operating-goal choice");

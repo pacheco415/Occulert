@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert,
+  View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ import {
 import { updateSessionHistory } from '../lib/sessionHistory';
 import {
   commitSessionHistoryEdit,
+  removeMatchingSessionRecord,
   updateMatchingSessionRecord,
   type SessionRecordMutation,
 } from '../lib/sessionHistoryEdits';
@@ -28,6 +29,7 @@ import {
   sortIndexedSessionsNewest,
   type HistoryFilter,
 } from '../lib/historyPreferences';
+import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
 
 const HISTORY_KEY = 'occulert-session-history';
 const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
@@ -276,6 +278,43 @@ export default function HistoryScreen() {
     );
   };
 
+  const shareSessions = async (items: SessionRecord[]) => {
+    if (items.length === 0) return;
+    try {
+      await Share.share({
+        title: 'Occulert session summaries',
+        message: buildSessionHistoryExport(items),
+      });
+    } catch {
+      Alert.alert('Could not share summaries', 'Please try exporting the session summaries again.');
+    }
+  };
+
+  const deleteSession = async (index: number) => {
+    const target = sessions[index];
+    if (!target) return;
+    historyRevisionRef.current += 1;
+    try {
+      await updateSessionHistory<SessionRecord>(stored => (
+        removeMatchingSessionRecord(stored, target, index)
+      ));
+      setSessions(current => removeMatchingSessionRecord(current, target, index));
+    } catch {
+      Alert.alert('Could not delete session', 'The session remains saved. Please try again.');
+    }
+  };
+
+  const confirmDeleteSession = (index: number) => {
+    Alert.alert(
+      'Delete this session?',
+      'This permanently removes the local session summary from this iPhone. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => { void deleteSession(index); } },
+      ],
+    );
+  };
+
   const evidenceSessions = sessions.filter(item => !item.recoveredFromInterruption);
   const reviewedMedium = evidenceSessions.filter(
     item => item.sensitivity === 'medium' && Boolean(item.alertAssessment),
@@ -380,6 +419,18 @@ export default function HistoryScreen() {
             <Text accessibilityLiveRegion="polite" style={s.filterResult}>
               Showing {filteredSessions.length} of {sessions.length} sessions
             </Text>
+            {filteredSessions.length > 0 && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={`Share ${filteredSessions.length} visible session summaries`}
+                accessibilityHint="Opens the iPhone share sheet with a privacy-limited text export"
+                style={s.exportButton}
+                onPress={() => { void shareSessions(filteredSessions.map(({ item }) => item)); }}
+              >
+                <Ionicons name="share-outline" size={16} color="#93c5fd" />
+                <Text style={s.exportButtonText}>SHARE SHOWN SUMMARIES</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityHint="Shows aggregate progress and test-condition coverage"
@@ -750,6 +801,16 @@ export default function HistoryScreen() {
               <Ionicons name="chatbubble-ellipses-outline" size={16} color="#93c5fd" />
               <Text style={s.feedbackTxt}>Send session feedback</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={`Delete session from ${fmtDate(item.savedAt || item.updatedAt)}`}
+              accessibilityHint="Permanently removes this local session after confirmation"
+              style={s.deleteBtn}
+              onPress={() => confirmDeleteSession(i)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#fca5a5" />
+              <Text style={s.deleteTxt}>Delete local session</Text>
+            </TouchableOpacity>
           </View>
           );
         })}
@@ -773,6 +834,8 @@ const s = StyleSheet.create({
   filterButtonText: { color: '#6592a5', fontSize: 10, fontWeight: '800' },
   filterButtonTextSelected: { color: '#dbeafe' },
   filterResult: { color: '#4a7a8a', fontSize: 10, marginBottom: 2 },
+  exportButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10, marginTop: 8, paddingHorizontal: 12 },
+  exportButtonText: { color: '#93c5fd', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   checkpoint: { backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: 'rgba(94,156,255,0.28)', borderRadius: radii.large, padding: 18, marginBottom: 16 },
   checkpointHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   checkpointHeaderCopy: { flex: 1 },
@@ -860,6 +923,8 @@ const s = StyleSheet.create({
   deviceImpact: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   deviceImpactNote: { color: '#6592a5', fontSize: 10, lineHeight: 14, marginTop: 4, marginBottom: 4 },
   deviceWarning: { color: '#fbbf24', fontSize: 10, fontWeight: '700', lineHeight: 14, marginTop: 10 },
-  feedbackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
+  feedbackBtn: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 8 },
   feedbackTxt: { color: '#93c5fd', fontSize: 13, fontWeight: '800' },
+  deleteBtn: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  deleteTxt: { color: '#fca5a5', fontSize: 12, fontWeight: '800' },
 });

@@ -647,6 +647,29 @@ test("pilot request controls use an accessible form", async ({ page }) => {
   await expect(page.getByLabel("Primary operating goal")).toHaveValue("");
 });
 
+test("fleet request validation identifies and focuses the field needing attention", async ({ page }) => {
+  await page.goto("/pilot-signup.html", { waitUntil: "domcontentloaded" });
+
+  await page.locator("#saveBtn").click();
+  await expect(page.locator("#name")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#name")).toBeFocused();
+  await expect(page.locator("#error")).toContainText("Enter your name");
+
+  await page.locator("#name").fill("Fleet Owner");
+  await expect(page.locator("#name")).not.toHaveAttribute("aria-invalid", "true");
+  await page.locator("#saveBtn").click();
+  await expect(page.locator("#company")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#company")).toBeFocused();
+  await expect(page.locator("#error")).toContainText("Enter your company name");
+
+  await page.locator("#company").fill("Safe Transit");
+  await page.locator("#email").fill("not-an-email");
+  await page.locator("#saveBtn").click();
+  await expect(page.locator("#email")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#email")).toBeFocused();
+  await expect(page.locator("#error")).toContainText("Enter a valid email address");
+});
+
 test("fleet dashboard paid-rollout path reuses the protected lead form with clear intent", async ({ page }) => {
   let submittedLead = null;
   await page.route("**/api/pilot-leads", async (route) => {

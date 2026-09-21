@@ -5,8 +5,10 @@ import test from 'node:test';
 import { createSettingPersister } from '../native-app/lib/settingPersistence.ts';
 import {
   commitSessionHistoryEdit,
+  removeMatchingSessionRecord,
   updateMatchingSessionRecord,
 } from '../native-app/lib/sessionHistoryEdits.ts';
+import { buildSessionHistoryExport } from '../native-app/lib/sessionHistoryExport.ts';
 
 const require = createRequire(import.meta.url);
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -270,6 +272,49 @@ test('session review mutations merge nested fields into the latest matching reco
   });
 });
 
+test('single-session deletion removes only the confirmed matching local record', () => {
+  const sessions = [
+    { sessionId: 'session-1', savedAt: '2026-08-15T00:00:00.000Z' },
+    { sessionId: 'session-2', savedAt: '2026-08-16T00:00:00.000Z' },
+  ];
+  assert.deepEqual(
+    removeMatchingSessionRecord(sessions, sessions[1], 1),
+    [sessions[0]],
+  );
+  assert.deepEqual(
+    removeMatchingSessionRecord(sessions, { savedAt: sessions[0].savedAt }, 0),
+    [sessions[1]],
+  );
+  const duplicatedIdentity = [sessions[0], { ...sessions[0], savedAt: '2026-08-17T00:00:00.000Z' }];
+  assert.deepEqual(
+    removeMatchingSessionRecord(duplicatedIdentity, duplicatedIdentity[0], 0),
+    [duplicatedIdentity[1]],
+  );
+});
+
+test('native session exports include review summaries and exclude private identifiers and diagnostics', () => {
+  const exported = buildSessionHistoryExport([{
+    savedAt: '2026-08-15T00:00:00.000Z',
+    durationSec: 125,
+    alertCount: 2,
+    avgFatigue: 34.5,
+    sensitivity: 'medium',
+    alertAssessment: 'accurate',
+    recoveredFromInterruption: false,
+    sessionId: 'private-session-id',
+    driverId: 'private-driver-id',
+    cloudSessionId: 'private-cloud-id',
+    location: { latitude: 1, longitude: 2 },
+    monitorPerformance: { p95InferenceMs: 10 },
+  }]);
+  assert.match(exported, /Duration: 2m 5s · Alerts: 2/);
+  assert.match(exported, /Review: Felt right/);
+  assert.match(exported, /excludes driver IDs, cloud IDs, location, camera media, audio, raw motion/i);
+  for (const privateValue of ['private-session-id', 'private-driver-id', 'private-cloud-id', 'latitude', 'p95InferenceMs']) {
+    assert.doesNotMatch(exported, new RegExp(privateValue));
+  }
+});
+
 test('a failed session review edit leaves confirmed UI state intact and permits retry', async () => {
   let sessions = [{ sessionId: 'session-1', alertAssessment: 'accurate' }];
   const errors = [];
@@ -321,7 +366,7 @@ test('fleet telemetry is explicitly labeled client-reported and unverified', () 
 });
 
 test('pilot contacts are server-only and disclosed accurately', () => {
-  const signup = read('pilot-signup.html') + read('pilot-signup-page-1.v47.js') + read('pilot-signup-page-2.v47.js');
+  const signup = read('pilot-signup.html') + read('static-page.v52.js') + read('pilot-signup-page-2.v53.js');
   const viewer = read('pilot-leads.html');
   const privacy = read('privacy.html');
   assert.doesNotMatch(signup, /occulert-pilot-leads|savePilotLead|firebase/i);

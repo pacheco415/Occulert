@@ -180,7 +180,9 @@ export default function PreDriveScreen() {
             ) : (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityState={{ disabled: healthAvailable !== true || healthLoading }}
+                accessibilityLabel={healthSnapshot ? 'Refresh Apple Health context' : 'Connect Apple Health context'}
+                accessibilityHint="Reads optional recent sleep and heart rate variability while you are parked"
+                accessibilityState={{ disabled: healthAvailable !== true || healthLoading, busy: healthLoading }}
                 disabled={healthAvailable !== true || healthLoading}
                 activeOpacity={0.8}
                 onPress={refreshHealth}
@@ -198,10 +200,12 @@ export default function PreDriveScreen() {
               </TouchableOpacity>
             )}
 
-            {healthNotice && <Text style={styles.healthNotice}>{healthNotice}</Text>}
+            {healthNotice && <Text accessibilityLiveRegion="polite" style={styles.healthNotice}>{healthNotice}</Text>}
             {healthSnapshot && (
               <TouchableOpacity
                 accessibilityRole="button"
+                accessibilityLabel="Remove local Apple Health summary"
+                accessibilityHint="Removes the saved summary from this iPhone but does not change Apple Health permissions"
                 activeOpacity={0.75}
                 onPress={removeHealthSummary}
                 style={styles.healthRemoveButton}
@@ -216,7 +220,7 @@ export default function PreDriveScreen() {
         )}
 
         <View style={styles.confirmationHeader}>
-          <View>
+          <View style={styles.confirmationCopy}>
             <Text style={styles.confirmationEyebrow}>FINAL SAFETY CONFIRMATION</Text>
             <Text style={styles.confirmationTitle}>Confirm all four before continuing</Text>
           </View>
@@ -230,6 +234,8 @@ export default function PreDriveScreen() {
             <TouchableOpacity
               key={item.title}
               accessibilityRole="checkbox"
+              accessibilityLabel={item.title}
+              accessibilityHint={item.detail}
               accessibilityState={{ checked: checked[index] }}
               activeOpacity={0.8}
               onPress={() => toggle(index)}
@@ -255,6 +261,8 @@ export default function PreDriveScreen() {
         >
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityLabel="Continue to monitoring"
+            accessibilityHint={ready ? 'Opens the parked camera setup before monitoring starts' : 'Complete all four safety confirmations first'}
             accessibilityState={{ disabled: !ready }}
             disabled={!ready}
             activeOpacity={0.85}
@@ -271,6 +279,7 @@ export default function PreDriveScreen() {
 
         <TouchableOpacity
           accessibilityRole="link"
+          accessibilityHint="Opens the full Occulert safety information in your browser"
           onPress={() => Linking.openURL('https://www.occulert.com/safety.html')}
           style={styles.safetyLink}
         >
@@ -329,6 +338,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingHorizontal: 2,
   },
+  confirmationCopy: { flex: 1 },
   confirmationEyebrow: { color: colors.cyan, fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
   confirmationTitle: { color: colors.text, fontSize: 15, fontWeight: '800', marginTop: 3 },
   confirmationCount: { color: colors.textSecondary, fontSize: 13, fontWeight: '800' },
@@ -353,9 +363,10 @@ const styles = StyleSheet.create({
   healthEyebrow: { color: '#fb7185', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
   healthTitle: { color: colors.text, fontSize: 17, fontWeight: '800', marginTop: 2 },
   healthDescription: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 12 },
-  healthMetrics: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  healthMetrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
   healthMetric: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 130,
     borderRadius: 12,
     backgroundColor: colors.backgroundRaised,
     borderWidth: 1,
@@ -367,6 +378,7 @@ const styles = StyleSheet.create({
   healthMetricTime: { color: colors.textMuted, fontSize: 9, marginTop: 4 },
   healthUpdated: { color: colors.textMuted, fontSize: 10, marginTop: 8 },
   healthButton: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -379,11 +391,12 @@ const styles = StyleSheet.create({
   healthButtonDisabled: { backgroundColor: '#26374a', opacity: 0.65 },
   healthButtonText: { color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
   healthNotice: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 10 },
-  healthRemoveButton: { alignItems: 'center', paddingTop: 12 },
+  healthRemoveButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingTop: 8 },
   healthRemoveText: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 0.45 },
   healthLimit: { color: colors.textMuted, fontSize: 10, lineHeight: 15, marginTop: 10 },
   checkList: { gap: 10 },
   checkCard: {
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
@@ -415,6 +428,7 @@ const styles = StyleSheet.create({
   continueButtonDisabled: { opacity: 0.5 },
   continueText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 0.7 },
   safetyLink: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

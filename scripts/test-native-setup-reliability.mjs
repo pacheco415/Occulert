@@ -187,8 +187,21 @@ test('pre-drive and Settings explain required versus optional setup', () => {
   assert.match(preDrive, /FINAL SAFETY CONFIRMATION/);
   assert.match(preDrive, /checked\.filter\(Boolean\)\.length/);
   assert.match(preDrive, /it never decides whether you are safe to drive/);
+  assert.match(preDrive, /accessibilityLabel=\{healthSnapshot \?/);
+  assert.match(preDrive, /accessibilityLabel="Continue to monitoring"/);
+  assert.match(preDrive, /accessibilityHint=\{ready \?/);
+  assert.match(preDrive, /healthMetrics: \{ flexDirection: 'row', flexWrap: 'wrap'/);
   assert.match(settings, /The iPhone camera and at least one phone alert are the primary setup/);
   assert.match(settings, /Watch, headphones, Health, and cloud sync are optional additions/);
+});
+
+test('safe-stop choices remain readable and accessible at larger text sizes', () => {
+  const monitor = read('native-app/app/monitor.tsx');
+  assert.match(monitor, /accessibilityLabel="Safe stop options"/);
+  assert.match(monitor, /accessibilityViewIsModal/);
+  assert.match(monitor, /accessibilityHint=\{`\$\{option\.detail\}/);
+  assert.match(monitor, /safeStopOption: \{\s*minHeight: 64/);
+  assert.match(monitor, /safeStopCancel: \{ minHeight: 44/);
 });
 
 test('connected-device readiness refresh remains single-flight', () => {
