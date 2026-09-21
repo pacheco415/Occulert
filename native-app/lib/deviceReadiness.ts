@@ -7,6 +7,10 @@ export const READINESS_TIMEOUT_MS = 3_000;
 export interface CameraReadiness {
   permission: string;
   frontAvailable: boolean;
+  backAvailable: boolean;
+  backPhysicalDevices: string[];
+  multiCamSupported: boolean | null;
+  frontBackMultiCamSupported: boolean | null;
 }
 
 export interface OutputReadiness {
@@ -31,7 +35,7 @@ export interface ReadinessSources {
 }
 
 export interface ReadinessRow {
-  id: 'camera' | 'outputs' | 'watch' | 'motion';
+  id: 'camera' | 'roadCamera' | 'outputs' | 'watch' | 'motion';
   title: string;
   status: string;
   detail: string;
@@ -73,7 +77,13 @@ export function isReadinessStale(snapshot: DeviceReadinessSnapshot, now: number)
 }
 
 export function describeDeviceReadiness(snapshot: DeviceReadinessSnapshot, now: number): ReadinessRow[] {
-  const titles = { camera: 'Front camera', outputs: 'Phone alerts', watch: 'Apple Watch · optional', motion: 'Headphone motion · optional' };
+  const titles = {
+    camera: 'Front camera',
+    roadCamera: 'Road camera · planned',
+    outputs: 'Phone alerts',
+    watch: 'Apple Watch · optional',
+    motion: 'Headphone motion · optional',
+  };
   if (isReadinessStale(snapshot, now)) {
     return (Object.keys(titles) as ReadinessRow['id'][]).map(id => ({
       id, title: titles[id], status: 'Check again',
@@ -91,6 +101,19 @@ export function describeDeviceReadiness(snapshot: DeviceReadinessSnapshot, now: 
       : camera.permission !== 'granted'
         ? row('camera', 'Access needed', 'Camera access is not granted. Continue to camera setup to review access.', true)
         : row('camera', 'Access granted', 'Check framing and eye visibility in the camera preview before starting.');
+  const roadCameraRow = !camera
+    ? row('roadCamera', 'Not confirmed', 'Road-camera compatibility could not be read. Driver monitoring remains independent.')
+    : !camera.backAvailable
+      ? row('roadCamera', 'Unavailable', 'No rear camera was reported. Front-camera driver monitoring remains available.')
+      : camera.frontBackMultiCamSupported === true
+        ? row(
+            'roadCamera',
+            'Hardware capable',
+            `${camera.backPhysicalDevices.length || 1} rear camera type${camera.backPhysicalDevices.length === 1 ? '' : 's'} reported. This confirms Apple multi-camera support only; road monitoring is not active yet.`,
+          )
+        : camera.multiCamSupported === false || camera.frontBackMultiCamSupported === false
+          ? row('roadCamera', 'Single camera only', 'This iPhone does not report Apple simultaneous multi-camera support. Driver monitoring keeps priority.')
+          : row('roadCamera', 'Support unknown', 'A rear camera is available, but simultaneous Apple multi-camera support was not confirmed.');
   const outputRow = !outputs
     ? row('outputs', 'Not confirmed', 'Saved alert settings could not be read. Check Settings before starting.', true)
     : !outputs.audio && !outputs.haptic
@@ -115,5 +138,5 @@ export function describeDeviceReadiness(snapshot: DeviceReadinessSnapshot, now: 
         : motion.authorization !== 'authorized'
           ? row('motion', 'Permission pending', 'Motion access may be requested when monitoring starts. This check does not request it.')
           : row('motion', 'Available', 'Experimental head-motion observations only; they do not change fatigue scores or alerts.');
-  return [cameraRow, outputRow, watchRow, motionRow];
+  return [cameraRow, roadCameraRow, outputRow, watchRow, motionRow];
 }
