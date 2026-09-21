@@ -12,6 +12,8 @@ The panel clears when authentication changes, rejects responses belonging to an 
 
 ## Rollout
 
+For the current published status and remaining checks, see [release progress](RELEASE_2026-09-21.md). The steps below also apply to future environments.
+
 1. Apply `supabase/migrations/20260921040303_fleet_session_followups.sql` to a staging database through the normal migration process.
 2. Deploy this branch to a preview using that database. With two separate fleet owners, check that each sees only their own sessions and can save/reload outcomes. Confirm an account without fleet ownership cannot access the endpoint. Check the Supabase security/performance advisors for the deployed schema.
 3. Before production deployment, repeat those checks against the approved production migration and verify session/account deletion behavior. No production database change is included in the local validation described below.
