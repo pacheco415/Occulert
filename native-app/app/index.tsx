@@ -198,7 +198,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingHorizontal: 22, paddingTop: 14, paddingBottom: 42 },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   brandMark: {
     width: 58,
     height: 58,
@@ -208,6 +208,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   privacyPill: {
+    maxWidth: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
@@ -219,8 +220,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(53, 227, 154, 0.22)',
   },
   privacyDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.green },
-  privacyPillText: { color: '#8ff0c5', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-  hero: { paddingTop: 48, paddingBottom: 30 },
+  privacyPillText: { flexShrink: 1, color: '#8ff0c5', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  hero: { paddingTop: 40, paddingBottom: 28 },
   eyebrow: { color: colors.cyan, fontSize: 11, fontWeight: '800', letterSpacing: 1.6 },
   title: {
     color: colors.text,
@@ -308,6 +309,7 @@ const styles = StyleSheet.create({
     minHeight: 86,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 14,
     paddingHorizontal: 18,
     gap: 13,
   },
@@ -327,7 +329,7 @@ const styles = StyleSheet.create({
   sectionLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.4, marginBottom: 10 },
   quickLinks: { gap: 10, marginBottom: 30 },
   linkCard: { borderRadius: radii.medium, overflow: 'hidden' },
-  linkButton: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14 },
+  linkButton: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
   linkIcon: {
     width: 38,
     height: 38,

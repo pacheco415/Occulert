@@ -195,6 +195,33 @@ test('pre-drive and Settings explain required versus optional setup', () => {
   assert.match(settings, /Watch, headphones, Health, and cloud sync are optional additions/);
 });
 
+test('Settings exposes scoped local-data controls without implying cloud deletion', () => {
+  const settings = read('native-app/app/settings.tsx');
+  const historyStorage = read('native-app/lib/sessionHistory.ts');
+  const recoveryStorage = read('native-app/lib/sessionRecovery.ts');
+
+  assert.match(settings, /PRIVACY &amp; LOCAL DATA/);
+  assert.match(settings, /Deleting local data here does not delete cloud records/);
+  assert.match(settings, /Delete all local session history/);
+  assert.match(settings, /Clear interrupted-drive recovery data/);
+  assert.match(settings, /This cannot be undone/);
+  assert.match(settings, /clearSessionHistory\(\)/);
+  assert.match(settings, /clearActiveSessionCheckpoint\(\)/);
+  assert.doesNotMatch(settings, /AsyncStorage\.clear/);
+  assert.match(historyStorage, /historyQueue\.then\(\(\) => AsyncStorage\.removeItem\(HISTORY_KEY\)\)/);
+  assert.match(recoveryStorage, /AsyncStorage\.removeItem\(ACTIVE_SESSION_KEY\)/);
+});
+
+test('Home and Settings allow key rows to grow with larger text', () => {
+  const home = read('native-app/app/index.tsx');
+  const settings = read('native-app/app/settings.tsx');
+  assert.match(home, /topRow: \{ flexDirection: 'row', flexWrap: 'wrap'/);
+  assert.match(home, /linkButton: \{ minHeight: 70[^\n]+paddingVertical: 12/);
+  assert.match(settings, /rowL:\{minWidth:0/);
+  assert.match(settings, /rowCopy:\{minWidth:0,flex:1\}/);
+  assert.match(settings, /localDataAction:\{minHeight:64/);
+});
+
 test('safe-stop choices remain readable and accessible at larger text sizes', () => {
   const monitor = read('native-app/app/monitor.tsx');
   assert.match(monitor, /accessibilityLabel="Safe stop options"/);

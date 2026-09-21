@@ -44,6 +44,8 @@ import {
 } from '../lib/alertSound';
 import { alertDeliveryPlan } from '../lib/alertDelivery';
 import { waitForCancellableDelay } from '../lib/cancellableDelay';
+import { clearSessionHistory, loadSessionHistory } from '../lib/sessionHistory';
+import { clearActiveSessionCheckpoint, loadActiveSessionCheckpoint } from '../lib/sessionRecovery';
 
 const EMPTY_WATCH_STATUS: WatchStatus = {
   moduleAvailable: false,
@@ -126,6 +128,9 @@ export default function SettingsScreen() {
   const [audioTestBusy, setAudioTestBusy] = useState(false);
   const [watchTestBusy, setWatchTestBusy] = useState(false);
   const [deviceRefreshBusy, setDeviceRefreshBusy] = useState(false);
+  const [localSessionCount, setLocalSessionCount] = useState<number | null>(null);
+  const [recoveryDataPresent, setRecoveryDataPresent] = useState<boolean | null>(null);
+  const [localDataBusy, setLocalDataBusy] = useState(false);
   // This parked-only test must release the shared iOS audio session when the
   // tone ends so music and navigation audio can return to their normal level.
   const audioTestPlayer = useAudioPlayer(ALERT_SOUND);
@@ -175,6 +180,18 @@ export default function SettingsScreen() {
       setWatch(saved);
       setHeadphoneMotionStatus(motionStatus);
     }).catch(() => {});
+    Promise.all([
+      loadSessionHistory(),
+      loadActiveSessionCheckpoint(),
+    ]).then(([sessions, checkpoint]) => {
+      if (!active) return;
+      setLocalSessionCount(sessions.length);
+      setRecoveryDataPresent(Boolean(checkpoint));
+    }).catch(() => {
+      if (!active) return;
+      setLocalSessionCount(null);
+      setRecoveryDataPresent(null);
+    });
     return () => { active = false; };
   }, []));
 
@@ -351,6 +368,59 @@ export default function SettingsScreen() {
     });
   };
 
+  const deleteAllLocalSessions = async () => {
+    if (localDataBusy) return;
+    setLocalDataBusy(true);
+    try {
+      await clearSessionHistory();
+      if (settingsMountedRef.current) setLocalSessionCount(0);
+      Alert.alert(
+        'Local history deleted',
+        'Session summaries were removed from this iPhone. Any separately synced cloud records were not changed.',
+      );
+    } catch {
+      Alert.alert('Could not delete local history', 'Your local session summaries remain saved. Please try again.');
+    } finally {
+      if (settingsMountedRef.current) setLocalDataBusy(false);
+    }
+  };
+
+  const confirmDeleteAllLocalSessions = () => {
+    Alert.alert(
+      'Delete all local session history?',
+      'This permanently removes every local session summary, review, and diagnostic from this iPhone. Cloud records are not changed. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete All', style: 'destructive', onPress: () => { void deleteAllLocalSessions(); } },
+      ],
+    );
+  };
+
+  const clearRecoveryData = async () => {
+    if (localDataBusy) return;
+    setLocalDataBusy(true);
+    try {
+      await clearActiveSessionCheckpoint();
+      if (settingsMountedRef.current) setRecoveryDataPresent(false);
+      Alert.alert('Recovery data cleared', 'The interrupted-drive checkpoint was removed from this iPhone.');
+    } catch {
+      Alert.alert('Could not clear recovery data', 'The recovery checkpoint remains saved. Please try again.');
+    } finally {
+      if (settingsMountedRef.current) setLocalDataBusy(false);
+    }
+  };
+
+  const confirmClearRecoveryData = () => {
+    Alert.alert(
+      'Clear interrupted-drive recovery data?',
+      'This removes the temporary local checkpoint used to recover an interrupted monitoring session. Existing session history is not changed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear', style: 'destructive', onPress: () => { void clearRecoveryData(); } },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={s.bg}>
       <AmbientBackground />
@@ -370,12 +440,12 @@ export default function SettingsScreen() {
         <View style={s.card}>
           <Text style={s.cardTitle}>ALERTS</Text>
           <View style={s.row}>
-            <View style={s.rowL}><Ionicons name="phone-portrait-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Haptic vibration</Text><Text style={s.sub}>Vibrate on alert</Text></View></View>
+            <View style={s.rowL}><Ionicons name="phone-portrait-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Haptic vibration</Text><Text style={s.sub}>Vibrate on alert</Text></View></View>
             <Switch accessibilityLabel="Haptic vibration alerts" accessibilityHint="Controls vibration from the iPhone during alerts" value={haptic} onValueChange={v=>saveBooleanSetting(HAPTIC_ALERT_PREFERENCE_KEY,v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
           <View style={s.row}>
-            <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
+            <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
             <Switch accessibilityLabel="Audio tone alerts" accessibilityHint="Controls alert sounds from the iPhone's current audio output" value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
@@ -477,7 +547,7 @@ export default function SettingsScreen() {
           <View style={s.patternBlock}>
             <View style={s.rowL}>
               <Ionicons name="ear-outline" size={18} color="#60a5fa" />
-              <View>
+              <View style={s.rowCopy}>
                 <Text style={s.label}>Headphone alert pattern</Text>
                 <Text style={s.sub}>Balanced is clearest; optional stereo emphasis is available for early alerts</Text>
               </View>
@@ -509,7 +579,7 @@ export default function SettingsScreen() {
           <View style={s.row}>
             <View style={s.rowL}>
               <Ionicons name="watch-outline" size={18} color="#60a5fa" />
-              <View>
+              <View style={s.rowCopy}>
                 <Text style={s.label}>Apple Watch alerts</Text>
                 <Text style={s.sub}>{watchDescription}</Text>
               </View>
@@ -533,6 +603,67 @@ export default function SettingsScreen() {
         </View>
         <CloudSyncCard />
         <View style={s.card}>
+          <Text style={s.cardTitle}>PRIVACY &amp; LOCAL DATA</Text>
+          <View style={s.privacySummary}>
+            <View style={s.privacySummaryIcon}>
+              <Ionicons name="phone-portrait-outline" size={19} color={colors.green} />
+            </View>
+            <View style={s.rowCopy}>
+              <Text style={s.privacySummaryTitle}>Stored on this iPhone</Text>
+              <Text style={s.privacySummaryText}>
+                Session summaries, your reviews and test conditions, bounded performance diagnostics, preferences, and a temporary interrupted-drive checkpoint.
+              </Text>
+            </View>
+          </View>
+          <View style={s.privNote}>
+            <Ionicons name="eye-off-outline" size={14} color="#4a7a8a" />
+            <Text style={s.privTxt}>Occulert does not save camera video, photos, microphone audio, or a location route. Optional Apple Health context is a small local summary managed from the pre-drive screen.</Text>
+          </View>
+          <View style={s.privNote}>
+            <Ionicons name="cloud-outline" size={14} color="#4a7a8a" />
+            <Text style={s.privTxt}>Cloud session summaries are separate and sync only when you enable cloud sync while signed in. Deleting local data here does not delete cloud records.</Text>
+          </View>
+          <View accessibilityLiveRegion="polite" style={s.localDataStatus}>
+            <Text style={s.localDataStatusText}>
+              {localSessionCount === null ? 'Local history count unavailable' : `${localSessionCount} local ${localSessionCount === 1 ? 'session' : 'sessions'}`}
+            </Text>
+            <Text style={s.localDataStatusText}>
+              {recoveryDataPresent === null ? 'Recovery status unavailable' : recoveryDataPresent ? 'Recovery checkpoint saved' : 'No recovery checkpoint'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Delete all local session history"
+            accessibilityHint="Permanently removes local session summaries after confirmation without changing cloud records"
+            accessibilityState={{ disabled: localDataBusy || localSessionCount === 0, busy: localDataBusy }}
+            disabled={localDataBusy || localSessionCount === 0}
+            onPress={confirmDeleteAllLocalSessions}
+            style={[s.localDataAction, (localDataBusy || localSessionCount === 0) && s.localDataActionDisabled]}
+          >
+            <Ionicons name="trash-outline" size={17} color="#fca5a5" />
+            <View style={s.rowCopy}>
+              <Text style={s.localDataActionTitle}>Delete all local session history</Text>
+              <Text style={s.localDataActionDetail}>Removes summaries, reviews, test conditions, and diagnostics from this iPhone.</Text>
+            </View>
+          </TouchableOpacity>
+          <View style={s.div} />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Clear interrupted-drive recovery data"
+            accessibilityHint="Removes the temporary local recovery checkpoint after confirmation"
+            accessibilityState={{ disabled: localDataBusy || recoveryDataPresent === false, busy: localDataBusy }}
+            disabled={localDataBusy || recoveryDataPresent === false}
+            onPress={confirmClearRecoveryData}
+            style={[s.localDataAction, (localDataBusy || recoveryDataPresent === false) && s.localDataActionDisabled]}
+          >
+            <Ionicons name="refresh-circle-outline" size={18} color="#fca5a5" />
+            <View style={s.rowCopy}>
+              <Text style={s.localDataActionTitle}>Clear interrupted-drive recovery data</Text>
+              <Text style={s.localDataActionDetail}>Keeps existing session history and removes only the temporary checkpoint.</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+        <View style={s.card}>
           <Text style={s.cardTitle}>PILOT SUPPORT</Text>
           <TouchableOpacity
             accessibilityRole="button"
@@ -545,7 +676,7 @@ export default function SettingsScreen() {
               }
             }}
           >
-            <View style={s.rowL}><Ionicons name="chatbubble-ellipses-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Send feedback</Text><Text style={s.sub}>Report an alert issue or share a suggestion</Text></View></View>
+            <View style={s.rowL}><Ionicons name="chatbubble-ellipses-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Send feedback</Text><Text style={s.sub}>Report an alert issue or share a suggestion</Text></View></View>
             <Ionicons name="chevron-forward" size={18} color="#4a7a8a" />
           </TouchableOpacity>
           <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>Feedback opens in Mail for your review. No camera video, audio, or location is attached.</Text></View>
@@ -568,11 +699,11 @@ const s = StyleSheet.create({
   priorityText:{color:colors.textSecondary,fontSize:11,lineHeight:16,marginTop:3},
   card:{backgroundColor:colors.material,borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.large,marginBottom:16,overflow:'hidden'},
   cardTitle:{color:colors.textSecondary,fontSize:11,fontWeight:'800',letterSpacing:0.8,textTransform:'uppercase',padding:14,borderBottomWidth:1,borderColor:'rgba(255,255,255,0.08)'},
-  row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:16,paddingVertical:14,gap:12},
-  rowL:{flexDirection:'row',alignItems:'center',gap:12,flex:1},
-  rowCopy:{flex:1},
-  label:{color:colors.text,fontSize:14,fontWeight:'700'}, sub:{color:colors.textMuted,fontSize:11,marginTop:2},
-  status:{color:colors.cyan,fontSize:10,fontWeight:'900',letterSpacing:0.6},
+  row:{minHeight:52,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:16,paddingVertical:14,gap:12},
+  rowL:{minWidth:0,flexDirection:'row',alignItems:'center',gap:12,flex:1},
+  rowCopy:{minWidth:0,flex:1},
+  label:{color:colors.text,fontSize:14,fontWeight:'700'}, sub:{color:colors.textMuted,fontSize:11,lineHeight:16,marginTop:2},
+  status:{flexShrink:1,color:colors.cyan,fontSize:10,fontWeight:'900',letterSpacing:0.6,textAlign:'right'},
   deviceSummary:{flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:16,paddingTop:14,paddingBottom:10,backgroundColor:'rgba(48,209,88,0.05)'},
   deviceSummaryIcon:{width:34,height:34,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(48,209,88,0.1)'},
   deviceSummaryCopy:{flex:1},
@@ -604,5 +735,15 @@ const s = StyleSheet.create({
   soundNote:{color:colors.textMuted,fontSize:11,lineHeight:16},
   privNote:{flexDirection:'row',alignItems:'flex-start',gap:8,padding:14,backgroundColor:colors.backgroundRaised,borderTopWidth:1,borderColor:colors.glassBorder},
   privTxt:{color:colors.textMuted,fontSize:11,lineHeight:16,flex:1},
+  privacySummary:{flexDirection:'row',alignItems:'flex-start',gap:11,padding:16,backgroundColor:'rgba(48,209,88,0.05)'},
+  privacySummaryIcon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(48,209,88,0.1)'},
+  privacySummaryTitle:{color:'#bbf7d0',fontSize:13,fontWeight:'900'},
+  privacySummaryText:{color:colors.textSecondary,fontSize:11,lineHeight:17,marginTop:3},
+  localDataStatus:{gap:4,paddingHorizontal:16,paddingVertical:12,borderTopWidth:1,borderColor:colors.glassBorder},
+  localDataStatusText:{color:colors.textSecondary,fontSize:11,lineHeight:16},
+  localDataAction:{minHeight:64,flexDirection:'row',alignItems:'flex-start',gap:11,paddingHorizontal:16,paddingVertical:14},
+  localDataActionDisabled:{opacity:0.4},
+  localDataActionTitle:{color:'#fca5a5',fontSize:13,fontWeight:'800'},
+  localDataActionDetail:{color:colors.textMuted,fontSize:11,lineHeight:16,marginTop:3},
   ver:{textAlign:'center',color:colors.textMuted,fontSize:11,marginTop:8},
 });
