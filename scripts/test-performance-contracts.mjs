@@ -10,6 +10,11 @@ import {
   formatSessionTime,
   shouldRefreshMonitorMetrics,
 } from '../native-app/lib/monitorPerformance.ts';
+import {
+  canRestartStalledCamera,
+  deriveCameraLoadPolicy,
+  shouldRestartCamera,
+} from '../native-app/lib/cameraResilience.ts';
 
 const read = relativePath => readFileSync(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
@@ -37,6 +42,7 @@ test('native monitoring timing stays bounded and deterministic', () => {
   tracker.recordUiUpdate();
   tracker.recordUiUpdate();
   tracker.recordCameraStall();
+  tracker.recordCameraRestart();
   tracker.recordAlertDecision(500);
   tracker.recordPhoneDispatch(500, 506);
   tracker.recordWatchDelivery(500, { accepted: true, acknowledged: true, roundTripMs: 44 });
@@ -50,6 +56,7 @@ test('native monitoring timing stays bounded and deterministic', () => {
     timeToFirstSampleMs: 50,
     uiUpdatesPerSecond: 2,
     cameraStalls: 1,
+    cameraRestarts: 1,
     alertTiming: {
       alertsTriggered: 1,
       phoneDispatches: 1,
@@ -64,10 +71,10 @@ test('native monitoring timing stays bounded and deterministic', () => {
   });
 });
 
-test('native analysis remains 10 Hz while display-only work is throttled', () => {
+test('native analysis remains 10 Hz normally while display-only work is throttled', () => {
   const monitor = read('native-app/app/monitor.tsx');
   const liveMetrics = read('native-app/components/LiveMetrics.tsx');
-  assert.match(monitor, /now - lastSample\.value < 100/);
+  assert.match(monitor, /now - lastSample\.value < analysisIntervalMs\.value/);
   assert.match(monitor, /recordSample\(now, inferenceMs\)/);
   assert.match(monitor, /deriveAlertLevel\(\{/);
   assert.match(monitor, /shouldRefreshMonitorMetrics\(\{/);
@@ -75,6 +82,7 @@ test('native analysis remains 10 Hz while display-only work is throttled', () =>
   assert.match(monitor, /performanceTrackerRef\.current\.recordUiUpdate\(\)/);
   assert.match(monitor, /performanceTrackerRef\.current\.recordSessionStart\(/);
   assert.match(monitor, /performanceTrackerRef\.current\.recordCameraStall\(\)/);
+  assert.match(monitor, /performanceTrackerRef\.current\.recordCameraRestart\(\)/);
   assert.match(monitor, /monitorPerformance,/);
   assert.doesNotMatch(monitor, /setSessionTime|timerRef/);
   assert.doesNotMatch(monitor, /await startHeadphoneMotion\(\)/);
@@ -99,6 +107,42 @@ test('native analysis remains 10 Hz while display-only work is throttled', () =>
     now: 100,
     lastUpdatedAt: 0,
   }), true, 'critical threshold crossings must bypass the display throttle');
+});
+
+test('camera resilience reduces load and permits only one safe restart', () => {
+  assert.deepEqual(deriveCameraLoadPolicy({
+    thermalState: 'nominal',
+    lowPowerMode: false,
+    batteryLevel: 0.8,
+    isCharging: false,
+  }), {
+    analysisIntervalMs: 100,
+    mode: 'normal',
+    reason: 'none',
+  });
+  assert.equal(deriveCameraLoadPolicy({
+    thermalState: 'serious',
+    lowPowerMode: false,
+    batteryLevel: 0.8,
+    isCharging: false,
+  }).mode, 'reduced');
+  assert.equal(deriveCameraLoadPolicy({
+    thermalState: 'critical',
+    lowPowerMode: false,
+    batteryLevel: 0.8,
+    isCharging: false,
+  }).mode, 'stop');
+  assert.equal(deriveCameraLoadPolicy({
+    thermalState: 'nominal',
+    lowPowerMode: false,
+    batteryLevel: 0.1,
+    isCharging: true,
+  }).mode, 'normal');
+  assert.equal(canRestartStalledCamera(0), true);
+  assert.equal(canRestartStalledCamera(1), false);
+  assert.equal(shouldRestartCamera('session/camera-not-ready', 0), true);
+  assert.equal(shouldRestartCamera('system/max-cameras-in-use', 0), false);
+  assert.equal(shouldRestartCamera('session/camera-not-ready', 1), false);
 });
 
 test('Build 30 pins its iOS toolchain and exposes local aggregate diagnostics', () => {

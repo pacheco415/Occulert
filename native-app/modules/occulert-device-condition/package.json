@@ -1,0 +1,9 @@
+{
+  "name": "occulert-device-condition",
+  "version": "1.0.0",
+  "description": "Private local Expo module for Occulert iOS thermal and power condition checks.",
+  "private": true,
+  "peerDependencies": {
+    "expo": "*"
+  }
+}
