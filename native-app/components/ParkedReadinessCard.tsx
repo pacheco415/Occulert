@@ -8,13 +8,42 @@ import {
 } from '../lib/deviceReadiness';
 import { deviceReadinessSources } from '../lib/deviceReadinessSources';
 import { createReadinessSession, type ReadinessViewState } from '../lib/deviceReadinessSession';
+import {
+  runMultiCamStabilityTest,
+  type MultiCamStabilityResult,
+} from '../lib/deviceCondition';
+
+function describeStabilityResult(result: MultiCamStabilityResult) {
+  const seconds = (result.elapsedMs / 1_000).toFixed(1);
+  const measurements = `${result.frontFrames} driver frames and ${result.roadFrames} road frames in ${seconds}s. Peak camera pressure ${result.maxPressureLevel}; phone heat ${result.thermalState}.`;
+  switch (result.state) {
+  case 'passed':
+    return { status: 'Live streams passed', detail: measurements, attention: false };
+  case 'driverOnlyFallback':
+    return { status: 'Driver camera protected', detail: `Occulert disabled or withheld the road stream while preserving driver frames. ${measurements}`, attention: true };
+  case 'driverStreamFailed':
+    return { status: 'Driver stream failed', detail: `The protected driver stream produced no frames. Road monitoring remains disabled. ${measurements}`, attention: true };
+  case 'overBudget':
+    return { status: 'Test blocked', detail: 'Apple’s resource budget was exceeded before live capture. Road monitoring remains disabled.', attention: true };
+  case 'permissionRequired':
+    return { status: 'Camera access needed', detail: 'Grant camera access before running the parked stability test.', attention: true };
+  case 'unsupported':
+    return { status: 'Not supported', detail: 'This phone does not expose a supported front-and-rear camera pair.', attention: true };
+  default:
+    return { status: 'Test could not finish', detail: 'Both camera streams were stopped. Close other camera apps and try again while parked.', attention: true };
+  }
+}
 
 export function ParkedReadinessCard() {
   const router = useRouter();
   const [{ snapshot, busy, now }, setState] = useState<ReadinessViewState>(() => ({ snapshot: null, busy: false, now: Date.now() }));
+  const [stabilityBusy, setStabilityBusy] = useState(false);
+  const [stabilityResult, setStabilityResult] = useState<MultiCamStabilityResult | null>(null);
   const refreshRef = useRef<() => void>(() => {});
+  const mountedRef = useRef(true);
 
   useFocusEffect(useCallback(() => {
+    mountedRef.current = true;
     const session = createReadinessSession(() => collectDeviceReadiness(deviceReadinessSources), setState);
     const refresh = () => {
       if (AppState.currentState === 'active') void session.refresh();
@@ -26,6 +55,7 @@ export function ParkedReadinessCard() {
       else session.invalidate();
     });
     return () => {
+      mountedRef.current = false;
       session.dispose();
       subscription.remove();
       refreshRef.current = () => {};
@@ -33,6 +63,19 @@ export function ParkedReadinessCard() {
   }, []));
 
   const rows = snapshot ? describeDeviceReadiness(snapshot, now) : [];
+  const stabilityEligible = snapshot?.camera?.multiCamProbe.state === 'withinBudget';
+  const stabilityDescription = stabilityResult ? describeStabilityResult(stabilityResult) : null;
+  const controlsBusy = busy || stabilityBusy;
+  const runStabilityTest = async () => {
+    if (!stabilityEligible || stabilityBusy || AppState.currentState !== 'active') return;
+    setStabilityResult(null);
+    setStabilityBusy(true);
+    const result = await runMultiCamStabilityTest();
+    if (!mountedRef.current) return;
+    setStabilityResult(result);
+    setStabilityBusy(false);
+    refreshRef.current();
+  };
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Your devices before this drive</Text>
@@ -49,12 +92,35 @@ export function ParkedReadinessCard() {
         ))}
         {snapshot ? <Text style={styles.note}>Snapshot only; refresh if you change devices or settings.</Text> : null}
       </View>
+      {stabilityEligible ? (
+        <View style={styles.row} accessibilityLiveRegion="polite">
+          <Text style={styles.rowTitle}>Live dual-camera test · parked</Text>
+          <Text style={styles.detail}>Runs both cameras for five seconds, counts frames, then stops. No images or video are saved.</Text>
+          {stabilityBusy ? <Text style={styles.status}>Testing both camera streams…</Text> : null}
+          {stabilityDescription ? (
+            <>
+              <Text style={[styles.status, stabilityDescription.attention && styles.attention]}>{stabilityDescription.status}</Text>
+              <Text style={styles.detail}>{stabilityDescription.detail}</Text>
+            </>
+          ) : null}
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityHint="Starts both cameras for five seconds and stops automatically"
+            accessibilityState={{ disabled: controlsBusy, busy: stabilityBusy }}
+            disabled={controlsBusy}
+            onPress={() => { void runStabilityTest(); }}
+            style={[styles.testButton, controlsBusy && styles.disabled]}
+          >
+            <Text style={styles.buttonText}>{stabilityBusy ? 'Testing for 5 seconds…' : 'Run parked camera test'}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityState={{ disabled: busy, busy }}
-        disabled={busy}
+        accessibilityState={{ disabled: controlsBusy, busy }}
+        disabled={controlsBusy}
         onPress={() => refreshRef.current()}
-        style={[styles.button, busy && styles.disabled]}
+        style={[styles.button, controlsBusy && styles.disabled]}
       >
         <Text style={styles.buttonText}>{busy ? 'Checking…' : 'Refresh device check'}</Text>
       </TouchableOpacity>
@@ -66,7 +132,7 @@ export function ParkedReadinessCard() {
       >
         <Text style={styles.secondaryText}>Open settings and alert tests</Text>
       </TouchableOpacity>
-      <Text style={styles.note}>This does not test fatigue or confirm that it is safe to drive. No sensors or alert tests start from this check.</Text>
+      <Text style={styles.note}>This does not test fatigue or confirm that it is safe to drive. Cameras start only if you run the parked live test.</Text>
     </View>
   );
 }
@@ -84,6 +150,7 @@ const styles = StyleSheet.create({
   button: { backgroundColor: colors.blueStrong, borderRadius: radii.small, minHeight: 48, justifyContent: 'center', alignItems: 'center', padding: 12, marginTop: 16 },
   disabled: { opacity: 0.6 },
   buttonText: { color: colors.text, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  testButton: { backgroundColor: colors.blueStrong, borderRadius: radii.small, minHeight: 48, justifyContent: 'center', alignItems: 'center', padding: 12, marginTop: 12 },
   secondaryButton: { minHeight: 48, padding: 12, justifyContent: 'center', alignItems: 'center', marginTop: 4 },
   secondaryText: { color: colors.cyan, fontSize: 13, fontWeight: '700', textAlign: 'center' },
 });
