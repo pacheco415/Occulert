@@ -126,10 +126,22 @@ test("product, safety, privacy, and fleet pages offer a keyboard shortcut to mai
     await expect(page.locator("#main-content"), `${path} should focus its main content`).toBeFocused();
   }
 
-  for (const path of ["/product-hub.html", "/safety.html", "/privacy.html", "/fleet-pricing.html", "/fleet-dashboard.html"]) {
+  for (const path of ["/product-hub.html", "/safety.html", "/privacy.html", "/fleet-pricing.html", "/fleet-dashboard.html", "/driver-profiles.html", "/pilot-signup.html", "/session-history.html"]) {
     await page.goto(path, { waitUntil: "domcontentloaded" });
     await expect(page.locator('script[src="/static-page.v52.js"]')).toHaveCount(1);
   }
+});
+
+test("fleet dashboard keeps mobile navigation and controls touch friendly", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await expect(page.locator(".top")).toHaveCSS("position", "relative");
+  expect(await page.locator(".actions").evaluate(element => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(2);
+  expect(await page.locator(".actions .btn").first().evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  expect(await page.locator("#driverSearch").evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  await expect(page.locator(".section-title").first()).toHaveCSS("flex-direction", "column");
 });
 
 test("forgot password stays on the login surface and opens reset mode", async ({ page }) => {

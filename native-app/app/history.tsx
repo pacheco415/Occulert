@@ -23,8 +23,14 @@ import type { SensitivityLevel } from '../constants/thresholds';
 import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import type { MonitorPerformanceSnapshot } from '../lib/monitorPerformance';
+import {
+  normalizeHistoryFilter,
+  sortIndexedSessionsNewest,
+  type HistoryFilter,
+} from '../lib/historyPreferences';
 
 const HISTORY_KEY = 'occulert-session-history';
+const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
 const CHECKPOINT_TARGET = 10;
 
 interface SessionRecord extends FeedbackSession {
@@ -50,8 +56,6 @@ interface TestConditionGroup {
 
 type DeviceImpactKey = keyof SessionDeviceImpact;
 type DeviceImpactValue = NonNullable<SessionDeviceImpact[DeviceImpactKey]>;
-
-type HistoryFilter = 'all' | 'needs-review' | 'reviewed' | 'recovered';
 
 interface DeviceImpactGroup {
   key: DeviceImpactKey;
@@ -178,14 +182,22 @@ export default function HistoryScreen() {
   const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const historyRevisionRef = useRef(0);
+  const filterRevisionRef = useRef(0);
 
   const load = useCallback(async () => {
     const revision = historyRevisionRef.current;
+    const filterRevision = filterRevisionRef.current;
     try {
-      const raw = await AsyncStorage.getItem(HISTORY_KEY);
+      const [raw, savedFilter] = await Promise.all([
+        AsyncStorage.getItem(HISTORY_KEY),
+        AsyncStorage.getItem(HISTORY_FILTER_KEY).catch(() => null),
+      ]);
       const parsed = raw ? JSON.parse(raw) : [];
       if (historyRevisionRef.current === revision) {
         setSessions(Array.isArray(parsed) ? parsed : []);
+        if (filterRevisionRef.current === filterRevision) {
+          setHistoryFilter(normalizeHistoryFilter(savedFilter));
+        }
       }
     } catch {
       if (historyRevisionRef.current === revision) setSessions([]);
@@ -195,6 +207,14 @@ export default function HistoryScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const chooseHistoryFilter = (filter: HistoryFilter) => {
+    filterRevisionRef.current += 1;
+    setHistoryFilter(filter);
+    AsyncStorage.setItem(HISTORY_FILTER_KEY, filter).catch(() => {
+      Alert.alert('Could not remember this view', 'The filter still works now, but it may reset next time.');
+    });
+  };
 
   const saveSessionChanges = async (
     index: number,
@@ -291,8 +311,7 @@ export default function HistoryScreen() {
     reviewed: reviewedCount,
     recovered: recoveredCount,
   };
-  const filteredSessions = sessions
-    .map((item, index) => ({ item, index }))
+  const filteredSessions = sortIndexedSessionsNewest(sessions)
     .filter(({ item }) => {
       if (historyFilter === 'recovered') return Boolean(item.recoveredFromInterruption);
       if (historyFilter === 'reviewed') return !item.recoveredFromInterruption && hasCompleteReview(item);
@@ -346,9 +365,10 @@ export default function HistoryScreen() {
                     key={filter.value}
                     accessibilityRole="tab"
                     accessibilityLabel={`${filter.label}, ${filterCounts[filter.value]} sessions`}
+                    accessibilityHint="Filters the saved session list"
                     accessibilityState={{ selected }}
                     style={[s.filterButton, selected && s.filterButtonSelected]}
-                    onPress={() => setHistoryFilter(filter.value)}
+                    onPress={() => chooseHistoryFilter(filter.value)}
                   >
                     <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>
                       {filter.label} · {filterCounts[filter.value]}
@@ -362,6 +382,7 @@ export default function HistoryScreen() {
             </Text>
             <TouchableOpacity
               accessibilityRole="button"
+              accessibilityHint="Shows aggregate progress and test-condition coverage"
               accessibilityState={{ expanded: showReviewProgress }}
               style={s.reviewToggle}
               onPress={() => setShowReviewProgress(current => !current)}
@@ -464,7 +485,12 @@ export default function HistoryScreen() {
             <Text style={s.emptySub}>
               Completed monitoring sessions will appear here.
             </Text>
-            <TouchableOpacity style={s.cta} onPress={() => router.push('/pre-drive')}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Start a new monitoring session"
+              style={s.cta}
+              onPress={() => router.push('/pre-drive')}
+            >
               <Text style={s.ctaTxt}>Start Monitoring</Text>
             </TouchableOpacity>
           </View>
@@ -478,7 +504,7 @@ export default function HistoryScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               style={s.clearFilterButton}
-              onPress={() => setHistoryFilter('all')}
+              onPress={() => chooseHistoryFilter('all')}
             >
               <Text style={s.clearFilterText}>Show all sessions</Text>
             </TouchableOpacity>
@@ -597,6 +623,7 @@ export default function HistoryScreen() {
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={isExpanded ? 'Hide session review details' : 'Show session review details'}
+                accessibilityHint="Shows test conditions, device impact, and local diagnostics"
                 accessibilityState={{ expanded: isExpanded }}
                 style={s.reviewToggle}
                 onPress={() => setExpandedSessions(current => ({
@@ -735,13 +762,13 @@ const s = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 20, paddingBottom: 48 },
   title: { color: colors.text, fontSize: 32, fontWeight: '800', letterSpacing: -0.8, marginBottom: 20 },
-  historySummary: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, paddingVertical: 13, marginBottom: 12 },
-  historySummaryItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  historySummary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, paddingVertical: 13, marginBottom: 12 },
+  historySummaryItem: { flexGrow: 1, flexBasis: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   historySummaryValue: { color: '#e0f2fe', fontSize: 19, fontWeight: '900' },
   historySummaryLabel: { color: '#6592a5', fontSize: 9, fontWeight: '800', marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.4 },
   historySummaryDivider: { width: 1, backgroundColor: '#1a3a4a' },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 7 },
-  filterButton: { minHeight: 38, justifyContent: 'center', borderRadius: 999, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', paddingHorizontal: 11, paddingVertical: 7 },
+  filterButton: { minHeight: 44, justifyContent: 'center', borderRadius: 999, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', paddingHorizontal: 11, paddingVertical: 7 },
   filterButtonSelected: { borderColor: '#3b82f6', backgroundColor: 'rgba(37,99,235,0.22)' },
   filterButtonText: { color: '#6592a5', fontSize: 10, fontWeight: '800' },
   filterButtonTextSelected: { color: '#dbeafe' },
@@ -777,9 +804,9 @@ const s = StyleSheet.create({
   clearFilterButton: { minHeight: 44, justifyContent: 'center', marginTop: 8, paddingHorizontal: 14 },
   clearFilterText: { color: '#93c5fd', fontSize: 12, fontWeight: '800' },
   card: { backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, padding: 18, marginBottom: 12 },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  date: { color: '#c8e8f0', fontSize: 13, fontWeight: '700' },
-  dur: { color: '#60a5fa', fontSize: 13, fontWeight: '800' },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+  date: { flex: 1, color: '#c8e8f0', fontSize: 13, fontWeight: '700' },
+  dur: { flexShrink: 0, color: '#60a5fa', fontSize: 13, fontWeight: '800' },
   stats: { flexDirection: 'row', gap: 12 },
   recoveryNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, backgroundColor: 'rgba(48,209,88,0.08)', borderWidth: 1, borderColor: 'rgba(48,209,88,0.24)', borderRadius: 12, padding: 11, marginTop: 12 },
   recoveryNoteCopy: { flex: 1 },
@@ -809,7 +836,7 @@ const s = StyleSheet.create({
   reviewBadgeText: { fontSize: 10, fontWeight: '900' },
   reviewBadgeTextComplete: { color: '#86efac' },
   reviewBadgeTextNeeded: { color: '#fbbf24' },
-  reviewToggle: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
+  reviewToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
   reviewToggleText: { color: '#93c5fd', fontSize: 11, fontWeight: '800' },
   review: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewTitle: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', marginBottom: 10 },
@@ -825,7 +852,7 @@ const s = StyleSheet.create({
   conditionGroup: { marginTop: 9 },
   conditionLabel: { color: '#6592a5', fontSize: 10, fontWeight: '800', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
   conditionOptions: { flexDirection: 'row', gap: 7 },
-  conditionOption: { flex: 1, minHeight: 38, borderRadius: 9, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, paddingVertical: 7 },
+  conditionOption: { flex: 1, minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, paddingVertical: 7 },
   conditionOptionSelected: { borderColor: '#3b82f6', backgroundColor: 'rgba(37,99,235,0.22)' },
   conditionOptionText: { color: '#4a7a8a', fontSize: 10, fontWeight: '800', textAlign: 'center' },
   conditionOptionTextSelected: { color: '#dbeafe' },

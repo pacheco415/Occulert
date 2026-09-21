@@ -371,12 +371,12 @@ export default function SettingsScreen() {
           <Text style={s.cardTitle}>ALERTS</Text>
           <View style={s.row}>
             <View style={s.rowL}><Ionicons name="phone-portrait-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Haptic vibration</Text><Text style={s.sub}>Vibrate on alert</Text></View></View>
-            <Switch accessibilityLabel="Haptic vibration alerts" value={haptic} onValueChange={v=>saveBooleanSetting(HAPTIC_ALERT_PREFERENCE_KEY,v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <Switch accessibilityLabel="Haptic vibration alerts" accessibilityHint="Controls vibration from the iPhone during alerts" value={haptic} onValueChange={v=>saveBooleanSetting(HAPTIC_ALERT_PREFERENCE_KEY,v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
           <View style={s.row}>
             <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
-            <Switch accessibilityLabel="Audio tone alerts" value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <Switch accessibilityLabel="Audio tone alerts" accessibilityHint="Controls alert sounds from the iPhone's current audio output" value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
           <View style={s.soundBlock}>
@@ -394,6 +394,7 @@ export default function SettingsScreen() {
                   <TouchableOpacity
                     key={value}
                     accessibilityLabel={`${profile.label} alert sound`}
+                    accessibilityHint={profile.description}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     style={[s.soundOption, selected && s.soundOptionSelected]}
@@ -449,6 +450,8 @@ export default function SettingsScreen() {
           <TouchableOpacity
             accessibilityHint="Plays the three-tone urgent alert sequence through the iPhone's current audio output"
             accessibilityRole="button"
+            accessibilityLabel={audioTestBusy ? 'Preparing audio test' : 'Test current audio output'}
+            accessibilityState={{ disabled: audioTestBusy, busy: audioTestBusy }}
             disabled={audioTestBusy}
             style={[s.testRow, audioTestBusy && s.testRowDisabled]}
             onPress={testAudioOutput}
@@ -489,6 +492,8 @@ export default function SettingsScreen() {
                   <TouchableOpacity
                     key={value}
                     accessibilityRole="button"
+                    accessibilityLabel={`${label} headphone alert pattern`}
+                    accessibilityHint="Changes stereo emphasis for early alerts only"
                     accessibilityState={{ selected }}
                     style={[s.patternOption, selected && s.patternOptionSelected]}
                     onPress={() => chooseInEarPattern(value)}
@@ -509,7 +514,7 @@ export default function SettingsScreen() {
                 <Text style={s.sub}>{watchDescription}</Text>
               </View>
             </View>
-            <Switch accessibilityLabel="Apple Watch alerts" disabled={!watchAvailable} value={watch && watchAvailable} onValueChange={changeWatchAlerts} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
+            <Switch accessibilityLabel="Apple Watch alerts" accessibilityHint="Controls optional alert delivery to the paired Apple Watch" disabled={!watchAvailable} value={watch && watchAvailable} onValueChange={changeWatchAlerts} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
           </View>
           <View style={s.div} />
           <TouchableOpacity
@@ -531,6 +536,8 @@ export default function SettingsScreen() {
           <Text style={s.cardTitle}>PILOT SUPPORT</Text>
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityLabel="Send pilot feedback"
+            accessibilityHint="Opens a draft email for your review"
             style={s.row}
             onPress={async () => {
               if (!await openFeedback()) {
@@ -574,22 +581,22 @@ const s = StyleSheet.create({
   refreshRow:{minHeight:44,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingHorizontal:16},
   refreshText:{color:colors.cyan,fontSize:11,fontWeight:'900',letterSpacing:0.55},
   div:{height:1,backgroundColor:colors.glassBorder,marginHorizontal:16},
-  testRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:13},
+  testRow:{minHeight:44,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:13,paddingHorizontal:12},
   testRowDisabled:{opacity:0.35},
   testText:{color:'#60a5fa',fontSize:13,fontWeight:'800'},
   testNote:{color:colors.textMuted,fontSize:10,lineHeight:15,textAlign:'center',paddingHorizontal:16,paddingBottom:12},
   alertSafetyNote:{flexDirection:'row',alignItems:'flex-start',gap:8,paddingHorizontal:16,paddingVertical:13,backgroundColor:'rgba(251,191,36,0.07)',borderTopWidth:1,borderColor:'rgba(251,191,36,0.16)'},
   alertSafetyText:{flex:1,color:'#f8d98b',fontSize:11,lineHeight:16},
   patternBlock:{paddingHorizontal:16,paddingVertical:14,gap:12},
-  patternOptions:{flexDirection:'row',gap:8},
-  patternOption:{flex:1,alignItems:'center',borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.small,paddingVertical:10,backgroundColor:colors.backgroundRaised},
+  patternOptions:{flexDirection:'row',flexWrap:'wrap',gap:8},
+  patternOption:{flexGrow:1,flexBasis:130,minHeight:44,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.small,paddingVertical:10,backgroundColor:colors.backgroundRaised},
   patternOptionSelected:{borderColor:colors.blue,backgroundColor:'rgba(94,156,255,0.18)'},
   patternOptionText:{color:'#7f9ba8',fontSize:12,fontWeight:'800'},
   patternOptionTextSelected:{color:'#bfdbfe'},
   patternNote:{color:colors.textMuted,fontSize:11,lineHeight:16},
   soundBlock:{paddingHorizontal:16,paddingVertical:14,gap:12},
-  soundOptions:{flexDirection:'row',gap:8},
-  soundOption:{flex:1,borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.small,paddingVertical:10,paddingHorizontal:8,backgroundColor:colors.backgroundRaised},
+  soundOptions:{flexDirection:'row',flexWrap:'wrap',gap:8},
+  soundOption:{flexGrow:1,flexBasis:130,minHeight:52,justifyContent:'center',borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.small,paddingVertical:10,paddingHorizontal:8,backgroundColor:colors.backgroundRaised},
   soundOptionSelected:{borderColor:colors.blue,backgroundColor:'rgba(94,156,255,0.18)'},
   soundOptionText:{color:'#7f9ba8',fontSize:12,fontWeight:'800',textAlign:'center'},
   soundOptionTextSelected:{color:'#bfdbfe'},

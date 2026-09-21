@@ -10,6 +10,10 @@ import {
   SESSION_RECOVERY_MAX_AGE_MS,
   recoveredSessionFromCheckpoint,
 } from '../native-app/lib/sessionRecoveryModel.ts';
+import {
+  normalizeHistoryFilter,
+  sortIndexedSessionsNewest,
+} from '../native-app/lib/historyPreferences.ts';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -127,10 +131,27 @@ test('recovery never replaces a complete record with an older partial copy', () 
   assert.equal(inserted.sessions[0].recoveredFromInterruption, true);
 });
 
+test('session history restores only known filters and sorts newest without losing storage indexes', () => {
+  assert.equal(normalizeHistoryFilter('reviewed'), 'reviewed');
+  assert.equal(normalizeHistoryFilter('unexpected'), 'all');
+  assert.equal(normalizeHistoryFilter(null), 'all');
+
+  const original = [
+    { sessionId: 'older', savedAt: '2026-01-01T12:00:00.000Z' },
+    { sessionId: 'invalid', savedAt: 'not-a-date' },
+    { sessionId: 'newer', savedAt: '2026-02-01T12:00:00.000Z' },
+    { sessionId: 'updated', updatedAt: '2026-01-15T12:00:00.000Z' },
+  ];
+  const sorted = sortIndexedSessionsNewest(original);
+  assert.deepEqual(sorted.map(entry => entry.item.sessionId), ['newer', 'updated', 'older', 'invalid']);
+  assert.deepEqual(sorted.map(entry => entry.index), [2, 3, 0, 1]);
+});
+
 test('native screens wire setup preview and recovery without changing detection inputs', () => {
   const monitor = read('native-app/app/monitor.tsx');
   const home = read('native-app/app/index.tsx');
   const history = read('native-app/app/history.tsx');
+  const historyPreferences = read('native-app/lib/historyPreferences.ts');
   const recovery = read('native-app/lib/sessionRecoveryModel.ts');
 
   assert.match(monitor, /isActive=\{isRunning \|\| setupPreviewActive\}/);
@@ -148,11 +169,15 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(history, /Recovered local checkpoint/);
   assert.match(history, /sessions\.filter\(item => !item\.recoveredFromInterruption\)/);
   assert.match(history, /Recovered partial sessions are excluded/);
-  assert.match(history, /type HistoryFilter = 'all' \| 'needs-review' \| 'reviewed' \| 'recovered'/);
+  assert.match(historyPreferences, /type HistoryFilter = 'all' \| 'needs-review' \| 'reviewed' \| 'recovered'/);
   assert.match(history, /accessibilityState=\{\{ selected \}\}/, 'history filters must expose their selected state');
   assert.match(history, /filteredSessions\.map\(\(\{ item, index: i \}\)/, 'filtered edits must retain their original stored index');
   assert.match(history, /Showing \{filteredSessions\.length\} of \{sessions\.length\} sessions/);
   assert.match(history, /All caught up/);
+  assert.match(history, /AsyncStorage\.setItem\(HISTORY_FILTER_KEY, filter\)/);
+  assert.match(history, /sortIndexedSessionsNewest\(sessions\)/);
+  assert.match(history, /filterRevisionRef\.current === filterRevision/, 'a late preference load must not replace a newer filter choice');
+  assert.match(history, /filterButton: \{ minHeight: 44/);
   assert.doesNotMatch(recovery, /cameraFrame|video|audio|location|gps/i);
 });
 

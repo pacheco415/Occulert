@@ -158,10 +158,16 @@ for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "privacy.html"
   assertIncludes(path, 'id="main-content" tabindex="-1"', `${path} must expose a focusable main destination`);
   assertIncludes(path, '<link rel="stylesheet" href="/accessibility.v52.css" />', `${path} must use the shared keyboard-navigation layer`);
 }
+for (const path of ["driver-profiles.html", "pilot-signup.html", "session-history.html"]) {
+  assertIncludes(path, '<script src="/static-page.v52.js" defer></script>', `${path} must reuse consolidated static-page behavior`);
+}
 for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "privacy.html", "product-hub.html", "safety.html"]) {
   assertIncludes(path, '<script src="/static-page.v52.js" defer></script>', `${path} must use consolidated static-page behavior`);
 }
 assertIncludes("fleet-dashboard.html", 'id="cloudStatus" role="status" aria-live="polite"', "fleet connection updates must be announced without stealing focus");
+assertIncludes("fleet-dashboard.html", ".btn{min-height:44px", "fleet actions must preserve accessible touch targets");
+assertIncludes("fleet-dashboard.html", ".input,.select{background:#0f172a", "fleet filters must preserve their shared mobile control sizing");
+assertIncludes("fleet-dashboard.html", "grid-template-columns:repeat(2,minmax(0,1fr))", "fleet mobile navigation must avoid cramped three-column actions");
 for (const accessibilityBoundary of [
   "prefers-reduced-transparency",
   "prefers-contrast: more",
