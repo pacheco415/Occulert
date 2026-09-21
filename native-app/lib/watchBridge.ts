@@ -43,9 +43,11 @@ export interface WatchDeliveryResult {
 
 let watch: WatchModule | null = null;
 let triedLoad = false;
+let watchModuleLoadedAt = 0;
 const WATCH_STATUS_CACHE_MS = 5_000;
 let cachedWatchStatus: { value: WatchStatus; checkedAt: number } | null = null;
 const WATCH_LIVE_ACK_TIMEOUT_MS = 1_500;
+const WATCH_ACTIVATION_SETTLE_MS = 500;
 
 function loadWatchModule(): WatchModule | null {
   if (triedLoad) return watch;
@@ -54,6 +56,7 @@ function loadWatchModule(): WatchModule | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     watch = require('react-native-watch-connectivity') as WatchModule;
+    watchModuleLoadedAt = Date.now();
   } catch {
     // Module not linked (Expo Go or no watchOS companion yet) - no-op.
     watch = null;
@@ -195,12 +198,26 @@ export async function getWatchStatus(maxAgeMs = 0): Promise<WatchStatus> {
     return cachedWatchStatus.value;
   }
   try {
+    // WCSession activates when the native module loads. Immediate reads can
+    // briefly report false for an already working companion, so allow one
+    // bounded settle before publishing the parked-device snapshot.
+    const settleRemaining = WATCH_ACTIVATION_SETTLE_MS - (now - watchModuleLoadedAt);
+    if (settleRemaining > 0) {
+      await new Promise<void>(resolve => setTimeout(resolve, settleRemaining));
+    }
     const [paired, appInstalled, reachable] = await Promise.all([
       mod.getIsPaired?.() ?? Promise.resolve(false),
       mod.getIsWatchAppInstalled?.() ?? Promise.resolve(false),
       mod.getReachability?.() ?? Promise.resolve(false),
     ]);
-    const value = { moduleAvailable: true, paired, appInstalled, reachable };
+    // Reachability is stronger live evidence: a reachable companion is both
+    // paired and installed even if those activation flags arrive a beat later.
+    const value = {
+      moduleAvailable: true,
+      paired: paired || reachable,
+      appInstalled: appInstalled || reachable,
+      reachable,
+    };
     cachedWatchStatus = { value, checkedAt: now };
     return value;
   } catch {

@@ -234,9 +234,9 @@ export default function SettingsScreen() {
   const watchDescription = !watchStatus.moduleAvailable
     ? 'Watch support is unavailable in this build'
     : !watchStatus.paired
-      ? 'No Apple Watch is paired'
+      ? 'Open Occulert on your Watch, then refresh connections'
       : !watchStatus.appInstalled
-        ? 'Install the Occulert Watch app to enable wrist alerts'
+        ? 'Open the Watch companion to confirm installation'
         : watchStatus.reachable
           ? 'Connected — enable background alerts in the Watch app'
           : 'Companion installed — open it to finish wrist alert setup';
@@ -247,7 +247,7 @@ export default function SettingsScreen() {
     ? watch
       ? 'Phone alert tests available · Watch alerts enabled'
       : 'Phone alert tests available · Watch available but disabled'
-    : 'Phone alert tests available · Watch is optional and needs setup';
+    : 'Phone alert tests available · Open Watch app, then refresh';
 
   const refreshConnectedDevices = () => {
     void deviceRefreshRunnerRef.current.run({

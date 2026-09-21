@@ -152,6 +152,18 @@ test('immediate alerts send before reachability checks and report live acknowled
   assert.match(sender, /roundTripMs/);
 });
 
+test('Watch readiness allows activation to settle and trusts a live connection', () => {
+  const start = watchBridge.indexOf('export async function getWatchStatus');
+  const end = watchBridge.indexOf('export async function isWatchAvailable', start);
+  assert.ok(start >= 0 && end > start, 'Watch status reader must be present');
+  const reader = watchBridge.slice(start, end);
+
+  assert.match(reader, /WATCH_ACTIVATION_SETTLE_MS/);
+  assert.match(reader, /setTimeout\(resolve, settleRemaining\)/);
+  assert.match(reader, /paired: paired \|\| reachable/);
+  assert.match(reader, /appInstalled: appInstalled \|\| reachable/);
+});
+
 test('the native Watch transfer error callback is patched safely after install', () => {
   assert.equal(
     nativePackage.scripts.postinstall,
