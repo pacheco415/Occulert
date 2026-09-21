@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   Alert,
   AppState,
@@ -15,6 +15,7 @@ import {
 import { useRouter } from 'expo-router';
 import {
   Camera,
+  type CameraRuntimeError,
   useCameraDevice,
   useCameraPermission,
   useFrameProcessor,
@@ -27,6 +28,7 @@ import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
+import * as Battery from 'expo-battery';
 import { Ionicons } from '@expo/vector-icons';
 import { useEyeTracking } from '../hooks/useEyeTracking';
 import { AlertSystem, type AlertTimingEvent } from '../components/AlertSystem';
@@ -87,6 +89,13 @@ import {
   type CameraSetupAssessment,
 } from '../lib/cameraSetup';
 import { clearActiveSessionCheckpoint, saveActiveSessionCheckpoint } from '../lib/sessionRecovery';
+import {
+  canRestartStalledCamera,
+  deriveCameraLoadPolicy,
+  shouldRestartCamera,
+  type DeviceThermalState,
+} from '../lib/cameraResilience';
+import { getDeviceCondition } from '../lib/deviceCondition';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -110,6 +119,7 @@ const SENSOR_STARTUP_GRACE_MS = 10_000;
 const SENSOR_STALL_MS = 5_000;
 const CAMERA_SETUP_UI_INTERVAL_MS = 250;
 const SESSION_CHECKPOINT_INTERVAL_MS = 15_000;
+const DEVICE_CONDITION_INTERVAL_MS = 15_000;
 
 type StopOptions = { deferCloudFinalization?: boolean };
 
@@ -143,6 +153,17 @@ export default function MonitorScreen() {
   const [cameraSetup, setCameraSetup] = useState<CameraSetupAssessment>(
     initialCameraSetupAssessment,
   );
+  const [cameraEpoch, setCameraEpoch] = useState(0);
+  const [cameraRecovering, setCameraRecovering] = useState(false);
+  const [thermalState, setThermalState] = useState<DeviceThermalState>('unknown');
+  const { batteryLevel, batteryState, lowPowerMode } = Battery.usePowerState();
+  const cameraLoadPolicy = useMemo(() => deriveCameraLoadPolicy({
+    thermalState,
+    lowPowerMode,
+    batteryLevel,
+    isCharging: batteryState === Battery.BatteryState.CHARGING
+      || batteryState === Battery.BatteryState.FULL,
+  }), [batteryLevel, batteryState, lowPowerMode, thermalState]);
 
   const sessionStartedAtRef = useRef<number | null>(null);
   const prevAlertingRef = useRef(false);
@@ -161,6 +182,9 @@ export default function MonitorScreen() {
   const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastSampleAtRef = useRef(0);
   const hasCameraSampleRef = useRef(false);
+  const cameraEpochRef = useRef(0);
+  const cameraRestartCountRef = useRef(0);
+  const cameraRecoveringRef = useRef(false);
   const headNodDetectorRef = useRef(new HeadNodDetector());
   const headNodObservationsRef = useRef(0);
   const monitoringActiveRef = useRef(false);
@@ -222,6 +246,24 @@ export default function MonitorScreen() {
       .then(setSensitivity)
       .finally(() => setSensitivityLoaded(true));
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      void getDeviceCondition().then((condition) => {
+        if (active) setThermalState(condition.thermalState);
+      });
+    };
+    refresh();
+    if (!isRunning && !setupPreviewActive) {
+      return () => { active = false; };
+    }
+    const timer = setInterval(refresh, DEVICE_CONDITION_INTERVAL_MS);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [isRunning, setupPreviewActive]);
 
   useEffect(() => {
     const sampleSubscription = addHeadphoneMotionSampleListener((sample) => {
@@ -355,6 +397,9 @@ export default function MonitorScreen() {
       displayedMetricsStateRef.current = 'noFace';
       displayedAlertLevelRef.current = 'none';
       performanceTrackerRef.current.reset();
+      cameraRestartCountRef.current = 0;
+      cameraRecoveringRef.current = false;
+      setCameraRecovering(false);
 
       // Headphone motion is optional observation-only input. Start it without
       // delaying core camera monitoring, and discard any late result after the
@@ -475,6 +520,8 @@ export default function MonitorScreen() {
     cloudEventQueueRef.current = Promise.resolve();
     isRunningRef.current = false;
     setIsRunning(false);
+    cameraRecoveringRef.current = false;
+    setCameraRecovering(false);
     reset();
 
     if (__DEV__ && wasRunning) {
@@ -614,18 +661,68 @@ export default function MonitorScreen() {
     return () => subscription.remove();
   }, [deliverMonitoringPausedCue]);
 
+  const attemptCameraRecovery = useCallback(() => {
+    if (
+      stoppingRef.current
+      || !isRunningRef.current
+      || !canRestartStalledCamera(cameraRestartCountRef.current)
+    ) return false;
+    cameraRestartCountRef.current += 1;
+    performanceTrackerRef.current.recordCameraRestart();
+    hasCameraSampleRef.current = false;
+    lastSampleAtRef.current = Date.now();
+    cameraRecoveringRef.current = true;
+    setCameraRecovering(true);
+    const nextEpoch = cameraEpochRef.current + 1;
+    cameraEpochRef.current = nextEpoch;
+    setCameraEpoch(nextEpoch);
+    return true;
+  }, []);
+
   useEffect(() => {
     if (!isRunning) return;
     const watchdog = setInterval(() => {
       const timeoutMs = hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS;
       if (stoppingRef.current || Date.now() - lastSampleAtRef.current <= timeoutMs) return;
       performanceTrackerRef.current.recordCameraStall();
+      if (attemptCameraRecovery()) return;
       const message = 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.';
       setSensorFault(message);
+      deliverMonitoringPausedCue();
       void handleStopRef.current();
     }, 500);
     return () => clearInterval(watchdog);
-  }, [isRunning]);
+  }, [attemptCameraRecovery, deliverMonitoringPausedCue, isRunning]);
+
+  const handleCameraError = useCallback((error: CameraRuntimeError, epoch: number) => {
+    if (epoch !== cameraEpochRef.current) return;
+    if (setupPreviewActiveRef.current && !isRunningRef.current) {
+      setupPreviewActiveRef.current = false;
+      setSetupPreviewActive(false);
+      setSensorFault('Camera preview could not start. Close other camera apps and try the setup check again.');
+      return;
+    }
+    if (!isRunningRef.current || stoppingRef.current) return;
+    performanceTrackerRef.current.recordCameraStall();
+    if (
+      shouldRestartCamera(error.code, cameraRestartCountRef.current)
+      && attemptCameraRecovery()
+    ) return;
+    setSensorFault(
+      'Monitoring stopped: the camera became unavailable. Pull over safely before checking the phone or restarting.',
+    );
+    deliverMonitoringPausedCue();
+    void handleStopRef.current();
+  }, [attemptCameraRecovery, deliverMonitoringPausedCue]);
+
+  useEffect(() => {
+    if (!isRunning || cameraLoadPolicy.mode !== 'stop') return;
+    setSensorFault(
+      'Monitoring stopped because the iPhone became too hot. Pull over safely and let the phone cool before restarting.',
+    );
+    deliverMonitoringPausedCue();
+    void handleStopRef.current();
+  }, [cameraLoadPolicy.mode, deliverMonitoringPausedCue, isRunning]);
 
   const onEyeState = useCallback((
     leftProb: number,
@@ -678,6 +775,10 @@ export default function MonitorScreen() {
     if (!isRunningRef.current || stoppingRef.current) return;
     hasCameraSampleRef.current = true;
     lastSampleAtRef.current = now;
+    if (cameraRecoveringRef.current) {
+      cameraRecoveringRef.current = false;
+      setCameraRecovering(false);
+    }
     performanceTrackerRef.current.recordSample(now, inferenceMs);
     const headNodResult = headNodDetectorRef.current.update({
       at: now,
@@ -764,11 +865,16 @@ export default function MonitorScreen() {
   // frame-processor bridge stays stable throughout a drive.
   const onEyeStateJS = useRunOnJS(onEyeState, [onEyeState]);
   const lastSample = useSharedValue(0);
+  const analysisIntervalMs = useSharedValue(cameraLoadPolicy.analysisIntervalMs);
+
+  useEffect(() => {
+    analysisIntervalMs.value = cameraLoadPolicy.analysisIntervalMs;
+  }, [analysisIntervalMs, cameraLoadPolicy.analysisIntervalMs]);
 
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
     const now = Date.now();
-    if (now - lastSample.value < 100) return;
+    if (now - lastSample.value < analysisIntervalMs.value) return;
     lastSample.value = now;
 
     const inferenceStartedAt = Date.now();
@@ -803,7 +909,7 @@ export default function MonitorScreen() {
       frame.width,
       frame.height,
     );
-  }, [detectFaces, lastSample, onEyeStateJS]);
+  }, [analysisIntervalMs, detectFaces, lastSample, onEyeStateJS]);
 
   const stateColor = {
     open: '#00ff88',
@@ -817,6 +923,8 @@ export default function MonitorScreen() {
       ? 'SAVING DRIVE'
       : isStarting
         ? 'STARTING'
+        : cameraRecovering
+          ? 'RECOVERING CAMERA'
         : isRunning
           ? ({
               open: 'TRACKING',
@@ -829,6 +937,8 @@ export default function MonitorScreen() {
             : 'READY WHILE PARKED';
   const monitorStatusColor = sensorFault
     ? '#ef4444'
+    : cameraRecovering
+      ? '#fbbf24'
     : isRunning
       ? stateColor
       : cameraSetup.ready
@@ -877,11 +987,13 @@ export default function MonitorScreen() {
       {isRunning && <MonitoringWakeLock />}
       {isRunning || setupPreviewActive ? (
         <Camera
+          key={`front-camera-${cameraEpoch}`}
           style={StyleSheet.absoluteFill}
           device={device}
           isActive={isRunning || setupPreviewActive}
           frameProcessor={frameProcessor}
           pixelFormat="yuv"
+          onError={(error) => handleCameraError(error, cameraEpoch)}
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, s.camOff]}>
@@ -1075,7 +1187,11 @@ export default function MonitorScreen() {
             </TouchableOpacity>
           )}
           {isRunning && (
-            <Text style={s.awakeNote}>Screen kept on · Keep app in foreground</Text>
+            <Text style={s.awakeNote}>
+              {cameraLoadPolicy.mode === 'reduced'
+                ? 'Battery and heat saver active · Keep app in foreground'
+                : 'Screen kept on · Keep app in foreground'}
+            </Text>
           )}
         </View>
       </SafeAreaView>

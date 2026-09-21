@@ -31,6 +31,7 @@ export interface MonitorPerformanceSnapshot {
   timeToFirstSampleMs: number | null;
   uiUpdatesPerSecond: number;
   cameraStalls: number;
+  cameraRestarts: number;
   alertTiming: {
     alertsTriggered: number;
     phoneDispatches: number;
@@ -49,6 +50,7 @@ export interface MonitorPerformanceTracker {
   recordSample: (at: number, inferenceMs: number) => void;
   recordUiUpdate: () => void;
   recordCameraStall: () => void;
+  recordCameraRestart: () => void;
   recordAlertDecision: (at: number) => void;
   recordPhoneDispatch: (decisionAt: number, dispatchedAt: number) => void;
   recordWatchDelivery: (
@@ -93,6 +95,7 @@ export function createMonitorPerformanceTracker(
   let samples = 0;
   let uiUpdates = 0;
   let cameraStalls = 0;
+  let cameraRestarts = 0;
   let alertsTriggered = 0;
   let watchResults = 0;
   let watchLiveAcknowledgements = 0;
@@ -130,6 +133,9 @@ export function createMonitorPerformanceTracker(
     recordCameraStall() {
       cameraStalls += 1;
     },
+    recordCameraRestart() {
+      cameraRestarts += 1;
+    },
     recordAlertDecision(at) {
       if (!Number.isFinite(at) || at < sessionStartedAt) return;
       alertsTriggered += 1;
@@ -159,6 +165,7 @@ export function createMonitorPerformanceTracker(
       samples = 0;
       uiUpdates = 0;
       cameraStalls = 0;
+      cameraRestarts = 0;
       alertsTriggered = 0;
       watchResults = 0;
       watchLiveAcknowledgements = 0;
@@ -184,6 +191,7 @@ export function createMonitorPerformanceTracker(
           : Math.round((firstSampleAt - sessionStartedAt) * 10) / 10,
         uiUpdatesPerSecond: roundedRate(uiUpdates, durationMs),
         cameraStalls,
+        cameraRestarts,
         alertTiming: {
           alertsTriggered,
           phoneDispatches: phoneDispatchDurations.length,
