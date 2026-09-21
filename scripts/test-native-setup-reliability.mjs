@@ -253,6 +253,36 @@ test('system accessibility preferences disable decorative glass and motion only'
   assert.match(monitor, /animationType=\{modalAnimationType\(reduceMotion\)\}/);
 });
 
+test('reusable setup controls expose labels, states, hints, and large-text layouts', () => {
+  const sensitivity = read('native-app/components/SensitivitySlider.tsx');
+  const cloud = read('native-app/components/CloudSyncCard.tsx');
+  const readiness = read('native-app/components/ParkedReadinessCard.tsx');
+  const cameraSetup = read('native-app/components/CameraSetupGuide.tsx');
+
+  assert.match(sensitivity, /accessibilityRole="radiogroup"/);
+  assert.match(sensitivity, /accessibilityRole="radio"/);
+  assert.match(sensitivity, /accessibilityHint=\{SENSITIVITY_PRESETS\[l\]\.description\}/);
+  assert.match(sensitivity, /row:\s+\{ flexDirection:'row', flexWrap:'wrap'/);
+  assert.match(sensitivity, /minHeight:48/);
+
+  assert.match(cloud, /accessibilityLabel="Checking cloud sync status"/);
+  assert.match(cloud, /accessibilityLabel=\{busy \? 'Signing in to cloud account'/);
+  assert.match(cloud, /accessibilityState=\{\{ disabled: busy \|\| !state\.available, busy \}\}/);
+  assert.match(cloud, /accessibilityHint="Signs out on this device without deleting local history"/);
+  assert.match(cloud, /accessibilityHint="Controls protected cloud syncing; local history remains available when off"/);
+  assert.doesNotMatch(cloud, /numberOfLines=\{1\}/);
+  assert.match(cloud, /titleRow: \{ minHeight: 48[^\n]+flexWrap: 'wrap'/);
+  assert.match(cloud, /linkBtn: \{ minHeight: 44/);
+
+  assert.match(readiness, /accessibilityLabel=\{stabilityBusy \? 'Testing both camera streams'/);
+  assert.match(readiness, /accessibilityLabel=\{busy \? 'Checking connected devices'/);
+  assert.match(readiness, /accessibilityLabel="Open settings and alert tests"/);
+  assert.match(cameraSetup, /accessibilityRole="summary"/);
+  assert.match(cameraSetup, /accessibilityLabel=\{active \? 'Pause parked camera check'/);
+  assert.match(cameraSetup, /copy: \{ minWidth: 0, flex: 1 \}/);
+  assert.match(cameraSetup, /buttonText:[^\n]+textAlign: 'center'/);
+});
+
 test('safe-stop choices remain readable and accessible at larger text sizes', () => {
   const monitor = read('native-app/app/monitor.tsx');
   assert.match(monitor, /accessibilityLabel="Safe stop options"/);

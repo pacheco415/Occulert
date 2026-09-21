@@ -136,8 +136,8 @@ export function CloudSyncCard() {
       <View style={s.titleRow}>
         <Text style={s.cardTitle}>CLOUD SESSION SYNC</Text>
         {busy
-          ? <ActivityIndicator size="small" color="#60a5fa" />
-          : <Text style={[s.status, state.signedIn && s.statusOn]}>
+          ? <ActivityIndicator accessibilityLabel="Checking cloud sync status" size="small" color="#60a5fa" />
+          : <Text accessibilityLiveRegion="polite" accessibilityRole="text" style={[s.status, state.signedIn && s.statusOn]}>
               {state.signedIn ? 'SIGNED IN' : state.available ? 'OPTIONAL' : 'UNAVAILABLE'}
             </Text>}
       </View>
@@ -149,6 +149,8 @@ export function CloudSyncCard() {
           </Text>
           <TextInput
             accessibilityLabel="Cloud account email"
+            accessibilityHint="Enter the email for your existing Occulert driver account"
+            accessibilityState={{ disabled: busy || !state.available }}
             autoCapitalize="none"
             autoComplete="email"
             editable={!busy && state.available}
@@ -161,6 +163,8 @@ export function CloudSyncCard() {
           />
           <TextInput
             accessibilityLabel="Cloud account password"
+            accessibilityHint="Enter your Occulert account password"
+            accessibilityState={{ disabled: busy || !state.available }}
             autoCapitalize="none"
             autoComplete="current-password"
             editable={!busy && state.available}
@@ -174,6 +178,9 @@ export function CloudSyncCard() {
           />
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityLabel={busy ? 'Signing in to cloud account' : 'Sign in to cloud account'}
+            accessibilityHint="Signs in without enabling session sharing"
+            accessibilityState={{ disabled: busy || !state.available, busy }}
             disabled={busy || !state.available}
             onPress={signIn}
             style={[s.primaryBtn, (busy || !state.available) && s.disabled]}
@@ -181,7 +188,13 @@ export function CloudSyncCard() {
             <Ionicons name="log-in-outline" size={17} color="#fff" />
             <Text style={s.primaryText}>SIGN IN</Text>
           </TouchableOpacity>
-          <TouchableOpacity accessibilityRole="link" onPress={openAccountPage} style={s.linkBtn}>
+          <TouchableOpacity
+            accessibilityRole="link"
+            accessibilityLabel="Create or manage an Occulert account"
+            accessibilityHint="Opens the Occulert account page in your browser"
+            onPress={openAccountPage}
+            style={s.linkBtn}
+          >
             <Text style={s.linkText}>Create or manage an account on occulert.com</Text>
           </TouchableOpacity>
         </View>
@@ -190,9 +203,17 @@ export function CloudSyncCard() {
           <View style={s.accountRow}>
             <View style={s.accountText}>
               <Text style={s.label}>Protected account</Text>
-              <Text numberOfLines={1} style={s.sub}>{state.email}</Text>
+              <Text style={s.sub}>{state.email}</Text>
             </View>
-            <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={signOut} style={s.signOutBtn}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={busy ? 'Signing out of cloud account' : 'Sign out of cloud account'}
+              accessibilityHint="Signs out on this device without deleting local history"
+              accessibilityState={{ disabled: busy, busy }}
+              disabled={busy}
+              onPress={signOut}
+              style={[s.signOutBtn, busy && s.disabled]}
+            >
               <Text style={s.signOutText}>Sign Out</Text>
             </TouchableOpacity>
           </View>
@@ -207,6 +228,8 @@ export function CloudSyncCard() {
             </View>
             <Switch
               accessibilityLabel="Share session summaries"
+              accessibilityHint="Controls protected cloud syncing; local history remains available when off"
+              accessibilityState={{ disabled: busy, busy }}
               disabled={busy}
               onValueChange={changeConsent}
               thumbColor="#fff"
@@ -229,9 +252,9 @@ export function CloudSyncCard() {
 
 const s = StyleSheet.create({
   card: { backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, marginBottom: 16, overflow: 'hidden' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderColor: colors.glassBorder },
-  cardTitle: { color: colors.textSecondary, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
-  status: { color: colors.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
+  titleRow: { minHeight: 48, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: 14, borderBottomWidth: 1, borderColor: colors.glassBorder },
+  cardTitle: { flexShrink: 1, color: colors.textSecondary, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  status: { flexShrink: 1, color: colors.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
   statusOn: { color: colors.green },
   form: { padding: 14, gap: 10 },
   formIntro: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 2 },
@@ -239,17 +262,17 @@ const s = StyleSheet.create({
   primaryBtn: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.blueStrong, borderRadius: radii.small },
   primaryText: { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 0.6 },
   disabled: { opacity: 0.4 },
-  linkBtn: { alignItems: 'center', paddingVertical: 6 },
+  linkBtn: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 8 },
   linkText: { color: colors.blue, fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  accountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
-  accountText: { flex: 1 },
+  accountRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
+  accountText: { minWidth: 0, flexGrow: 1, flexBasis: 180 },
   label: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  sub: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
-  signOutBtn: { borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.small, paddingHorizontal: 12, paddingVertical: 8 },
+  sub: { color: colors.textMuted, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  signOutBtn: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.small, paddingHorizontal: 12, paddingVertical: 8 },
   signOutText: { color: colors.textSecondary, fontSize: 11, fontWeight: '800' },
   div: { height: 1, backgroundColor: colors.glassBorder, marginHorizontal: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
-  rowL: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  row: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
+  rowL: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   privacy: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 14, backgroundColor: colors.backgroundRaised, borderTopWidth: 1, borderColor: colors.glassBorder },
   privacyText: { color: colors.textMuted, fontSize: 11, lineHeight: 16, flex: 1 },
 });
