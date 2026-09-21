@@ -103,6 +103,10 @@ test("public information pages share accessible mobile navigation", async ({ pag
   for (const path of ["/about.html", "/faq.html", "/features.html", "/how-it-works.html", "/install.html"]) {
     await page.goto(path, { waitUntil: "domcontentloaded" });
     await expect(page.locator('script[src="/public-page.v51.js"]')).toHaveCount(1);
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
+    await skipLink.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content"), `${path} should focus its main content`).toBeFocused();
     await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "false");
     await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "true");
     await page.locator("#menuBtn").click();

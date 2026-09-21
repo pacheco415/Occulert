@@ -115,6 +115,9 @@ for (const page of ["about.html", "faq.html", "features.html", "how-it-works.htm
   assertIncludes(page, 'aria-controls="mobileMenu"', `${page} menu button must identify its controlled menu`);
   assertIncludes(page, 'aria-expanded="false"', `${page} menu button must expose its initial state`);
   assertIncludes(page, 'id="mobileMenu" aria-hidden="true"', `${page} mobile menu must expose its initial state`);
+  assertIncludes(page, 'class="skip-link" href="#main-content"', `${page} must let keyboard users skip repeated navigation`);
+  assertIncludes(page, 'id="main-content" tabindex="-1"', `${page} must expose a focusable main destination`);
+  assertIncludes(page, '<link rel="stylesheet" href="/accessibility.v52.css" />', `${page} must use the shared keyboard-navigation layer`);
   assertIncludes(page, '<script src="/public-page.v51.js"></script>', `${page} must use the shared accessible navigation behavior`);
 }
 assertIncludes("public-page.v51.js", "setAttribute('aria-expanded',String(open))", "public-page menus must announce expanded state");

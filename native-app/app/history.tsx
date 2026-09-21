@@ -12,7 +12,7 @@ import {
   type SessionDeviceImpact,
   type SessionTestConditions,
 } from '../lib/feedback';
-import { updateSessionHistory } from '../lib/sessionHistory';
+import { loadSessionHistory, updateSessionHistory } from '../lib/sessionHistory';
 import {
   commitSessionHistoryEdit,
   removeMatchingSessionRecord,
@@ -31,7 +31,6 @@ import {
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
 
-const HISTORY_KEY = 'occulert-session-history';
 const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
 const CHECKPOINT_TARGET = 10;
 
@@ -190,13 +189,12 @@ export default function HistoryScreen() {
     const revision = historyRevisionRef.current;
     const filterRevision = filterRevisionRef.current;
     try {
-      const [raw, savedFilter] = await Promise.all([
-        AsyncStorage.getItem(HISTORY_KEY),
+      const [storedSessions, savedFilter] = await Promise.all([
+        loadSessionHistory<SessionRecord>(),
         AsyncStorage.getItem(HISTORY_FILTER_KEY).catch(() => null),
       ]);
-      const parsed = raw ? JSON.parse(raw) : [];
       if (historyRevisionRef.current === revision) {
-        setSessions(Array.isArray(parsed) ? parsed : []);
+        setSessions(storedSessions);
         if (filterRevisionRef.current === filterRevision) {
           setHistoryFilter(normalizeHistoryFilter(savedFilter));
         }
@@ -290,9 +288,7 @@ export default function HistoryScreen() {
     }
   };
 
-  const deleteSession = async (index: number) => {
-    const target = sessions[index];
-    if (!target) return;
+  const deleteSession = async (target: SessionRecord, index: number) => {
     historyRevisionRef.current += 1;
     try {
       await updateSessionHistory<SessionRecord>(stored => (
@@ -304,13 +300,13 @@ export default function HistoryScreen() {
     }
   };
 
-  const confirmDeleteSession = (index: number) => {
+  const confirmDeleteSession = (target: SessionRecord, index: number) => {
     Alert.alert(
       'Delete this session?',
       'This permanently removes the local session summary from this iPhone. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => { void deleteSession(index); } },
+        { text: 'Delete', style: 'destructive', onPress: () => { void deleteSession(target, index); } },
       ],
     );
   };
@@ -806,7 +802,7 @@ export default function HistoryScreen() {
               accessibilityLabel={`Delete session from ${fmtDate(item.savedAt || item.updatedAt)}`}
               accessibilityHint="Permanently removes this local session after confirmation"
               style={s.deleteBtn}
-              onPress={() => confirmDeleteSession(i)}
+              onPress={() => confirmDeleteSession(item, i)}
             >
               <Ionicons name="trash-outline" size={16} color="#fca5a5" />
               <Text style={s.deleteTxt}>Delete local session</Text>

@@ -344,6 +344,8 @@ test('a failed session review edit leaves confirmed UI state intact and permits 
 test('History commits after persistence and ignores loads started before a newer edit', () => {
   const history = read('native-app/app/history.tsx');
   const storage = read('native-app/lib/sessionHistory.ts');
+  assert.match(history, /loadSessionHistory<SessionRecord>\(\)/, 'history loads must wait for queued local writes');
+  assert.doesNotMatch(history, /AsyncStorage\.getItem\(HISTORY_KEY\)/);
   assert.match(history, /await commitSessionHistoryEdit/);
   assert.match(history, /persist: mutation => updateSessionHistory/);
   assert.match(history, /apply: mutation => setSessions\(current/);
@@ -351,6 +353,18 @@ test('History commits after persistence and ignores loads started before a newer
   assert.doesNotMatch(history, /const updated = sessions\.map/);
   assert.match(storage, /const operation = historyQueue\.then/);
   assert.match(storage, /historyQueue = operation\.catch/);
+});
+
+test('History deletion captures the confirmed record before the alert can become stale', () => {
+  const history = read('native-app/app/history.tsx');
+  const deletion = history.slice(
+    history.indexOf('const deleteSession'),
+    history.indexOf('const evidenceSessions'),
+  );
+  assert.match(deletion, /confirmDeleteSession = \(target: SessionRecord, index: number\)/);
+  assert.match(deletion, /deleteSession\(target, index\)/);
+  assert.match(history, /confirmDeleteSession\(item, i\)/);
+  assert.doesNotMatch(deletion, /const target = sessions\[index\]/);
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
