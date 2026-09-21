@@ -22,6 +22,7 @@ import type { HealthReadinessSnapshot } from '../lib/healthReadiness';
 import { confirmPreDriveSafety } from '../lib/preDriveGate';
 import { AmbientBackground, GlassSurface } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
+import { ParkedReadinessCard } from '../components/ParkedReadinessCard';
 
 const CHECKS = [
   {
@@ -133,6 +134,8 @@ export default function PreDriveScreen() {
             Never begin or configure Occulert while operating a vehicle.
           </Text>
         </View>
+
+        <ParkedReadinessCard />
 
         {Platform.OS === 'ios' && (
           <View style={styles.healthCard}>

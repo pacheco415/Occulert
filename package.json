@@ -19,7 +19,7 @@
     "test:alert-delivery": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-alert-delivery.mjs",
     "test:safe-stop": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-safe-stop-links.mjs",
     "test:monitor-lifecycle": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-monitor-lifecycle.mjs",
-    "test:native-setup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-native-setup-reliability.mjs",
+    "test:native-setup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-native-setup-reliability.mjs scripts/test-device-readiness.mjs",
     "test:performance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-performance-contracts.mjs",
     "test:native-perclos": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-native-perclos.mjs",
     "test:watch-status": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-watch-status.mjs",
