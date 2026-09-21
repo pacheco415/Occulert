@@ -151,6 +151,16 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.doesNotMatch(recovery, /cameraFrame|video|audio|location|gps/i);
 });
 
+test('pre-drive and Settings explain required versus optional setup', () => {
+  const preDrive = read('native-app/app/pre-drive.tsx');
+  const settings = read('native-app/app/settings.tsx');
+  assert.match(preDrive, /FINAL SAFETY CONFIRMATION/);
+  assert.match(preDrive, /checked\.filter\(Boolean\)\.length/);
+  assert.match(preDrive, /it never decides whether you are safe to drive/);
+  assert.match(settings, /The iPhone camera and at least one phone alert are the primary setup/);
+  assert.match(settings, /Watch, headphones, Health, and cloud sync are optional additions/);
+});
+
 test('connected-device readiness refresh remains single-flight', () => {
   const settings = read('native-app/app/settings.tsx');
   assert.match(settings, /deviceRefreshRunnerRef\.current\.run/);

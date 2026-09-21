@@ -150,7 +150,7 @@ export default function PreDriveScreen() {
             </View>
 
             <Text style={styles.healthDescription}>
-              Read recent sleep and heart rate variability from Apple Health. Only a small summary is kept in this iPhone's protected storage.
+              Optional context from recent sleep and heart rate variability. Only a small summary is kept in this iPhone's protected storage; it never decides whether you are safe to drive.
             </Text>
 
             {healthSnapshot && (
@@ -214,6 +214,16 @@ export default function PreDriveScreen() {
             </Text>
           </View>
         )}
+
+        <View style={styles.confirmationHeader}>
+          <View>
+            <Text style={styles.confirmationEyebrow}>FINAL SAFETY CONFIRMATION</Text>
+            <Text style={styles.confirmationTitle}>Confirm all four before continuing</Text>
+          </View>
+          <Text accessibilityLiveRegion="polite" style={styles.confirmationCount}>
+            {checked.filter(Boolean).length} / {CHECKS.length}
+          </Text>
+        </View>
 
         <View style={styles.checkList}>
           {CHECKS.map((item, index) => (
@@ -310,6 +320,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   warningText: { flex: 1, color: '#fde68a', fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  confirmationHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 6,
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  confirmationEyebrow: { color: colors.cyan, fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  confirmationTitle: { color: colors.text, fontSize: 15, fontWeight: '800', marginTop: 3 },
+  confirmationCount: { color: colors.textSecondary, fontSize: 13, fontWeight: '800' },
   healthCard: {
     backgroundColor: colors.material,
     borderWidth: 1,

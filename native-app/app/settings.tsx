@@ -357,6 +357,15 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={s.scroll}>
         <Text style={s.eyebrow}>OCCULERT</Text>
         <Text style={s.title}>Settings</Text>
+        <View style={s.priorityCard}>
+          <View style={s.priorityIcon}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={colors.cyan} />
+          </View>
+          <View style={s.priorityCopy}>
+            <Text style={s.priorityTitle}>Keep the core setup simple</Text>
+            <Text style={s.priorityText}>The iPhone camera and at least one phone alert are the primary setup. Watch, headphones, Health, and cloud sync are optional additions.</Text>
+          </View>
+        </View>
         <SensitivitySlider value={sens} onChange={setSens} />
         <View style={s.card}>
           <Text style={s.cardTitle}>ALERTS</Text>
@@ -544,7 +553,12 @@ export default function SettingsScreen() {
 const s = StyleSheet.create({
   bg:{flex:1,backgroundColor:colors.background}, scroll:{padding:20,paddingBottom:48},
   eyebrow:{color:colors.cyan,fontSize:10,fontWeight:'800',letterSpacing:1.5,marginTop:6,marginBottom:5},
-  title:{color:colors.text,fontSize:32,fontWeight:'800',letterSpacing:-0.8,marginBottom:22},
+  title:{color:colors.text,fontSize:32,fontWeight:'800',letterSpacing:-0.8,marginBottom:12},
+  priorityCard:{flexDirection:'row',alignItems:'flex-start',gap:11,backgroundColor:'rgba(100,210,255,0.07)',borderWidth:1,borderColor:'rgba(100,210,255,0.2)',borderRadius:radii.medium,padding:14,marginBottom:18},
+  priorityIcon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(100,210,255,0.1)'},
+  priorityCopy:{flex:1},
+  priorityTitle:{color:colors.text,fontSize:13,fontWeight:'800'},
+  priorityText:{color:colors.textSecondary,fontSize:11,lineHeight:16,marginTop:3},
   card:{backgroundColor:colors.material,borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.large,marginBottom:16,overflow:'hidden'},
   cardTitle:{color:colors.textSecondary,fontSize:11,fontWeight:'800',letterSpacing:0.8,textTransform:'uppercase',padding:14,borderBottomWidth:1,borderColor:'rgba(255,255,255,0.08)'},
   row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:16,paddingVertical:14,gap:12},

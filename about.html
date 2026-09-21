@@ -1,4 +1,4 @@
-™<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
@@ -35,10 +35,10 @@
   </div>
   <div class="nav-right">
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
-    <button class="hamburger" id="menuBtn" aria-label="Open menu"><span class="bar"></span><span class="bar"></span><span class="bar"></span></button>
+    <button class="hamburger" id="menuBtn" aria-label="Open menu" aria-controls="mobileMenu" aria-expanded="false"><span class="bar"></span><span class="bar"></span><span class="bar"></span></button>
   </div>
 </nav>
-<div class="mobile-menu" id="mobileMenu">
+<div class="mobile-menu" id="mobileMenu" aria-hidden="true">
   <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a>
   <a href="/app.html" class="launch" style="text-align:center;border-radius:9px">Launch App</a>
   <div class="mobile-menu-footer"><span>Theme</span><button class="theme-toggle-mobile" id="themeToggleMobile">🌙 Dark Mode</button></div>
@@ -96,7 +96,7 @@
   </div>
 </footer>
 <button class="scroll-top" id="scrollTop" aria-label="Back to top">↑</button>
-<script src="/about-page-1.v47.js"></script>
+<script src="/public-page.v51.js"></script>
   <script src="/lang.v47.js" defer></script>
 </body>
 </html>

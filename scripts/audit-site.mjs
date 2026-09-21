@@ -95,6 +95,15 @@ assertIncludes("homepage.js", "event.key==='Escape'", "homepage menu must close 
 assertIncludes("homepage.js", "querySelector('.faq-q')?.setAttribute('aria-expanded','false')", "homepage FAQ must announce expanded state");
 assertIncludes("homepage.v51.css", ".journey-scene{position:relative;height:340px;margin:14px -4px 10px;overflow:hidden", "homepage journey must clip its moving road inside the scene");
 assertIncludes("homepage.v51.css", ".journey-copy{position:relative;z-index:2", "homepage journey copy must stay above animated scene layers");
+for (const page of ["about.html", "faq.html", "features.html", "how-it-works.html", "install.html"]) {
+  assertIncludes(page, 'aria-controls="mobileMenu"', `${page} menu button must identify its controlled menu`);
+  assertIncludes(page, 'aria-expanded="false"', `${page} menu button must expose its initial state`);
+  assertIncludes(page, 'id="mobileMenu" aria-hidden="true"', `${page} mobile menu must expose its initial state`);
+  assertIncludes(page, '<script src="/public-page.v51.js"></script>', `${page} must use the shared accessible navigation behavior`);
+}
+assertIncludes("public-page.v51.js", "setAttribute('aria-expanded',String(open))", "public-page menus must announce expanded state");
+assertIncludes("public-page.v51.js", "event.key==='Escape'", "public-page menus must close with Escape");
+assertNotIncludes("about.html", "™<!DOCTYPE html>", "About must start with a valid doctype");
 for (const unsupportedStat of ["1 in 6", "100,000+", "91%", "Crashes involve driver fatigue"]) {
   assertNotIncludes("index.html", unsupportedStat, `homepage must not present the unsupported statistic: ${unsupportedStat}`);
 }

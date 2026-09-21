@@ -98,6 +98,23 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
 });
 
+test("public information pages share accessible mobile navigation", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const path of ["/about.html", "/faq.html", "/features.html", "/how-it-works.html", "/install.html"]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    await expect(page.locator('script[src="/public-page.v51.js"]')).toHaveCount(1);
+    await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "true");
+    await page.locator("#menuBtn").click();
+    await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "false");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator("#menuBtn")).toBeFocused();
+  }
+});
+
 test("forgot password stays on the login surface and opens reset mode", async ({ page }) => {
   await page.goto("/login.html", { waitUntil: "domcontentloaded" });
   await page.locator("#forgotPasswordBtn").click();
