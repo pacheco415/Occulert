@@ -136,4 +136,35 @@ assert.equal(roundTripped.length, prepared.rows.length);
 assert.ok(roundTripped.every((row) => ["train", "test"].includes(row.split)));
 run(roundTripped);
 
+// Invalid measurements must never become closed eyes or awake ground truth.
+for (const value of ["", "  ", "NaN", "Infinity", "-0.1"]) {
+  assert.throws(() => parseCsv(`label,ear\nawake,${value}`), /Invalid EAR/);
+  const invalid = prepare([{ label: "awake", ear: value, participant: "p1" }], {});
+  assert.equal(invalid.rows.length, 0);
+  assert.equal(invalid.manifest.exclusions["invalid or missing EAR"], 1);
+}
+for (const label of ["", "unknown", "drowzy"]) {
+  assert.throws(() => parseCsv(`label,ear\n${label},0.3`), /Unknown label/);
+}
+assert.equal(parseCsv("label,ear\ndrowsy,0")[0].ear, 0, "measured zero is valid");
+assert.equal(parseCsv("LABEL,EAR\nSLEEPY,0.1")[0].label, "sleepy", "legacy sleepy alias stays supported");
+
+// Exported metadata must round-trip without shifting EAR or participant fields.
+const quotedRows = [{ label: "awake", ear: 0.3, participant: 'person, "one"', clip: "line1\nline2\rline3", lighting: "day" }];
+const quotedHeaders = ["label", "ear", "participant", "clip", "lighting"];
+const quotedCsv = toCsv(quotedHeaders, quotedRows);
+assert.deepEqual(parseCsv(quotedCsv), quotedRows);
+assert.equal(parseDelimited('name\n" padded "').rows[0].name, " padded ");
+assert.deepEqual(prepare(parseDelimited(quotedCsv).rows, {}).rows[0].participant, quotedRows[0].participant);
+assert.deepEqual(parseDelimited(" \n").rows, []);
+assert.equal(parseCsv('\uFEFFlabel,ear\r\n"awake","0.3"\r\n')[0].ear, 0.3);
+for (const csv of [
+  "label,ear\nawake", "label,ear\nawake,0.3,extra",
+  "label,ear,EAR\nawake,0.3,0.2", "label,,ear\nawake,x,0.3",
+  'label,ear\n"awake,0.3', 'label,ear\n"awake"oops,0.3',
+]) {
+  assert.throws(() => parseCsv(csv), /CSV/);
+  assert.throws(() => parseDelimited(csv), /CSV/);
+}
+
 console.log("Occulert benchmark runner and dataset-preparation tests passed.");

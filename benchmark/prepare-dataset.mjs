@@ -11,26 +11,20 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
+import { parseTable, validEar } from "./csv.mjs";
 
 export const CANONICAL_LABELS = new Set(["awake", "drowsy", "high_fatigue"]);
 
 export function parseDelimited(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (!lines.length) return { headers: [], rows: [] };
-  const headers = lines.shift().split(",").map((value) => value.trim());
-  const rows = lines.filter(Boolean).map((line) => {
-    const cells = line.split(",").map((value) => value.trim());
-    return Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? ""]));
-  });
-  return { headers, rows };
+  return parseTable(text);
 }
 
 export function toCsv(headers, rows) {
   const escape = (value) => {
     const text = value === undefined || value === null ? "" : String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
-  return [headers.join(","), ...rows.map((row) => headers.map((h) => escape(row[h])).join(","))].join("\n");
+  return [headers.map(escape).join(","), ...rows.map((row) => headers.map((h) => escape(row[h])).join(","))].join("\n");
 }
 
 // Deterministic and seed-stable: the same participant always lands in the same
@@ -87,11 +81,12 @@ export function prepare(rawRows, config) {
       continue;
     }
 
-    const ear = Number(raw[columns.ear ?? "ear"]);
-    if (!Number.isFinite(ear)) {
-      note("non-numeric EAR");
+    const earValue = raw[columns.ear ?? "ear"];
+    if (!validEar(earValue)) {
+      note("invalid or missing EAR");
       continue;
     }
+    const ear = Number(earValue);
 
     const participant = String(raw[columns.participant ?? "participant"] ?? "").trim();
     if (!participant) {
