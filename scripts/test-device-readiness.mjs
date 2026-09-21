@@ -11,7 +11,14 @@ import { createReadinessSession } from '../native-app/lib/deviceReadinessSession
 const now = 100_000;
 const baseline = () => ({
   checkedAt: now,
-  camera: { permission: 'granted', frontAvailable: true },
+  camera: {
+    permission: 'granted',
+    frontAvailable: true,
+    backAvailable: true,
+    backPhysicalDevices: ['ultra-wide-angle-camera', 'wide-angle-camera'],
+    multiCamSupported: true,
+    frontBackMultiCamSupported: true,
+  },
   outputs: { audio: true, haptic: true, watch: false },
   watch: { moduleAvailable: false, paired: false, appInstalled: false, reachable: false },
   motion: { state: 'not-built', authorization: 'unavailable', isAvailable: false, isActive: false },
@@ -38,6 +45,23 @@ test('camera access is not evidence of face tracking, and missing access gets ac
   assert.equal(row(snapshot, 'camera').status, 'Not found');
   snapshot.camera = null;
   assert.equal(row(snapshot, 'camera').status, 'Not confirmed');
+});
+
+test('road-camera readiness reports hardware facts without activating or promising detection', () => {
+  const snapshot = baseline();
+  assert.equal(row(snapshot, 'roadCamera').status, 'Hardware capable');
+  assert.match(row(snapshot, 'roadCamera').detail, /not active yet/);
+  snapshot.camera.multiCamSupported = false;
+  snapshot.camera.frontBackMultiCamSupported = false;
+  assert.equal(row(snapshot, 'roadCamera').status, 'Single camera only');
+  assert.match(row(snapshot, 'roadCamera').detail, /Driver monitoring keeps priority/);
+  snapshot.camera.multiCamSupported = null;
+  snapshot.camera.frontBackMultiCamSupported = null;
+  assert.equal(row(snapshot, 'roadCamera').status, 'Support unknown');
+  snapshot.camera.backAvailable = false;
+  assert.equal(row(snapshot, 'roadCamera').status, 'Unavailable');
+  snapshot.camera = null;
+  assert.equal(row(snapshot, 'roadCamera').status, 'Not confirmed');
 });
 
 test('all phone-output combinations reflect preferences without claiming successful delivery', () => {

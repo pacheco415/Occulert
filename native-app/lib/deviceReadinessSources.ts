@@ -5,14 +5,22 @@ import { WATCH_ALERTS_PREFERENCE_KEY } from './watchPreferences';
 import { getWatchStatus } from './watchBridge';
 import { getHeadphoneMotionStatus } from './headphoneMotion';
 import type { ReadinessSources } from './deviceReadiness';
+import { getDeviceCondition } from './deviceCondition';
 
 // Read persisted choices directly: a failed read must be "not confirmed", not
 // the delivery layer's cached/default fallback presented as verified settings.
 export const deviceReadinessSources: ReadinessSources = {
   async camera() {
+    const devices = Camera.getAvailableCameraDevices();
+    const condition = await getDeviceCondition();
+    const backDevices = devices.filter(device => device.position === 'back');
     return {
       permission: Camera.getCameraPermissionStatus(),
-      frontAvailable: Camera.getAvailableCameraDevices().some(device => device.position === 'front'),
+      frontAvailable: devices.some(device => device.position === 'front'),
+      backAvailable: backDevices.length > 0,
+      backPhysicalDevices: [...new Set(backDevices.flatMap(device => device.physicalDevices))].sort(),
+      multiCamSupported: condition.multiCamSupported,
+      frontBackMultiCamSupported: condition.frontBackMultiCamSupported,
     };
   },
   async outputs() {
