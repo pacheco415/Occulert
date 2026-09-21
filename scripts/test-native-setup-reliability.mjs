@@ -148,6 +148,11 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(history, /Recovered local checkpoint/);
   assert.match(history, /sessions\.filter\(item => !item\.recoveredFromInterruption\)/);
   assert.match(history, /Recovered partial sessions are excluded/);
+  assert.match(history, /type HistoryFilter = 'all' \| 'needs-review' \| 'reviewed' \| 'recovered'/);
+  assert.match(history, /accessibilityState=\{\{ selected \}\}/, 'history filters must expose their selected state');
+  assert.match(history, /filteredSessions\.map\(\(\{ item, index: i \}\)/, 'filtered edits must retain their original stored index');
+  assert.match(history, /Showing \{filteredSessions\.length\} of \{sessions\.length\} sessions/);
+  assert.match(history, /All caught up/);
   assert.doesNotMatch(recovery, /cameraFrame|video|audio|location|gps/i);
 });
 

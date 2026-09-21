@@ -115,6 +115,23 @@ test("public information pages share accessible mobile navigation", async ({ pag
   }
 });
 
+test("product, safety, privacy, and fleet pages offer a keyboard shortcut to main content", async ({ page }) => {
+  for (const path of ["/product-hub.html", "/safety.html", "/privacy.html", "/fleet-pricing.html", "/fleet-dashboard.html"]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
+    await skipLink.focus();
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toHaveAttribute("href", "#main-content");
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content"), `${path} should focus its main content`).toBeFocused();
+  }
+
+  for (const path of ["/product-hub.html", "/safety.html", "/privacy.html", "/fleet-pricing.html", "/fleet-dashboard.html"]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    await expect(page.locator('script[src="/static-page.v52.js"]')).toHaveCount(1);
+  }
+});
+
 test("forgot password stays on the login surface and opens reset mode", async ({ page }) => {
   await page.goto("/login.html", { waitUntil: "domcontentloaded" });
   await page.locator("#forgotPasswordBtn").click();

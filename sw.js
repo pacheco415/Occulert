@@ -59,12 +59,14 @@ const STATIC_ASSETS = [
   '/favicon.ico',
   '/homepage.v51.css',
   '/liquid-glass.v47.css',
+  '/accessibility.v52.css',
   '/portal.v47.css',
   '/homepage.js',
   '/driver-app.v47.css',
   '/driver-app.v48.js',
   '/lang.v47.js',
-  '/security-utils.v47.js'
+  '/security-utils.v47.js',
+  '/static-page.v52.js'
 ];
 
 const NETWORK_ONLY_ASSETS = new Set([

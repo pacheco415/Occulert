@@ -51,6 +51,8 @@ interface TestConditionGroup {
 type DeviceImpactKey = keyof SessionDeviceImpact;
 type DeviceImpactValue = NonNullable<SessionDeviceImpact[DeviceImpactKey]>;
 
+type HistoryFilter = 'all' | 'needs-review' | 'reviewed' | 'recovered';
+
 interface DeviceImpactGroup {
   key: DeviceImpactKey;
   label: string;
@@ -118,6 +120,13 @@ const DEVICE_IMPACT_GROUPS: DeviceImpactGroup[] = [
   },
 ];
 
+const HISTORY_FILTERS: Array<{ value: HistoryFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'needs-review', label: 'Needs review' },
+  { value: 'reviewed', label: 'Reviewed' },
+  { value: 'recovered', label: 'Recovered' },
+];
+
 function fmtDuration(sec?: number): string {
   if (!sec || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);
@@ -165,6 +174,7 @@ export default function HistoryScreen() {
   const router = useRouter();
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
   const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const historyRevisionRef = useRef(0);
@@ -272,6 +282,37 @@ export default function HistoryScreen() {
   )).length;
   const issueInsights = summarizePilotIssues(evidenceSessions);
   const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
+  const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteReview(item)).length;
+  const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteReview(item)).length;
+  const recoveredCount = sessions.filter(item => item.recoveredFromInterruption).length;
+  const filterCounts: Record<HistoryFilter, number> = {
+    all: sessions.length,
+    'needs-review': needsReviewCount,
+    reviewed: reviewedCount,
+    recovered: recoveredCount,
+  };
+  const filteredSessions = sessions
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => {
+      if (historyFilter === 'recovered') return Boolean(item.recoveredFromInterruption);
+      if (historyFilter === 'reviewed') return !item.recoveredFromInterruption && hasCompleteReview(item);
+      if (historyFilter === 'needs-review') return !item.recoveredFromInterruption && !hasCompleteReview(item);
+      return true;
+    });
+  const filteredEmptyCopy: Record<Exclude<HistoryFilter, 'all'>, { title: string; detail: string }> = {
+    'needs-review': {
+      title: 'All caught up',
+      detail: 'Every completed session has a full review.',
+    },
+    reviewed: {
+      title: 'No completed reviews yet',
+      detail: 'Finish the alert rating, test conditions, and device-impact notes on a session to see it here.',
+    },
+    recovered: {
+      title: 'No recovered sessions',
+      detail: 'Sessions restored after an unexpected interruption will appear here.',
+    },
+  };
 
   return (
     <SafeAreaView style={s.bg}>
@@ -280,17 +321,57 @@ export default function HistoryScreen() {
         <Text style={s.title}>Session History</Text>
 
         {loaded && sessions.length > 0 && (
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityState={{ expanded: showReviewProgress }}
-            style={s.reviewToggle}
-            onPress={() => setShowReviewProgress(current => !current)}
-          >
-            <Text style={s.reviewToggleText}>
-              {showReviewProgress ? 'Hide review progress' : 'Show review progress'}
+          <>
+            <View style={s.historySummary}>
+              <View style={s.historySummaryItem}>
+                <Text style={s.historySummaryValue}>{needsReviewCount}</Text>
+                <Text style={s.historySummaryLabel}>Need review</Text>
+              </View>
+              <View style={s.historySummaryDivider} />
+              <View style={s.historySummaryItem}>
+                <Text style={s.historySummaryValue}>{reviewedCount}</Text>
+                <Text style={s.historySummaryLabel}>Reviewed</Text>
+              </View>
+              <View style={s.historySummaryDivider} />
+              <View style={s.historySummaryItem}>
+                <Text style={s.historySummaryValue}>{recoveredCount}</Text>
+                <Text style={s.historySummaryLabel}>Recovered</Text>
+              </View>
+            </View>
+            <View accessibilityRole="tablist" style={s.filterRow}>
+              {HISTORY_FILTERS.map(filter => {
+                const selected = historyFilter === filter.value;
+                return (
+                  <TouchableOpacity
+                    key={filter.value}
+                    accessibilityRole="tab"
+                    accessibilityLabel={`${filter.label}, ${filterCounts[filter.value]} sessions`}
+                    accessibilityState={{ selected }}
+                    style={[s.filterButton, selected && s.filterButtonSelected]}
+                    onPress={() => setHistoryFilter(filter.value)}
+                  >
+                    <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>
+                      {filter.label} · {filterCounts[filter.value]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text accessibilityLiveRegion="polite" style={s.filterResult}>
+              Showing {filteredSessions.length} of {sessions.length} sessions
             </Text>
-            <Ionicons name={showReviewProgress ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showReviewProgress }}
+              style={s.reviewToggle}
+              onPress={() => setShowReviewProgress(current => !current)}
+            >
+              <Text style={s.reviewToggleText}>
+                {showReviewProgress ? 'Hide review progress' : 'Show review progress'}
+              </Text>
+              <Ionicons name={showReviewProgress ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
+            </TouchableOpacity>
+          </>
         )}
 
         {loaded && sessions.length > 0 && showReviewProgress && (
@@ -389,7 +470,22 @@ export default function HistoryScreen() {
           </View>
         )}
 
-        {sessions.map((item, i) => {
+        {loaded && sessions.length > 0 && filteredSessions.length === 0 && historyFilter !== 'all' && (
+          <View style={s.filteredEmpty}>
+            <Ionicons name="checkmark-circle-outline" size={32} color="#4a7a8a" />
+            <Text style={s.emptyTitle}>{filteredEmptyCopy[historyFilter].title}</Text>
+            <Text style={s.emptySub}>{filteredEmptyCopy[historyFilter].detail}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={s.clearFilterButton}
+              onPress={() => setHistoryFilter('all')}
+            >
+              <Text style={s.clearFilterText}>Show all sessions</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {filteredSessions.map(({ item, index: i }) => {
           const sessionKey = item.sessionId || `${item.savedAt || item.updatedAt || 'session'}-${i}`;
           const reviewComplete = hasCompleteReview(item);
           const isExpanded = expandedSessions[sessionKey] ?? false;
@@ -639,6 +735,17 @@ const s = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 20, paddingBottom: 48 },
   title: { color: colors.text, fontSize: 32, fontWeight: '800', letterSpacing: -0.8, marginBottom: 20 },
+  historySummary: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, paddingVertical: 13, marginBottom: 12 },
+  historySummaryItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  historySummaryValue: { color: '#e0f2fe', fontSize: 19, fontWeight: '900' },
+  historySummaryLabel: { color: '#6592a5', fontSize: 9, fontWeight: '800', marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.4 },
+  historySummaryDivider: { width: 1, backgroundColor: '#1a3a4a' },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 7 },
+  filterButton: { minHeight: 38, justifyContent: 'center', borderRadius: 999, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', paddingHorizontal: 11, paddingVertical: 7 },
+  filterButtonSelected: { borderColor: '#3b82f6', backgroundColor: 'rgba(37,99,235,0.22)' },
+  filterButtonText: { color: '#6592a5', fontSize: 10, fontWeight: '800' },
+  filterButtonTextSelected: { color: '#dbeafe' },
+  filterResult: { color: '#4a7a8a', fontSize: 10, marginBottom: 2 },
   checkpoint: { backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: 'rgba(94,156,255,0.28)', borderRadius: radii.large, padding: 18, marginBottom: 16 },
   checkpointHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   checkpointHeaderCopy: { flex: 1 },
@@ -662,10 +769,13 @@ const s = StyleSheet.create({
   patternMissing: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 3 },
   patternCaution: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 8 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 10 },
+  filteredEmpty: { alignItems: 'center', backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, paddingVertical: 34, paddingHorizontal: 16, gap: 8, marginTop: 12 },
   emptyTitle: { color: '#c8e8f0', fontSize: 17, fontWeight: '800', marginTop: 8 },
   emptySub: { color: '#4a7a8a', fontSize: 13, textAlign: 'center', lineHeight: 19, paddingHorizontal: 20 },
   cta: { marginTop: 16, backgroundColor: '#2563eb', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
   ctaTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  clearFilterButton: { minHeight: 44, justifyContent: 'center', marginTop: 8, paddingHorizontal: 14 },
+  clearFilterText: { color: '#93c5fd', fontSize: 12, fontWeight: '800' },
   card: { backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, padding: 18, marginBottom: 12 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   date: { color: '#c8e8f0', fontSize: 13, fontWeight: '700' },

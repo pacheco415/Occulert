@@ -127,6 +127,8 @@ assertNotIncludes("sw.js", "'/homepage.css',", "service worker must not recache 
 assertNotIncludes("sw.js", "'/homepage-journey-cinematic-v1.jpg'", "service worker install must not preload the large cinematic journey image");
 assertIncludes("sw.js", "'/homepage.js'", "service worker must cache the external homepage behavior script");
 assertIncludes("sw.js", "'/liquid-glass.v47.css'", "service worker must cache the current shared Liquid Glass stylesheet");
+assertIncludes("sw.js", "'/accessibility.v52.css'", "service worker must cache the shared skip-link stylesheet");
+assertIncludes("sw.js", "'/static-page.v52.js'", "service worker must cache the consolidated static-page behavior");
 assertNotIncludes("sw.js", "'/liquid-glass.css',", "service worker must not retain the stale unversioned Liquid Glass stylesheet");
 for (const path of [
   "about.html",
@@ -151,6 +153,15 @@ for (const path of [
 ]) {
   assertIncludes(path, '<link rel="stylesheet" href="/liquid-glass.v47.css" />', `${path} must use the current shared Liquid Glass design layer`);
 }
+for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "privacy.html", "product-hub.html", "safety.html"]) {
+  assertIncludes(path, 'class="skip-link" href="#main-content"', `${path} must let keyboard users skip repeated navigation`);
+  assertIncludes(path, 'id="main-content" tabindex="-1"', `${path} must expose a focusable main destination`);
+  assertIncludes(path, '<link rel="stylesheet" href="/accessibility.v52.css" />', `${path} must use the shared keyboard-navigation layer`);
+}
+for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "privacy.html", "product-hub.html", "safety.html"]) {
+  assertIncludes(path, '<script src="/static-page.v52.js" defer></script>', `${path} must use consolidated static-page behavior`);
+}
+assertIncludes("fleet-dashboard.html", 'id="cloudStatus" role="status" aria-live="polite"', "fleet connection updates must be announced without stealing focus");
 for (const accessibilityBoundary of [
   "prefers-reduced-transparency",
   "prefers-contrast: more",
