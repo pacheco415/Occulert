@@ -24,7 +24,11 @@
 </nav>
 <main id="main-content" tabindex="-1">
 <h1>Privacy, Safety &amp; Legal</h1>
-<p class="sub">Last updated: August 1, 2026 &middot; Applies to occulert.com and all Occulert tools</p>
+<p class="sub">Last updated: September 21, 2026 &middot; Applies to occulert.com and all Occulert tools</p>
+<div class="hl" role="navigation" aria-label="Privacy and data controls">
+  <b>Find your data controls</b><br>
+  In the native app, open Settings and choose Privacy &amp; Local Data to review local counts, open Session History, or clear local recovery data. On the website, use <a href="/session-history.html" style="color:var(--bl)">Session History</a> for same-browser records and <a href="/account.html" style="color:var(--bl)">Account Settings</a> for signed-in account and cloud-data controls.
+</div>
 <div class="sec" id="safety">
 <h2><span class="n">1</span> Safety Disclaimer &amp; User Responsibility</h2>
 <div class="box danger"><b>Critical Safety Notice</b>Occulert is a SUPPLEMENTAL prototype alerting tool ONLY. It does NOT replace attentive driving, adequate rest, sober driving, medical judgment, commercial safety programs, or compliance with traffic and transportation laws.</div>
@@ -70,12 +74,20 @@
 <div class="sec" id="data">
 <h2><span class="n">5</span> Data We Collect</h2>
 <ul>
-<li><b>Local device storage:</b> Driver IDs, fatigue scores, alert counts, session duration, optional GPS, and preferences — stored on your device unless you separately sign in and enable cloud sync.</li>
+<li><b>Local device storage:</b> Session timestamps and duration, fatigue summaries, alert counts, sensitivity, reviews, test conditions, bounded performance diagnostics, aggregate experimental motion observations, preferences, and a temporary interrupted-drive checkpoint. Web sessions may also include optional GPS when you enable it. These records stay on your device unless you separately sign in and enable an applicable cloud-sync option.</li>
 <li><b>Account and passkey data:</b> Supabase Auth processes your account identifier and, if you enroll a passkey, stores the credential's public key and basic authenticator metadata. Your biometric, device PIN, and passkey private key stay with your device, security key, or password manager and are not provided to Occulert.</li>
 <li><b>Optional Apple Health context:</b> If you explicitly connect Apple Health on iPhone, Occulert reads recent sleep analysis and heart rate variability (SDNN) to display factual pre-drive context. Occulert stores only a derived 24-hour sleep total and latest HRV value in protected local device storage. It does not write Apple Health data, use background HealthKit delivery, upload these values through cloud sync, calculate medical or driving fitness, or use them to change alerts. You can remove the local summary in Occulert and change future access in Apple Health settings.</li>
 <li><b>Fleet inquiry data:</b> Name, company, email, phone, fleet size, and message — sent once to our protected pilot-request endpoint, stored server-side through Supabase when configured (or a configured HTTPS processor fallback), and used only to respond to your inquiry. The current form does not keep a browser-storage copy.</li>
 <li><b>Analytics:</b> If analytics are enabled, they should be limited to anonymous usage data such as page views or app launches, and should not be linked to your identity or camera data.</li>
 </ul>
+<div class="box info" id="local-history"><b>Local History, Recovery &amp; Sharing</b>The native app keeps local session history and interrupted-drive recovery data separate. Clearing one does not silently clear the other, and neither local action deletes separately synced cloud records.</div>
+<ul>
+<li><b>Interrupted-drive recovery:</b> During native monitoring, Occulert saves a small local checkpoint about every 15 seconds. It contains summary values, not camera frames, audio, raw motion, or a location route. A valid checkpoint can restore one clearly labeled partial session after an unexpected interruption; expired or unusable checkpoints are not presented as completed drives.</li>
+<li><b>Privacy-limited sharing:</b> When you choose Share Shown Summaries in native Session History, the text includes session date, duration, alert count, average fatigue, sensitivity, review status, and whether the record is a recovered partial session. It excludes driver and cloud IDs, location, camera media, audio, raw motion, and local performance diagnostics.</li>
+<li><b>Local deletion:</b> You can delete one native session, delete all native local history, or clear only the temporary recovery checkpoint. Destructive actions require confirmation. Settings also offers Review or Export and Review First paths before Delete All.</li>
+<li><b>Cloud deletion is separate:</b> Removing local history or recovery data does not remove separately synced account or fleet records. Use Account Settings for signed-in account deletion, or contact us for another applicable cloud-data request.</li>
+</ul>
+<p><a href="/session-history.html" style="color:var(--bl)">Open browser Session History</a> &middot; <a href="/account.html" style="color:var(--bl)">Open Account Settings</a></p>
 <p>We do not sell, rent, or share personal data with third parties for marketing or advertising.</p>
 </div>
 <div class="sec" id="location">

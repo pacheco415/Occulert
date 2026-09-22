@@ -358,6 +358,12 @@ if (!networkOnlyAssets.includes("'/passkey-auth.v49.js'")) fail("the passkey cli
 if (staticAssets.includes("'/supabase-loader.v47.js'")) fail("the resilient Supabase loader must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes("'/supabase-loader.v47.js'")) fail("the resilient Supabase loader must be listed as a network-only asset");
 assertIncludes("privacy.html", "passkey private key stay with your device", "privacy terms must disclose that Occulert does not receive passkey private keys or biometrics");
+assertIncludes("privacy.html", 'aria-label="Privacy and data controls"', "privacy terms must expose a clear data-controls navigation landmark");
+assertIncludes("privacy.html", 'id="local-history"', "privacy terms must explain native local history and recovery data");
+assertIncludes("privacy.html", "saves a small local checkpoint about every 15 seconds", "privacy terms must disclose native recovery checkpoint timing");
+assertIncludes("privacy.html", "It excludes driver and cloud IDs, location, camera media, audio, raw motion, and local performance diagnostics", "privacy terms must define the native sharing boundary");
+assertIncludes("privacy.html", "Review or Export and Review First paths before Delete All", "privacy terms must explain the native pre-deletion review path");
+assertIncludes("privacy.html", "Removing local history or recovery data does not remove separately synced account or fleet records", "privacy terms must separate local and cloud deletion");
 assertNotIncludes("account.html", "window.firebase", "account.html must not call the retired Firebase SDK");
 assertIncludes("account-page-2.v47.js", "Your sign-in email changes once you open the link", "email changes must disclose that confirmation is required");
 assertIncludes("account.html", "your current address may receive one too", "email changes must account for secure-email-change double confirmation");

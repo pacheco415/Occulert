@@ -11,6 +11,9 @@ queuing a native build or publishing the website.
 - The homepage now identifies its above-fold visual as an interactive product
   demo and shows the parked, on-device, foreground-only, and safe-stop state at
   every step without adding autoplay media.
+- The public Privacy page now documents native local reviews, 15-second recovery
+  checkpoints, privacy-limited sharing, confirmed local deletion, and the
+  separate path for signed-in cloud records.
 - Native session history now supports filters, review progress, privacy-limited
   sharing, individual deletion, and clearer local-versus-cloud status.
 - Native Settings now explains local data and provides confirmed controls for

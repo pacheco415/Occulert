@@ -141,6 +141,20 @@ test("product, safety, privacy, and fleet pages offer a keyboard shortcut to mai
   }
 });
 
+test("privacy page explains local history, recovery, sharing, and separate cloud deletion", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/privacy.html", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("navigation", { name: "Privacy and data controls" })).toBeVisible();
+  await expect(page.locator("#local-history")).toContainText("Local History, Recovery & Sharing");
+  await expect(page.locator("#data")).toContainText("checkpoint about every 15 seconds");
+  await expect(page.locator("#data")).toContainText("excludes driver and cloud IDs");
+  await expect(page.locator("#data")).toContainText("does not remove separately synced account or fleet records");
+  await expect(page.getByRole("link", { name: "Open browser Session History" })).toHaveAttribute("href", "/session-history.html");
+  await expect(page.getByRole("link", { name: "Open Account Settings" })).toHaveAttribute("href", "/account.html");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
 test("fleet dashboard keeps mobile navigation and controls touch friendly", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
