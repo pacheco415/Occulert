@@ -1,11 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  hasConflictingActiveSessionCheckpoint,
   isActiveSessionCheckpoint,
   type ActiveSessionCheckpoint,
 } from './sessionRecoveryModel';
 
 const ACTIVE_SESSION_KEY = 'occulert-active-session-v1';
 let recoveryQueue: Promise<void> = Promise.resolve();
+
+export class ActiveSessionCheckpointConflictError extends Error {
+  constructor() {
+    super('A different active-session checkpoint must be recovered before starting another session.');
+    this.name = 'ActiveSessionCheckpointConflictError';
+  }
+}
 
 function enqueue(operation: () => Promise<void>): Promise<void> {
   const pending = recoveryQueue.then(operation);
@@ -14,7 +22,20 @@ function enqueue(operation: () => Promise<void>): Promise<void> {
 }
 
 export function saveActiveSessionCheckpoint(checkpoint: ActiveSessionCheckpoint): Promise<void> {
-  return enqueue(() => AsyncStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(checkpoint)));
+  return enqueue(async () => {
+    const raw = await AsyncStorage.getItem(ACTIVE_SESSION_KEY);
+    if (raw) {
+      try {
+        const stored: unknown = JSON.parse(raw);
+        if (hasConflictingActiveSessionCheckpoint(stored, checkpoint.sessionId)) {
+          throw new ActiveSessionCheckpointConflictError();
+        }
+      } catch (error) {
+        if (error instanceof ActiveSessionCheckpointConflictError) throw error;
+      }
+    }
+    await AsyncStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(checkpoint));
+  });
 }
 
 export async function loadActiveSessionCheckpoint(): Promise<ActiveSessionCheckpoint | null> {

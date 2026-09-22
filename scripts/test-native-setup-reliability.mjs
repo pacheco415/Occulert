@@ -6,6 +6,7 @@ import {
   initialCameraSetupAssessment,
 } from '../native-app/lib/cameraSetup.ts';
 import {
+  hasConflictingActiveSessionCheckpoint,
   prependRecoveredSession,
   SESSION_RECOVERY_MAX_AGE_MS,
   recoveredSessionFromCheckpoint,
@@ -135,6 +136,13 @@ test('recovery never replaces a complete record with an older partial copy', () 
   assert.equal(inserted.sessions[0].recoveredFromInterruption, true);
 });
 
+test('checkpoint storage recognizes another unresolved session but permits same-session updates', () => {
+  assert.equal(hasConflictingActiveSessionCheckpoint(CHECKPOINT, CHECKPOINT.sessionId), false);
+  assert.equal(hasConflictingActiveSessionCheckpoint(CHECKPOINT, 'session-new'), true);
+  assert.equal(hasConflictingActiveSessionCheckpoint({ ...CHECKPOINT, durationSec: -1 }, 'session-new'), false);
+  assert.equal(hasConflictingActiveSessionCheckpoint(null, 'session-new'), false);
+});
+
 test('session history restores only known filters and sorts newest without losing storage indexes', () => {
   assert.equal(normalizeHistoryFilter('reviewed'), 'reviewed');
   assert.equal(normalizeHistoryFilter('unexpected'), 'all');
@@ -157,12 +165,21 @@ test('native screens wire setup preview and recovery without changing detection 
   const history = read('native-app/app/history.tsx');
   const historyPreferences = read('native-app/lib/historyPreferences.ts');
   const recovery = read('native-app/lib/sessionRecoveryModel.ts');
+  const recoveryStorage = read('native-app/lib/sessionRecovery.ts');
 
   assert.match(monitor, /isActive=\{isRunning \|\| setupPreviewActive\}/);
   assert.match(monitor, /setupPreviewActiveRef\.current && !isRunningRef\.current/);
   assert.match(monitor, /return;\s*}\s*\/\/ A frame already crossing/);
   assert.match(monitor, /SESSION_CHECKPOINT_INTERVAL_MS = 15_000/);
   assert.match(monitor, /clearActiveSessionCheckpoint\(activeSessionId\)/);
+  assert.match(monitor, /await saveActiveSessionCheckpoint\(\{/,
+    'monitoring must reserve recovery storage before camera startup');
+  assert.match(monitor, /ActiveSessionCheckpointConflictError/);
+  assert.match(monitor, /RECOVERY REQUIRED/);
+  assert.match(monitor, /reservedSessionId && !monitoringStarted/,
+    'an interrupted startup must release only its own reservation');
+  assert.match(recoveryStorage, /hasConflictingActiveSessionCheckpoint\(stored, checkpoint\.sessionId\)/);
+  assert.match(recoveryStorage, /throw new ActiveSessionCheckpointConflictError\(\)/);
   assert.match(home, /recoveredSessionFromCheckpoint/);
   assert.match(home, /Previous drive recovered/);
   assert.match(home, /prependRecoveredSession\(sessions, recovered\)/);

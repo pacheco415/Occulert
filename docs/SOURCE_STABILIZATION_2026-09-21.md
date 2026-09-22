@@ -27,6 +27,8 @@ queuing a native build or publishing the website.
 - Home now prevents a new session from starting while interrupted-drive
   recovery is still checking or has failed, protecting an unresolved checkpoint
   from being replaced before retry succeeds.
+- Recovery storage now rejects a different session before monitoring starts,
+  so restored routes and direct navigation cannot bypass the Home-screen guard.
 
 ## Local verification completed
 

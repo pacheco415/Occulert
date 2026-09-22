@@ -48,6 +48,13 @@ export function isActiveSessionCheckpoint(value: unknown): value is ActiveSessio
     && typeof checkpoint.monitorPerformance === 'object';
 }
 
+export function hasConflictingActiveSessionCheckpoint(
+  value: unknown,
+  nextSessionId: string,
+): boolean {
+  return isActiveSessionCheckpoint(value) && value.sessionId !== nextSessionId;
+}
+
 export function recoveredSessionFromCheckpoint(
   value: unknown,
   now = Date.now(),

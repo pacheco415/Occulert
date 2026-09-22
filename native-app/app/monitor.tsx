@@ -88,7 +88,11 @@ import {
   initialCameraSetupAssessment,
   type CameraSetupAssessment,
 } from '../lib/cameraSetup';
-import { clearActiveSessionCheckpoint, saveActiveSessionCheckpoint } from '../lib/sessionRecovery';
+import {
+  ActiveSessionCheckpointConflictError,
+  clearActiveSessionCheckpoint,
+  saveActiveSessionCheckpoint,
+} from '../lib/sessionRecovery';
 import {
   canRestartStalledCamera,
   deriveCameraLoadPolicy,
@@ -345,6 +349,8 @@ export default function MonitorScreen() {
   const handleStart = async () => {
     if (startingRef.current || isStopping || !sensitivityLoaded) return;
     const startAttempt = startAttemptRef.current + 1;
+    let reservedSessionId: string | null = null;
+    let monitoringStarted = false;
     startAttemptRef.current = startAttempt;
     startingRef.current = true;
     setIsStarting(true);
@@ -376,6 +382,43 @@ export default function MonitorScreen() {
         AppState.currentState,
       )) return;
 
+      const nextSessionStartedAt = Date.now();
+      const nextSessionId = `session-${nextSessionStartedAt}`;
+      performanceTrackerRef.current.reset();
+      try {
+        await saveActiveSessionCheckpoint({
+          sessionId: nextSessionId,
+          startedAt: nextSessionStartedAt,
+          checkpointedAt: nextSessionStartedAt,
+          durationSec: 0,
+          alertCount: 0,
+          avgFatigue: 0,
+          maxFatigue: 0,
+          headNodObservations: 0,
+          cameraHeadNodObservations: 0,
+          headphoneHeadNodObservations: 0,
+          headphoneMotionSamples: 0,
+          headphoneMotionStatus: 'starting',
+          monitorPerformance: performanceTrackerRef.current.snapshot(nextSessionStartedAt),
+          sensitivity,
+          ...currentAppBuildInfo(),
+        });
+        reservedSessionId = nextSessionId;
+      } catch (error) {
+        setSensorFault(error instanceof ActiveSessionCheckpointConflictError
+          ? 'Monitoring did not start because a previous interrupted drive still needs recovery. Return Home and retry recovery before starting again.'
+          : 'Monitoring did not start because local recovery storage could not be verified. Return Home and retry before starting again.');
+        return;
+      }
+      if (shouldAbortMonitoringStart(
+        startAttempt !== startAttemptRef.current,
+        AppState.currentState,
+      )) {
+        await clearActiveSessionCheckpoint(nextSessionId).catch(() => {});
+        reservedSessionId = null;
+        return;
+      }
+
       reset();
       setupPreviewActiveRef.current = false;
       setSetupPreviewActive(false);
@@ -399,7 +442,6 @@ export default function MonitorScreen() {
       lastMetricsUiAtRef.current = 0;
       displayedMetricsStateRef.current = 'noFace';
       displayedAlertLevelRef.current = 'none';
-      performanceTrackerRef.current.reset();
       cameraRestartCountRef.current = 0;
       cameraRecoveringRef.current = false;
       setCameraRecovering(false);
@@ -412,14 +454,15 @@ export default function MonitorScreen() {
       setAlertCount(0);
       alertCountRef.current = 0;
       hasCameraSampleRef.current = false;
-      lastSampleAtRef.current = Date.now();
-      sessionStartedAtRef.current = lastSampleAtRef.current;
-      activeSessionIdRef.current = `session-${lastSampleAtRef.current}`;
-      performanceTrackerRef.current.recordSessionStart(lastSampleAtRef.current);
-      setSessionStartedAt(lastSampleAtRef.current);
+      lastSampleAtRef.current = nextSessionStartedAt;
+      sessionStartedAtRef.current = nextSessionStartedAt;
+      activeSessionIdRef.current = nextSessionId;
+      performanceTrackerRef.current.recordSessionStart(nextSessionStartedAt);
+      setSessionStartedAt(nextSessionStartedAt);
       setSessionEndedAt(null);
       isRunningRef.current = true;
       setIsRunning(true);
+      monitoringStarted = true;
       void headphoneStart.then(async (headphoneStatus) => {
         const stale = startAttempt !== startAttemptRef.current
           || !monitoringActiveRef.current;
@@ -438,8 +481,11 @@ export default function MonitorScreen() {
       });
       // A local recovery write is best-effort and never delays the camera or
       // optional headphone startup path.
-      void checkpointActiveSession(lastSampleAtRef.current).catch(() => {});
+      void checkpointActiveSession(nextSessionStartedAt).catch(() => {});
     } finally {
+      if (reservedSessionId && !monitoringStarted) {
+        await clearActiveSessionCheckpoint(reservedSessionId).catch(() => {});
+      }
       startingRef.current = false;
       setIsStarting(false);
     }
@@ -1114,7 +1160,9 @@ export default function MonitorScreen() {
 
         {sensorFault && (
           <View style={s.sensorFault} accessibilityRole="alert">
-            <Text style={s.sensorFaultTitle}>CAMERA ANALYSIS STOPPED</Text>
+            <Text style={s.sensorFaultTitle}>
+              {sensorFault.startsWith('Monitoring did not start') ? 'RECOVERY REQUIRED' : 'CAMERA ANALYSIS STOPPED'}
+            </Text>
             <Text style={s.sensorFaultText}>{sensorFault}</Text>
           </View>
         )}
