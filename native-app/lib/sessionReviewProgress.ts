@@ -17,6 +17,11 @@ export interface SessionReviewProgress {
   missingSummary: string;
 }
 
+export interface IndexedReviewSession<T extends FeedbackSession = FeedbackSession> {
+  item: T & { recoveredFromInterruption?: boolean };
+  index: number;
+}
+
 export function getSessionReviewProgress(session: FeedbackSession): SessionReviewProgress {
   const steps: SessionReviewStep[] = [
     {
@@ -63,4 +68,15 @@ export function getSessionReviewProgress(session: FeedbackSession): SessionRevie
 
 export function hasCompleteSessionReview(session: FeedbackSession): boolean {
   return getSessionReviewProgress(session).complete;
+}
+
+export function incompleteSessionReviewQueue<T extends FeedbackSession>(
+  newestFirstSessions: Array<IndexedReviewSession<T>>,
+  excludedIndex?: number,
+): Array<IndexedReviewSession<T>> {
+  return newestFirstSessions.filter(({ item, index }) => (
+    index !== excludedIndex
+    && !item.recoveredFromInterruption
+    && !hasCompleteSessionReview(item)
+  ));
 }

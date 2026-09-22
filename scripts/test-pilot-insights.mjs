@@ -7,7 +7,9 @@ import {
 import {
   getSessionReviewProgress,
   hasCompleteSessionReview,
+  incompleteSessionReviewQueue,
 } from '../native-app/lib/sessionReviewProgress.ts';
+import { sortIndexedSessionsNewest } from '../native-app/lib/historyPreferences.ts';
 
 test('session review progress identifies every missing pilot detail', () => {
   const progress = getSessionReviewProgress({
@@ -44,6 +46,26 @@ test('session review progress recognizes a complete review', () => {
   assert.equal(progress.missingSummary, 'Nothing missing');
   assert.equal(hasCompleteSessionReview(session), true);
   assert.equal(hasCompleteSessionReview({}), false);
+});
+
+test('review queue selects newest unfinished complete-session records only', () => {
+  const sorted = sortIndexedSessionsNewest([
+    { sessionId: 'older', savedAt: '2026-09-18T12:00:00.000Z' },
+    { sessionId: 'just-completed', savedAt: '2026-09-21T12:00:00.000Z' },
+    { sessionId: 'newer', savedAt: '2026-09-20T12:00:00.000Z', alertAssessment: 'accurate' },
+    { sessionId: 'recovered', savedAt: '2026-09-19T12:00:00.000Z', recoveredFromInterruption: true },
+    {
+      sessionId: 'finished',
+      savedAt: '2026-09-17T12:00:00.000Z',
+      alertAssessment: 'accurate',
+      testConditions: { lighting: 'daylight', eyewear: 'none', phonePosition: 'center' },
+      deviceImpact: { batteryImpact: 'low', phoneHeat: 'cool' },
+    },
+  ]);
+
+  const queue = incompleteSessionReviewQueue(sorted, 1);
+  assert.deepEqual(queue.map(entry => entry.item.sessionId), ['newer', 'older']);
+  assert.deepEqual(queue.map(entry => entry.index), [2, 0]);
 });
 
 test('pilot issue summaries group reviewed problems without turning counts into rates', () => {

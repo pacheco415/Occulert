@@ -234,6 +234,11 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(history, /Finish this review/);
   assert.match(history, /reviewProgress\.missingSummary/);
   assert.match(history, /accessibilityLiveRegion="polite"/, 'review progress changes must be announced');
+  assert.match(history, /incompleteSessionReviewQueue\(sortIndexedSessionsNewest\(sessions\), index\)/);
+  assert.match(history, /text: 'Review Next'/);
+  assert.match(history, /chooseHistoryFilter\('needs-review'\)/);
+  assert.match(history, /pendingReviewScrollRef\.current = key/);
+  assert.match(history, /accessibilityRole="alert" style=\{s\.reviewQueueMessage\}/);
   assert.match(history, /Showing \{filteredSessions\.length\} of \{sessions\.length\} sessions/);
   assert.match(history, /All caught up/);
   assert.match(history, /AsyncStorage\.setItem\(HISTORY_FILTER_KEY, filter\)/);

@@ -41,6 +41,8 @@ queuing a native build or publishing the website.
   Delete All confirmation can open Session History without removing anything.
 - Each saved session now shows a three-step review checklist, names the exact
   missing pilot details, and announces completion progress for assistive tools.
+- Finishing a review now offers the next newest unfinished session, preserves
+  the Needs Review queue, expands the next form, and moves it into view.
 - Home now prevents a new session from starting while interrupted-drive
   recovery is still checking or has failed, protecting an unresolved checkpoint
   from being replaced before retry succeeds.

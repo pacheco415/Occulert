@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share, ActivityIndicator,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,7 +33,11 @@ import {
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
 import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
-import { getSessionReviewProgress, hasCompleteSessionReview } from '../lib/sessionReviewProgress';
+import {
+  getSessionReviewProgress,
+  hasCompleteSessionReview,
+  incompleteSessionReviewQueue,
+} from '../lib/sessionReviewProgress';
 
 const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
 const CHECKPOINT_TARGET = 10;
@@ -183,6 +188,9 @@ export default function HistoryScreen() {
   const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const [sessionOperations, setSessionOperations] = useState<Record<string, SessionOperation>>({});
+  const [reviewQueueMessage, setReviewQueueMessage] = useState<{ key: string; text: string } | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const pendingReviewScrollRef = useRef<string | null>(null);
   const historyRevisionRef = useRef(0);
   const filterRevisionRef = useRef(0);
   const historyLoadAttemptRef = useRef(0);
@@ -250,6 +258,7 @@ export default function HistoryScreen() {
   const chooseHistoryFilter = (filter: HistoryFilter) => {
     filterRevisionRef.current += 1;
     setHistoryFilter(filter);
+    setReviewQueueMessage(null);
     AsyncStorage.setItem(HISTORY_FILTER_KEY, filter).catch(() => {
       Alert.alert('Could not remember this view', 'The filter still works now, but it may reset next time.');
     });
@@ -264,7 +273,9 @@ export default function HistoryScreen() {
     const target = sessions[index];
     if (!target) return;
 
-    await runSessionOperation(
+    const completesReview = !hasCompleteSessionReview(target) && hasCompleteSessionReview(update(target));
+
+    const saved = await runSessionOperation(
       sessionRecordKey(target, index),
       'saving',
       async () => {
@@ -282,6 +293,40 @@ export default function HistoryScreen() {
       },
       () => Alert.alert(errorTitle, errorMessage),
     );
+
+    if (saved && completesReview && !target.recoveredFromInterruption) {
+      setReviewQueueMessage(null);
+      const queue = incompleteSessionReviewQueue(sortIndexedSessionsNewest(sessions), index);
+      if (queue.length === 0) {
+        Alert.alert(
+          'Review queue complete',
+          'Every completed session has a full review. Your ratings remain saved on this iPhone.',
+        );
+        return;
+      }
+
+      const next = queue[0];
+      Alert.alert(
+        'Review complete',
+        `${queue.length} unfinished ${queue.length === 1 ? 'session remains' : 'sessions remain'}.`,
+        [
+          { text: 'Done', style: 'cancel' },
+          {
+            text: 'Review Next',
+            onPress: () => {
+              const key = sessionRecordKey(next.item, next.index);
+              pendingReviewScrollRef.current = key;
+              chooseHistoryFilter('needs-review');
+              setExpandedSessions(current => ({ ...current, [key]: true }));
+              setReviewQueueMessage({
+                key,
+                text: `Next unfinished review · ${queue.length} ${queue.length === 1 ? 'session' : 'sessions'} remaining`,
+              });
+            },
+          },
+        ],
+      );
+    }
   };
 
   const saveAssessment = async (index: number, value: AlertAssessment) => {
@@ -426,14 +471,28 @@ export default function HistoryScreen() {
   const continueReviewing = () => {
     if (!nextReviewSession || sessionOperationsBusy) return;
     const key = sessionRecordKey(nextReviewSession.item, nextReviewSession.index);
+    pendingReviewScrollRef.current = key;
     chooseHistoryFilter('needs-review');
     setExpandedSessions(current => ({ ...current, [key]: true }));
+    setReviewQueueMessage({
+      key,
+      text: `${needsReviewCount} unfinished ${needsReviewCount === 1 ? 'session' : 'sessions'} in this review queue`,
+    });
+  };
+
+  const scrollToPendingReview = (key: string, event: LayoutChangeEvent) => {
+    if (pendingReviewScrollRef.current !== key) return;
+    pendingReviewScrollRef.current = null;
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, event.nativeEvent.layout.y - 12),
+      animated: true,
+    });
   };
 
   return (
     <SafeAreaView style={s.bg}>
       <AmbientBackground />
-      <ScrollView contentContainerStyle={s.scroll}>
+      <ScrollView ref={scrollRef} contentContainerStyle={s.scroll}>
         <Text style={s.title}>Session History</Text>
 
         {!loaded && historyLoadBusy && (
@@ -704,6 +763,7 @@ export default function HistoryScreen() {
           return (
           <View
             key={sessionKey}
+            onLayout={event => scrollToPendingReview(sessionKey, event)}
             style={[
               s.card,
               item.recoveredFromInterruption
@@ -711,6 +771,12 @@ export default function HistoryScreen() {
                 : !reviewComplete && s.cardNeedsReview,
             ]}
           >
+            {reviewQueueMessage?.key === sessionKey && (
+              <View accessibilityRole="alert" style={s.reviewQueueMessage}>
+                <Ionicons name="arrow-forward-circle-outline" size={17} color="#93c5fd" />
+                <Text style={s.reviewQueueMessageText}>{reviewQueueMessage.text}</Text>
+              </View>
+            )}
             <View style={s.rowBetween}>
               <Text style={s.date}>{fmtDate(item.savedAt || item.updatedAt)}</Text>
               <Text style={s.dur}>{fmtDuration(item.durationSec)}</Text>
@@ -1089,6 +1155,8 @@ const s = StyleSheet.create({
   card: { backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, padding: 18, marginBottom: 12 },
   cardNeedsReview: { borderColor: 'rgba(251,191,36,0.35)' },
   cardRecovered: { borderColor: 'rgba(74,222,128,0.35)' },
+  reviewQueueMessage: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(37,99,235,0.12)', borderWidth: 1, borderColor: 'rgba(96,165,250,0.28)', borderRadius: 9, padding: 10, marginBottom: 12 },
+  reviewQueueMessageText: { minWidth: 0, flex: 1, color: '#bfdbfe', fontSize: 10, lineHeight: 15, fontWeight: '800' },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
   date: { flex: 1, color: '#c8e8f0', fontSize: 13, fontWeight: '700' },
   dur: { flexShrink: 0, color: '#60a5fa', fontSize: 13, fontWeight: '800' },
