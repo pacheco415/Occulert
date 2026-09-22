@@ -22,6 +22,8 @@ queuing a native build or publishing the website.
   retry instead of showing a misleading empty-history screen.
 - Review changes and deletion now run one operation at a time per session,
   announce their pending state, and temporarily disable conflicting controls.
+- Session History now shows a clear first-load status and ignores older reads
+  that finish after a newer refresh or after the user leaves the screen.
 - Settings now keeps destructive local-data controls disabled until session and
   recovery status are confirmed, explains read failures, and offers a retry.
 - Home now prevents a new session from starting while interrupted-drive

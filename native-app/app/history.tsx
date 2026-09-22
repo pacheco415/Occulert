@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share,
+  View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share, ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -194,6 +194,7 @@ export default function HistoryScreen() {
   const [sessionOperations, setSessionOperations] = useState<Record<string, SessionOperation>>({});
   const historyRevisionRef = useRef(0);
   const filterRevisionRef = useRef(0);
+  const historyLoadAttemptRef = useRef(0);
   const sessionOperationRunnersRef = useRef(new Map<string, ReturnType<typeof createSingleFlightActionRunner>>());
 
   const runSessionOperation = async (
@@ -220,6 +221,8 @@ export default function HistoryScreen() {
   };
 
   const load = useCallback(async () => {
+    const loadAttempt = historyLoadAttemptRef.current + 1;
+    historyLoadAttemptRef.current = loadAttempt;
     const revision = historyRevisionRef.current;
     const filterRevision = filterRevisionRef.current;
     setHistoryLoadBusy(true);
@@ -228,7 +231,7 @@ export default function HistoryScreen() {
         loadSessionHistory<SessionRecord>(),
         AsyncStorage.getItem(HISTORY_FILTER_KEY).catch(() => null),
       ]);
-      if (historyRevisionRef.current === revision) {
+      if (historyLoadAttemptRef.current === loadAttempt && historyRevisionRef.current === revision) {
         setSessions(storedSessions);
         setHistoryLoadError(false);
         if (filterRevisionRef.current === filterRevision) {
@@ -236,14 +239,22 @@ export default function HistoryScreen() {
         }
       }
     } catch {
-      if (historyRevisionRef.current === revision) setHistoryLoadError(true);
+      if (
+        historyLoadAttemptRef.current === loadAttempt
+        && historyRevisionRef.current === revision
+      ) setHistoryLoadError(true);
     } finally {
-      setLoaded(true);
-      setHistoryLoadBusy(false);
+      if (historyLoadAttemptRef.current === loadAttempt) {
+        setLoaded(true);
+        setHistoryLoadBusy(false);
+      }
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void load();
+    return () => { historyLoadAttemptRef.current += 1; };
+  }, [load]));
 
   const chooseHistoryFilter = (filter: HistoryFilter) => {
     filterRevisionRef.current += 1;
@@ -421,6 +432,20 @@ export default function HistoryScreen() {
       <AmbientBackground />
       <ScrollView contentContainerStyle={s.scroll}>
         <Text style={s.title}>Session History</Text>
+
+        {!loaded && historyLoadBusy && (
+          <View
+            accessibilityLabel="Checking local session history"
+            accessibilityLiveRegion="polite"
+            style={s.loadingBox}
+          >
+            <ActivityIndicator size="small" color={colors.cyan} />
+            <View style={s.loadErrorCopy}>
+              <Text style={s.loadingTitle}>Checking local history</Text>
+              <Text style={s.loadErrorDetail}>Reading session summaries saved on this iPhone.</Text>
+            </View>
+          </View>
+        )}
 
         {loaded && historyLoadError && (
           <View accessibilityRole="alert" style={s.loadError}>
@@ -918,6 +943,8 @@ const s = StyleSheet.create({
   scroll: { padding: 20, paddingBottom: 48 },
   title: { color: colors.text, fontSize: 32, fontWeight: '800', letterSpacing: -0.8, marginBottom: 20 },
   loadError: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: 'rgba(251,191,36,0.08)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.28)', borderRadius: radii.large, padding: 14, marginBottom: 16 },
+  loadingBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(56,189,248,0.07)', borderWidth: 1, borderColor: 'rgba(56,189,248,0.2)', borderRadius: radii.large, padding: 14, marginBottom: 16 },
+  loadingTitle: { color: '#bae6fd', fontSize: 13, fontWeight: '900' },
   loadErrorCopy: { minWidth: 0, flex: 1 },
   loadErrorTitle: { color: '#fde68a', fontSize: 13, fontWeight: '900' },
   loadErrorDetail: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 3 },

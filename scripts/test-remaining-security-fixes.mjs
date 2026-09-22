@@ -371,8 +371,11 @@ test('History load failures stay visible without pretending saved sessions are e
   const history = read('native-app/app/history.tsx');
   const loadStart = history.indexOf('const load = useCallback');
   const load = history.slice(loadStart, history.indexOf('useFocusEffect', loadStart));
+  assert.match(load, /historyLoadAttemptRef\.current === loadAttempt/, 'only the latest history read may update the screen');
+  assert.match(history, /return \(\) => \{ historyLoadAttemptRef\.current \+= 1; \}/, 'leaving History must invalidate its pending read');
   assert.match(load, /setHistoryLoadError\(true\)/);
   assert.doesNotMatch(load, /catch \{[\s\S]*setSessions\(\[\]\)/);
+  assert.match(history, /Checking local session history/);
   assert.match(history, /Couldn’t load local history/);
   assert.match(history, /Your saved sessions were not deleted/);
   assert.match(history, /accessibilityLabel=\{historyLoadBusy \? 'Retrying local session history'/);
