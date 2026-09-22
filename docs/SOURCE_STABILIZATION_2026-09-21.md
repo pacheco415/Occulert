@@ -43,6 +43,8 @@ queuing a native build or publishing the website.
   missing pilot details, and announces completion progress for assistive tools.
 - Finishing a review now offers the next newest unfinished session, preserves
   the Needs Review queue, expands the next form, and moves it into view.
+- Pilot progress now identifies represented and missing lighting, eyewear, and
+  phone-position variants without presenting a single observation as accuracy.
 - Home now prevents a new session from starting while interrupted-drive
   recovery is still checking or has failed, protecting an unresolved checkpoint
   from being replaced before retry succeeds.

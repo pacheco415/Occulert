@@ -26,6 +26,19 @@ export interface PilotIssueSummary {
   conditions: PilotCount[];
 }
 
+export interface PilotCoverageItem {
+  id: string;
+  label: string;
+  count: number;
+}
+
+export interface PilotCoverageSummary {
+  coveredCount: number;
+  totalCount: number;
+  items: PilotCoverageItem[];
+  missingLabels: string[];
+}
+
 const ISSUE_LABELS: Record<PilotIssueAssessment, string> = {
   false_alert: 'False alerts',
   missed_alert: 'Missed alerts',
@@ -51,6 +64,21 @@ const CONDITION_LABELS: Array<{
   { key: 'phonePosition', value: 'high', label: 'High phone' },
   { key: 'phonePosition', value: 'center', label: 'Center phone' },
   { key: 'phonePosition', value: 'low', label: 'Low phone' },
+];
+
+const PILOT_COVERAGE_CONDITIONS: Array<{
+  id: string;
+  label: string;
+  matches: (session: PilotInsightSession) => boolean;
+}> = [
+  { id: 'daylight', label: 'Daylight', matches: session => session.testConditions?.lighting === 'daylight' },
+  { id: 'low-light', label: 'Low light', matches: session => session.testConditions?.lighting === 'low_light' },
+  { id: 'no-eyewear', label: 'No eyewear', matches: session => session.testConditions?.eyewear === 'none' },
+  { id: 'glasses', label: 'Glasses', matches: session => session.testConditions?.eyewear === 'glasses' },
+  { id: 'sunglasses', label: 'Sunglasses', matches: session => session.testConditions?.eyewear === 'sunglasses' },
+  { id: 'high-phone', label: 'High phone', matches: session => session.testConditions?.phonePosition === 'high' },
+  { id: 'center-phone', label: 'Center phone', matches: session => session.testConditions?.phonePosition === 'center' },
+  { id: 'low-phone', label: 'Low phone', matches: session => session.testConditions?.phonePosition === 'low' },
 ];
 
 function countMatching(
@@ -99,4 +127,19 @@ export function summarizePilotIssues(sessions: PilotInsightSession[]): PilotIssu
 
 export function formatPilotCounts(counts: PilotCount[]): string {
   return counts.map(item => `${item.count} ${item.label.toLowerCase()}`).join(' · ');
+}
+
+export function summarizePilotCoverage(sessions: PilotInsightSession[]): PilotCoverageSummary {
+  const items = PILOT_COVERAGE_CONDITIONS.map(condition => ({
+    id: condition.id,
+    label: condition.label,
+    count: sessions.filter(condition.matches).length,
+  }));
+
+  return {
+    coveredCount: items.filter(item => item.count > 0).length,
+    totalCount: items.length,
+    items,
+    missingLabels: items.filter(item => item.count === 0).map(item => item.label),
+  };
 }

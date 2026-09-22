@@ -20,7 +20,7 @@ import {
   updateMatchingSessionRecord,
   type SessionRecordMutation,
 } from '../lib/sessionHistoryEdits';
-import { formatPilotCounts, summarizePilotIssues } from '../lib/pilotInsights';
+import { formatPilotCounts, summarizePilotCoverage, summarizePilotIssues } from '../lib/pilotInsights';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
@@ -419,16 +419,10 @@ export default function HistoryScreen() {
     && Boolean(item.testConditions?.eyewear)
     && Boolean(item.testConditions?.phonePosition)
   )).length;
-  const lowLightCount = reviewedMedium.filter(item => item.testConditions?.lighting === 'low_light').length;
-  const eyewearCount = reviewedMedium.filter(item => (
-    item.testConditions?.eyewear === 'glasses' || item.testConditions?.eyewear === 'sunglasses'
-  )).length;
-  const phonePositionCount = new Set(
-    reviewedMedium.map(item => item.testConditions?.phonePosition).filter(Boolean),
-  ).size;
   const completeDeviceImpactCount = reviewedMedium.filter(item => (
     Boolean(item.deviceImpact?.batteryImpact) && Boolean(item.deviceImpact?.phoneHeat)
   )).length;
+  const pilotCoverage = summarizePilotCoverage(reviewedMedium);
   const issueInsights = summarizePilotIssues(evidenceSessions);
   const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
   const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteSessionReview(item)).length;
@@ -667,10 +661,40 @@ export default function HistoryScreen() {
                 {completeConditionCount} of {reviewedMedium.length} reviewed sessions include lighting, eyewear, and phone position.
               </Text>
               <Text style={s.coverageStats}>
-                {lowLightCount} low light · {eyewearCount} with eyewear · {phonePositionCount} phone positions
+                {pilotCoverage.coveredCount} of {pilotCoverage.totalCount} planned condition variants represented
+              </Text>
+              <View style={s.coverageGrid}>
+                {pilotCoverage.items.map(item => (
+                  <View
+                    accessible
+                    accessibilityLabel={`${item.label}, ${item.count} reviewed ${item.count === 1 ? 'session' : 'sessions'}`}
+                    key={item.id}
+                    style={[s.coverageItem, item.count > 0 && s.coverageItemCovered]}
+                  >
+                    <Ionicons
+                      name={item.count > 0 ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={14}
+                      color={item.count > 0 ? '#86efac' : '#fbbf24'}
+                    />
+                    <Text style={[s.coverageItemText, item.count > 0 && s.coverageItemTextCovered]}>
+                      {item.label} · {item.count}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <Text
+                accessibilityLiveRegion="polite"
+                style={pilotCoverage.missingLabels.length > 0 ? s.coverageMissing : s.coverageComplete}
+              >
+                {pilotCoverage.missingLabels.length > 0
+                  ? `Still needed: ${pilotCoverage.missingLabels.join(', ')}`
+                  : 'Every planned lighting, eyewear, and phone-position variant is represented.'}
               </Text>
               <Text style={s.coverageStats}>
                 {completeDeviceImpactCount} include battery-use and phone-heat observations
+              </Text>
+              <Text style={s.coverageCaution}>
+                Coverage prevents obvious gaps; one session in a condition is not enough to establish accuracy.
               </Text>
             </View>
             {issueSessionCount > 0 && (
@@ -1141,6 +1165,14 @@ const s = StyleSheet.create({
   patternCopy: { color: '#93c5fd', fontSize: 10, lineHeight: 15, marginTop: 3 },
   patternMissing: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 3 },
   patternCaution: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 8 },
+  coverageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 9 },
+  coverageItem: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6 },
+  coverageItemCovered: { borderColor: 'rgba(134,239,172,0.24)', backgroundColor: 'rgba(22,163,74,0.08)' },
+  coverageItemText: { color: '#fbbf24', fontSize: 9, fontWeight: '800' },
+  coverageItemTextCovered: { color: '#bbf7d0' },
+  coverageMissing: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 9 },
+  coverageComplete: { color: '#86efac', fontSize: 10, lineHeight: 15, marginTop: 9 },
+  coverageCaution: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 7 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 10 },
   filteredEmpty: { alignItems: 'center', backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, paddingVertical: 34, paddingHorizontal: 16, gap: 8, marginTop: 12 },
   emptyTitle: { color: '#c8e8f0', fontSize: 17, fontWeight: '800', marginTop: 8 },

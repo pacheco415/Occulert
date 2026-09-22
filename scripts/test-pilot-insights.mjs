@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   formatPilotCounts,
+  summarizePilotCoverage,
   summarizePilotIssues,
 } from '../native-app/lib/pilotInsights.ts';
 import {
@@ -150,4 +151,38 @@ test('pilot count formatting stays compact and handles no recorded context', () 
   assert.deepEqual(summaries[0]?.sensitivities, []);
   assert.deepEqual(summaries[0]?.conditions, []);
   assert.equal(summaries[1]?.total, 0);
+});
+
+test('pilot coverage names represented and missing condition variants', () => {
+  const coverage = summarizePilotCoverage([
+    { testConditions: { lighting: 'daylight', eyewear: 'none', phonePosition: 'center' } },
+    { testConditions: { lighting: 'low_light', eyewear: 'glasses', phonePosition: 'low' } },
+    { testConditions: { lighting: 'low_light', eyewear: 'glasses', phonePosition: 'low' } },
+  ]);
+
+  assert.equal(coverage.coveredCount, 6);
+  assert.equal(coverage.totalCount, 8);
+  assert.deepEqual(coverage.missingLabels, ['Sunglasses', 'High phone']);
+  assert.deepEqual(
+    coverage.items.filter(item => item.count > 0).map(item => [item.label, item.count]),
+    [
+      ['Daylight', 1],
+      ['Low light', 2],
+      ['No eyewear', 1],
+      ['Glasses', 2],
+      ['Center phone', 1],
+      ['Low phone', 2],
+    ],
+  );
+});
+
+test('pilot coverage recognizes every planned condition variant', () => {
+  const coverage = summarizePilotCoverage([
+    { testConditions: { lighting: 'daylight', eyewear: 'none', phonePosition: 'high' } },
+    { testConditions: { lighting: 'low_light', eyewear: 'glasses', phonePosition: 'center' } },
+    { testConditions: { lighting: 'daylight', eyewear: 'sunglasses', phonePosition: 'low' } },
+  ]);
+
+  assert.equal(coverage.coveredCount, coverage.totalCount);
+  assert.deepEqual(coverage.missingLabels, []);
 });
