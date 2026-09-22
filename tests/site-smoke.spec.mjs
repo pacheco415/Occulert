@@ -20,11 +20,7 @@ for (const path of ["/account.html", "/login.html", "/driver-profiles.html", "/f
     page.on("pageerror", error => pageErrors.push(error.message));
     const response = await page.goto(path, { waitUntil: "domcontentloaded" });
     expect(response?.ok(), `${path} should load`).toBeTruthy();
-    if (['/faq.html', '/about.html'].includes(path)) {
-      await expect(page.locator('main .section-title')).toBeVisible();
-    } else {
-      expect(await page.locator("h1").count(), `${path} should have one h1`).toBe(1);
-    }
+    expect(await page.locator("h1").count(), `${path} should have one h1`).toBe(1);
     const robots = await page.locator('meta[name="robots"]').evaluateAll(elements => elements[0]?.content || '');
     if (path !== '/login.html' && !robots?.includes('noindex')) {
       expect(await page.locator('link[rel="canonical"]').count(), `${path} should have a canonical URL`).toBe(1);
@@ -139,6 +135,20 @@ test("product, safety, privacy, and fleet pages offer a keyboard shortcut to mai
     await page.goto(path, { waitUntil: "domcontentloaded" });
     await expect(page.locator('script[src="/static-page.v52.js"]')).toHaveCount(1);
   }
+});
+
+test("driver app and local history expose accessible main content and controls", async ({ page }) => {
+  for (const path of ["/app.html", "/session-history.html"]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
+    await skipLink.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content"), `${path} should focus its main content`).toBeFocused();
+  }
+
+  await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { level: 1, name: "AI Fatigue Monitoring" })).toBeVisible();
+  await expect(page.getByRole("slider", { name: /Night Alert Brightness/ })).toBeVisible();
 });
 
 test("privacy page explains local history, recovery, sharing, and separate cloud deletion", async ({ page }) => {

@@ -14,8 +14,11 @@
 <!-- The supported cloud path uses authenticated Occulert API endpoints. -->
 <link rel="stylesheet" href="/driver-app.v47.css" />
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
+<link rel="stylesheet" href="/accessibility.v52.css" />
+<script src="/static-page.v52.js" defer></script>
 </head>
 <body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
 <div class="top">
   <div class="brandrow">
     <a class="brand" href="/" aria-label="Occulert home">
@@ -36,12 +39,12 @@
     <div class="status" id="status">OFFLINE</div>
   </div>
 </div>
-<div class="app">
+<main class="app" id="main-content" tabindex="-1">
   <div class="camera">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
     <div class="overlay" id="overlay"><div>
-      <h2 id="overlayTitle" style="font-size:22px;font-weight:900;letter-spacing:-0.5px">AI Fatigue Monitoring</h2>
+      <h1 id="overlayTitle" style="font-size:22px;font-weight:900;letter-spacing:-0.5px">AI Fatigue Monitoring</h1>
       <p class="small" id="overlayText">Supplemental prototype only. Keep your eyes on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.</p>
       <div class="phone-guide" id="phoneGuide">
         <div class="guide-step"><div class="guide-icon">&#128241;</div><div class="guide-label">Mount on dash</div></div>
@@ -54,7 +57,7 @@
       </div>
       <div class="hint" id="overlayHint"><strong>iPhone tip:</strong> Keep Safari open, screen unlocked, and Low Power Mode off for best reliability.</div>
     </div></div>
-    <div class="alertScreen" id="alertScreen"><div><h1 id="alertTitle">DROWSY ALERT</h1><p id="alertSub">Pull over safely</p></div></div>
+    <div class="alertScreen" id="alertScreen"><div><h2 id="alertTitle">DROWSY ALERT</h2><p id="alertSub">Pull over safely</p></div></div>
   </div>
   <aside class="panel" aria-label="Occulert controls and metrics">
 
@@ -100,7 +103,7 @@
     </div>
 
 
-    <div class="night-row"><label>&#127761; Night Alert Brightness<span style="font-size:10px;color:var(--text3);margin-left:6px;font-weight:400;font-style:italic">Alert screen opacity</span></label><div class="night-slider"><input type="range" id="nightOpacity" min="30" max="95" value="72" step="1"><span class="night-val" id="nightVal">72%</span></div></div>
+    <div class="night-row"><label for="nightOpacity">&#127761; Night Alert Brightness<span style="font-size:10px;color:var(--text3);margin-left:6px;font-weight:400;font-style:italic">Alert screen opacity</span></label><div class="night-slider"><input type="range" id="nightOpacity" min="30" max="95" value="72" step="1"><span class="night-val" id="nightVal">72%</span></div></div>
     <div class="card privacy-card"><div class="label">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b>Enable GPS for this session</b><br><span class="small">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b>Enable cloud session sync</b><br><span class="small">Requires sign-in and saves session totals plus alerts. Camera images are never uploaded. Otherwise data stays local.</span></span></label></div>
     <div class="card"><div class="label">Calibration</div><div class="value" id="calibration">READY</div><div class="cal-bar-wrap"><div class="cal-bar-fill" id="calibrationFill"></div></div><p class="metric-note" id="calHint">Keep your face centered and eyes open during calibration.</p></div>
     <div class="grid">
@@ -167,7 +170,7 @@
       <button id="pwaInstallBtn" onclick="typeof triggerPWAInstall==='function'&&triggerPWAInstall()" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
     </div>
 </aside>
-</div>
+</main>
 <script src="/occulert-backend.v47.js"></script>
 <script src="/security-utils.v47.js"></script>
 <script src="/driver-app.v48.js"></script>

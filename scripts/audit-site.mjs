@@ -125,6 +125,8 @@ for (const page of ["about.html", "faq.html", "features.html", "how-it-works.htm
   assertIncludes(page, '<link rel="stylesheet" href="/accessibility.v52.css" />', `${page} must use the shared keyboard-navigation layer`);
   assertIncludes(page, '<script src="/public-page.v51.js"></script>', `${page} must use the shared accessible navigation behavior`);
 }
+assertIncludes("about.html", '<h1 class="section-title">Why We Are Testing Occulert</h1>', "About must expose its page title as the main heading");
+assertIncludes("faq.html", '<h1 class="section-title">Common Questions</h1>', "FAQ must expose its page title as the main heading");
 assertIncludes("public-page.v51.js", "setAttribute('aria-expanded',String(open))", "public-page menus must announce expanded state");
 assertIncludes("public-page.v51.js", "event.key==='Escape'", "public-page menus must close with Escape");
 assertNotIncludes("about.html", "™<!DOCTYPE html>", "About must start with a valid doctype");
@@ -203,6 +205,14 @@ for (const accessibilityBoundary of [
 assertIncludes("app.html", "<link rel=\"stylesheet\" href=\"/driver-app.v47.css\" />", "driver app must load its external stylesheet");
 assertNotIncludes("app.html", "<style>", "driver app must keep its styles out of the HTML document");
 assertIncludes("app.html", "<script src=\"/driver-app.v48.js\"></script>", "driver app must load its external behavior script");
+for (const path of ["app.html", "session-history.html"]) {
+  assertIncludes(path, 'class="skip-link" href="#main-content"', `${path} must let keyboard users skip repeated navigation`);
+  assertIncludes(path, 'id="main-content" tabindex="-1"', `${path} must expose a focusable main destination`);
+  assertIncludes(path, '<link rel="stylesheet" href="/accessibility.v52.css" />', `${path} must use the shared keyboard-navigation layer`);
+}
+assertIncludes("app.html", '<h1 id="overlayTitle"', "driver app must expose a visible main heading");
+assertIncludes("app.html", '<h2 id="alertTitle">DROWSY ALERT</h2>', "driver alert overlay must not replace the page's main heading");
+assertIncludes("app.html", '<label for="nightOpacity">', "driver app must label the night alert brightness slider");
 const driverAppInlineScripts = [...read("app.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
 if (driverAppInlineScripts !== 0) fail(`driver app must keep its scripts out of the HTML document (found ${driverAppInlineScripts})`);
 const driverAppPage = read("app.html");
