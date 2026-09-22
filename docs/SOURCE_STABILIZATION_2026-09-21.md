@@ -17,6 +17,9 @@ queuing a native build or publishing the website.
   Transparency support.
 - Stabilization review fixed a stale-confirmation deletion race and made history
   reads wait for pending local writes before updating the screen.
+- A temporary local-storage read failure now keeps any last-loaded sessions
+  visible, explains that saved data was not deleted, and offers an accessible
+  retry instead of showing a misleading empty-history screen.
 
 ## Local verification completed
 

@@ -179,6 +179,8 @@ export default function HistoryScreen() {
   const router = useRouter();
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [historyLoadError, setHistoryLoadError] = useState(false);
+  const [historyLoadBusy, setHistoryLoadBusy] = useState(true);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
   const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
@@ -188,6 +190,7 @@ export default function HistoryScreen() {
   const load = useCallback(async () => {
     const revision = historyRevisionRef.current;
     const filterRevision = filterRevisionRef.current;
+    setHistoryLoadBusy(true);
     try {
       const [storedSessions, savedFilter] = await Promise.all([
         loadSessionHistory<SessionRecord>(),
@@ -195,14 +198,16 @@ export default function HistoryScreen() {
       ]);
       if (historyRevisionRef.current === revision) {
         setSessions(storedSessions);
+        setHistoryLoadError(false);
         if (filterRevisionRef.current === filterRevision) {
           setHistoryFilter(normalizeHistoryFilter(savedFilter));
         }
       }
     } catch {
-      if (historyRevisionRef.current === revision) setSessions([]);
+      if (historyRevisionRef.current === revision) setHistoryLoadError(true);
     } finally {
       setLoaded(true);
+      setHistoryLoadBusy(false);
     }
   }, []);
 
@@ -374,6 +379,30 @@ export default function HistoryScreen() {
       <ScrollView contentContainerStyle={s.scroll}>
         <Text style={s.title}>Session History</Text>
 
+        {loaded && historyLoadError && (
+          <View accessibilityRole="alert" style={s.loadError}>
+            <Ionicons name="warning-outline" size={21} color="#fbbf24" />
+            <View style={s.loadErrorCopy}>
+              <Text style={s.loadErrorTitle}>Couldn’t load local history</Text>
+              <Text style={s.loadErrorDetail}>
+                {sessions.length > 0
+                  ? 'The last loaded sessions remain visible below. Retry to confirm they are current.'
+                  : 'Your saved sessions were not deleted. Try reading them from this iPhone again.'}
+              </Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={historyLoadBusy ? 'Retrying local session history' : 'Retry local session history'}
+                accessibilityState={{ disabled: historyLoadBusy, busy: historyLoadBusy }}
+                disabled={historyLoadBusy}
+                onPress={() => { void load(); }}
+                style={s.loadRetry}
+              >
+                <Text style={s.loadRetryText}>{historyLoadBusy ? 'Retrying…' : 'Try again'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {loaded && sessions.length > 0 && (
           <>
             <View style={s.historySummary}>
@@ -525,7 +554,7 @@ export default function HistoryScreen() {
           </View>
         )}
 
-        {loaded && sessions.length === 0 && (
+        {loaded && !historyLoadError && sessions.length === 0 && (
           <View style={s.empty}>
             <Ionicons name="time-outline" size={40} color="#4a7a8a" />
             <Text style={s.emptyTitle}>No sessions yet</Text>
@@ -819,6 +848,12 @@ const s = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 20, paddingBottom: 48 },
   title: { color: colors.text, fontSize: 32, fontWeight: '800', letterSpacing: -0.8, marginBottom: 20 },
+  loadError: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: 'rgba(251,191,36,0.08)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.28)', borderRadius: radii.large, padding: 14, marginBottom: 16 },
+  loadErrorCopy: { minWidth: 0, flex: 1 },
+  loadErrorTitle: { color: '#fde68a', fontSize: 13, fontWeight: '900' },
+  loadErrorDetail: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 3 },
+  loadRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 18 },
+  loadRetryText: { color: '#93c5fd', fontSize: 12, fontWeight: '900' },
   historySummary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, paddingVertical: 13, marginBottom: 12 },
   historySummaryItem: { flexGrow: 1, flexBasis: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   historySummaryValue: { color: '#e0f2fe', fontSize: 19, fontWeight: '900' },

@@ -367,6 +367,18 @@ test('History deletion captures the confirmed record before the alert can become
   assert.doesNotMatch(deletion, /const target = sessions\[index\]/);
 });
 
+test('History load failures stay visible without pretending saved sessions are empty', () => {
+  const history = read('native-app/app/history.tsx');
+  const loadStart = history.indexOf('const load = useCallback');
+  const load = history.slice(loadStart, history.indexOf('useFocusEffect', loadStart));
+  assert.match(load, /setHistoryLoadError\(true\)/);
+  assert.doesNotMatch(load, /catch \{[\s\S]*setSessions\(\[\]\)/);
+  assert.match(history, /Couldn’t load local history/);
+  assert.match(history, /Your saved sessions were not deleted/);
+  assert.match(history, /accessibilityLabel=\{historyLoadBusy \? 'Retrying local session history'/);
+  assert.match(history, /!historyLoadError && sessions\.length === 0/);
+});
+
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
   const app = read('driver-app.v48.js');
   assert.doesNotMatch(app, /Snooze 5m|function isSnoozed|Alert snoozed/);
