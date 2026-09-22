@@ -31,15 +31,22 @@ queuing a native build or publishing the website.
   so restored routes and direct navigation cannot bypass the Home-screen guard.
 - A recovery-blocked monitoring screen now provides a direct accessible action
   back to Home, where the interrupted-drive recovery check can run again.
+- The final browser sweep fixed a fleet-dashboard startup race so local demo
+  rows remain visible when the signed-out status check finishes, while any
+  protected account data is still cleared on sign-out.
 
 ## Local verification completed
 
-- Full source verification suite passed.
+- Final consolidated source verification suite passed after recovery hardening.
 - Native TypeScript check passed.
 - Expo dependency compatibility check passed without changing dependencies.
 - Website asset-version, integrity, cache-policy, offline-shell, and CSP checks
   passed.
 - 192 browser tests passed in Chromium and WebKit.
+- The fleet demo startup race also passed 10 focused repeat runs across Chromium
+  and WebKit.
+- Final privacy, recovery, destructive-action, and data-loss review found no
+  remaining source-level blockers.
 - No native build, TestFlight submission, website deployment, push, or pull
   request was created.
 

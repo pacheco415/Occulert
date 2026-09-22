@@ -453,6 +453,8 @@ test("fleet filtering preserves input focus and updates only the visible roster"
   await page.locator(".dashboard-tools").getByText("Dashboard tools", { exact: true }).click();
   await page.locator(".dashboard-tools").getByRole("button", { name: "Load Demo Data" }).click();
   await expect(page.locator(".driver")).toHaveCount(3);
+  await page.waitForTimeout(300);
+  await expect(page.locator(".driver")).toHaveCount(3);
 
   const search = page.locator("#driverSearch");
   await search.fill("Mina");
