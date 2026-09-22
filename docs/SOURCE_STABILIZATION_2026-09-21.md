@@ -59,6 +59,10 @@ queuing a native build or publishing the website.
 - The final browser sweep fixed a fleet-dashboard startup race so local demo
   rows remain visible when the signed-out status check finishes, while any
   protected account data is still cleared on sign-out.
+- About and FAQ expose proper page headings; the web Driver App and Session
+  History offer keyboard skip links. The Driver App's main heading stays
+  available when the camera guidance overlay closes, and the night-alert
+  brightness slider has an associated label.
 
 ## Local verification completed
 
@@ -67,13 +71,15 @@ queuing a native build or publishing the website.
 - Expo dependency compatibility check passed without changing dependencies.
 - Website asset-version, integrity, cache-policy, offline-shell, and CSP checks
   passed.
-- 194 browser tests passed in Chromium and WebKit.
+- 196 browser tests passed in Chromium and WebKit after the first accessibility
+  pass; six focused browser checks passed after keeping the Driver App heading
+  visible during monitoring.
 - The fleet demo startup race also passed 10 focused repeat runs across Chromium
   and WebKit.
 - Final privacy, recovery, destructive-action, and data-loss review found no
   remaining source-level blockers.
-- No native build, TestFlight submission, website deployment, push, or pull
-  request was created.
+- Draft PR #132 contains this source work. No native build, TestFlight
+  submission, production website deployment, or merge was initiated.
 
 ## Physical-device checklist for a future approved build
 

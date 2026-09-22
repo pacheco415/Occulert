@@ -147,7 +147,7 @@ test("driver app and local history expose accessible main content and controls",
   }
 
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { level: 1, name: "AI Fatigue Monitoring" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Driver monitoring" })).toBeVisible();
   await expect(page.getByRole("slider", { name: /Night Alert Brightness/ })).toBeVisible();
 });
 
@@ -568,6 +568,8 @@ test("driver alerts enhance only successful triggers and sensitivity is unambigu
   expect(await page.locator('input[oninput*="setSensitivity"]').count()).toBe(0);
 
   await page.evaluate(() => demoAlert());
+  await expect(page.locator("#overlay")).toHaveClass(/hide/);
+  await expect(page.getByRole("heading", { level: 1, name: "Driver monitoring" })).toBeVisible();
   await expect(page.locator("#alerts")).toHaveText("1");
   const firstAlertLogs = await page.evaluate(() => _sessionLog.filter((entry) => entry.type === "alert").length);
   expect(firstAlertLogs).toBe(1);

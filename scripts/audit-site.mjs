@@ -210,8 +210,9 @@ for (const path of ["app.html", "session-history.html"]) {
   assertIncludes(path, 'id="main-content" tabindex="-1"', `${path} must expose a focusable main destination`);
   assertIncludes(path, '<link rel="stylesheet" href="/accessibility.v52.css" />', `${path} must use the shared keyboard-navigation layer`);
 }
-assertIncludes("app.html", '<h1 id="overlayTitle"', "driver app must expose a visible main heading");
-assertIncludes("app.html", '<h2 id="alertTitle">DROWSY ALERT</h2>', "driver alert overlay must not replace the page's main heading");
+assertIncludes("app.html", '<h1 style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>', "driver app must keep its main heading visible while monitoring");
+assertIncludes("app.html", '<h2 id="overlayTitle"', "camera guidance must remain a subordinate heading");
+assertIncludes("app.html", '<h2 id="alertTitle"', "driver alert overlay must not replace the page's main heading");
 assertIncludes("app.html", '<label for="nightOpacity">', "driver app must label the night alert brightness slider");
 const driverAppInlineScripts = [...read("app.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
 if (driverAppInlineScripts !== 0) fail(`driver app must keep its scripts out of the HTML document (found ${driverAppInlineScripts})`);
