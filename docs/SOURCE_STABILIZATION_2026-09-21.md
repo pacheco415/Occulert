@@ -27,6 +27,8 @@ queuing a native build or publishing the website.
   announce their pending state, and temporarily disable conflicting controls.
 - Session History now shows a clear first-load status and ignores older reads
   that finish after a newer refresh or after the user leaves the screen.
+- Session History now groups its newest-first results into Today, Yesterday,
+  and Earlier, with clearer borders for recovered and unfinished reviews.
 - Settings now keeps destructive local-data controls disabled until session and
   recovery status are confirmed, explains read failures, and offers a retry.
 - Home now prevents a new session from starting while interrupted-drive

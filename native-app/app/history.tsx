@@ -25,6 +25,7 @@ import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import type { MonitorPerformanceSnapshot } from '../lib/monitorPerformance';
 import {
+  groupIndexedSessionsByDate,
   normalizeHistoryFilter,
   sortIndexedSessionsNewest,
   type HistoryFilter,
@@ -411,6 +412,7 @@ export default function HistoryScreen() {
       if (historyFilter === 'needs-review') return !item.recoveredFromInterruption && !hasCompleteReview(item);
       return true;
     });
+  const groupedFilteredSessions = groupIndexedSessionsByDate(filteredSessions);
   const sessionOperationsBusy = Object.keys(sessionOperations).length > 0;
   const filteredEmptyCopy: Record<Exclude<HistoryFilter, 'all'>, { title: string; detail: string }> = {
     'needs-review': {
@@ -659,14 +661,33 @@ export default function HistoryScreen() {
           </View>
         )}
 
-        {filteredSessions.map(({ item, index: i }) => {
+        {groupedFilteredSessions.map(group => (
+          <React.Fragment key={group.key}>
+            <View
+              accessible
+              accessibilityRole="header"
+              accessibilityLabel={`${group.label}, ${group.sessions.length} ${group.sessions.length === 1 ? 'session' : 'sessions'}`}
+              style={s.dateGroupHeader}
+            >
+              <Text style={s.dateGroupTitle}>{group.label}</Text>
+              <Text style={s.dateGroupCount}>{group.sessions.length}</Text>
+            </View>
+        {group.sessions.map(({ item, index: i }) => {
           const sessionKey = sessionRecordKey(item, i);
           const sessionOperation = sessionOperations[sessionKey];
           const sessionBusy = Boolean(sessionOperation);
           const reviewComplete = hasCompleteReview(item);
           const isExpanded = expandedSessions[sessionKey] ?? false;
           return (
-          <View key={sessionKey} style={s.card}>
+          <View
+            key={sessionKey}
+            style={[
+              s.card,
+              item.recoveredFromInterruption
+                ? s.cardRecovered
+                : !reviewComplete && s.cardNeedsReview,
+            ]}
+          >
             <View style={s.rowBetween}>
               <Text style={s.date}>{fmtDate(item.savedAt || item.updatedAt)}</Text>
               <Text style={s.dur}>{fmtDuration(item.durationSec)}</Text>
@@ -933,6 +954,8 @@ export default function HistoryScreen() {
           </View>
           );
         })}
+          </React.Fragment>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -993,7 +1016,12 @@ const s = StyleSheet.create({
   ctaTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
   clearFilterButton: { minHeight: 44, justifyContent: 'center', marginTop: 8, paddingHorizontal: 14 },
   clearFilterText: { color: '#93c5fd', fontSize: 12, fontWeight: '800' },
+  dateGroupHeader: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 8, paddingHorizontal: 4 },
+  dateGroupTitle: { flex: 1, color: '#bae6fd', fontSize: 12, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase' },
+  dateGroupCount: { flexShrink: 0, minWidth: 28, color: '#6592a5', fontSize: 11, fontWeight: '900', textAlign: 'right' },
   card: { backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, padding: 18, marginBottom: 12 },
+  cardNeedsReview: { borderColor: 'rgba(251,191,36,0.35)' },
+  cardRecovered: { borderColor: 'rgba(74,222,128,0.35)' },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
   date: { flex: 1, color: '#c8e8f0', fontSize: 13, fontWeight: '700' },
   dur: { flexShrink: 0, color: '#60a5fa', fontSize: 13, fontWeight: '800' },

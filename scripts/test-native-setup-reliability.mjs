@@ -12,6 +12,7 @@ import {
   recoveredSessionFromCheckpoint,
 } from '../native-app/lib/sessionRecoveryModel.ts';
 import {
+  groupIndexedSessionsByDate,
   normalizeHistoryFilter,
   sortIndexedSessionsNewest,
 } from '../native-app/lib/historyPreferences.ts';
@@ -159,6 +160,26 @@ test('session history restores only known filters and sorts newest without losin
   assert.deepEqual(sorted.map(entry => entry.index), [2, 3, 0, 1]);
 });
 
+test('session history groups sorted records by local calendar day without losing storage indexes', () => {
+  const now = new Date(2026, 8, 21, 12, 0, 0).getTime();
+  const sorted = sortIndexedSessionsNewest([
+    { sessionId: 'earlier', savedAt: new Date(2026, 8, 18, 16, 0, 0).toISOString() },
+    { sessionId: 'today', savedAt: new Date(2026, 8, 21, 8, 0, 0).toISOString() },
+    { sessionId: 'yesterday', savedAt: new Date(2026, 8, 20, 22, 0, 0).toISOString() },
+    { sessionId: 'future', savedAt: new Date(2026, 8, 22, 8, 0, 0).toISOString() },
+    { sessionId: 'invalid', savedAt: 'not-a-date' },
+  ]);
+  const groups = groupIndexedSessionsByDate(sorted, now);
+
+  assert.deepEqual(groups.map(group => group.label), ['Today', 'Yesterday', 'Earlier']);
+  assert.deepEqual(groups.map(group => group.sessions.map(session => session.item.sessionId)), [
+    ['today'],
+    ['yesterday'],
+    ['future', 'earlier', 'invalid'],
+  ]);
+  assert.deepEqual(groups.flatMap(group => group.sessions.map(session => session.index)), [1, 2, 3, 0, 4]);
+});
+
 test('native screens wire setup preview and recovery without changing detection inputs', () => {
   const monitor = read('native-app/app/monitor.tsx');
   const home = read('native-app/app/index.tsx');
@@ -200,7 +221,10 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(history, /Recovered partial sessions are excluded/);
   assert.match(historyPreferences, /type HistoryFilter = 'all' \| 'needs-review' \| 'reviewed' \| 'recovered'/);
   assert.match(history, /accessibilityState=\{\{ selected \}\}/, 'history filters must expose their selected state');
-  assert.match(history, /filteredSessions\.map\(\(\{ item, index: i \}\)/, 'filtered edits must retain their original stored index');
+  assert.match(history, /group\.sessions\.map\(\(\{ item, index: i \}\)/, 'grouped filtered edits must retain their original stored index');
+  assert.match(history, /accessibilityLabel=\{`\$\{group\.label\}, \$\{group\.sessions\.length\}/, 'date groups must announce their label and session count');
+  assert.match(history, /cardNeedsReview/);
+  assert.match(history, /cardRecovered/);
   assert.match(history, /Showing \{filteredSessions\.length\} of \{sessions\.length\} sessions/);
   assert.match(history, /All caught up/);
   assert.match(history, /AsyncStorage\.setItem\(HISTORY_FILTER_KEY, filter\)/);
