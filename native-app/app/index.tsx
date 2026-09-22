@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -55,6 +56,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [recoveryState, setRecoveryState] = useState<'checking' | 'idle' | 'recovered' | 'error'>('checking');
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
+  const recoveryBlocksStart = recoveryState === 'checking' || recoveryState === 'error';
 
   useEffect(() => {
     let active = true;
@@ -119,6 +121,20 @@ export default function HomeScreen() {
           </Text>
         </View>
 
+        {recoveryState === 'checking' && (
+          <View
+            accessibilityLabel="Checking for an interrupted previous drive"
+            accessibilityLiveRegion="polite"
+            style={styles.recoveryCheckingBox}
+          >
+            <ActivityIndicator size="small" color={colors.cyan} />
+            <View style={styles.recoveryCopy}>
+              <Text style={styles.recoveryCheckingTitle}>Checking the previous drive</Text>
+              <Text style={styles.recoveryDetail}>A new session will be available when this local recovery check finishes.</Text>
+            </View>
+          </View>
+        )}
+
         {recoveryState === 'recovered' && (
           <TouchableOpacity
             accessibilityRole="button"
@@ -159,13 +175,22 @@ export default function HomeScreen() {
         )}
 
         <GlassSurface
-          interactive
-          style={styles.startSurface}
+          interactive={!recoveryBlocksStart}
+          style={[styles.startSurface, recoveryBlocksStart && styles.startSurfaceDisabled]}
           tintColor="rgba(42, 105, 244, 0.58)"
         >
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Begin pre-drive safety check"
+            accessibilityLabel={recoveryBlocksStart
+              ? 'Pre-drive safety check unavailable while previous drive recovery is unresolved'
+              : 'Begin pre-drive safety check'}
+            accessibilityHint={recoveryState === 'checking'
+              ? 'Wait for the local recovery check to finish'
+              : recoveryState === 'error'
+                ? 'Retry previous drive recovery before starting another session'
+                : 'Opens the parked pre-drive safety confirmation'}
+            accessibilityState={{ disabled: recoveryBlocksStart, busy: recoveryState === 'checking' }}
+            disabled={recoveryBlocksStart}
             onPress={() => router.push('/pre-drive')}
             activeOpacity={0.82}
             style={styles.startButton}
@@ -174,8 +199,8 @@ export default function HomeScreen() {
               <Ionicons name="shield-checkmark" size={22} color={colors.text} />
             </View>
             <View style={styles.startCopy}>
-              <Text style={styles.startLabel}>Begin safely</Text>
-              <Text style={styles.startDetail}>Pre-drive check</Text>
+              <Text style={styles.startLabel}>{recoveryState === 'checking' ? 'Checking previous drive…' : recoveryState === 'error' ? 'Recovery check required' : 'Begin safely'}</Text>
+              <Text style={styles.startDetail}>{recoveryBlocksStart ? 'Resolve local recovery first' : 'Pre-drive check'}</Text>
             </View>
             <Ionicons name="arrow-forward" size={20} color={colors.text} />
           </TouchableOpacity>
@@ -274,6 +299,8 @@ const styles = StyleSheet.create({
   recoveryCopy: { flex: 1 },
   recoveryTitle: { color: '#b7f7cb', fontSize: 13, fontWeight: '800' },
   recoveryDetail: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  recoveryCheckingBox: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(100,210,255,0.07)', borderWidth: 1, borderColor: 'rgba(100,210,255,0.2)', borderRadius: radii.medium, padding: 14, marginBottom: 16 },
+  recoveryCheckingTitle: { color: '#bae6fd', fontSize: 13, fontWeight: '800' },
   recoveryErrorBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -305,6 +332,7 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },
   },
+  startSurfaceDisabled: { opacity: 0.5, shadowOpacity: 0 },
   startButton: {
     minHeight: 86,
     flexDirection: 'row',

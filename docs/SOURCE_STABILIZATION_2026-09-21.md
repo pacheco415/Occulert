@@ -24,6 +24,9 @@ queuing a native build or publishing the website.
   announce their pending state, and temporarily disable conflicting controls.
 - Settings now keeps destructive local-data controls disabled until session and
   recovery status are confirmed, explains read failures, and offers a retry.
+- Home now prevents a new session from starting while interrupted-drive
+  recovery is still checking or has failed, protecting an unresolved checkpoint
+  from being replaced before retry succeeds.
 
 ## Local verification completed
 

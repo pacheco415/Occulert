@@ -169,6 +169,11 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(home, /must never replace the complete record with an older partial copy/);
   assert.match(home, /setRecoveryState\('error'\)/, 'a failed recovery check must become visible');
   assert.match(home, /accessibilityLabel="Retry previous drive recovery"/, 'failed recovery must provide an accessible retry');
+  assert.match(home, /recoveryState === 'checking' \|\| recoveryState === 'error'/, 'unresolved recovery must block a new session');
+  assert.match(home, /disabled=\{recoveryBlocksStart\}/, 'the pre-drive action must stay disabled until recovery resolves');
+  assert.match(home, /busy: recoveryState === 'checking'/, 'the recovery check must expose its pending state');
+  assert.match(home, /Checking the previous drive/);
+  assert.match(home, /Retry previous drive recovery before starting another session/);
   assert.doesNotMatch(home, /recoverInterruptedDrive\(\)\.catch\(\(\) => \{\}\)/, 'recovery failures must not be silently swallowed');
   assert.match(history, /Recovered local checkpoint/);
   assert.match(history, /sessions\.filter\(item => !item\.recoveredFromInterruption\)/);
