@@ -11,6 +11,7 @@ import {
   incompleteSessionReviewQueue,
 } from '../native-app/lib/sessionReviewProgress.ts';
 import { sortIndexedSessionsNewest } from '../native-app/lib/historyPreferences.ts';
+import { buildPilotProgressExport } from '../native-app/lib/pilotProgressExport.ts';
 
 test('session review progress identifies every missing pilot detail', () => {
   const progress = getSessionReviewProgress({
@@ -185,4 +186,41 @@ test('pilot coverage recognizes every planned condition variant', () => {
 
   assert.equal(coverage.coveredCount, coverage.totalCount);
   assert.deepEqual(coverage.missingLabels, []);
+});
+
+test('pilot progress export stays aggregate, privacy-limited, and evidence-bounded', () => {
+  const complete = {
+    alertAssessment: 'false_alert',
+    sensitivity: 'medium',
+    testConditions: { lighting: 'low_light', eyewear: 'glasses', phonePosition: 'low' },
+    deviceImpact: { batteryImpact: 'noticeable', phoneHeat: 'warm' },
+  };
+  const report = buildPilotProgressExport([
+    {
+      ...complete,
+      sessionId: 'private-session-id',
+      savedAt: '2026-09-22T12:34:56.000Z',
+      driverId: 'private-driver-id',
+      monitorPerformance: { private: true },
+    },
+    {
+      ...complete,
+      alertAssessment: 'accurate',
+      testConditions: { lighting: 'daylight', eyewear: 'none', phonePosition: 'center' },
+      deviceImpact: { batteryImpact: 'low', phoneHeat: 'cool' },
+    },
+    { ...complete, recoveredFromInterruption: true },
+    { sensitivity: 'medium', alertAssessment: 'missed_alert' },
+  ], 10, new Date('2026-09-22T20:00:00.000Z'));
+
+  assert.match(report, /Medium review target: 2 of 10/);
+  assert.match(report, /Complete local reviews: 2/);
+  assert.match(report, /Recovered partial sessions excluded: 1/);
+  assert.match(report, /Condition coverage: 6 of 8 planned variants represented/);
+  assert.match(report, /Still needed: Sunglasses, High phone/);
+  assert.match(report, /Felt right 1 · False alerts 1 · Missed alerts 0 · Late alerts 0/);
+  assert.match(report, /Battery use: Low 1 · Noticeable 1 · High 0/);
+  assert.match(report, /counts, not accuracy or safety-effectiveness rates/);
+  assert.match(report, /excludes session and driver identifiers/);
+  assert.doesNotMatch(report, /private-session-id|private-driver-id|2026-09-22T12:34:56/);
 });

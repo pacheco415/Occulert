@@ -242,6 +242,9 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(history, /summarizePilotCoverage\(reviewedMedium\)/);
   assert.match(history, /Still needed: \$\{pilotCoverage\.missingLabels\.join\(', '\)\}/);
   assert.match(history, /one session in a condition is not enough to establish accuracy/i);
+  assert.match(history, /buildPilotProgressExport\(sessions, CHECKPOINT_TARGET\)/);
+  assert.match(history, /Share pilot progress/);
+  assert.match(history, /Aggregate counts only · no session or driver identifiers/);
   assert.match(history, /Showing \{filteredSessions\.length\} of \{sessions\.length\} sessions/);
   assert.match(history, /All caught up/);
   assert.match(history, /AsyncStorage\.setItem\(HISTORY_FILTER_KEY, filter\)/);

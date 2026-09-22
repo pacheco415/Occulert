@@ -32,6 +32,7 @@ import {
   type HistoryFilter,
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
+import { buildPilotProgressExport } from '../lib/pilotProgressExport';
 import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
 import {
   getSessionReviewProgress,
@@ -376,6 +377,17 @@ export default function HistoryScreen() {
       });
     } catch {
       Alert.alert('Could not share summaries', 'Please try exporting the session summaries again.');
+    }
+  };
+
+  const sharePilotProgress = async () => {
+    try {
+      await Share.share({
+        title: 'Occulert pilot progress',
+        message: buildPilotProgressExport(sessions, CHECKPOINT_TARGET),
+      });
+    } catch {
+      Alert.alert('Could not share pilot progress', 'Please try exporting the aggregate pilot report again.');
     }
   };
 
@@ -730,6 +742,24 @@ export default function HistoryScreen() {
                 </Text>
               </View>
             )}
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={sessionOperationsBusy
+                ? 'Wait for session changes before sharing pilot progress'
+                : 'Share aggregate pilot progress'}
+              accessibilityHint="Opens the iPhone share sheet with condition coverage and aggregate review counts"
+              accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
+              disabled={sessionOperationsBusy}
+              onPress={() => { void sharePilotProgress(); }}
+              style={[s.pilotExportButton, sessionOperationsBusy && s.operationDisabled]}
+            >
+              <Ionicons name="document-text-outline" size={17} color="#bfdbfe" />
+              <View style={s.pilotExportCopy}>
+                <Text style={s.pilotExportTitle}>Share pilot progress</Text>
+                <Text style={s.pilotExportDetail}>Aggregate counts only · no session or driver identifiers</Text>
+              </View>
+              <Ionicons name="share-outline" size={16} color="#93c5fd" />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -1173,6 +1203,10 @@ const s = StyleSheet.create({
   coverageMissing: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 9 },
   coverageComplete: { color: '#86efac', fontSize: 10, lineHeight: 15, marginTop: 9 },
   coverageCaution: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 7 },
+  pilotExportButton: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 9, borderTopWidth: 1, borderTopColor: '#1d4f68', marginTop: 14, paddingTop: 12 },
+  pilotExportCopy: { minWidth: 0, flex: 1 },
+  pilotExportTitle: { color: '#dbeafe', fontSize: 11, fontWeight: '900' },
+  pilotExportDetail: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 2 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 10 },
   filteredEmpty: { alignItems: 'center', backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, paddingVertical: 34, paddingHorizontal: 16, gap: 8, marginTop: 12 },
   emptyTitle: { color: '#c8e8f0', fontSize: 17, fontWeight: '800', marginTop: 8 },
