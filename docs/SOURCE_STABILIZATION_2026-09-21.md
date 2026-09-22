@@ -22,6 +22,8 @@ queuing a native build or publishing the website.
   retry instead of showing a misleading empty-history screen.
 - Review changes and deletion now run one operation at a time per session,
   announce their pending state, and temporarily disable conflicting controls.
+- Settings now keeps destructive local-data controls disabled until session and
+  recovery status are confirmed, explains read failures, and offers a retry.
 
 ## Local verification completed
 

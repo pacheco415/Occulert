@@ -130,6 +130,7 @@ export default function SettingsScreen() {
   const [deviceRefreshBusy, setDeviceRefreshBusy] = useState(false);
   const [localSessionCount, setLocalSessionCount] = useState<number | null>(null);
   const [recoveryDataPresent, setRecoveryDataPresent] = useState<boolean | null>(null);
+  const [localDataStatusBusy, setLocalDataStatusBusy] = useState(true);
   const [localDataBusy, setLocalDataBusy] = useState(false);
   // This parked-only test must release the shared iOS audio session when the
   // tone ends so music and navigation audio can return to their normal level.
@@ -137,6 +138,7 @@ export default function SettingsScreen() {
   const audioTestRunnerRef = useRef(createSingleFlightActionRunner());
   const watchTestRunnerRef = useRef(createSingleFlightActionRunner());
   const deviceRefreshRunnerRef = useRef(createSingleFlightActionRunner());
+  const localDataStatusRunnerRef = useRef(createSingleFlightActionRunner());
   const settingsMountedRef = useRef(true);
   const audioTestAbortRef = useRef<AbortController | null>(null);
   const watchAvailable = watchStatus.paired && watchStatus.appInstalled;
@@ -168,6 +170,28 @@ export default function SettingsScreen() {
     return () => { active = false; };
   }, []);
 
+  const refreshLocalDataStatus = useCallback(() => {
+    void localDataStatusRunnerRef.current.run({
+      action: async () => {
+        const [sessions, checkpoint] = await Promise.all([
+          loadSessionHistory(),
+          loadActiveSessionCheckpoint(),
+        ]);
+        if (!settingsMountedRef.current) return;
+        setLocalSessionCount(sessions.length);
+        setRecoveryDataPresent(Boolean(checkpoint));
+      },
+      onBusyChange: busy => {
+        if (settingsMountedRef.current) setLocalDataStatusBusy(busy);
+      },
+      onError: () => {
+        if (!settingsMountedRef.current) return;
+        setLocalSessionCount(null);
+        setRecoveryDataPresent(null);
+      },
+    });
+  }, []);
+
   useFocusEffect(useCallback(() => {
     let active = true;
     Promise.all([
@@ -180,20 +204,9 @@ export default function SettingsScreen() {
       setWatch(saved);
       setHeadphoneMotionStatus(motionStatus);
     }).catch(() => {});
-    Promise.all([
-      loadSessionHistory(),
-      loadActiveSessionCheckpoint(),
-    ]).then(([sessions, checkpoint]) => {
-      if (!active) return;
-      setLocalSessionCount(sessions.length);
-      setRecoveryDataPresent(Boolean(checkpoint));
-    }).catch(() => {
-      if (!active) return;
-      setLocalSessionCount(null);
-      setRecoveryDataPresent(null);
-    });
+    refreshLocalDataStatus();
     return () => { active = false; };
-  }, []));
+  }, [refreshLocalDataStatus]));
 
   const saveBooleanSetting = (
     key: string,
@@ -369,7 +382,7 @@ export default function SettingsScreen() {
   };
 
   const deleteAllLocalSessions = async () => {
-    if (localDataBusy) return;
+    if (localDataBusy || localDataStatusBusy || localSessionCount === null || localSessionCount === 0) return;
     setLocalDataBusy(true);
     try {
       await clearSessionHistory();
@@ -397,7 +410,7 @@ export default function SettingsScreen() {
   };
 
   const clearRecoveryData = async () => {
-    if (localDataBusy) return;
+    if (localDataBusy || localDataStatusBusy || recoveryDataPresent !== true) return;
     setLocalDataBusy(true);
     try {
       await clearActiveSessionCheckpoint();
@@ -420,6 +433,14 @@ export default function SettingsScreen() {
       ],
     );
   };
+
+  const localHistoryDeleteDisabled = localDataBusy
+    || localDataStatusBusy
+    || localSessionCount === null
+    || localSessionCount === 0;
+  const recoveryDeleteDisabled = localDataBusy
+    || localDataStatusBusy
+    || recoveryDataPresent !== true;
 
   return (
     <SafeAreaView style={s.bg}>
@@ -625,20 +646,45 @@ export default function SettingsScreen() {
           </View>
           <View accessibilityLiveRegion="polite" style={s.localDataStatus}>
             <Text style={s.localDataStatusText}>
-              {localSessionCount === null ? 'Local history count unavailable' : `${localSessionCount} local ${localSessionCount === 1 ? 'session' : 'sessions'}`}
+              {localDataStatusBusy
+                ? 'Checking local history…'
+                : localSessionCount === null
+                  ? 'Local history count unavailable'
+                  : `${localSessionCount} local ${localSessionCount === 1 ? 'session' : 'sessions'}`}
             </Text>
             <Text style={s.localDataStatusText}>
-              {recoveryDataPresent === null ? 'Recovery status unavailable' : recoveryDataPresent ? 'Recovery checkpoint saved' : 'No recovery checkpoint'}
+              {localDataStatusBusy
+                ? 'Checking recovery data…'
+                : recoveryDataPresent === null
+                  ? 'Recovery status unavailable'
+                  : recoveryDataPresent ? 'Recovery checkpoint saved' : 'No recovery checkpoint'}
             </Text>
+            {!localDataStatusBusy && (localSessionCount === null || recoveryDataPresent === null) && (
+              <>
+                <Text style={s.localDataStatusError}>
+                  Destructive controls stay unavailable until Occulert confirms what is stored on this iPhone.
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry local data status check"
+                  accessibilityHint="Checks local session history and interrupted-drive recovery data again"
+                  onPress={refreshLocalDataStatus}
+                  style={s.localDataRetry}
+                >
+                  <Ionicons name="refresh" size={15} color={colors.cyan} />
+                  <Text style={s.localDataRetryText}>TRY AGAIN</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Delete all local session history"
             accessibilityHint="Permanently removes local session summaries after confirmation without changing cloud records"
-            accessibilityState={{ disabled: localDataBusy || localSessionCount === 0, busy: localDataBusy }}
-            disabled={localDataBusy || localSessionCount === 0}
+            accessibilityState={{ disabled: localHistoryDeleteDisabled, busy: localDataBusy || localDataStatusBusy }}
+            disabled={localHistoryDeleteDisabled}
             onPress={confirmDeleteAllLocalSessions}
-            style={[s.localDataAction, (localDataBusy || localSessionCount === 0) && s.localDataActionDisabled]}
+            style={[s.localDataAction, localHistoryDeleteDisabled && s.localDataActionDisabled]}
           >
             <Ionicons name="trash-outline" size={17} color="#fca5a5" />
             <View style={s.rowCopy}>
@@ -651,10 +697,10 @@ export default function SettingsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Clear interrupted-drive recovery data"
             accessibilityHint="Removes the temporary local recovery checkpoint after confirmation"
-            accessibilityState={{ disabled: localDataBusy || recoveryDataPresent === false, busy: localDataBusy }}
-            disabled={localDataBusy || recoveryDataPresent === false}
+            accessibilityState={{ disabled: recoveryDeleteDisabled, busy: localDataBusy || localDataStatusBusy }}
+            disabled={recoveryDeleteDisabled}
             onPress={confirmClearRecoveryData}
-            style={[s.localDataAction, (localDataBusy || recoveryDataPresent === false) && s.localDataActionDisabled]}
+            style={[s.localDataAction, recoveryDeleteDisabled && s.localDataActionDisabled]}
           >
             <Ionicons name="refresh-circle-outline" size={18} color="#fca5a5" />
             <View style={s.rowCopy}>
@@ -741,6 +787,9 @@ const s = StyleSheet.create({
   privacySummaryText:{color:colors.textSecondary,fontSize:11,lineHeight:17,marginTop:3},
   localDataStatus:{gap:4,paddingHorizontal:16,paddingVertical:12,borderTopWidth:1,borderColor:colors.glassBorder},
   localDataStatusText:{color:colors.textSecondary,fontSize:11,lineHeight:16},
+  localDataStatusError:{color:'#f8d98b',fontSize:11,lineHeight:16,marginTop:5},
+  localDataRetry:{alignSelf:'flex-start',minHeight:44,flexDirection:'row',alignItems:'center',gap:7,paddingRight:16},
+  localDataRetryText:{color:colors.cyan,fontSize:11,fontWeight:'900',letterSpacing:0.55},
   localDataAction:{minHeight:64,flexDirection:'row',alignItems:'flex-start',gap:11,paddingHorizontal:16,paddingVertical:14},
   localDataActionDisabled:{opacity:0.4},
   localDataActionTitle:{color:'#fca5a5',fontSize:13,fontWeight:'800'},

@@ -216,6 +216,19 @@ test('Settings exposes scoped local-data controls without implying cloud deletio
   assert.match(recoveryStorage, /AsyncStorage\.removeItem\(ACTIVE_SESSION_KEY\)/);
 });
 
+test('Settings fails closed when local-data status is unavailable and offers retry', () => {
+  const settings = read('native-app/app/settings.tsx');
+  assert.match(settings, /localDataStatusRunnerRef\.current\.run/);
+  assert.match(settings, /setLocalSessionCount\(null\)/);
+  assert.match(settings, /setRecoveryDataPresent\(null\)/);
+  assert.match(settings, /localSessionCount === null/);
+  assert.match(settings, /recoveryDataPresent !== true/);
+  assert.match(settings, /Destructive controls stay unavailable until Occulert confirms/);
+  assert.match(settings, /accessibilityLabel="Retry local data status check"/);
+  assert.match(settings, /disabled=\{localHistoryDeleteDisabled\}/);
+  assert.match(settings, /disabled=\{recoveryDeleteDisabled\}/);
+});
+
 test('Home and Settings allow key rows to grow with larger text', () => {
   const home = read('native-app/app/index.tsx');
   const settings = read('native-app/app/settings.tsx');
