@@ -47,6 +47,8 @@ queuing a native build or publishing the website.
   phone-position variants without presenting a single observation as accuracy.
 - Session History can share a privacy-limited aggregate pilot report with
   review totals, condition gaps, device observations, and bounded pattern counts.
+- Review completion and queue advancement now require a confirmed local write;
+  a failed save leaves the form retryable without claiming the review finished.
 - Home now prevents a new session from starting while interrupted-drive
   recovery is still checking or has failed, protecting an unresolved checkpoint
   from being replaced before retry succeeds.

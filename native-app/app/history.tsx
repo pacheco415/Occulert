@@ -276,12 +276,13 @@ export default function HistoryScreen() {
 
     const completesReview = !hasCompleteSessionReview(target) && hasCompleteSessionReview(update(target));
 
-    const saved = await runSessionOperation(
+    let commitSucceeded = false;
+    const operationCompleted = await runSessionOperation(
       sessionRecordKey(target, index),
       'saving',
       async () => {
         historyRevisionRef.current += 1;
-        await commitSessionHistoryEdit({
+        commitSucceeded = await commitSessionHistoryEdit({
           update,
           persist: mutation => updateSessionHistory<SessionRecord>(stored => (
             updateMatchingSessionRecord(stored, target, index, mutation)
@@ -295,7 +296,7 @@ export default function HistoryScreen() {
       () => Alert.alert(errorTitle, errorMessage),
     );
 
-    if (saved && completesReview && !target.recoveredFromInterruption) {
+    if (operationCompleted && commitSucceeded && completesReview && !target.recoveredFromInterruption) {
       setReviewQueueMessage(null);
       const queue = incompleteSessionReviewQueue(sortIndexedSessionsNewest(sessions), index);
       if (queue.length === 0) {

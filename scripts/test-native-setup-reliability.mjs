@@ -239,6 +239,8 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(history, /chooseHistoryFilter\('needs-review'\)/);
   assert.match(history, /pendingReviewScrollRef\.current = key/);
   assert.match(history, /accessibilityRole="alert" style=\{s\.reviewQueueMessage\}/);
+  assert.match(history, /commitSucceeded = await commitSessionHistoryEdit/);
+  assert.match(history, /operationCompleted && commitSucceeded && completesReview/);
   assert.match(history, /summarizePilotCoverage\(reviewedMedium\)/);
   assert.match(history, /Still needed: \$\{pilotCoverage\.missingLabels\.join\(', '\)\}/);
   assert.match(history, /one session in a condition is not enough to establish accuracy/i);
