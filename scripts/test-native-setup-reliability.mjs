@@ -261,6 +261,9 @@ test('Settings exposes scoped local-data controls without implying cloud deletio
   assert.match(settings, /PRIVACY &amp; LOCAL DATA/);
   assert.match(settings, /Deleting local data here does not delete cloud records/);
   assert.match(settings, /Delete all local session history/);
+  assert.match(settings, /Review or export local history/);
+  assert.match(settings, /share a privacy-limited text copy before deleting anything/);
+  assert.match(settings, /\{ text: 'Review First', onPress: \(\) => router\.push\('\/history'\) \}/);
   assert.match(settings, /Clear interrupted-drive recovery data/);
   assert.match(settings, /This cannot be undone/);
   assert.match(settings, /clearSessionHistory\(\)/);

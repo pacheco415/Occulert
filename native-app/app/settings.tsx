@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SensitivitySlider, loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { openFeedback } from '../lib/feedback';
@@ -115,6 +115,7 @@ const labelHeadphoneMotion = (status: HeadphoneMotionStatus): string => {
 };
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const [sens, setSens] = useState<SensitivityLevel>('medium');
   const [haptic, setHaptic] = useState(true);
   const [audio, setAudio] = useState(true);
@@ -401,9 +402,10 @@ export default function SettingsScreen() {
   const confirmDeleteAllLocalSessions = () => {
     Alert.alert(
       'Delete all local session history?',
-      'This permanently removes every local session summary, review, and diagnostic from this iPhone. Cloud records are not changed. This cannot be undone.',
+      'This permanently removes every local session summary, review, and diagnostic from this iPhone. You can review or share a privacy-limited text copy first. Cloud records are not changed. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
+        { text: 'Review First', onPress: () => router.push('/history') },
         { text: 'Delete All', style: 'destructive', onPress: () => { void deleteAllLocalSessions(); } },
       ],
     );
@@ -679,6 +681,25 @@ export default function SettingsScreen() {
           </View>
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityLabel="Review or export local session history"
+            accessibilityHint="Opens Session History, where privacy-limited summaries can be shared before local deletion"
+            accessibilityState={{ disabled: localDataBusy, busy: localDataBusy }}
+            disabled={localDataBusy}
+            onPress={() => router.push('/history')}
+            style={[s.localDataAction, localDataBusy && s.localDataActionDisabled]}
+          >
+            <Ionicons name="share-outline" size={17} color="#93c5fd" />
+            <View style={s.rowCopy}>
+              <Text style={s.localDataReviewTitle}>Review or export local history</Text>
+              <Text style={s.localDataActionDetail}>
+                Open saved summaries and share a privacy-limited text copy before deleting anything.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={17} color="#4a7a8a" />
+          </TouchableOpacity>
+          <View style={s.div} />
+          <TouchableOpacity
+            accessibilityRole="button"
             accessibilityLabel="Delete all local session history"
             accessibilityHint="Permanently removes local session summaries after confirmation without changing cloud records"
             accessibilityState={{ disabled: localHistoryDeleteDisabled, busy: localDataBusy || localDataStatusBusy }}
@@ -792,6 +813,7 @@ const s = StyleSheet.create({
   localDataRetryText:{color:colors.cyan,fontSize:11,fontWeight:'900',letterSpacing:0.55},
   localDataAction:{minHeight:64,flexDirection:'row',alignItems:'flex-start',gap:11,paddingHorizontal:16,paddingVertical:14},
   localDataActionDisabled:{opacity:0.4},
+  localDataReviewTitle:{color:'#bfdbfe',fontSize:13,fontWeight:'800'},
   localDataActionTitle:{color:'#fca5a5',fontSize:13,fontWeight:'800'},
   localDataActionDetail:{color:colors.textMuted,fontSize:11,lineHeight:16,marginTop:3},
   ver:{textAlign:'center',color:colors.textMuted,fontSize:11,marginTop:8},
