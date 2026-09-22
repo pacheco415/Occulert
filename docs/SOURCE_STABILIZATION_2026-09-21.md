@@ -29,6 +29,9 @@ queuing a native build or publishing the website.
   that finish after a newer refresh or after the user leaves the screen.
 - Session History now groups its newest-first results into Today, Yesterday,
   and Earlier, with clearer borders for recovered and unfinished reviews.
+- A Continue Reviewing shortcut now opens the newest unfinished local session,
+  reveals its review fields, and shows truthful progress toward ten complete
+  Medium-sensitivity pilot reviews.
 - Settings now keeps destructive local-data controls disabled until session and
   recovery status are confirmed, explains read failures, and offers a retry.
 - Home now prevents a new session from starting while interrupted-drive

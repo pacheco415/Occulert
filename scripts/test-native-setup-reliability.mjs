@@ -225,6 +225,11 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(history, /accessibilityLabel=\{`\$\{group\.label\}, \$\{group\.sessions\.length\}/, 'date groups must announce their label and session count');
   assert.match(history, /cardNeedsReview/);
   assert.match(history, /cardRecovered/);
+  assert.match(history, /const nextReviewSession = sortedSessions\.find/);
+  assert.match(history, /chooseHistoryFilter\('needs-review'\)/);
+  assert.match(history, /setExpandedSessions\(current => \(\{ \.\.\.current, \[key\]: true \}\)\)/);
+  assert.match(history, /Continue reviewing the newest unfinished session/);
+  assert.match(history, /item\.sensitivity === 'medium' && hasCompleteReview\(item\)/, 'pilot progress must count only complete Medium reviews');
   assert.match(history, /Showing \{filteredSessions\.length\} of \{sessions\.length\} sessions/);
   assert.match(history, /All caught up/);
   assert.match(history, /AsyncStorage\.setItem\(HISTORY_FILTER_KEY, filter\)/);

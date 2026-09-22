@@ -372,7 +372,7 @@ export default function HistoryScreen() {
 
   const evidenceSessions = sessions.filter(item => !item.recoveredFromInterruption);
   const reviewedMedium = evidenceSessions.filter(
-    item => item.sensitivity === 'medium' && Boolean(item.alertAssessment),
+    item => item.sensitivity === 'medium' && hasCompleteReview(item),
   );
   const checkpointProgress = Math.min(reviewedMedium.length, CHECKPOINT_TARGET);
   const accurateCount = reviewedMedium.filter(item => item.alertAssessment === 'accurate').length;
@@ -405,7 +405,11 @@ export default function HistoryScreen() {
     reviewed: reviewedCount,
     recovered: recoveredCount,
   };
-  const filteredSessions = sortIndexedSessionsNewest(sessions)
+  const sortedSessions = sortIndexedSessionsNewest(sessions);
+  const nextReviewSession = sortedSessions.find(({ item }) => (
+    !item.recoveredFromInterruption && !hasCompleteReview(item)
+  ));
+  const filteredSessions = sortedSessions
     .filter(({ item }) => {
       if (historyFilter === 'recovered') return Boolean(item.recoveredFromInterruption);
       if (historyFilter === 'reviewed') return !item.recoveredFromInterruption && hasCompleteReview(item);
@@ -427,6 +431,13 @@ export default function HistoryScreen() {
       title: 'No recovered sessions',
       detail: 'Sessions restored after an unexpected interruption will appear here.',
     },
+  };
+
+  const continueReviewing = () => {
+    if (!nextReviewSession || sessionOperationsBusy) return;
+    const key = sessionRecordKey(nextReviewSession.item, nextReviewSession.index);
+    chooseHistoryFilter('needs-review');
+    setExpandedSessions(current => ({ ...current, [key]: true }));
   };
 
   return (
@@ -491,6 +502,27 @@ export default function HistoryScreen() {
                 <Text style={s.historySummaryLabel}>Recovered</Text>
               </View>
             </View>
+            {nextReviewSession && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={`Continue reviewing the newest unfinished session from ${fmtDate(nextReviewSession.item.savedAt || nextReviewSession.item.updatedAt)}`}
+                accessibilityHint="Shows the Needs Review queue and expands the newest unfinished session"
+                accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
+                disabled={sessionOperationsBusy}
+                onPress={continueReviewing}
+                style={[s.continueReviewButton, sessionOperationsBusy && s.operationDisabled]}
+              >
+                <View style={s.continueReviewIcon}>
+                  <Ionicons name="arrow-forward" size={17} color="#dbeafe" />
+                </View>
+                <View style={s.continueReviewCopy}>
+                  <Text style={s.continueReviewTitle}>Continue reviewing</Text>
+                  <Text style={s.continueReviewDetail}>
+                    Open the newest unfinished session · {checkpointProgress} of {CHECKPOINT_TARGET} Medium reviews complete
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
             <View accessibilityRole="tablist" style={s.filterRow}>
               {HISTORY_FILTERS.map(filter => {
                 const selected = historyFilter === filter.value;
@@ -978,6 +1010,11 @@ const s = StyleSheet.create({
   historySummaryValue: { color: '#e0f2fe', fontSize: 19, fontWeight: '900' },
   historySummaryLabel: { color: '#6592a5', fontSize: 9, fontWeight: '800', marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.4 },
   historySummaryDivider: { width: 1, backgroundColor: '#1a3a4a' },
+  continueReviewButton: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: 'rgba(37,99,235,0.14)', borderWidth: 1, borderColor: 'rgba(96,165,250,0.35)', borderRadius: radii.large, paddingHorizontal: 13, paddingVertical: 10, marginBottom: 12 },
+  continueReviewIcon: { flexShrink: 0, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(37,99,235,0.5)' },
+  continueReviewCopy: { minWidth: 0, flex: 1 },
+  continueReviewTitle: { color: '#dbeafe', fontSize: 13, fontWeight: '900' },
+  continueReviewDetail: { color: '#93c5fd', fontSize: 10, lineHeight: 15, marginTop: 2 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 7 },
   filterButton: { minHeight: 44, justifyContent: 'center', borderRadius: 999, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', paddingHorizontal: 11, paddingVertical: 7 },
   filterButtonSelected: { borderColor: '#3b82f6', backgroundColor: 'rgba(37,99,235,0.22)' },
