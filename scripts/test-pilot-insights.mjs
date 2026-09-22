@@ -4,6 +4,47 @@ import {
   formatPilotCounts,
   summarizePilotIssues,
 } from '../native-app/lib/pilotInsights.ts';
+import {
+  getSessionReviewProgress,
+  hasCompleteSessionReview,
+} from '../native-app/lib/sessionReviewProgress.ts';
+
+test('session review progress identifies every missing pilot detail', () => {
+  const progress = getSessionReviewProgress({
+    alertAssessment: 'accurate',
+    testConditions: { lighting: 'daylight', phonePosition: 'center' },
+    deviceImpact: { batteryImpact: 'low' },
+  });
+
+  assert.equal(progress.completedSteps, 1);
+  assert.equal(progress.totalSteps, 3);
+  assert.equal(progress.complete, false);
+  assert.equal(progress.missingSummary, 'Still needed: eyewear, phone heat');
+  assert.deepEqual(progress.steps.map(step => ({
+    id: step.id,
+    complete: step.complete,
+    missing: step.missing,
+  })), [
+    { id: 'assessment', complete: true, missing: [] },
+    { id: 'conditions', complete: false, missing: ['eyewear'] },
+    { id: 'device-impact', complete: false, missing: ['phone heat'] },
+  ]);
+});
+
+test('session review progress recognizes a complete review', () => {
+  const session = {
+    alertAssessment: 'false_alert',
+    testConditions: { lighting: 'low_light', eyewear: 'glasses', phonePosition: 'low' },
+    deviceImpact: { batteryImpact: 'noticeable', phoneHeat: 'warm' },
+  };
+
+  const progress = getSessionReviewProgress(session);
+  assert.equal(progress.completedSteps, 3);
+  assert.equal(progress.complete, true);
+  assert.equal(progress.missingSummary, 'Nothing missing');
+  assert.equal(hasCompleteSessionReview(session), true);
+  assert.equal(hasCompleteSessionReview({}), false);
+});
 
 test('pilot issue summaries group reviewed problems without turning counts into rates', () => {
   const summaries = summarizePilotIssues([

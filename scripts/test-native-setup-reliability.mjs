@@ -229,7 +229,11 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(history, /chooseHistoryFilter\('needs-review'\)/);
   assert.match(history, /setExpandedSessions\(current => \(\{ \.\.\.current, \[key\]: true \}\)\)/);
   assert.match(history, /Continue reviewing the newest unfinished session/);
-  assert.match(history, /item\.sensitivity === 'medium' && hasCompleteReview\(item\)/, 'pilot progress must count only complete Medium reviews');
+  assert.match(history, /item\.sensitivity === 'medium' && hasCompleteSessionReview\(item\)/, 'pilot progress must count only complete Medium reviews');
+  assert.match(history, /getSessionReviewProgress\(item\)/, 'each session must calculate guided review progress');
+  assert.match(history, /Finish this review/);
+  assert.match(history, /reviewProgress\.missingSummary/);
+  assert.match(history, /accessibilityLiveRegion="polite"/, 'review progress changes must be announced');
   assert.match(history, /Showing \{filteredSessions\.length\} of \{sessions\.length\} sessions/);
   assert.match(history, /All caught up/);
   assert.match(history, /AsyncStorage\.setItem\(HISTORY_FILTER_KEY, filter\)/);

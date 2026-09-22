@@ -32,6 +32,7 @@ import {
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
 import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
+import { getSessionReviewProgress, hasCompleteSessionReview } from '../lib/sessionReviewProgress';
 
 const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
 const CHECKPOINT_TARGET = 10;
@@ -164,17 +165,6 @@ function headphoneMotionLabel(value?: string): string {
   if (value === 'not-built') return 'This build does not include headphone motion';
   if (value === 'stopped') return 'Headphone motion was stopped';
   return 'Headphone motion status was not recorded';
-}
-
-function hasCompleteReview(item: SessionRecord): boolean {
-  return Boolean(
-    item.alertAssessment
-    && item.testConditions?.lighting
-    && item.testConditions?.eyewear
-    && item.testConditions?.phonePosition
-    && item.deviceImpact?.batteryImpact
-    && item.deviceImpact?.phoneHeat,
-  );
 }
 
 function sessionRecordKey(item: SessionRecord, index: number): string {
@@ -372,7 +362,7 @@ export default function HistoryScreen() {
 
   const evidenceSessions = sessions.filter(item => !item.recoveredFromInterruption);
   const reviewedMedium = evidenceSessions.filter(
-    item => item.sensitivity === 'medium' && hasCompleteReview(item),
+    item => item.sensitivity === 'medium' && hasCompleteSessionReview(item),
   );
   const checkpointProgress = Math.min(reviewedMedium.length, CHECKPOINT_TARGET);
   const accurateCount = reviewedMedium.filter(item => item.alertAssessment === 'accurate').length;
@@ -396,8 +386,8 @@ export default function HistoryScreen() {
   )).length;
   const issueInsights = summarizePilotIssues(evidenceSessions);
   const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
-  const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteReview(item)).length;
-  const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteReview(item)).length;
+  const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteSessionReview(item)).length;
+  const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteSessionReview(item)).length;
   const recoveredCount = sessions.filter(item => item.recoveredFromInterruption).length;
   const filterCounts: Record<HistoryFilter, number> = {
     all: sessions.length,
@@ -407,13 +397,13 @@ export default function HistoryScreen() {
   };
   const sortedSessions = sortIndexedSessionsNewest(sessions);
   const nextReviewSession = sortedSessions.find(({ item }) => (
-    !item.recoveredFromInterruption && !hasCompleteReview(item)
+    !item.recoveredFromInterruption && !hasCompleteSessionReview(item)
   ));
   const filteredSessions = sortedSessions
     .filter(({ item }) => {
       if (historyFilter === 'recovered') return Boolean(item.recoveredFromInterruption);
-      if (historyFilter === 'reviewed') return !item.recoveredFromInterruption && hasCompleteReview(item);
-      if (historyFilter === 'needs-review') return !item.recoveredFromInterruption && !hasCompleteReview(item);
+      if (historyFilter === 'reviewed') return !item.recoveredFromInterruption && hasCompleteSessionReview(item);
+      if (historyFilter === 'needs-review') return !item.recoveredFromInterruption && !hasCompleteSessionReview(item);
       return true;
     });
   const groupedFilteredSessions = groupIndexedSessionsByDate(filteredSessions);
@@ -708,7 +698,8 @@ export default function HistoryScreen() {
           const sessionKey = sessionRecordKey(item, i);
           const sessionOperation = sessionOperations[sessionKey];
           const sessionBusy = Boolean(sessionOperation);
-          const reviewComplete = hasCompleteReview(item);
+          const reviewProgress = getSessionReviewProgress(item);
+          const reviewComplete = reviewProgress.complete;
           const isExpanded = expandedSessions[sessionKey] ?? false;
           return (
           <View
@@ -850,6 +841,45 @@ export default function HistoryScreen() {
                 <Text style={s.reviewToggleText}>{isExpanded ? 'Hide details' : 'Show details'}</Text>
                 <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
               </TouchableOpacity>
+            </View>
+            <View
+              accessible
+              accessibilityLabel={reviewComplete
+                ? 'Review complete, 3 of 3 steps complete'
+                : `Review incomplete, ${reviewProgress.completedSteps} of ${reviewProgress.totalSteps} steps complete. ${reviewProgress.missingSummary}`}
+              accessibilityLiveRegion="polite"
+              style={[s.reviewProgress, reviewComplete && s.reviewProgressComplete]}
+            >
+              <View style={s.reviewProgressHeader}>
+                <Text style={[s.reviewProgressTitle, reviewComplete && s.reviewProgressTitleComplete]}>
+                  {reviewComplete ? 'Review checklist complete' : 'Finish this review'}
+                </Text>
+                <Text style={s.reviewProgressCount}>
+                  {reviewProgress.completedSteps}/{reviewProgress.totalSteps}
+                </Text>
+              </View>
+              {!reviewComplete && (
+                <Text style={s.reviewProgressMissing}>{reviewProgress.missingSummary}</Text>
+              )}
+              {isExpanded && (
+                <View style={s.reviewChecklist}>
+                  {reviewProgress.steps.map(step => (
+                    <View key={step.id} style={s.reviewChecklistRow}>
+                      <Ionicons
+                        name={step.complete ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={16}
+                        color={step.complete ? '#86efac' : '#fbbf24'}
+                      />
+                      <View style={s.reviewChecklistCopy}>
+                        <Text style={s.reviewChecklistLabel}>{step.label}</Text>
+                        {!step.complete && (
+                          <Text style={s.reviewChecklistMissing}>Add {step.missing.join(', ')}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
             <View style={s.review}>
               <Text style={s.reviewTitle}>How did the alerts feel?</Text>
@@ -1083,6 +1113,18 @@ const s = StyleSheet.create({
   observationTitle: { color: '#60a5fa', fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   observationInfo: { color: '#bae6fd', fontSize: 10, lineHeight: 15, marginTop: 4 },
   observationStatus: { color: '#6592a5', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  reviewProgress: { backgroundColor: 'rgba(251,191,36,0.06)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.24)', borderRadius: 10, marginTop: 10, padding: 11 },
+  reviewProgressComplete: { backgroundColor: 'rgba(134,239,172,0.05)', borderColor: 'rgba(134,239,172,0.22)' },
+  reviewProgressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  reviewProgressTitle: { flex: 1, color: '#fde68a', fontSize: 11, fontWeight: '900' },
+  reviewProgressTitleComplete: { color: '#bbf7d0' },
+  reviewProgressCount: { flexShrink: 0, color: '#93c5fd', fontSize: 11, fontWeight: '900' },
+  reviewProgressMissing: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 4 },
+  reviewChecklist: { borderTopWidth: 1, borderTopColor: '#1d4f68', marginTop: 9, paddingTop: 7, gap: 7 },
+  reviewChecklistRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  reviewChecklistCopy: { minWidth: 0, flex: 1 },
+  reviewChecklistLabel: { color: '#dbeafe', fontSize: 10, fontWeight: '800' },
+  reviewChecklistMissing: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 1 },
   observationCaution: { color: '#4a7a8a', fontSize: 9, lineHeight: 14, marginTop: 6 },
   reviewSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6 },

@@ -39,6 +39,8 @@ queuing a native build or publishing the website.
   recovery status are confirmed, explains read failures, and offers a retry.
 - Settings now offers a Review or Export path before local deletion, and the
   Delete All confirmation can open Session History without removing anything.
+- Each saved session now shows a three-step review checklist, names the exact
+  missing pilot details, and announces completion progress for assistive tools.
 - Home now prevents a new session from starting while interrupted-drive
   recovery is still checking or has failed, protecting an unresolved checkpoint
   from being replaced before retry succeeds.
@@ -57,7 +59,7 @@ queuing a native build or publishing the website.
 - Expo dependency compatibility check passed without changing dependencies.
 - Website asset-version, integrity, cache-policy, offline-shell, and CSP checks
   passed.
-- 192 browser tests passed in Chromium and WebKit.
+- 194 browser tests passed in Chromium and WebKit.
 - The fleet demo startup race also passed 10 focused repeat runs across Chromium
   and WebKit.
 - Final privacy, recovery, destructive-action, and data-loss review found no
