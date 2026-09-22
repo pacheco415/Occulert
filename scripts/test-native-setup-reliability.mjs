@@ -176,6 +176,9 @@ test('native screens wire setup preview and recovery without changing detection 
     'monitoring must reserve recovery storage before camera startup');
   assert.match(monitor, /ActiveSessionCheckpointConflictError/);
   assert.match(monitor, /RECOVERY REQUIRED/);
+  assert.match(monitor, /accessibilityLabel="Return Home to recover the previous drive"/);
+  assert.match(monitor, /router\.replace\('\/'\)/,
+    'blocked direct navigation must provide a clear route back through recovery');
   assert.match(monitor, /reservedSessionId && !monitoringStarted/,
     'an interrupted startup must release only its own reservation');
   assert.match(recoveryStorage, /hasConflictingActiveSessionCheckpoint\(stored, checkpoint\.sessionId\)/);

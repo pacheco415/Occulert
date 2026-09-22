@@ -29,6 +29,8 @@ queuing a native build or publishing the website.
   from being replaced before retry succeeds.
 - Recovery storage now rejects a different session before monitoring starts,
   so restored routes and direct navigation cannot bypass the Home-screen guard.
+- A recovery-blocked monitoring screen now provides a direct accessible action
+  back to Home, where the interrupted-drive recovery check can run again.
 
 ## Local verification completed
 

@@ -966,8 +966,9 @@ export default function MonitorScreen() {
     closed: '#ff3344',
     noFace: '#4a7a8a',
   }[metrics.state];
+  const recoveryRequired = Boolean(sensorFault?.startsWith('Monitoring did not start'));
   const monitorStatusLabel = sensorFault
-    ? 'STOPPED · CHECK CAMERA'
+    ? recoveryRequired ? 'RECOVERY REQUIRED' : 'STOPPED · CHECK CAMERA'
     : isStopping
       ? 'SAVING DRIVE'
       : isStarting
@@ -1161,9 +1162,25 @@ export default function MonitorScreen() {
         {sensorFault && (
           <View style={s.sensorFault} accessibilityRole="alert">
             <Text style={s.sensorFaultTitle}>
-              {sensorFault.startsWith('Monitoring did not start') ? 'RECOVERY REQUIRED' : 'CAMERA ANALYSIS STOPPED'}
+              {recoveryRequired ? 'RECOVERY REQUIRED' : 'CAMERA ANALYSIS STOPPED'}
             </Text>
             <Text style={s.sensorFaultText}>{sensorFault}</Text>
+            {recoveryRequired && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Return Home to recover the previous drive"
+                accessibilityHint="Leaves monitoring and starts the interrupted-drive recovery check"
+                onPress={() => {
+                  setupPreviewActiveRef.current = false;
+                  setSetupPreviewActive(false);
+                  router.replace('/');
+                }}
+                style={s.recoveryHomeButton}
+              >
+                <Ionicons name="arrow-back" size={16} color="#fee2e2" />
+                <Text style={s.recoveryHomeButtonText}>RETURN HOME TO RECOVER</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1298,6 +1315,8 @@ const s = StyleSheet.create({
   sensorFault: { position: 'absolute', top: 132, left: 16, right: 16, zIndex: 4, backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
   sensorFaultTitle: { color: '#fecaca', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
   sensorFaultText: { color: '#fff1f2', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  recoveryHomeButton: { alignSelf: 'flex-start', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, paddingRight: 14 },
+  recoveryHomeButtonText: { color: '#fee2e2', fontSize: 11, fontWeight: '900', letterSpacing: 0.45 },
   ctrl: { padding: 20, gap: 10 },
   startBtn: {
     flexDirection: 'row',
