@@ -20,6 +20,8 @@ queuing a native build or publishing the website.
 - A temporary local-storage read failure now keeps any last-loaded sessions
   visible, explains that saved data was not deleted, and offers an accessible
   retry instead of showing a misleading empty-history screen.
+- Review changes and deletion now run one operation at a time per session,
+  announce their pending state, and temporarily disable conflicting controls.
 
 ## Local verification completed
 

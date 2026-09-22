@@ -30,6 +30,7 @@ import {
   type HistoryFilter,
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
+import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
 
 const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
 const CHECKPOINT_TARGET = 10;
@@ -175,6 +176,12 @@ function hasCompleteReview(item: SessionRecord): boolean {
   );
 }
 
+function sessionRecordKey(item: SessionRecord, index: number): string {
+  return item.sessionId || `${item.savedAt || item.updatedAt || 'session'}-${index}`;
+}
+
+type SessionOperation = 'saving' | 'deleting';
+
 export default function HistoryScreen() {
   const router = useRouter();
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
@@ -184,8 +191,33 @@ export default function HistoryScreen() {
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
   const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
+  const [sessionOperations, setSessionOperations] = useState<Record<string, SessionOperation>>({});
   const historyRevisionRef = useRef(0);
   const filterRevisionRef = useRef(0);
+  const sessionOperationRunnersRef = useRef(new Map<string, ReturnType<typeof createSingleFlightActionRunner>>());
+
+  const runSessionOperation = async (
+    operationKey: string,
+    operation: SessionOperation,
+    action: () => Promise<void>,
+    onError: () => void,
+  ): Promise<boolean> => {
+    let runner = sessionOperationRunnersRef.current.get(operationKey);
+    if (!runner) {
+      runner = createSingleFlightActionRunner();
+      sessionOperationRunnersRef.current.set(operationKey, runner);
+    }
+    return runner.run({
+      action,
+      onBusyChange: busy => setSessionOperations(current => {
+        if (busy) return { ...current, [operationKey]: operation };
+        const next = { ...current };
+        delete next[operationKey];
+        return next;
+      }),
+      onError,
+    });
+  };
 
   const load = useCallback(async () => {
     const revision = historyRevisionRef.current;
@@ -230,17 +262,24 @@ export default function HistoryScreen() {
     const target = sessions[index];
     if (!target) return;
 
-    historyRevisionRef.current += 1;
-    await commitSessionHistoryEdit({
-      update,
-      persist: mutation => updateSessionHistory<SessionRecord>(stored => (
-        updateMatchingSessionRecord(stored, target, index, mutation)
-      )),
-      apply: mutation => setSessions(current => (
-        updateMatchingSessionRecord(current, target, index, mutation)
-      )),
-      onError: () => Alert.alert(errorTitle, errorMessage),
-    });
+    await runSessionOperation(
+      sessionRecordKey(target, index),
+      'saving',
+      async () => {
+        historyRevisionRef.current += 1;
+        await commitSessionHistoryEdit({
+          update,
+          persist: mutation => updateSessionHistory<SessionRecord>(stored => (
+            updateMatchingSessionRecord(stored, target, index, mutation)
+          )),
+          apply: mutation => setSessions(current => (
+            updateMatchingSessionRecord(current, target, index, mutation)
+          )),
+          onError: () => Alert.alert(errorTitle, errorMessage),
+        });
+      },
+      () => Alert.alert(errorTitle, errorMessage),
+    );
   };
 
   const saveAssessment = async (index: number, value: AlertAssessment) => {
@@ -294,15 +333,18 @@ export default function HistoryScreen() {
   };
 
   const deleteSession = async (target: SessionRecord, index: number) => {
-    historyRevisionRef.current += 1;
-    try {
-      await updateSessionHistory<SessionRecord>(stored => (
-        removeMatchingSessionRecord(stored, target, index)
-      ));
-      setSessions(current => removeMatchingSessionRecord(current, target, index));
-    } catch {
-      Alert.alert('Could not delete session', 'The session remains saved. Please try again.');
-    }
+    await runSessionOperation(
+      sessionRecordKey(target, index),
+      'deleting',
+      async () => {
+        historyRevisionRef.current += 1;
+        await updateSessionHistory<SessionRecord>(stored => (
+          removeMatchingSessionRecord(stored, target, index)
+        ));
+        setSessions(current => removeMatchingSessionRecord(current, target, index));
+      },
+      () => Alert.alert('Could not delete session', 'The session remains saved. Please try again.'),
+    );
   };
 
   const confirmDeleteSession = (target: SessionRecord, index: number) => {
@@ -358,6 +400,7 @@ export default function HistoryScreen() {
       if (historyFilter === 'needs-review') return !item.recoveredFromInterruption && !hasCompleteReview(item);
       return true;
     });
+  const sessionOperationsBusy = Object.keys(sessionOperations).length > 0;
   const filteredEmptyCopy: Record<Exclude<HistoryFilter, 'all'>, { title: string; detail: string }> = {
     'needs-review': {
       title: 'All caught up',
@@ -447,9 +490,13 @@ export default function HistoryScreen() {
             {filteredSessions.length > 0 && (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={`Share ${filteredSessions.length} visible session summaries`}
+                accessibilityLabel={sessionOperationsBusy
+                  ? 'Wait for session changes before sharing summaries'
+                  : `Share ${filteredSessions.length} visible session summaries`}
                 accessibilityHint="Opens the iPhone share sheet with a privacy-limited text export"
-                style={s.exportButton}
+                accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
+                disabled={sessionOperationsBusy}
+                style={[s.exportButton, sessionOperationsBusy && s.operationDisabled]}
                 onPress={() => { void shareSessions(filteredSessions.map(({ item }) => item)); }}
               >
                 <Ionicons name="share-outline" size={16} color="#93c5fd" />
@@ -588,7 +635,9 @@ export default function HistoryScreen() {
         )}
 
         {filteredSessions.map(({ item, index: i }) => {
-          const sessionKey = item.sessionId || `${item.savedAt || item.updatedAt || 'session'}-${i}`;
+          const sessionKey = sessionRecordKey(item, i);
+          const sessionOperation = sessionOperations[sessionKey];
+          const sessionBusy = Boolean(sessionOperation);
           const reviewComplete = hasCompleteReview(item);
           const isExpanded = expandedSessions[sessionKey] ?? false;
           return (
@@ -686,14 +735,27 @@ export default function HistoryScreen() {
               </View>
             )}
             <View style={s.reviewSummary}>
-              <View style={[s.reviewBadge, reviewComplete ? s.reviewBadgeComplete : s.reviewBadgeNeeded]}>
+              <View style={[
+                s.reviewBadge,
+                sessionBusy ? s.reviewBadgeBusy : reviewComplete ? s.reviewBadgeComplete : s.reviewBadgeNeeded,
+              ]}>
                 <Ionicons
-                  name={reviewComplete ? 'checkmark-circle' : 'ellipse-outline'}
+                  name={sessionBusy ? 'sync-outline' : reviewComplete ? 'checkmark-circle' : 'ellipse-outline'}
                   size={14}
-                  color={reviewComplete ? '#86efac' : '#fbbf24'}
+                  color={sessionBusy ? '#93c5fd' : reviewComplete ? '#86efac' : '#fbbf24'}
                 />
-                <Text style={[s.reviewBadgeText, reviewComplete ? s.reviewBadgeTextComplete : s.reviewBadgeTextNeeded]}>
-                  {reviewComplete ? 'Review complete' : item.alertAssessment ? 'Rating saved' : 'Needs review'}
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={[
+                    s.reviewBadgeText,
+                    sessionBusy ? s.reviewBadgeTextBusy : reviewComplete ? s.reviewBadgeTextComplete : s.reviewBadgeTextNeeded,
+                  ]}
+                >
+                  {sessionOperation === 'saving'
+                    ? 'Saving changes…'
+                    : sessionOperation === 'deleting'
+                      ? 'Deleting session…'
+                      : reviewComplete ? 'Review complete' : item.alertAssessment ? 'Rating saved' : 'Needs review'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -726,8 +788,9 @@ export default function HistoryScreen() {
                       key={option.value}
                       accessibilityRole="button"
                       accessibilityLabel={option.label}
-                      accessibilityState={{ selected }}
-                      style={[s.reviewOption, selected && s.reviewOptionSelected]}
+                      accessibilityState={{ selected, disabled: sessionBusy, busy: sessionBusy }}
+                      disabled={sessionBusy}
+                      style={[s.reviewOption, selected && s.reviewOptionSelected, sessionBusy && s.operationDisabled]}
                       onPress={() => saveAssessment(i, option.value)}
                     >
                       <Ionicons name={option.icon} size={15} color={selected ? '#dbeafe' : '#4a7a8a'} />
@@ -758,8 +821,9 @@ export default function HistoryScreen() {
                           key={option.value}
                           accessibilityRole="button"
                           accessibilityLabel={`${group.label}: ${option.label}`}
-                          accessibilityState={{ selected }}
-                          style={[s.conditionOption, selected && s.conditionOptionSelected]}
+                          accessibilityState={{ selected, disabled: sessionBusy, busy: sessionBusy }}
+                          disabled={sessionBusy}
+                          style={[s.conditionOption, selected && s.conditionOptionSelected, sessionBusy && s.operationDisabled]}
                           onPress={() => saveTestCondition(i, group.key, option.value)}
                         >
                           <Text style={[s.conditionOptionText, selected && s.conditionOptionTextSelected]}>
@@ -791,8 +855,9 @@ export default function HistoryScreen() {
                           key={option.value}
                           accessibilityRole="button"
                           accessibilityLabel={`${group.label}: ${option.label}, tester-reported`}
-                          accessibilityState={{ selected }}
-                          style={[s.conditionOption, selected && s.conditionOptionSelected]}
+                          accessibilityState={{ selected, disabled: sessionBusy, busy: sessionBusy }}
+                          disabled={sessionBusy}
+                          style={[s.conditionOption, selected && s.conditionOptionSelected, sessionBusy && s.operationDisabled]}
                           onPress={() => saveDeviceImpact(i, group.key, option.value)}
                         >
                           <Text style={[s.conditionOptionText, selected && s.conditionOptionTextSelected]}>
@@ -816,7 +881,9 @@ export default function HistoryScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Send feedback about this session"
-              style={s.feedbackBtn}
+              accessibilityState={{ disabled: sessionBusy, busy: sessionBusy }}
+              disabled={sessionBusy}
+              style={[s.feedbackBtn, sessionBusy && s.operationDisabled]}
               onPress={async () => {
                 if (!await openFeedback(item)) {
                   Alert.alert('Mail is unavailable', 'Email hello@occulert.com to share pilot feedback.');
@@ -830,7 +897,9 @@ export default function HistoryScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Delete session from ${fmtDate(item.savedAt || item.updatedAt)}`}
               accessibilityHint="Permanently removes this local session after confirmation"
-              style={s.deleteBtn}
+              accessibilityState={{ disabled: sessionBusy, busy: sessionBusy }}
+              disabled={sessionBusy}
+              style={[s.deleteBtn, sessionBusy && s.operationDisabled]}
               onPress={() => confirmDeleteSession(item, i)}
             >
               <Ionicons name="trash-outline" size={16} color="#fca5a5" />
@@ -927,9 +996,11 @@ const s = StyleSheet.create({
   reviewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6 },
   reviewBadgeComplete: { backgroundColor: 'rgba(22,163,74,0.12)', borderColor: 'rgba(74,222,128,0.35)' },
   reviewBadgeNeeded: { backgroundColor: 'rgba(217,119,6,0.10)', borderColor: 'rgba(251,191,36,0.35)' },
+  reviewBadgeBusy: { backgroundColor: 'rgba(37,99,235,0.14)', borderColor: 'rgba(96,165,250,0.38)' },
   reviewBadgeText: { fontSize: 10, fontWeight: '900' },
   reviewBadgeTextComplete: { color: '#86efac' },
   reviewBadgeTextNeeded: { color: '#fbbf24' },
+  reviewBadgeTextBusy: { color: '#93c5fd' },
   reviewToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
   reviewToggleText: { color: '#93c5fd', fontSize: 11, fontWeight: '800' },
   review: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
@@ -957,5 +1028,6 @@ const s = StyleSheet.create({
   feedbackBtn: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 8 },
   feedbackTxt: { color: '#93c5fd', fontSize: 13, fontWeight: '800' },
   deleteBtn: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  operationDisabled: { opacity: 0.5 },
   deleteTxt: { color: '#fca5a5', fontSize: 12, fontWeight: '800' },
 });

@@ -379,6 +379,20 @@ test('History load failures stay visible without pretending saved sessions are e
   assert.match(history, /!historyLoadError && sessions\.length === 0/);
 });
 
+test('History serializes each session operation and announces pending saves', () => {
+  const history = read('native-app/app/history.tsx');
+  assert.match(history, /new Map<string, ReturnType<typeof createSingleFlightActionRunner>>\(\)/);
+  assert.match(history, /runSessionOperation\([\s\S]*sessionRecordKey\(target, index\),[\s\S]*'saving'/);
+  assert.match(history, /sessionRecordKey\(target, index\),[\s\S]*'deleting'/);
+  assert.match(history, /accessibilityLiveRegion="polite"/);
+  assert.match(history, /Saving changes…/);
+  assert.match(history, /Deleting session…/);
+  assert.match(history, /accessibilityState=\{\{ selected, disabled: sessionBusy, busy: sessionBusy \}\}/);
+  assert.match(history, /Wait for session changes before sharing summaries/);
+  assert.match(history, /accessibilityState=\{\{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy \}\}/);
+  assert.match(history, /disabled=\{sessionBusy\}/);
+});
+
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
   const app = read('driver-app.v48.js');
   assert.doesNotMatch(app, /Snooze 5m|function isSnoozed|Alert snoozed/);
