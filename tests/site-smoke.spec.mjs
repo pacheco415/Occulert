@@ -46,6 +46,9 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await expect(page.locator(".skip-link")).toBeFocused();
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator("#safetyJourney")).toBeVisible();
+  await expect(page.locator("#safetyJourney")).toHaveAttribute("aria-describedby", "journeyBoundary");
+  await expect(page.locator(".journey-topline")).toContainText("Interactive product demo");
+  await expect(page.locator("#journeyStep0")).toContainText("Camera off");
   await page.locator("#journeyMotion").click();
   await expect(page.locator("#journeyMotion")).toHaveText("Play motion");
   await expect(page.locator("#journeyMotion")).toHaveAttribute("aria-pressed", "true");
@@ -55,6 +58,8 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.locator('[data-journey-step="3"]').click();
   await expect(page.locator("#safetyJourney")).toHaveAttribute("data-stage", "3");
   await expect(page.locator("#journeyStep3")).toContainText("An alert creates time to act");
+  await expect(page.locator("#journeyStep3")).toContainText("Pull over safely");
+  await expect(page.locator("#journeyBoundary")).toContainText("cannot make it safe to continue driving while tired");
   await expect(page.locator(".safe-stop")).toHaveCSS("opacity", "1");
   await expect(page.locator(".journey-frame-alert")).toHaveCSS("opacity", "1");
   await expect(page.locator(".journey-frame-enter")).toHaveCSS("opacity", "0");

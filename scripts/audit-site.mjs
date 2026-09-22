@@ -100,6 +100,11 @@ if (homepageInlineScripts !== 1) fail(`homepage must contain only the early pass
 assertIncludes("index.html", "params.get('type')==='recovery'", "homepage must detect recovery links that fall back to the site root");
 assertIncludes("index.html", "'/account.html?recovery=1'+hash", "homepage must preserve recovery tokens while handing off to Account Setup");
 assertIncludes("index.html", "id=\"safetyJourney\"", "homepage must include the illustrated safety journey");
+assertIncludes("index.html", "Interactive product demo", "homepage must identify the above-fold product demonstration");
+assertIncludes("index.html", "aria-describedby=\"journeyBoundary\"", "homepage product demo must identify its safety boundary");
+assertIncludes("index.html", "Camera off. No monitoring has started.", "homepage product demo must distinguish parked entry from monitoring");
+assertIncludes("index.html", "Occulert must remain open and visible.", "homepage product demo must disclose foreground-only monitoring");
+assertIncludes("index.html", "cannot make it safe to continue driving while tired", "homepage product demo must preserve the safe-stop boundary");
 assertIncludes("index.html", "data-journey-step=\"3\"", "homepage safety journey must include the alert and safe-stop stage");
 assertNotIncludes("index.html", "class=\"phone-wrap\"", "homepage must not retain the broken phone mockup");
 assertIncludes("homepage.js", "prefers-reduced-motion: reduce", "homepage journey must honor reduced-motion preferences");

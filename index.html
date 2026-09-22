@@ -76,10 +76,10 @@
       </div>
       <div class="trust"><span data-i18n="trust1">✓ No account required</span><span data-i18n="trust2">✓ Runs on your device</span><span data-i18n="trust3">✓ No data sold</span><span style="color:#00ff88;font-weight:700">🔒 No video ever leaves your device</span></div>
     </div>
-    <section class="journey-card" id="safetyJourney" data-stage="0" aria-labelledby="journeyTitle">
+    <section class="journey-card" id="safetyJourney" data-stage="0" aria-labelledby="journeyTitle" aria-describedby="journeyBoundary">
       <div class="journey-topline">
-        <span><i></i> Cinematic safety journey</span>
-        <button class="journey-motion" id="journeyMotion" type="button" aria-pressed="false">Pause</button>
+        <span><i></i> Interactive product demo</span>
+        <button class="journey-motion" id="journeyMotion" type="button" aria-pressed="false">Pause motion</button>
       </div>
       <div class="journey-scene" aria-hidden="true">
         <div class="journey-frame-stack">
@@ -102,21 +102,25 @@
           <span>01 · Enter</span>
           <h2 id="journeyTitle">Get in. Get settled.</h2>
           <p>While parked, the driver gets settled before setting up any device.</p>
+          <p><strong>Demo state:</strong> Camera off. No monitoring has started.</p>
         </article>
         <article class="journey-step" id="journeyStep1" role="tabpanel" data-journey-copy="1" hidden>
           <span>02 · Set up</span>
           <h2>Connect the safety setup.</h2>
           <p>Before moving, the driver secures the phone for a clear camera view and checks the optional Watch alert.</p>
+          <p><strong>Demo state:</strong> Parked camera check. Framing guidance stays on the phone.</p>
         </article>
         <article class="journey-step" id="journeyStep2" role="tabpanel" data-journey-copy="2" hidden>
           <span>03 · Monitor</span>
           <h2>Stay focused on the drive.</h2>
           <p>With the app open, eye-pattern monitoring runs on the phone. Camera video stays on the device.</p>
+          <p><strong>Demo state:</strong> On-device processing. Occulert must remain open and visible.</p>
         </article>
         <article class="journey-step" id="journeyStep3" role="tabpanel" data-journey-copy="3" hidden>
           <span>04 · Respond</span>
           <h2>An alert creates time to act.</h2>
           <p>If fatigue is suspected, a supplemental alert can prompt the driver to pull over and rest before conditions worsen.</p>
+          <p><strong>Demo state:</strong> Supplemental alert. Pull over safely; do not rely on Occulert to keep driving.</p>
         </article>
       </div>
       <div class="journey-controls" role="tablist" aria-label="Safety journey steps">
@@ -125,7 +129,7 @@
         <button type="button" role="tab" aria-selected="false" aria-controls="journeyStep2" tabindex="-1" data-journey-step="2"><b>3</b><span>Monitor</span></button>
         <button type="button" role="tab" aria-selected="false" aria-controls="journeyStep3" tabindex="-1" data-journey-step="3"><b>4</b><span>Respond</span></button>
       </div>
-      <p class="journey-note">Illustrative scenario. Occulert is a supplemental prototype and may miss events or issue false alerts. Never drive tired.</p>
+      <p class="journey-note" id="journeyBoundary">Illustrative product demonstration only. Occulert is a supplemental prototype, may miss events or issue false alerts, and cannot make it safe to continue driving while tired.</p>
     </section>
 
 <!-- Privacy Headline Banner -->
