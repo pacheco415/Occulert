@@ -15,6 +15,7 @@ import { AmbientBackground, GlassSurface } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import { updateSessionHistory } from '../lib/sessionHistory';
 import { clearActiveSessionCheckpoint, loadActiveSessionCheckpoint } from '../lib/sessionRecovery';
+import { ActiveSessionCheckpointUnreadableError } from '../lib/sessionRecoveryModel';
 import {
   prependRecoveredSession,
   recoveredSessionFromCheckpoint,
@@ -55,6 +56,7 @@ function QuickLink({ icon, label, detail, href }: QuickLinkProps) {
 export default function HomeScreen() {
   const router = useRouter();
   const [recoveryState, setRecoveryState] = useState<'checking' | 'idle' | 'recovered' | 'error'>('checking');
+  const [recoveryUnreadable, setRecoveryUnreadable] = useState(false);
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const recoveryBlocksStart = recoveryState === 'checking' || recoveryState === 'error';
 
@@ -62,6 +64,7 @@ export default function HomeScreen() {
     let active = true;
     const recoverInterruptedDrive = async () => {
       if (active) setRecoveryState('checking');
+      if (active) setRecoveryUnreadable(false);
       const checkpoint = await loadActiveSessionCheckpoint();
       if (!checkpoint) {
         if (active) setRecoveryState('idle');
@@ -84,8 +87,11 @@ export default function HomeScreen() {
       await clearActiveSessionCheckpoint(recovered.sessionId);
       if (active) setRecoveryState(insertedRecovery ? 'recovered' : 'idle');
     };
-    void recoverInterruptedDrive().catch(() => {
-      if (active) setRecoveryState('error');
+    void recoverInterruptedDrive().catch(error => {
+      if (active) {
+        setRecoveryUnreadable(error instanceof ActiveSessionCheckpointUnreadableError);
+        setRecoveryState('error');
+      }
     });
     return () => { active = false; };
   }, [recoveryAttempt]);
@@ -161,7 +167,9 @@ export default function HomeScreen() {
             </View>
             <View style={styles.recoveryCopy}>
               <Text style={styles.recoveryErrorTitle}>Couldn’t check the previous drive</Text>
-              <Text style={styles.recoveryDetail}>Your local history stays on this iPhone. Try the recovery check again before starting another session.</Text>
+              <Text style={styles.recoveryDetail}>{recoveryUnreadable
+                ? 'The checkpoint was kept, but Occulert cannot read it. You can retry or review the explicit discard option in Settings. Consider contacting pilot support before discarding it.'
+                : 'Your local history stays on this iPhone. Try the recovery check again before starting another session.'}</Text>
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel="Retry previous drive recovery"
@@ -170,6 +178,16 @@ export default function HomeScreen() {
               >
                 <Text style={styles.recoveryRetryText}>Try again</Text>
               </TouchableOpacity>
+              {recoveryUnreadable && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Settings to review unreadable recovery data"
+                  onPress={() => router.push('/settings')}
+                  style={styles.recoveryRetry}
+                >
+                  <Text style={styles.recoveryRetryText}>Review in Settings</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}

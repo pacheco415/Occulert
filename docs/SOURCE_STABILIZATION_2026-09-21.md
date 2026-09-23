@@ -56,6 +56,8 @@ queuing a native build or publishing the website.
   from being replaced before retry succeeds.
 - Recovery storage now rejects a different session before monitoring starts,
   so restored routes and direct navigation cannot bypass the Home-screen guard.
+- Unreadable recovery data is now preserved and blocks a new drive. Settings
+  offers a separate, confirmed discard option with a pilot-support warning.
 - A recovery-blocked monitoring screen now provides a direct accessible action
   back to Home, where the interrupted-drive recovery check can run again.
 - The final browser sweep fixed a fleet-dashboard startup race so local demo
@@ -71,6 +73,8 @@ queuing a native build or publishing the website.
 - Final consolidated source verification suite passed after recovery hardening.
 - The consolidated source verification suite and native TypeScript check passed
   again after the malformed-history overwrite guard was added.
+- All 32 source checks and native TypeScript passed after the unreadable
+  checkpoint guard and confirmed, exact-data discard path were added.
 - Native TypeScript check passed.
 - Expo dependency compatibility check passed without changing dependencies.
 - Website asset-version, integrity, cache-policy, offline-shell, and CSP checks

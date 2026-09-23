@@ -45,7 +45,12 @@ import {
 import { alertDeliveryPlan } from '../lib/alertDelivery';
 import { waitForCancellableDelay } from '../lib/cancellableDelay';
 import { clearSessionHistory, loadSessionHistory } from '../lib/sessionHistory';
-import { clearActiveSessionCheckpoint, loadActiveSessionCheckpoint } from '../lib/sessionRecovery';
+import {
+  clearActiveSessionCheckpoint,
+  discardUnreadableActiveSessionCheckpoint,
+  loadActiveSessionCheckpoint,
+} from '../lib/sessionRecovery';
+import { ActiveSessionCheckpointUnreadableError } from '../lib/sessionRecoveryModel';
 
 const EMPTY_WATCH_STATUS: WatchStatus = {
   moduleAvailable: false,
@@ -131,6 +136,8 @@ export default function SettingsScreen() {
   const [deviceRefreshBusy, setDeviceRefreshBusy] = useState(false);
   const [localSessionCount, setLocalSessionCount] = useState<number | null>(null);
   const [recoveryDataPresent, setRecoveryDataPresent] = useState<boolean | null>(null);
+  const [recoverySessionId, setRecoverySessionId] = useState<string | null>(null);
+  const [recoveryDataUnreadable, setRecoveryDataUnreadable] = useState(false);
   const [localDataStatusBusy, setLocalDataStatusBusy] = useState(true);
   const [localDataBusy, setLocalDataBusy] = useState(false);
   // This parked-only test must release the shared iOS audio session when the
@@ -174,13 +181,16 @@ export default function SettingsScreen() {
   const refreshLocalDataStatus = useCallback(() => {
     void localDataStatusRunnerRef.current.run({
       action: async () => {
-        const [sessions, checkpoint] = await Promise.all([
+        const [historyResult, checkpointResult] = await Promise.allSettled([
           loadSessionHistory(),
           loadActiveSessionCheckpoint(),
         ]);
         if (!settingsMountedRef.current) return;
-        setLocalSessionCount(sessions.length);
-        setRecoveryDataPresent(Boolean(checkpoint));
+        setLocalSessionCount(historyResult.status === 'fulfilled' ? historyResult.value.length : null);
+        setRecoveryDataPresent(checkpointResult.status === 'fulfilled' ? Boolean(checkpointResult.value) : null);
+        setRecoverySessionId(checkpointResult.status === 'fulfilled' ? checkpointResult.value?.sessionId ?? null : null);
+        setRecoveryDataUnreadable(checkpointResult.status === 'rejected'
+          && checkpointResult.reason instanceof ActiveSessionCheckpointUnreadableError);
       },
       onBusyChange: busy => {
         if (settingsMountedRef.current) setLocalDataStatusBusy(busy);
@@ -189,6 +199,8 @@ export default function SettingsScreen() {
         if (!settingsMountedRef.current) return;
         setLocalSessionCount(null);
         setRecoveryDataPresent(null);
+        setRecoverySessionId(null);
+        setRecoveryDataUnreadable(false);
       },
     });
   }, []);
@@ -412,14 +424,24 @@ export default function SettingsScreen() {
   };
 
   const clearRecoveryData = async () => {
-    if (localDataBusy || localDataStatusBusy || recoveryDataPresent !== true) return;
+    if (localDataBusy || localDataStatusBusy || (recoverySessionId === null && !recoveryDataUnreadable)) return;
     setLocalDataBusy(true);
     try {
-      await clearActiveSessionCheckpoint();
+      if (recoveryDataUnreadable) {
+        await discardUnreadableActiveSessionCheckpoint();
+      } else if (recoverySessionId) {
+        await clearActiveSessionCheckpoint(recoverySessionId);
+        if (await loadActiveSessionCheckpoint()) {
+          throw new Error('The recovery checkpoint changed before it could be cleared.');
+        }
+      }
       if (settingsMountedRef.current) setRecoveryDataPresent(false);
+      if (settingsMountedRef.current) setRecoverySessionId(null);
+      if (settingsMountedRef.current) setRecoveryDataUnreadable(false);
       Alert.alert('Recovery data cleared', 'The interrupted-drive checkpoint was removed from this iPhone.');
     } catch {
-      Alert.alert('Could not clear recovery data', 'The recovery checkpoint remains saved. Please try again.');
+      Alert.alert('Could not clear recovery data', 'The checkpoint may have changed. Refresh its status before trying again.');
+      refreshLocalDataStatus();
     } finally {
       if (settingsMountedRef.current) setLocalDataBusy(false);
     }
@@ -427,8 +449,10 @@ export default function SettingsScreen() {
 
   const confirmClearRecoveryData = () => {
     Alert.alert(
-      'Clear interrupted-drive recovery data?',
-      'This removes the temporary local checkpoint used to recover an interrupted monitoring session. Existing session history is not changed.',
+      recoveryDataUnreadable ? 'Discard unreadable recovery data?' : 'Clear interrupted-drive recovery data?',
+      recoveryDataUnreadable
+        ? 'Occulert cannot read this checkpoint. Clearing it permanently removes the stored data, which may still be useful to support, and allows a new drive to start. Existing session history is not changed. Consider contacting pilot support first.'
+        : 'This removes the temporary local checkpoint used to recover an interrupted monitoring session. Existing session history is not changed.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Clear', style: 'destructive', onPress: () => { void clearRecoveryData(); } },
@@ -442,7 +466,7 @@ export default function SettingsScreen() {
     || localSessionCount === 0;
   const recoveryDeleteDisabled = localDataBusy
     || localDataStatusBusy
-    || recoveryDataPresent !== true;
+    || (recoverySessionId === null && !recoveryDataUnreadable);
 
   return (
     <SafeAreaView style={s.bg}>
@@ -657,6 +681,8 @@ export default function SettingsScreen() {
             <Text style={s.localDataStatusText}>
               {localDataStatusBusy
                 ? 'Checking recovery data…'
+                : recoveryDataUnreadable
+                  ? 'Unreadable recovery checkpoint saved'
                 : recoveryDataPresent === null
                   ? 'Recovery status unavailable'
                   : recoveryDataPresent ? 'Recovery checkpoint saved' : 'No recovery checkpoint'}
@@ -664,7 +690,9 @@ export default function SettingsScreen() {
             {!localDataStatusBusy && (localSessionCount === null || recoveryDataPresent === null) && (
               <>
                 <Text style={s.localDataStatusError}>
-                  Destructive controls stay unavailable until Occulert confirms what is stored on this iPhone.
+                  {recoveryDataUnreadable
+                    ? 'The unreadable checkpoint is preserved. You can retry, contact pilot support, or explicitly discard only that checkpoint below.'
+                    : 'Destructive controls stay unavailable until Occulert confirms what is stored on this iPhone.'}
                 </Text>
                 <TouchableOpacity
                   accessibilityRole="button"
@@ -726,7 +754,9 @@ export default function SettingsScreen() {
             <Ionicons name="refresh-circle-outline" size={18} color="#fca5a5" />
             <View style={s.rowCopy}>
               <Text style={s.localDataActionTitle}>Clear interrupted-drive recovery data</Text>
-              <Text style={s.localDataActionDetail}>Keeps existing session history and removes only the temporary checkpoint.</Text>
+              <Text style={s.localDataActionDetail}>{recoveryDataUnreadable
+                ? 'Permanently discard an unreadable checkpoint after confirmation. Consider contacting pilot support first.'
+                : 'Keeps existing session history and removes only the temporary checkpoint.'}</Text>
             </View>
           </TouchableOpacity>
         </View>

@@ -6,7 +6,9 @@ import {
   initialCameraSetupAssessment,
 } from '../native-app/lib/cameraSetup.ts';
 import {
+  ActiveSessionCheckpointUnreadableError,
   hasConflictingActiveSessionCheckpoint,
+  parseActiveSessionCheckpoint,
   prependRecoveredSession,
   SESSION_RECOVERY_MAX_AGE_MS,
   recoveredSessionFromCheckpoint,
@@ -142,6 +144,30 @@ test('checkpoint storage recognizes another unresolved session but permits same-
   assert.equal(hasConflictingActiveSessionCheckpoint(CHECKPOINT, 'session-new'), true);
   assert.equal(hasConflictingActiveSessionCheckpoint({ ...CHECKPOINT, durationSec: -1 }, 'session-new'), false);
   assert.equal(hasConflictingActiveSessionCheckpoint(null, 'session-new'), false);
+});
+
+test('checkpoint parser distinguishes no checkpoint from unreadable stored data', () => {
+  assert.equal(parseActiveSessionCheckpoint(null), null);
+  assert.deepEqual(parseActiveSessionCheckpoint(JSON.stringify(CHECKPOINT)), CHECKPOINT);
+  for (const raw of ['', '{', '{}', 'null', '"missing"', JSON.stringify({ ...CHECKPOINT, durationSec: -1 })]) {
+    assert.throws(() => parseActiveSessionCheckpoint(raw), ActiveSessionCheckpointUnreadableError);
+  }
+});
+
+test('checkpoint reads, writes, and scoped cleanup preserve unreadable data', () => {
+  const storage = read('native-app/lib/sessionRecovery.ts');
+  const home = read('native-app/app/index.tsx');
+  const settings = read('native-app/app/settings.tsx');
+  assert.match(storage, /const stored = parseActiveSessionCheckpoint\(raw\)/);
+  assert.match(storage, /return parseActiveSessionCheckpoint\(await AsyncStorage\.getItem\(ACTIVE_SESSION_KEY\)\)/);
+  assert.match(storage, /if \(stored\?\.sessionId === sessionId\)/);
+  assert.match(storage, /export function discardUnreadableActiveSessionCheckpoint\(\)/);
+  assert.match(storage, /if \(error instanceof ActiveSessionCheckpointUnreadableError\)/);
+  assert.match(home, /setRecoveryUnreadable\(error instanceof ActiveSessionCheckpointUnreadableError\)/);
+  assert.match(settings, /checkpointResult\.reason instanceof ActiveSessionCheckpointUnreadableError/);
+  assert.match(settings, /Discard unreadable recovery data\?/);
+  assert.match(settings, /discardUnreadableActiveSessionCheckpoint\(\)/);
+  assert.match(settings, /clearActiveSessionCheckpoint\(recoverySessionId\)/);
 });
 
 test('session history restores only known filters and sorts newest without losing storage indexes', () => {
@@ -284,7 +310,7 @@ test('Settings exposes scoped local-data controls without implying cloud deletio
   assert.match(settings, /Clear interrupted-drive recovery data/);
   assert.match(settings, /This cannot be undone/);
   assert.match(settings, /clearSessionHistory\(\)/);
-  assert.match(settings, /clearActiveSessionCheckpoint\(\)/);
+  assert.match(settings, /clearActiveSessionCheckpoint\(recoverySessionId\)/);
   assert.doesNotMatch(settings, /AsyncStorage\.clear/);
   assert.match(historyStorage, /historyQueue\.then\(\(\) => AsyncStorage\.removeItem\(HISTORY_KEY\)\)/);
   assert.match(recoveryStorage, /AsyncStorage\.removeItem\(ACTIVE_SESSION_KEY\)/);
@@ -296,7 +322,7 @@ test('Settings fails closed when local-data status is unavailable and offers ret
   assert.match(settings, /setLocalSessionCount\(null\)/);
   assert.match(settings, /setRecoveryDataPresent\(null\)/);
   assert.match(settings, /localSessionCount === null/);
-  assert.match(settings, /recoveryDataPresent !== true/);
+  assert.match(settings, /recoverySessionId === null && !recoveryDataUnreadable/);
   assert.match(settings, /Destructive controls stay unavailable until Occulert confirms/);
   assert.match(settings, /accessibilityLabel="Retry local data status check"/);
   assert.match(settings, /disabled=\{localHistoryDeleteDisabled\}/);
