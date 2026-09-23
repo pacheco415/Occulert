@@ -28,6 +28,8 @@ queuing a native build or publishing the website.
   retry instead of showing a misleading empty-history screen.
 - Review changes and deletion now run one operation at a time per session,
   announce their pending state, and temporarily disable conflicting controls.
+- If saved session history is malformed, local reads and writes now fail closed
+  instead of treating it as empty and risking an overwrite of recoverable data.
 - Session History now shows a clear first-load status and ignores older reads
   that finish after a newer refresh or after the user leaves the screen.
 - Session History now groups its newest-first results into Today, Yesterday,
@@ -67,6 +69,8 @@ queuing a native build or publishing the website.
 ## Local verification completed
 
 - Final consolidated source verification suite passed after recovery hardening.
+- The consolidated source verification suite and native TypeScript check passed
+  again after the malformed-history overwrite guard was added.
 - Native TypeScript check passed.
 - Expo dependency compatibility check passed without changing dependencies.
 - Website asset-version, integrity, cache-policy, offline-shell, and CSP checks
