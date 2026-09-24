@@ -105,6 +105,7 @@ export function ParkedReadinessCard() {
           ) : null}
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityLabel={stabilityBusy ? 'Testing both camera streams' : 'Run parked dual-camera test'}
             accessibilityHint="Starts both cameras for five seconds and stops automatically"
             accessibilityState={{ disabled: controlsBusy, busy: stabilityBusy }}
             disabled={controlsBusy}
@@ -117,6 +118,8 @@ export function ParkedReadinessCard() {
       ) : null}
       <TouchableOpacity
         accessibilityRole="button"
+        accessibilityLabel={busy ? 'Checking connected devices' : 'Refresh connected device check'}
+        accessibilityHint="Checks saved settings and current optional device connections while parked"
         accessibilityState={{ disabled: controlsBusy, busy }}
         disabled={controlsBusy}
         onPress={() => refreshRef.current()}
@@ -126,6 +129,7 @@ export function ParkedReadinessCard() {
       </TouchableOpacity>
       <TouchableOpacity
         accessibilityRole="button"
+        accessibilityLabel="Open settings and alert tests"
         accessibilityHint="Opens alert settings and parked audio and Watch tests"
         onPress={() => router.push('/settings')}
         style={styles.secondaryButton}

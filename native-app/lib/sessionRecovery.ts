@@ -1,11 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  isActiveSessionCheckpoint,
+  ActiveSessionCheckpointUnreadableError,
+  hasConflictingActiveSessionCheckpoint,
+  parseActiveSessionCheckpoint,
   type ActiveSessionCheckpoint,
 } from './sessionRecoveryModel';
 
 const ACTIVE_SESSION_KEY = 'occulert-active-session-v1';
 let recoveryQueue: Promise<void> = Promise.resolve();
+
+export class ActiveSessionCheckpointConflictError extends Error {
+  constructor() {
+    super('A different active-session checkpoint must be recovered before starting another session.');
+    this.name = 'ActiveSessionCheckpointConflictError';
+  }
+}
 
 function enqueue(operation: () => Promise<void>): Promise<void> {
   const pending = recoveryQueue.then(operation);
@@ -14,19 +23,19 @@ function enqueue(operation: () => Promise<void>): Promise<void> {
 }
 
 export function saveActiveSessionCheckpoint(checkpoint: ActiveSessionCheckpoint): Promise<void> {
-  return enqueue(() => AsyncStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(checkpoint)));
+  return enqueue(async () => {
+    const raw = await AsyncStorage.getItem(ACTIVE_SESSION_KEY);
+    const stored = parseActiveSessionCheckpoint(raw);
+    if (hasConflictingActiveSessionCheckpoint(stored, checkpoint.sessionId)) {
+      throw new ActiveSessionCheckpointConflictError();
+    }
+    await AsyncStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(checkpoint));
+  });
 }
 
 export async function loadActiveSessionCheckpoint(): Promise<ActiveSessionCheckpoint | null> {
   await recoveryQueue;
-  const raw = await AsyncStorage.getItem(ACTIVE_SESSION_KEY);
-  if (!raw) return null;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return isActiveSessionCheckpoint(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  return parseActiveSessionCheckpoint(await AsyncStorage.getItem(ACTIVE_SESSION_KEY));
 }
 
 export function clearActiveSessionCheckpoint(sessionId?: string): Promise<void> {
@@ -36,14 +45,26 @@ export function clearActiveSessionCheckpoint(sessionId?: string): Promise<void> 
       return;
     }
     const raw = await AsyncStorage.getItem(ACTIVE_SESSION_KEY);
-    if (!raw) return;
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (!isActiveSessionCheckpoint(parsed) || parsed.sessionId === sessionId) {
-        await AsyncStorage.removeItem(ACTIVE_SESSION_KEY);
-      }
-    } catch {
+    const stored = parseActiveSessionCheckpoint(raw);
+    if (stored?.sessionId === sessionId) {
       await AsyncStorage.removeItem(ACTIVE_SESSION_KEY);
     }
+  });
+}
+
+/** Explicit recovery-only discard; never delete a checkpoint that became readable. */
+export function discardUnreadableActiveSessionCheckpoint(): Promise<void> {
+  return enqueue(async () => {
+    const raw = await AsyncStorage.getItem(ACTIVE_SESSION_KEY);
+    try {
+      parseActiveSessionCheckpoint(raw);
+    } catch (error) {
+      if (error instanceof ActiveSessionCheckpointUnreadableError) {
+        await AsyncStorage.removeItem(ACTIVE_SESSION_KEY);
+        return;
+      }
+      throw error;
+    }
+    throw new Error('The recovery checkpoint changed; refresh its status before clearing it.');
   });
 }

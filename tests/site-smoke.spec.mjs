@@ -20,11 +20,7 @@ for (const path of ["/account.html", "/login.html", "/driver-profiles.html", "/f
     page.on("pageerror", error => pageErrors.push(error.message));
     const response = await page.goto(path, { waitUntil: "domcontentloaded" });
     expect(response?.ok(), `${path} should load`).toBeTruthy();
-    if (['/faq.html', '/about.html'].includes(path)) {
-      await expect(page.locator('main .section-title')).toBeVisible();
-    } else {
-      expect(await page.locator("h1").count(), `${path} should have one h1`).toBe(1);
-    }
+    expect(await page.locator("h1").count(), `${path} should have one h1`).toBe(1);
     const robots = await page.locator('meta[name="robots"]').evaluateAll(elements => elements[0]?.content || '');
     if (path !== '/login.html' && !robots?.includes('noindex')) {
       expect(await page.locator('link[rel="canonical"]').count(), `${path} should have a canonical URL`).toBe(1);
@@ -38,12 +34,17 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(() => document.documentElement.style.setProperty("scroll-behavior", "auto", "important"));
 
-  expect(await page.locator('link[href="/homepage.v47.css"]').count()).toBe(1);
+  expect(await page.locator('link[href="/homepage.v51.css"]').count()).toBe(1);
   expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1-640.avif"][type="image/avif"]').count()).toBe(1);
   expect(await page.locator('link[href="/homepage.css"]').count()).toBe(0);
   expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
+  await page.locator(".skip-link").focus();
+  await expect(page.locator(".skip-link")).toBeFocused();
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator("#safetyJourney")).toBeVisible();
+  await expect(page.locator("#safetyJourney")).toHaveAttribute("aria-describedby", "journeyBoundary");
+  await expect(page.locator(".journey-topline")).toContainText("Interactive product demo");
+  await expect(page.locator("#journeyStep0")).toContainText("Camera off");
   await page.locator("#journeyMotion").click();
   await expect(page.locator("#journeyMotion")).toHaveText("Play motion");
   await expect(page.locator("#journeyMotion")).toHaveAttribute("aria-pressed", "true");
@@ -53,6 +54,8 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.locator('[data-journey-step="3"]').click();
   await expect(page.locator("#safetyJourney")).toHaveAttribute("data-stage", "3");
   await expect(page.locator("#journeyStep3")).toContainText("An alert creates time to act");
+  await expect(page.locator("#journeyStep3")).toContainText("Pull over safely");
+  await expect(page.locator("#journeyBoundary")).toContainText("cannot make it safe to continue driving while tired");
   await expect(page.locator(".safe-stop")).toHaveCSS("opacity", "1");
   await expect(page.locator(".journey-frame-alert")).toHaveCSS("opacity", "1");
   await expect(page.locator(".journey-frame-enter")).toHaveCSS("opacity", "0");
@@ -74,8 +77,15 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.locator("#themeToggle").click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", initialTheme === "light" ? "dark" : "light");
 
+  await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "false");
   await page.locator("#menuBtn").click();
   await expect(page.locator("#mobileMenu")).toHaveClass(/open/);
+  await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "false");
+  await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#mobileMenu")).not.toHaveClass(/open/);
+  await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator("#menuBtn")).toBeFocused();
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   expect(await page.locator(".disclaimer > .disclaimer-content").count()).toBe(1);
@@ -87,6 +97,84 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(page.locator(".disclaimer")).toHaveCSS("display", "flex");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
+});
+
+test("public information pages share accessible mobile navigation", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const path of ["/about.html", "/faq.html", "/features.html", "/how-it-works.html", "/install.html"]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    await expect(page.locator('script[src="/public-page.v51.js"]')).toHaveCount(1);
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
+    await skipLink.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content"), `${path} should focus its main content`).toBeFocused();
+    await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "true");
+    await page.locator("#menuBtn").click();
+    await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "false");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#menuBtn")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#mobileMenu")).toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator("#menuBtn")).toBeFocused();
+  }
+});
+
+test("product, safety, privacy, and fleet pages offer a keyboard shortcut to main content", async ({ page }) => {
+  for (const path of ["/product-hub.html", "/safety.html", "/privacy.html", "/fleet-pricing.html", "/fleet-dashboard.html"]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
+    await skipLink.focus();
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toHaveAttribute("href", "#main-content");
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content"), `${path} should focus its main content`).toBeFocused();
+  }
+
+  for (const path of ["/product-hub.html", "/safety.html", "/privacy.html", "/fleet-pricing.html", "/fleet-dashboard.html", "/driver-profiles.html", "/pilot-signup.html", "/session-history.html"]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    await expect(page.locator('script[src="/static-page.v52.js"]')).toHaveCount(1);
+  }
+});
+
+test("driver app and local history expose accessible main content and controls", async ({ page }) => {
+  for (const path of ["/app.html", "/session-history.html"]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
+    await skipLink.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content"), `${path} should focus its main content`).toBeFocused();
+  }
+
+  await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { level: 1, name: "Driver monitoring" })).toBeVisible();
+  await expect(page.getByRole("slider", { name: /Night Alert Brightness/ })).toBeVisible();
+});
+
+test("privacy page explains local history, recovery, sharing, and separate cloud deletion", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/privacy.html", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("navigation", { name: "Privacy and data controls" })).toBeVisible();
+  await expect(page.locator("#local-history")).toContainText("Local History, Recovery & Sharing");
+  await expect(page.locator("#data")).toContainText("checkpoint about every 15 seconds");
+  await expect(page.locator("#data")).toContainText("excludes driver and cloud IDs");
+  await expect(page.locator("#data")).toContainText("does not remove separately synced account or fleet records");
+  await expect(page.getByRole("link", { name: "Open browser Session History" })).toHaveAttribute("href", "/session-history.html");
+  await expect(page.getByRole("link", { name: "Open Account Settings" })).toHaveAttribute("href", "/account.html");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test("fleet dashboard keeps mobile navigation and controls touch friendly", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await expect(page.locator(".top")).toHaveCSS("position", "relative");
+  expect(await page.locator(".actions").evaluate(element => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(2);
+  expect(await page.locator(".actions .btn").first().evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  expect(await page.locator("#driverSearch").evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  await expect(page.locator(".section-title").first()).toHaveCSS("flex-direction", "column");
 });
 
 test("forgot password stays on the login surface and opens reset mode", async ({ page }) => {
@@ -394,6 +482,8 @@ test("fleet filtering preserves input focus and updates only the visible roster"
   await page.locator(".dashboard-tools").getByText("Dashboard tools", { exact: true }).click();
   await page.locator(".dashboard-tools").getByRole("button", { name: "Load Demo Data" }).click();
   await expect(page.locator(".driver")).toHaveCount(3);
+  await page.waitForTimeout(300);
+  await expect(page.locator(".driver")).toHaveCount(3);
 
   const search = page.locator("#driverSearch");
   await search.fill("Mina");
@@ -478,6 +568,8 @@ test("driver alerts enhance only successful triggers and sensitivity is unambigu
   expect(await page.locator('input[oninput*="setSensitivity"]').count()).toBe(0);
 
   await page.evaluate(() => demoAlert());
+  await expect(page.locator("#overlay")).toHaveClass(/hide/);
+  await expect(page.getByRole("heading", { level: 1, name: "Driver monitoring" })).toBeVisible();
   await expect(page.locator("#alerts")).toHaveText("1");
   const firstAlertLogs = await page.evaluate(() => _sessionLog.filter((entry) => entry.type === "alert").length);
   expect(firstAlertLogs).toBe(1);
@@ -590,6 +682,29 @@ test("pilot request controls use an accessible form", async ({ page }) => {
   await expect(page.getByLabel("Desired start")).toHaveValue("");
   await expect(page.getByLabel("Primary operating goal")).toHaveAttribute("required", "");
   await expect(page.getByLabel("Primary operating goal")).toHaveValue("");
+});
+
+test("fleet request validation identifies and focuses the field needing attention", async ({ page }) => {
+  await page.goto("/pilot-signup.html", { waitUntil: "domcontentloaded" });
+
+  await page.locator("#saveBtn").click();
+  await expect(page.locator("#name")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#name")).toBeFocused();
+  await expect(page.locator("#error")).toContainText("Enter your name");
+
+  await page.locator("#name").fill("Fleet Owner");
+  await expect(page.locator("#name")).not.toHaveAttribute("aria-invalid", "true");
+  await page.locator("#saveBtn").click();
+  await expect(page.locator("#company")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#company")).toBeFocused();
+  await expect(page.locator("#error")).toContainText("Enter your company name");
+
+  await page.locator("#company").fill("Safe Transit");
+  await page.locator("#email").fill("not-an-email");
+  await page.locator("#saveBtn").click();
+  await expect(page.locator("#email")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#email")).toBeFocused();
+  await expect(page.locator("#error")).toContainText("Enter a valid email address");
 });
 
 test("fleet dashboard paid-rollout path reuses the protected lead form with clear intent", async ({ page }) => {

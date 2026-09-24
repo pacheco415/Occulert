@@ -26,8 +26,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/features-page-1.v47.css" />
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
+<link rel="stylesheet" href="/accessibility.v52.css" />
 </head>
 <body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
 <nav>
   <a class="logo" href="/" aria-label="Occulert home"><span class="logo-mark"><svg width="23" height="23" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></span>Occulert</a>
   <div class="nav-links">
@@ -35,16 +37,16 @@
   </div>
   <div class="nav-right">
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
-    <button class="hamburger" id="menuBtn" aria-label="Open menu"><span class="bar"></span><span class="bar"></span><span class="bar"></span></button>
+    <button class="hamburger" id="menuBtn" aria-label="Open menu" aria-controls="mobileMenu" aria-expanded="false"><span class="bar"></span><span class="bar"></span><span class="bar"></span></button>
   </div>
 </nav>
-<div class="mobile-menu" id="mobileMenu">
+<div class="mobile-menu" id="mobileMenu" aria-hidden="true">
   <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a>
   <a href="/app.html" class="launch" style="text-align:center;border-radius:9px">Launch App</a>
   <div class="mobile-menu-footer"><span>Theme</span><button class="theme-toggle-mobile" id="themeToggleMobile">🌙 Dark Mode</button></div>
 </div>
 
-<main style="padding-top:72px">
+<main id="main-content" tabindex="-1" style="padding-top:72px">
 <div class="container section" id="features">
   <div class="section-label">What It Does</div>
   <h1 class="section-title">Intelligent Driver Monitoring</h1>
@@ -82,7 +84,7 @@
   </div>
 </footer>
 <button class="scroll-top" id="scrollTop" aria-label="Back to top">↑</button>
-<script src="/features-page-1.v47.js"></script>
+<script src="/public-page.v51.js"></script>
   <script src="/lang.v47.js" defer></script>
 </body>
 </html>

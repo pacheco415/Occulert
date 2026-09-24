@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SensitivitySlider, loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { openFeedback } from '../lib/feedback';
@@ -44,6 +44,13 @@ import {
 } from '../lib/alertSound';
 import { alertDeliveryPlan } from '../lib/alertDelivery';
 import { waitForCancellableDelay } from '../lib/cancellableDelay';
+import { clearSessionHistory, loadSessionHistory } from '../lib/sessionHistory';
+import {
+  clearActiveSessionCheckpoint,
+  discardUnreadableActiveSessionCheckpoint,
+  loadActiveSessionCheckpoint,
+} from '../lib/sessionRecovery';
+import { ActiveSessionCheckpointUnreadableError } from '../lib/sessionRecoveryModel';
 
 const EMPTY_WATCH_STATUS: WatchStatus = {
   moduleAvailable: false,
@@ -113,6 +120,7 @@ const labelHeadphoneMotion = (status: HeadphoneMotionStatus): string => {
 };
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const [sens, setSens] = useState<SensitivityLevel>('medium');
   const [haptic, setHaptic] = useState(true);
   const [audio, setAudio] = useState(true);
@@ -126,12 +134,19 @@ export default function SettingsScreen() {
   const [audioTestBusy, setAudioTestBusy] = useState(false);
   const [watchTestBusy, setWatchTestBusy] = useState(false);
   const [deviceRefreshBusy, setDeviceRefreshBusy] = useState(false);
+  const [localSessionCount, setLocalSessionCount] = useState<number | null>(null);
+  const [recoveryDataPresent, setRecoveryDataPresent] = useState<boolean | null>(null);
+  const [recoverySessionId, setRecoverySessionId] = useState<string | null>(null);
+  const [recoveryDataUnreadable, setRecoveryDataUnreadable] = useState(false);
+  const [localDataStatusBusy, setLocalDataStatusBusy] = useState(true);
+  const [localDataBusy, setLocalDataBusy] = useState(false);
   // This parked-only test must release the shared iOS audio session when the
   // tone ends so music and navigation audio can return to their normal level.
   const audioTestPlayer = useAudioPlayer(ALERT_SOUND);
   const audioTestRunnerRef = useRef(createSingleFlightActionRunner());
   const watchTestRunnerRef = useRef(createSingleFlightActionRunner());
   const deviceRefreshRunnerRef = useRef(createSingleFlightActionRunner());
+  const localDataStatusRunnerRef = useRef(createSingleFlightActionRunner());
   const settingsMountedRef = useRef(true);
   const audioTestAbortRef = useRef<AbortController | null>(null);
   const watchAvailable = watchStatus.paired && watchStatus.appInstalled;
@@ -163,6 +178,33 @@ export default function SettingsScreen() {
     return () => { active = false; };
   }, []);
 
+  const refreshLocalDataStatus = useCallback(() => {
+    void localDataStatusRunnerRef.current.run({
+      action: async () => {
+        const [historyResult, checkpointResult] = await Promise.allSettled([
+          loadSessionHistory(),
+          loadActiveSessionCheckpoint(),
+        ]);
+        if (!settingsMountedRef.current) return;
+        setLocalSessionCount(historyResult.status === 'fulfilled' ? historyResult.value.length : null);
+        setRecoveryDataPresent(checkpointResult.status === 'fulfilled' ? Boolean(checkpointResult.value) : null);
+        setRecoverySessionId(checkpointResult.status === 'fulfilled' ? checkpointResult.value?.sessionId ?? null : null);
+        setRecoveryDataUnreadable(checkpointResult.status === 'rejected'
+          && checkpointResult.reason instanceof ActiveSessionCheckpointUnreadableError);
+      },
+      onBusyChange: busy => {
+        if (settingsMountedRef.current) setLocalDataStatusBusy(busy);
+      },
+      onError: () => {
+        if (!settingsMountedRef.current) return;
+        setLocalSessionCount(null);
+        setRecoveryDataPresent(null);
+        setRecoverySessionId(null);
+        setRecoveryDataUnreadable(false);
+      },
+    });
+  }, []);
+
   useFocusEffect(useCallback(() => {
     let active = true;
     Promise.all([
@@ -175,8 +217,9 @@ export default function SettingsScreen() {
       setWatch(saved);
       setHeadphoneMotionStatus(motionStatus);
     }).catch(() => {});
+    refreshLocalDataStatus();
     return () => { active = false; };
-  }, []));
+  }, [refreshLocalDataStatus]));
 
   const saveBooleanSetting = (
     key: string,
@@ -351,23 +394,106 @@ export default function SettingsScreen() {
     });
   };
 
+  const deleteAllLocalSessions = async () => {
+    if (localDataBusy || localDataStatusBusy || localSessionCount === null || localSessionCount === 0) return;
+    setLocalDataBusy(true);
+    try {
+      await clearSessionHistory();
+      if (settingsMountedRef.current) setLocalSessionCount(0);
+      Alert.alert(
+        'Local history deleted',
+        'Session summaries were removed from this iPhone. Any separately synced cloud records were not changed.',
+      );
+    } catch {
+      Alert.alert('Could not delete local history', 'Your local session summaries remain saved. Please try again.');
+    } finally {
+      if (settingsMountedRef.current) setLocalDataBusy(false);
+    }
+  };
+
+  const confirmDeleteAllLocalSessions = () => {
+    Alert.alert(
+      'Delete all local session history?',
+      'This permanently removes every local session summary, review, and diagnostic from this iPhone. You can review or share a privacy-limited text copy first. Cloud records are not changed. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Review First', onPress: () => router.push('/history') },
+        { text: 'Delete All', style: 'destructive', onPress: () => { void deleteAllLocalSessions(); } },
+      ],
+    );
+  };
+
+  const clearRecoveryData = async () => {
+    if (localDataBusy || localDataStatusBusy || (recoverySessionId === null && !recoveryDataUnreadable)) return;
+    setLocalDataBusy(true);
+    try {
+      if (recoveryDataUnreadable) {
+        await discardUnreadableActiveSessionCheckpoint();
+      } else if (recoverySessionId) {
+        await clearActiveSessionCheckpoint(recoverySessionId);
+        if (await loadActiveSessionCheckpoint()) {
+          throw new Error('The recovery checkpoint changed before it could be cleared.');
+        }
+      }
+      if (settingsMountedRef.current) setRecoveryDataPresent(false);
+      if (settingsMountedRef.current) setRecoverySessionId(null);
+      if (settingsMountedRef.current) setRecoveryDataUnreadable(false);
+      Alert.alert('Recovery data cleared', 'The interrupted-drive checkpoint was removed from this iPhone.');
+    } catch {
+      Alert.alert('Could not clear recovery data', 'The checkpoint may have changed. Refresh its status before trying again.');
+      refreshLocalDataStatus();
+    } finally {
+      if (settingsMountedRef.current) setLocalDataBusy(false);
+    }
+  };
+
+  const confirmClearRecoveryData = () => {
+    Alert.alert(
+      recoveryDataUnreadable ? 'Discard unreadable recovery data?' : 'Clear interrupted-drive recovery data?',
+      recoveryDataUnreadable
+        ? 'Occulert cannot read this checkpoint. Clearing it permanently removes the stored data, which may still be useful to support, and allows a new drive to start. Existing session history is not changed. Consider contacting pilot support first.'
+        : 'This removes the temporary local checkpoint used to recover an interrupted monitoring session. Existing session history is not changed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear', style: 'destructive', onPress: () => { void clearRecoveryData(); } },
+      ],
+    );
+  };
+
+  const localHistoryDeleteDisabled = localDataBusy
+    || localDataStatusBusy
+    || localSessionCount === null
+    || localSessionCount === 0;
+  const recoveryDeleteDisabled = localDataBusy
+    || localDataStatusBusy
+    || (recoverySessionId === null && !recoveryDataUnreadable);
+
   return (
     <SafeAreaView style={s.bg}>
       <AmbientBackground />
       <ScrollView contentContainerStyle={s.scroll}>
         <Text style={s.eyebrow}>OCCULERT</Text>
         <Text style={s.title}>Settings</Text>
+        <View style={s.priorityCard}>
+          <View style={s.priorityIcon}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={colors.cyan} />
+          </View>
+          <View style={s.priorityCopy}>
+            <Text style={s.priorityTitle}>Keep the core setup simple</Text>
+            <Text style={s.priorityText}>The iPhone camera and at least one phone alert are the primary setup. Watch, headphones, Health, and cloud sync are optional additions.</Text>
+          </View>
+        </View>
         <SensitivitySlider value={sens} onChange={setSens} />
         <View style={s.card}>
           <Text style={s.cardTitle}>ALERTS</Text>
           <View style={s.row}>
-            <View style={s.rowL}><Ionicons name="phone-portrait-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Haptic vibration</Text><Text style={s.sub}>Vibrate on alert</Text></View></View>
-            <Switch accessibilityLabel="Haptic vibration alerts" value={haptic} onValueChange={v=>saveBooleanSetting(HAPTIC_ALERT_PREFERENCE_KEY,v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <View style={s.rowL}><Ionicons name="phone-portrait-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Haptic vibration</Text><Text style={s.sub}>Vibrate on alert</Text></View></View>
+            <Switch accessibilityLabel="Haptic vibration alerts" accessibilityHint="Controls vibration from the iPhone during alerts" value={haptic} onValueChange={v=>saveBooleanSetting(HAPTIC_ALERT_PREFERENCE_KEY,v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
           <View style={s.row}>
-            <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
-            <Switch accessibilityLabel="Audio tone alerts" value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
+            <Switch accessibilityLabel="Audio tone alerts" accessibilityHint="Controls alert sounds from the iPhone's current audio output" value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
           <View style={s.soundBlock}>
@@ -385,6 +511,7 @@ export default function SettingsScreen() {
                   <TouchableOpacity
                     key={value}
                     accessibilityLabel={`${profile.label} alert sound`}
+                    accessibilityHint={profile.description}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     style={[s.soundOption, selected && s.soundOptionSelected]}
@@ -440,6 +567,8 @@ export default function SettingsScreen() {
           <TouchableOpacity
             accessibilityHint="Plays the three-tone urgent alert sequence through the iPhone's current audio output"
             accessibilityRole="button"
+            accessibilityLabel={audioTestBusy ? 'Preparing audio test' : 'Test current audio output'}
+            accessibilityState={{ disabled: audioTestBusy, busy: audioTestBusy }}
             disabled={audioTestBusy}
             style={[s.testRow, audioTestBusy && s.testRowDisabled]}
             onPress={testAudioOutput}
@@ -465,7 +594,7 @@ export default function SettingsScreen() {
           <View style={s.patternBlock}>
             <View style={s.rowL}>
               <Ionicons name="ear-outline" size={18} color="#60a5fa" />
-              <View>
+              <View style={s.rowCopy}>
                 <Text style={s.label}>Headphone alert pattern</Text>
                 <Text style={s.sub}>Balanced is clearest; optional stereo emphasis is available for early alerts</Text>
               </View>
@@ -480,6 +609,8 @@ export default function SettingsScreen() {
                   <TouchableOpacity
                     key={value}
                     accessibilityRole="button"
+                    accessibilityLabel={`${label} headphone alert pattern`}
+                    accessibilityHint="Changes stereo emphasis for early alerts only"
                     accessibilityState={{ selected }}
                     style={[s.patternOption, selected && s.patternOptionSelected]}
                     onPress={() => chooseInEarPattern(value)}
@@ -495,12 +626,12 @@ export default function SettingsScreen() {
           <View style={s.row}>
             <View style={s.rowL}>
               <Ionicons name="watch-outline" size={18} color="#60a5fa" />
-              <View>
+              <View style={s.rowCopy}>
                 <Text style={s.label}>Apple Watch alerts</Text>
                 <Text style={s.sub}>{watchDescription}</Text>
               </View>
             </View>
-            <Switch accessibilityLabel="Apple Watch alerts" disabled={!watchAvailable} value={watch && watchAvailable} onValueChange={changeWatchAlerts} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
+            <Switch accessibilityLabel="Apple Watch alerts" accessibilityHint="Controls optional alert delivery to the paired Apple Watch" disabled={!watchAvailable} value={watch && watchAvailable} onValueChange={changeWatchAlerts} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
           </View>
           <View style={s.div} />
           <TouchableOpacity
@@ -519,9 +650,122 @@ export default function SettingsScreen() {
         </View>
         <CloudSyncCard />
         <View style={s.card}>
+          <Text style={s.cardTitle}>PRIVACY &amp; LOCAL DATA</Text>
+          <View style={s.privacySummary}>
+            <View style={s.privacySummaryIcon}>
+              <Ionicons name="phone-portrait-outline" size={19} color={colors.green} />
+            </View>
+            <View style={s.rowCopy}>
+              <Text style={s.privacySummaryTitle}>Stored on this iPhone</Text>
+              <Text style={s.privacySummaryText}>
+                Session summaries, your reviews and test conditions, bounded performance diagnostics, preferences, and a temporary interrupted-drive checkpoint.
+              </Text>
+            </View>
+          </View>
+          <View style={s.privNote}>
+            <Ionicons name="eye-off-outline" size={14} color="#4a7a8a" />
+            <Text style={s.privTxt}>Occulert does not save camera video, photos, microphone audio, or a location route. Optional Apple Health context is a small local summary managed from the pre-drive screen.</Text>
+          </View>
+          <View style={s.privNote}>
+            <Ionicons name="cloud-outline" size={14} color="#4a7a8a" />
+            <Text style={s.privTxt}>Cloud session summaries are separate and sync only when you enable cloud sync while signed in. Deleting local data here does not delete cloud records.</Text>
+          </View>
+          <View accessibilityLiveRegion="polite" style={s.localDataStatus}>
+            <Text style={s.localDataStatusText}>
+              {localDataStatusBusy
+                ? 'Checking local history…'
+                : localSessionCount === null
+                  ? 'Local history count unavailable'
+                  : `${localSessionCount} local ${localSessionCount === 1 ? 'session' : 'sessions'}`}
+            </Text>
+            <Text style={s.localDataStatusText}>
+              {localDataStatusBusy
+                ? 'Checking recovery data…'
+                : recoveryDataUnreadable
+                  ? 'Unreadable recovery checkpoint saved'
+                : recoveryDataPresent === null
+                  ? 'Recovery status unavailable'
+                  : recoveryDataPresent ? 'Recovery checkpoint saved' : 'No recovery checkpoint'}
+            </Text>
+            {!localDataStatusBusy && (localSessionCount === null || recoveryDataPresent === null) && (
+              <>
+                <Text style={s.localDataStatusError}>
+                  {recoveryDataUnreadable
+                    ? 'The unreadable checkpoint is preserved. You can retry, contact pilot support, or explicitly discard only that checkpoint below.'
+                    : 'Destructive controls stay unavailable until Occulert confirms what is stored on this iPhone.'}
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry local data status check"
+                  accessibilityHint="Checks local session history and interrupted-drive recovery data again"
+                  onPress={refreshLocalDataStatus}
+                  style={s.localDataRetry}
+                >
+                  <Ionicons name="refresh" size={15} color={colors.cyan} />
+                  <Text style={s.localDataRetryText}>TRY AGAIN</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Review or export local session history"
+            accessibilityHint="Opens Session History, where privacy-limited summaries can be shared before local deletion"
+            accessibilityState={{ disabled: localDataBusy, busy: localDataBusy }}
+            disabled={localDataBusy}
+            onPress={() => router.push('/history')}
+            style={[s.localDataAction, localDataBusy && s.localDataActionDisabled]}
+          >
+            <Ionicons name="share-outline" size={17} color="#93c5fd" />
+            <View style={s.rowCopy}>
+              <Text style={s.localDataReviewTitle}>Review or export local history</Text>
+              <Text style={s.localDataActionDetail}>
+                Open saved summaries and share a privacy-limited text copy before deleting anything.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={17} color="#4a7a8a" />
+          </TouchableOpacity>
+          <View style={s.div} />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Delete all local session history"
+            accessibilityHint="Permanently removes local session summaries after confirmation without changing cloud records"
+            accessibilityState={{ disabled: localHistoryDeleteDisabled, busy: localDataBusy || localDataStatusBusy }}
+            disabled={localHistoryDeleteDisabled}
+            onPress={confirmDeleteAllLocalSessions}
+            style={[s.localDataAction, localHistoryDeleteDisabled && s.localDataActionDisabled]}
+          >
+            <Ionicons name="trash-outline" size={17} color="#fca5a5" />
+            <View style={s.rowCopy}>
+              <Text style={s.localDataActionTitle}>Delete all local session history</Text>
+              <Text style={s.localDataActionDetail}>Removes summaries, reviews, test conditions, and diagnostics from this iPhone.</Text>
+            </View>
+          </TouchableOpacity>
+          <View style={s.div} />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Clear interrupted-drive recovery data"
+            accessibilityHint="Removes the temporary local recovery checkpoint after confirmation"
+            accessibilityState={{ disabled: recoveryDeleteDisabled, busy: localDataBusy || localDataStatusBusy }}
+            disabled={recoveryDeleteDisabled}
+            onPress={confirmClearRecoveryData}
+            style={[s.localDataAction, recoveryDeleteDisabled && s.localDataActionDisabled]}
+          >
+            <Ionicons name="refresh-circle-outline" size={18} color="#fca5a5" />
+            <View style={s.rowCopy}>
+              <Text style={s.localDataActionTitle}>Clear interrupted-drive recovery data</Text>
+              <Text style={s.localDataActionDetail}>{recoveryDataUnreadable
+                ? 'Permanently discard an unreadable checkpoint after confirmation. Consider contacting pilot support first.'
+                : 'Keeps existing session history and removes only the temporary checkpoint.'}</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+        <View style={s.card}>
           <Text style={s.cardTitle}>PILOT SUPPORT</Text>
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityLabel="Send pilot feedback"
+            accessibilityHint="Opens a draft email for your review"
             style={s.row}
             onPress={async () => {
               if (!await openFeedback()) {
@@ -529,7 +773,7 @@ export default function SettingsScreen() {
               }
             }}
           >
-            <View style={s.rowL}><Ionicons name="chatbubble-ellipses-outline" size={18} color="#60a5fa" /><View><Text style={s.label}>Send feedback</Text><Text style={s.sub}>Report an alert issue or share a suggestion</Text></View></View>
+            <View style={s.rowL}><Ionicons name="chatbubble-ellipses-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Send feedback</Text><Text style={s.sub}>Report an alert issue or share a suggestion</Text></View></View>
             <Ionicons name="chevron-forward" size={18} color="#4a7a8a" />
           </TouchableOpacity>
           <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>Feedback opens in Mail for your review. No camera video, audio, or location is attached.</Text></View>
@@ -544,14 +788,19 @@ export default function SettingsScreen() {
 const s = StyleSheet.create({
   bg:{flex:1,backgroundColor:colors.background}, scroll:{padding:20,paddingBottom:48},
   eyebrow:{color:colors.cyan,fontSize:10,fontWeight:'800',letterSpacing:1.5,marginTop:6,marginBottom:5},
-  title:{color:colors.text,fontSize:32,fontWeight:'800',letterSpacing:-0.8,marginBottom:22},
+  title:{color:colors.text,fontSize:32,fontWeight:'800',letterSpacing:-0.8,marginBottom:12},
+  priorityCard:{flexDirection:'row',alignItems:'flex-start',gap:11,backgroundColor:'rgba(100,210,255,0.07)',borderWidth:1,borderColor:'rgba(100,210,255,0.2)',borderRadius:radii.medium,padding:14,marginBottom:18},
+  priorityIcon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(100,210,255,0.1)'},
+  priorityCopy:{flex:1},
+  priorityTitle:{color:colors.text,fontSize:13,fontWeight:'800'},
+  priorityText:{color:colors.textSecondary,fontSize:11,lineHeight:16,marginTop:3},
   card:{backgroundColor:colors.material,borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.large,marginBottom:16,overflow:'hidden'},
   cardTitle:{color:colors.textSecondary,fontSize:11,fontWeight:'800',letterSpacing:0.8,textTransform:'uppercase',padding:14,borderBottomWidth:1,borderColor:'rgba(255,255,255,0.08)'},
-  row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:16,paddingVertical:14,gap:12},
-  rowL:{flexDirection:'row',alignItems:'center',gap:12,flex:1},
-  rowCopy:{flex:1},
-  label:{color:colors.text,fontSize:14,fontWeight:'700'}, sub:{color:colors.textMuted,fontSize:11,marginTop:2},
-  status:{color:colors.cyan,fontSize:10,fontWeight:'900',letterSpacing:0.6},
+  row:{minHeight:52,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:16,paddingVertical:14,gap:12},
+  rowL:{minWidth:0,flexDirection:'row',alignItems:'center',gap:12,flex:1},
+  rowCopy:{minWidth:0,flex:1},
+  label:{color:colors.text,fontSize:14,fontWeight:'700'}, sub:{color:colors.textMuted,fontSize:11,lineHeight:16,marginTop:2},
+  status:{flexShrink:1,color:colors.cyan,fontSize:10,fontWeight:'900',letterSpacing:0.6,textAlign:'right'},
   deviceSummary:{flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:16,paddingTop:14,paddingBottom:10,backgroundColor:'rgba(48,209,88,0.05)'},
   deviceSummaryIcon:{width:34,height:34,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(48,209,88,0.1)'},
   deviceSummaryCopy:{flex:1},
@@ -560,22 +809,22 @@ const s = StyleSheet.create({
   refreshRow:{minHeight:44,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingHorizontal:16},
   refreshText:{color:colors.cyan,fontSize:11,fontWeight:'900',letterSpacing:0.55},
   div:{height:1,backgroundColor:colors.glassBorder,marginHorizontal:16},
-  testRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:13},
+  testRow:{minHeight:44,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:13,paddingHorizontal:12},
   testRowDisabled:{opacity:0.35},
   testText:{color:'#60a5fa',fontSize:13,fontWeight:'800'},
   testNote:{color:colors.textMuted,fontSize:10,lineHeight:15,textAlign:'center',paddingHorizontal:16,paddingBottom:12},
   alertSafetyNote:{flexDirection:'row',alignItems:'flex-start',gap:8,paddingHorizontal:16,paddingVertical:13,backgroundColor:'rgba(251,191,36,0.07)',borderTopWidth:1,borderColor:'rgba(251,191,36,0.16)'},
   alertSafetyText:{flex:1,color:'#f8d98b',fontSize:11,lineHeight:16},
   patternBlock:{paddingHorizontal:16,paddingVertical:14,gap:12},
-  patternOptions:{flexDirection:'row',gap:8},
-  patternOption:{flex:1,alignItems:'center',borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.small,paddingVertical:10,backgroundColor:colors.backgroundRaised},
+  patternOptions:{flexDirection:'row',flexWrap:'wrap',gap:8},
+  patternOption:{flexGrow:1,flexBasis:130,minHeight:44,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.small,paddingVertical:10,backgroundColor:colors.backgroundRaised},
   patternOptionSelected:{borderColor:colors.blue,backgroundColor:'rgba(94,156,255,0.18)'},
   patternOptionText:{color:'#7f9ba8',fontSize:12,fontWeight:'800'},
   patternOptionTextSelected:{color:'#bfdbfe'},
   patternNote:{color:colors.textMuted,fontSize:11,lineHeight:16},
   soundBlock:{paddingHorizontal:16,paddingVertical:14,gap:12},
-  soundOptions:{flexDirection:'row',gap:8},
-  soundOption:{flex:1,borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.small,paddingVertical:10,paddingHorizontal:8,backgroundColor:colors.backgroundRaised},
+  soundOptions:{flexDirection:'row',flexWrap:'wrap',gap:8},
+  soundOption:{flexGrow:1,flexBasis:130,minHeight:52,justifyContent:'center',borderWidth:1,borderColor:colors.glassBorder,borderRadius:radii.small,paddingVertical:10,paddingHorizontal:8,backgroundColor:colors.backgroundRaised},
   soundOptionSelected:{borderColor:colors.blue,backgroundColor:'rgba(94,156,255,0.18)'},
   soundOptionText:{color:'#7f9ba8',fontSize:12,fontWeight:'800',textAlign:'center'},
   soundOptionTextSelected:{color:'#bfdbfe'},
@@ -583,5 +832,19 @@ const s = StyleSheet.create({
   soundNote:{color:colors.textMuted,fontSize:11,lineHeight:16},
   privNote:{flexDirection:'row',alignItems:'flex-start',gap:8,padding:14,backgroundColor:colors.backgroundRaised,borderTopWidth:1,borderColor:colors.glassBorder},
   privTxt:{color:colors.textMuted,fontSize:11,lineHeight:16,flex:1},
+  privacySummary:{flexDirection:'row',alignItems:'flex-start',gap:11,padding:16,backgroundColor:'rgba(48,209,88,0.05)'},
+  privacySummaryIcon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(48,209,88,0.1)'},
+  privacySummaryTitle:{color:'#bbf7d0',fontSize:13,fontWeight:'900'},
+  privacySummaryText:{color:colors.textSecondary,fontSize:11,lineHeight:17,marginTop:3},
+  localDataStatus:{gap:4,paddingHorizontal:16,paddingVertical:12,borderTopWidth:1,borderColor:colors.glassBorder},
+  localDataStatusText:{color:colors.textSecondary,fontSize:11,lineHeight:16},
+  localDataStatusError:{color:'#f8d98b',fontSize:11,lineHeight:16,marginTop:5},
+  localDataRetry:{alignSelf:'flex-start',minHeight:44,flexDirection:'row',alignItems:'center',gap:7,paddingRight:16},
+  localDataRetryText:{color:colors.cyan,fontSize:11,fontWeight:'900',letterSpacing:0.55},
+  localDataAction:{minHeight:64,flexDirection:'row',alignItems:'flex-start',gap:11,paddingHorizontal:16,paddingVertical:14},
+  localDataActionDisabled:{opacity:0.4},
+  localDataReviewTitle:{color:'#bfdbfe',fontSize:13,fontWeight:'800'},
+  localDataActionTitle:{color:'#fca5a5',fontSize:13,fontWeight:'800'},
+  localDataActionDetail:{color:colors.textMuted,fontSize:11,lineHeight:16,marginTop:3},
   ver:{textAlign:'center',color:colors.textMuted,fontSize:11,marginTop:8},
 });

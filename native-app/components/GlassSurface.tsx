@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { colors } from '../constants/theme';
+import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
+import { shouldUseGlassEffect } from '../lib/accessibilityPreferencesModel';
 
 interface GlassSurfaceProps extends ViewProps {
   children: React.ReactNode;
@@ -24,7 +26,11 @@ export function GlassSurface({
   tintColor = 'rgba(34, 42, 56, 0.34)',
   ...viewProps
 }: GlassSurfaceProps) {
-  const supportsLiquidGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable();
+  const { reduceTransparency } = useAccessibilityPreferences();
+  const supportsLiquidGlass = shouldUseGlassEffect(
+    Platform.OS === 'ios' && isGlassEffectAPIAvailable(),
+    reduceTransparency,
+  );
 
   if (supportsLiquidGlass) {
     return (
@@ -41,18 +47,23 @@ export function GlassSurface({
   }
 
   return (
-    <View {...viewProps} style={[styles.fallback, style]}>
+    <View {...viewProps} style={[styles.fallback, style, reduceTransparency && styles.opaqueFallback]}>
       {children}
     </View>
   );
 }
 
 export function AmbientBackground() {
+  const { reduceTransparency } = useAccessibilityPreferences();
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill} accessibilityElementsHidden>
-      <View style={[styles.orb, styles.orbBlue]} />
-      <View style={[styles.orb, styles.orbCyan]} />
-      <View style={[styles.orb, styles.orbViolet]} />
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, reduceTransparency && styles.opaqueAmbient]}
+      accessibilityElementsHidden
+    >
+      {!reduceTransparency && <View style={[styles.orb, styles.orbBlue]} />}
+      {!reduceTransparency && <View style={[styles.orb, styles.orbCyan]} />}
+      {!reduceTransparency && <View style={[styles.orb, styles.orbViolet]} />}
     </View>
   );
 }
@@ -62,6 +73,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.glassFallback,
     borderWidth: 1,
     borderColor: colors.glassBorder,
+  },
+  opaqueFallback: {
+    backgroundColor: colors.materialStrong,
+    borderColor: '#465064',
+  },
+  opaqueAmbient: {
+    backgroundColor: colors.background,
   },
   orb: {
     position: 'absolute',

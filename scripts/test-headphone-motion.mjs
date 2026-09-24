@@ -57,7 +57,10 @@ test('optional headphone startup never delays core camera monitoring', () => {
   const monitor = read('native-app/app/monitor.tsx');
   assert.match(monitor, /const headphoneStart = startHeadphoneMotion\(\)/);
   assert.doesNotMatch(monitor, /await startHeadphoneMotion\(\)/);
-  assert.match(monitor, /setIsRunning\(true\);\s*void headphoneStart\.then/s);
+  const monitoringStartIndex = monitor.indexOf('setIsRunning(true);');
+  const headphoneResultIndex = monitor.indexOf('void headphoneStart.then');
+  assert.ok(monitoringStartIndex >= 0);
+  assert.ok(headphoneResultIndex > monitoringStartIndex);
   assert.match(monitor, /startAttempt !== startAttemptRef\.current/);
   assert.match(monitor, /if \(!monitoringActiveRef\.current\) await stopHeadphoneMotion\(\)/);
 });

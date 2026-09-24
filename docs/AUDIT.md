@@ -41,7 +41,7 @@ Cache v48 verifies the complete runtime before activation and preserves the prio
 | Real beta waitlist with reliable storage | Done | `api/pilot-leads.js` writes to Supabase using the service-role key |
 | Safety / legal disclaimer page | Done | `safety.html` and `privacy.html` are live; `safety.html` carries accuracy-status and pilot-program sections |
 | Move the fleet dashboard off `localStorage` | Done | See below |
-| Visible demo video above the fold | Still open | No `<video>` or embed in `index.html` |
+| Visible product demo above the fold | Done in current source | The four-step interactive demonstration uses the existing optimized visual, works without autoplay video, and keeps parked setup, foreground-only monitoring, on-device processing, and safe-stop limits explicit |
 | Testing for night driving, sunglasses, bumpy roads, false alerts | Still open | Now the required-slices work in #65 rather than a separate task |
 
 ## Backend: no longer scaffolding

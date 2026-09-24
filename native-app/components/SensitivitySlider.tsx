@@ -37,10 +37,22 @@ export function SensitivitySlider({ value, onChange }: Props) {
     <View style={s.wrap}>
       <Text style={s.label}>Alert sensitivity</Text>
       <Text style={s.desc}>{SENSITIVITY_PRESETS[value].description}</Text>
-      <View style={s.row}>
+      <View
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Alert sensitivity"
+        accessibilityHint="Choose when fatigue warnings begin"
+        style={s.row}
+      >
         {LEVELS.map(l => (
-          <TouchableOpacity key={l} style={[s.btn, value===l && s.active]} onPress={() => press(l)}
-            accessibilityRole="button" accessibilityState={{ selected: value===l }}>
+          <TouchableOpacity
+            key={l}
+            style={[s.btn, value===l && s.active]}
+            onPress={() => press(l)}
+            accessibilityRole="radio"
+            accessibilityLabel={`${SENSITIVITY_PRESETS[l].label} sensitivity`}
+            accessibilityHint={SENSITIVITY_PRESETS[l].description}
+            accessibilityState={{ selected: value===l }}
+          >
             <Text style={[s.btnTxt, value===l && s.activeTxt]}>
               {SENSITIVITY_PRESETS[l].label}
             </Text>
@@ -64,10 +76,10 @@ const s = StyleSheet.create({
   wrap:     { backgroundColor:colors.material, borderWidth:1, borderColor:colors.glassBorder, borderRadius:radii.large, padding:16, marginBottom:16 },
   label:    { color:colors.text, fontSize:15, fontWeight:'800', marginBottom:4 },
   desc:     { color:colors.textSecondary, fontSize:12, lineHeight:17, marginBottom:12 },
-  row:      { flexDirection:'row', gap:8 },
-  btn:      { flex:1, paddingVertical:10, borderRadius:radii.small, borderWidth:1, borderColor:colors.glassBorder, backgroundColor:colors.backgroundRaised, alignItems:'center' },
+  row:      { flexDirection:'row', flexWrap:'wrap', gap:8 },
+  btn:      { flexGrow:1, flexBasis:90, minHeight:48, paddingHorizontal:8, paddingVertical:10, borderRadius:radii.small, borderWidth:1, borderColor:colors.glassBorder, backgroundColor:colors.backgroundRaised, alignItems:'center', justifyContent:'center' },
   active:   { borderColor:colors.blue, backgroundColor:'rgba(94,156,255,0.16)' },
-  btnTxt:   { color:colors.textSecondary, fontSize:13, fontWeight:'800' },
+  btnTxt:   { color:colors.textSecondary, fontSize:13, fontWeight:'800', textAlign:'center' },
   activeTxt:{ color:'#cfe0ff' },
   thresh:   { color:colors.textMuted, fontSize:11, lineHeight:16, marginTop:10 },
 });

@@ -28,6 +28,13 @@ export interface RecoveredSessionRecord extends Omit<ActiveSessionCheckpoint, 's
   recoveryNote: string;
 }
 
+export class ActiveSessionCheckpointUnreadableError extends Error {
+  constructor() {
+    super('The saved interrupted-drive checkpoint could not be read.');
+    this.name = 'ActiveSessionCheckpointUnreadableError';
+  }
+}
+
 export function isActiveSessionCheckpoint(value: unknown): value is ActiveSessionCheckpoint {
   if (!value || typeof value !== 'object') return false;
   const checkpoint = value as Partial<ActiveSessionCheckpoint>;
@@ -46,6 +53,26 @@ export function isActiveSessionCheckpoint(value: unknown): value is ActiveSessio
       || checkpoint.sensitivity === 'high')
     && Boolean(checkpoint.monitorPerformance)
     && typeof checkpoint.monitorPerformance === 'object';
+}
+
+/** Only a missing key means no checkpoint; malformed stored data must be preserved. */
+export function parseActiveSessionCheckpoint(raw: string | null): ActiveSessionCheckpoint | null {
+  if (raw === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new ActiveSessionCheckpointUnreadableError();
+  }
+  if (!isActiveSessionCheckpoint(parsed)) throw new ActiveSessionCheckpointUnreadableError();
+  return parsed;
+}
+
+export function hasConflictingActiveSessionCheckpoint(
+  value: unknown,
+  nextSessionId: string,
+): boolean {
+  return isActiveSessionCheckpoint(value) && value.sessionId !== nextSessionId;
 }
 
 export function recoveredSessionFromCheckpoint(

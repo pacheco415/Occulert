@@ -88,7 +88,11 @@ import {
   initialCameraSetupAssessment,
   type CameraSetupAssessment,
 } from '../lib/cameraSetup';
-import { clearActiveSessionCheckpoint, saveActiveSessionCheckpoint } from '../lib/sessionRecovery';
+import {
+  ActiveSessionCheckpointConflictError,
+  clearActiveSessionCheckpoint,
+  saveActiveSessionCheckpoint,
+} from '../lib/sessionRecovery';
 import {
   canRestartStalledCamera,
   deriveCameraLoadPolicy,
@@ -96,6 +100,8 @@ import {
   type DeviceThermalState,
 } from '../lib/cameraResilience';
 import { getDeviceCondition } from '../lib/deviceCondition';
+import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
+import { modalAnimationType } from '../lib/accessibilityPreferencesModel';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -136,6 +142,7 @@ function MonitoringWakeLock() {
 
 export default function MonitorScreen() {
   const router = useRouter();
+  const { reduceMotion } = useAccessibilityPreferences();
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
   const [isRunning, setIsRunning] = useState(false);
@@ -342,6 +349,8 @@ export default function MonitorScreen() {
   const handleStart = async () => {
     if (startingRef.current || isStopping || !sensitivityLoaded) return;
     const startAttempt = startAttemptRef.current + 1;
+    let reservedSessionId: string | null = null;
+    let monitoringStarted = false;
     startAttemptRef.current = startAttempt;
     startingRef.current = true;
     setIsStarting(true);
@@ -373,6 +382,43 @@ export default function MonitorScreen() {
         AppState.currentState,
       )) return;
 
+      const nextSessionStartedAt = Date.now();
+      const nextSessionId = `session-${nextSessionStartedAt}`;
+      performanceTrackerRef.current.reset();
+      try {
+        await saveActiveSessionCheckpoint({
+          sessionId: nextSessionId,
+          startedAt: nextSessionStartedAt,
+          checkpointedAt: nextSessionStartedAt,
+          durationSec: 0,
+          alertCount: 0,
+          avgFatigue: 0,
+          maxFatigue: 0,
+          headNodObservations: 0,
+          cameraHeadNodObservations: 0,
+          headphoneHeadNodObservations: 0,
+          headphoneMotionSamples: 0,
+          headphoneMotionStatus: 'starting',
+          monitorPerformance: performanceTrackerRef.current.snapshot(nextSessionStartedAt),
+          sensitivity,
+          ...currentAppBuildInfo(),
+        });
+        reservedSessionId = nextSessionId;
+      } catch (error) {
+        setSensorFault(error instanceof ActiveSessionCheckpointConflictError
+          ? 'Monitoring did not start because a previous interrupted drive still needs recovery. Return Home and retry recovery before starting again.'
+          : 'Monitoring did not start because local recovery storage could not be verified. Return Home and retry before starting again.');
+        return;
+      }
+      if (shouldAbortMonitoringStart(
+        startAttempt !== startAttemptRef.current,
+        AppState.currentState,
+      )) {
+        await clearActiveSessionCheckpoint(nextSessionId).catch(() => {});
+        reservedSessionId = null;
+        return;
+      }
+
       reset();
       setupPreviewActiveRef.current = false;
       setSetupPreviewActive(false);
@@ -396,7 +442,6 @@ export default function MonitorScreen() {
       lastMetricsUiAtRef.current = 0;
       displayedMetricsStateRef.current = 'noFace';
       displayedAlertLevelRef.current = 'none';
-      performanceTrackerRef.current.reset();
       cameraRestartCountRef.current = 0;
       cameraRecoveringRef.current = false;
       setCameraRecovering(false);
@@ -409,14 +454,15 @@ export default function MonitorScreen() {
       setAlertCount(0);
       alertCountRef.current = 0;
       hasCameraSampleRef.current = false;
-      lastSampleAtRef.current = Date.now();
-      sessionStartedAtRef.current = lastSampleAtRef.current;
-      activeSessionIdRef.current = `session-${lastSampleAtRef.current}`;
-      performanceTrackerRef.current.recordSessionStart(lastSampleAtRef.current);
-      setSessionStartedAt(lastSampleAtRef.current);
+      lastSampleAtRef.current = nextSessionStartedAt;
+      sessionStartedAtRef.current = nextSessionStartedAt;
+      activeSessionIdRef.current = nextSessionId;
+      performanceTrackerRef.current.recordSessionStart(nextSessionStartedAt);
+      setSessionStartedAt(nextSessionStartedAt);
       setSessionEndedAt(null);
       isRunningRef.current = true;
       setIsRunning(true);
+      monitoringStarted = true;
       void headphoneStart.then(async (headphoneStatus) => {
         const stale = startAttempt !== startAttemptRef.current
           || !monitoringActiveRef.current;
@@ -435,8 +481,11 @@ export default function MonitorScreen() {
       });
       // A local recovery write is best-effort and never delays the camera or
       // optional headphone startup path.
-      void checkpointActiveSession(lastSampleAtRef.current).catch(() => {});
+      void checkpointActiveSession(nextSessionStartedAt).catch(() => {});
     } finally {
+      if (reservedSessionId && !monitoringStarted) {
+        await clearActiveSessionCheckpoint(reservedSessionId).catch(() => {});
+      }
       startingRef.current = false;
       setIsStarting(false);
     }
@@ -917,8 +966,9 @@ export default function MonitorScreen() {
     closed: '#ff3344',
     noFace: '#4a7a8a',
   }[metrics.state];
+  const recoveryRequired = Boolean(sensorFault?.startsWith('Monitoring did not start'));
   const monitorStatusLabel = sensorFault
-    ? 'STOPPED · CHECK CAMERA'
+    ? recoveryRequired ? 'RECOVERY REQUIRED' : 'STOPPED · CHECK CAMERA'
     : isStopping
       ? 'SAVING DRIVE'
       : isStarting
@@ -1003,7 +1053,7 @@ export default function MonitorScreen() {
       )}
 
       <Modal
-        animationType="fade"
+        animationType={modalAnimationType(reduceMotion)}
         transparent
         visible={safeStopOpen}
         onRequestClose={() => {
@@ -1011,7 +1061,11 @@ export default function MonitorScreen() {
         }}
       >
         <View style={s.safeStopBackdrop}>
-          <View style={s.safeStopSheet} accessibilityViewIsModal>
+          <View
+            accessibilityLabel="Safe stop options"
+            accessibilityViewIsModal
+            style={s.safeStopSheet}
+          >
             <View style={s.safeStopHeader}>
               <View style={s.safeStopIconWrap}>
                 <Ionicons name="navigate" size={24} color="#7dd3fc" />
@@ -1034,6 +1088,9 @@ export default function MonitorScreen() {
                 <TouchableOpacity
                   key={option.kind}
                   accessibilityRole="button"
+                  accessibilityLabel={`Find ${option.label.toLowerCase()}`}
+                  accessibilityHint={`${option.detail}. Ends monitoring, saves this drive, then opens Maps.`}
+                  accessibilityState={{ disabled: safeStopBusy, busy: safeStopBusy }}
                   disabled={safeStopBusy}
                   style={[s.safeStopOption, safeStopBusy && s.disabledBtn]}
                   onPress={() => {
@@ -1054,6 +1111,8 @@ export default function MonitorScreen() {
 
             <TouchableOpacity
               accessibilityRole="button"
+              accessibilityLabel={safeStopBusy ? 'Ending and saving drive' : 'Cancel safe stop search'}
+              accessibilityState={{ disabled: safeStopBusy, busy: safeStopBusy }}
               disabled={safeStopBusy}
               style={s.safeStopCancel}
               onPress={() => setSafeStopOpen(false)}
@@ -1102,8 +1161,26 @@ export default function MonitorScreen() {
 
         {sensorFault && (
           <View style={s.sensorFault} accessibilityRole="alert">
-            <Text style={s.sensorFaultTitle}>CAMERA ANALYSIS STOPPED</Text>
+            <Text style={s.sensorFaultTitle}>
+              {recoveryRequired ? 'RECOVERY REQUIRED' : 'CAMERA ANALYSIS STOPPED'}
+            </Text>
             <Text style={s.sensorFaultText}>{sensorFault}</Text>
+            {recoveryRequired && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Return Home to recover the previous drive"
+                accessibilityHint="Leaves monitoring and starts the interrupted-drive recovery check"
+                onPress={() => {
+                  setupPreviewActiveRef.current = false;
+                  setSetupPreviewActive(false);
+                  router.replace('/');
+                }}
+                style={s.recoveryHomeButton}
+              >
+                <Ionicons name="arrow-back" size={16} color="#fee2e2" />
+                <Text style={s.recoveryHomeButtonText}>RETURN HOME TO RECOVER</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1138,6 +1215,8 @@ export default function MonitorScreen() {
           {isRunning && alertCount > 0 && (
             <TouchableOpacity
               accessibilityRole="button"
+              accessibilityLabel="Find a safe place to stop"
+              accessibilityHint="Open parked-only rest area, gas, food, and coffee options"
               style={s.safeStopBtn}
               onPress={() => setSafeStopOpen(true)}
             >
@@ -1177,6 +1256,7 @@ export default function MonitorScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Stop monitoring and save this drive"
+              accessibilityHint="Ends camera monitoring and saves the local session summary"
               style={s.stopBtn}
               onPress={() => {
                 void handleStop();
@@ -1235,6 +1315,8 @@ const s = StyleSheet.create({
   sensorFault: { position: 'absolute', top: 132, left: 16, right: 16, zIndex: 4, backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
   sensorFaultTitle: { color: '#fecaca', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
   sensorFaultText: { color: '#fff1f2', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  recoveryHomeButton: { alignSelf: 'flex-start', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, paddingRight: 14 },
+  recoveryHomeButtonText: { color: '#fee2e2', fontSize: 11, fontWeight: '900', letterSpacing: 0.45 },
   ctrl: { padding: 20, gap: 10 },
   startBtn: {
     flexDirection: 'row',
@@ -1307,6 +1389,7 @@ const s = StyleSheet.create({
   safeStopPrivacy: { color: '#7c9eab', fontSize: 12, lineHeight: 18, marginTop: 8 },
   safeStopOptions: { gap: 9, marginTop: 18 },
   safeStopOption: {
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -1327,7 +1410,7 @@ const s = StyleSheet.create({
   safeStopOptionText: { flex: 1 },
   safeStopOptionTitle: { color: '#f0f9ff', fontSize: 15, fontWeight: '800' },
   safeStopOptionDetail: { color: '#7c9eab', fontSize: 11, lineHeight: 16, marginTop: 2 },
-  safeStopCancel: { alignItems: 'center', paddingTop: 18, paddingBottom: 2 },
+  safeStopCancel: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingTop: 10, paddingBottom: 2 },
   safeStopCancelText: { color: '#7dd3fc', fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
   permBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   permIcon: { fontSize: 48, marginBottom: 16 },

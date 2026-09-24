@@ -19,11 +19,41 @@ function setTheme(t){document.documentElement.setAttribute('data-theme',t);local
 function toggleTheme(){setTheme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light')}
 setTheme(getTheme());
 document.getElementById('themeToggle')?.addEventListener('click',toggleTheme);
-document.getElementById('themeToggleMobile')?.addEventListener('click',()=>{toggleTheme();mobileMenu.classList.remove('open');menuBtn.classList.remove('open')});
 const menuBtn=document.getElementById('menuBtn'),mobileMenu=document.getElementById('mobileMenu');
-if(menuBtn&&mobileMenu){menuBtn.addEventListener('click',()=>{const open=mobileMenu.classList.toggle('open');menuBtn.classList.toggle('open',open)});mobileMenu.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{mobileMenu.classList.remove('open');menuBtn.classList.remove('open')}))}
+function setMobileMenu(open,{restoreFocus=false}={}){
+  if(!menuBtn||!mobileMenu)return;
+  mobileMenu.classList.toggle('open',open);
+  mobileMenu.setAttribute('aria-hidden',String(!open));
+  menuBtn.classList.toggle('open',open);
+  menuBtn.setAttribute('aria-expanded',String(open));
+  menuBtn.setAttribute('aria-label',open?'Close menu':'Open menu');
+  if(restoreFocus)menuBtn.focus();
+}
+document.getElementById('themeToggleMobile')?.addEventListener('click',()=>{toggleTheme();setMobileMenu(false)});
+if(menuBtn&&mobileMenu){
+  menuBtn.addEventListener('click',()=>setMobileMenu(!mobileMenu.classList.contains('open')));
+  mobileMenu.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>setMobileMenu(false)));
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&mobileMenu.classList.contains('open'))setMobileMenu(false,{restoreFocus:true});
+  });
+  document.addEventListener('pointerdown',event=>{
+    if(!mobileMenu.classList.contains('open')||menuBtn.contains(event.target)||mobileMenu.contains(event.target))return;
+    setMobileMenu(false);
+  });
+}
 const scrollTopBtn=document.getElementById('scrollTop');
 window.addEventListener('scroll',()=>{scrollTopBtn.classList.toggle('visible',window.scrollY>400)});
 scrollTopBtn.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
-document.querySelectorAll('.faq-q').forEach(btn=>{btn.addEventListener('click',()=>{const item=btn.parentElement;const wasOpen=item.classList.contains('open');document.querySelectorAll('.faq-item').forEach(i=>i.classList.remove('open'));if(!wasOpen)item.classList.add('open')})});
+document.querySelectorAll('.faq-q').forEach(btn=>{
+  btn.setAttribute('aria-expanded','false');
+  btn.addEventListener('click',()=>{
+    const item=btn.parentElement;
+    const wasOpen=item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(other=>{
+      other.classList.remove('open');
+      other.querySelector('.faq-q')?.setAttribute('aria-expanded','false');
+    });
+    if(!wasOpen){item.classList.add('open');btn.setAttribute('aria-expanded','true')}
+  });
+});
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{})}

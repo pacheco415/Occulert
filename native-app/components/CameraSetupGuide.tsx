@@ -35,36 +35,40 @@ export const CameraSetupGuide = memo(function CameraSetupGuide({
   onTogglePreview,
 }: CameraSetupGuideProps) {
   return (
-    <View
-      accessibilityLiveRegion="polite"
-      accessibilityLabel={`${assessment.title}. ${assessment.detail}`}
-      style={[styles.card, assessment.ready && styles.cardReady]}
-    >
-      <View style={styles.header}>
-        <View style={[styles.icon, assessment.ready && styles.iconReady]}>
-          <Ionicons
-            name={assessment.ready ? 'checkmark' : 'scan-outline'}
-            size={19}
-            color={assessment.ready ? '#07150d' : '#b9e6ff'}
-          />
+    <View style={[styles.card, assessment.ready && styles.cardReady]}>
+      <View
+        accessible
+        accessibilityLiveRegion="polite"
+        accessibilityRole="summary"
+        accessibilityLabel={`${assessment.title}. ${assessment.detail}${active ? ` Face framed ${assessment.faceCentered && assessment.faceSized ? 'ready' : 'needs adjustment'}. Mount aimed ${assessment.facingCamera ? 'ready' : 'needs adjustment'}. Eyes visible ${assessment.eyesVisible ? 'ready' : 'needs adjustment'}.` : ''}`}
+      >
+        <View style={styles.header}>
+          <View style={[styles.icon, assessment.ready && styles.iconReady]}>
+            <Ionicons
+              name={assessment.ready ? 'checkmark' : 'scan-outline'}
+              size={19}
+              color={assessment.ready ? '#07150d' : '#b9e6ff'}
+            />
+          </View>
+          <View style={styles.copy}>
+            <Text style={styles.eyebrow}>PARKED CAMERA CHECK</Text>
+            <Text style={styles.title}>{assessment.title}</Text>
+            <Text style={styles.detail}>{assessment.detail}</Text>
+          </View>
         </View>
-        <View style={styles.copy}>
-          <Text style={styles.eyebrow}>PARKED CAMERA CHECK</Text>
-          <Text style={styles.title}>{assessment.title}</Text>
-          <Text style={styles.detail}>{assessment.detail}</Text>
-        </View>
-      </View>
 
-      {active && (
-        <View style={styles.checks}>
-          <SetupCheck complete={assessment.faceCentered && assessment.faceSized} label="Face framed" />
-          <SetupCheck complete={assessment.facingCamera} label="Mount aimed" />
-          <SetupCheck complete={assessment.eyesVisible} label="Eyes visible" />
-        </View>
-      )}
+        {active && (
+          <View style={styles.checks}>
+            <SetupCheck complete={assessment.faceCentered && assessment.faceSized} label="Face framed" />
+            <SetupCheck complete={assessment.facingCamera} label="Mount aimed" />
+            <SetupCheck complete={assessment.eyesVisible} label="Eyes visible" />
+          </View>
+        )}
+      </View>
 
       <TouchableOpacity
         accessibilityRole="button"
+        accessibilityLabel={active ? 'Pause parked camera check' : 'Start parked camera check'}
         accessibilityHint={active
           ? 'Stops the parked camera setup preview'
           : 'Starts a private on-device camera preview for positioning the mounted phone'}
@@ -103,7 +107,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(100, 210, 255, 0.14)',
   },
   iconReady: { backgroundColor: '#30d158' },
-  copy: { flex: 1 },
+  copy: { minWidth: 0, flex: 1 },
   eyebrow: { color: '#64d2ff', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   title: { color: '#f5f7fa', fontSize: 15, fontWeight: '900', marginTop: 3 },
   detail: { color: '#b3bccb', fontSize: 11, lineHeight: 16, marginTop: 3 },
@@ -130,7 +134,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: 'rgba(37, 99, 235, 0.28)',
     marginTop: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
   buttonDisabled: { opacity: 0.45 },
-  buttonText: { color: '#dff4ff', fontSize: 11, fontWeight: '900', letterSpacing: 0.55 },
+  buttonText: { color: '#dff4ff', fontSize: 11, fontWeight: '900', letterSpacing: 0.55, textAlign: 'center' },
 });

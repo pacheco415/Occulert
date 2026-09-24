@@ -5,8 +5,10 @@ import test from 'node:test';
 import { createSettingPersister } from '../native-app/lib/settingPersistence.ts';
 import {
   commitSessionHistoryEdit,
+  removeMatchingSessionRecord,
   updateMatchingSessionRecord,
 } from '../native-app/lib/sessionHistoryEdits.ts';
+import { buildSessionHistoryExport } from '../native-app/lib/sessionHistoryExport.ts';
 
 const require = createRequire(import.meta.url);
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -270,6 +272,49 @@ test('session review mutations merge nested fields into the latest matching reco
   });
 });
 
+test('single-session deletion removes only the confirmed matching local record', () => {
+  const sessions = [
+    { sessionId: 'session-1', savedAt: '2026-08-15T00:00:00.000Z' },
+    { sessionId: 'session-2', savedAt: '2026-08-16T00:00:00.000Z' },
+  ];
+  assert.deepEqual(
+    removeMatchingSessionRecord(sessions, sessions[1], 1),
+    [sessions[0]],
+  );
+  assert.deepEqual(
+    removeMatchingSessionRecord(sessions, { savedAt: sessions[0].savedAt }, 0),
+    [sessions[1]],
+  );
+  const duplicatedIdentity = [sessions[0], { ...sessions[0], savedAt: '2026-08-17T00:00:00.000Z' }];
+  assert.deepEqual(
+    removeMatchingSessionRecord(duplicatedIdentity, duplicatedIdentity[0], 0),
+    [duplicatedIdentity[1]],
+  );
+});
+
+test('native session exports include review summaries and exclude private identifiers and diagnostics', () => {
+  const exported = buildSessionHistoryExport([{
+    savedAt: '2026-08-15T00:00:00.000Z',
+    durationSec: 125,
+    alertCount: 2,
+    avgFatigue: 34.5,
+    sensitivity: 'medium',
+    alertAssessment: 'accurate',
+    recoveredFromInterruption: false,
+    sessionId: 'private-session-id',
+    driverId: 'private-driver-id',
+    cloudSessionId: 'private-cloud-id',
+    location: { latitude: 1, longitude: 2 },
+    monitorPerformance: { p95InferenceMs: 10 },
+  }]);
+  assert.match(exported, /Duration: 2m 5s · Alerts: 2/);
+  assert.match(exported, /Review: Felt right/);
+  assert.match(exported, /excludes driver IDs, cloud IDs, location, camera media, audio, raw motion/i);
+  for (const privateValue of ['private-session-id', 'private-driver-id', 'private-cloud-id', 'latitude', 'p95InferenceMs']) {
+    assert.doesNotMatch(exported, new RegExp(privateValue));
+  }
+});
+
 test('a failed session review edit leaves confirmed UI state intact and permits retry', async () => {
   let sessions = [{ sessionId: 'session-1', alertAssessment: 'accurate' }];
   const errors = [];
@@ -299,6 +344,8 @@ test('a failed session review edit leaves confirmed UI state intact and permits 
 test('History commits after persistence and ignores loads started before a newer edit', () => {
   const history = read('native-app/app/history.tsx');
   const storage = read('native-app/lib/sessionHistory.ts');
+  assert.match(history, /loadSessionHistory<SessionRecord>\(\)/, 'history loads must wait for queued local writes');
+  assert.doesNotMatch(history, /AsyncStorage\.getItem\(HISTORY_KEY\)/);
   assert.match(history, /await commitSessionHistoryEdit/);
   assert.match(history, /persist: mutation => updateSessionHistory/);
   assert.match(history, /apply: mutation => setSessions\(current/);
@@ -306,6 +353,47 @@ test('History commits after persistence and ignores loads started before a newer
   assert.doesNotMatch(history, /const updated = sessions\.map/);
   assert.match(storage, /const operation = historyQueue\.then/);
   assert.match(storage, /historyQueue = operation\.catch/);
+});
+
+test('History deletion captures the confirmed record before the alert can become stale', () => {
+  const history = read('native-app/app/history.tsx');
+  const deletion = history.slice(
+    history.indexOf('const deleteSession'),
+    history.indexOf('const evidenceSessions'),
+  );
+  assert.match(deletion, /confirmDeleteSession = \(target: SessionRecord, index: number\)/);
+  assert.match(deletion, /deleteSession\(target, index\)/);
+  assert.match(history, /confirmDeleteSession\(item, i\)/);
+  assert.doesNotMatch(deletion, /const target = sessions\[index\]/);
+});
+
+test('History load failures stay visible without pretending saved sessions are empty', () => {
+  const history = read('native-app/app/history.tsx');
+  const loadStart = history.indexOf('const load = useCallback');
+  const load = history.slice(loadStart, history.indexOf('useFocusEffect', loadStart));
+  assert.match(load, /historyLoadAttemptRef\.current === loadAttempt/, 'only the latest history read may update the screen');
+  assert.match(history, /return \(\) => \{ historyLoadAttemptRef\.current \+= 1; \}/, 'leaving History must invalidate its pending read');
+  assert.match(load, /setHistoryLoadError\(true\)/);
+  assert.doesNotMatch(load, /catch \{[\s\S]*setSessions\(\[\]\)/);
+  assert.match(history, /Checking local session history/);
+  assert.match(history, /Couldn’t load local history/);
+  assert.match(history, /Your saved sessions were not deleted/);
+  assert.match(history, /accessibilityLabel=\{historyLoadBusy \? 'Retrying local session history'/);
+  assert.match(history, /!historyLoadError && sessions\.length === 0/);
+});
+
+test('History serializes each session operation and announces pending saves', () => {
+  const history = read('native-app/app/history.tsx');
+  assert.match(history, /new Map<string, ReturnType<typeof createSingleFlightActionRunner>>\(\)/);
+  assert.match(history, /runSessionOperation\([\s\S]*sessionRecordKey\(target, index\),[\s\S]*'saving'/);
+  assert.match(history, /sessionRecordKey\(target, index\),[\s\S]*'deleting'/);
+  assert.match(history, /accessibilityLiveRegion="polite"/);
+  assert.match(history, /Saving changes…/);
+  assert.match(history, /Deleting session…/);
+  assert.match(history, /accessibilityState=\{\{ selected, disabled: sessionBusy, busy: sessionBusy \}\}/);
+  assert.match(history, /Wait for session changes before sharing summaries/);
+  assert.match(history, /accessibilityState=\{\{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy \}\}/);
+  assert.match(history, /disabled=\{sessionBusy\}/);
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
@@ -321,7 +409,7 @@ test('fleet telemetry is explicitly labeled client-reported and unverified', () 
 });
 
 test('pilot contacts are server-only and disclosed accurately', () => {
-  const signup = read('pilot-signup.html') + read('pilot-signup-page-1.v47.js') + read('pilot-signup-page-2.v47.js');
+  const signup = read('pilot-signup.html') + read('static-page.v52.js') + read('pilot-signup-page-2.v53.js');
   const viewer = read('pilot-leads.html');
   const privacy = read('privacy.html');
   assert.doesNotMatch(signup, /occulert-pilot-leads|savePilotLead|firebase/i);

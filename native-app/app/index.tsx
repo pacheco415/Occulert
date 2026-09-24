@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -14,6 +15,7 @@ import { AmbientBackground, GlassSurface } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import { updateSessionHistory } from '../lib/sessionHistory';
 import { clearActiveSessionCheckpoint, loadActiveSessionCheckpoint } from '../lib/sessionRecovery';
+import { ActiveSessionCheckpointUnreadableError } from '../lib/sessionRecoveryModel';
 import {
   prependRecoveredSession,
   recoveredSessionFromCheckpoint,
@@ -53,16 +55,25 @@ function QuickLink({ icon, label, detail, href }: QuickLinkProps) {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [recoveredDrive, setRecoveredDrive] = useState(false);
+  const [recoveryState, setRecoveryState] = useState<'checking' | 'idle' | 'recovered' | 'error'>('checking');
+  const [recoveryUnreadable, setRecoveryUnreadable] = useState(false);
+  const [recoveryAttempt, setRecoveryAttempt] = useState(0);
+  const recoveryBlocksStart = recoveryState === 'checking' || recoveryState === 'error';
 
   useEffect(() => {
     let active = true;
     const recoverInterruptedDrive = async () => {
+      if (active) setRecoveryState('checking');
+      if (active) setRecoveryUnreadable(false);
       const checkpoint = await loadActiveSessionCheckpoint();
-      if (!checkpoint) return;
+      if (!checkpoint) {
+        if (active) setRecoveryState('idle');
+        return;
+      }
       const recovered = recoveredSessionFromCheckpoint(checkpoint);
       if (!recovered) {
         await clearActiveSessionCheckpoint(checkpoint.sessionId);
+        if (active) setRecoveryState('idle');
         return;
       }
       let insertedRecovery = false;
@@ -74,11 +85,16 @@ export default function HomeScreen() {
         return result.sessions;
       });
       await clearActiveSessionCheckpoint(recovered.sessionId);
-      if (active && insertedRecovery) setRecoveredDrive(true);
+      if (active) setRecoveryState(insertedRecovery ? 'recovered' : 'idle');
     };
-    void recoverInterruptedDrive().catch(() => {});
+    void recoverInterruptedDrive().catch(error => {
+      if (active) {
+        setRecoveryUnreadable(error instanceof ActiveSessionCheckpointUnreadableError);
+        setRecoveryState('error');
+      }
+    });
     return () => { active = false; };
-  }, []);
+  }, [recoveryAttempt]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -111,7 +127,21 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {recoveredDrive && (
+        {recoveryState === 'checking' && (
+          <View
+            accessibilityLabel="Checking for an interrupted previous drive"
+            accessibilityLiveRegion="polite"
+            style={styles.recoveryCheckingBox}
+          >
+            <ActivityIndicator size="small" color={colors.cyan} />
+            <View style={styles.recoveryCopy}>
+              <Text style={styles.recoveryCheckingTitle}>Checking the previous drive</Text>
+              <Text style={styles.recoveryDetail}>A new session will be available when this local recovery check finishes.</Text>
+            </View>
+          </View>
+        )}
+
+        {recoveryState === 'recovered' && (
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Previous interrupted drive recovered. Open session history"
@@ -130,14 +160,55 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
+        {recoveryState === 'error' && (
+          <View accessibilityRole="alert" style={styles.recoveryErrorBox}>
+            <View style={styles.recoveryErrorIcon}>
+              <Ionicons name="warning" size={19} color={colors.amber} />
+            </View>
+            <View style={styles.recoveryCopy}>
+              <Text style={styles.recoveryErrorTitle}>Couldn’t check the previous drive</Text>
+              <Text style={styles.recoveryDetail}>{recoveryUnreadable
+                ? 'The checkpoint was kept, but Occulert cannot read it. You can retry or review the explicit discard option in Settings. Consider contacting pilot support before discarding it.'
+                : 'Your local history stays on this iPhone. Try the recovery check again before starting another session.'}</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Retry previous drive recovery"
+                onPress={() => setRecoveryAttempt(attempt => attempt + 1)}
+                style={styles.recoveryRetry}
+              >
+                <Text style={styles.recoveryRetryText}>Try again</Text>
+              </TouchableOpacity>
+              {recoveryUnreadable && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Settings to review unreadable recovery data"
+                  onPress={() => router.push('/settings')}
+                  style={styles.recoveryRetry}
+                >
+                  <Text style={styles.recoveryRetryText}>Review in Settings</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
         <GlassSurface
-          interactive
-          style={styles.startSurface}
+          interactive={!recoveryBlocksStart}
+          style={[styles.startSurface, recoveryBlocksStart && styles.startSurfaceDisabled]}
           tintColor="rgba(42, 105, 244, 0.58)"
         >
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Begin pre-drive safety check"
+            accessibilityLabel={recoveryBlocksStart
+              ? 'Pre-drive safety check unavailable while previous drive recovery is unresolved'
+              : 'Begin pre-drive safety check'}
+            accessibilityHint={recoveryState === 'checking'
+              ? 'Wait for the local recovery check to finish'
+              : recoveryState === 'error'
+                ? 'Retry previous drive recovery before starting another session'
+                : 'Opens the parked pre-drive safety confirmation'}
+            accessibilityState={{ disabled: recoveryBlocksStart, busy: recoveryState === 'checking' }}
+            disabled={recoveryBlocksStart}
             onPress={() => router.push('/pre-drive')}
             activeOpacity={0.82}
             style={styles.startButton}
@@ -146,8 +217,8 @@ export default function HomeScreen() {
               <Ionicons name="shield-checkmark" size={22} color={colors.text} />
             </View>
             <View style={styles.startCopy}>
-              <Text style={styles.startLabel}>Begin safely</Text>
-              <Text style={styles.startDetail}>Pre-drive check</Text>
+              <Text style={styles.startLabel}>{recoveryState === 'checking' ? 'Checking previous drive…' : recoveryState === 'error' ? 'Recovery check required' : 'Begin safely'}</Text>
+              <Text style={styles.startDetail}>{recoveryBlocksStart ? 'Resolve local recovery first' : 'Pre-drive check'}</Text>
             </View>
             <Ionicons name="arrow-forward" size={20} color={colors.text} />
           </TouchableOpacity>
@@ -170,7 +241,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingHorizontal: 22, paddingTop: 14, paddingBottom: 42 },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   brandMark: {
     width: 58,
     height: 58,
@@ -180,6 +251,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   privacyPill: {
+    maxWidth: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
@@ -191,8 +263,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(53, 227, 154, 0.22)',
   },
   privacyDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.green },
-  privacyPillText: { color: '#8ff0c5', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-  hero: { paddingTop: 48, paddingBottom: 30 },
+  privacyPillText: { flexShrink: 1, color: '#8ff0c5', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  hero: { paddingTop: 40, paddingBottom: 28 },
   eyebrow: { color: colors.cyan, fontSize: 11, fontWeight: '800', letterSpacing: 1.6 },
   title: {
     color: colors.text,
@@ -245,6 +317,30 @@ const styles = StyleSheet.create({
   recoveryCopy: { flex: 1 },
   recoveryTitle: { color: '#b7f7cb', fontSize: 13, fontWeight: '800' },
   recoveryDetail: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  recoveryCheckingBox: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(100,210,255,0.07)', borderWidth: 1, borderColor: 'rgba(100,210,255,0.2)', borderRadius: radii.medium, padding: 14, marginBottom: 16 },
+  recoveryCheckingTitle: { color: '#bae6fd', fontSize: 13, fontWeight: '800' },
+  recoveryErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 11,
+    backgroundColor: 'rgba(255, 214, 10, 0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 214, 10, 0.24)',
+    borderRadius: radii.medium,
+    padding: 14,
+    marginBottom: 16,
+  },
+  recoveryErrorIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 214, 10, 0.1)',
+  },
+  recoveryErrorTitle: { color: '#ffe895', fontSize: 13, fontWeight: '800' },
+  recoveryRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: 5, paddingRight: 16 },
+  recoveryRetryText: { color: colors.cyan, fontSize: 12, fontWeight: '800' },
   startSurface: {
     borderRadius: radii.large,
     overflow: 'hidden',
@@ -254,10 +350,12 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },
   },
+  startSurfaceDisabled: { opacity: 0.5, shadowOpacity: 0 },
   startButton: {
     minHeight: 86,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 14,
     paddingHorizontal: 18,
     gap: 13,
   },
@@ -277,7 +375,7 @@ const styles = StyleSheet.create({
   sectionLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.4, marginBottom: 10 },
   quickLinks: { gap: 10, marginBottom: 30 },
   linkCard: { borderRadius: radii.medium, overflow: 'hidden' },
-  linkButton: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14 },
+  linkButton: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
   linkIcon: {
     width: 38,
     height: 38,

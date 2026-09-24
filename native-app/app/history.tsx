@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert,
+  View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share, ActivityIndicator,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,19 +13,34 @@ import {
   type SessionDeviceImpact,
   type SessionTestConditions,
 } from '../lib/feedback';
-import { updateSessionHistory } from '../lib/sessionHistory';
+import { loadSessionHistory, updateSessionHistory } from '../lib/sessionHistory';
 import {
   commitSessionHistoryEdit,
+  removeMatchingSessionRecord,
   updateMatchingSessionRecord,
   type SessionRecordMutation,
 } from '../lib/sessionHistoryEdits';
-import { formatPilotCounts, summarizePilotIssues } from '../lib/pilotInsights';
+import { formatPilotCounts, summarizePilotCoverage, summarizePilotIssues } from '../lib/pilotInsights';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import type { MonitorPerformanceSnapshot } from '../lib/monitorPerformance';
+import {
+  groupIndexedSessionsByDate,
+  normalizeHistoryFilter,
+  sortIndexedSessionsNewest,
+  type HistoryFilter,
+} from '../lib/historyPreferences';
+import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
+import { buildPilotProgressExport } from '../lib/pilotProgressExport';
+import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
+import {
+  getSessionReviewProgress,
+  hasCompleteSessionReview,
+  incompleteSessionReviewQueue,
+} from '../lib/sessionReviewProgress';
 
-const HISTORY_KEY = 'occulert-session-history';
+const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
 const CHECKPOINT_TARGET = 10;
 
 interface SessionRecord extends FeedbackSession {
@@ -118,6 +134,13 @@ const DEVICE_IMPACT_GROUPS: DeviceImpactGroup[] = [
   },
 ];
 
+const HISTORY_FILTERS: Array<{ value: HistoryFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'needs-review', label: 'Needs review' },
+  { value: 'reviewed', label: 'Reviewed' },
+  { value: 'recovered', label: 'Recovered' },
+];
+
 function fmtDuration(sec?: number): string {
   if (!sec || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);
@@ -150,41 +173,97 @@ function headphoneMotionLabel(value?: string): string {
   return 'Headphone motion status was not recorded';
 }
 
-function hasCompleteReview(item: SessionRecord): boolean {
-  return Boolean(
-    item.alertAssessment
-    && item.testConditions?.lighting
-    && item.testConditions?.eyewear
-    && item.testConditions?.phonePosition
-    && item.deviceImpact?.batteryImpact
-    && item.deviceImpact?.phoneHeat,
-  );
+function sessionRecordKey(item: SessionRecord, index: number): string {
+  return item.sessionId || `${item.savedAt || item.updatedAt || 'session'}-${index}`;
 }
+
+type SessionOperation = 'saving' | 'deleting';
 
 export default function HistoryScreen() {
   const router = useRouter();
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [historyLoadError, setHistoryLoadError] = useState(false);
+  const [historyLoadBusy, setHistoryLoadBusy] = useState(true);
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
   const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
+  const [sessionOperations, setSessionOperations] = useState<Record<string, SessionOperation>>({});
+  const [reviewQueueMessage, setReviewQueueMessage] = useState<{ key: string; text: string } | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const pendingReviewScrollRef = useRef<string | null>(null);
   const historyRevisionRef = useRef(0);
+  const filterRevisionRef = useRef(0);
+  const historyLoadAttemptRef = useRef(0);
+  const sessionOperationRunnersRef = useRef(new Map<string, ReturnType<typeof createSingleFlightActionRunner>>());
+
+  const runSessionOperation = async (
+    operationKey: string,
+    operation: SessionOperation,
+    action: () => Promise<void>,
+    onError: () => void,
+  ): Promise<boolean> => {
+    let runner = sessionOperationRunnersRef.current.get(operationKey);
+    if (!runner) {
+      runner = createSingleFlightActionRunner();
+      sessionOperationRunnersRef.current.set(operationKey, runner);
+    }
+    return runner.run({
+      action,
+      onBusyChange: busy => setSessionOperations(current => {
+        if (busy) return { ...current, [operationKey]: operation };
+        const next = { ...current };
+        delete next[operationKey];
+        return next;
+      }),
+      onError,
+    });
+  };
 
   const load = useCallback(async () => {
+    const loadAttempt = historyLoadAttemptRef.current + 1;
+    historyLoadAttemptRef.current = loadAttempt;
     const revision = historyRevisionRef.current;
+    const filterRevision = filterRevisionRef.current;
+    setHistoryLoadBusy(true);
     try {
-      const raw = await AsyncStorage.getItem(HISTORY_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      if (historyRevisionRef.current === revision) {
-        setSessions(Array.isArray(parsed) ? parsed : []);
+      const [storedSessions, savedFilter] = await Promise.all([
+        loadSessionHistory<SessionRecord>(),
+        AsyncStorage.getItem(HISTORY_FILTER_KEY).catch(() => null),
+      ]);
+      if (historyLoadAttemptRef.current === loadAttempt && historyRevisionRef.current === revision) {
+        setSessions(storedSessions);
+        setHistoryLoadError(false);
+        if (filterRevisionRef.current === filterRevision) {
+          setHistoryFilter(normalizeHistoryFilter(savedFilter));
+        }
       }
     } catch {
-      if (historyRevisionRef.current === revision) setSessions([]);
+      if (
+        historyLoadAttemptRef.current === loadAttempt
+        && historyRevisionRef.current === revision
+      ) setHistoryLoadError(true);
     } finally {
-      setLoaded(true);
+      if (historyLoadAttemptRef.current === loadAttempt) {
+        setLoaded(true);
+        setHistoryLoadBusy(false);
+      }
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void load();
+    return () => { historyLoadAttemptRef.current += 1; };
+  }, [load]));
+
+  const chooseHistoryFilter = (filter: HistoryFilter) => {
+    filterRevisionRef.current += 1;
+    setHistoryFilter(filter);
+    setReviewQueueMessage(null);
+    AsyncStorage.setItem(HISTORY_FILTER_KEY, filter).catch(() => {
+      Alert.alert('Could not remember this view', 'The filter still works now, but it may reset next time.');
+    });
+  };
 
   const saveSessionChanges = async (
     index: number,
@@ -195,17 +274,61 @@ export default function HistoryScreen() {
     const target = sessions[index];
     if (!target) return;
 
-    historyRevisionRef.current += 1;
-    await commitSessionHistoryEdit({
-      update,
-      persist: mutation => updateSessionHistory<SessionRecord>(stored => (
-        updateMatchingSessionRecord(stored, target, index, mutation)
-      )),
-      apply: mutation => setSessions(current => (
-        updateMatchingSessionRecord(current, target, index, mutation)
-      )),
-      onError: () => Alert.alert(errorTitle, errorMessage),
-    });
+    const completesReview = !hasCompleteSessionReview(target) && hasCompleteSessionReview(update(target));
+
+    let commitSucceeded = false;
+    const operationCompleted = await runSessionOperation(
+      sessionRecordKey(target, index),
+      'saving',
+      async () => {
+        historyRevisionRef.current += 1;
+        commitSucceeded = await commitSessionHistoryEdit({
+          update,
+          persist: mutation => updateSessionHistory<SessionRecord>(stored => (
+            updateMatchingSessionRecord(stored, target, index, mutation)
+          )),
+          apply: mutation => setSessions(current => (
+            updateMatchingSessionRecord(current, target, index, mutation)
+          )),
+          onError: () => Alert.alert(errorTitle, errorMessage),
+        });
+      },
+      () => Alert.alert(errorTitle, errorMessage),
+    );
+
+    if (operationCompleted && commitSucceeded && completesReview && !target.recoveredFromInterruption) {
+      setReviewQueueMessage(null);
+      const queue = incompleteSessionReviewQueue(sortIndexedSessionsNewest(sessions), index);
+      if (queue.length === 0) {
+        Alert.alert(
+          'Review queue complete',
+          'Every completed session has a full review. Your ratings remain saved on this iPhone.',
+        );
+        return;
+      }
+
+      const next = queue[0];
+      Alert.alert(
+        'Review complete',
+        `${queue.length} unfinished ${queue.length === 1 ? 'session remains' : 'sessions remain'}.`,
+        [
+          { text: 'Done', style: 'cancel' },
+          {
+            text: 'Review Next',
+            onPress: () => {
+              const key = sessionRecordKey(next.item, next.index);
+              pendingReviewScrollRef.current = key;
+              chooseHistoryFilter('needs-review');
+              setExpandedSessions(current => ({ ...current, [key]: true }));
+              setReviewQueueMessage({
+                key,
+                text: `Next unfinished review · ${queue.length} ${queue.length === 1 ? 'session' : 'sessions'} remaining`,
+              });
+            },
+          },
+        ],
+      );
+    }
   };
 
   const saveAssessment = async (index: number, value: AlertAssessment) => {
@@ -246,9 +369,58 @@ export default function HistoryScreen() {
     );
   };
 
+  const shareSessions = async (items: SessionRecord[]) => {
+    if (items.length === 0) return;
+    try {
+      await Share.share({
+        title: 'Occulert session summaries',
+        message: buildSessionHistoryExport(items),
+      });
+    } catch {
+      Alert.alert('Could not share summaries', 'Please try exporting the session summaries again.');
+    }
+  };
+
+  const sharePilotProgress = async () => {
+    try {
+      await Share.share({
+        title: 'Occulert pilot progress',
+        message: buildPilotProgressExport(sessions, CHECKPOINT_TARGET),
+      });
+    } catch {
+      Alert.alert('Could not share pilot progress', 'Please try exporting the aggregate pilot report again.');
+    }
+  };
+
+  const deleteSession = async (target: SessionRecord, index: number) => {
+    await runSessionOperation(
+      sessionRecordKey(target, index),
+      'deleting',
+      async () => {
+        historyRevisionRef.current += 1;
+        await updateSessionHistory<SessionRecord>(stored => (
+          removeMatchingSessionRecord(stored, target, index)
+        ));
+        setSessions(current => removeMatchingSessionRecord(current, target, index));
+      },
+      () => Alert.alert('Could not delete session', 'The session remains saved. Please try again.'),
+    );
+  };
+
+  const confirmDeleteSession = (target: SessionRecord, index: number) => {
+    Alert.alert(
+      'Delete this session?',
+      'This permanently removes the local session summary from this iPhone. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => { void deleteSession(target, index); } },
+      ],
+    );
+  };
+
   const evidenceSessions = sessions.filter(item => !item.recoveredFromInterruption);
   const reviewedMedium = evidenceSessions.filter(
-    item => item.sensitivity === 'medium' && Boolean(item.alertAssessment),
+    item => item.sensitivity === 'medium' && hasCompleteSessionReview(item),
   );
   const checkpointProgress = Math.min(reviewedMedium.length, CHECKPOINT_TARGET);
   const accurateCount = reviewedMedium.filter(item => item.alertAssessment === 'accurate').length;
@@ -260,37 +432,205 @@ export default function HistoryScreen() {
     && Boolean(item.testConditions?.eyewear)
     && Boolean(item.testConditions?.phonePosition)
   )).length;
-  const lowLightCount = reviewedMedium.filter(item => item.testConditions?.lighting === 'low_light').length;
-  const eyewearCount = reviewedMedium.filter(item => (
-    item.testConditions?.eyewear === 'glasses' || item.testConditions?.eyewear === 'sunglasses'
-  )).length;
-  const phonePositionCount = new Set(
-    reviewedMedium.map(item => item.testConditions?.phonePosition).filter(Boolean),
-  ).size;
   const completeDeviceImpactCount = reviewedMedium.filter(item => (
     Boolean(item.deviceImpact?.batteryImpact) && Boolean(item.deviceImpact?.phoneHeat)
   )).length;
+  const pilotCoverage = summarizePilotCoverage(reviewedMedium);
   const issueInsights = summarizePilotIssues(evidenceSessions);
   const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
+  const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteSessionReview(item)).length;
+  const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteSessionReview(item)).length;
+  const recoveredCount = sessions.filter(item => item.recoveredFromInterruption).length;
+  const filterCounts: Record<HistoryFilter, number> = {
+    all: sessions.length,
+    'needs-review': needsReviewCount,
+    reviewed: reviewedCount,
+    recovered: recoveredCount,
+  };
+  const sortedSessions = sortIndexedSessionsNewest(sessions);
+  const nextReviewSession = sortedSessions.find(({ item }) => (
+    !item.recoveredFromInterruption && !hasCompleteSessionReview(item)
+  ));
+  const filteredSessions = sortedSessions
+    .filter(({ item }) => {
+      if (historyFilter === 'recovered') return Boolean(item.recoveredFromInterruption);
+      if (historyFilter === 'reviewed') return !item.recoveredFromInterruption && hasCompleteSessionReview(item);
+      if (historyFilter === 'needs-review') return !item.recoveredFromInterruption && !hasCompleteSessionReview(item);
+      return true;
+    });
+  const groupedFilteredSessions = groupIndexedSessionsByDate(filteredSessions);
+  const sessionOperationsBusy = Object.keys(sessionOperations).length > 0;
+  const filteredEmptyCopy: Record<Exclude<HistoryFilter, 'all'>, { title: string; detail: string }> = {
+    'needs-review': {
+      title: 'All caught up',
+      detail: 'Every completed session has a full review.',
+    },
+    reviewed: {
+      title: 'No completed reviews yet',
+      detail: 'Finish the alert rating, test conditions, and device-impact notes on a session to see it here.',
+    },
+    recovered: {
+      title: 'No recovered sessions',
+      detail: 'Sessions restored after an unexpected interruption will appear here.',
+    },
+  };
+
+  const continueReviewing = () => {
+    if (!nextReviewSession || sessionOperationsBusy) return;
+    const key = sessionRecordKey(nextReviewSession.item, nextReviewSession.index);
+    pendingReviewScrollRef.current = key;
+    chooseHistoryFilter('needs-review');
+    setExpandedSessions(current => ({ ...current, [key]: true }));
+    setReviewQueueMessage({
+      key,
+      text: `${needsReviewCount} unfinished ${needsReviewCount === 1 ? 'session' : 'sessions'} in this review queue`,
+    });
+  };
+
+  const scrollToPendingReview = (key: string, event: LayoutChangeEvent) => {
+    if (pendingReviewScrollRef.current !== key) return;
+    pendingReviewScrollRef.current = null;
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, event.nativeEvent.layout.y - 12),
+      animated: true,
+    });
+  };
 
   return (
     <SafeAreaView style={s.bg}>
       <AmbientBackground />
-      <ScrollView contentContainerStyle={s.scroll}>
+      <ScrollView ref={scrollRef} contentContainerStyle={s.scroll}>
         <Text style={s.title}>Session History</Text>
 
-        {loaded && sessions.length > 0 && (
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityState={{ expanded: showReviewProgress }}
-            style={s.reviewToggle}
-            onPress={() => setShowReviewProgress(current => !current)}
+        {!loaded && historyLoadBusy && (
+          <View
+            accessibilityLabel="Checking local session history"
+            accessibilityLiveRegion="polite"
+            style={s.loadingBox}
           >
-            <Text style={s.reviewToggleText}>
-              {showReviewProgress ? 'Hide review progress' : 'Show review progress'}
+            <ActivityIndicator size="small" color={colors.cyan} />
+            <View style={s.loadErrorCopy}>
+              <Text style={s.loadingTitle}>Checking local history</Text>
+              <Text style={s.loadErrorDetail}>Reading session summaries saved on this iPhone.</Text>
+            </View>
+          </View>
+        )}
+
+        {loaded && historyLoadError && (
+          <View accessibilityRole="alert" style={s.loadError}>
+            <Ionicons name="warning-outline" size={21} color="#fbbf24" />
+            <View style={s.loadErrorCopy}>
+              <Text style={s.loadErrorTitle}>Couldn’t load local history</Text>
+              <Text style={s.loadErrorDetail}>
+                {sessions.length > 0
+                  ? 'The last loaded sessions remain visible below. Retry to confirm they are current.'
+                  : 'Your saved sessions were not deleted. Try reading them from this iPhone again.'}
+              </Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={historyLoadBusy ? 'Retrying local session history' : 'Retry local session history'}
+                accessibilityState={{ disabled: historyLoadBusy, busy: historyLoadBusy }}
+                disabled={historyLoadBusy}
+                onPress={() => { void load(); }}
+                style={s.loadRetry}
+              >
+                <Text style={s.loadRetryText}>{historyLoadBusy ? 'Retrying…' : 'Try again'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {loaded && sessions.length > 0 && (
+          <>
+            <View style={s.historySummary}>
+              <View style={s.historySummaryItem}>
+                <Text style={s.historySummaryValue}>{needsReviewCount}</Text>
+                <Text style={s.historySummaryLabel}>Need review</Text>
+              </View>
+              <View style={s.historySummaryDivider} />
+              <View style={s.historySummaryItem}>
+                <Text style={s.historySummaryValue}>{reviewedCount}</Text>
+                <Text style={s.historySummaryLabel}>Reviewed</Text>
+              </View>
+              <View style={s.historySummaryDivider} />
+              <View style={s.historySummaryItem}>
+                <Text style={s.historySummaryValue}>{recoveredCount}</Text>
+                <Text style={s.historySummaryLabel}>Recovered</Text>
+              </View>
+            </View>
+            {nextReviewSession && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={`Continue reviewing the newest unfinished session from ${fmtDate(nextReviewSession.item.savedAt || nextReviewSession.item.updatedAt)}`}
+                accessibilityHint="Shows the Needs Review queue and expands the newest unfinished session"
+                accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
+                disabled={sessionOperationsBusy}
+                onPress={continueReviewing}
+                style={[s.continueReviewButton, sessionOperationsBusy && s.operationDisabled]}
+              >
+                <View style={s.continueReviewIcon}>
+                  <Ionicons name="arrow-forward" size={17} color="#dbeafe" />
+                </View>
+                <View style={s.continueReviewCopy}>
+                  <Text style={s.continueReviewTitle}>Continue reviewing</Text>
+                  <Text style={s.continueReviewDetail}>
+                    Open the newest unfinished session · {checkpointProgress} of {CHECKPOINT_TARGET} Medium reviews complete
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            <View accessibilityRole="tablist" style={s.filterRow}>
+              {HISTORY_FILTERS.map(filter => {
+                const selected = historyFilter === filter.value;
+                return (
+                  <TouchableOpacity
+                    key={filter.value}
+                    accessibilityRole="tab"
+                    accessibilityLabel={`${filter.label}, ${filterCounts[filter.value]} sessions`}
+                    accessibilityHint="Filters the saved session list"
+                    accessibilityState={{ selected }}
+                    style={[s.filterButton, selected && s.filterButtonSelected]}
+                    onPress={() => chooseHistoryFilter(filter.value)}
+                  >
+                    <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>
+                      {filter.label} · {filterCounts[filter.value]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text accessibilityLiveRegion="polite" style={s.filterResult}>
+              Showing {filteredSessions.length} of {sessions.length} sessions
             </Text>
-            <Ionicons name={showReviewProgress ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
-          </TouchableOpacity>
+            {filteredSessions.length > 0 && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={sessionOperationsBusy
+                  ? 'Wait for session changes before sharing summaries'
+                  : `Share ${filteredSessions.length} visible session summaries`}
+                accessibilityHint="Opens the iPhone share sheet with a privacy-limited text export"
+                accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
+                disabled={sessionOperationsBusy}
+                style={[s.exportButton, sessionOperationsBusy && s.operationDisabled]}
+                onPress={() => { void shareSessions(filteredSessions.map(({ item }) => item)); }}
+              >
+                <Ionicons name="share-outline" size={16} color="#93c5fd" />
+                <Text style={s.exportButtonText}>SHARE SHOWN SUMMARIES</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityHint="Shows aggregate progress and test-condition coverage"
+              accessibilityState={{ expanded: showReviewProgress }}
+              style={s.reviewToggle}
+              onPress={() => setShowReviewProgress(current => !current)}
+            >
+              <Text style={s.reviewToggleText}>
+                {showReviewProgress ? 'Hide review progress' : 'Show review progress'}
+              </Text>
+              <Ionicons name={showReviewProgress ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
+            </TouchableOpacity>
+          </>
         )}
 
         {loaded && sessions.length > 0 && showReviewProgress && (
@@ -334,10 +674,40 @@ export default function HistoryScreen() {
                 {completeConditionCount} of {reviewedMedium.length} reviewed sessions include lighting, eyewear, and phone position.
               </Text>
               <Text style={s.coverageStats}>
-                {lowLightCount} low light · {eyewearCount} with eyewear · {phonePositionCount} phone positions
+                {pilotCoverage.coveredCount} of {pilotCoverage.totalCount} planned condition variants represented
+              </Text>
+              <View style={s.coverageGrid}>
+                {pilotCoverage.items.map(item => (
+                  <View
+                    accessible
+                    accessibilityLabel={`${item.label}, ${item.count} reviewed ${item.count === 1 ? 'session' : 'sessions'}`}
+                    key={item.id}
+                    style={[s.coverageItem, item.count > 0 && s.coverageItemCovered]}
+                  >
+                    <Ionicons
+                      name={item.count > 0 ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={14}
+                      color={item.count > 0 ? '#86efac' : '#fbbf24'}
+                    />
+                    <Text style={[s.coverageItemText, item.count > 0 && s.coverageItemTextCovered]}>
+                      {item.label} · {item.count}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <Text
+                accessibilityLiveRegion="polite"
+                style={pilotCoverage.missingLabels.length > 0 ? s.coverageMissing : s.coverageComplete}
+              >
+                {pilotCoverage.missingLabels.length > 0
+                  ? `Still needed: ${pilotCoverage.missingLabels.join(', ')}`
+                  : 'Every planned lighting, eyewear, and phone-position variant is represented.'}
               </Text>
               <Text style={s.coverageStats}>
                 {completeDeviceImpactCount} include battery-use and phone-heat observations
+              </Text>
+              <Text style={s.coverageCaution}>
+                Coverage prevents obvious gaps; one session in a condition is not enough to establish accuracy.
               </Text>
             </View>
             {issueSessionCount > 0 && (
@@ -373,28 +743,95 @@ export default function HistoryScreen() {
                 </Text>
               </View>
             )}
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={sessionOperationsBusy
+                ? 'Wait for session changes before sharing pilot progress'
+                : 'Share aggregate pilot progress'}
+              accessibilityHint="Opens the iPhone share sheet with condition coverage and aggregate review counts"
+              accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
+              disabled={sessionOperationsBusy}
+              onPress={() => { void sharePilotProgress(); }}
+              style={[s.pilotExportButton, sessionOperationsBusy && s.operationDisabled]}
+            >
+              <Ionicons name="document-text-outline" size={17} color="#bfdbfe" />
+              <View style={s.pilotExportCopy}>
+                <Text style={s.pilotExportTitle}>Share pilot progress</Text>
+                <Text style={s.pilotExportDetail}>Aggregate counts only · no session or driver identifiers</Text>
+              </View>
+              <Ionicons name="share-outline" size={16} color="#93c5fd" />
+            </TouchableOpacity>
           </View>
         )}
 
-        {loaded && sessions.length === 0 && (
+        {loaded && !historyLoadError && sessions.length === 0 && (
           <View style={s.empty}>
             <Ionicons name="time-outline" size={40} color="#4a7a8a" />
             <Text style={s.emptyTitle}>No sessions yet</Text>
             <Text style={s.emptySub}>
               Completed monitoring sessions will appear here.
             </Text>
-            <TouchableOpacity style={s.cta} onPress={() => router.push('/pre-drive')}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Start a new monitoring session"
+              style={s.cta}
+              onPress={() => router.push('/pre-drive')}
+            >
               <Text style={s.ctaTxt}>Start Monitoring</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {sessions.map((item, i) => {
-          const sessionKey = item.sessionId || `${item.savedAt || item.updatedAt || 'session'}-${i}`;
-          const reviewComplete = hasCompleteReview(item);
+        {loaded && sessions.length > 0 && filteredSessions.length === 0 && historyFilter !== 'all' && (
+          <View style={s.filteredEmpty}>
+            <Ionicons name="checkmark-circle-outline" size={32} color="#4a7a8a" />
+            <Text style={s.emptyTitle}>{filteredEmptyCopy[historyFilter].title}</Text>
+            <Text style={s.emptySub}>{filteredEmptyCopy[historyFilter].detail}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={s.clearFilterButton}
+              onPress={() => chooseHistoryFilter('all')}
+            >
+              <Text style={s.clearFilterText}>Show all sessions</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {groupedFilteredSessions.map(group => (
+          <React.Fragment key={group.key}>
+            <View
+              accessible
+              accessibilityRole="header"
+              accessibilityLabel={`${group.label}, ${group.sessions.length} ${group.sessions.length === 1 ? 'session' : 'sessions'}`}
+              style={s.dateGroupHeader}
+            >
+              <Text style={s.dateGroupTitle}>{group.label}</Text>
+              <Text style={s.dateGroupCount}>{group.sessions.length}</Text>
+            </View>
+        {group.sessions.map(({ item, index: i }) => {
+          const sessionKey = sessionRecordKey(item, i);
+          const sessionOperation = sessionOperations[sessionKey];
+          const sessionBusy = Boolean(sessionOperation);
+          const reviewProgress = getSessionReviewProgress(item);
+          const reviewComplete = reviewProgress.complete;
           const isExpanded = expandedSessions[sessionKey] ?? false;
           return (
-          <View key={sessionKey} style={s.card}>
+          <View
+            key={sessionKey}
+            onLayout={event => scrollToPendingReview(sessionKey, event)}
+            style={[
+              s.card,
+              item.recoveredFromInterruption
+                ? s.cardRecovered
+                : !reviewComplete && s.cardNeedsReview,
+            ]}
+          >
+            {reviewQueueMessage?.key === sessionKey && (
+              <View accessibilityRole="alert" style={s.reviewQueueMessage}>
+                <Ionicons name="arrow-forward-circle-outline" size={17} color="#93c5fd" />
+                <Text style={s.reviewQueueMessageText}>{reviewQueueMessage.text}</Text>
+              </View>
+            )}
             <View style={s.rowBetween}>
               <Text style={s.date}>{fmtDate(item.savedAt || item.updatedAt)}</Text>
               <Text style={s.dur}>{fmtDuration(item.durationSec)}</Text>
@@ -488,19 +925,33 @@ export default function HistoryScreen() {
               </View>
             )}
             <View style={s.reviewSummary}>
-              <View style={[s.reviewBadge, reviewComplete ? s.reviewBadgeComplete : s.reviewBadgeNeeded]}>
+              <View style={[
+                s.reviewBadge,
+                sessionBusy ? s.reviewBadgeBusy : reviewComplete ? s.reviewBadgeComplete : s.reviewBadgeNeeded,
+              ]}>
                 <Ionicons
-                  name={reviewComplete ? 'checkmark-circle' : 'ellipse-outline'}
+                  name={sessionBusy ? 'sync-outline' : reviewComplete ? 'checkmark-circle' : 'ellipse-outline'}
                   size={14}
-                  color={reviewComplete ? '#86efac' : '#fbbf24'}
+                  color={sessionBusy ? '#93c5fd' : reviewComplete ? '#86efac' : '#fbbf24'}
                 />
-                <Text style={[s.reviewBadgeText, reviewComplete ? s.reviewBadgeTextComplete : s.reviewBadgeTextNeeded]}>
-                  {reviewComplete ? 'Review complete' : item.alertAssessment ? 'Rating saved' : 'Needs review'}
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={[
+                    s.reviewBadgeText,
+                    sessionBusy ? s.reviewBadgeTextBusy : reviewComplete ? s.reviewBadgeTextComplete : s.reviewBadgeTextNeeded,
+                  ]}
+                >
+                  {sessionOperation === 'saving'
+                    ? 'Saving changes…'
+                    : sessionOperation === 'deleting'
+                      ? 'Deleting session…'
+                      : reviewComplete ? 'Review complete' : item.alertAssessment ? 'Rating saved' : 'Needs review'}
                 </Text>
               </View>
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={isExpanded ? 'Hide session review details' : 'Show session review details'}
+                accessibilityHint="Shows test conditions, device impact, and local diagnostics"
                 accessibilityState={{ expanded: isExpanded }}
                 style={s.reviewToggle}
                 onPress={() => setExpandedSessions(current => ({
@@ -511,6 +962,45 @@ export default function HistoryScreen() {
                 <Text style={s.reviewToggleText}>{isExpanded ? 'Hide details' : 'Show details'}</Text>
                 <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
               </TouchableOpacity>
+            </View>
+            <View
+              accessible
+              accessibilityLabel={reviewComplete
+                ? 'Review complete, 3 of 3 steps complete'
+                : `Review incomplete, ${reviewProgress.completedSteps} of ${reviewProgress.totalSteps} steps complete. ${reviewProgress.missingSummary}`}
+              accessibilityLiveRegion="polite"
+              style={[s.reviewProgress, reviewComplete && s.reviewProgressComplete]}
+            >
+              <View style={s.reviewProgressHeader}>
+                <Text style={[s.reviewProgressTitle, reviewComplete && s.reviewProgressTitleComplete]}>
+                  {reviewComplete ? 'Review checklist complete' : 'Finish this review'}
+                </Text>
+                <Text style={s.reviewProgressCount}>
+                  {reviewProgress.completedSteps}/{reviewProgress.totalSteps}
+                </Text>
+              </View>
+              {!reviewComplete && (
+                <Text style={s.reviewProgressMissing}>{reviewProgress.missingSummary}</Text>
+              )}
+              {isExpanded && (
+                <View style={s.reviewChecklist}>
+                  {reviewProgress.steps.map(step => (
+                    <View key={step.id} style={s.reviewChecklistRow}>
+                      <Ionicons
+                        name={step.complete ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={16}
+                        color={step.complete ? '#86efac' : '#fbbf24'}
+                      />
+                      <View style={s.reviewChecklistCopy}>
+                        <Text style={s.reviewChecklistLabel}>{step.label}</Text>
+                        {!step.complete && (
+                          <Text style={s.reviewChecklistMissing}>Add {step.missing.join(', ')}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
             <View style={s.review}>
               <Text style={s.reviewTitle}>How did the alerts feel?</Text>
@@ -527,8 +1017,9 @@ export default function HistoryScreen() {
                       key={option.value}
                       accessibilityRole="button"
                       accessibilityLabel={option.label}
-                      accessibilityState={{ selected }}
-                      style={[s.reviewOption, selected && s.reviewOptionSelected]}
+                      accessibilityState={{ selected, disabled: sessionBusy, busy: sessionBusy }}
+                      disabled={sessionBusy}
+                      style={[s.reviewOption, selected && s.reviewOptionSelected, sessionBusy && s.operationDisabled]}
                       onPress={() => saveAssessment(i, option.value)}
                     >
                       <Ionicons name={option.icon} size={15} color={selected ? '#dbeafe' : '#4a7a8a'} />
@@ -559,8 +1050,9 @@ export default function HistoryScreen() {
                           key={option.value}
                           accessibilityRole="button"
                           accessibilityLabel={`${group.label}: ${option.label}`}
-                          accessibilityState={{ selected }}
-                          style={[s.conditionOption, selected && s.conditionOptionSelected]}
+                          accessibilityState={{ selected, disabled: sessionBusy, busy: sessionBusy }}
+                          disabled={sessionBusy}
+                          style={[s.conditionOption, selected && s.conditionOptionSelected, sessionBusy && s.operationDisabled]}
                           onPress={() => saveTestCondition(i, group.key, option.value)}
                         >
                           <Text style={[s.conditionOptionText, selected && s.conditionOptionTextSelected]}>
@@ -592,8 +1084,9 @@ export default function HistoryScreen() {
                           key={option.value}
                           accessibilityRole="button"
                           accessibilityLabel={`${group.label}: ${option.label}, tester-reported`}
-                          accessibilityState={{ selected }}
-                          style={[s.conditionOption, selected && s.conditionOptionSelected]}
+                          accessibilityState={{ selected, disabled: sessionBusy, busy: sessionBusy }}
+                          disabled={sessionBusy}
+                          style={[s.conditionOption, selected && s.conditionOptionSelected, sessionBusy && s.operationDisabled]}
                           onPress={() => saveDeviceImpact(i, group.key, option.value)}
                         >
                           <Text style={[s.conditionOptionText, selected && s.conditionOptionTextSelected]}>
@@ -617,7 +1110,9 @@ export default function HistoryScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Send feedback about this session"
-              style={s.feedbackBtn}
+              accessibilityState={{ disabled: sessionBusy, busy: sessionBusy }}
+              disabled={sessionBusy}
+              style={[s.feedbackBtn, sessionBusy && s.operationDisabled]}
               onPress={async () => {
                 if (!await openFeedback(item)) {
                   Alert.alert('Mail is unavailable', 'Email hello@occulert.com to share pilot feedback.');
@@ -627,9 +1122,23 @@ export default function HistoryScreen() {
               <Ionicons name="chatbubble-ellipses-outline" size={16} color="#93c5fd" />
               <Text style={s.feedbackTxt}>Send session feedback</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={`Delete session from ${fmtDate(item.savedAt || item.updatedAt)}`}
+              accessibilityHint="Permanently removes this local session after confirmation"
+              accessibilityState={{ disabled: sessionBusy, busy: sessionBusy }}
+              disabled={sessionBusy}
+              style={[s.deleteBtn, sessionBusy && s.operationDisabled]}
+              onPress={() => confirmDeleteSession(item, i)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#fca5a5" />
+              <Text style={s.deleteTxt}>Delete local session</Text>
+            </TouchableOpacity>
           </View>
           );
         })}
+          </React.Fragment>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -639,6 +1148,32 @@ const s = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 20, paddingBottom: 48 },
   title: { color: colors.text, fontSize: 32, fontWeight: '800', letterSpacing: -0.8, marginBottom: 20 },
+  loadError: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: 'rgba(251,191,36,0.08)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.28)', borderRadius: radii.large, padding: 14, marginBottom: 16 },
+  loadingBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(56,189,248,0.07)', borderWidth: 1, borderColor: 'rgba(56,189,248,0.2)', borderRadius: radii.large, padding: 14, marginBottom: 16 },
+  loadingTitle: { color: '#bae6fd', fontSize: 13, fontWeight: '900' },
+  loadErrorCopy: { minWidth: 0, flex: 1 },
+  loadErrorTitle: { color: '#fde68a', fontSize: 13, fontWeight: '900' },
+  loadErrorDetail: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 3 },
+  loadRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 18 },
+  loadRetryText: { color: '#93c5fd', fontSize: 12, fontWeight: '900' },
+  historySummary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, paddingVertical: 13, marginBottom: 12 },
+  historySummaryItem: { flexGrow: 1, flexBasis: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  historySummaryValue: { color: '#e0f2fe', fontSize: 19, fontWeight: '900' },
+  historySummaryLabel: { color: '#6592a5', fontSize: 9, fontWeight: '800', marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.4 },
+  historySummaryDivider: { width: 1, backgroundColor: '#1a3a4a' },
+  continueReviewButton: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: 'rgba(37,99,235,0.14)', borderWidth: 1, borderColor: 'rgba(96,165,250,0.35)', borderRadius: radii.large, paddingHorizontal: 13, paddingVertical: 10, marginBottom: 12 },
+  continueReviewIcon: { flexShrink: 0, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(37,99,235,0.5)' },
+  continueReviewCopy: { minWidth: 0, flex: 1 },
+  continueReviewTitle: { color: '#dbeafe', fontSize: 13, fontWeight: '900' },
+  continueReviewDetail: { color: '#93c5fd', fontSize: 10, lineHeight: 15, marginTop: 2 },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 7 },
+  filterButton: { minHeight: 44, justifyContent: 'center', borderRadius: 999, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', paddingHorizontal: 11, paddingVertical: 7 },
+  filterButtonSelected: { borderColor: '#3b82f6', backgroundColor: 'rgba(37,99,235,0.22)' },
+  filterButtonText: { color: '#6592a5', fontSize: 10, fontWeight: '800' },
+  filterButtonTextSelected: { color: '#dbeafe' },
+  filterResult: { color: '#4a7a8a', fontSize: 10, marginBottom: 2 },
+  exportButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10, marginTop: 8, paddingHorizontal: 12 },
+  exportButtonText: { color: '#93c5fd', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   checkpoint: { backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: 'rgba(94,156,255,0.28)', borderRadius: radii.large, padding: 18, marginBottom: 16 },
   checkpointHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   checkpointHeaderCopy: { flex: 1 },
@@ -661,15 +1196,37 @@ const s = StyleSheet.create({
   patternCopy: { color: '#93c5fd', fontSize: 10, lineHeight: 15, marginTop: 3 },
   patternMissing: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 3 },
   patternCaution: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 8 },
+  coverageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 9 },
+  coverageItem: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6 },
+  coverageItemCovered: { borderColor: 'rgba(134,239,172,0.24)', backgroundColor: 'rgba(22,163,74,0.08)' },
+  coverageItemText: { color: '#fbbf24', fontSize: 9, fontWeight: '800' },
+  coverageItemTextCovered: { color: '#bbf7d0' },
+  coverageMissing: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 9 },
+  coverageComplete: { color: '#86efac', fontSize: 10, lineHeight: 15, marginTop: 9 },
+  coverageCaution: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 7 },
+  pilotExportButton: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 9, borderTopWidth: 1, borderTopColor: '#1d4f68', marginTop: 14, paddingTop: 12 },
+  pilotExportCopy: { minWidth: 0, flex: 1 },
+  pilotExportTitle: { color: '#dbeafe', fontSize: 11, fontWeight: '900' },
+  pilotExportDetail: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 2 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 10 },
+  filteredEmpty: { alignItems: 'center', backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, paddingVertical: 34, paddingHorizontal: 16, gap: 8, marginTop: 12 },
   emptyTitle: { color: '#c8e8f0', fontSize: 17, fontWeight: '800', marginTop: 8 },
   emptySub: { color: '#4a7a8a', fontSize: 13, textAlign: 'center', lineHeight: 19, paddingHorizontal: 20 },
   cta: { marginTop: 16, backgroundColor: '#2563eb', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
   ctaTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  clearFilterButton: { minHeight: 44, justifyContent: 'center', marginTop: 8, paddingHorizontal: 14 },
+  clearFilterText: { color: '#93c5fd', fontSize: 12, fontWeight: '800' },
+  dateGroupHeader: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 8, paddingHorizontal: 4 },
+  dateGroupTitle: { flex: 1, color: '#bae6fd', fontSize: 12, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase' },
+  dateGroupCount: { flexShrink: 0, minWidth: 28, color: '#6592a5', fontSize: 11, fontWeight: '900', textAlign: 'right' },
   card: { backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, padding: 18, marginBottom: 12 },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  date: { color: '#c8e8f0', fontSize: 13, fontWeight: '700' },
-  dur: { color: '#60a5fa', fontSize: 13, fontWeight: '800' },
+  cardNeedsReview: { borderColor: 'rgba(251,191,36,0.35)' },
+  cardRecovered: { borderColor: 'rgba(74,222,128,0.35)' },
+  reviewQueueMessage: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(37,99,235,0.12)', borderWidth: 1, borderColor: 'rgba(96,165,250,0.28)', borderRadius: 9, padding: 10, marginBottom: 12 },
+  reviewQueueMessageText: { minWidth: 0, flex: 1, color: '#bfdbfe', fontSize: 10, lineHeight: 15, fontWeight: '800' },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+  date: { flex: 1, color: '#c8e8f0', fontSize: 13, fontWeight: '700' },
+  dur: { flexShrink: 0, color: '#60a5fa', fontSize: 13, fontWeight: '800' },
   stats: { flexDirection: 'row', gap: 12 },
   recoveryNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, backgroundColor: 'rgba(48,209,88,0.08)', borderWidth: 1, borderColor: 'rgba(48,209,88,0.24)', borderRadius: 12, padding: 11, marginTop: 12 },
   recoveryNoteCopy: { flex: 1 },
@@ -691,15 +1248,29 @@ const s = StyleSheet.create({
   observationTitle: { color: '#60a5fa', fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   observationInfo: { color: '#bae6fd', fontSize: 10, lineHeight: 15, marginTop: 4 },
   observationStatus: { color: '#6592a5', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  reviewProgress: { backgroundColor: 'rgba(251,191,36,0.06)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.24)', borderRadius: 10, marginTop: 10, padding: 11 },
+  reviewProgressComplete: { backgroundColor: 'rgba(134,239,172,0.05)', borderColor: 'rgba(134,239,172,0.22)' },
+  reviewProgressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  reviewProgressTitle: { flex: 1, color: '#fde68a', fontSize: 11, fontWeight: '900' },
+  reviewProgressTitleComplete: { color: '#bbf7d0' },
+  reviewProgressCount: { flexShrink: 0, color: '#93c5fd', fontSize: 11, fontWeight: '900' },
+  reviewProgressMissing: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 4 },
+  reviewChecklist: { borderTopWidth: 1, borderTopColor: '#1d4f68', marginTop: 9, paddingTop: 7, gap: 7 },
+  reviewChecklistRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  reviewChecklistCopy: { minWidth: 0, flex: 1 },
+  reviewChecklistLabel: { color: '#dbeafe', fontSize: 10, fontWeight: '800' },
+  reviewChecklistMissing: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 1 },
   observationCaution: { color: '#4a7a8a', fontSize: 9, lineHeight: 14, marginTop: 6 },
   reviewSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6 },
   reviewBadgeComplete: { backgroundColor: 'rgba(22,163,74,0.12)', borderColor: 'rgba(74,222,128,0.35)' },
   reviewBadgeNeeded: { backgroundColor: 'rgba(217,119,6,0.10)', borderColor: 'rgba(251,191,36,0.35)' },
+  reviewBadgeBusy: { backgroundColor: 'rgba(37,99,235,0.14)', borderColor: 'rgba(96,165,250,0.38)' },
   reviewBadgeText: { fontSize: 10, fontWeight: '900' },
   reviewBadgeTextComplete: { color: '#86efac' },
   reviewBadgeTextNeeded: { color: '#fbbf24' },
-  reviewToggle: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
+  reviewBadgeTextBusy: { color: '#93c5fd' },
+  reviewToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
   reviewToggleText: { color: '#93c5fd', fontSize: 11, fontWeight: '800' },
   review: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewTitle: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', marginBottom: 10 },
@@ -715,7 +1286,7 @@ const s = StyleSheet.create({
   conditionGroup: { marginTop: 9 },
   conditionLabel: { color: '#6592a5', fontSize: 10, fontWeight: '800', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
   conditionOptions: { flexDirection: 'row', gap: 7 },
-  conditionOption: { flex: 1, minHeight: 38, borderRadius: 9, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, paddingVertical: 7 },
+  conditionOption: { flex: 1, minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: '#1a3a4a', backgroundColor: 'rgba(5,10,15,0.35)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, paddingVertical: 7 },
   conditionOptionSelected: { borderColor: '#3b82f6', backgroundColor: 'rgba(37,99,235,0.22)' },
   conditionOptionText: { color: '#4a7a8a', fontSize: 10, fontWeight: '800', textAlign: 'center' },
   conditionOptionTextSelected: { color: '#dbeafe' },
@@ -723,6 +1294,9 @@ const s = StyleSheet.create({
   deviceImpact: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   deviceImpactNote: { color: '#6592a5', fontSize: 10, lineHeight: 14, marginTop: 4, marginBottom: 4 },
   deviceWarning: { color: '#fbbf24', fontSize: 10, fontWeight: '700', lineHeight: 14, marginTop: 10 },
-  feedbackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
+  feedbackBtn: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 8 },
   feedbackTxt: { color: '#93c5fd', fontSize: 13, fontWeight: '800' },
+  deleteBtn: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  operationDisabled: { opacity: 0.5 },
+  deleteTxt: { color: '#fca5a5', fontSize: 12, fontWeight: '800' },
 });
