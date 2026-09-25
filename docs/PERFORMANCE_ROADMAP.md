@@ -16,6 +16,7 @@ accuracy, or safe real-world behavior.
 | Web startup | Removes the eager MediaPipe request and lazy-loads the hidden install-logo image | No behavior or consent default changes |
 | Fleet API | Runs driver and session reads concurrently, optionally skips event history, and returns `Server-Timing` durations | Existing owner verification and privacy-limited field selection remain unchanged |
 | Fleet dashboard | Keeps the existing 30-second refresh while a session is active, shifts idle dashboards to 90 seconds, backs off after failures, updates relative-time labels every 15 seconds, and limits open history-event refreshes to every two minutes | Active manager visibility is unchanged; protected and local fallback data remain separate; GPS and personal media stay excluded |
+| Shared-screen fleet display | Adds a read-only, 10-foot web view for browser or AirPlay use with 30-second active and 90-second idle refresh, hidden-tab pause, data-saver pacing, and bounded retry backoff | Uses only the authenticated owner-scoped summary without raw events or local fallback; driver names, aliases, vehicles, locations, individual scores, media, and editing controls are never rendered |
 | Native cloud sync | Reuses the verified SecureStore auth value in memory and deduplicates its initial read | Token writes refresh the cache; sign-out clears it before local deletion/revocation |
 | Native alert delivery | Preloads confirmed haptic, audio, in-ear, and Watch preferences before monitoring so alert cues do not wait for storage reads | Detection thresholds, cooldowns, cue plans, and user-confirmed settings remain unchanged |
 | Optional headphone motion | Starts observation-only headphone motion without delaying camera activation | Late accessory results are discarded after cancellation; headphone data never changes scores or alerts |
@@ -67,6 +68,9 @@ These are acceptance targets, not measured production claims.
   preview plus force-quit/relaunch checks on the exact native build.
 - Production fleet latency requires a signed-in owner and an agreed read-only
   dataset size.
+- Native tvOS packaging remains a later decision after a browser/AirPlay fleet
+  pilot establishes demand. The current source package does not spend a native
+  build or claim Apple TV device validation.
 - Exact 96 px, 192 px, and 512 px exports now serve browser shortcuts and PWA
   install metadata; the original high-resolution logo remains available for
   social previews and brand use.

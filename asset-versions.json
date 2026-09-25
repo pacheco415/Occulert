@@ -51,5 +51,7 @@
   "install-page-1.css": "install-page-1.v47.css",
   "safety-page-1.js": "static-page.v52.js",
   "passwordless-auth.js": "passwordless-auth.v49.js",
-  "fleet-followups.js": "fleet-followups.v50.js"
+  "fleet-followups.js": "fleet-followups.v50.js",
+  "fleet-display.css": "fleet-display.v54.css",
+  "fleet-display.js": "fleet-display.v54.js"
 }
