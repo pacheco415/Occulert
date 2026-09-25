@@ -53,5 +53,6 @@
   "passwordless-auth.js": "passwordless-auth.v49.js",
   "fleet-followups.js": "fleet-followups.v50.js",
   "fleet-display.css": "fleet-display.v54.css",
-  "fleet-display.js": "fleet-display.v54.js"
+  "fleet-display.js": "fleet-display.v54.js",
+  "pilot-guide-page-1.css": "pilot-guide-page-1.v55.css"
 }

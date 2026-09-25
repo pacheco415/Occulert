@@ -14,7 +14,7 @@ function contrastRatio(foreground, background) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-for (const path of ["/account.html", "/login.html", "/driver-profiles.html", "/faq.html", "/about.html", "/product-hub.html", "/pilot-leads.html", "/", "/features.html", "/how-it-works.html", "/install.html", "/fleet-pricing.html", "/pilot-signup.html", "/fleet-dashboard.html", "/fleet-display.html", "/fleet-onboarding.html", "/accept-invite.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
+for (const path of ["/account.html", "/login.html", "/driver-profiles.html", "/faq.html", "/about.html", "/product-hub.html", "/pilot-guide.html", "/pilot-leads.html", "/", "/features.html", "/how-it-works.html", "/install.html", "/fleet-pricing.html", "/pilot-signup.html", "/fleet-dashboard.html", "/fleet-display.html", "/fleet-onboarding.html", "/accept-invite.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
   test(`important public page ${path} loads without script errors`, async ({ page }) => {
     const pageErrors = [];
     page.on("pageerror", error => pageErrors.push(error.message));

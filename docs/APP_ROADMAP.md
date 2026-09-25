@@ -29,7 +29,7 @@ queue a native build or publish the website by itself.
 | Connected-device readiness | Settings summarizes primary phone and optional Watch readiness, refreshes Watch/headphone status through a single-flight action, and preserves the existing direct audio and Watch tests | Physical Watch, AirPods/Bluetooth, and car-audio confirmation |
 | Fleet manager reporting | 7/30-day pilot scorecard, privacy-limited report export, driver-specific action queue, transparent early-access plan comparison, deliberate rollout qualification, and separate free-trial/post-trial lead attribution implemented in source | Existing signed-in Preview evidence covers owner scoping, a two-driver no-session fleet, and both reporting windows. PR #109 Preview verification covers the public pricing, free-trial, paid-rollout, and signed-out dashboard journeys; authenticated adaptive-refresh timing and production verification remain pending. Broader pilot production verification remains pending |
 | Fleet shared-screen operations | Privacy-safe, read-only browser/AirPlay display is production-verified with aggregate counts only, no raw events or local fallback, and no driver names, vehicles, locations, individual scores, or editing controls | Use during an authorized pilot before deciding whether native tvOS packaging has enough value |
-| Pilot launch workflow | Manager checklist derives fleet setup, joined-driver, first-session, and 7/30-day readiness from protected records without claiming offline tasks were completed | First authorized fleet partner and real 30-day operating evidence remain external |
+| Pilot launch workflow | Manager checklist derives fleet setup, joined-driver, first-session, and 7/30-day readiness from protected records without claiming offline tasks were completed. A manager-and-driver quick-start center provides parked setup, privacy, shared-display, alert-response, and review guidance without tracking reading progress | First authorized fleet partner and real 30-day operating evidence remain external |
 
 Safety boundary: stronger alerts are intended to get attention and prompt a
 safe stop. They cannot wake every driver, keep a drowsy driver safely awake, or
@@ -49,7 +49,7 @@ bounded, and the existing cooldown remains in force.
 | Capture structured correct / false / missed alert feedback | — | Done in private TestFlight build 13 |
 | Audit background reliability (screen-off, app-backgrounded) | — | Foreground loss stops and saves; 15-second local recovery checkpoints are implemented for unexpected interruption. Physical force-quit/relaunch validation remains pending |
 | Offer a safe-stop Maps handoff after a confirmed alert | — | Implemented in source; physical-device verification pending |
-| Land a pilot fleet (rideshare, delivery, or trucking partner) | ★ | Production launch workflow supports an owner fleet, up to five pilot drivers, first protected session, shared display, and 7/30-day reviews; partner recruitment and operation have not started |
+| Land a pilot fleet (rideshare, delivery, or trucking partner) | ★ | Production launch workflow supports an owner fleet, up to five pilot drivers, first protected session, shared display, manager-and-driver quick start, and 7/30-day reviews; partner recruitment and operation have not started |
 | Tighten safety disclaimers and credibility documentation | — | Done |
 
 The safe-stop handoff offers rest-area, gas-station, and food/coffee searches.

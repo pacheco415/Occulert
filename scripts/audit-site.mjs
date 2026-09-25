@@ -173,6 +173,7 @@ for (const path of [
   "login.html",
   "pilot-leads.html",
   "pilot-signup.html",
+  "pilot-guide.html",
   "privacy.html",
   "product-hub.html",
   "safety.html",
@@ -180,7 +181,7 @@ for (const path of [
 ]) {
   assertIncludes(path, '<link rel="stylesheet" href="/liquid-glass.v47.css" />', `${path} must use the current shared Liquid Glass design layer`);
 }
-for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "privacy.html", "product-hub.html", "safety.html"]) {
+for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "pilot-guide.html", "privacy.html", "product-hub.html", "safety.html"]) {
   assertIncludes(path, 'class="skip-link" href="#main-content"', `${path} must let keyboard users skip repeated navigation`);
   assertIncludes(path, 'id="main-content" tabindex="-1"', `${path} must expose a focusable main destination`);
   assertIncludes(path, '<link rel="stylesheet" href="/accessibility.v52.css" />', `${path} must use the shared keyboard-navigation layer`);
@@ -188,7 +189,7 @@ for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "privacy.html"
 for (const path of ["driver-profiles.html", "pilot-signup.html", "session-history.html"]) {
   assertIncludes(path, '<script src="/static-page.v52.js" defer></script>', `${path} must reuse consolidated static-page behavior`);
 }
-for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "privacy.html", "product-hub.html", "safety.html"]) {
+for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "pilot-guide.html", "privacy.html", "product-hub.html", "safety.html"]) {
   assertIncludes(path, '<script src="/static-page.v52.js" defer></script>', `${path} must use consolidated static-page behavior`);
 }
 assertIncludes("fleet-dashboard.html", 'id="cloudStatus" role="status" aria-live="polite"', "fleet connection updates must be announced without stealing focus");
@@ -196,6 +197,13 @@ assertIncludes("fleet-dashboard.html", 'href="/fleet-display.html">Open TV displ
 assertIncludes("fleet-dashboard.html", "30-day pilot checklist", "fleet managers must receive a protected-record pilot launch path");
 assertIncludes("fleet-dashboard.html", "function pilotLaunchState", "pilot launch progress must use a deterministic protected-record projection");
 assertIncludes("fleet-dashboard.html", "Progress uses protected fleet records only", "pilot launch progress must disclose its data boundary");
+assertIncludes("fleet-dashboard.html", 'href="/pilot-guide.html">Pilot quick start', "fleet managers must be able to open the pilot quick start");
+assertIncludes("pilot-guide.html", "Launch a focused pilot", "pilot guide must include the manager launch path");
+assertIncludes("pilot-guide.html", "Complete a safe pilot session", "pilot guide must include the driver path");
+assertIncludes("pilot-guide.html", "Start a normal session", "pilot guide must explain foreground-only driver monitoring");
+assertIncludes("pilot-guide.html", "An alert never makes it safe to continue driving", "pilot guide must preserve the safe-stop boundary");
+assertIncludes("pilot-guide.html", "GPS coordinates and personal media", "pilot guide must disclose protected report exclusions");
+assertNotIncludes("pilot-guide.html", "localStorage", "pilot guide must not create a second progress store");
 assertIncludes("fleet-display.html", 'meta name="robots" content="noindex,nofollow"', "shared-screen fleet data must not be indexed");
 assertIncludes("fleet-display.html", 'id="connectionStatus" role="status" aria-live="polite"', "TV connection updates must be announced without stealing focus");
 assertIncludes("fleet-display.v54.js", "getFleetSummary({ includeEvents: false })", "TV display must skip raw event history");

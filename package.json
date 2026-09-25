@@ -28,7 +28,7 @@
     "test:watch-status": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-watch-status.mjs",
     "test:fleet-history": "node --test scripts/test-fleet-session-history.mjs",
     "test:fleet-display": "node --test scripts/test-fleet-display.mjs",
-    "test:pilot-launch": "node --test scripts/test-pilot-launch-checklist.mjs",
+    "test:pilot-launch": "node --test scripts/test-pilot-launch-checklist.mjs scripts/test-pilot-guide.mjs",
     "test:login": "node --test scripts/test-login-auth.mjs",
     "test:supabase-loader": "node --test scripts/test-supabase-loader.mjs",
     "test:passkeys": "node --test scripts/test-passkey-auth.mjs",
