@@ -165,6 +165,7 @@ for (const path of [
   "faq.html",
   "features.html",
   "fleet-dashboard.html",
+  "fleet-display.html",
   "fleet-onboarding.html",
   "fleet-pricing.html",
   "how-it-works.html",
@@ -191,6 +192,12 @@ for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "privacy.html"
   assertIncludes(path, '<script src="/static-page.v52.js" defer></script>', `${path} must use consolidated static-page behavior`);
 }
 assertIncludes("fleet-dashboard.html", 'id="cloudStatus" role="status" aria-live="polite"', "fleet connection updates must be announced without stealing focus");
+assertIncludes("fleet-dashboard.html", 'href="/fleet-display.html">Open TV display', "fleet managers must be able to open the shared-screen display");
+assertIncludes("fleet-display.html", 'meta name="robots" content="noindex,nofollow"', "shared-screen fleet data must not be indexed");
+assertIncludes("fleet-display.html", 'id="connectionStatus" role="status" aria-live="polite"', "TV connection updates must be announced without stealing focus");
+assertIncludes("fleet-display.v54.js", "getFleetSummary({ includeEvents: false })", "TV display must skip raw event history");
+assertIncludes("fleet-display.v54.js", "No local or demo data is used here", "TV display must never fall back to local or demo data");
+assertNotIncludes("fleet-display.html", "driverSearch", "TV display must not expose driver-level controls");
 assertIncludes("fleet-dashboard.html", ".btn{min-height:44px", "fleet actions must preserve accessible touch targets");
 assertIncludes("fleet-dashboard.html", ".input,.select{background:#0f172a", "fleet filters must preserve their shared mobile control sizing");
 assertIncludes("fleet-dashboard.html", "grid-template-columns:repeat(2,minmax(0,1fr))", "fleet mobile navigation must avoid cramped three-column actions");

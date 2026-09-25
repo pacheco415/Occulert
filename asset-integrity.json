@@ -52,5 +52,7 @@
   "auth-helper.v49.js": "d7147382e004dc5f21e5c978f2138dc04b299a6ed84f91456969c1613e6819fd",
   "fleet-followups.v50.js": "56203644b9d618acb30c1d91b1bf573716b459d84edef25d9f883ba3c06605be",
   "static-page.v52.js": "417c0ace043391162cc891ae67d4163ecccbd4c3b763534747141a3d4d4a12c0",
-  "pilot-signup-page-2.v53.js": "2e451d18cdcec29e43674bdbb8a59c73a1a581426b840d8a42217141a3fb1430"
+  "pilot-signup-page-2.v53.js": "2e451d18cdcec29e43674bdbb8a59c73a1a581426b840d8a42217141a3fb1430",
+  "fleet-display.v54.css": "98667c8d5f6fd37e4065a2ae2ce9c779c820e0a8c211fcf56b85718457fc133c",
+  "fleet-display.v54.js": "452eacc91a6f35bbd659d987d3dfc2657dae4558119fb0f5d330e1eb57a17a53"
 }

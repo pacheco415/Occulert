@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Occulert Fleet TV Display</title>
+  <meta name="description" content="A privacy-safe, read-only shared-screen view of an authenticated Occulert fleet.">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#050a13">
+  <link rel="canonical" href="https://www.occulert.com/fleet-display.html">
+  <link rel="apple-touch-icon" href="/occulert-logo-main-192.png">
+  <link rel="stylesheet" href="/liquid-glass.v47.css" />
+  <link rel="stylesheet" href="/accessibility.v52.css" />
+  <link rel="stylesheet" href="/fleet-display.v54.css" />
+  <script src="/occulert-backend.v47.js"></script>
+  <script src="/static-page.v52.js" defer></script>
+  <script src="/fleet-display.v54.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="display-header">
+    <a class="brand" href="/fleet-dashboard.html" aria-label="Return to Occulert fleet dashboard">Occulert</a>
+    <div class="header-status">
+      <span class="privacy-chip">Shared-screen privacy mode</span>
+      <span class="clock" id="pageClock" aria-label="Current time">--:--</span>
+    </div>
+    <nav class="display-actions" aria-label="TV display controls">
+      <button class="control" id="fullscreenButton" type="button">Full screen</button>
+      <a class="control" href="/fleet-dashboard.html">Exit TV display</a>
+    </nav>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="hero" aria-labelledby="displayTitle">
+      <div>
+        <p class="eyebrow">Read-only fleet operations</p>
+        <h1 id="displayTitle">Fleet operations</h1>
+      </div>
+      <div class="connection" id="connectionStatus" role="status" aria-live="polite">Checking protected fleet access…</div>
+    </section>
+
+    <section class="privacy-boundary" aria-label="Shared-screen privacy boundary">
+      <strong>Privacy-safe by default</strong>
+      <span>Driver names, vehicles, locations, individual scores, personal media, and raw events are not shown on this display.</span>
+    </section>
+
+    <section class="empty-state" id="emptyState" aria-live="polite">
+      <h2 id="emptyTitle">Connecting securely</h2>
+      <p id="emptyMessage">This display uses the signed-in fleet owner’s protected summary.</p>
+      <div class="empty-actions" id="emptyActions" hidden>
+        <a class="control primary" id="emptyPrimary" href="/login.html">Sign in</a>
+        <a class="control" href="/fleet-dashboard.html">Fleet dashboard</a>
+      </div>
+    </section>
+
+    <div id="displayContent" hidden>
+      <section class="metric-grid" aria-label="Fleet-wide status">
+        <article class="metric-card live-card">
+          <p>Monitoring now</p>
+          <strong id="activeSessions">0</strong>
+          <span>protected active sessions</span>
+        </article>
+        <article class="metric-card">
+          <p>Active roster</p>
+          <strong id="activeDrivers">0</strong>
+          <span>enabled drivers</span>
+        </article>
+        <article class="metric-card">
+          <p>Sessions recorded</p>
+          <strong id="recentSessions">0</strong>
+          <span>past 30 days</span>
+        </article>
+        <article class="metric-card attention-card">
+          <p>Sessions to review</p>
+          <strong id="reviewSessions">0</strong>
+          <span>aggregate manager queue</span>
+        </article>
+      </section>
+
+      <section class="operations-grid">
+        <article class="panel coverage-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">30-day participation</p>
+              <h2>Roster coverage</h2>
+            </div>
+            <strong class="coverage-value" id="coverageValue">0%</strong>
+          </div>
+          <div class="coverage-track" role="progressbar" aria-label="Thirty-day roster coverage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="coverageTrack"><span id="coverageBar"></span></div>
+          <p class="panel-note" id="coverageNote">No protected sessions are available yet.</p>
+        </article>
+
+        <article class="panel pulse-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Aggregate activity</p>
+              <h2>Session pulse</h2>
+            </div>
+          </div>
+          <div class="pulse-grid">
+            <div><span>Monitoring now</span><strong id="pulseNow">0</strong></div>
+            <div><span>Completed in past hour</span><strong id="pulseHour">0</strong></div>
+            <div><span>Completed in past 24 hours</span><strong id="pulseDay">0</strong></div>
+            <div><span>Earlier in 30 days</span><strong id="pulseMonth">0</strong></div>
+          </div>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <footer class="display-footer">
+    <span>Decision support only — never a substitute for rest, safe driving, or emergency procedures.</span>
+    <span id="refreshAge">Waiting for protected data</span>
+    <button class="refresh-button" id="refreshButton" type="button">Refresh now</button>
+  </footer>
+</body>
+</html>

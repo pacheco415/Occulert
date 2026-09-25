@@ -14,7 +14,7 @@ function contrastRatio(foreground, background) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-for (const path of ["/account.html", "/login.html", "/driver-profiles.html", "/faq.html", "/about.html", "/product-hub.html", "/pilot-leads.html", "/", "/features.html", "/how-it-works.html", "/install.html", "/fleet-pricing.html", "/pilot-signup.html", "/fleet-dashboard.html", "/fleet-onboarding.html", "/accept-invite.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
+for (const path of ["/account.html", "/login.html", "/driver-profiles.html", "/faq.html", "/about.html", "/product-hub.html", "/pilot-leads.html", "/", "/features.html", "/how-it-works.html", "/install.html", "/fleet-pricing.html", "/pilot-signup.html", "/fleet-dashboard.html", "/fleet-display.html", "/fleet-onboarding.html", "/accept-invite.html", "/session-history.html", "/privacy.html", "/safety.html"]) {
   test(`important public page ${path} loads without script errors`, async ({ page }) => {
     const pageErrors = [];
     page.on("pageerror", error => pageErrors.push(error.message));
@@ -175,6 +175,19 @@ test("fleet dashboard keeps mobile navigation and controls touch friendly", asyn
   expect(await page.locator(".actions .btn").first().evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   expect(await page.locator("#driverSearch").evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   await expect(page.locator(".section-title").first()).toHaveCSS("flex-direction", "column");
+});
+
+test("fleet TV display keeps signed-out and shared-screen states privacy safe", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/fleet-display.html", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { level: 1, name: "Fleet operations" })).toBeVisible();
+  await expect(page.locator(".privacy-boundary")).toContainText("Driver names, vehicles, locations, individual scores, personal media, and raw events are not shown");
+  await expect(page.locator("#emptyTitle")).toHaveText("Fleet owner sign-in required");
+  await expect(page.locator("#displayContent")).toBeHidden();
+  await expect(page.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login.html");
+  await expect(page.getByRole("link", { name: "Exit TV display" })).toHaveAttribute("href", "/fleet-dashboard.html");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1920);
 });
 
 test("forgot password stays on the login surface and opens reset mode", async ({ page }) => {
