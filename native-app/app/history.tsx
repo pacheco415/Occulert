@@ -26,7 +26,10 @@ import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import type { MonitorPerformanceSnapshot } from '../lib/monitorPerformance';
 import type { SensorFusionObservationSnapshot } from '../lib/sensorFusionObservation';
-import { summarizeFusionValidation } from '../lib/fusionValidationSummary';
+import {
+  planNextFusionValidationSession,
+  summarizeFusionValidation,
+} from '../lib/fusionValidationSummary';
 import {
   groupIndexedSessionsByDate,
   normalizeHistoryFilter,
@@ -443,6 +446,7 @@ export default function HistoryScreen() {
   const issueInsights = summarizePilotIssues(evidenceSessions);
   const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
   const fusionValidation = summarizeFusionValidation(sessions);
+  const fusionSessionPlan = planNextFusionValidationSession(sessions);
   const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteSessionReview(item)).length;
   const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteSessionReview(item)).length;
   const recoveredCount = sessions.filter(item => item.recoveredFromInterruption).length;
@@ -681,6 +685,31 @@ export default function HistoryScreen() {
             <Text style={s.fusionDetail}>
               Camera + headphone head-nod overlap: {fusionValidation.cameraHeadphoneNodOverlaps} across {fusionValidation.overlapSessions} sessions · {fusionValidation.elevatedCameraHeadphoneNodOverlaps} during elevated camera observations
             </Text>
+            <View style={fusionSessionPlan.complete ? s.fusionPlanComplete : s.fusionPlan}>
+              <View style={s.fusionPlanHeader}>
+                <View style={s.fusionPlanCopy}>
+                  <Text style={s.fusionPlanEyebrow}>NEXT VALIDATION SESSION</Text>
+                  <Text style={s.fusionPlanTitle}>{fusionSessionPlan.title}</Text>
+                </View>
+                <Text style={s.fusionPlanProgress}>
+                  {fusionSessionPlan.completedSetups}/{fusionSessionPlan.totalSetups} setups
+                </Text>
+              </View>
+              <Text style={s.fusionPlanDetail}>{fusionSessionPlan.detail}</Text>
+              {fusionSessionPlan.checklist.length > 0 && (
+                <View style={s.fusionPlanChecklist}>
+                  {fusionSessionPlan.checklist.map(item => (
+                    <View key={item} style={s.fusionPlanChecklistRow}>
+                      <Ionicons name="checkmark-circle-outline" size={14} color="#93c5fd" />
+                      <Text style={s.fusionPlanChecklistText}>{item}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              <Text style={s.fusionPlanOptional}>
+                Optional accessories are never required to use Occulert or complete a safe trip.
+              </Text>
+            </View>
             {fusionValidation.recoveredSessionsExcluded > 0 && (
               <Text style={s.fusionExcluded}>
                 {fusionValidation.recoveredSessionsExcluded} recovered partial {fusionValidation.recoveredSessionsExcluded === 1 ? 'session was' : 'sessions were'} excluded.
@@ -1370,6 +1399,18 @@ const s = StyleSheet.create({
   fusionStatValue: { color: '#dbeafe', fontSize: 16, fontWeight: '900' },
   fusionStatLabel: { color: '#6592a5', fontSize: 8, fontWeight: '800', letterSpacing: 0.35, marginTop: 3, textTransform: 'uppercase', textAlign: 'center' },
   fusionDetail: { color: '#bae6fd', fontSize: 10, lineHeight: 15, marginTop: 7 },
+  fusionPlan: { backgroundColor: 'rgba(37,99,235,0.08)', borderWidth: 1, borderColor: 'rgba(96,165,250,0.30)', borderRadius: 10, padding: 12, marginTop: 13 },
+  fusionPlanComplete: { backgroundColor: 'rgba(22,163,74,0.08)', borderWidth: 1, borderColor: 'rgba(134,239,172,0.24)', borderRadius: 10, padding: 12, marginTop: 13 },
+  fusionPlanHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  fusionPlanCopy: { flex: 1, minWidth: 0 },
+  fusionPlanEyebrow: { color: '#93c5fd', fontSize: 8, fontWeight: '900', letterSpacing: 0.65 },
+  fusionPlanTitle: { color: '#dbeafe', fontSize: 12, fontWeight: '900', lineHeight: 17, marginTop: 3 },
+  fusionPlanProgress: { color: '#93c5fd', fontSize: 9, fontWeight: '900' },
+  fusionPlanDetail: { color: '#bae6fd', fontSize: 10, lineHeight: 15, marginTop: 7 },
+  fusionPlanChecklist: { borderTopWidth: 1, borderTopColor: 'rgba(96,165,250,0.20)', gap: 7, marginTop: 10, paddingTop: 9 },
+  fusionPlanChecklistRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
+  fusionPlanChecklistText: { flex: 1, minWidth: 0, color: '#c8e8f0', fontSize: 9, lineHeight: 14 },
+  fusionPlanOptional: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 9 },
   fusionExcluded: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 7 },
   fusionCoverageMissing: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, backgroundColor: 'rgba(217,119,6,0.08)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)', borderRadius: 9, padding: 10, marginTop: 12 },
   fusionCoverageComplete: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, backgroundColor: 'rgba(22,163,74,0.08)', borderWidth: 1, borderColor: 'rgba(134,239,172,0.24)', borderRadius: 9, padding: 10, marginTop: 12 },
