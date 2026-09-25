@@ -193,6 +193,9 @@ for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "privacy.html"
 }
 assertIncludes("fleet-dashboard.html", 'id="cloudStatus" role="status" aria-live="polite"', "fleet connection updates must be announced without stealing focus");
 assertIncludes("fleet-dashboard.html", 'href="/fleet-display.html">Open TV display', "fleet managers must be able to open the shared-screen display");
+assertIncludes("fleet-dashboard.html", "30-day pilot checklist", "fleet managers must receive a protected-record pilot launch path");
+assertIncludes("fleet-dashboard.html", "function pilotLaunchState", "pilot launch progress must use a deterministic protected-record projection");
+assertIncludes("fleet-dashboard.html", "Progress uses protected fleet records only", "pilot launch progress must disclose its data boundary");
 assertIncludes("fleet-display.html", 'meta name="robots" content="noindex,nofollow"', "shared-screen fleet data must not be indexed");
 assertIncludes("fleet-display.html", 'id="connectionStatus" role="status" aria-live="polite"', "TV connection updates must be announced without stealing focus");
 assertIncludes("fleet-display.v54.js", "getFleetSummary({ includeEvents: false })", "TV display must skip raw event history");
