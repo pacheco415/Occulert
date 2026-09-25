@@ -1,5 +1,6 @@
 import type { SensitivityLevel } from '../constants/thresholds';
 import type { MonitorPerformanceSnapshot } from './monitorPerformance';
+import type { SensorFusionObservationSnapshot } from './sensorFusionObservation';
 
 export const SESSION_RECOVERY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 
@@ -17,6 +18,7 @@ export interface ActiveSessionCheckpoint {
   headphoneMotionSamples: number;
   headphoneMotionStatus: string;
   monitorPerformance: MonitorPerformanceSnapshot;
+  sensorFusion?: SensorFusionObservationSnapshot;
   sensitivity: SensitivityLevel;
   appVersion?: string;
   appBuildNumber?: string;
