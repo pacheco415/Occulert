@@ -26,6 +26,7 @@ import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import type { MonitorPerformanceSnapshot } from '../lib/monitorPerformance';
 import type { SensorFusionObservationSnapshot } from '../lib/sensorFusionObservation';
+import { summarizeFusionValidation } from '../lib/fusionValidationSummary';
 import {
   groupIndexedSessionsByDate,
   normalizeHistoryFilter,
@@ -189,6 +190,7 @@ export default function HistoryScreen() {
   const [historyLoadBusy, setHistoryLoadBusy] = useState(true);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
   const [showReviewProgress, setShowReviewProgress] = useState(false);
+  const [showFusionValidation, setShowFusionValidation] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const [sessionOperations, setSessionOperations] = useState<Record<string, SessionOperation>>({});
   const [reviewQueueMessage, setReviewQueueMessage] = useState<{ key: string; text: string } | null>(null);
@@ -440,6 +442,7 @@ export default function HistoryScreen() {
   const pilotCoverage = summarizePilotCoverage(reviewedMedium);
   const issueInsights = summarizePilotIssues(evidenceSessions);
   const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
+  const fusionValidation = summarizeFusionValidation(sessions);
   const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteSessionReview(item)).length;
   const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteSessionReview(item)).length;
   const recoveredCount = sessions.filter(item => item.recoveredFromInterruption).length;
@@ -632,7 +635,73 @@ export default function HistoryScreen() {
               </Text>
               <Ionicons name={showReviewProgress ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
             </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityHint="Shows local aggregate camera, headphone, and Apple Watch observation coverage"
+              accessibilityState={{ expanded: showFusionValidation }}
+              style={s.reviewToggle}
+              onPress={() => setShowFusionValidation(current => !current)}
+            >
+              <Text style={s.reviewToggleText}>
+                {showFusionValidation ? 'Hide fusion observations' : 'Show fusion observations'}
+              </Text>
+              <Ionicons name={showFusionValidation ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
+            </TouchableOpacity>
           </>
+        )}
+
+        {loaded && sessions.length > 0 && showFusionValidation && (
+          <View style={s.fusionDashboard}>
+            <Text style={s.fusionEyebrow}>LOCAL FUSION VALIDATION</Text>
+            <Text style={s.fusionTitle}>Observation coverage across saved sessions</Text>
+            <View style={s.fusionStats}>
+              <View style={s.fusionStat}>
+                <Text style={s.fusionStatValue}>{fusionValidation.observedSessions}/{fusionValidation.sessionTarget}</Text>
+                <Text style={s.fusionStatLabel}>Sessions</Text>
+              </View>
+              <View style={s.fusionStat}>
+                <Text style={s.fusionStatValue}>{fusionValidation.cameraSessions}</Text>
+                <Text style={s.fusionStatLabel}>Camera</Text>
+              </View>
+              <View style={s.fusionStat}>
+                <Text style={s.fusionStatValue}>{fusionValidation.headphoneSessions}</Text>
+                <Text style={s.fusionStatLabel}>Headphone</Text>
+              </View>
+              <View style={s.fusionStat}>
+                <Text style={s.fusionStatValue}>{fusionValidation.watchCheckedSessions}</Text>
+                <Text style={s.fusionStatLabel}>Watch checked</Text>
+              </View>
+            </View>
+            <Text style={s.fusionDetail}>
+              Aggregate observation time: {fmtDuration(fusionValidation.observationDurationSec)}
+            </Text>
+            <Text style={s.fusionDetail}>
+              Apple Watch context: {fusionValidation.watchPairedSessions} paired · {fusionValidation.watchInstalledSessions} app installed · {fusionValidation.watchReachableSessions} reachable
+            </Text>
+            <Text style={s.fusionDetail}>
+              Camera + headphone head-nod overlap: {fusionValidation.cameraHeadphoneNodOverlaps} across {fusionValidation.overlapSessions} sessions · {fusionValidation.elevatedCameraHeadphoneNodOverlaps} during elevated camera observations
+            </Text>
+            {fusionValidation.recoveredSessionsExcluded > 0 && (
+              <Text style={s.fusionExcluded}>
+                {fusionValidation.recoveredSessionsExcluded} recovered partial {fusionValidation.recoveredSessionsExcluded === 1 ? 'session was' : 'sessions were'} excluded.
+              </Text>
+            )}
+            <View style={fusionValidation.insufficientData ? s.fusionCoverageMissing : s.fusionCoverageComplete}>
+              <Ionicons
+                name={fusionValidation.insufficientData ? 'information-circle-outline' : 'checkmark-circle-outline'}
+                size={16}
+                color={fusionValidation.insufficientData ? '#fbbf24' : '#86efac'}
+              />
+              <Text style={fusionValidation.insufficientData ? s.fusionCoverageMissingText : s.fusionCoverageCompleteText}>
+                {fusionValidation.insufficientData
+                  ? `More observation coverage needed: ${fusionValidation.missingCoverage.join(', ')}.`
+                  : 'Planned observation coverage is represented. This does not establish detection accuracy.'}
+              </Text>
+            </View>
+            <Text style={s.fusionCaution}>
+              Aggregate planning context only. No accuracy rate or safety score is produced, and these observations do not change alerts. Fusion diagnostics remain on this iPhone and are excluded from sync, exports, and feedback.
+            </Text>
+          </View>
         )}
 
         {loaded && sessions.length > 0 && showReviewProgress && (
@@ -1293,6 +1362,20 @@ const s = StyleSheet.create({
   reviewBadgeTextBusy: { color: '#93c5fd' },
   reviewToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
   reviewToggleText: { color: '#93c5fd', fontSize: 11, fontWeight: '800' },
+  fusionDashboard: { backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: 'rgba(96,165,250,0.30)', borderRadius: radii.large, padding: 18, marginBottom: 16 },
+  fusionEyebrow: { color: '#60a5fa', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  fusionTitle: { color: '#e0f2fe', fontSize: 15, fontWeight: '800', marginTop: 4 },
+  fusionStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 13 },
+  fusionStat: { flexGrow: 1, flexBasis: 70, minHeight: 58, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5,10,15,0.28)', borderRadius: 9, paddingHorizontal: 6, paddingVertical: 8 },
+  fusionStatValue: { color: '#dbeafe', fontSize: 16, fontWeight: '900' },
+  fusionStatLabel: { color: '#6592a5', fontSize: 8, fontWeight: '800', letterSpacing: 0.35, marginTop: 3, textTransform: 'uppercase', textAlign: 'center' },
+  fusionDetail: { color: '#bae6fd', fontSize: 10, lineHeight: 15, marginTop: 7 },
+  fusionExcluded: { color: '#6592a5', fontSize: 9, lineHeight: 14, marginTop: 7 },
+  fusionCoverageMissing: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, backgroundColor: 'rgba(217,119,6,0.08)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)', borderRadius: 9, padding: 10, marginTop: 12 },
+  fusionCoverageComplete: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, backgroundColor: 'rgba(22,163,74,0.08)', borderWidth: 1, borderColor: 'rgba(134,239,172,0.24)', borderRadius: 9, padding: 10, marginTop: 12 },
+  fusionCoverageMissingText: { minWidth: 0, flex: 1, color: '#fde68a', fontSize: 10, lineHeight: 15, fontWeight: '700' },
+  fusionCoverageCompleteText: { minWidth: 0, flex: 1, color: '#bbf7d0', fontSize: 10, lineHeight: 15, fontWeight: '700' },
+  fusionCaution: { color: '#4a7a8a', fontSize: 9, lineHeight: 14, marginTop: 10 },
   review: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   reviewTitle: { color: '#c8e8f0', fontSize: 12, fontWeight: '800', marginBottom: 10 },
   reviewOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
