@@ -19,6 +19,8 @@ App-to-dashboard sync supports protected Supabase sessions, with browser localSt
   shared-screen view deliberately requests the summary without raw events.
 - A manager pilot checklist derives launch readiness from protected fleet,
   roster, and session records without storing a second progress state.
+- The protected fleet workflow passed signed-in Preview review with an
+  owner-scoped fleet containing two active drivers and no recorded sessions.
 
 ## Next production upgrade
 
