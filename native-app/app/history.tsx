@@ -25,6 +25,7 @@ import type { SensitivityLevel } from '../constants/thresholds';
 import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import type { MonitorPerformanceSnapshot } from '../lib/monitorPerformance';
+import type { SensorFusionObservationSnapshot } from '../lib/sensorFusionObservation';
 import {
   groupIndexedSessionsByDate,
   normalizeHistoryFilter,
@@ -51,6 +52,7 @@ interface SessionRecord extends FeedbackSession {
   conditionsUpdatedAt?: string;
   deviceImpactUpdatedAt?: string;
   monitorPerformance?: MonitorPerformanceSnapshot;
+  sensorFusion?: SensorFusionObservationSnapshot;
   recoveredFromInterruption?: boolean;
   recoveryNote?: string;
 }
@@ -921,6 +923,25 @@ export default function HistoryScreen() {
                 <Text style={s.observationStatus}>{headphoneMotionLabel(item.headphoneMotionStatus)}</Text>
                 <Text style={s.observationCaution}>
                   Saved locally as aggregate observations only and included only if you choose Send session feedback. Does not trigger alerts or change scores.
+                </Text>
+              </View>
+            )}
+            {isExpanded && item.sensorFusion?.mode === 'observation-only' && (
+              <View style={s.observationBox}>
+                <Text style={s.observationTitle}>OBSERVATION-ONLY SENSOR FUSION</Text>
+                <Text style={s.observationInfo}>
+                  Camera: {item.sensorFusion.camera?.trackedSamples ?? 0}/{item.sensorFusion.camera?.samples ?? 0} tracked samples · {item.sensorFusion.camera?.watchSamples ?? 0} watch · {item.sensorFusion.camera?.closedSamples ?? 0} closed
+                </Text>
+                <Text style={s.observationInfo}>
+                  Head-nod overlap: {item.sensorFusion.coincidences?.cameraHeadphoneNods ?? 0} camera + headphone · {item.sensorFusion.coincidences?.elevatedCameraHeadphoneNods ?? 0} during elevated camera observations
+                </Text>
+                <Text style={s.observationStatus}>
+                  Apple Watch: {item.sensorFusion.watch?.checked
+                    ? item.sensorFusion.watch.reachable ? 'reachable' : item.sensorFusion.watch.appInstalled ? 'app installed' : item.sensorFusion.watch.paired ? 'paired' : 'not available'
+                    : 'not checked'}
+                </Text>
+                <Text style={s.observationCaution}>
+                  Local aggregate context only. It does not change fatigue scores or alerts and is not included in cloud sync, exports, or session feedback.
                 </Text>
               </View>
             )}

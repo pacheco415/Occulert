@@ -83,6 +83,7 @@ import {
 } from '../lib/alertPolicy';
 import { currentAlertPreferences, loadAlertPreferences } from '../lib/alertPreferences';
 import { getWatchAlertsEnabled } from '../lib/watchPreferences';
+import { getWatchStatus } from '../lib/watchBridge';
 import {
   assessCameraSetup,
   initialCameraSetupAssessment,
@@ -102,6 +103,7 @@ import {
 import { getDeviceCondition } from '../lib/deviceCondition';
 import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
 import { modalAnimationType } from '../lib/accessibilityPreferencesModel';
+import { createSensorFusionObservationTracker } from '../lib/sensorFusionObservation';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -203,6 +205,7 @@ export default function MonitorScreen() {
   const displayedMetricsStateRef = useRef<EyeMetrics['state']>('noFace');
   const displayedAlertLevelRef = useRef<AlertLevel>('none');
   const performanceTrackerRef = useRef(createMonitorPerformanceTracker());
+  const sensorFusionTrackerRef = useRef(createSensorFusionObservationTracker());
   const setupPreviewActiveRef = useRef(false);
   const lastCameraSetupUiAtRef = useRef(0);
   const activeSessionIdRef = useRef<string | null>(null);
@@ -275,7 +278,9 @@ export default function MonitorScreen() {
   useEffect(() => {
     const sampleSubscription = addHeadphoneMotionSampleListener((sample) => {
       if (!monitoringActiveRef.current) return;
+      const observedAt = Date.now();
       headphoneMotionSamplesRef.current += 1;
+      sensorFusionTrackerRef.current.recordHeadphoneSample(observedAt);
       const result = headphoneHeadNodDetectorRef.current.update({
         at: sample.timestampMs,
         faceFound: true,
@@ -284,10 +289,16 @@ export default function MonitorScreen() {
         rollAngle: sample.rollAngle,
       });
       // Observation only: headphone motion never changes the fatigue score or alerts.
-      if (result.observed) headphoneHeadNodObservationsRef.current += 1;
+      if (result.observed) {
+        headphoneHeadNodObservationsRef.current += 1;
+        sensorFusionTrackerRef.current.recordHeadphoneHeadNod(observedAt);
+      }
     });
     const statusSubscription = addHeadphoneMotionStatusListener((status) => {
-      if (monitoringActiveRef.current) headphoneMotionStatusRef.current = status.state;
+      if (monitoringActiveRef.current) {
+        headphoneMotionStatusRef.current = status.state;
+        sensorFusionTrackerRef.current.setHeadphoneStatus(status.state);
+      }
     });
 
     return () => {
@@ -323,6 +334,7 @@ export default function MonitorScreen() {
       headphoneMotionSamples: headphoneMotionSamplesRef.current,
       headphoneMotionStatus: headphoneMotionStatusRef.current,
       monitorPerformance: performanceTrackerRef.current.snapshot(checkpointedAt),
+      sensorFusion: sensorFusionTrackerRef.current.snapshot(checkpointedAt),
       sensitivity: sessionSensitivityRef.current,
       ...currentAppBuildInfo(),
     });
@@ -385,6 +397,8 @@ export default function MonitorScreen() {
       const nextSessionStartedAt = Date.now();
       const nextSessionId = `session-${nextSessionStartedAt}`;
       performanceTrackerRef.current.reset();
+      sensorFusionTrackerRef.current.reset(nextSessionStartedAt);
+      sensorFusionTrackerRef.current.setHeadphoneStatus('starting');
       try {
         await saveActiveSessionCheckpoint({
           sessionId: nextSessionId,
@@ -400,6 +414,7 @@ export default function MonitorScreen() {
           headphoneMotionSamples: 0,
           headphoneMotionStatus: 'starting',
           monitorPerformance: performanceTrackerRef.current.snapshot(nextSessionStartedAt),
+          sensorFusion: sensorFusionTrackerRef.current.snapshot(nextSessionStartedAt),
           sensitivity,
           ...currentAppBuildInfo(),
         });
@@ -463,6 +478,14 @@ export default function MonitorScreen() {
       isRunningRef.current = true;
       setIsRunning(true);
       monitoringStarted = true;
+      // Watch availability is optional observation context. It never delays
+      // camera monitoring and never enters scoring or alert policy.
+      void getWatchStatus().then((watchStatus) => {
+        if (
+          startAttempt === startAttemptRef.current
+          && monitoringActiveRef.current
+        ) sensorFusionTrackerRef.current.setWatchStatus(watchStatus);
+      }).catch(() => {});
       void headphoneStart.then(async (headphoneStatus) => {
         const stale = startAttempt !== startAttemptRef.current
           || !monitoringActiveRef.current;
@@ -472,12 +495,16 @@ export default function MonitorScreen() {
         }
         if (headphoneMotionStatusRef.current === 'starting') {
           headphoneMotionStatusRef.current = headphoneStatus.state;
+          sensorFusionTrackerRef.current.setHeadphoneStatus(headphoneStatus.state);
         }
       }).catch(() => {
         if (
           startAttempt === startAttemptRef.current
           && monitoringActiveRef.current
-        ) headphoneMotionStatusRef.current = 'error';
+        ) {
+          headphoneMotionStatusRef.current = 'error';
+          sensorFusionTrackerRef.current.setHeadphoneStatus('error');
+        }
       });
       // A local recovery write is best-effort and never delays the camera or
       // optional headphone startup path.
@@ -496,6 +523,7 @@ export default function MonitorScreen() {
     durationSec: number,
     alerts: number,
     monitorPerformance: MonitorPerformanceSnapshot,
+    endedAt: number,
   ): Promise<string | null> => {
     if (durationSec <= 0) return null;
     const avgFatigue = fatigueSamplesRef.current
@@ -513,6 +541,7 @@ export default function MonitorScreen() {
       headphoneMotionSamples: headphoneMotionSamplesRef.current,
       headphoneMotionStatus: headphoneMotionStatusRef.current,
       monitorPerformance,
+      sensorFusion: sensorFusionTrackerRef.current.snapshot(endedAt),
       sensitivity: sessionSensitivityRef.current,
       ...currentAppBuildInfo(),
     };
@@ -596,7 +625,7 @@ export default function MonitorScreen() {
     try {
       if (!wasRunning) return;
       const localSessionId = activeSessionId
-        ? await saveSession(activeSessionId, durationSec, alerts, monitorPerformance)
+        ? await saveSession(activeSessionId, durationSec, alerts, monitorPerformance, stoppedAt)
         : null;
       if (activeSessionId) {
         await clearActiveSessionCheckpoint(activeSessionId).catch(() => {});
@@ -837,7 +866,10 @@ export default function MonitorScreen() {
       rollAngle,
     });
     // Observation only: camera pose does not change scoring or alert delivery.
-    if (headNodResult.observed) headNodObservationsRef.current += 1;
+    if (headNodResult.observed) {
+      headNodObservationsRef.current += 1;
+      sensorFusionTrackerRef.current.recordCameraHeadNod(now);
+    }
 
     const rawResult = faceFound
       ? processEyeOpenness(leftProb, rightProb)
@@ -863,6 +895,11 @@ export default function MonitorScreen() {
         EARLY_CLOSED_ALERT_MS,
       ),
     };
+    sensorFusionTrackerRef.current.recordCameraSample({
+      at: now,
+      state: result.state,
+      fatigueScore: result.fatigueScore,
+    });
 
     const alertLevel = deriveAlertLevel({
       isRunning: isRunningRef.current,
