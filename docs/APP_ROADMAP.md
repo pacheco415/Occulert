@@ -4,7 +4,7 @@ This document outlines the full multi-phase development plan for Occulert — ex
 
 ★ = top-priority milestone for each phase
 
-**Last updated: 2026-09-01** — statuses distinguish shipped production work,
+**Last updated: 2026-09-24** — statuses distinguish shipped production work,
 current development source, and physical-device validation. See
 `ACCURACY_BENCHMARK.md`, `BETA_TEST_PLAN.md`, `SAFE_STOP_HANDOFF.md`, and issue
 #6 for the remaining evidence and product gaps.
@@ -28,6 +28,8 @@ queue a native build or publish the website by itself.
 | Parked setup and session recovery | Optional on-device camera preview now gives framing, mount-angle, and eye-visibility guidance without changing fatigue scoring. Active drives keep a private local checkpoint every 15 seconds and restore a clearly labeled partial summary after an unexpected interruption | Physical-device preview, force-quit/relaunch, larger-text, and recovery-boundary validation |
 | Connected-device readiness | Settings summarizes primary phone and optional Watch readiness, refreshes Watch/headphone status through a single-flight action, and preserves the existing direct audio and Watch tests | Physical Watch, AirPods/Bluetooth, and car-audio confirmation |
 | Fleet manager reporting | 7/30-day pilot scorecard, privacy-limited report export, driver-specific action queue, transparent early-access plan comparison, deliberate rollout qualification, and separate free-trial/post-trial lead attribution implemented in source | Existing signed-in Preview evidence covers owner scoping, a two-driver no-session fleet, and both reporting windows. PR #109 Preview verification covers the public pricing, free-trial, paid-rollout, and signed-out dashboard journeys; authenticated adaptive-refresh timing and production verification remain pending |
+| Fleet shared-screen operations | Privacy-safe, read-only browser/AirPlay display is production-verified with aggregate counts only, no raw events or local fallback, and no driver names, vehicles, locations, individual scores, or editing controls | Use during an authorized pilot before deciding whether native tvOS packaging has enough value |
+| Pilot launch workflow | Manager checklist derives fleet setup, joined-driver, first-session, and 7/30-day readiness from protected records without claiming offline tasks were completed | First authorized fleet partner and real 30-day operating evidence remain external |
 
 Safety boundary: stronger alerts are intended to get attention and prompt a
 safe stop. They cannot wake every driver, keep a drowsy driver safely awake, or
@@ -47,7 +49,7 @@ bounded, and the existing cooldown remains in force.
 | Capture structured correct / false / missed alert feedback | — | Done in private TestFlight build 13 |
 | Audit background reliability (screen-off, app-backgrounded) | — | Foreground loss stops and saves; 15-second local recovery checkpoints are implemented for unexpected interruption. Physical force-quit/relaunch validation remains pending |
 | Offer a safe-stop Maps handoff after a confirmed alert | — | Implemented in source; physical-device verification pending |
-| Land a pilot fleet (rideshare, delivery, or trucking partner) | ★ | Not started |
+| Land a pilot fleet (rideshare, delivery, or trucking partner) | ★ | Production launch workflow supports an owner fleet, up to five pilot drivers, first protected session, shared display, and 7/30-day reviews; partner recruitment and operation have not started |
 | Tighten safety disclaimers and credibility documentation | — | Done |
 
 The safe-stop handoff offers rest-area, gas-station, and food/coffee searches.
@@ -112,7 +114,7 @@ complication remain separate future work.
 |------|----------|--------|
 | Unified confidence model fusing camera + earbud + watch signals | ★ | Observation-only local aggregation, a validation-coverage dashboard, and a next-session planner are implemented in source for camera state/head-nod counts, compatible headphone motion/head-nod counts, Apple Watch availability, and bounded co-occurrences. The planner prioritizes missing camera, headphone, Watch-check, and combined-accessory setups, prohibits staged fatigue behavior, and treats accessories as optional. Recovered partial sessions are excluded, and no accuracy rate or safety score is produced. Fusion data stores no raw sensor timeline, does not affect scoring or alerts, and is excluded from cloud sync, exports, and feedback. Physical validation and any confidence model remain future work |
 | Device-agnostic engine (works with any combination of devices) | — | Not started |
-| Fleet dashboard with per-driver device and signal data | — | Protected session history, mobile hierarchy, and hidden-tab performance are production-verified; 7/30-day pilot value reporting, privacy-limited CSV export, driver-specific follow-up actions, and the paid-rollout lead path are implemented in source and verified in a signed-in Preview for a two-driver fleet with no recorded sessions. Nonzero results passed automated browser coverage; production verification remains pending |
+| Fleet dashboard with per-driver device and signal data | — | Protected history, performance, reporting, saved follow-ups, and the privacy-safe shared-screen display are production-verified. A protected-record pilot checklist is implemented in source. The next gap is authorized real-fleet evidence, not another dashboard data surface |
 | Tiered pricing model for fleet operators | — | Introductory source package defines a card-free 30-day trial for up to five active drivers, a $9/month Starter plan for up to 10, and a $25/month Growth plan for up to 30. Hands-on rollout services remain Custom. No billing, entitlement enforcement, or production offer has been enabled |
 
 ---
@@ -150,7 +152,7 @@ complication remain separate future work.
 | 0 · Foundation | Accuracy & pilots | Detection validation, safe-stop handoff, pilot fleet | Partial (handoff implemented; formal benchmark and pilot partner pending) |
 | 1 · Earbuds | Head & heart signals | Head-nod detection, directional alerts | Partial (routing, directional/repeated cues, and local motion diagnostics implemented; physical calibration remains open) |
 | 2 · Smartwatch | Biometric pre-screening | Pre-drive risk score | Partial (live status and stronger alerts implemented; device revalidation, pre-drive score, and complication remain open) |
-| 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Partial (protected fleet history and dashboard performance work implemented; observation-only local fusion diagnostics, validation-coverage dashboard, and next-session planner implemented in source, with physical validation and scoring integration not started) |
+| 3 · Fusion + Fleet | Multi-signal model | Unified confidence engine | Partial (protected fleet reporting, follow-ups, shared display, and pilot launch workflow implemented; observation-only local fusion diagnostics, validation-coverage dashboard, and next-session planner implemented, with real pilot evidence, physical validation, and scoring integration not started) |
 | 4 · Smart Glasses | Ambient + eye tracking | Inward eye-tracking | Not started |
 | Platform | Native apps | iOS app, real-time sensor access | Private iOS pilot |
 

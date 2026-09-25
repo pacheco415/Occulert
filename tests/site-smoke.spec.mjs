@@ -1192,6 +1192,12 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
   await expect(page.locator("#valueScore")).toHaveText("77");
   await expect(page.locator(".value-metric:has(#valueScore) .label")).toHaveText("Average reported safety score");
   await expect(page.locator("#pilotValueStory")).toContainText("3 sessions across 2 drivers");
+  await expect(page.locator("#pilotLaunchBadge")).toHaveText("30-day review ready");
+  await expect(page.locator("#launchFleetStep")).toHaveAttribute("data-state", "complete");
+  await expect(page.locator("#launchDriversStatus")).toHaveText("3 of 5 active drivers");
+  await expect(page.locator("#launchSessionStatus")).toHaveText("4 protected sessions recorded");
+  await expect(page.locator("#launchDisplayStatus")).toHaveText("Privacy-safe display available");
+  await expect(page.locator("#launchReviewStatus")).toHaveText("30-day decision window ready");
 
   const alexAction = page.locator("#actionQueue .ops-row").filter({ hasText: "Alex Driver" });
   await expect(alexAction).toContainText("Watch follow-up");

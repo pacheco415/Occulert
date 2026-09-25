@@ -15,16 +15,20 @@ App-to-dashboard sync supports protected Supabase sessions, with browser localSt
   pilot contact endpoint and records an allowlisted server-side source label.
 - The dashboard keeps local demo and same-browser fallback data separate from
   authenticated fleet data.
+- Saved manager follow-up outcomes are protected by fleet ownership, and the
+  shared-screen view deliberately requests the summary without raw events.
+- A manager pilot checklist derives launch readiness from protected fleet,
+  roster, and session records without storing a second progress state.
 
 ## Next production upgrade
 
-The new reporting workflow passed signed-in Preview review for an owner-scoped
-fleet with two active drivers and no recorded sessions; nonzero reporting states
-passed automated browser coverage. After merge, verify production behavior,
-then roll out [saved manager follow-up outcomes](FLEET_FOLLOWUPS.md) after its
-migration and signed-in preview checks. Reporting pagination or retention and
-plan entitlements remain next steps after pilot pricing is defined. Keep driver consent, fleet
-ownership, and telemetry-trust boundaries unchanged.
+The protected reporting, saved follow-up, adaptive-refresh, and aggregate
+shared-screen workflows are in production. The immediate priority is an
+authorized pilot with up to five drivers and a real 7/30-day review cycle.
+Do not add pagination, retention changes, realtime subscriptions, billing, or
+plan entitlements until pilot scale or an agreed commercial offer establishes
+the need. Keep driver consent, fleet ownership, and telemetry-trust boundaries
+unchanged.
 
 Recommended stack options:
 
