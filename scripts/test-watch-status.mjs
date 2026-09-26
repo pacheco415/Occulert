@@ -167,7 +167,7 @@ test('Watch readiness allows activation to settle and trusts a live connection',
 test('the native Watch transfer error callback is patched safely after install', () => {
   assert.equal(
     nativePackage.scripts.postinstall,
-    'node ./scripts/patch-watch-connectivity.mjs',
+    'node ./scripts/patch-watch-connectivity.mjs && node ./scripts/patch-query-decoder.mjs',
   );
   const fixture = `before\n${vulnerableUserInfoErrorCallback}\nafter`;
   const firstPass = patchWatchConnectivitySource(fixture);

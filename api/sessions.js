@@ -46,16 +46,16 @@ message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to enable session stora
 });
 }
 
-const user = await verifyAccessToken(bearerToken(request));
-if (!user) {
-return json(response, 401, { ok: false, error: "unauthorized" });
-}
-
-if ((request.method === "POST" || request.method === "PATCH") && !validBody(request)) {
-return json(response, 415, { ok: false, error: "invalid_json_body" });
-}
-
+let user;
 try {
+  user = await verifyAccessToken(bearerToken(request));
+  if (!user) {
+  return json(response, 401, { ok: false, error: "unauthorized" });
+  }
+
+  if ((request.method === "POST" || request.method === "PATCH") && !validBody(request)) {
+  return json(response, 415, { ok: false, error: "invalid_json_body" });
+  }
 const drivers = await pgFetch("drivers", {
 params: { select: "id,fleet_id", user_id: "eq." + user.id, limit: "1" },
 });

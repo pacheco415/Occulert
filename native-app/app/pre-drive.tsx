@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -68,18 +68,26 @@ export default function PreDriveScreen() {
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthNotice, setHealthNotice] = useState<string | null>(null);
   const [healthSnapshot, setHealthSnapshot] = useState<HealthReadinessSnapshot | null>(null);
+  const healthRequestRef = useRef(0);
+  const healthMountedRef = useRef(true);
   const ready = useMemo(() => checked.every(Boolean), [checked]);
 
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
     let active = true;
+    healthMountedRef.current = true;
+    const request = healthRequestRef.current;
     Promise.all([loadStoredHealthReadiness(), isAppleHealthAvailable()])
       .then(([stored, available]) => {
-        if (!active) return;
+        if (!active || request !== healthRequestRef.current) return;
         setHealthSnapshot(stored);
         setHealthAvailable(available);
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+      healthMountedRef.current = false;
+      healthRequestRef.current += 1;
+    };
   }, []);
 
   const toggle = (index: number) => {
@@ -89,28 +97,36 @@ export default function PreDriveScreen() {
   };
 
   const refreshHealth = async () => {
+    const request = ++healthRequestRef.current;
     setHealthLoading(true);
     setHealthNotice(null);
     try {
       const result = await refreshAppleHealthReadiness();
+      if (!healthMountedRef.current || request !== healthRequestRef.current) return;
       setHealthSnapshot(result.snapshot);
       setHealthNotice(result.status === 'no_data'
         ? 'Apple Health returned no recent sleep or HRV samples. This can mean no data or limited access.'
         : 'Apple Health context updated on this iPhone.');
     } catch {
+      if (!healthMountedRef.current || request !== healthRequestRef.current) return;
       setHealthNotice('Apple Health could not be read. Check Health access for Occulert and try again.');
     } finally {
-      setHealthLoading(false);
+      if (healthMountedRef.current && request === healthRequestRef.current) setHealthLoading(false);
     }
   };
 
   const removeHealthSummary = async () => {
+    const request = ++healthRequestRef.current;
     try {
       await clearStoredHealthReadiness();
+      if (!healthMountedRef.current || request !== healthRequestRef.current) return;
       setHealthSnapshot(null);
       setHealthNotice('The local Apple Health summary was removed. Manage future access in iOS Health settings.');
     } catch {
+      if (!healthMountedRef.current || request !== healthRequestRef.current) return;
       setHealthNotice('The local Apple Health summary could not be removed. Try again.');
+    } finally {
+      if (healthMountedRef.current && request === healthRequestRef.current) setHealthLoading(false);
     }
   };
 

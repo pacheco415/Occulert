@@ -58,7 +58,7 @@ assert.doesNotMatch(
 assert.match(cloud, /refreshAuth\(auth, refreshVersion\)/);
 assert.match(cloud, /if \(!authRefreshPromise\)/);
 assert.match(cloud, /authCache = auth/);
-assert.match(cloud, /consentRuntimeOverride = false;\s*authMutationVersion \+= 1;\s*authCache = null;/);
+assert.match(cloud, /consentRuntimeOverride = false;\s*consentMutationVersion \+= 1;\s*authMutationVersion \+= 1;\s*authCache = null;/);
 assert.match(cloud, /cloudSyncPreference\.set\(false\)/);
 assert.match(cloud, /cloudSyncPreference\.get\(\)/);
 assert.doesNotMatch(
@@ -71,11 +71,11 @@ assert.doesNotMatch(
   /testConditions|lighting|eyewear|phonePosition|deviceImpact|batteryImpact|phoneHeat|appVersion|appBuildNumber|headNodObservations/,
   'pilot review observations and build metadata must not be added to cloud sync',
 );
-assert.match(cloud, /if \(!await consentEnabled\(\) \|\| !await ensureDriverProfile\(\)\) return null;/);
+assert.match(cloud, /if \(!syncContext \|\| !await ensureDriverProfile\(syncContext\)\) return null;/);
 assert.equal(
-  [...cloud.matchAll(/if \(!await consentEnabled\(\)/g)].length,
+  [...cloud.matchAll(/const syncContext = await currentSyncContext\(\)/g)].length,
   3,
-  'session start, alert logging, and session finish should each check consent once',
+  'session start, alert logging, and session finish must bind consent and owner before transport',
 );
 assert.match(cloud, /https:\/\/www\.occulert\.com/);
 

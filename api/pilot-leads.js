@@ -222,6 +222,10 @@ module.exports = async function handler(request, response) {
   // primary store; the webhook is a fallback only when Supabase is absent.
   if (stored) return json(response, 200, { ok: true, stored: true, storage: "supabase" });
 
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json(response, 502, { ok: false, error: "storage_unavailable" });
+  }
+
   const webhookUrl = parseWebhookUrl(process.env.PILOT_LEADS_WEBHOOK_URL);
   if (!webhookUrl) {
     if (storageError) return json(response, 502, { ok: false, error: "storage_unavailable" });

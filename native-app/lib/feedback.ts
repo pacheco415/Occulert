@@ -1,6 +1,7 @@
 import { Linking, Platform } from 'react-native';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { currentAppBuildInfo } from './appBuildInfo';
+import { formatSessionAlertCount } from './sessionAlertCount';
 
 export type AlertAssessment = 'accurate' | 'false_alert' | 'missed_alert' | 'late_alert';
 export type LightingCondition = 'daylight' | 'low_light';
@@ -81,7 +82,7 @@ export function feedbackUrl(session?: FeedbackSession): string {
       'Session: ' + (session.sessionId || '-'),
       'Saved: ' + (session.savedAt || session.updatedAt || '-'),
       'Duration seconds: ' + valueOrDash(session.durationSec),
-      'Alerts: ' + valueOrDash(session.alertCount),
+      'Alerts: ' + formatSessionAlertCount(session.alertCount),
       'Average fatigue: ' + valueOrDash(session.avgFatigue),
       'Experimental camera head-nod observations: ' + valueOrDash(
         session.cameraHeadNodObservations ?? session.headNodObservations,

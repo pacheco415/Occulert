@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const inline = readFileSync(new URL('../account-page-2.v47.js', import.meta.url), 'utf8');
+const inline = readFileSync(new URL('../account-page-2.v60.js', import.meta.url), 'utf8');
 
 assert.ok(inline, 'account.html must load the credential script');
 
@@ -34,7 +34,9 @@ function makeElement(id) {
   };
 }
 
-function boot({ user, updateEmail, updatePassword, deleteAccount, confirm = () => true, signOut }) {
+async function boot({ user, updateEmail, updatePassword, deleteAccount, confirm = () => true, signOut }) {
+  let revision=0;
+  const authSnapshot=()=>user?{access_token:'fixture-access',refresh_token:'fixture-refresh',expires_at:9999999999,user}:null;
   const elements = new Map();
   const store = new Map();
   const context = {
@@ -68,15 +70,20 @@ function boot({ user, updateEmail, updatePassword, deleteAccount, confirm = () =
   context.window.matchMedia = () => ({ matches: false });
   context.window.OcculertBackend = {
     currentUser: () => user,
+    getSession: async () => authSnapshot(),
+    captureAuthContext: () => ({revision,auth:authSnapshot()}),
+    isAuthContextCurrent: context => !!context&&context.revision===revision&&context.auth?.user?.id===user?.id,
+    signOut() { user=null;revision++; },
     updateEmail,
     updatePassword,
     deleteAccount,
     accountMessage: (result, mode) => `mapped:${mode}:${(result.body && result.body.error) || 'unknown'}`,
   };
   context.window.confirm = confirm;
-  context.window.OcculertAuth = signOut ? { signOut, onAuth() {} } : null;
+  context.window.OcculertAuth = signOut ? { signOut() { user=null;revision++;return signOut(); }, onAuth() {} } : null;
 
   vm.runInNewContext(inline, context);
+  await new Promise(resolve=>setImmediate(resolve));
   const el = (id) => context.document.getElementById(id);
   return { context, el, store };
 }
@@ -90,7 +97,7 @@ test('account deletion requires sign-in, exact confirmation, and confirmation di
     { user: { id: 'u1' }, confirmation: 'delete' },
     { user: { id: 'u1' }, confirmation: 'DELETE', confirm: () => false },
   ]) {
-    const { context, el } = boot({ ...scenario, deleteAccount: noCall });
+    const { context, el } = await boot({ ...scenario, deleteAccount: noCall });
     el('deleteConfirmation').value = scenario.confirmation;
     await context.deleteAccount({ preventDefault });
   }
@@ -98,7 +105,7 @@ test('account deletion requires sign-in, exact confirmation, and confirmation di
 
 test('successful deletion signs out SDK and removes only Occulert local data', async () => {
   let signedOut = false;
-  const { context, el, store } = boot({
+  const { context, el, store } = await boot({
     user: { id: 'u1' }, deleteAccount: async () => ({ ok: true }),
     signOut: async () => { signedOut = true; },
   });
@@ -117,7 +124,7 @@ test('successful deletion signs out SDK and removes only Occulert local data', a
 test('unconfirmed deletion keeps local data and allows retry without double submission', async () => {
   let calls = 0;
   let finish;
-  const { context, el, store } = boot({ user: { id: 'u1' }, deleteAccount: () => {
+  const { context, el, store } = await boot({ user: { id: 'u1' }, deleteAccount: () => {
     calls++;
     return new Promise((resolve) => { finish = resolve; });
   } });
@@ -133,14 +140,14 @@ test('unconfirmed deletion keeps local data and allows retry without double subm
   assert.equal(el('deleteAccountBtn').disabled, false);
 });
 
-test('credential forms stay hidden until a session exists', () => {
-  const { el } = boot({ user: null, updateEmail: noCall, updatePassword: noCall });
+test('credential forms stay hidden until a session exists', async () => {
+  const { el } = await boot({ user: null, updateEmail: noCall, updatePassword: noCall });
   assert.equal(el('securityForms').classList.contains('hidden'), true);
   assert.match(el('securityIntro').textContent, /Sign in to change/);
 });
 
-test('a signed-in session reveals the forms and names the account', () => {
-  const { el } = boot({
+test('a signed-in session reveals the forms and names the account', async () => {
+  const { el } = await boot({
     user: { id: 'u1', email: 'driver@example.com' },
     updateEmail: noCall,
     updatePassword: noCall,
@@ -151,7 +158,7 @@ test('a signed-in session reveals the forms and names the account', () => {
 });
 
 test('signed-out submits never reach the network', async () => {
-  const { context, el } = boot({ user: null, updateEmail: noCall, updatePassword: noCall });
+  const { context, el } = await boot({ user: null, updateEmail: noCall, updatePassword: noCall });
   el('newEmail').value = 'new@example.com';
   await context.changeEmail({ preventDefault });
   assert.match(el('status').textContent, /Sign in first/);
@@ -163,7 +170,7 @@ test('signed-out submits never reach the network', async () => {
 
 test('signed-out passkey enrollment never reaches the provider', async () => {
   let registrations = 0;
-  const { context, el } = boot({ user: null, updateEmail: noCall, updatePassword: noCall });
+  const { context, el } = await boot({ user: null, updateEmail: noCall, updatePassword: noCall });
   context.window.OcculertPasskeys = {
     isSupported: () => true,
     register: () => { registrations += 1; return Promise.resolve({}); },
@@ -178,7 +185,7 @@ test('signed-out passkey enrollment never reaches the provider', async () => {
 test('passkey names are escaped and removal requires confirmation', async () => {
   const id = '11111111-1111-4111-8111-111111111111';
   let removals = 0;
-  const { context, el } = boot({
+  const { context, el } = await boot({
     user: { id: 'u1', email: 'driver@example.com' },
     updateEmail: noCall,
     updatePassword: noCall,
@@ -199,7 +206,7 @@ test('passkey names are escaped and removal requires confirmation', async () => 
 });
 
 test('short passwords are rejected before any request', async () => {
-  const { context, el } = boot({
+  const { context, el } = await boot({
     user: { id: 'u1', email: 'driver@example.com' },
     updateEmail: noCall,
     updatePassword: noCall,
@@ -211,7 +218,7 @@ test('short passwords are rejected before any request', async () => {
 
 test('a successful email change reports that confirmation is pending', async () => {
   const sent = [];
-  const { context, el } = boot({
+  const { context, el } = await boot({
     user: { id: 'u1', email: 'driver@example.com' },
     updateEmail: (email) => { sent.push(email); return Promise.resolve({ ok: true, body: {} }); },
     updatePassword: noCall,
@@ -227,7 +234,7 @@ test('a successful email change reports that confirmation is pending', async () 
 });
 
 test('a successful password change clears the field and never echoes the secret', async () => {
-  const { context, el } = boot({
+  const { context, el } = await boot({
     user: { id: 'u1', email: 'driver@example.com' },
     updateEmail: noCall,
     updatePassword: () => Promise.resolve({ ok: true, body: {} }),
@@ -241,7 +248,7 @@ test('a successful password change clears the field and never echoes the secret'
 });
 
 test('backend failures surface the mapped message, not a raw error', async () => {
-  const { context, el } = boot({
+  const { context, el } = await boot({
     user: { id: 'u1', email: 'driver@example.com' },
     updateEmail: () => Promise.resolve({ ok: false, body: { error: 'email_exists' } }),
     updatePassword: noCall,
@@ -255,7 +262,7 @@ test('backend failures surface the mapped message, not a raw error', async () =>
 });
 
 test('a thrown request still restores the button', async () => {
-  const { context, el } = boot({
+  const { context, el } = await boot({
     user: { id: 'u1', email: 'driver@example.com' },
     updateEmail: noCall,
     updatePassword: () => Promise.reject(new Error('network down')),

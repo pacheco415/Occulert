@@ -43,20 +43,20 @@ module.exports = async function handler(request, response) {
     return json(response, 405, { ok: false, error: "method_not_allowed" });
   }
 
-  const user = await verifyAccessToken(bearerToken(request));
-  if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
-  if (!user.email || !(user.email_confirmed_at || user.confirmed_at)) {
-    return json(response, 403, { ok: false, error: "email_not_verified" });
-  }
-  if (!validBody(request)) return json(response, 415, { ok: false, error: "invalid_json_body" });
-
-  const token = String(request.body && request.body.token || "").trim();
-  if (!/^[A-Za-z0-9_-]{32,128}$/.test(token)) {
-    return json(response, 400, { ok: false, error: "invalid_invitation" });
-  }
-  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
+  let user;
   try {
+    user = await verifyAccessToken(bearerToken(request));
+    if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
+    if (!user.email || !(user.email_confirmed_at || user.confirmed_at)) {
+      return json(response, 403, { ok: false, error: "email_not_verified" });
+    }
+    if (!validBody(request)) return json(response, 415, { ok: false, error: "invalid_json_body" });
+
+    const token = String(request.body && request.body.token || "").trim();
+    if (!/^[A-Za-z0-9_-]{32,128}$/.test(token)) {
+      return json(response, 400, { ok: false, error: "invalid_invitation" });
+    }
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     const rows = await pgFetch("rpc/accept_fleet_invitation", {
       method: "POST",
       body: {

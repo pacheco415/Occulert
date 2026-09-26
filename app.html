@@ -12,7 +12,7 @@
 <!-- Run before any stylesheet or dependency can hold up the driver page. -->
 <script id="driver-startup-guard">
 (() => {
-  const corePath = '/driver-app.v59.js';
+  const corePath = '/driver-app.v60.js';
   let state = 'loading';
   const byId = id => document.getElementById(id);
   const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
@@ -67,7 +67,7 @@
     refresh: () => { if (state !== 'ready') refresh(); },
     ready: core => {
       if (state !== 'loading') { if (state === 'failed') refresh(); return false; }
-      if (!core || core.version !== 'v59' || !Object.isFrozen(core) ||
+      if (!core || core.version !== 'v60' || !Object.isFrozen(core) ||
           !['start', 'stop', 'findCameraChoices', 'initModel'].every(key => typeof core[key] === 'function') ||
           typeof byId('startBtn')?.onclick !== 'function') { fail(); return false; }
       state = 'ready'; clearTimeout(deadline); observer.disconnect(); refresh(); return true;
@@ -81,7 +81,7 @@
 <link rel="stylesheet" href="/driver-app.v47.css" />
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
-<script src="/static-page.v52.js" defer></script>
+<script src="/static-page.v60.js" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -246,9 +246,9 @@
     </fieldset>
 </aside>
 </main>
-<script src="/occulert-backend.v58.js"></script>
+<script src="/occulert-backend.v60.js"></script>
 <script src="/security-utils.v47.js"></script>
-<script src="/driver-app.v59.js"></script>
+<script src="/driver-app.v60.js"></script>
 <script src="/lang.v47.js" defer></script>
 
 <!-- iOS Add to Home Screen Modal -->

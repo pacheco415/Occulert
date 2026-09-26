@@ -9,9 +9,15 @@ test('only a missing storage key means empty session history', () => {
 });
 
 test('malformed or unexpected saved history cannot become an empty list', () => {
-  for (const raw of ['', '{', '{}', 'null', '"[]"']) {
+  for (const raw of ['', '{', '{}', 'null', '"[]"', '[null]', '[false]', '[1]', '["saved"]', '[[]]', '[{"sessionId":"saved"},null]']) {
     assert.throws(() => parseSessionHistory(raw), /Saved session history/);
   }
+});
+
+test('legacy record objects and unknown fields remain intact', () => {
+  const raw = '[{"savedAt":"old","unknown":{"keep":true}},{"sessionId":"new"}]';
+  assert.deepEqual(parseSessionHistory(raw), JSON.parse(raw));
+  assert.deepEqual(parseSessionHistory('[]'), []);
 });
 
 test('both history reads and ordered writes use the fail-closed parser', () => {

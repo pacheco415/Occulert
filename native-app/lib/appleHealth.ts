@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { createAsyncMutationQueue } from './asyncMutationQueue';
 import {
   createHealthReadinessSnapshot,
   isHealthReadinessSnapshot,
@@ -13,6 +14,8 @@ const SECURE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainService: 'com.occulert.app.apple-health',
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
+let summaryRevision = 0;
+const summaryStorageQueue = createAsyncMutationQueue();
 
 export type AppleHealthRefreshResult = {
   status: 'updated' | 'no_data';
@@ -20,8 +23,10 @@ export type AppleHealthRefreshResult = {
 };
 
 export async function loadStoredHealthReadiness(): Promise<HealthReadinessSnapshot | null> {
+  const readRevision = summaryRevision;
   try {
     const raw = await SecureStore.getItemAsync(HEALTH_READINESS_KEY, SECURE_OPTIONS);
+    if (readRevision !== summaryRevision) return null;
     const parsed: unknown = raw ? JSON.parse(raw) : null;
     return isHealthReadinessSnapshot(parsed) ? parsed : null;
   } catch {
@@ -30,7 +35,8 @@ export async function loadStoredHealthReadiness(): Promise<HealthReadinessSnapsh
 }
 
 export async function clearStoredHealthReadiness(): Promise<void> {
-  await SecureStore.deleteItemAsync(HEALTH_READINESS_KEY, SECURE_OPTIONS);
+  summaryRevision += 1;
+  await summaryStorageQueue.run(() => SecureStore.deleteItemAsync(HEALTH_READINESS_KEY, SECURE_OPTIONS));
 }
 
 export async function isAppleHealthAvailable(): Promise<boolean> {
@@ -46,6 +52,7 @@ export async function isAppleHealthAvailable(): Promise<boolean> {
 export async function refreshAppleHealthReadiness(
   capturedAt = new Date(),
 ): Promise<AppleHealthRefreshResult> {
+  const refreshRevision = ++summaryRevision;
   if (Platform.OS !== 'ios') {
     throw new Error('Apple Health is available on iPhone only.');
   }
@@ -84,11 +91,11 @@ export async function refreshAppleHealthReadiness(
     latestHrvSample: hrvSamples[0] ?? null,
   });
 
-  await SecureStore.setItemAsync(
-    HEALTH_READINESS_KEY,
-    JSON.stringify(snapshot),
-    SECURE_OPTIONS,
-  );
+  await summaryStorageQueue.run(async () => {
+    if (refreshRevision !== summaryRevision) throw new Error('Apple Health refresh was superseded.');
+    await SecureStore.setItemAsync(HEALTH_READINESS_KEY, JSON.stringify(snapshot), SECURE_OPTIONS);
+    if (refreshRevision !== summaryRevision) throw new Error('Apple Health refresh was superseded.');
+  });
 
   return {
     status: snapshot.sleepMinutes24h === null && snapshot.latestHrvMs === null

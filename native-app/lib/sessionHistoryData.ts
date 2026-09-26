@@ -13,7 +13,9 @@ export function parseSessionHistory<T extends object>(raw: string | null): T[] {
     throw new Error('Saved session history is unreadable; no changes were made.');
   }
 
-  if (!Array.isArray(parsed)) {
+  if (!Array.isArray(parsed) || parsed.some(item => (
+    item === null || typeof item !== 'object' || Array.isArray(item)
+  ))) {
     throw new Error('Saved session history has an unexpected format; no changes were made.');
   }
 

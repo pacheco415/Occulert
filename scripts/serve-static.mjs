@@ -1,8 +1,12 @@
 import { createServer } from "node:http";
-import { readFile, stat } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { readFile, realpath, stat } from "node:fs/promises";
+import { extname, isAbsolute, join, relative, resolve } from "node:path";
 
-const root = process.cwd();
+const root = await realpath(process.cwd());
+const insideRoot = file => {
+  const path = relative(root, file);
+  return path !== '..' && !path.startsWith('../') && !path.startsWith('..\\') && !isAbsolute(path);
+};
 const port = Number(process.env.PORT || 4173);
 const vercel = JSON.parse(await readFile(join(root, "vercel.json"), "utf8"));
 const globalHeaders = Object.fromEntries(
@@ -39,9 +43,11 @@ createServer(async (req, res) => {
       res.end(Buffer.from(await upstream.arrayBuffer()));
       return;
     }
-    const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-    const file = normalize(join(root, relative));
-    if (!file.startsWith(root)) throw new Error("invalid_path");
+    const requested = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+    const candidate = resolve(root, requested);
+    if (!insideRoot(candidate)) throw new Error("invalid_path");
+    const file = await realpath(candidate);
+    if (!insideRoot(file)) throw new Error("invalid_path");
     if (!(await stat(file)).isFile()) throw new Error("not_found");
     for (const [name, value] of Object.entries(globalHeaders)) res.setHeader(name, value);
     // Apply the same ordered static-header rules used by this site's Vercel config.

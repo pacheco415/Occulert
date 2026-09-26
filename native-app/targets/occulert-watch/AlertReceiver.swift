@@ -23,6 +23,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   private let backgroundAlertFeedbackFreshnessMilliseconds = 2_000.0
   private var statusTimeoutTask: Task<Void, Never>?
   private var hapticSequenceTask: Task<Void, Never>?
+  private var lastStoppedStatusAt = 0.0
 
   override init() {
     super.init()
@@ -244,25 +245,34 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   }
 
   private func scheduleBackgroundAlert(level: String, message: String, sentAt: Double) {
-    UNUserNotificationCenter.current().getNotificationSettings { settings in
-      guard settings.authorizationStatus == .authorized else { return }
+    UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+      let authorized = settings.authorizationStatus == .authorized
+      Task { @MainActor [weak self] in
+        guard let self, authorized else { return }
+        let ageMilliseconds = Date().timeIntervalSince1970 * 1_000 - sentAt
+        guard ageMilliseconds >= 0,
+          ageMilliseconds < self.backgroundAlertFeedbackFreshnessMilliseconds,
+          self.lastAlertAt == sentAt,
+          self.lastStoppedStatusAt < sentAt
+        else { return }
 
-      let content = UNMutableNotificationContent()
-      content.title = switch level {
-      case "critical": "PULL OVER NOW"
-      case "tracking": "Tracking lost"
-      case "watch": "Eyes drooping"
-      default: "Drowsiness detected"
+        let content = UNMutableNotificationContent()
+        content.title = switch level {
+        case "critical": "PULL OVER NOW"
+        case "tracking": "Tracking lost"
+        case "watch": "Eyes drooping"
+        default: "Drowsiness detected"
+        }
+        content.body = message
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive
+        content.relevanceScore = level == "critical" ? 1.0 : 0.8
+        content.userInfo = ["level": level, "at": sentAt]
+
+        let identifier = "occulert-alert-\(Int64(sentAt))"
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
       }
-      content.body = message
-      content.sound = .default
-      content.interruptionLevel = .timeSensitive
-      content.relevanceScore = level == "critical" ? 1.0 : 0.8
-      content.userInfo = ["level": level, "at": sentAt]
-
-      let identifier = "occulert-alert-\(Int64(sentAt))"
-      let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
-      UNUserNotificationCenter.current().add(request)
     }
   }
 
@@ -282,6 +292,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     sessionSeconds = Int(duration)
 
     guard running else {
+      lastStoppedStatusAt = sentAt
       isMonitoring = false
       monitoringState = "stopped"
       return
