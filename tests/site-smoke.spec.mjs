@@ -1210,7 +1210,7 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
   await expect(page.locator("#valueScore")).toHaveText("75");
 
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download trial report" }).click();
+  await page.getByRole("button", { name: "Download protected session CSV" }).click();
   const download = await downloadPromise;
   const csv = await readFile(await download.path(), "utf8");
   expect(csv).toContain("unverified_client_report");

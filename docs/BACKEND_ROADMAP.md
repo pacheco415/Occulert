@@ -1,104 +1,85 @@
-# Occulert Backend Roadmap
+# Occulert backend implementation and next steps
 
-App-to-dashboard sync supports protected Supabase sessions, with browser localStorage retained for local fallback and demos.
+Status recorded September 25, 2026. Product/release status lives in the
+[authoritative roadmap](APP_ROADMAP.md). This describes the existing Supabase
+implementation; choosing a backend or building accounts from scratch is not
+pending work.
 
-## Current implementation
+## Current architecture
 
-- Signed-in drivers can opt into protected session and event writes through the
-  Supabase-backed API; localStorage remains the fallback.
-- Verified fleet owners can read their server-scoped roster and recent sessions.
-- Protected fleet history includes recent alert events without GPS coordinates,
-  personal media, or raw motion.
-- The manager dashboard turns the 50 most recent protected sessions into a
-  clearly bounded 7- or 30-day pilot snapshot, driver follow-up queue, and
-  formula-safe report export. A paid-rollout interest path reuses the protected
-  pilot contact endpoint and records an allowlisted server-side source label.
-- The dashboard keeps local demo and same-browser fallback data separate from
-  authenticated fleet data.
-- Saved manager follow-up outcomes are protected by fleet ownership, and the
-  shared-screen view deliberately requests the summary without raw events.
-- A manager pilot checklist derives launch readiness from protected fleet,
-  roster, and session records without storing a second progress state.
-- The protected fleet workflow passed signed-in Preview review with an
-  owner-scoped fleet containing two active drivers and no recorded sessions.
+Supabase Auth supplies identity. Vercel `/api` endpoints verify access tokens,
+derive driver/owner scope on the server, and perform protected Postgres reads
+and writes. Row-level security supplies documented read boundaries. The
+service-role key stays server-only; browsers receive publishable configuration
+through `/api/public-config`.
 
-## Next production upgrade
+- Signed-in drivers explicitly opt into session/event sync. Browser and native
+  local history remain useful without cloud consent.
+- Fleet owners create fleets and invite drivers with hashed, expiring,
+  one-time tokens and atomic acceptance.
+- Manager summaries load the roster and latest 50 protected sessions.
+  Optional history is capped at 200 events; `include_events=0` skips it.
+  Adaptive browser polling refreshes data; no realtime subscription is used.
+- Manager reporting and saved per-session follow-ups use owner-scoped records.
+  Local demo/fallback data never grants protected access. Follow-up writes
+  check ownership and reject stale revisions.
+- TV requests the protected summary without events and renders aggregate
+  counts only; there is no local/demo fallback.
+- Pilot readiness derives from protected fleet, roster, and session records,
+  without storing a second checklist state.
+- Contact requests use validated, rate-limited `/api/pilot-leads`; contact
+  details are not retained in browser localStorage.
+- Quick start and new reports/data-quality/TV-control upgrades remain branch
+  source work until released and production-verified.
 
-The protected reporting, saved follow-up, adaptive-refresh, and aggregate
-shared-screen workflows are in production. The immediate priority is an
-authorized pilot with up to five drivers and a real 7/30-day review cycle.
-Do not add pagination, retention changes, realtime subscriptions, billing, or
-plan entitlements until pilot scale or an agreed commercial offer establishes
-the need. Keep driver consent, fleet ownership, and telemetry-trust boundaries
-unchanged.
+See [BACKEND_SETUP.md](../BACKEND_SETUP.md) for setup and operational checks.
+The initial schema is [db/schema.sql](../db/schema.sql); later account deletion,
+follow-up functions, and query indexes are in
+[supabase/migrations](../supabase/migrations). The initial schema alone is not
+the full deployed migration history.
 
-Recommended stack options:
+## Implemented data model
 
-1. Firebase
-   - Fastest for MVP
-   - Auth, database, hosting, realtime updates
+| Table | Purpose and authorization |
+|---|---|
+| `fleets` | Company, authenticated owner, descriptive plan, creation time. Owner reads their own fleet; plan does not enforce payment/capacity. |
+| `drivers` | Auth user, optional fleet, name/email/vehicle label, active state. Drivers read their own profile; owners read their own roster. |
+| `fleet_invitations` | Fleet/email binding, hash, inviter, expiry/acceptance/revocation. Server-only access and atomic acceptance. |
+| `sessions` | Server-derived driver/fleet, start/end, client fatigue/safety metrics and alert/head-nod counts, device/browser labels. Driver writes cannot select another driver/fleet. |
+| `events` | Session-bound type, fatigue/confidence, time, optional location columns. Writes check the driver's session; manager projections exclude coordinates. |
+| `fleet_session_followups` | Latest per-session outcome, revision, updater/time. Server-only owner scope; no free text or historical audit log. |
+| `pilot_leads` | Contact/qualification request and allowlisted source. No browser-facing table access. |
 
-2. Supabase
-   - Good open-source style option
-   - Postgres database, auth, realtime channels
+## Privacy and evidence boundaries
 
-3. Custom Node/Express API
-   - More control
-   - More maintenance
+Camera video, images, audio, and raw motion are not uploaded by these workflows.
+Native Health context, local review labels, recovered partial summaries, and
+fusion observations remain local and outside protected fleet telemetry.
 
-## Data tables needed
+The web driver can enable GPS and cloud sync independently; the combined
+explicit opt-in path supplies optional event coordinates. Location is not
+required for monitoring or a pilot. Protected fleet-summary selections omit
+coordinates, personal media, and raw motion. TV further omits identities,
+vehicles, individual scores, and events. Existing optional event columns do not
+constitute a fleet location/route product.
 
-### fleets
-- id
-- company_name
-- owner_user_id
-- plan
-- created_at
+Scores/counts originate in clients; authentication and validation do not
+independently measure them. Summaries label `unverified_client_report`.
+Reports are not certified risk, accuracy, compliance, employment, or
+fitness-to-drive determinations.
 
-### drivers
-- id
-- fleet_id
-- name
-- email
-- vehicle_id
-- active
-- created_at
+A 7/30-day report is a bounded latest-50-session snapshot, not complete window
+coverage or a retention guarantee. Explain missing values and unfinished
+sessions; missing is not a measured zero.
 
-### sessions
-- id
-- driver_id
-- fleet_id
-- started_at
-- ended_at
-- average_fatigue
-- max_fatigue
-- safety_score
-- alert_count
-- head_nod_count
-- device
-- browser
+## Next work
 
-### events
-- id
-- session_id
-- type
-- fatigue_score
-- confidence
-- latitude
-- longitude
-- created_at
+Complete and verify branch reporting, data-quality, and TV changes, then use
+the existing workflow with an authorized pilot of up to five drivers. Review
+day-7/day-30 participation, source completeness, manager workflow, and support
+issues without accuracy claims.
 
-## Privacy requirements
-
-- Do not upload live camera video unless a future policy explicitly supports it.
-- Store fatigue scores and event metadata, not raw face video.
-- Ask permission before collecting GPS.
-- Make fleet use transparent to drivers.
-
-## Immediate implementation order
-
-1. Add backend account system.
-2. Add driver login or driver code.
-3. Save sessions to database.
-4. Show realtime fleet dashboard updates.
-5. Add exportable reports for fleet managers.
+Pagination, retention changes, aggregates, realtime subscriptions, billing,
+entitlements, audit logs, and reminders are future decisions based on pilot
+need. Preserve server-derived identity, voluntary consent, ownership checks,
+deletion, and privacy-limited projections when expanding.

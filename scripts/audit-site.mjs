@@ -206,8 +206,8 @@ assertIncludes("pilot-guide.html", "GPS coordinates and personal media", "pilot 
 assertNotIncludes("pilot-guide.html", "localStorage", "pilot guide must not create a second progress store");
 assertIncludes("fleet-display.html", 'meta name="robots" content="noindex,nofollow"', "shared-screen fleet data must not be indexed");
 assertIncludes("fleet-display.html", 'id="connectionStatus" role="status" aria-live="polite"', "TV connection updates must be announced without stealing focus");
-assertIncludes("fleet-display.v54.js", "getFleetSummary({ includeEvents: false })", "TV display must skip raw event history");
-assertIncludes("fleet-display.v54.js", "No local or demo data is used here", "TV display must never fall back to local or demo data");
+assertIncludes("fleet-display.v56.js", "getFleetSummary({ includeEvents: false })", "TV display must skip raw event history");
+assertIncludes("fleet-display.v56.js", "No local or demo data is used here", "TV display must never fall back to local or demo data");
 assertNotIncludes("fleet-display.html", "driverSearch", "TV display must not expose driver-level controls");
 assertIncludes("fleet-dashboard.html", ".btn{min-height:44px", "fleet actions must preserve accessible touch targets");
 assertIncludes("fleet-dashboard.html", ".input,.select{background:#0f172a", "fleet filters must preserve their shared mobile control sizing");
@@ -459,7 +459,7 @@ assertIncludes("liquid-glass.v47.css", "[data-theme=\"light\"] :where(.status.sh
 assertIncludes("liquid-glass.v47.css", "html[data-theme=\"light\"] .dashboard-page .privacy-note", "light-theme fleet privacy warnings must retain accessible contrast");
 assertIncludes("liquid-glass.v47.css", "html[data-theme=\"light\"] .dashboard-page #cloudStatus", "light-theme fleet connection status must retain accessible contrast");
 assertNotIncludes("liquid-glass.v47.css", "backdrop-filter: blur(14px) saturate(135%)", "mobile content cards must not restore expensive backdrop blur");
-assertIncludes("docs/APP_ROADMAP.md", "Open one draft pull request only after explicit approval.\n3. Perform a focused review", "the roadmap must open the draft before reviewing its complete PR diff");
+assertIncludes("docs/APP_ROADMAP.md", "Review the full diff and repair findings", "the roadmap must preserve review and repair before release");
 assertNotIncludes("features.html", "designed to actually wake you up", "public alert copy must not imply that alerts make drowsy driving safe");
 assertIncludes("native-app/components/AlertSystem.tsx", "setTrackingLost(true)", "native monitoring must apply a grace period before warning about tracking loss");
 assertIncludes("native-app/components/AlertSystem.tsx", "TRACKING LOST", "native monitoring must warn after sustained tracking loss");

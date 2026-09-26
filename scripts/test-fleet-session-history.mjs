@@ -90,13 +90,14 @@ test('fleet projection preserves inactive and unmeasured driver states', () => {
 test('roadmap and setup docs distinguish source completion from deployment', () => {
   const roadmap = read('docs/APP_ROADMAP.md');
   const setup = read('BACKEND_SETUP.md');
-  assert.match(roadmap, /protected session history.*production-verified/i);
-  assert.match(roadmap, /signed-in Preview evidence covers.*two-driver no-session fleet/is);
-  assert.match(roadmap, /PR #109 Preview verification covers.*public pricing.*free-trial.*paid-rollout.*signed-out dashboard/is);
-  assert.match(roadmap, /authenticated adaptive-refresh timing.*production verification remain pending/i);
-  assert.match(roadmap, /production verification remains pending/i);
+  assert.match(roadmap, /Shipped web.*merged and production-verified/i);
+  assert.match(roadmap, /Manager reporting and follow-ups \| Shipped web/i);
+  assert.match(roadmap, /latest 50 protected sessions/i);
+  assert.match(roadmap, /Source tests cannot close those gaps/i);
+  assert.match(roadmap, /Record Preview, merged\s+source, production, installed binary, and device evidence separately/i);
   assert.match(setup, /manager-scoped session and event history excludes GPS/i);
   const backendRoadmap = read('docs/BACKEND_ROADMAP.md');
-  assert.match(backendRoadmap, /formula-safe report export/i);
-  assert.match(backendRoadmap, /passed signed-in Preview review[\s\S]*two active drivers and no recorded sessions/i);
+  assert.match(backendRoadmap, /owner-scoped records/i);
+  assert.match(backendRoadmap, /latest-50-session snapshot/i);
+  assert.match(backendRoadmap, /until released and production-verified/i);
 });

@@ -6,13 +6,21 @@ Occulert is a prototype real-time AI drowsiness detection platform that uses you
 
 🌐 **Live at [occulert.com](https://www.occulert.com)**
 
+Development status is maintained in the [authoritative roadmap](docs/APP_ROADMAP.md).
+The protected Supabase fleet workflow, reporting, TV aggregate view, and pilot
+launch checklist are released web features. Quick start and current reporting,
+data-quality, and TV-control upgrades remain branch source work. Private native
+distribution and physical-device evidence are recorded separately; source
+changes do not update an installed TestFlight build. Detection accuracy has not
+been established by a labeled dataset benchmark.
+
 ---
 
 ## ✨ Features
 
 - 👁 **AI Eye Tracking** — Uses MediaPipe FaceMesh landmarks to estimate eye openness.
 - ⚡ **Fast Alerts** — Designed to warn quickly when signs of fatigue appear.
-- 🔒 **Privacy First** — Core camera processing is intended to run on device.
+- 🔒 **Privacy First** — Camera processing runs on device; these workflows do not upload camera video, audio, or raw motion.
 - 📍 **Opt-In GPS** — Location tracking is off by default and only starts when enabled.
 - ☁️ **Opt-In Cloud Sync** — Fleet cloud sync is off by default. When enabled it uses Supabase Auth with fleet-scoped row-level security.
 - 📊 **Session Event Log** — Alerts and fatigue metrics can be saved locally in the browser.
@@ -54,8 +62,10 @@ Occulert is an assistive prototype. It cannot guarantee crash prevention, driver
 occulert/
 ├── index.html              # Landing page
 ├── app.html                # Driver monitoring app
-├── driver-app.js           # Driver monitoring and alert behavior
-├── fleet-dashboard.html    # Prototype fleet dashboard
+├── driver-app.v48.js       # Versioned browser monitoring and alerts
+├── fleet-dashboard.html    # Protected manager workflow + separate demo
+├── fleet-display.html      # Protected read-only TV aggregate view
+├── pilot-guide.html        # Quick-start source on the unmerged branch
 ├── fleet-pricing.html      # Managed early-access fleet plans
 ├── pilot-signup.html       # Pilot and rollout qualification form
 ├── session-history.html    # Local session history
@@ -67,11 +77,14 @@ occulert/
 ├── accept-invite.html      # Invitation acceptance
 ├── manifest.json           # PWA manifest
 ├── sw.js                   # Service worker
-├── occulert-backend.js     # Browser client for Supabase Auth + /api routes
-├── auth-helper.js          # Profile and session helper
+├── occulert-backend.v47.js  # Browser client for Supabase Auth + /api routes
 ├── api/                    # Vercel serverless endpoints
-├── db/schema.sql           # Database schema and RLS policies
-├── PERFORMANCE_ROADMAP.md  # Runtime budgets and evidence gates
+├── db/schema.sql           # Initial schema and RLS policies
+├── supabase/migrations/    # Subsequent protected schema/function changes
+├── native-app/             # Private iPhone/Watch source
+├── docs/APP_ROADMAP.md      # Authoritative release/source/evidence status
+├── docs/PILOT_OVERVIEW.md   # One-page voluntary 30-day pilot overview
+├── docs/PILOT_OUTREACH.md   # Qualification and unsent outreach drafts
 └── BACKEND_SETUP.md        # Backend configuration guide
 ```
 
@@ -81,17 +94,25 @@ occulert/
 
 1. Go to **[occulert.com](https://www.occulert.com)** on your iPhone or Android.
 2. Tap **Launch App**.
-3. Mount your phone on your dashboard facing you.
+3. While safely parked, secure the phone in a lawful mount facing you.
 4. Tap **Start Monitoring**.
 5. Allow camera access.
 6. Keep the browser visible and screen unlocked.
-7. Only enable GPS/cloud sync if you intentionally want fleet/demo data saved.
+7. Choose cloud sync deliberately if you want protected fleet session records;
+   GPS is a separate optional choice and is not needed for monitoring or a pilot.
 
 ---
 
 ## 🔐 Backend / Fleet Security
 
-Before using Occulert with real drivers or fleet data, review `BACKEND_SETUP.md` and the row-level security policies in `db/schema.sql`. Driver sessions and events are scoped to the authenticated driver, fleet history is scoped to the fleet owner, and invitations are stored as hashed one-time tokens. Never expose the Supabase service-role key to the browser — only the publishable anon key is served, via `/api/public-config`.
+Review [backend setup](BACKEND_SETUP.md), the initial schema, and subsequent
+migrations before handling real fleet data. Server endpoints derive driver and
+fleet scope from verified identity; invitations use hashed one-time tokens.
+Protected manager reports exclude coordinates, personal media, and raw motion.
+TV further excludes identities and individual scores. Summaries use adaptive
+polling and the latest 50 sessions; a 7/30-day view can be incomplete. Metrics
+are unverified client reports. Never expose the Supabase service-role key to a
+browser; `/api/public-config` serves only publishable configuration.
 
 ## 🧪 Site Audit
 
@@ -105,9 +126,10 @@ The audit checks local links/assets, inline script/style extraction, the Supabas
 
 ## 📬 Pilot Lead Capture
 
-Pilot signup always stores a local browser copy for the demo. When the Supabase
-server variables from `BACKEND_SETUP.md` are configured, validated requests are
-stored in the `pilot_leads` table. To additionally forward requests, set:
+Pilot signup sends validated requests to the protected server endpoint without
+retaining contact details in browser localStorage. With the Supabase server
+variables from `BACKEND_SETUP.md`, requests are stored in `pilot_leads`. To
+additionally forward requests, set:
 
 ```bash
 PILOT_LEADS_WEBHOOK_URL=https://your-webhook-endpoint.example
@@ -117,6 +139,12 @@ OCCULERT_ALLOWED_ORIGINS=https://www.occulert.com,https://occulert.com
 The `/api/pilot-leads` endpoint requires same-origin JSON submissions, validates
 required fields and form timing, strips oversized values, rate limits bursts,
 and only forwards to an HTTPS webhook.
+
+The [pilot package](docs/PILOT_OUTREACH.md) includes a one-page overview,
+qualification questions, and unsent email drafts for one fleet owner and up to
+five voluntary drivers over 30 days. Reviews evaluate participation, setup,
+missing data, and workflow; they do not establish detection accuracy. No
+external outreach has been sent by this source work.
 
 ---
 

@@ -1,0 +1,37 @@
+.dashboard-page .pilot-quality-panel{margin:18px 0;padding:clamp(18px,3vw,24px)}
+.pilot-quality-header{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}
+.pilot-quality-header p{margin:6px 0 14px;max-width:760px}
+.pilot-quality-header .btn{flex-shrink:0}
+.pilot-quality-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
+.pilot-quality-metric{min-width:0;border:1px solid var(--portal-border,#24324a);border-radius:16px;padding:14px;background:var(--portal-surface-strong,#0f172a)}
+.pilot-quality-metric strong{display:block;margin-top:8px;font-size:24px;color:var(--portal-text,#fff);overflow-wrap:anywhere}
+.pilot-quality-metric p,.pilot-quality-note{color:var(--portal-muted,#94a3b8);font-size:12px;line-height:1.6}
+.pilot-quality-metric p{margin:8px 0 0}
+.pilot-report-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:16px}
+.pilot-report-actions .btn:disabled,.pilot-quality-header .btn:disabled{opacity:.5;cursor:default}
+.pilot-report-preview{margin-top:18px;border-top:1px solid var(--portal-border,#24324a);padding-top:16px}
+.pilot-report-preview summary{min-height:44px;cursor:pointer;font-weight:800;line-height:1.6}
+#pilotPrintableReport{background:#fff;color:#111827;padding:clamp(16px,3vw,28px);border-radius:8px;margin-top:12px;font:14px/1.6 Arial,sans-serif;overflow-wrap:anywhere}
+#pilotPrintableReport h2{color:#111827;font-size:24px}
+#pilotPrintableReport p{margin:12px 0}
+#pilotPrintableReport table{border-collapse:collapse;width:100%;margin:18px 0}
+#pilotPrintableReport caption{text-align:left;font-weight:700;margin-bottom:8px}
+#pilotPrintableReport th,#pilotPrintableReport td{padding:9px 10px;border:1px solid #cbd5e1;text-align:left;vertical-align:top}
+#pilotPrintableReport th{width:58%;font-weight:600}
+@media(max-width:900px){.pilot-quality-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pilot-quality-header{flex-wrap:wrap}}
+@media(max-width:560px){.pilot-quality-grid{grid-template-columns:1fr}.pilot-quality-header{display:grid}.pilot-quality-header .btn{width:100%}#pilotPrintableReport{font-size:12px}#pilotPrintableReport th,#pilotPrintableReport td{padding:8px 6px}}
+@media print{
+  @page{margin:16mm}
+  html,body{background:#fff!important;color:#111827!important}
+  body>*:not(#main-content){display:none!important}
+  #main-content{display:block!important;max-width:none!important;margin:0!important;padding:0!important}
+  #main-content>*:not(#pilotQualityPanel){display:none!important}
+  #pilotQualityPanel{display:block!important;margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;background:#fff!important}
+  #pilotQualityPanel>*:not(#pilotReportPreview){display:none!important}
+  #pilotReportPreview{display:block!important;margin:0!important;padding:0!important;border:0!important}
+  #pilotReportPreview>summary{display:none!important}
+  #pilotPrintableReport{display:block!important;margin:0!important;padding:0!important;border:0!important;font-size:11pt!important;border-radius:0!important}
+  #pilotPrintableReport h2{font-size:20pt!important}
+  #pilotPrintableReport p,#pilotPrintableReport tr{break-inside:avoid}
+  #pilotPrintableReport table{font-size:10pt}
+}

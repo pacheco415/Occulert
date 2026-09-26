@@ -3,6 +3,9 @@
 Occulert has not yet been validated against a peer-reviewed drowsy-driving
 dataset. This document defines the repeatable benchmark path and deliberately
 does not claim an accuracy percentage before real labeled data is evaluated.
+Product/release priorities are maintained in the
+[authoritative roadmap](APP_ROADMAP.md); participant observation counts and
+fusion coverage are not substitutes for labeled evaluation.
 
 ## Current status
 
@@ -13,9 +16,9 @@ does not claim an accuracy percentage before real labeled data is evaluated.
 | Reproducible EAR threshold runner | Ready in `benchmark/run-benchmark.mjs` |
 | Label mapping, exclusions, leak-free splits | Ready in `benchmark/prepare-dataset.mjs` |
 | Slice reporting and result provenance | Ready (`--slice-by`, `--json`) |
-| Formal dataset validation | Not completed; dataset access is the only remaining blocker |
+| Formal dataset validation | Not completed; authorized access, compatible EAR extraction, and frozen labeled evaluation remain required |
 | Peer-reviewed publication | Not completed |
-| Last updated | August 2026 |
+| Status reference updated | September 25, 2026 |
 
 ## Target datasets
 

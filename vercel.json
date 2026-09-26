@@ -137,6 +137,15 @@
       ]
     },
     {
+      "source": "/(.*).v56.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
       "source": "/(.*).v47.(js|css)",
       "headers": [
         {

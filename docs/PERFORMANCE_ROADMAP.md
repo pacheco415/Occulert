@@ -1,6 +1,9 @@
 # Occulert Performance Roadmap
 
-Last updated: 2026-09-01
+Status reference updated: 2026-09-25. The
+[authoritative roadmap](APP_ROADMAP.md) records shipped/source status. The
+implemented contracts and acceptance targets below do not establish a new
+release, production latency, or device acceptance.
 
 This roadmap separates source optimizations from physical-device, live-service,
 and accuracy evidence. A green source check means the implementation is ready
@@ -49,12 +52,13 @@ These are acceptance targets, not measured production claims.
 1. Run the full source and browser suites.
 2. Review the complete performance diff for alert, privacy, authentication, and
    accessibility regressions.
-3. After separate approval, open a draft pull request and validate an
-   authenticated Preview with an owner-scoped fleet.
+3. Advance the authorized pull-request workflow and validate an authenticated
+   Preview with an owner-scoped fleet. Existing session approval covers the
+   agreed source work; this document does not require repeated confirmation.
 4. Run the physical iPhone, Safari, Chrome, Watch, headphone, and car-audio
    matrix. Record timing, temperature, battery delta, foreground-loss behavior,
    and visible alerts for the exact tested build.
-5. After merge and deployment approvals, repeat public and signed-in production
+5. After the authorized merge/deployment workflow, repeat public and signed-in production
    checks. Do not substitute Preview or device results for production evidence.
 
 ## Evidence still blocked or external
@@ -74,8 +78,11 @@ These are acceptance targets, not measured production claims.
 - Exact 96 px, 192 px, and 512 px exports now serve browser shortcuts and PWA
   install metadata; the original high-resolution logo remains available for
   social previews and brand use.
-- Pricing, billing activation, plan entitlements, push, pull request, merge,
-  deployment, and native-build submission remain separate approval gates.
+- Published managed-plan descriptions do not activate billing or enforce
+  entitlements. Payment activation and native-build submission remain distinct
+  from the authorized source/release workflow. The remaining reserved native
+  build is held for a frozen package and final authorization; none is queued
+  by this performance work.
 
 ## Later scaling work
 

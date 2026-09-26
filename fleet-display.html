@@ -11,10 +11,10 @@
   <link rel="apple-touch-icon" href="/occulert-logo-main-192.png">
   <link rel="stylesheet" href="/liquid-glass.v47.css" />
   <link rel="stylesheet" href="/accessibility.v52.css" />
-  <link rel="stylesheet" href="/fleet-display.v54.css" />
+  <link rel="stylesheet" href="/fleet-display.v56.css" />
   <script src="/occulert-backend.v47.js"></script>
   <script src="/static-page.v52.js" defer></script>
-  <script src="/fleet-display.v54.js" defer></script>
+  <script src="/fleet-display.v56.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -25,7 +25,7 @@
       <span class="clock" id="pageClock" aria-label="Current time">--:--</span>
     </div>
     <nav class="display-actions" aria-label="TV display controls">
-      <button class="control" id="fullscreenButton" type="button">Full screen</button>
+      <button class="control" id="fullscreenButton" type="button" aria-describedby="fullscreenFeedback">Full screen</button>
       <a class="control" href="/fleet-dashboard.html">Exit TV display</a>
     </nav>
   </header>
@@ -44,6 +44,24 @@
       <span>Driver names, vehicles, locations, individual scores, personal media, and raw events are not shown on this display.</span>
     </section>
 
+    <section class="display-settings" aria-label="Display settings">
+      <div class="window-control">
+        <label for="windowDays">Session window</label>
+        <select class="control" id="windowDays" aria-describedby="windowRange summaryScope">
+          <option value="7">Past 7 days</option>
+          <option value="30" selected>Past 30 days</option>
+        </select>
+      </div>
+      <button class="control" id="largeTextButton" type="button" aria-pressed="false">Large text</button>
+      <p class="window-range" id="windowRange">Past 30 days · based on session start time</p>
+    </section>
+
+    <details class="display-help">
+      <summary>Connection and full-screen details</summary>
+      <p id="connectionDetails">Checking the signed-in owner’s protected connection.</p>
+      <p id="fullscreenFeedback" aria-live="polite">Full screen is optional. Use Exit full screen or press Escape to return. Large text also works in a normal browser window.</p>
+    </details>
+
     <section class="empty-state" id="emptyState" aria-live="polite">
       <h2 id="emptyTitle">Connecting securely</h2>
       <p id="emptyMessage">This display uses the signed-in fleet owner’s protected summary.</p>
@@ -56,9 +74,9 @@
     <div id="displayContent" hidden>
       <section class="metric-grid" aria-label="Fleet-wide status">
         <article class="metric-card live-card">
-          <p>Monitoring now</p>
+          <p>Sessions without recorded end</p>
           <strong id="activeSessions">0</strong>
-          <span>protected active sessions</span>
+          <span>available protected records</span>
         </article>
         <article class="metric-card">
           <p>Active roster</p>
@@ -68,12 +86,12 @@
         <article class="metric-card">
           <p>Sessions recorded</p>
           <strong id="recentSessions">0</strong>
-          <span>past 30 days</span>
+          <span id="sessionWindowLabel">available in past 30 days</span>
         </article>
         <article class="metric-card attention-card">
           <p>Sessions to review</p>
           <strong id="reviewSessions">0</strong>
-          <span>aggregate manager queue</span>
+          <span id="reviewWindowLabel">available in past 30 days</span>
         </article>
       </section>
 
@@ -81,12 +99,12 @@
         <article class="panel coverage-panel">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">30-day participation</p>
+              <p class="eyebrow" id="coverageWindowLabel">30-day participation</p>
               <h2>Roster coverage</h2>
             </div>
             <strong class="coverage-value" id="coverageValue">0%</strong>
           </div>
-          <div class="coverage-track" role="progressbar" aria-label="Thirty-day roster coverage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="coverageTrack"><span id="coverageBar"></span></div>
+          <div class="coverage-track" role="progressbar" aria-label="Roster coverage in available 30-day history" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="coverageTrack"><span id="coverageBar"></span></div>
           <p class="panel-note" id="coverageNote">No protected sessions are available yet.</p>
         </article>
 
@@ -98,13 +116,14 @@
             </div>
           </div>
           <div class="pulse-grid">
-            <div><span>Monitoring now</span><strong id="pulseNow">0</strong></div>
+            <div><span>No recorded end</span><strong id="pulseNow">0</strong></div>
             <div><span>Completed in past hour</span><strong id="pulseHour">0</strong></div>
             <div><span>Completed in past 24 hours</span><strong id="pulseDay">0</strong></div>
-            <div><span>Earlier in 30 days</span><strong id="pulseMonth">0</strong></div>
+            <div><span id="pulseWindowLabel">Earlier in 30 days</span><strong id="pulseMonth">0</strong></div>
           </div>
         </article>
       </section>
+      <p class="summary-scope" id="summaryScope">Session metrics use up to 50 recent protected sessions. The selected window is based on session start time. Sessions without a recorded end describe available record state; live device monitoring is not verified.</p>
     </div>
   </main>
 

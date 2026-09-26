@@ -1,5 +1,10 @@
 # Occulert Technical Audit
 
+This is a dated audit record. Current release/source status and priorities are
+in the [authoritative roadmap](APP_ROADMAP.md). Build-36 and earlier source
+entries below are historical evidence, not the latest installed native build
+or a statement that subsequent merged web work is still proposed.
+
 Last updated: 2026-09-14. Last full source and live-site review: 2026-08-04
 (previously 2026-07-08, 2026-07-05, 2026-06-14).
 
@@ -117,11 +122,12 @@ camera, vibration, and Bluetooth.
 
 ## Recommended product direction
 
-Unchanged: prioritize fleet safety — driver drowsiness alerts, a fleet
-dashboard, GPS tracking, driver safety scoring, incident history, and a pilot
-program for local fleet operators. The backend for this now exists rather than
-being planned, which moves the constraint from engineering to evidence: the
-pilot program and any accuracy claim both depend on #65.
+Prioritize supplemental driver alerts, parked setup, protected manager
+reporting/follow-ups, and an authorized voluntary fleet pilot. GPS routes,
+verified safety scores, and incident prevention are not demonstrated products.
+The backend exists; the next gap is evidence. Pilot workflow observations do
+not establish accuracy, and any public accuracy statement still requires the
+authorized labeled-data work in #65 and its stated limitations.
 
 
 ## 2026-09-14 — Passwordless profile onboarding and selective offline runtime (proposed)
