@@ -64,7 +64,15 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   }
 
   nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-    Task { @MainActor in self.handle(message, shouldDeliverFeedback: true) }
+    Task { @MainActor in
+      let sentAt = self.numberValue(message["at"])
+      let ageMilliseconds = Date().timeIntervalSince1970 * 1_000 - sentAt
+      self.handle(
+        message,
+        shouldDeliverFeedback: ageMilliseconds >= 0
+          && ageMilliseconds < self.backgroundAlertFeedbackFreshnessMilliseconds
+      )
+    }
   }
 
   nonisolated func session(
@@ -72,7 +80,15 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     didReceiveMessage message: [String: Any],
     replyHandler: @escaping ([String: Any]) -> Void
   ) {
-    Task { @MainActor in self.handle(message, shouldDeliverFeedback: true) }
+    Task { @MainActor in
+      let sentAt = self.numberValue(message["at"])
+      let ageMilliseconds = Date().timeIntervalSince1970 * 1_000 - sentAt
+      self.handle(
+        message,
+        shouldDeliverFeedback: ageMilliseconds >= 0
+          && ageMilliseconds < self.backgroundAlertFeedbackFreshnessMilliseconds
+      )
+    }
     replyHandler([
       "received": true,
       "receivedAt": Date().timeIntervalSince1970 * 1_000,

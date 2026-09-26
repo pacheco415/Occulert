@@ -360,6 +360,44 @@ test('opening the Watch app restores the latest iPhone context without replaying
   assert.doesNotMatch(activation, /scheduleBackgroundAlert/);
 });
 
+test('both live Watch callbacks suppress stale feedback while preserving display and receipt updates', () => {
+  const start = alertReceiver.indexOf('nonisolated func session(_ session: WCSession, didReceiveMessage');
+  const end = alertReceiver.indexOf('didReceiveApplicationContext', start);
+  assert.ok(start >= 0 && end > start, 'both live receive callbacks must be present');
+  const callbacks = alertReceiver.slice(start, end);
+
+  assert.equal(
+    [...callbacks.matchAll(/let sentAt = self\.numberValue\(message\["at"\]\)/g)].length,
+    2,
+    'both live callbacks must use the phone decision timestamp',
+  );
+  assert.equal(
+    [...callbacks.matchAll(/let ageMilliseconds = Date\(\)\.timeIntervalSince1970 \* 1_000 - sentAt/g)].length,
+    2,
+    'receipt age must compare epoch milliseconds on both devices',
+  );
+  assert.equal(
+    [...callbacks.matchAll(/self\.handle\(\s*message,\s*shouldDeliverFeedback: ageMilliseconds >= 0\s*&& ageMilliseconds < self\.backgroundAlertFeedbackFreshnessMilliseconds/g)].length,
+    2,
+    'both callbacks must update the display but reject future and two-second-old feedback',
+  );
+  assert.doesNotMatch(callbacks, /shouldDeliverFeedback: true/);
+  assert.match(callbacks, /replyHandler\(\[\s*"received": true,\s*"receivedAt": Date\(\)\.timeIntervalSince1970 \* 1_000/);
+
+  const handlerStart = alertReceiver.indexOf('private func handleAlert');
+  const handlerEnd = alertReceiver.indexOf('private func playHaptic', handlerStart);
+  assert.ok(handlerStart >= 0 && handlerEnd > handlerStart, 'alert feedback handler must be present');
+  const handler = alertReceiver.slice(handlerStart, handlerEnd);
+  const feedbackGuard = handler.indexOf('guard shouldDeliverFeedback else { return }');
+  const displayUpdate = handler.indexOf('lastMessage = switch level');
+  assert.ok(displayUpdate >= 0 && feedbackGuard > displayUpdate,
+    'stale alerts must still update the latest-alert display');
+  assert.ok(handler.indexOf('scheduleBackgroundAlert') > feedbackGuard,
+    'stale alerts must not schedule background sound or haptics');
+  assert.ok(handler.indexOf('playHaptic') > feedbackGuard,
+    'stale alerts must not play foreground haptics');
+});
+
 test('Watch status expires visibly and cannot play an alert haptic', () => {
   const start = alertReceiver.indexOf('private func handleStatus');
   const end = alertReceiver.indexOf('private func numberValue', start);
