@@ -4,10 +4,12 @@ on:
   pull_request:
     paths:
       - "native-app/**"
+      - ".github/workflows/native-app-typecheck.yml"
   push:
     branches: [main]
     paths:
       - "native-app/**"
+      - ".github/workflows/native-app-typecheck.yml"
 
 jobs:
   typecheck:
@@ -22,5 +24,23 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: native-app/package-lock.json
-      - run: npm ci
+      - run: npm ci --include=dev
+      - run: npm run verify
+
+  eas-install:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: native-app
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          # Match the pinned iOS EAS image so peer lockfile errors fail before a cloud build.
+          node-version: 22.23.1
+          cache: npm
+          cache-dependency-path: native-app/package-lock.json
+      - name: Match EAS package manager
+        run: npm install --global npm@10.9.8
+      - run: npm ci --include=dev
       - run: npm run verify
