@@ -586,11 +586,12 @@ test('service-worker bounds network and cache writes while preserving a known-go
 test('network-only account scripts time out without exposing cached auth and preserve valid network responses', async () => {
   const listeners = {}, timers = new Map(), fetches = [];
   let timerId = 0, network, cacheReads = 0, cacheWrites = 0, lifetimeUpdates = 0;
-  const fresh = { source: 'fresh-account-script', ok: true, status: 200 };
+  const fresh = new Response('window.accountScript = "current";', { status: 200, statusText: 'Current script', headers: {
+    'content-type': 'text/javascript', 'content-encoding': 'gzip', 'content-length': '12', 'x-script-source': 'online',
+  } });
   const sensitiveCached = { source: 'cached-account-script', ok: true };
   const context = {
-    AbortController, URL, Request, Promise, Set,
-    Response: { error: () => ({ source: 'network-error', ok: false }) },
+    AbortController, URL, Request, Promise, Set, Response, Headers,
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
     clearTimeout: id => timers.delete(id),
     fetch: (request, options) => { fetches.push({ request, options }); return network(); },
@@ -618,7 +619,7 @@ test('network-only account scripts time out without exposing cached auth and pre
     const [id, timer] = [...timers][0];
     assert.equal(timer.delay, 2500);
     timers.delete(id); timer.callback();
-    assert.equal((await responsePromise).source, 'network-error', path + ' must settle after its deadline');
+    assert.equal((await responsePromise).type, 'error', path + ' must settle after its deadline');
     assert.equal(request.options.signal.aborted, true);
     assert.equal(cacheReads, 0, 'a failed account script must never fall back to cached auth');
     assert.equal(cacheWrites, 0);
@@ -628,19 +629,82 @@ test('network-only account scripts time out without exposing cached auth and pre
   }
   network = async () => fresh;
   dispatch('/occulert-backend.v58.js');
-  assert.equal(await responsePromise, fresh, 'a working online account script remains available');
+  const valid = await responsePromise;
+  assert.equal(valid.status, 200);
+  assert.equal(valid.statusText, 'Current script');
+  assert.equal(await valid.text(), 'window.accountScript = "current";', 'a complete online account script remains available');
+  assert.equal(valid.headers.get('content-type'), 'text/javascript');
+  assert.equal(valid.headers.get('x-script-source'), 'online');
+  assert.equal(valid.headers.has('content-encoding'), false, 'the buffered body already contains decoded bytes');
+  assert.equal(valid.headers.has('content-length'), false, 'the original wire length does not describe decoded bytes');
   assert.equal(fetches.at(-1).options.cache, 'no-store');
   assert.equal(fetches.at(-1).options.signal.aborted, false);
   assert.equal(timers.size, 0, 'successful delivery clears its deadline');
   network = async () => { throw new Error('Connection lost'); };
   dispatch('/occulert-backend.v58.js');
-  assert.equal((await responsePromise).source, 'network-error');
-  network = async () => ({ ok: false, status: 503 });
+  assert.equal((await responsePromise).type, 'error');
+  network = async () => new Response('Unavailable', { status: 503, statusText: 'Service Unavailable' });
   dispatch('/occulert-backend.v58.js');
-  assert.equal((await responsePromise).status, 503, 'network denial is preserved without cached substitution');
+  const denied = await responsePromise;
+  assert.equal(denied.status, 503, 'network denial is preserved without cached substitution');
+  assert.equal(denied.statusText, 'Service Unavailable');
+  assert.equal(await denied.text(), 'Unavailable');
+  for (const status of [204, 205, 304]) {
+    network = async () => new Response(null, { status });
+    dispatch('/occulert-backend.v58.js');
+    const empty = await responsePromise;
+    assert.equal(empty.status, status, 'body-forbidden response status remains valid');
+    assert.equal(empty.body, null);
+  }
   assert.equal(cacheReads, 0);
   assert.equal(cacheWrites, 0);
   assert.equal(lifetimeUpdates, 0, 'network-only assets schedule no cache writes');
+  assert.equal(timers.size, 0);
+});
+
+test('network-only script headers and a partial body share one deadline and ignore late completion', async () => {
+  const listeners = {}, timers = new Map(), headers = deferred();
+  let timerId = 0, streamController, networkSignal, networkOptions, delivered = false, cacheAccess = 0;
+  const body = new ReadableStream({ start(controller) {
+    streamController = controller;
+    controller.enqueue(new TextEncoder().encode('window.accountScript = "partial'));
+  } });
+  const partial = new Response(body, { status: 200, headers: { 'content-type': 'text/javascript' } });
+  const context = {
+    AbortController, URL, Request, Promise, Set, Response, Headers,
+    setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
+    clearTimeout: id => timers.delete(id),
+    fetch: (_request, options) => { networkOptions = options; networkSignal = options.signal; return headers.promise; },
+    caches: {
+      match: async () => { cacheAccess++; return new Response('window.cachedAuthWasExecuted=true;'); },
+      open: async () => { cacheAccess++; return { put: async () => { cacheAccess++; } }; },
+    },
+    self: { location: { origin: 'https://www.occulert.com' }, addEventListener: (name, handler) => { listeners[name] = handler; } },
+  };
+  runInNewContext(read('sw.js'), context);
+  let responsePromise;
+  listeners.fetch({
+    request: { method: 'GET', mode: 'no-cors', destination: 'script', url: 'https://www.occulert.com/occulert-backend.v58.js' },
+    respondWith: promise => { responsePromise = promise; promise.then(() => { delivered = true; }); },
+  });
+  const [[deadlineId, deadline]] = [...timers];
+  await drainTasks();
+  assert.equal(networkOptions.cache, 'no-store');
+  headers.resolve(partial);
+  await drainTasks();
+  assert.equal(delivered, false, 'headers and partial bytes cannot release a still-loading script');
+  assert.deepEqual([...timers.keys()], [deadlineId], 'header arrival must not restart the deadline');
+  assert.equal(deadline.delay, 2500);
+  timers.delete(deadlineId); deadline.callback();
+  const failed = await responsePromise;
+  assert.equal(failed.type, 'error');
+  assert.equal(networkSignal.aborted, true, 'deadline aborts the response body transfer');
+  assert.equal(cacheAccess, 0, 'partial account scripts cannot expose cached auth');
+  streamController.enqueue(new TextEncoder().encode(' but now complete";'));
+  streamController.close();
+  await drainTasks();
+  assert.equal(await responsePromise, failed, 'late body completion cannot replace the failed response');
+  assert.equal(cacheAccess, 0);
   assert.equal(timers.size, 0);
 });
 

@@ -5,7 +5,8 @@ import { resolve, extname } from 'node:path';
 
 test.use({ serviceWorkers: 'allow' });
 
-test('a stalled network-only account script cannot block driver startup or use a cached account script', async ({ page }) => {
+for (const partialBody of [false, true]) {
+test(`a network-only account script stalled ${partialBody ? 'mid-body' : 'before headers'} cannot block startup or use a cached account script`, async ({ page }) => {
   test.setTimeout(60_000);
   const root = resolve('.');
   const state = { stall: false, requested: false, aborted: false };
@@ -15,6 +16,10 @@ test('a stalled network-only account script cannot block driver startup or use a
     if (state.stall && pathname === '/occulert-backend.v58.js') {
       state.requested = true;
       response.on('close', () => { state.aborted = !response.writableEnded; });
+      if (partialBody) {
+        response.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
+        response.write('// Account script response has not finished.\n');
+      }
       return;
     }
     const file = resolve(root, pathname === '/' ? 'index.html' : pathname.slice(1));
@@ -50,3 +55,4 @@ test('a stalled network-only account script cannot block driver startup or use a
     await new Promise(resolve => server.close(resolve));
   }
 });
+}
