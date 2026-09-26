@@ -85,7 +85,9 @@ sharing remains withheld after a failed refresh. Account changes invalidate
 pending work, and late results cannot replace recovered views or sign out a
 newer session. Browser account refreshes preserve newer credentials and retain
 the stored account when a transient failure cannot confirm sign-out. A stalled
-public configuration lookup is bounded and retried.
+public configuration lookup is bounded and retried. Network-only account
+scripts have a bounded service-worker wait so a stalled request cannot hold
+driver-page startup; they never fall back to cached account scripts.
 
 Protected summaries and saved follow-ups select the same latest 50 sessions,
 using session ID to break equal start times. Regression coverage checks tied

@@ -583,6 +583,67 @@ test('service-worker bounds network and cache writes while preserving a known-go
   await lifetimePromise;
 });
 
+test('network-only account scripts time out without exposing cached auth and preserve valid network responses', async () => {
+  const listeners = {}, timers = new Map(), fetches = [];
+  let timerId = 0, network, cacheReads = 0, cacheWrites = 0, lifetimeUpdates = 0;
+  const fresh = { source: 'fresh-account-script', ok: true, status: 200 };
+  const sensitiveCached = { source: 'cached-account-script', ok: true };
+  const context = {
+    AbortController, URL, Request, Promise, Set,
+    Response: { error: () => ({ source: 'network-error', ok: false }) },
+    setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
+    clearTimeout: id => timers.delete(id),
+    fetch: (request, options) => { fetches.push({ request, options }); return network(); },
+    caches: {
+      match: async () => { cacheReads++; return sensitiveCached; },
+      open: async () => { cacheWrites++; return { put: async () => { cacheWrites++; } }; },
+    },
+    self: { location: { origin: 'https://www.occulert.com' }, addEventListener: (name, handler) => { listeners[name] = handler; } },
+  };
+  runInNewContext(read('sw.js'), context);
+  let responsePromise;
+  const dispatch = path => listeners.fetch({
+    request: { method: 'GET', mode: 'no-cors', destination: 'script', url: 'https://www.occulert.com' + path },
+    respondWith: promise => { responsePromise = promise; },
+    waitUntil: () => { lifetimeUpdates++; },
+  });
+  for (const path of ['/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', '/supabase-loader.v47.js']) {
+    const old = deferred();
+    network = () => old.promise;
+    dispatch(path);
+    await drainTasks();
+    const request = fetches.at(-1);
+    assert.equal(request.options.cache, 'no-store');
+    assert.equal(request.options.signal.aborted, false);
+    const [id, timer] = [...timers][0];
+    assert.equal(timer.delay, 2500);
+    timers.delete(id); timer.callback();
+    assert.equal((await responsePromise).source, 'network-error', path + ' must settle after its deadline');
+    assert.equal(request.options.signal.aborted, true);
+    assert.equal(cacheReads, 0, 'a failed account script must never fall back to cached auth');
+    assert.equal(cacheWrites, 0);
+    old.resolve(fresh);
+    await drainTasks();
+    assert.equal(cacheWrites, 0, 'a late response must not be cached');
+  }
+  network = async () => fresh;
+  dispatch('/occulert-backend.v58.js');
+  assert.equal(await responsePromise, fresh, 'a working online account script remains available');
+  assert.equal(fetches.at(-1).options.cache, 'no-store');
+  assert.equal(fetches.at(-1).options.signal.aborted, false);
+  assert.equal(timers.size, 0, 'successful delivery clears its deadline');
+  network = async () => { throw new Error('Connection lost'); };
+  dispatch('/occulert-backend.v58.js');
+  assert.equal((await responsePromise).source, 'network-error');
+  network = async () => ({ ok: false, status: 503 });
+  dispatch('/occulert-backend.v58.js');
+  assert.equal((await responsePromise).status, 503, 'network denial is preserved without cached substitution');
+  assert.equal(cacheReads, 0);
+  assert.equal(cacheWrites, 0);
+  assert.equal(lifetimeUpdates, 0, 'network-only assets schedule no cache writes');
+  assert.equal(timers.size, 0);
+});
+
 test('fleet refreshes adapt to activity and throttle protected event queries', () => {
   const api = read('api/fleet-summary.js');
   const dashboard = read('fleet-dashboard.html');

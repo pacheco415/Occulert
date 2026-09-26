@@ -106,9 +106,10 @@ function settleWithin(promise, timeoutMs, fallback = null) {
   });
 }
 
-function fetchWithDeadline(request, timeoutMs = NETWORK_FIRST_TIMEOUT_MS) {
+function fetchWithDeadline(request, timeoutMs = NETWORK_FIRST_TIMEOUT_MS, fetchOptions) {
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
-  const requestPromise = Promise.resolve().then(() => fetch(request, controller ? { signal: controller.signal } : undefined));
+  const options = Object.assign({}, fetchOptions, controller ? { signal: controller.signal } : {});
+  const requestPromise = Promise.resolve().then(() => fetch(request, options));
   return new Promise(resolve => {
     let settled = false;
     const finish = response => {
@@ -185,7 +186,8 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
   if (url.origin === self.location.origin && NETWORK_ONLY_ASSETS.has(url.pathname)) {
-    event.respondWith(fetch(req, { cache: 'no-store' }));
+    event.respondWith(fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, { cache: 'no-store' })
+      .then(response => response || Response.error()));
     return;
   }
   if (url.origin === self.location.origin && NETWORK_FIRST_ASSETS.has(url.pathname)) {
