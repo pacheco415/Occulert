@@ -3,13 +3,18 @@
 Status reference updated: 2026-09-26. The
 [authoritative roadmap](APP_ROADMAP.md) records shipped/source status. The
 implemented contracts and acceptance targets below do not establish measured
-production latency or device acceptance. PR #138 and PR #139 are shipped; native
-TestFlight 1.0.0 (52) is built/submitted and Apple VALID / IN_BETA_TESTING, with
-embedded Watch packaging confirmed. On September 26, the user reported
-TestFlight build 52 installed and working iPhone functionality: a general phone
-functional pass. The iPhone model/iOS, individual audio/accessory checks, and
-sustained battery/heat measurements are not documented. Watch installation/update
-and checks remain pending; no Watch download/update prompt has been reported.
+production latency or full device acceptance. PR #144 is merged at `d3ae5a3`
+and its website/backend release is live; native audit fixes await a future
+binary. TestFlight 1.0.0 (52) remains the binary from exact source
+`969849b0c551edb2de6f9230cbeecdce89346b6f`, built/submitted and Apple VALID /
+IN_BETA_TESTING, with embedded Watch packaging confirmed. On September 26, the
+user reported its iPhone installation/general functional pass, Watch launch,
+and foreground/background urgent alert display and wrist vibration. Reported
+devices are iPhone 17 Pro Max on iOS 27.2 and Apple Watch Ultra 4, with Watch
+software described as the same version 27.2; these details are not independently
+verified. Exact delay, Focus/permission variations, individual audio/accessory,
+safe-stop, recovery, accessibility, and sustained battery/heat measurements
+remain undocumented. No new native build, submission, or OTA update is queued.
 
 This roadmap separates source optimizations from physical-device, live-service,
 and accuracy evidence. A green source check means the implementation is ready
@@ -72,8 +77,10 @@ These are acceptance targets, not measured production claims.
 - Detection accuracy still needs an authorized labeled dataset and the
   participant-safe workflow in `ACCURACY_BENCHMARK.md`. No accuracy percentage
   is claimed by this performance work.
-- Battery, thermal, camera, Watch, headphone, and car-audio results require
-  physical checks on the available build 52 and actual devices.
+- Battery, thermal, camera, headphone, and car-audio results require physical
+  checks on the available build 52 and actual devices. Its reported Watch urgent
+  foreground/background display/vibration passes do not establish exact timing,
+  Focus/permission variations, or acceptance of the later native audit fixes.
 - Camera-setup framing and interrupted-session recovery require physical
   preview plus force-quit/relaunch checks on the exact native build.
 - Production fleet latency requires a signed-in owner and an agreed read-only
@@ -86,8 +93,10 @@ These are acceptance targets, not measured production claims.
   social previews and brand use.
 - Published managed-plan descriptions do not activate billing or enforce
   entitlements. Build 52 has a FINISHED submission and Apple beta availability;
-  there are 0 iOS builds left this cycle. Continue source checks and physical
-  validation of the existing binary without queueing another iOS build.
+  included iOS build usage is 15/15, with the next period beginning September 30
+  at 5 p.m. Pacific. Continue source checks and physical validation of the
+  existing binary. The merged native audit fixes need a future authorized
+  binary and separate physical acceptance; no build is queued.
 
 ## Later scaling work
 

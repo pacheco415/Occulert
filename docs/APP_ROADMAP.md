@@ -18,7 +18,15 @@ state; they are not the current feature backlog.
   gap remains. Source tests cannot close those gaps.
 - **Future:** proposed capability without an implementation or delivery claim.
 
-Recorded PR #138/#139 release baseline is `969849b`. PR #138 (`bc7858a`)
+The current website/backend release is [PR #144](https://github.com/pacheco415/Occulert/pull/144),
+merged at `d3ae5a30422586cbfa03c9b7092a0fa375d44681` and verified live in
+production. Assets use v60 and offline cache v54. Its native audit fixes are
+merged source awaiting a future binary; they are not installed in TestFlight 52.
+The atomic invitation-creation prerequisite was installed before rollout:
+deployed migration `20260926185813 / atomic_fleet_invitation_creation` maps to
+source `20260926010000_atomic_fleet_invitation_creation.sql`.
+
+The earlier PR #138/#139 release baseline is `969849b`. PR #138 (`bc7858a`)
 shipped the manager-and-driver quick start, printable report, data-quality
 explanations, and TV operating controls. PR #139 (`969849b`) shipped the native
 peer-lockfile/clean-install repair and stale Watch alert-feedback guard.
@@ -28,12 +36,19 @@ Private TestFlight **1.0.0 (52)** has a finished build and `FINISHED` submission
 Apple reports `VALID` and `IN_BETA_TESTING`. The archive's embedded Watch app
 is confirmed. Its exact source is
 `969849b0c551edb2de6f9230cbeecdce89346b6f`. **The user confirms build 52
-installed and generally working on iPhone.** The phone model/iOS and individual
-test conditions are not documented. Watch installation/update and checks remain
-pending: the user has not received a Watch download/update prompt. Earlier
-iPhone/Watch feedback applies to its exact tested build, not automatically to
-52. There are **0 iOS builds left in the current cycle**; continue source work
-and validate the available binary without queueing another iOS build.
+installed and generally working on iPhone, Watch launch, and foreground/background
+urgent alert display and wrist vibration.** TestFlight App Details showed the
+Watch **Open** button; the background result was reported after returning to
+the watch face. The user reports iPhone 17 Pro Max on iOS 27.2 and Apple Watch
+Ultra 4, with Watch software described as the same version 27.2. These device
+details are not independently verified. Exact delay, Focus/permission variations,
+individual accessory, safe-stop, recovery, accessibility, battery/heat checks
+remain undocumented. Earlier iPhone/Watch feedback applies to its exact tested
+build, not automatically to 52. Included iOS build usage is **15/15**; the next
+period begins **September 30 at 5 p.m. Pacific**. No new build, submission, or
+OTA update is queued. Continue source work and available-binary validation;
+the merged native audit fixes require a future authorized binary and its own
+physical acceptance.
 
 ## Shipped and private baseline
 
@@ -45,7 +60,7 @@ and validate the available binary without queueing another iOS build.
 | Managed early-access offers | Shipped web pages and qualification | Card-free 30-day trial for up to five active drivers; introductory Starter/Growth comparison and rollout requests. No payment collection, automatic renewal, billing, or entitlement enforcement. |
 | Fleet TV display | Shipped web, PR #136 and PR #138 | Authenticated read-only browser/AirPlay aggregate view, 7/30-day selection, large text, connection details, and fullscreen controls. No names, vehicles, locations, individual scores, raw events, local fallback, or editing. Native tvOS remains future. |
 | Pilot launch checklist | Shipped web, PR #137 | Setup, joined-driver, first-session, 7/30-day milestones derive from protected records. It cannot confirm offline tasks or fitness to drive. |
-| iPhone and Apple Watch | Private TestFlight 1.0.0 (52): user-reported iPhone installation and general functional pass | Embedded Watch packaging confirmed; Watch installation/update and checks pending. Phone model/iOS and individual parked-test results remain undocumented. Native uses ML Kit; browser uses MediaPipe. Prior build-49 parked checks and build-36 feedback in the [dated audit](AUDIT.md) are historical evidence. |
+| iPhone and Apple Watch | Private TestFlight 1.0.0 (52): user-reported iPhone installation/general functional pass, Watch launch, foreground/background urgent display and wrist vibration | Reported iPhone 17 Pro Max/iOS 27.2 and Watch Ultra 4/Watch software described as 27.2 are not independently verified. Exact delay, Focus/permission variations and remaining individual checks are undocumented. Native audit fixes from PR #144 await a future binary. Native uses ML Kit; browser uses MediaPipe. Prior build-49 parked checks and build-36 feedback in the [dated audit](AUDIT.md) are historical evidence. |
 
 ## Current capabilities and remaining evidence
 
@@ -59,7 +74,7 @@ and validate the available binary without queueing another iOS build.
 | Pilot recruitment package | Prepared documents; outreach unsent; owner/participants not supplied | [One-page overview, qualification, unsent emails, 30-day plan](PILOT_OUTREACH.md). Launch/physical validation preparation is approved, but no fleet owner, enrolled cohort, operating results, or consent is invented. |
 | Parked setup and reliability | Included in TestFlight 52; general iPhone pass reported, individual checks pending | Exact-build camera guidance, fresh permission/readiness, foreground-loss stop, interruptions, 15-second checkpoints, explicitly partial recovery. See [device readiness](PARKED_DEVICE_READINESS.md). |
 | Local History and privacy controls | Included in TestFlight 52; general iPhone pass reported, individual checks pending | Install-over-existing-data, save/read failures, aggregate sharing, confirmed individual/all-history deletion, recovery safeguards. Local deletion does not delete cloud records. |
-| Alerts, Watch, accessibility | Included in TestFlight 52; Watch installation/update and individual checks pending | Bounded phone/audio cues, optional directional earbuds, Watch status/haptics/notifications, larger text, VoiceOver, Reduce Motion/Transparency. Retest speaker, headphones, car audio, Watch. |
+| Alerts, Watch, accessibility | Included in TestFlight 52; Watch launch and foreground/background urgent display/vibration have user-reported passes | Exact delay and Focus/permission variations remain undocumented. Validate speaker, headphones, car audio, larger text, VoiceOver, Reduce Motion/Transparency and other alert conditions. PR #144 native fixes require a future binary and separate acceptance. |
 | Runtime and fleet performance | Native source included in TestFlight 52; web portions released | Preserve analysis cadence/preferences; measure battery/heat/camera timing on device and signed-in API latency. [Performance Roadmap](PERFORMANCE_ROADMAP.md) contains targets, not measured claims. |
 | Sensor-fusion observations | Included in TestFlight 52, observation only; physical validation pending | Camera/headphone candidate counts, optional Watch availability, bounded co-occurrences, validation coverage, next-session planning. No raw timeline, cloud sync, export, feedback inclusion, score or alert changes. Accessories optional. |
 
@@ -140,16 +155,45 @@ merge and production evidence. This recovery handles loading failures without
 establishing the cause of the intermittent hosted WebKit loading errors. It
 uses no native build and changes no detection thresholds or accuracy claims.
 
+## September 26 audit release
+
+PR #144 is merged and its website/backend release is live. Merged-commit checks
+pass, including all 280 browser cases without retries and native source/runtime/
+Swift checks. Production integration checks passed using rolled-back synthetic
+records; no test records remain. These checks add no labeled detection evidence.
+
+Chromium live-origin offline startup passes. Live smoke retains 38 passing
+checks and one unresolved WebKit emulated-offline stage; focused and adaptive
+repeats also failed at document navigation. The offline loading algorithm was
+unchanged and source review found no concrete introduced regression, but the
+precise cause and physical Safari/PWA offline behavior remain unestablished.
+This failure is not a passing Safari device-acceptance result. Genuine signed-in
+browser login and fleet workflows remain separate acceptance checks with a
+consenting test account. The native audit changes require a future binary;
+no EAS build, submission, or OTA update was queued by this release.
+
+## Native Watch connection recovery
+
+Prepared source preserves a confirmed live Watch reply even when separate
+connection flags are false or fail. Native status reads have a 1.5-second
+deadline after at most 0.5 seconds of activation settling; older checks cannot
+overwrite a newer cached connection. Runtime fault tests cover delayed and
+failed queries, retries, and out-of-order results. A reply confirms message
+receipt, not visible notification or vibration. No build-52 connection hang
+was reported, and this source change requires a future binary and device checks.
+
 ## Validating
 
-1. **Native acceptance:** build 52 installation and general iPhone functionality
-   have a positive user-reported pass. Record model, OS, setup, phone/audio/Watch routing,
-   interruptions, recovery, accessibility, battery, and heat under safe parked
-   or passenger conditions. Build/submission and embedded Watch packaging are
-   complete; Watch installation/update and individual checks remain open.
-   In TestFlight, open Occulert's App Details under Information and check for
-   the Watch install/update button when the paired Watch is compatible
-   ([Apple instructions](https://testflight.apple.com/)). No iOS builds remain this cycle.
+1. **Native acceptance:** build 52 installation/general iPhone functionality,
+   Watch launch, and foreground/background urgent display/wrist vibration have
+   user-reported passes on the reported devices above. Record exact delay,
+   Focus/permission variations, setup, phone/audio/accessory routing,
+   safe-stop, interruptions, recovery, accessibility, battery and heat under
+   safe parked or passenger conditions. The merged native audit fixes need a
+   future authorized binary followed by separate device acceptance. Included
+   iOS usage is 15/15 until the next period begins September 30 at 5 p.m. Pacific;
+   no build is queued. Record physical Safari/PWA offline behavior and genuine
+   signed-in browser login/fleet acceptance separately.
 2. **Pilot readiness and recruitment:** qualify one fleet owner and up to five
    willing drivers. Confirm parked setup, cloud consent, ownership, support,
    and stop/escalation rules. The owner and participant questions remain

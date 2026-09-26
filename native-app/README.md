@@ -5,10 +5,21 @@ Android configuration remains source; no released Android app is claimed.
 
 Current private distribution is TestFlight **1.0.0 (52)**: finished build,
 FINISHED submission, Apple VALID / IN_BETA_TESTING, and confirmed embedded
-Watch packaging. **No physical build-52 acceptance is recorded.** Earlier
-build-15/19/36 and build-49 feedback is evidence for those exact builds. There
-are **0 iOS builds left this cycle**; validate the available binary without
-queueing another build. See the [authoritative roadmap](../docs/APP_ROADMAP.md).
+Watch packaging. Its exact source remains
+`969849b0c551edb2de6f9230cbeecdce89346b6f`. **Build 52 has user-reported iPhone
+installation/general functional, Watch launch, and foreground/background urgent
+display/wrist vibration passes.** The user reports iPhone 17 Pro Max on iOS 27.2
+and Apple Watch Ultra 4, with Watch software described as the same version 27.2;
+these details are not independently verified. Exact delay, Focus/permission
+variations and individual accessory, safe-stop, recovery, accessibility,
+battery/heat checks remain undocumented. Earlier build-15/19/36 and build-49
+feedback is evidence for those exact builds.
+
+PR #144 is merged at `d3ae5a3` and its website/backend release is live. The
+native audit fixes in that source await a future binary and separate physical
+acceptance. Included iOS build usage is **15/15**; the next period begins
+**September 30 at 5 p.m. Pacific**. No new EAS build, submission, or OTA update
+is queued. See the [authoritative roadmap](../docs/APP_ROADMAP.md).
 
 ## Why Native?
 
@@ -106,7 +117,7 @@ physical acceptance of the available build 52.
 | Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-audio |
 | Earlier sustained-closure escalation | Source complete - prominent alert at 600 ms, stronger stage at 1.2 s; physical calibration pending |
 | Foreground-loss spoken warning | Source complete - camera stops and a local warning begins immediately; physical validation pending |
-| Apple Watch companion + wrist haptics | Embedded in build 52; historical build-15 feedback does not accept build-52 delivery |
+| Apple Watch companion + wrist haptics | Build 52 user-reported launch and foreground/background urgent alert display/wrist vibration passes; exact timing and Focus/permission variations remain undocumented |
 | Per-session pre-drive safety confirmation | Done - required before monitoring |
 | Structured session alert review | Implemented - local felt-right / false / missed / late labels |
 | Structured session test conditions | Done - private TestFlight build 15 |
@@ -120,7 +131,7 @@ physical acceptance of the available build 52.
 | Head-nod detection | Experimental local camera and compatible-headphone observations; does not trigger alerts or sync |
 | HealthKit HRV/sleep integration | Done - optional read-only local context validated in private TestFlight build 19 |
 | Pre-drive risk score screen | Foundation in source - factual sleep/HRV context only; no score or alert influence |
-| Private iOS distribution | TestFlight 1.0.0 (52), FINISHED submission and Apple VALID / IN_BETA_TESTING; physical acceptance pending |
+| Private iOS distribution | TestFlight 1.0.0 (52), FINISHED submission and Apple VALID / IN_BETA_TESTING; limited user-reported phone/Watch passes above, remaining acceptance open; PR #144 native audit fixes await a future binary |
 
 Pilot testers can send general feedback from Settings or attach basic session
 metrics and a structured alert assessment from History. Alert assessments stay
@@ -268,6 +279,13 @@ physical devices, open the Occulert Watch app, enable background alerts, confirm
 the iPhone reports the companion as installed, opt into Watch alerts, and test
 both the active-app haptic and the background notification. Verify the phone
 alert still works as the fallback.
+
+For build 52, the user reported the TestFlight Watch **Open** button, then
+confirmed the foreground urgent test displayed an alert and produced wrist
+vibration. The background test was also reported to display a notification and
+produce wrist vibration after returning to the watch face. These limited
+passes do not supply exact delivery delay or Focus/permission variations and
+do not accept the later merged native audit fixes, which need a future binary.
 
 ### Background camera and reduced-mode boundary
 

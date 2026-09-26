@@ -8,14 +8,14 @@ external sending needs authorized recipients and final messages.
 
 Use the [one-page overview](PILOT_OVERVIEW.md) for partner conversations and
 the [authoritative roadmap](APP_ROADMAP.md) for current release and evidence
-status. PR #138 shipped quick start, printable reports, data-quality
-explanations, and TV controls. Private TestFlight 1.0.0 (52) is built/submitted
-and Apple VALID / IN_BETA_TESTING, with embedded Watch packaging confirmed;
-the user reported build 52 installed and working iPhone functionality on
-September 26. The iPhone model/iOS and individual audio, recovery, and battery
-checks are not documented. Watch installation/update and checks remain pending;
-no Watch download/update prompt has been reported. There are 0 iOS builds left
-this cycle.
+status, including the deployed PR #144 website/backend audit release and native
+fixes awaiting a future binary. Private TestFlight 1.0.0 (52) remains available
+with user-reported iPhone installation/general functionality, Watch launch,
+and foreground/background urgent alert display and wrist vibration on September
+26. These limited reports do not establish complete physical acceptance;
+individual timing, permissions, accessory, safe-stop, recovery, accessibility,
+battery/heat checks remain undocumented. The roadmap records reported device
+details and build availability. Included iOS usage is 15/15; no build is queued.
 Pilot/physical-validation preparation is approved, but the fleet owner and
 participants have not been supplied. Do not invent enrollment, consent, or
 results or promise a new native build.
