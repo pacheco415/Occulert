@@ -217,7 +217,7 @@
     <section class="card history-section" aria-labelledby="sessionHistoryTitle">
       <div class="section-title">
         <div><h2 id="sessionHistoryTitle">Protected Session History</h2><div class="sub">Recent sessions and events for the signed-in manager's server-verified fleet.</div></div>
-        <button class="btn" onclick="exportSessionHistoryCSV()">Export Session CSV</button>
+        <div class="toolbar"><a class="btn" href="/fleet-history.html">Browse older sessions</a><button class="btn" onclick="exportSessionHistoryCSV()">Export Session CSV</button></div>
       </div>
       <div class="notice privacy-note"><strong>Client-reported and unverified:</strong> Session scores and events are operational observations, not independently measured evidence. This history excludes GPS coordinates, camera media, audio, and raw motion.</div>
       <div class="history-list" id="sessionHistory" role="list"></div>

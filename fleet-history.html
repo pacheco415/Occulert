@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html data-base="portal" lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Protected Fleet History — Occulert</title>
+  <meta name="description" content="Browse older recorded sessions for your protected Occulert fleet.">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0a0e1a">
+  <link rel="canonical" href="https://www.occulert.com/fleet-history.html">
+  <link rel="stylesheet" href="/portal.v47.css">
+  <link rel="stylesheet" href="/accessibility.v52.css">
+  <link rel="stylesheet" href="/fleet-history-page.v64.css">
+  <script defer src="/occulert-backend.v60.js"></script>
+  <script defer src="/fleet-history-page.v64.js"></script>
+</head>
+<body class="portal-page fleet-history-page">
+  <a class="skip-link" href="#main-content">Skip to session history</a>
+  <header class="top">
+    <a class="brand" href="/">Occulert</a>
+    <nav class="nav" aria-label="Fleet history navigation">
+      <a class="btn" href="/fleet-dashboard.html">Dashboard</a>
+      <a class="btn" href="/fleet-onboarding.html">Fleet Setup</a>
+      <a class="btn" href="/account.html">Account</a>
+    </nav>
+  </header>
+  <main class="wrap" id="main-content" tabindex="-1">
+    <section class="history-intro" aria-labelledby="historyTitle">
+      <p class="eyebrow">Protected fleet</p>
+      <h1 id="historyTitle">Session history</h1>
+      <p class="muted">Browse recorded sessions from newest to oldest, up to 50 at a time. This page shows up to 500 sessions. Refresh starts again with the newest records.</p>
+    </section>
+    <div class="history-status" id="historyStatus" role="status" aria-live="polite">Checking protected fleet access…</div>
+    <div class="history-access" id="historyAccess" hidden>
+      <a class="btn primary" href="/login.html">Sign in</a>
+      <a class="btn" href="/fleet-onboarding.html">Fleet Setup</a>
+      <p class="muted">Use the account that owns your fleet, then return here.</p>
+    </div>
+    <section class="history-card" aria-labelledby="recordsTitle">
+      <div class="history-toolbar">
+        <div><h2 id="recordsTitle">Recorded sessions</h2><p class="muted" id="historyScope">Protected records are unavailable until fleet ownership is verified.</p></div>
+        <button class="btn" id="historyRefresh" type="button">Refresh history</button>
+      </div>
+      <p class="history-privacy">Session scores and alert counts are unverified client reports. A missing end time does not establish that a session is active. This page excludes location, camera media, audio, raw motion, events, and saved follow-ups.</p>
+      <p class="muted">Older records here do not change the dashboard’s latest-50 summaries, manager reports, or TV display.</p>
+      <div class="history-list" id="historyList" role="list" aria-busy="false"></div>
+      <div class="history-pagination">
+        <button class="btn primary" id="historyOlder" type="button" hidden>Load older sessions</button>
+        <p class="muted" id="historyBoundary"></p>
+      </div>
+    </section>
+    <noscript><p class="history-status">Enable JavaScript to verify fleet ownership and load protected history.</p></noscript>
+  </main>
+  <footer class="history-footer">Occulert — protected fleet history is available only to the server-verified fleet owner.</footer>
+</body>
+</html>

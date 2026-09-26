@@ -14,6 +14,11 @@ the native clean-install and stale Watch-feedback repair. PR #144 is merged at
 `d3ae5a3`, and its website/backend audit release is live. PR #145 is merged at
 `1c340e3` with confirmed-reply preservation and bounded Watch connection checks;
 both releases' native source fixes await a future binary.
+PR #146 is merged at `9662c3b`; its invitation/form/font repairs and benchmark
+provenance update are the current production website release. Monitoring/auth
+assets remain v60 and offline cache v54. Subsequent local-history date filters
+and older-fleet-history browsing are development source, with testing and
+deployment deferred at the user's request; they are not part of this live release.
 TestFlight 1.0.0 (52) remains the binary from `969849b`,
 with finished submission, Apple VALID / IN_BETA_TESTING, and embedded Watch
 packaging confirmed. On September 26, the user reported an iPhone installation

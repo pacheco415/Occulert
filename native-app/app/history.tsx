@@ -31,10 +31,13 @@ import {
   summarizeFusionValidation,
 } from '../lib/fusionValidationSummary';
 import {
+  filterIndexedSessionsByPeriod,
   groupIndexedSessionsByDate,
   normalizeHistoryFilter,
+  normalizeHistoryPeriod,
   sortIndexedSessionsNewest,
   type HistoryFilter,
+  type HistoryPeriod,
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
 import { formatSessionAlertCount } from '../lib/sessionAlertCount';
@@ -47,6 +50,7 @@ import {
 } from '../lib/sessionReviewProgress';
 
 const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
+const HISTORY_PERIOD_KEY = 'occulert-session-history-period';
 const CHECKPOINT_TARGET = 10;
 
 interface SessionRecord extends FeedbackSession {
@@ -148,6 +152,12 @@ const HISTORY_FILTERS: Array<{ value: HistoryFilter; label: string }> = [
   { value: 'recovered', label: 'Recovered' },
 ];
 
+const HISTORY_PERIODS: Array<{ value: HistoryPeriod; label: string }> = [
+  { value: 'all', label: 'All time' },
+  { value: '7-days', label: 'Last 7 days' },
+  { value: '30-days', label: 'Last 30 days' },
+];
+
 function fmtDuration(sec?: number): string {
   if (!sec || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);
@@ -193,6 +203,7 @@ export default function HistoryScreen() {
   const [historyLoadError, setHistoryLoadError] = useState(false);
   const [historyLoadBusy, setHistoryLoadBusy] = useState(true);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
+  const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>('all');
   const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [showFusionValidation, setShowFusionValidation] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
@@ -202,6 +213,9 @@ export default function HistoryScreen() {
   const pendingReviewScrollRef = useRef<string | null>(null);
   const historyRevisionRef = useRef(0);
   const filterRevisionRef = useRef(0);
+  const periodRevisionRef = useRef(0);
+  const historyPeriodRef = useRef<HistoryPeriod>('all');
+  const periodWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
   const historyLoadAttemptRef = useRef(0);
   const sessionOperationRunnersRef = useRef(new Map<string, ReturnType<typeof createSingleFlightActionRunner>>());
 
@@ -233,17 +247,26 @@ export default function HistoryScreen() {
     historyLoadAttemptRef.current = loadAttempt;
     const revision = historyRevisionRef.current;
     const filterRevision = filterRevisionRef.current;
+    const periodRevision = periodRevisionRef.current;
     setHistoryLoadBusy(true);
     try {
-      const [storedSessions, savedFilter] = await Promise.all([
+      const [storedSessions, savedFilter, savedPeriod] = await Promise.all([
         loadSessionHistory<SessionRecord>(),
         AsyncStorage.getItem(HISTORY_FILTER_KEY).catch(() => null),
+        periodWriteQueueRef.current
+          .then(() => AsyncStorage.getItem(HISTORY_PERIOD_KEY))
+          .catch(() => undefined),
       ]);
       if (historyLoadAttemptRef.current === loadAttempt && historyRevisionRef.current === revision) {
         setSessions(storedSessions);
         setHistoryLoadError(false);
         if (filterRevisionRef.current === filterRevision) {
           setHistoryFilter(normalizeHistoryFilter(savedFilter));
+        }
+        if (periodRevisionRef.current === periodRevision && savedPeriod !== undefined) {
+          const period = normalizeHistoryPeriod(savedPeriod);
+          historyPeriodRef.current = period;
+          setHistoryPeriod(period);
         }
       }
     } catch {
@@ -271,6 +294,22 @@ export default function HistoryScreen() {
     AsyncStorage.setItem(HISTORY_FILTER_KEY, filter).catch(() => {
       Alert.alert('Could not remember this view', 'The filter still works now, but it may reset next time.');
     });
+  };
+
+  const chooseHistoryPeriod = (period: HistoryPeriod) => {
+    const revision = periodRevisionRef.current + 1;
+    periodRevisionRef.current = revision;
+    historyPeriodRef.current = period;
+    setHistoryPeriod(period);
+    setReviewQueueMessage(null);
+    pendingReviewScrollRef.current = null;
+    periodWriteQueueRef.current = periodWriteQueueRef.current
+      .then(() => AsyncStorage.setItem(HISTORY_PERIOD_KEY, period))
+      .catch(() => {
+        if (periodRevisionRef.current === revision) {
+          Alert.alert('Could not remember this period', 'The date view still works now, but it may reset next time.');
+        }
+      });
   };
 
   const saveSessionChanges = async (
@@ -306,11 +345,17 @@ export default function HistoryScreen() {
 
     if (operationCompleted && commitSucceeded && completesReview && !target.recoveredFromInterruption) {
       setReviewQueueMessage(null);
-      const queue = incompleteSessionReviewQueue(sortIndexedSessionsNewest(sessions), index);
+      const reviewPeriod = historyPeriodRef.current;
+      const queue = incompleteSessionReviewQueue(
+        filterIndexedSessionsByPeriod(sortIndexedSessionsNewest(sessions), reviewPeriod),
+        index,
+      );
       if (queue.length === 0) {
         Alert.alert(
           'Review queue complete',
-          'Every completed session has a full review. Your ratings remain saved on this iPhone.',
+          reviewPeriod === 'all'
+            ? 'Every completed session has a full review. Your ratings remain saved on this iPhone.'
+            : 'Every completed session in this period has a full review. Other dates remain available in All time.',
         );
         return;
       }
@@ -318,7 +363,7 @@ export default function HistoryScreen() {
       const next = queue[0];
       Alert.alert(
         'Review complete',
-        `${queue.length} unfinished ${queue.length === 1 ? 'session remains' : 'sessions remain'}.`,
+        `${queue.length} unfinished ${queue.length === 1 ? 'session remains' : 'sessions remain'} in this period.`,
         [
           { text: 'Done', style: 'cancel' },
           {
@@ -379,10 +424,15 @@ export default function HistoryScreen() {
 
   const shareSessions = async (items: SessionRecord[]) => {
     if (items.length === 0) return;
+    const periodLabel = HISTORY_PERIODS.find(period => period.value === historyPeriod)?.label || 'All time';
+    const filterLabel = HISTORY_FILTERS.find(filter => filter.value === historyFilter)?.label || 'All';
+    const dateScope = historyPeriod === 'all'
+      ? 'All saved dates are included.'
+      : 'This period includes today and the preceding local calendar days; unrecorded and future dates are excluded.';
     try {
       await Share.share({
         title: 'Occulert session summaries',
-        message: buildSessionHistoryExport(items),
+        message: `Shown view: ${periodLabel} · ${filterLabel}\n${dateScope}\n\n${buildSessionHistoryExport(items)}`,
       });
     } catch {
       Alert.alert('Could not share summaries', 'Please try exporting the session summaries again.');
@@ -451,17 +501,22 @@ export default function HistoryScreen() {
   const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteSessionReview(item)).length;
   const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteSessionReview(item)).length;
   const recoveredCount = sessions.filter(item => item.recoveredFromInterruption).length;
-  const filterCounts: Record<HistoryFilter, number> = {
-    all: sessions.length,
-    'needs-review': needsReviewCount,
-    reviewed: reviewedCount,
-    recovered: recoveredCount,
-  };
   const sortedSessions = sortIndexedSessionsNewest(sessions);
-  const nextReviewSession = sortedSessions.find(({ item }) => (
+  const periodSessions = filterIndexedSessionsByPeriod(sortedSessions, historyPeriod);
+  const periodNeedsReviewCount = periodSessions.filter(({ item }) => (
+    !item.recoveredFromInterruption && !hasCompleteSessionReview(item)
+  )).length;
+  const filterCounts: Record<HistoryFilter, number> = {
+    all: periodSessions.length,
+    'needs-review': periodNeedsReviewCount,
+    reviewed: periodSessions.filter(({ item }) => !item.recoveredFromInterruption && hasCompleteSessionReview(item)).length,
+    recovered: periodSessions.filter(({ item }) => item.recoveredFromInterruption).length,
+  };
+  const historyPeriodLabel = HISTORY_PERIODS.find(period => period.value === historyPeriod)?.label || 'All time';
+  const nextReviewSession = periodSessions.find(({ item }) => (
     !item.recoveredFromInterruption && !hasCompleteSessionReview(item)
   ));
-  const filteredSessions = sortedSessions
+  const filteredSessions = periodSessions
     .filter(({ item }) => {
       if (historyFilter === 'recovered') return Boolean(item.recoveredFromInterruption);
       if (historyFilter === 'reviewed') return !item.recoveredFromInterruption && hasCompleteSessionReview(item);
@@ -473,15 +528,15 @@ export default function HistoryScreen() {
   const filteredEmptyCopy: Record<Exclude<HistoryFilter, 'all'>, { title: string; detail: string }> = {
     'needs-review': {
       title: 'All caught up',
-      detail: 'Every completed session has a full review.',
+      detail: 'Every completed session in this period has a full review.',
     },
     reviewed: {
-      title: 'No completed reviews yet',
-      detail: 'Finish the alert rating, test conditions, and device-impact notes on a session to see it here.',
+      title: 'No completed reviews in this period',
+      detail: 'Finish a session review or choose another date period to see completed reviews.',
     },
     recovered: {
-      title: 'No recovered sessions',
-      detail: 'Sessions restored after an unexpected interruption will appear here.',
+      title: 'No recovered sessions in this period',
+      detail: 'Sessions restored after an unexpected interruption will appear here for their saved date.',
     },
   };
 
@@ -493,7 +548,7 @@ export default function HistoryScreen() {
     setExpandedSessions(current => ({ ...current, [key]: true }));
     setReviewQueueMessage({
       key,
-      text: `${needsReviewCount} unfinished ${needsReviewCount === 1 ? 'session' : 'sessions'} in this review queue`,
+      text: `${periodNeedsReviewCount} unfinished ${periodNeedsReviewCount === 1 ? 'session' : 'sessions'} in this period’s review queue`,
     });
   };
 
@@ -552,6 +607,7 @@ export default function HistoryScreen() {
 
         {loaded && sessions.length > 0 && (
           <>
+            <Text style={s.scopeLabel}>ALL HISTORY</Text>
             <View style={s.historySummary}>
               <View style={s.historySummaryItem}>
                 <Text style={s.historySummaryValue}>{needsReviewCount}</Text>
@@ -572,7 +628,7 @@ export default function HistoryScreen() {
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={`Continue reviewing the newest unfinished session from ${fmtDate(nextReviewSession.item.savedAt || nextReviewSession.item.updatedAt)}`}
-                accessibilityHint="Shows the Needs Review queue and expands the newest unfinished session"
+                accessibilityHint="Shows the Needs Review queue within the selected date period and expands its newest unfinished session"
                 accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
                 disabled={sessionOperationsBusy}
                 onPress={continueReviewing}
@@ -584,10 +640,38 @@ export default function HistoryScreen() {
                 <View style={s.continueReviewCopy}>
                   <Text style={s.continueReviewTitle}>Continue reviewing</Text>
                   <Text style={s.continueReviewDetail}>
-                    Open the newest unfinished session · {checkpointProgress} of {CHECKPOINT_TARGET} Medium reviews complete
+                    Newest unfinished session · {historyPeriodLabel} · All history: {checkpointProgress} of {CHECKPOINT_TARGET} Medium reviews complete
                   </Text>
                 </View>
               </TouchableOpacity>
+            )}
+            <Text style={s.scopeLabel}>SESSION DATES</Text>
+            <View accessibilityRole="tablist" style={s.filterRow}>
+              {HISTORY_PERIODS.map(period => {
+                const selected = historyPeriod === period.value;
+                return (
+                  <TouchableOpacity
+                    key={period.value}
+                    accessibilityRole="tab"
+                    accessibilityLabel={period.label}
+                    accessibilityHint={period.value === 'all'
+                      ? 'Shows saved sessions from every date'
+                      : 'Includes today and the preceding local calendar days; excludes unrecorded and future dates'}
+                    accessibilityState={{ selected }}
+                    style={[s.filterButton, selected && s.filterButtonSelected]}
+                    onPress={() => chooseHistoryPeriod(period.value)}
+                  >
+                    <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>
+                      {period.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {historyPeriod !== 'all' && (
+              <Text style={s.periodNote}>
+                Includes today and the previous {historyPeriod === '7-days' ? 6 : 29} days. Unrecorded and future dates stay in All time.
+              </Text>
             )}
             <View accessibilityRole="tablist" style={s.filterRow}>
               {HISTORY_FILTERS.map(filter => {
@@ -597,7 +681,7 @@ export default function HistoryScreen() {
                     key={filter.value}
                     accessibilityRole="tab"
                     accessibilityLabel={`${filter.label}, ${filterCounts[filter.value]} sessions`}
-                    accessibilityHint="Filters the saved session list"
+                    accessibilityHint="Filters the sessions in the selected date period"
                     accessibilityState={{ selected }}
                     style={[s.filterButton, selected && s.filterButtonSelected]}
                     onPress={() => chooseHistoryFilter(filter.value)}
@@ -610,7 +694,7 @@ export default function HistoryScreen() {
               })}
             </View>
             <Text accessibilityLiveRegion="polite" style={s.filterResult}>
-              Showing {filteredSessions.length} of {sessions.length} sessions
+              {historyPeriodLabel} · Showing {filteredSessions.length} of {periodSessions.length} sessions in this period · {sessions.length} saved overall
             </Text>
             {filteredSessions.length > 0 && (
               <TouchableOpacity
@@ -618,7 +702,7 @@ export default function HistoryScreen() {
                 accessibilityLabel={sessionOperationsBusy
                   ? 'Wait for session changes before sharing summaries'
                   : `Share ${filteredSessions.length} visible session summaries`}
-                accessibilityHint="Opens the iPhone share sheet with a privacy-limited text export"
+                accessibilityHint="Shares only the shown sessions and identifies the selected date period and review filter"
                 accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
                 disabled={sessionOperationsBusy}
                 style={[s.exportButton, sessionOperationsBusy && s.operationDisabled]}
@@ -657,8 +741,8 @@ export default function HistoryScreen() {
 
         {loaded && sessions.length > 0 && showFusionValidation && (
           <View style={s.fusionDashboard}>
-            <Text style={s.fusionEyebrow}>LOCAL FUSION VALIDATION</Text>
-            <Text style={s.fusionTitle}>Observation coverage across saved sessions</Text>
+            <Text style={s.fusionEyebrow}>ALL HISTORY · LOCAL FUSION VALIDATION</Text>
+            <Text style={s.fusionTitle}>Observation coverage across all saved sessions</Text>
             <View style={s.fusionStats}>
               <View style={s.fusionStat}>
                 <Text style={s.fusionStatValue}>{fusionValidation.observedSessions}/{fusionValidation.sessionTarget}</Text>
@@ -738,7 +822,7 @@ export default function HistoryScreen() {
           <View style={s.checkpoint}>
             <View style={s.checkpointHeader}>
               <View style={s.checkpointHeaderCopy}>
-                <Text style={s.checkpointEyebrow}>DRIVE REVIEW PROGRESS</Text>
+                <Text style={s.checkpointEyebrow}>ALL HISTORY · DRIVE REVIEW PROGRESS</Text>
                 <Text style={s.checkpointTitle}>
                   {checkpointProgress} of {CHECKPOINT_TARGET} Medium sessions reviewed
                 </Text>
@@ -858,7 +942,7 @@ export default function HistoryScreen() {
               <Ionicons name="document-text-outline" size={17} color="#bfdbfe" />
               <View style={s.pilotExportCopy}>
                 <Text style={s.pilotExportTitle}>Share pilot progress</Text>
-                <Text style={s.pilotExportDetail}>Aggregate counts only · no session or driver identifiers</Text>
+                <Text style={s.pilotExportDetail}>All history · aggregate counts only · no session or driver identifiers</Text>
               </View>
               <Ionicons name="share-outline" size={16} color="#93c5fd" />
             </TouchableOpacity>
@@ -883,15 +967,21 @@ export default function HistoryScreen() {
           </View>
         )}
 
-        {loaded && sessions.length > 0 && filteredSessions.length === 0 && historyFilter !== 'all' && (
+        {loaded && sessions.length > 0 && filteredSessions.length === 0 && (historyFilter !== 'all' || historyPeriod !== 'all') && (
           <View style={s.filteredEmpty}>
             <Ionicons name="checkmark-circle-outline" size={32} color="#4a7a8a" />
-            <Text style={s.emptyTitle}>{filteredEmptyCopy[historyFilter].title}</Text>
-            <Text style={s.emptySub}>{filteredEmptyCopy[historyFilter].detail}</Text>
+            <Text style={s.emptyTitle}>
+              {periodSessions.length === 0 ? 'No sessions in this period' : historyFilter !== 'all' ? filteredEmptyCopy[historyFilter].title : 'No sessions shown'}
+            </Text>
+            <Text style={s.emptySub}>
+              {periodSessions.length === 0
+                ? 'Your saved history is unchanged. Choose All time to see older sessions and sessions with unrecorded or future dates.'
+                : historyFilter !== 'all' ? filteredEmptyCopy[historyFilter].detail : 'Choose another view to see your saved sessions.'}
+            </Text>
             <TouchableOpacity
               accessibilityRole="button"
               style={s.clearFilterButton}
-              onPress={() => chooseHistoryFilter('all')}
+              onPress={() => { chooseHistoryFilter('all'); chooseHistoryPeriod('all'); }}
             >
               <Text style={s.clearFilterText}>Show all sessions</Text>
             </TouchableOpacity>
@@ -1293,6 +1383,8 @@ const s = StyleSheet.create({
   filterButtonText: { color: '#6592a5', fontSize: 10, fontWeight: '800' },
   filterButtonTextSelected: { color: '#dbeafe' },
   filterResult: { color: '#4a7a8a', fontSize: 10, marginBottom: 2 },
+  scopeLabel: { color: '#6592a5', fontSize: 9, fontWeight: '800', letterSpacing: 0.6, marginBottom: 7 },
+  periodNote: { color: '#6592a5', fontSize: 10, lineHeight: 15, marginBottom: 10 },
   exportButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10, marginTop: 8, paddingHorizontal: 12 },
   exportButtonText: { color: '#93c5fd', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   checkpoint: { backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: 'rgba(94,156,255,0.28)', borderRadius: radii.large, padding: 18, marginBottom: 16 },

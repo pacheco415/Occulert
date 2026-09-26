@@ -83,5 +83,7 @@
   "accept-invite-page-2.v61.js": "2b09970c9b52fe9d5985344181731d262992d9dc40f331b16e47e5b1b8f9ae18",
   "form-controls.v61.css": "acd03e2af5c895d08cb6f69e8e97431eb23c7e22cfec5f01e82a7b4231c04278",
   "form-controls.v62.css": "60adecc9dd4ee5a2dc105d3c5624f4d545d611617901a8d47332bc10afac336b",
-  "form-controls.v63.css": "c54e82ca6505a4f9a7d04f82e3208cf5c432d2ab79151afb3f5946bad16fa12c"
+  "form-controls.v63.css": "c54e82ca6505a4f9a7d04f82e3208cf5c432d2ab79151afb3f5946bad16fa12c",
+  "fleet-history-page.v64.js": "5f51daa1dc5a0589d59664b115c508d2f53c00344fee28b15bf8ae2a6bfc8b6f",
+  "fleet-history-page.v64.css": "1bbff354cca790796b19279f504726d89895e3281631371ff39abce205acdb83"
 }

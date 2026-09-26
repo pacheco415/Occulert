@@ -11,10 +11,35 @@ export function normalizeHistoryFilter(value: string | null | undefined): Histor
   return value && HISTORY_FILTERS.has(value as HistoryFilter) ? value as HistoryFilter : 'all';
 }
 
+export type HistoryPeriod = 'all' | '7-days' | '30-days';
+
+export function normalizeHistoryPeriod(value: string | null | undefined): HistoryPeriod {
+  return value === '7-days' || value === '30-days' ? value : 'all';
+}
+
 function validTimestamp(value: string | undefined): number | null {
   if (!value) return null;
   const timestamp = new Date(value).getTime();
   return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+/** Keep original storage indices so a dated view edits the same saved records. */
+export function filterIndexedSessionsByPeriod<T extends { savedAt?: string; updatedAt?: string }>(
+  sessions: Array<{ item: T; index: number }>,
+  period: HistoryPeriod,
+  now = Date.now(),
+): Array<{ item: T; index: number }> {
+  if (period === 'all') return sessions;
+
+  const firstDay = new Date(now);
+  firstDay.setHours(0, 0, 0, 0);
+  firstDay.setDate(firstDay.getDate() - (period === '7-days' ? 6 : 29));
+  const firstTimestamp = firstDay.getTime();
+
+  return sessions.filter(({ item }) => {
+    const timestamp = validTimestamp(item.savedAt) ?? validTimestamp(item.updatedAt);
+    return timestamp !== null && timestamp >= firstTimestamp && timestamp <= now;
+  });
 }
 
 export function sortIndexedSessionsNewest<T extends { savedAt?: string; updatedAt?: string }>(
