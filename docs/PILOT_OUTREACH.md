@@ -1,157 +1,176 @@
-# Occulert Pilot Fleet Outreach
+# Occulert pilot recruitment package
 
-Ready-to-send messages for recruiting real-world pilot fleet partners. Copy, personalize the [brackets], and send.
+Prepared September 25, 2026. **Drafts only: no messages have been sent.**
+This package supports recruitment of one fleet owner and up to five voluntary
+drivers for a 30-day introductory trial. Larger organizations may begin with
+that same five-driver subset. Existing session approval covers preparation;
+external sending needs authorized recipients and final messages.
 
----
+Use the [one-page overview](PILOT_OVERVIEW.md) for partner conversations and
+the [authoritative roadmap](APP_ROADMAP.md) to distinguish live features from
+unmerged source and future plans. Do not promise the quick-start branch,
+new reports workspace, data-quality upgrades, TV controls, or a new native
+build until released and verified.
 
-## Target Audiences
+## Recruitment fit
 
-1. **Rideshare drivers** — Uber/Lyft driver Facebook groups, Reddit r/uberdrivers, r/lyftdrivers
-2. **Delivery drivers** — Amazon DSP driver groups, FedEx/UPS forums, DoorDash Dashers
-3. **Trucking** — r/Truckers, Owner-Operator forums, OOIDA community boards
-4. **Small fleet operators** — LinkedIn outreach to fleet safety managers
-5. **Driver safety orgs** — NSC (National Safety Council), NTSB community contacts
+Prefer a fleet owner or manager who can support a small voluntary cohort,
+parked setup, explicit cloud consent, and day-7/day-30 review. Delivery,
+rideshare, local transport, and other small fleet teams are possible
+audiences; the use case does not establish compatibility or safety efficacy.
 
----
+The first conversation should establish whether the team wants to evaluate
+participation, setup friction, manager review time, or coaching workflow.
+Do not recruit people to drive tired, stage on-road fatigue, test emergency
+response, or substantiate accident-reduction claims.
 
-## Message Templates
+## Qualification questions
 
-### Template A — Facebook/Reddit (Driver Communities)
+Ask only what is needed to plan the pilot. Do not request medical/sleep records,
+face media, detailed routes, precise locations, or credentials.
 
-```
-Hey everyone — I built a free prototype called Occulert that uses your phone’s front camera
-to look for eye-closure patterns associated with drowsiness and provide supplemental alerts.
+| Question | What the answer resolves |
+|---|---|
+| 1. Who owns the fleet workspace, and who will handle support/reviews? | An accountable owner and permitted manager access. |
+| 2. Can you begin with up to five willing drivers for 30 days? | A bounded voluntary cohort rather than a broad compulsory rollout. |
+| 3. Which phone models/OS versions and browsers will they use? Is an installed private iPhone build part of the scope? | Platform compatibility and the exact tested distribution; no native Android promise. |
+| 4. Can every participant set up a stable lawful mount and test alerts while parked? | Safe camera placement and appropriate phone/audio testing. |
+| 5. What is your existing rest, fatigue, safe-stop, and escalation policy? | The prototype supplements an existing safe operating process. |
+| 6. Can drivers make an informed cloud-sync choice, pause participation, and review records after parking? | Voluntary participation and an understood local/protected-data boundary. |
+| 7. Is protected manager access acceptable without location, media, raw motion, or verified safety claims? Will any shared screen show aggregates only? | Privacy fit and no unsupported surveillance promise. |
+| 8. Is connectivity available when drivers choose to sync, and what should happen during a failed/missing upload? | Missing data is visible; local history does not guarantee cloud recovery. |
+| 9. Which primary goal and available day-7/day-30 meeting times should we agree? | A concrete workflow evaluation and review owner. |
+| 10. Who receives support issues, and how will withdrawal/local deletion/cloud deletion requests be handled? | A clear contact and exit plan before enrollment. |
 
-It can miss drowsiness or produce false alerts, so never rely on it to decide whether it is safe
-to keep driving. If you feel tired or unsafe, pull over safely and rest. Set it up only while parked.
+**Proceed** when a responsible owner, compatible devices, parked setup,
+voluntary consent, existing safe-stop policy, and two reviews are agreed.
+**Clarify before launch** when any is unconfirmed. **Decline or defer** a pilot
+requiring guaranteed detection/background monitoring, involuntary surveillance,
+road fatigue simulation, identity recognition, or location/medical evidence.
+These are partner-fit decisions, not a declaration that a participant is safe
+to drive.
 
-I’m a driver myself and built this because I know how real drowsy driving is, 
-especially on long shifts. It works right now as a web app at occulert.com — no download needed, 
-just open it in Safari or Chrome and mount your phone on the dash.
+## Email draft A — initial fleet invitation
 
-I’m looking for [5–10] drivers willing to try it for a week and give me honest feedback. 
-Completely free, no strings. In exchange I’ll give you direct access to me and early 
-access to new features.
+Subject: A small 30-day Occulert pilot for [Company]
 
-If you’re interested, drop a comment or DM me. Happy to answer any questions.
+Hi [Name],
 
-— Richard, builder of Occulert | hello@occulert.com
-```
+I'm Richard Pacheco, the builder of Occulert. I would like to discuss a
+voluntary trial with one fleet owner and up to five drivers at [Company].
 
----
+Occulert is a supplemental prototype that uses a phone's front camera to
+estimate eye/fatigue patterns and provide alerts. Its owner-scoped dashboard
+can help review voluntarily synced session summaries, participation, and
+manager follow-ups. Camera processing stays on the phone; protected manager
+reports exclude location, camera media, and raw motion.
 
-### Template B — Email to a Small Fleet Operator
+The introductory trial is 30 days, with no charge, credit card, or automatic
+renewal. We would agree parked setup, driver consent, a support contact, and
+reviews at days 7 and 30 before starting.
 
-```
-Subject: Free Pilot — AI Drowsiness Detection for Your Drivers
+It may miss drowsiness or produce false alerts. It does not establish fitness
+to drive or prevent crashes, and it does not replace rest or your safety
+policy. Drivers must pull over safely when tired and use the controls only
+while parked.
 
-Hi [Name / Fleet Manager],
-
-My name is Richard Pacheco. I’m an automotive technology student and fleet driver 
-from San Francisco who built Occulert — a free, privacy-first prototype that uses a
-driver’s phone camera to look for eye-closure patterns and provide supplemental alerts.
-
-Occulert has not been validated to prevent incidents. It may miss drowsiness or produce false
-alerts and must not replace rest, attentive driving, fleet policy, or emergency judgment. Drivers
-must pull over safely if tired and must not interact with the app while driving.
-
-I’m looking for a small fleet (5–20 vehicles) to run a 2–4 week pilot at no cost. 
-Here’s what that looks like:
-
-- Drivers install nothing — it runs as a web app in their phone’s browser
-- No camera video is stored or uploaded (privacy-first, on-device processing)
-- GPS and cloud sync are opt-in only, with full driver consent
-- You get a fleet dashboard showing session data across drivers
-- I provide direct support throughout the pilot
-
-At the end, all I ask for is honest feedback: what worked, what didn’t, 
-what would make it actually useful for your operation.
-
-If you’re interested or have questions, I’d love to connect.
+Would a brief conversation about [participation / manager review / setup]
+be useful? The overview is at [attach or share the approved one-page overview].
+A fleet request can also be made at
+https://www.occulert.com/pilot-signup.html?interest=free-trial&plan=free-trial.
 
 Richard Pacheco
-Builder, Occulert
+Occulert
 fleet@occulert.com
-occulert.com
-```
+https://www.occulert.com
 
----
+## Email draft B — interested partner qualification
 
-### Template C — LinkedIn DM to Fleet Safety Manager
+Subject: Planning the [Company] Occulert trial
 
-```
 Hi [Name],
 
-I noticed you work in fleet safety at [Company] — I’d love to share something 
-I’ve been building.
+Thanks for your interest. To keep the evaluation small and useful, I suggest
+one fleet owner, up to five willing drivers, and reviews at days 7 and 30.
 
-Occulert is a free, privacy-first drowsiness detection app that runs on a driver’s 
-phone (no hardware needed). It uses on-device AI to monitor eye fatigue and alert 
-drivers in real time. GPS and cloud sync are opt-in only.
+Before we agree a start date, could you share:
 
-It is a supplemental prototype that may miss drowsiness or produce false alerts. Drivers must
-pull over safely when tired and must not use Occulert as a reason to remain on the road.
+- the responsible manager and primary workflow goal;
+- the participants' phone models, OS versions, and intended browser/build;
+- how parked mounting/alert checks and voluntary cloud consent will work;
+- your existing rest/safe-stop policy and preferred support contact;
+- availability for the two review meetings?
 
-I’m currently recruiting pilot fleets for a free 30-day trial. If drowsy driving 
-is a concern for your operation, I’d love to get your feedback.
+Location and medical/sleep records are not needed. Please do not send face
+video, camera images, credentials, or private driver records.
 
-occulert.com | fleet@occulert.com
+We will confirm the available released features and support/deletion steps
+before enrollment. The trial does not require payment or renew automatically.
+Our review will cover participation, setup friction, incomplete records, and
+drivers' voluntary alert observations; it will not claim detection accuracy.
 
-— Richard
-```
+Richard Pacheco
+Occulert
+fleet@occulert.com
 
----
+## Email draft C — optional follow-up
 
-### Template D — Follow-up After No Response (1 week later)
+Subject: Re: A small Occulert pilot for [Company]
 
-```
 Hi [Name],
 
-Just circling back on my note about Occulert — the free drowsiness detection pilot. 
-No pressure at all if it’s not the right fit.
+Following up on the proposed 30-day Occulert pilot with up to five voluntary
+drivers. If evaluating setup, participation, and the manager workflow is useful
+for [Company], I can share the overview and agree a small scope.
 
-If timing is better later or you know someone who might be interested, 
-feel free to pass along: occulert.com
+If the timing is unsuitable, no action is needed. Thank you for considering it.
 
-Thanks for your time.
+Richard Pacheco
+Occulert
+fleet@occulert.com
 
-— Richard | fleet@occulert.com
-```
+## Pilot operating and review plan
 
----
+| When | Manager and driver actions | Evidence to record |
+|---|---|---|
+| Before enrollment | Confirm qualified fit, available release/build, consent, mounted parked setup, phone-only alert test, support/exit plan. Create fleet/invitations deliberately. | Agreed cohort size, device/build scope, goal, review dates; avoid unnecessary personal data. |
+| First session | Each willing driver chooses cloud consent, sets up while parked, monitors in the foreground, and reviews after parking. Owner checks the protected record. | Successful/failed setup and sync; no record is not a measured zero. |
+| Day 7 | Review participation, stale/missing/unfinished records, repeated setup problems, and voluntary false/missed/late-alert reports. Agree support fixes or pause. | Bounded 7-day dashboard snapshot and coverage limits, follow-up actions, non-sensitive observations. |
+| Day 30 | Repeat review, compare agreed workflow goals, decide stop/continue/separate rollout. Explain local versus cloud deletion. | Bounded 30-day snapshot, unresolved issues, participant feedback, explicit next decision. |
 
-## Outreach Tracker
+An operating goal can be three to five willing participants and several
+naturally occurring sessions each; this is a proposed participation target,
+not an accuracy denominator or a reason to extend driving. A fully reviewed
+Medium-sensitivity checkpoint requires ten complete reviews and varied safe
+conditions; recovered partial sessions do not count. See
+[Beta Test Plan](BETA_TEST_PLAN.md).
 
-Use this table to track your outreach progress:
+Pause or stop participation for unresolved mounting/tracking problems,
+unreliable intended alert routing, excess heat, distracting controls, repeated
+failures, or any participant concern. Review only after parking. A failed test
+is a support finding, never a request to continue driving to produce evidence.
 
-| Date | Platform / Name | Template Used | Status | Notes |
-|------|----------------|---------------|--------|-------|
-| | | | | |
-| | | | | |
-| | | | | |
+## Outreach tracker
 
-**Status options:** Sent / Replied / Pilot Active / Pilot Complete / No Response / Not Interested
+Maintain recipient details only in the authorized contact workspace. This
+repository table records no real contacts or sends.
 
----
+| Organization placeholder | Owner | Stage | Next action |
+|---|---|---|---|
+| [Qualified fleet] | [Assigned outreach owner] | Draft; unsent | Review recipient and personalized message before sending |
 
-## Pilot Success Criteria
+Stages: Draft / Authorized to send / Sent / Replied / Qualified / Deferred /
+Pilot active / Pilot complete / Not interested. Authorization is not a send.
+Do not invent timestamps, responses, enrollments, testimonials, or results.
 
-A successful pilot provides at least:
-- [ ] 3–5 active drivers using Occulert for 5+ sessions each
-- [ ] Qualitative feedback (what triggered alerts, false alert rate, UX friction)
-- [ ] At least one fleet operator willing to provide a written testimonial
-- [ ] Data on real alert events (how many, during what driving conditions)
+## Interpreting feedback
 
----
+Record voluntary feedback and condition gaps without face media, location,
+health records, or raw motion. Summarize observations and counts rather than
+an on-road false-alert rate. Complete the authorized dataset benchmark and
+full-pipeline evaluation before making accuracy claims.
 
-## What to Do With Pilot Feedback
-
-1. Log all feedback in a shared doc or Notion page
-2. Update `ACCURACY_BENCHMARK.md` with real-world false alert rates
-3. Prioritize top UX issues in next sprint
-4. Add testimonial (with permission) to occulert.com landing page
-5. Use pilot data to support future grant or investor conversations
-
----
-
-*Occulert™ · fleet@occulert.com · occulert.com*
+Testimonials are optional and require the participant's permission for the
+exact wording and use; they are not a pilot success requirement or safety
+evidence. Recruitment sending and publishing endorsements remain separate
+external actions.

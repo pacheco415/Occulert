@@ -18,7 +18,7 @@ for (const [original, asset] of Object.entries(versions)) {
 for (const path of ['/index.html', '/app.html', '/manifest.json', '/sw.js']) {
   assert.equal(cachePolicy(path), 'public, max-age=0, must-revalidate', `${path} must revalidate`);
 }
-const extractedPages = 'account login driver-profiles faq features how-it-works install pilot-signup privacy product-hub safety session-history accept-invite fleet-onboarding fleet-pricing pilot-leads about'.split(' ');
+const extractedPages = 'account login driver-profiles faq features how-it-works install pilot-signup pilot-guide privacy product-hub safety session-history accept-invite fleet-onboarding fleet-pricing pilot-leads about'.split(' ');
 for (const name of extractedPages) {
   const html = read(name + '.html');
   assert.doesNotMatch(html, /<style\b|<script(?![^>]*\bsrc=)/i, `${name} must use external styles and scripts`);

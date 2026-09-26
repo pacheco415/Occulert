@@ -1,23 +1,26 @@
 # Occulert Beta Test Plan
 
-Purpose: collect controlled evidence about false, correct, and missed alerts
-before changing detection thresholds or making accuracy claims.
+Purpose: collect controlled observations about correct, false, missed, and late
+alerts before changing detection thresholds or making accuracy claims. Current
+release status is in the [authoritative roadmap](APP_ROADMAP.md).
 
-## Current private baseline
+## Recorded evidence and current source
 
-- iPhone monitoring, phone alert/audio behavior, Apple Watch haptics, alert
-  frequency, layout, and read-only Apple Health context passed real-device
-  checks in private TestFlight build 19.
+- Earlier iPhone/Watch evidence, including build 19 and the dated audit's build
+  36, is historical. The September 21 release record includes build-49 parked
+  camera-load/readiness feedback and build-50 submission/availability. Confirm
+  the installed version/build for each new session; this plan does not identify
+  the latest installed binary or accept subsequent source changes.
 - Session History lets testers label a completed session as **Felt right**,
-  **False alert**, or **Missed alert**.
+  **False alert**, **Missed alert**, or **Late alert**.
 - New sessions preserve the active sensitivity setting, and Session History
   shows progress toward the first 10 reviewed Medium-sensitivity sessions.
 - Those labels stay on the tester's iPhone unless the tester chooses to send an
   editable feedback email.
-- Build 15 includes structured lighting, eyewear, and phone-position capture,
+- Current source includes structured lighting, eyewear, and phone-position capture,
   plus local coverage counts so repeated test conditions do not create a
   misleading 10-session checkpoint.
-- Build 15 includes tester-reported battery use and phone heat; they are
+- Current source includes tester-reported battery use and phone heat; they are
   observations, not measurements.
 - Completed reviews collapse to a summary, while incomplete sessions remain
   open with a **Needs review** indicator.
@@ -49,15 +52,17 @@ before changing detection thresholds or making accuracy claims.
 - Reduce false alerts.
 - Identify missed drowsiness events.
 - Test phone mount positions.
-- Test night driving and low-light conditions.
+- Review naturally occurring low-light observations and safe parked/passenger tests.
 - Test glasses, sunglasses, and different face angles.
-- Measure battery use and phone heat.
+- Record battery percentage change and tester-reported heat, with model/build.
 - Collect user feedback from real drivers.
 
-## First accuracy checkpoint
+## First review checkpoint
 
-Begin with 10 reviewed sessions on the default Medium sensitivity. Use several
-safe conditions before changing thresholds:
+Begin with 10 fully reviewed, complete sessions on default Medium sensitivity,
+with exact build recorded. Exclude recovered partial sessions from the target.
+Use several safe conditions before considering threshold changes; ten reviews
+alone do not establish accuracy:
 
 1. Normal indoor or daylight conditions while parked.
 2. Low light while parked.
@@ -96,7 +101,7 @@ sleepy.
 After each safely completed session:
 
 1. Open **Session History**.
-2. Choose **Felt right**, **False alert**, or **Missed alert**.
+2. Choose **Felt right**, **False alert**, **Missed alert**, or **Late alert**.
 3. Record lighting, eyewear, and phone position directly on the session card.
 4. Record the tester-observed battery use and phone heat after safely parking.
 5. Record any remaining non-sensitive test conditions below.
@@ -128,9 +133,9 @@ Use a 1 to 5 score:
 - 4 = good
 - 5 = excellent
 
-Score these categories:
+These are participant experience ratings, not measured accuracy. Rate:
 
-- Detection accuracy
+- Perceived alert fit
 - Alert timing
 - Ease of setup
 - Battery impact
@@ -139,22 +144,38 @@ Score these categories:
 
 ## Fleet pilot target
 
-After at least 10 reviewed sessions show no unresolved safety blocker, expand
-to 5 to 10 trusted testers. Once that group is stable, prepare a small fleet
-pilot:
+Prepare one fleet owner and up to five willing drivers for a 30-day controlled
+pilot. Before operating, review the ten-session checkpoint, varied conditions,
+and unresolved setup/alert concerns; do not interpret enrollment as device or
+accuracy acceptance. Agree:
 
-- 3 to 5 drivers
-- 2 weeks
-- daily feedback form
-- summary report
-- before/after safety insights
+- Voluntary participation, compatible phones, parked setup, and cloud consent
+- Existing rest/safe-stop policy, a support owner, and pause/exit/deletion steps
+- Day-7 and day-30 reviews using protected, bounded snapshots
+- Setup, participation, missing records, manager workflow, and driver observations
+- No crash-reduction, fitness-to-drive, or before/after safety claims
+
+Protected manager snapshots cover the latest 50 sessions and omit local review
+labels, recovery reasons, Health context, raw motion, and fusion observations.
+A missing record does not establish that no drive or alert occurred. Local
+reviews and voluntarily shared aggregate feedback are separate evidence.
+Recruitment questions and unsent email drafts are in
+[Pilot Outreach](PILOT_OUTREACH.md).
 
 ## Next pilot priorities
 
-1. Complete 10 safely reviewed build-15 sessions on Medium sensitivity.
+1. Confirm the exact installed build, then complete ten safely reviewed,
+   complete Medium-sensitivity sessions across varied conditions.
 2. Use the local alert-pattern summary to compare false and missed alerts by
    lighting, eyewear, phone position, and sensitivity after coverage is broad
    enough to avoid misleading conclusions.
 3. Adjust thresholds only when the reviewed evidence supports a change.
 4. Obtain authorized dataset access and run `ACCURACY_BENCHMARK.md`.
-5. Add a privacy-safe aggregate export only if manual review becomes too slow.
+5. Use the implemented local privacy-limited aggregate sharing deliberately;
+   reports contain observation counts, not accuracy rates.
+
+Local fusion coverage and its next-session planner remain observation only.
+Camera/headphone candidate counts and optional Watch availability do not change
+scores or alerts. Independently calibrate/validate each signal before fusion
+scoring; do not stage on-road fatigue or treat a represented condition as proof
+of accuracy.
