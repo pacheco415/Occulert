@@ -16,7 +16,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/occulert-logo-main-192.png">
   <script defer src="/lang.v47.js"></script>
-  <script src="/occulert-backend.v47.js"></script>
+  <script src="/occulert-backend.v58.js"></script>
   <script src="/security-utils.v47.js"></script>
   <script src="/fleet-followups.v57.js" defer></script>
   <script src="/fleet-pilot-report.v56.js" defer></script>
@@ -229,11 +229,11 @@
   <footer class="footer"><a href="/">Occulert</a> &nbsp;·&nbsp; <a href="/app.html">Driver App</a> &nbsp;·&nbsp; <a href="/privacy.html">Privacy</a><div style="margin-top:8px">© 2026 Occulert. Prototype only — not a certified safety, medical, emergency, or compliance device.</div></footer>
 <script>
 /* fleet-refresh-policy:start */
-const DASHBOARD_CLOCK_INTERVAL_MS=15000,PROTECTED_ACTIVE_REFRESH_MS=30000,PROTECTED_IDLE_REFRESH_MS=90000,PROTECTED_SAVE_DATA_REFRESH_MS=120000,PROTECTED_EVENTS_REFRESH_MS=120000,PROTECTED_MAX_BACKOFF_MS=300000;
+const DASHBOARD_CLOCK_INTERVAL_MS=15000,PROTECTED_ACTIVE_REFRESH_MS=30000,PROTECTED_IDLE_REFRESH_MS=90000,PROTECTED_SAVE_DATA_REFRESH_MS=120000,PROTECTED_EVENTS_REFRESH_MS=120000,PROTECTED_MAX_BACKOFF_MS=300000,PROTECTED_REQUEST_TIMEOUT_MS=8000;
 function protectedRefreshDelay({hasActiveSession=false,failureCount=0,saveData=false}={}){let base=hasActiveSession?PROTECTED_ACTIVE_REFRESH_MS:saveData?PROTECTED_SAVE_DATA_REFRESH_MS:PROTECTED_IDLE_REFRESH_MS,multiplier=2**Math.min(Math.max(0,failureCount),3);return Math.min(PROTECTED_MAX_BACKOFF_MS,base*multiplier)}
 function shouldRefreshProtectedEvents({historyOpen=false,lastLoadedAt=0,now=Date.now(),force=false}={}){return historyOpen&&(force||!lastLoadedAt||now-lastLoadedAt>=PROTECTED_EVENTS_REFRESH_MS)}
 /* fleet-refresh-policy:end */
-let cloudRows=[],lastOpsSummary='',lastRows=[],fleetMode=false,protectedUserId='',protectedFleetName='',protectedFleetPlan='',protectedSessions=[],protectedEvents=[],protectedDrivers=[],lastDashboardSnapshot='',sessionHistoryDirty=true,driverListFrame=0,protectedFleetLoading=false,protectedEventsRefreshPending=false,protectedAccountRefreshPending=false,dashboardRefreshTimer=0,protectedRefreshTimer=0,protectedEventsLoadedAt=0,protectedLastSuccessfulAt=0,protectedRefreshFailures=0,protectedTelemetryTrust='',protectedReportPrivacy=null,protectedReportShape=false;
+let cloudRows=[],lastOpsSummary='',lastRows=[],fleetMode=false,protectedUserId='',protectedFleetName='',protectedFleetPlan='',protectedSessions=[],protectedEvents=[],protectedDrivers=[],lastDashboardSnapshot='',sessionHistoryDirty=true,driverListFrame=0,protectedFleetLoading=false,protectedFleetGeneration=0,protectedFleetCancel=null,protectedEventsRefreshPending=false,protectedAccountRefreshPending=false,dashboardRefreshTimer=0,protectedRefreshTimer=0,protectedEventsLoadedAt=0,protectedLastSuccessfulAt=0,protectedRefreshFailures=0,protectedTelemetryTrust='',protectedReportPrivacy=null,protectedReportShape=false;
 function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function jsArg(v){return encodeURIComponent(String(v??''))}
 function fromArg(v){try{return decodeURIComponent(String(v??''))}catch(e){return String(v??'')}}
@@ -335,33 +335,46 @@ function clearDemoData(){cloudRows=[];let live=getLocal();if(live&&String(live.d
 /* fleet-summary-projection:start */
 function rowsFromFleet(summary){let sessions=Array.isArray(summary.sessions)?summary.sessions:[],latest=new Map();sessions.forEach(s=>{if(!latest.has(s.driver_id))latest.set(s.driver_id,s)});return (summary.drivers||[]).map(d=>{let s=latest.get(d.id),active=d.active!==false,hasSafetyScore=!!s&&s.safety_score!==null&&s.safety_score!==undefined&&s.safety_score!==''&&Number.isFinite(Number(s.safety_score)),score=hasSafetyScore?Number(s.safety_score):null,status=!active?'INACTIVE':!s||!hasSafetyScore?'NO DATA':score<50?'ALERT':score<75?'WATCH':'SAFE';return{name:d.name,driverId:d.id,route:d.vehicle_id||'Unassigned vehicle',status,safetyScore:score,hasSafetyScore,hasSession:!!s,active,sessionActive:!!s&&!s.ended_at,fatigue:s&&s.max_fatigue,alerts:s&&s.alert_count,lastUpdate:s&&(s.ended_at||s.started_at),cloudConsent:true,cloudSynced:true}})}
 /* fleet-summary-projection:end */
+/* fleet-refresh-request:start */
+function setProtectedFleetBusy(value){protectedFleetLoading=value;let button=document.getElementById('refreshNow');if(button){button.disabled=value;button.textContent=value?'Refreshing…':'Refresh now'}document.getElementById('cloudStatus')?.setAttribute('aria-busy',String(value))}
+function cancelProtectedFleetRefresh(){protectedFleetGeneration+=1;protectedFleetCancel?.()}
+async function boundedProtectedFleetRequest(work,cancelled){let timer;try{return await Promise.race([Promise.resolve().then(work),cancelled,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Protected request timed out')),PROTECTED_REQUEST_TIMEOUT_MS)})])}finally{clearTimeout(timer)}}
+function currentProtectedOwner(){let user=window.OcculertBackend?.currentUser?.();return typeof user?.id==='string'?user.id:''}
 function showSignedOutActions(show){document.getElementById('signedOutActions')?.classList.toggle('hidden',!show);document.getElementById('driverAppNav')?.classList.toggle('hidden',!show);document.getElementById('accountNav')?.classList.toggle('hidden',show);document.getElementById('refreshNow')?.classList.toggle('hidden',show);let primary=document.getElementById('fleetPrimaryNav');if(primary){primary.href=show?'/login.html':'/fleet-onboarding.html';primary.textContent=show?'Sign In':'Fleet setup'}}
 function clearProtectedFleetCache(){window.OcculertFollowups?.reset();window.OcculertPilotReport?.reset();protectedTelemetryTrust='';protectedReportPrivacy=null;protectedReportShape=false;cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedEventsRefreshPending=false;protectedFleetName='';protectedFleetPlan='';protectedEventsLoadedAt=0;protectedLastSuccessfulAt=0;protectedRefreshFailures=0;sessionHistoryDirty=true;lastDashboardSnapshot=''}
-function resetProtectedFleet(){let localDemoRows=cloudRows.length&&cloudRows.every(row=>String(row.driverId||'').startsWith('demo-'))?cloudRows:[];fleetMode=false;protectedUserId='';protectedAccountRefreshPending=false;clearProtectedFleetCache();cloudRows=localDemoRows;showSignedOutActions(true);syncProtectedControls();document.getElementById('cloudStatus').textContent='Not signed in. Showing same-browser local data only; protected fleet data remains unavailable.';render()}
+function resetProtectedFleet(){cancelProtectedFleetRefresh();let localDemoRows=cloudRows.length&&cloudRows.every(row=>String(row.driverId||'').startsWith('demo-'))?cloudRows:[];fleetMode=false;protectedUserId='';protectedAccountRefreshPending=false;clearProtectedFleetCache();cloudRows=localDemoRows;showSignedOutActions(true);syncProtectedControls();document.getElementById('cloudStatus').textContent='Not signed in. Showing same-browser local data only; protected fleet data remains unavailable.';render()}
+function reconcileProtectedOwner(expectedUserId){let currentUserId=currentProtectedOwner();if(currentUserId===expectedUserId)return false;if(!currentUserId){resetProtectedFleet();return true}cancelProtectedFleetRefresh();clearProtectedFleetCache();protectedUserId=currentUserId;fleetMode=true;protectedAccountRefreshPending=true;showSignedOutActions(false);syncProtectedControls();document.getElementById('cloudStatus').textContent='Signed-in account changed. Loading the new account’s protected fleet data.';render();return true}
+function recordProtectedRefreshFailure(stage){protectedRefreshFailures=Math.min(4,protectedRefreshFailures+1);let last=protectedLastSuccessfulAt?new Date(protectedLastSuccessfulAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';document.getElementById('cloudStatus').textContent=stage==='account'?'Account check unavailable or timed out. Sign-out was not confirmed. '+(last?'Showing the protected data last updated at '+last+'. ':'Protected fleet data is unavailable. '):last?'Connection interrupted or timed out. Showing the protected data last updated at '+last+'. ':'Protected fleet data is temporarily unavailable or the request timed out. ';document.getElementById('cloudStatus').textContent+='Use Refresh now to retry; automatic retries will slow down to reduce data use.';refreshDashboardIfNeeded();window.OcculertPilotReport?.update()}
 async function loadProtectedFleet(options={}){
   let includeEvents=options.includeEvents===true;
   if(protectedFleetLoading){if(includeEvents)protectedEventsRefreshPending=true;return false}
-  protectedFleetLoading=true;
+  setProtectedFleetBusy(true);
+  let version=++protectedFleetGeneration,cancel,stage='account',backend=window.OcculertBackend,expectedUserId='';
+  let cancelled=new Promise((_,reject)=>{cancel=()=>reject(new Error('Protected request superseded'))});cancelled.catch(()=>{});protectedFleetCancel=cancel;
   try{
-    let backend=window.OcculertBackend,session=null;
-    try{session=backend&&backend.getSession?await backend.getSession():null}catch(e){}
-    let user=session&&session.user,userId=typeof user?.id==='string'?user.id:'';
-    if(!userId){resetProtectedFleet();return false}
-    if(protectedUserId&&protectedUserId!==userId){clearProtectedFleetCache();fleetMode=true;showSignedOutActions(false);syncProtectedControls();document.getElementById('cloudStatus').textContent='Signed-in account changed. Loading the new account’s protected fleet data.';render()}
-    protectedUserId=userId;
+    if(!backend?.currentUser)throw new Error('Protected backend unavailable');
+    expectedUserId=currentProtectedOwner();
+    if(!expectedUserId){resetProtectedFleet();return false}
+    if(protectedUserId!==expectedUserId){clearProtectedFleetCache();protectedUserId=expectedUserId;fleetMode=true;render()}
     showSignedOutActions(false);fleetMode=true;syncProtectedControls();
-    let result;
-    try{result=backend&&backend.getFleetSummary?await backend.getFleetSummary({includeEvents}):{ok:false,status:0,body:{error:'backend_unavailable'}}}
-    catch(e){result={ok:false,status:0,body:{error:'network_unavailable'}}}
-    let currentUser=backend&&backend.currentUser?backend.currentUser():user,currentUserId=typeof currentUser?.id==='string'?currentUser.id:'';
-    if(currentUserId!==userId){clearProtectedFleetCache();protectedUserId=currentUserId;fleetMode=!!currentUserId;showSignedOutActions(!currentUserId);syncProtectedControls();document.getElementById('cloudStatus').textContent=currentUserId?'Signed-in account changed while the dashboard was refreshing. Refresh again to load the new account’s protected fleet data.':'Signed out while the dashboard was refreshing. Protected fleet data was cleared.';render();return false}
+    if(!backend.getSession||!backend.getFleetSummary)throw new Error('Protected backend unavailable');
+    let session=await boundedProtectedFleetRequest(()=>backend.getSession(),cancelled);
+    if(version!==protectedFleetGeneration)return false;
+    if(reconcileProtectedOwner(expectedUserId))return false;
+    if(session?.user?.id!==expectedUserId)throw new Error('Protected account could not be confirmed');
+    stage='summary';
+    let result=await boundedProtectedFleetRequest(()=>backend.getFleetSummary({includeEvents}),cancelled);
+    if(version!==protectedFleetGeneration)return false;
+    if(reconcileProtectedOwner(expectedUserId))return false;
     if(!result.ok&&result.status===401){backend.signOut();resetProtectedFleet();return false}
     if(result.ok){protectedReportShape=Array.isArray(result.body.sessions)&&Array.isArray(result.body.drivers);protectedTelemetryTrust=String(result.body.telemetry_trust||'');protectedReportPrivacy=result.body.privacy||null;window.OcculertFollowups?.show();protectedFleetName=result.body.fleet.company_name||'your fleet';protectedFleetPlan=String(result.body.fleet.plan||'fleet').slice(0,40);protectedDrivers=Array.isArray(result.body.drivers)?result.body.drivers:[];protectedSessions=Array.isArray(result.body.sessions)?result.body.sessions:[];if(result.body.events_included!==false){protectedEvents=Array.isArray(result.body.events)?result.body.events:[];protectedEventsLoadedAt=Date.now()}cloudRows=rowsFromFleet(result.body);protectedLastSuccessfulAt=Date.now();protectedRefreshFailures=0;sessionHistoryDirty=true;document.getElementById('cloudStatus').textContent='Protected connection active for '+protectedFleetName+'. Active sessions refresh every 30 seconds; otherwise the dashboard uses a lower-cost 90-second refresh.'}
     else if(result.body&&result.body.error==='fleet_not_found'){clearProtectedFleetCache();document.getElementById('cloudStatus').textContent='No owned fleet found. Use Fleet setup to create one and invite drivers.'}
-    else{protectedRefreshFailures=Math.min(4,protectedRefreshFailures+1);let last=protectedLastSuccessfulAt?new Date(protectedLastSuccessfulAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';document.getElementById('cloudStatus').textContent=last?'Connection interrupted. Showing the protected data last updated at '+last+' while automatic retries slow down to reduce data use.':'Protected fleet data is temporarily unavailable. Automatic retries will slow down to reduce data use.'}
+    else{recordProtectedRefreshFailure(stage);return false}
     refreshDashboardIfNeeded();window.OcculertPilotReport?.update();return result.ok
-  }finally{let refreshEvents=protectedEventsRefreshPending,refreshAccount=protectedAccountRefreshPending;protectedEventsRefreshPending=false;protectedAccountRefreshPending=false;protectedFleetLoading=false;if((refreshAccount||refreshEvents)&&fleetMode)void refreshProtectedFleetNow({forceEvents:refreshEvents})}
+  }catch(error){if(version!==protectedFleetGeneration)return false;if(backend?.currentUser&&reconcileProtectedOwner(expectedUserId))return false;recordProtectedRefreshFailure(stage);return false}
+  finally{let refreshEvents=protectedEventsRefreshPending,refreshAccount=protectedAccountRefreshPending;protectedEventsRefreshPending=false;protectedAccountRefreshPending=false;if(protectedFleetCancel===cancel)protectedFleetCancel=null;setProtectedFleetBusy(false);if((refreshAccount||refreshEvents&&protectedRefreshFailures===0)&&fleetMode&&!document.hidden)void refreshProtectedFleetNow({forceEvents:refreshEvents})}
 }
+/* fleet-refresh-request:end */
 /* fleet-refresh-scheduling:start */
 function stopRefreshTimers(){clearInterval(dashboardRefreshTimer);clearTimeout(protectedRefreshTimer);dashboardRefreshTimer=0;protectedRefreshTimer=0}
 function startDashboardClock(){clearInterval(dashboardRefreshTimer);dashboardRefreshTimer=0;if(!document.hidden)dashboardRefreshTimer=setInterval(refreshDashboardIfNeeded,DASHBOARD_CLOCK_INTERVAL_MS)}
@@ -371,7 +384,7 @@ function startRefreshTimers(){stopRefreshTimers();if(document.hidden)return;star
 async function refreshProtectedFleetNow(options={}){clearTimeout(protectedRefreshTimer);protectedRefreshTimer=0;let includeEvents=shouldRefreshProtectedEvents({historyOpen:protectedHistoryOpen(),lastLoadedAt:protectedEventsLoadedAt,force:options.forceEvents===true});await loadProtectedFleet({includeEvents});scheduleProtectedRefresh()}
 async function handleVisibilityChange(){if(document.hidden){stopRefreshTimers();return}startDashboardClock();refreshDashboardIfNeeded();if(fleetMode)await refreshProtectedFleetNow();else scheduleProtectedRefresh()}
 /* fleet-refresh-scheduling:end */
-async function handleAuthStorageChange(event){if(event.key!==null&&event.key!=='occulert-auth')return;let backend=window.OcculertBackend,currentUser=backend&&backend.currentUser?backend.currentUser():null,currentUserId=typeof currentUser?.id==='string'?currentUser.id:'';if(currentUserId===protectedUserId)return;if(!currentUserId){resetProtectedFleet();startRefreshTimers();return}clearProtectedFleetCache();protectedUserId=currentUserId;fleetMode=true;showSignedOutActions(false);syncProtectedControls();document.getElementById('cloudStatus').textContent='Signed-in account changed. Loading the new account’s protected fleet data.';render();if(protectedFleetLoading){protectedAccountRefreshPending=true;return}await refreshProtectedFleetNow()}
+async function handleAuthStorageChange(event){if(event.key!==null&&event.key!=='occulert-auth')return;let backend=window.OcculertBackend,currentUser=backend&&backend.currentUser?backend.currentUser():null,currentUserId=typeof currentUser?.id==='string'?currentUser.id:'';if(currentUserId===protectedUserId){if(!currentUserId)return;cancelProtectedFleetRefresh();if(protectedFleetLoading){protectedAccountRefreshPending=true;return}await refreshProtectedFleetNow();return}if(!currentUserId){resetProtectedFleet();startRefreshTimers();return}cancelProtectedFleetRefresh();clearProtectedFleetCache();protectedUserId=currentUserId;fleetMode=true;showSignedOutActions(false);syncProtectedControls();document.getElementById('cloudStatus').textContent='Signed-in account changed. Loading the new account’s protected fleet data.';render();if(protectedFleetLoading){protectedAccountRefreshPending=true;return}await refreshProtectedFleetNow()}
 async function boot(){render();await new Promise(resolve=>setTimeout(resolve,100));await loadProtectedFleet();startRefreshTimers()}
 document.addEventListener('visibilitychange',()=>{void handleVisibilityChange()});
 window.addEventListener('storage',event=>{void handleAuthStorageChange(event)});

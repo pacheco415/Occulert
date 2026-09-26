@@ -74,13 +74,15 @@ const context = {
   Promise,
   String,
   URLSearchParams,
+  setTimeout, clearTimeout, AbortController,
 };
 window.window = window;
 window.localStorage = localStorage;
 window.navigator = context.navigator;
 window.fetch = fetchMock;
 
-vm.runInNewContext(readFileSync(new URL("../occulert-backend.v47.js", import.meta.url), "utf8"), context);
+const clientSource = readFileSync(new URL("../occulert-backend.v58.js", import.meta.url), "utf8");
+vm.runInNewContext(clientSource, context);
 const backend = window.OcculertBackend;
 
 assert.equal(backend.authMessage({ body: { code: "over_email_send_rate_limit", message: "email rate limit exceeded" } }, "signup"), "Too many confirmation emails were requested. Wait about an hour, then try Create Account once.");
@@ -177,4 +179,205 @@ assert.equal(recoveryUserCall.headers.Authorization, "Bearer recovery-access");
 
 backend.signOut();
 assert.equal(backend.currentUser(), null);
+
+function refreshHarness() {
+  const storage = new Map();
+  const pending = [];
+  const protectedPending = [];
+  const requests = [];
+  let writesBlocked = false;
+  const localStorage = {
+    getItem: key => storage.get(key) || null,
+    setItem: (key, value) => { if (writesBlocked) throw new Error('Storage unavailable'); storage.set(key, String(value)); },
+    removeItem: key => storage.delete(key),
+  };
+  const window = {};
+  vm.runInNewContext(clientSource, {
+    window, localStorage, navigator: {},
+    fetch(url) {
+      requests.push(String(url));
+      if (url === '/api/public-config') return Promise.resolve(response({ supabase: { configured: true, url: 'https://example.supabase.co', anonKey: 'public' } }));
+      if (String(url).includes('grant_type=refresh_token')) return new Promise(resolve => pending.push(resolve));
+      if (String(url).includes('/api/fleet-summary') || String(url).endsWith('/auth/v1/user')) return new Promise(resolve => protectedPending.push(resolve));
+      throw new Error('Unexpected protected request after superseded auth: ' + url);
+    },
+    Date, JSON, Promise, URLSearchParams, setTimeout, clearTimeout, AbortController,
+  });
+  const expired = { access_token: 'old-access', refresh_token: 'old-refresh', expires_at: 1, user: { id: 'owner-a' } };
+  const fresh = { access_token: 'new-access', refresh_token: 'new-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'owner-b' } };
+  window.OcculertBackend.adoptSession(expired);
+  return { backend: window.OcculertBackend, pending, protectedPending, requests, storage, expired, fresh, blockWrites: () => { writesBlocked = true; } };
+}
+async function waitForRefresh(harness, count = 1) {
+  for (let i = 0; i < 10 && harness.pending.length < count; i++) await new Promise(setImmediate);
+  assert.equal(harness.pending.length, count, 'refresh request must reach the deferred transport');
+}
+
+for (const status of [200, 400]) {
+  for (const replacement of ['signout', 'adopt', 'other-tab', 'same-session']) {
+    const h = refreshHarness();
+    const refresh = h.backend.getSession();
+    const rejected = assert.rejects(refresh, { code: 'auth_session_changed' });
+    await waitForRefresh(h);
+    if (replacement === 'signout') h.backend.signOut();
+    else if (replacement === 'other-tab') h.storage.set('occulert-auth', JSON.stringify(h.fresh));
+    else h.backend.adoptSession(replacement === 'same-session' ? h.expired : h.fresh);
+    const expected = h.storage.get('occulert-auth');
+    h.pending[0](response({ access_token: 'late-access', refresh_token: 'late-refresh', user: { id: 'owner-a' }, expires_in: 3600 }, status));
+    await rejected;
+    assert.equal(h.storage.get('occulert-auth'), expected, `late ${status} response must preserve ${replacement}`);
+  }
+}
+
+for (const [status, body] of [
+  [503, { error: 'temporarily_unavailable' }],
+  [200, { error: 'missing_session' }],
+  [200, null],
+  [200, { access_token: 'partial-access' }],
+  [200, { access_token: 'partial-access', refresh_token: 'partial-refresh', user: {} }],
+  [200, { access_token: 'wrong-owner-access', refresh_token: 'wrong-owner-refresh', user: { id: 'owner-b' }, expires_in: 3600 }],
+]) {
+  const h = refreshHarness();
+  const refresh = h.backend.getSession();
+  const rejected = assert.rejects(refresh, { code: 'cloud_unavailable' });
+  await waitForRefresh(h);
+  const expected = h.storage.get('occulert-auth');
+  h.pending[0](response(body, status));
+  await rejected;
+  assert.equal(h.storage.get('occulert-auth'), expected, 'unavailable or malformed refresh must not clear stored account');
+}
+
+for (const status of [400, 401, 403]) {
+  const h = refreshHarness();
+  const refresh = h.backend.getSession();
+  await waitForRefresh(h);
+  h.pending[0](response({ error: 'refresh_token_invalid' }, status));
+  assert.equal(await refresh, null);
+  assert.equal(h.backend.currentUser(), null, 'definitively rejected current token must still sign out');
+}
+
+{
+  const h = refreshHarness();
+  const refresh = h.backend.getSession();
+  const rejected = assert.rejects(refresh, { code: 'cloud_unavailable' });
+  await waitForRefresh(h);
+  const expected = h.storage.get('occulert-auth');
+  h.blockWrites();
+  h.pending[0](response({ ...h.fresh, user: { id: 'owner-a' } }));
+  await rejected;
+  assert.equal(h.storage.get('occulert-auth'), expected, 'failed refresh persistence must preserve the prior stored account');
+}
+
+{
+  const h = refreshHarness();
+  const first = h.backend.getSession();
+  const second = h.backend.getSession();
+  const rejected = assert.rejects(second, { code: 'auth_session_changed' });
+  await waitForRefresh(h, 2);
+  h.pending[0](response({ ...h.fresh, user: { id: 'owner-a' } }));
+  assert.equal((await first).access_token, 'new-access');
+  h.pending[1](response({ error: 'refresh_token_already_used' }, 400));
+  await rejected;
+  assert.equal(h.backend.currentUser().id, 'owner-a');
+  assert.equal(JSON.parse(h.storage.get('occulert-auth')).access_token, 'new-access', 'concurrent stale token failure must preserve rotated session');
+}
+
+{
+  const h = refreshHarness();
+  const request = h.backend.getFleetSummary({ includeEvents: false });
+  await waitForRefresh(h);
+  h.backend.adoptSession(h.fresh);
+  h.pending[0](response({ ...h.fresh, user: { id: 'owner-a' } }));
+  const result = await request;
+  assert.equal(result.status, 409);
+  assert.equal(result.body.error, 'auth_session_changed');
+  assert.ok(h.requests.every(url => !url.startsWith('/api/fleet-summary')), 'superseded operation must not continue using another owner');
+}
+
+for (const operation of ['summary', 'account']) {
+  for (const status of [200, 401]) {
+    for (const replacement of ['same-owner', 'other-owner', 'other-tab', 'signout']) {
+      const h = refreshHarness();
+      h.backend.adoptSession({ ...h.fresh, user: { id: 'owner-a' } });
+      const request = operation === 'summary' ? h.backend.getFleetSummary({ includeEvents: false }) : h.backend.updatePassword('new-password');
+      for (let i = 0; i < 10 && !h.protectedPending.length; i++) await new Promise(setImmediate);
+      assert.equal(h.protectedPending.length, 1);
+      if (replacement === 'signout') h.backend.signOut();
+      else {
+        const next = { ...h.fresh, access_token: 'replacement-access', refresh_token: 'replacement-refresh', user: { id: replacement === 'same-owner' ? 'owner-a' : 'owner-b' } };
+        if (replacement === 'other-tab') h.storage.set('occulert-auth', JSON.stringify(next));
+        else h.backend.adoptSession(next);
+      }
+      const expected = h.storage.get('occulert-auth');
+      h.protectedPending[0](response(status === 200 ? { fleet: { id: 'old-fleet' } } : { error: 'unauthorized' }, status));
+      const result = await request;
+      assert.equal(result.status, 409);
+      assert.equal(result.ok, false);
+      assert.equal(result.body.error, 'auth_session_changed');
+      assert.equal(h.storage.get('occulert-auth'), expected, `${operation} late ${status} must preserve ${replacement}`);
+    }
+  }
+}
+
+{
+  const h = refreshHarness();
+  const request = h.backend.getFleetSummary();
+  await waitForRefresh(h);
+  h.pending[0](response({ error: 'unavailable' }, 503));
+  const result = await request;
+  assert.equal(result.status, 503);
+  assert.equal(result.body.error, 'cloud_unavailable');
+  assert.equal(h.backend.currentUser().id, 'owner-a');
+  assert.equal(h.protectedPending.length, 0, 'unverified expired auth must not send a protected request');
+}
+for (const stalledStage of ['fetch', 'body']) {
+  const storage = new Map(), timers = new Map(), transport = [], configSignals = [];
+  let timerId = 0, configCalls = 0, releaseOld;
+  const stalled = new Promise(resolve => { releaseOld = resolve; });
+  const window = {};
+  const config = { supabase: { configured: true, url: 'https://current.supabase.co', anonKey: 'public' } };
+  vm.runInNewContext(clientSource, {
+    window, navigator: {}, Date, JSON, Promise, URLSearchParams, AbortController,
+    localStorage: {
+      getItem: key => storage.get(key) || null,
+      setItem: (key, value) => storage.set(key, String(value)),
+      removeItem: key => storage.delete(key),
+    },
+    setTimeout(fn, delay) { timers.set(++timerId, { fn, delay }); return timerId; },
+    clearTimeout(id) { timers.delete(id); },
+    fetch(url, options) {
+      transport.push(url);
+      if (url === '/api/public-config') {
+        configSignals.push(options.signal);
+        configCalls++;
+        if (configCalls === 1) return stalledStage === 'fetch' ? stalled : Promise.resolve({ text: () => stalled });
+        return Promise.resolve(response(config));
+      }
+      return Promise.resolve(response({ access_token: 'fresh-access', refresh_token: 'fresh-refresh', expires_in: 3600, user: { id: 'owner-a' } }));
+    },
+  });
+  const client = window.OcculertBackend;
+  client.adoptSession({ access_token: 'expired-access', refresh_token: 'expired-refresh', expires_at: 1, user: { id: 'owner-a' } });
+  const attempt = client.getSession();
+  const rejected = assert.rejects(attempt, { code: 'cloud_unavailable' });
+  await new Promise(setImmediate);
+  const deadline = [...timers.values()].find(timer => timer.delay === 8000);
+  assert.ok(deadline, `${stalledStage} config must have a deadline`);
+  deadline.fn();
+  await rejected;
+  assert.equal(client.currentUser().id, 'owner-a');
+  assert.equal(configSignals[0].aborted, true);
+  assert.equal(timers.size, 0);
+  const recovered = await client.getSession();
+  assert.equal(recovered.access_token, 'fresh-access');
+  assert.equal(configCalls, 2, 'retry must start a replacement configuration lookup');
+  const oldConfig = { supabase: { configured: true, url: 'https://discarded.supabase.co', anonKey: 'old' } };
+  releaseOld(stalledStage === 'fetch' ? response(oldConfig) : JSON.stringify(oldConfig));
+  await new Promise(setImmediate);
+  assert.equal((await client.getAuthConfig()).url, 'https://current.supabase.co', 'late config must not replace the successful retry');
+  assert.equal(configCalls, 2);
+  assert.ok(transport.includes('https://current.supabase.co/auth/v1/token?grant_type=refresh_token'));
+  assert.ok(!transport.some(url => String(url).includes('discarded.supabase.co')));
+}
+
 console.log("Occulert browser backend client tests passed.");

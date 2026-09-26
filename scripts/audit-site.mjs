@@ -206,8 +206,8 @@ assertIncludes("pilot-guide.html", "GPS coordinates and personal media", "pilot 
 assertNotIncludes("pilot-guide.html", "localStorage", "pilot guide must not create a second progress store");
 assertIncludes("fleet-display.html", 'meta name="robots" content="noindex,nofollow"', "shared-screen fleet data must not be indexed");
 assertIncludes("fleet-display.html", 'id="connectionStatus" role="status" aria-live="polite"', "TV connection updates must be announced without stealing focus");
-assertIncludes("fleet-display.v56.js", "getFleetSummary({ includeEvents: false })", "TV display must skip raw event history");
-assertIncludes("fleet-display.v56.js", "No local or demo data is used here", "TV display must never fall back to local or demo data");
+assertIncludes("fleet-display.v58.js", "getFleetSummary({ includeEvents: false })", "TV display must skip raw event history");
+assertIncludes("fleet-display.v58.js", "No local or demo data is used here", "TV display must never fall back to local or demo data");
 assertNotIncludes("fleet-display.html", "driverSearch", "TV display must not expose driver-level controls");
 assertIncludes("fleet-dashboard.html", ".btn{min-height:44px", "fleet actions must preserve accessible touch targets");
 assertIncludes("fleet-dashboard.html", ".input,.select{background:#0f172a", "fleet filters must preserve their shared mobile control sizing");
@@ -235,7 +235,7 @@ assertIncludes("app.html", '<label for="nightOpacity">', "driver app must label 
 const driverAppInlineScripts = [...read("app.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
 if (driverAppInlineScripts !== 0) fail(`driver app must keep its scripts out of the HTML document (found ${driverAppInlineScripts})`);
 const driverAppPage = read("app.html");
-const driverAppDependencies = ["/occulert-backend.v47.js", "/security-utils.v47.js", "/driver-app.v57.js"].map((path) => driverAppPage.indexOf(`src=\"${path}\"`));
+const driverAppDependencies = ["/occulert-backend.v58.js", "/security-utils.v47.js", "/driver-app.v57.js"].map((path) => driverAppPage.indexOf(`src=\"${path}\"`));
 if (driverAppDependencies.some((index) => index < 0) || driverAppDependencies.some((index, position) => position > 0 && index <= driverAppDependencies[position - 1])) {
   fail("driver app dependencies must load before the external monitoring behavior in their original order");
 }
@@ -258,10 +258,10 @@ assertIncludes("vercel.json", "webp|avif|gif", "optimized AVIF assets must recei
 assertIncludes("vercel.json", "publickey-credentials-create=(self)", "the production permissions policy must allow same-origin passkey enrollment");
 assertIncludes("vercel.json", "publickey-credentials-get=(self)", "the production permissions policy must allow same-origin passkey sign-in");
 assertIncludes("vercel.json", "\"source\": \"/(.*).(js|css)\"", "unversioned homepage styles and scripts must be revalidated after deployment");
-assertNotIncludes("occulert-backend.v47.js", "PASTE_ANON_KEY_HERE", "browser backend client must not ship placeholder credentials");
-assertIncludes("occulert-backend.v47.js", "/api/public-config", "browser backend client must load public runtime configuration");
-assertIncludes("occulert-backend.v47.js", "redirect_to=", "signup confirmation emails must return users to the active Occulert site");
-assertIncludes("occulert-backend.v47.js", 'authFetch("/resend"', "signup confirmation emails must have a supported resend path");
+assertNotIncludes("occulert-backend.v58.js", "PASTE_ANON_KEY_HERE", "browser backend client must not ship placeholder credentials");
+assertIncludes("occulert-backend.v58.js", "/api/public-config", "browser backend client must load public runtime configuration");
+assertIncludes("occulert-backend.v58.js", "redirect_to=", "signup confirmation emails must return users to the active Occulert site");
+assertIncludes("occulert-backend.v58.js", 'authFetch("/resend"', "signup confirmation emails must have a supported resend path");
 assertIncludes("api/public-config.js", "SUPABASE_ANON_KEY", "public config endpoint must read the browser-safe anon key from the environment");
 assertNotIncludes("api/public-config.js", "SUPABASE_SERVICE_ROLE_KEY", "public config endpoint must never expose the service-role key");
 assertIncludes("api/profile.js", "fleet_id: null", "driver profile creation must not trust caller-provided fleet membership");
@@ -313,7 +313,7 @@ assertIncludes("driver-app.v57.js", "function warnTrackingLoss", "driver app mus
 assertIncludes("driver-app.v57.js", "function verifyFirstInference", "driver app must complete one camera inference before monitoring becomes active");
 assertIncludes("driver-app.v57.js", "function haltForDetectionFailure", "driver app must stop visibly when the detector stalls or repeatedly fails");
 assertIncludes("driver-app.v57.js", "function primeAlertAudio", "driver app must unlock alert audio from the Start gesture");
-assertIncludes("login.html", "src=\"/occulert-backend.v47.js\"", "login must load the Supabase backend client");
+assertIncludes("login.html", "src=\"/occulert-backend.v58.js\"", "login must load the Supabase backend client");
 assertNotIncludes("login.html", "id=\"fleetId\"", "login must not offer caller-controlled fleet membership");
 assertIncludes("login.html", "id=\"passkeySignInBtn\"", "login must offer the supported passkey sign-in action");
 assertIncludes("login.html", "id=\"passkeyStatus\"", "passkey results must appear beside the passkey action");
@@ -333,7 +333,7 @@ assertIncludes("login.html", "id=\"passkeyRetryBtn\"", "login must offer recover
 assertIncludes("account.html", "id=\"passkeyRetryBtn\"", "account settings must offer recovery after a retryable passkey setup failure");
 assertIncludes("passkey-auth.v49.js", "sdk_load_failed", "passkey errors must distinguish an SDK delivery failure");
 assertIncludes("passkey-auth.v49.js", "auth_config_unavailable", "passkey errors must distinguish unavailable runtime account settings");
-assertIncludes("occulert-backend.v47.js", "refreshAuthConfig", "passkey retry must be able to refresh a transient runtime configuration failure");
+assertIncludes("occulert-backend.v58.js", "refreshAuthConfig", "passkey retry must be able to refresh a transient runtime configuration failure");
 assertIncludes("login.html", "Passkey biometrics, PINs, and private keys stay", "login must disclose that passkey secrets stay with the user's authenticator");
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
 assertIncludes("login.html", "id=\"profileFields\" class=\"hidden\"", "sign-in must hide profile setup fields by default");
@@ -344,9 +344,9 @@ assertIncludes("login-page-1.v47.js", "authMode==='signup'?extras():{}", "sign-i
 assertIncludes("login-page-1.v47.js", "await backend.getFleet()", "signed-in role display must verify server-owned fleet access");
 assertIncludes("login-page-1.v47.js", "Verified owner of ", "verified fleet owners must receive a truthful manager status");
 assertNotIncludes("login.html", "Manager invitation required", "login must not infer fleet access from the saved local role");
-assertIncludes("occulert-backend.v47.js", "\"/recover\" + passwordResetRedirect()", "password resets must go through Supabase Auth");
-assertIncludes("occulert-backend.v47.js", "params.get(\"type\") !== \"recovery\"", "auth redirects must accept recovery links only");
-assertIncludes("occulert-backend.v47.js", "window.history.replaceState", "recovery tokens must be removed from the visible URL");
+assertIncludes("occulert-backend.v58.js", "\"/recover\" + passwordResetRedirect()", "password resets must go through Supabase Auth");
+assertIncludes("occulert-backend.v58.js", "params.get(\"type\") !== \"recovery\"", "auth redirects must accept recovery links only");
+assertIncludes("occulert-backend.v58.js", "window.history.replaceState", "recovery tokens must be removed from the visible URL");
 assertIncludes("account-page-2.v47.js", "OcculertBackend.consumeAuthRedirect", "account setup must verify recovery links before allowing a password change");
 assertIncludes("fleet-onboarding-page-1.v47.js", "createFleetInvitation", "fleet onboarding must create protected invitations through the API");
 assertIncludes("fleet-onboarding-page-1.v47.js", "resendFleetInvitation", "fleet onboarding must support replacing pending invitation links");
@@ -397,8 +397,8 @@ assertNotIncludes("account.html", "window.firebase", "account.html must not call
 assertIncludes("account-page-2.v47.js", "Your sign-in email changes once you open the link", "email changes must disclose that confirmation is required");
 assertIncludes("account.html", "your current address may receive one too", "email changes must account for secure-email-change double confirmation");
 assertIncludes("account-page-2.v47.js", "setBusy('emailBtn',true", "account credential actions must prevent duplicate in-flight requests");
-assertIncludes("occulert-backend.v47.js", "/auth/v1/user", "backend client must expose authenticated account updates");
-assertIncludes("occulert-backend.v47.js", "Authorization: \"Bearer \" + auth.access_token", "account updates must be authorized with the live session token");
+assertIncludes("occulert-backend.v58.js", "/auth/v1/user", "backend client must expose authenticated account updates");
+assertIncludes("occulert-backend.v58.js", "Authorization: \"Bearer \" + auth.access_token", "account updates must be authorized with the live session token");
 assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "native alert sound must be bundled locally");
 assertIncludes("native-app/app/monitor.tsx", "updateSessionHistory", "native monitor must serialize completed-session history writes");
 assertIncludes("native-app/app/history.tsx", "openFeedback(item)", "native session history must offer pilot feedback tied to a completed session");
@@ -532,10 +532,10 @@ assertIncludes("fleet-pricing.html", "interest=paid-rollout&amp;plan=starter", "
 assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet exports must neutralize spreadsheet formulas");
 assertIncludes("fleet-dashboard.html", "aria-label=\"Fleet navigation\"", "fleet dashboards must keep explicit navigation controls");
 assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigation must expose one contextual primary action");
-assertIncludes("fleet-dashboard.html", "await backend.getSession()", "fleet navigation must validate or refresh the stored session before showing manager controls");
+assertIncludes("fleet-dashboard.html", "await boundedProtectedFleetRequest(()=>backend.getSession(),cancelled)", "fleet access must validate or refresh the stored session within a bounded wait");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v50'", "the camera-selection repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v51'", "the camera-selection repair must advance the offline cache");
 assertNotIncludes("sw.js", "occulert-v41", "the performance repair must not reuse the stale driver-script cache");
 assertIncludes("sw.js", "'/portal.v47.css'", "the service worker must cache the current shared portal stylesheet");
 assertNotIncludes("sw.js", "occulert-v40", "the external driver script must not reuse the previous offline cache");

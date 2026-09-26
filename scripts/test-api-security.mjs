@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { PGlite } from "@electric-sql/pglite";
 
 const require = createRequire(import.meta.url);
 const libPath = require.resolve("../api/_lib/supabase.js");
@@ -365,6 +366,86 @@ assert.equal(lightweightResult.status, 200);
 assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions"]);
 assert.equal(lightweightResult.body.events_included, false);
 assert.deepEqual(lightweightResult.body.events, []);
+
+// Exercise the query's real ordering at the latest-50 boundary. Equal start
+// times must select the same sessions as follow-ups, independent of row order.
+const orderingDb = new PGlite();
+try {
+  await orderingDb.exec(`
+    create table sessions (id uuid primary key, fleet_id uuid, driver_id uuid,
+      started_at timestamptz not null, ended_at timestamptz, average_fatigue numeric,
+      max_fatigue numeric, safety_score numeric, alert_count integer, head_nod_count integer);
+    create index sessions_fleet_started_id_idx on sessions (fleet_id, started_at desc, id desc);
+  `);
+  const sessionId = n => `11111111-1111-4111-8111-${n.toString(16).padStart(12, "0")}`;
+  const ownedFleetId = "22222222-2222-4222-8222-222222222222";
+  const otherFleetId = "33333333-3333-4333-8333-333333333333";
+  const driverId = "44444444-4444-4444-8444-444444444444";
+  const ownedRows = Array.from({ length: 66 }, (_, i) => ({
+    id: sessionId(i + 1), fleet_id: ownedFleetId, driver_id: driverId,
+    started_at: i < 3 ? "2026-09-26T12:00:00Z" : i < 63 ? "2026-09-25T12:00:00Z" : "2026-09-24T12:00:00Z",
+  }));
+  const foreignRows = Array.from({ length: 3 }, (_, i) => ({
+    id: sessionId(101 + i), fleet_id: otherFleetId, driver_id: driverId,
+    started_at: "2026-09-27T12:00:00Z",
+  }));
+  const expectedIds = [3, 2, 1, ...Array.from({ length: 47 }, (_, i) => 63 - i)].map(sessionId);
+  const eventScopes = [], followupScopes = [];
+  const fetchOrderedRows = async (table, { params }) => {
+    if (table === "fleets") {
+      assert.equal(params.owner_user_id, "eq." + verifiedUser.id);
+      return [{ id: ownedFleetId, company_name: "Owned Fleet" }];
+    }
+    if (table === "drivers") {
+      assert.equal(params.fleet_id, "eq." + ownedFleetId);
+      return [{ id: driverId, name: "Driver", active: true }];
+    }
+    if (table === "sessions") {
+      assert.equal(params.fleet_id, "eq." + ownedFleetId);
+      assert.equal(params.limit, "50");
+      assert.doesNotMatch(params.select, /latitude|longitude|location|raw_motion/i);
+      const order = params.order.split(",").map(term => {
+        const [column, direction] = term.split(".");
+        assert.ok(["started_at", "id"].includes(column));
+        assert.equal(direction, "desc");
+        return `${column} desc`;
+      }).join(",");
+      return (await orderingDb.query(`select ${params.select} from sessions where fleet_id=$1 order by ${order} limit $2`,
+        [ownedFleetId, Number(params.limit)])).rows;
+    }
+    if (table === "events" || table === "fleet_session_followups") {
+      if (table === "events") {
+        assert.equal(params.limit, "200");
+        assert.doesNotMatch(params.select, /latitude|longitude/i);
+        eventScopes.push(params.session_id);
+      } else followupScopes.push(params.session_id);
+      return [];
+    }
+    throw new Error(`unexpected ordering fixture query: ${table}`);
+  };
+  const orderedSummary = loadHandler("../api/fleet-summary.js", fetchOrderedRows);
+  const orderedFollowups = loadHandler("../api/fleet-followups.js", fetchOrderedRows);
+  for (const rows of [[...ownedRows, ...foreignRows], [...foreignRows, ...ownedRows].reverse()]) {
+    await orderingDb.exec("truncate sessions");
+    await orderingDb.query(`insert into sessions (id,fleet_id,driver_id,started_at)
+      select id,fleet_id,driver_id,started_at from jsonb_to_recordset($1::jsonb)
+      as fixture(id uuid,fleet_id uuid,driver_id uuid,started_at timestamptz)`, [JSON.stringify(rows)]);
+    const summary = await invoke(orderedSummary, request("GET"));
+    const followups = await invoke(orderedFollowups, request("GET"));
+    assert.equal(summary.status, 200);
+    assert.equal(followups.status, 200);
+    assert.deepEqual(summary.body.sessions.map(row => row.id), expectedIds);
+    assert.deepEqual(followups.body.sessions.map(row => row.id), expectedIds);
+    assert.equal(summary.body.telemetry_trust, "unverified_client_report");
+    assert.deepEqual(summary.body.privacy, fleetSummaryResult.body.privacy);
+    assert.equal(summary.headers["cache-control"], "no-store");
+  }
+  const expectedScopes = Array(2).fill(`in.(${expectedIds.join(",")})`);
+  assert.deepEqual(eventScopes, expectedScopes, "events must use exactly the selected 50 sessions in both insertion orders");
+  assert.deepEqual(followupScopes, expectedScopes, "follow-ups must use the same bounded session selection");
+} finally {
+  await orderingDb.close();
+}
 
 const publicConfigPath = require.resolve("../api/public-config.js");
 delete require.cache[publicConfigPath];

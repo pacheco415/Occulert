@@ -80,7 +80,7 @@ occulert/
 ├── accept-invite.html      # Invitation acceptance
 ├── manifest.json           # PWA manifest
 ├── sw.js                   # Service worker
-├── occulert-backend.v47.js  # Browser client for Supabase Auth + /api routes
+├── occulert-backend.v58.js  # Browser client for Supabase Auth + /api routes
 ├── api/                    # Vercel serverless endpoints
 ├── db/schema.sql           # Initial schema and RLS policies
 ├── supabase/migrations/    # Subsequent protected schema/function changes

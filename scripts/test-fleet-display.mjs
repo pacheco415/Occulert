@@ -4,7 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-const source = read('fleet-display.v56.js');
+const source = read('fleet-display.v58.js');
 const context = { globalThis: {} };
 context.globalThis.globalThis = context.globalThis;
 vm.runInNewContext(source, context);
@@ -127,7 +127,7 @@ test('TV surface requests the owner-scoped summary without raw events or local f
   assert.match(html, /Driver names, vehicles, locations, individual scores, personal media, and raw events are not shown/);
   assert.doesNotMatch(html, /driverSearch|export|invite|latitude|longitude/i);
   assert.doesNotMatch(source, /localStorage|getItem\(|setItem\(|latitude|longitude|vehicle_id|\.name\b/);
-  assert.match(html, /fleet-display\.v56\.js/);
+  assert.match(html, /fleet-display\.v58\.js/);
   assert.match(html, /fleet-display\.v56\.css/);
 });
 
@@ -138,7 +138,9 @@ function browser(summary, options = {}) {
   const timers = new Map();
   let nextTimer = 0;
   let calls = 0;
-  let user = { id: 'owner-a' };
+  let sessionCalls = 0;
+  let signOutCalls = 0;
+  let user = Object.hasOwn(options, 'user') ? options.user : { id: 'owner-a' };
   let result = { ok: true, body: summary };
   class Element {
     constructor() { this.textContent = ''; this.hidden = false; this.disabled = false; this.style = {}; this.attributes = {}; this.listeners = {}; this.value = '30'; this.open = false; }
@@ -158,9 +160,9 @@ function browser(summary, options = {}) {
   const root = {
     document, navigator: { onLine: true, connection: { saveData: false } },
     OcculertBackend: {
-      getSession: async () => user ? { user } : null,
+      getSession: async () => { sessionCalls++; return options.getSession ? options.getSession(user) : user ? { user } : null; },
       currentUser: () => user,
-      signOut: () => { user = null; },
+      signOut: () => { signOutCalls++; user = null; },
       getFleetSummary: async settings => { calls++; assert.deepEqual(JSON.parse(JSON.stringify(settings)), { includeEvents: false }); return options.getFleetSummary ? options.getFleetSummary() : result; },
     },
     setTimeout: (fn, delay) => { const id = ++nextTimer; timers.set(id, { fn, delay }); return id; },
@@ -171,8 +173,15 @@ function browser(summary, options = {}) {
   vm.runInNewContext(source, { window: root, Date: FixedDate });
   return {
     root, elements, timers, calls: () => calls,
+    sessionCalls: () => sessionCalls, signOutCalls: () => signOutCalls,
     user: next => { user = next; }, result: next => { result = next; },
     emit: (type, event = {}) => listeners.get(type)?.(event),
+    fireTimer: delay => {
+      const timer = [...timers].find(([, value]) => value.delay === delay);
+      assert.ok(timer, `expected a ${delay}ms timer`);
+      timers.delete(timer[0]);
+      timer[1].fn();
+    },
     settle: () => new Promise(resolve => setImmediate(resolve)),
   };
 }
@@ -183,6 +192,233 @@ const protectedSummary = () => ({
     { driver_id: 'a', started_at: '2026-09-24T16:00:00.000Z', ended_at: '2026-09-24T17:30:00.000Z', alert_count: 1 },
     { driver_id: 'a', started_at: '2026-09-10T16:00:00.000Z', ended_at: '2026-09-10T17:30:00.000Z' },
   ],
+});
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+test('a stalled first owner check releases refresh, retries automatically, and discards its late session', async () => {
+  const first = deferred();
+  let stalled = true;
+  const next = { fleet: { company_name: 'Recovered Owner' }, drivers: [], sessions: [] };
+  const page = browser(next, { user: null, getSession: user => stalled ? first.promise : { user } });
+  await page.settle();
+  assert.equal(page.elements.get('refreshButton').disabled, true);
+  assert.equal(page.calls(), 0, 'the summary waits for owner verification');
+  assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [8000]);
+  page.fireTimer(8000);
+  await page.settle();
+  assert.equal(page.elements.get('refreshButton').disabled, false);
+  assert.equal(page.elements.get('connectionStatus').getAttribute('data-state'), 'interrupted');
+  assert.equal(page.elements.get('emptyTitle').textContent, 'Protected data unavailable');
+  assert.match(page.elements.get('connectionDetails').textContent, /Next automatic retry.*owner session has not been verified/);
+  assert.equal(page.signOutCalls(), 0);
+  assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [180000]);
+
+  stalled = false;
+  page.user({ id: 'owner-b' });
+  page.fireTimer(180000);
+  await page.settle();
+  assert.equal(page.elements.get('displayTitle').textContent, 'Recovered Owner');
+  assert.equal(page.elements.get('refreshButton').disabled, false);
+  assert.equal(page.sessionCalls(), 2);
+  assert.equal(page.calls(), 1);
+  first.resolve({ user: { id: 'owner-a' } });
+  await page.settle();
+  assert.equal(page.calls(), 1, 'late verification cannot start another summary request');
+  assert.equal(page.elements.get('displayTitle').textContent, 'Recovered Owner');
+  assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [90000]);
+});
+
+test('a stalled summary preserves only the verified owner data and ignores late success or unauthorized results', async () => {
+  for (const lateResult of [
+    { ok: true, body: { fleet: { company_name: 'Late Old Summary' }, drivers: [], sessions: [] } },
+    { ok: false, status: 401, body: { error: 'unauthorized' } },
+  ]) {
+    const stalled = deferred();
+    let request = 0;
+    const fresh = { fleet: { company_name: 'Fresh Protected Summary' }, drivers: [], sessions: [] };
+    const page = browser(protectedSummary(), { getFleetSummary: () => {
+      request++;
+      return request === 2 ? stalled.promise : { ok: true, body: request === 1 ? protectedSummary() : fresh };
+    } });
+    await page.settle();
+    page.elements.get('refreshButton').emit('click');
+    await page.settle();
+    page.fireTimer(8000);
+    await page.settle();
+    assert.equal(page.elements.get('refreshButton').disabled, false);
+    assert.equal(page.elements.get('displayContent').hidden, false);
+    assert.equal(page.elements.get('recentSessions').textContent, '2');
+    assert.equal(page.elements.get('connectionStatus').getAttribute('data-state'), 'interrupted');
+    assert.match(page.elements.get('connectionDetails').textContent, /Next automatic retry.*last protected summary/);
+    assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [180000]);
+    assert.equal(page.signOutCalls(), 0);
+
+    page.elements.get('refreshButton').emit('click');
+    await page.settle();
+    assert.equal(page.elements.get('displayTitle').textContent, 'Fresh Protected Summary');
+    stalled.resolve(lateResult);
+    await page.settle();
+    assert.equal(page.elements.get('displayTitle').textContent, 'Fresh Protected Summary');
+    assert.equal(page.elements.get('connectionStatus').getAttribute('data-state'), 'connected');
+    assert.equal(page.signOutCalls(), 0, 'an expired request cannot sign out a recovered owner');
+    assert.equal(page.elements.get('refreshButton').disabled, false);
+    assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [90000]);
+  }
+});
+
+test('account changes cancel a stalled summary immediately without waiting for its deadline', async () => {
+  const old = deferred();
+  let request = 0;
+  const next = { fleet: { company_name: 'Next Protected Owner' }, drivers: [], sessions: [] };
+  const page = browser(protectedSummary(), { getFleetSummary: () => {
+    request++;
+    return request === 2 ? old.promise : { ok: true, body: request === 1 ? protectedSummary() : next };
+  } });
+  await page.settle();
+  page.elements.get('refreshButton').emit('click');
+  await page.settle();
+  assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [8000]);
+  page.user({ id: 'owner-b' });
+  page.emit('storage', { key: 'occulert-auth' });
+  assert.equal(page.elements.get('displayContent').hidden, true);
+  assert.equal(page.elements.get('recentSessions').textContent, '0');
+  await page.settle();
+  assert.equal(page.calls(), 3);
+  assert.equal(page.elements.get('displayTitle').textContent, 'Next Protected Owner');
+  assert.equal(page.elements.get('refreshButton').disabled, false);
+  assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [90000]);
+  old.resolve({ ok: false, status: 401, body: { error: 'unauthorized' } });
+  await page.settle();
+  assert.equal(page.elements.get('displayTitle').textContent, 'Next Protected Owner');
+  assert.equal(page.signOutCalls(), 0);
+});
+
+test('account changes cancel a stalled session check and discard its late rejection', async () => {
+  const old = deferred();
+  let checks = 0;
+  const page = browser(protectedSummary(), { getSession: user => ++checks === 1 ? old.promise : { user } });
+  await page.settle();
+  page.user({ id: 'owner-b' });
+  page.emit('storage', { key: 'occulert-auth' });
+  await page.settle();
+  assert.equal(page.sessionCalls(), 2);
+  assert.equal(page.calls(), 1);
+  assert.equal(page.elements.get('refreshButton').disabled, false);
+  assert.equal(page.elements.get('displayContent').hidden, false);
+  old.reject(new Error('Old owner verification failed'));
+  await page.settle();
+  assert.equal(page.elements.get('connectionStatus').getAttribute('data-state'), 'connected');
+  assert.equal(page.signOutCalls(), 0);
+  assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [90000]);
+});
+
+test('a session timeout cannot retain counts after the stored owner disappeared or confirm sign-out', async () => {
+  const stalled = deferred();
+  let checks = 0;
+  const page = browser(protectedSummary(), { getSession: user => ++checks === 2 ? stalled.promise : { user } });
+  await page.settle();
+  page.elements.get('refreshButton').emit('click');
+  await page.settle();
+  page.user(null);
+  page.fireTimer(8000);
+  await page.settle();
+  assert.equal(page.elements.get('displayContent').hidden, true);
+  assert.equal(page.elements.get('displayTitle').textContent, 'Fleet operations');
+  assert.equal(page.elements.get('recentSessions').textContent, '0');
+  assert.equal(page.elements.get('emptyTitle').textContent, 'Protected data unavailable');
+  assert.equal(page.elements.get('connectionStatus').getAttribute('data-state'), 'interrupted');
+  assert.equal(page.elements.get('refreshButton').disabled, false);
+  assert.equal(page.signOutCalls(), 0);
+  assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [180000]);
+  page.fireTimer(180000);
+  await page.settle();
+  assert.equal(page.elements.get('emptyTitle').textContent, 'Fleet owner sign-in required', 'a successful empty session check confirms sign-out');
+  assert.equal(page.timers.size, 0);
+  stalled.resolve({ user: { id: 'owner-a' } });
+  await page.settle();
+  assert.equal(page.elements.get('displayContent').hidden, true);
+  assert.equal(page.calls(), 1);
+});
+
+test('a late session for a different stored owner never starts an old-owner summary', async () => {
+  const old = deferred();
+  let checks = 0;
+  const next = { fleet: { company_name: 'Current Protected Owner' }, drivers: [], sessions: [] };
+  const page = browser(next, { getSession: user => ++checks === 1 ? old.promise : { user } });
+  await page.settle();
+  page.user({ id: 'owner-b' });
+  old.resolve({ user: { id: 'owner-a' } });
+  await page.settle();
+  assert.equal(page.calls(), 1, 'only the verified current owner can request a summary');
+  assert.equal(page.sessionCalls(), 2);
+  assert.equal(page.elements.get('displayTitle').textContent, 'Current Protected Owner');
+  assert.equal(page.signOutCalls(), 0);
+});
+
+test('a hidden-tab session timeout preserves same-owner counts and resumes only after visibility returns', async () => {
+  const stalled = deferred();
+  let checks = 0;
+  const page = browser(protectedSummary(), { getSession: user => ++checks === 2 ? stalled.promise : { user } });
+  await page.settle();
+  page.elements.get('refreshButton').emit('click');
+  await page.settle();
+  page.root.document.hidden = true;
+  page.emit('document:visibilitychange');
+  page.fireTimer(8000);
+  await page.settle();
+  assert.equal(page.elements.get('refreshButton').disabled, false);
+  assert.equal(page.elements.get('displayContent').hidden, false);
+  assert.equal(page.elements.get('recentSessions').textContent, '2');
+  assert.match(page.elements.get('connectionDetails').textContent, /paused while this tab is hidden.*last protected summary/);
+  assert.equal(page.timers.size, 0);
+  assert.equal(page.signOutCalls(), 0);
+  page.result({ ok: true, body: { fleet: { company_name: 'Visible Recovered Fleet' }, drivers: [], sessions: [] } });
+  page.root.document.hidden = false;
+  page.emit('document:visibilitychange');
+  await page.settle();
+  assert.equal(page.elements.get('displayTitle').textContent, 'Visible Recovered Fleet');
+  assert.equal(page.elements.get('connectionStatus').getAttribute('data-state'), 'connected');
+  assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [90000]);
+  stalled.reject(new Error('Late session failure'));
+  await page.settle();
+  assert.equal(page.elements.get('displayTitle').textContent, 'Visible Recovered Fleet');
+  assert.equal(page.signOutCalls(), 0);
+});
+
+test('manual refresh hides a previous owner before a stalled same-tab account check', async () => {
+  for (const changedUser of [null, { id: 'owner-b' }]) {
+    const stalled = deferred();
+    let checks = 0;
+    const page = browser(protectedSummary(), { getSession: user => ++checks === 2 ? stalled.promise : user ? { user } : null });
+    await page.settle();
+    assert.equal(page.elements.get('recentSessions').textContent, '2');
+    page.user(changedUser);
+    page.elements.get('refreshButton').emit('click');
+    assert.equal(page.elements.get('displayContent').hidden, true, 'old counts clear before asynchronous verification starts');
+    assert.equal(page.elements.get('displayTitle').textContent, 'Fleet operations');
+    assert.equal(page.elements.get('recentSessions').textContent, '0');
+    assert.equal(page.elements.get('activeDrivers').textContent, '0');
+    assert.equal(page.elements.get('emptyTitle').textContent, 'Verifying fleet owner');
+    await page.settle();
+    assert.equal(page.calls(), 1, 'no new protected summary request before verification');
+    page.fireTimer(8000);
+    await page.settle();
+    assert.equal(page.elements.get('displayContent').hidden, true);
+    assert.equal(page.elements.get('refreshButton').disabled, false);
+    assert.equal(page.elements.get('connectionStatus').getAttribute('data-state'), 'interrupted');
+    assert.equal(page.elements.get('emptyTitle').textContent, 'Protected data unavailable');
+    assert.equal(page.signOutCalls(), 0, 'verification timeout is still uncertain');
+    stalled.resolve({ user: { id: 'owner-a' } });
+    await page.settle();
+    assert.equal(page.elements.get('displayContent').hidden, true);
+    assert.equal(page.elements.get('recentSessions').textContent, '0');
+    assert.equal(page.calls(), 1);
+  }
 });
 
 test('window selection rerenders protected metrics and accessible labels without another request', async () => {
