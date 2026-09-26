@@ -9,6 +9,72 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
+<!-- Run before any stylesheet or dependency can hold up the driver page. -->
+<script id="driver-startup-guard">
+(() => {
+  const corePath = '/driver-app.v59.js';
+  let state = 'loading';
+  const byId = id => document.getElementById(id);
+  const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
+  // HTML may still be streaming when the deadline expires. Paint once all
+  // recovery controls exist, even if a later dependency still blocks parsing.
+  const failureNodes = ['startupNotice', 'startupReload', 'driverControls', 'startBtn', 'driveState', 'calibration', 'risk', 'riskDetail', 'status', 'overlay'];
+  const observer = new MutationObserver(() => {
+    if (state === 'failed' && failureNodes.every(id => byId(id))) { observer.disconnect(); refresh(); }
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  function refresh() {
+    const failed = state === 'failed', ready = state === 'ready';
+    const controls = byId('driverControls'), startButton = byId('startBtn');
+    if (controls) controls.disabled = !ready;
+    if (startButton) { startButton.disabled = !ready; startButton.textContent = ready ? 'START MONITORING' : failed ? 'APP UNAVAILABLE' : 'Loading app…'; }
+    const notice = byId('startupNotice');
+    if (notice) { notice.hidden = ready; notice.setAttribute('role', failed ? 'alert' : 'status'); notice.setAttribute('aria-live', failed ? 'assertive' : 'polite'); }
+    setText('startupTitle', failed ? 'App could not load' : 'Loading app…');
+    setText('startupMessage', failed ? 'No monitoring is active. Reload the app when safely parked.' : 'Monitoring controls will be available when the app finishes loading.');
+    const reload = byId('startupReload');
+    if (reload) { reload.hidden = !failed; reload.onclick = () => location.reload(); }
+    setText('driveState', 'NOT MONITORING');
+    setText('driveHint', ready ? 'Press Start Monitoring only when safely parked.' : 'Monitoring has not started.');
+    setText('calibration', 'NOT STARTED');
+    setText('risk', '--'); setText('riskDetail', '--');
+    setText('status', ready ? 'OFFLINE' : failed ? 'APP UNAVAILABLE' : 'LOADING');
+    const card = byId('stateCard'); if (card) card.className = 'card state-card';
+    const status = byId('status'); if (status) status.className = 'status off';
+    if (failed) {
+      setText('overlayTitle', 'Monitoring unavailable');
+      setText('overlayText', 'The app did not finish loading. No camera monitoring is active.');
+      setText('overlayHint', 'Reload the app only when safely parked.');
+      const overlay = byId('overlay'); if (overlay) overlay.classList.remove('hide');
+    }
+  }
+  function fail() {
+    if (state !== 'loading') return;
+    state = 'failed'; clearTimeout(deadline);
+    if (failureNodes.every(id => byId(id))) observer.disconnect();
+    refresh();
+  }
+  const deadline = setTimeout(fail, 8000);
+  function isCore(value) {
+    try { return new URL(value, location.href).pathname === corePath; } catch (_) { return false; }
+  }
+  window.addEventListener('error', event => {
+    if (isCore(event.filename || '') || (event.target?.tagName === 'SCRIPT' && isCore(event.target.src))) fail();
+  }, true);
+  document.addEventListener('DOMContentLoaded', () => { if (state !== 'ready') refresh(); }, { once: true });
+  window.OcculertStartup = Object.freeze({
+    isReady: () => state === 'ready',
+    refresh: () => { if (state !== 'ready') refresh(); },
+    ready: core => {
+      if (state !== 'loading') { if (state === 'failed') refresh(); return false; }
+      if (!core || core.version !== 'v59' || !Object.isFrozen(core) ||
+          !['start', 'stop', 'findCameraChoices', 'initModel'].every(key => typeof core[key] === 'function') ||
+          typeof byId('startBtn')?.onclick !== 'function') { fail(); return false; }
+      state = 'ready'; clearTimeout(deadline); observer.disconnect(); refresh(); return true;
+    }
+  });
+})();
+</script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 <!-- The supported cloud path uses authenticated Occulert API endpoints. -->
@@ -36,7 +102,7 @@
       <span class="intensity-icon" id="intensityIcon">🔆</span>
       <span class="intensity-label" id="intensityLabel">Standard</span>
     </button>
-    <div class="status" id="status">OFFLINE</div>
+    <div class="status" id="status">LOADING</div>
   </div>
 </div>
 <main class="app" id="main-content" tabindex="-1">
@@ -62,6 +128,13 @@
   <aside class="panel" aria-label="Occulert controls and metrics">
     <h1 style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>
 
+    <div class="card notice-card" id="startupNotice" role="status" aria-live="polite">
+      <h2 id="startupTitle" style="font-size:18px;margin:0 0 8px">Loading app…</h2>
+      <p class="small" id="startupMessage">Monitoring controls will be available when the app finishes loading.</p>
+      <button class="btn primary" type="button" id="startupReload" hidden>Reload app</button>
+    </div>
+    <fieldset id="driverControls" disabled aria-label="Monitoring controls" style="border:0;padding:0;margin:0;min-width:0">
+
     <!-- ── Background / Screen-Lock Warning ─────────────────────────────── -->
     <div class="screen-warning" id="screenWarning" style="display:none">
       ⚠️ <strong>Screen locked or app backgrounded</strong> — Occulert may have paused. Return to this tab and keep your screen on.
@@ -77,10 +150,10 @@
       </div>
       <p class="camera-source-hint" id="cameraSourceHint" aria-live="polite">Choose your Mac camera to keep Safari from using your iPhone.</p>
     </div>
-    <button class="btn primary" id="startBtn">START MONITORING</button>
+    <button class="btn primary" id="startBtn" disabled>Loading app…</button>
     <div class="timer-card" id="timerCard"><span class="timer-label">Session Time</span><span class="timer-value" id="sessionTimer">00:00</span></div>
 <button class="btn" id="recalBtn" style="background:rgba(6,182,212,.08);border-color:rgba(6,182,212,.35);color:#06b6d4;display:none;margin-bottom:12px;font-size:13px;padding:11px 15px;letter-spacing:.5px" title="Recalibrate to personalize detection for your eyes">↻ Recalibrate Eyes</button>
-    <div class="card state-card" id="stateCard"><div class="label">Driving Status</div><div class="state-value" id="driveState">READY</div><p class="metric-note" id="driveHint">Start monitoring, keep your face centered, and let Occulert calibrate for a few seconds.</p></div>
+    <div class="card state-card" id="stateCard"><div class="label">Driving Status</div><div class="state-value" id="driveState">NOT MONITORING</div><p class="metric-note" id="driveHint">Monitoring has not started.</p></div>
     <div class="card notice-card"><div class="label">Safety Notice</div><p class="small">Occulert is a supplemental prototype only, not a certified safety, medical, emergency, insurance, legal, employment, fleet compliance, or transportation compliance device. It may miss drowsiness and may trigger false alerts. If you feel tired or unsafe, pull over safely and rest.</p></div>
 
     <!-- Display Intensity Controls -->
@@ -106,14 +179,14 @@
 
     <div class="night-row"><label for="nightOpacity">&#127761; Night Alert Brightness<span style="font-size:10px;color:var(--text3);margin-left:6px;font-weight:400;font-style:italic">Alert screen opacity</span></label><div class="night-slider"><input type="range" id="nightOpacity" min="30" max="95" value="72" step="1"><span class="night-val" id="nightVal">72%</span></div></div>
     <div class="card privacy-card"><div class="label">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b>Enable GPS for this session</b><br><span class="small">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b>Enable cloud session sync</b><br><span class="small">Requires sign-in and saves session totals plus alerts. Camera images are never uploaded. Otherwise data stays local.</span></span></label></div>
-    <div class="card"><div class="label">Calibration</div><div class="value" id="calibration">READY</div><div class="cal-bar-wrap"><div class="cal-bar-fill" id="calibrationFill"></div></div><p class="metric-note" id="calHint">Keep your face centered and eyes open during calibration.</p></div>
+    <div class="card"><div class="label">Calibration</div><div class="value" id="calibration">NOT STARTED</div><div class="cal-bar-wrap"><div class="cal-bar-fill" id="calibrationFill"></div></div><p class="metric-note" id="calHint">Keep your face centered and eyes open during calibration.</p></div>
     <div class="grid">
       <div class="card"><div class="label">Fatigue</div><div class="value" id="fatigue">0</div><div class="bar"><div class="fill" id="fatigueFill"></div></div></div>
       <div class="card"><div class="label">Confidence</div><div class="value" id="confidence">0%</div><div class="bar"><div class="fill" id="confidenceFill"></div></div></div>
       <div class="card"><div class="label">Face</div><div class="value" id="faceState">--</div></div>
       <div class="card"><div class="label">EAR</div><div class="value" id="ear">--</div></div>
       <div class="card"><div class="label">PERCLOS</div><div class="value" id="perclos">0%</div></div>
-      <div class="card"><div class="label">Risk</div><div class="value" id="risk">SAFE</div></div>
+      <div class="card"><div class="label">Risk</div><div class="value" id="risk">--</div></div>
     </div>
     <div class="grid">
       <div class="card"><div class="label">Microsleeps</div><div class="value" id="microsleeps">0</div></div>
@@ -121,7 +194,7 @@
       <div class="card"><div class="label">Distraction</div><div class="value" id="distraction">0s</div></div>
       <div class="card"><div class="label">GPS</div><div class="value gps" id="gps">OFF</div></div>
     </div>
-    <div class="card"><div class="label">Risk State</div><div class="value" id="riskDetail">SAFE</div><p class="metric-note">Weighted score combines PERCLOS, microsleeps, eye closure, head movement, distraction time, confidence, and repeated alerts. GPS is optional.</p></div>
+    <div class="card"><div class="label">Risk State</div><div class="value" id="riskDetail">--</div><p class="metric-note">Weighted score combines PERCLOS, microsleeps, eye closure, head movement, distraction time, confidence, and repeated alerts. GPS is optional.</p></div>
     <div class="grid">
       <div class="card"><div class="label">Alerts</div><div class="value" id="alerts">0</div></div>
       <div class="card"><div class="label">Escalation</div><div class="value" id="escalation">0</div></div>
@@ -170,11 +243,12 @@
       <button onclick="typeof exportCSV==='function'&&exportCSV()" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
       <button id="pwaInstallBtn" onclick="typeof triggerPWAInstall==='function'&&triggerPWAInstall()" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
     </div>
+    </fieldset>
 </aside>
 </main>
 <script src="/occulert-backend.v58.js"></script>
 <script src="/security-utils.v47.js"></script>
-<script src="/driver-app.v57.js"></script>
+<script src="/driver-app.v59.js"></script>
 <script src="/lang.v47.js" defer></script>
 
 <!-- iOS Add to Home Screen Modal -->

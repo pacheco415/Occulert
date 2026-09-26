@@ -80,7 +80,7 @@ for (const upgrade of [false, true]) {
       }
       expect(await register(upgrade)).toBe('redundant');
       const keys = await page.evaluate(() => caches.keys());
-      expect(keys).not.toContain('occulert-v52');
+      expect(keys).not.toContain('occulert-v53');
       if (upgrade) {
         expect(keys).toContain('occulert-v48');
         expect(await page.evaluate(async () => (await (await caches.open('occulert-v48')).match('/app.html')).text())).toContain('/driver-app.v48.js');
@@ -94,7 +94,7 @@ for (const upgrade of [false, true]) {
         const registration = await navigator.serviceWorker.getRegistration();
         return navigator.serviceWorker.controller === registration?.active && registration?.active?.state === 'activated';
       })).toBe(true);
-      const cached = await page.evaluate(async () => (await (await caches.open('occulert-v52')).keys()).map(request => new URL(request.url).pathname));
+      const cached = await page.evaluate(async () => (await (await caches.open('occulert-v53')).keys()).map(request => new URL(request.url).pathname));
       for (const file of Object.keys(manifest.files)) {
         const excluded = scalar ? file.includes('solution_simd_wasm_bin.') : file.includes('solution_wasm_bin.');
         if (excluded) { expect(cached).not.toContain(runtimeRoot + file); expect(requested).not.toContain(runtimeRoot + file); }

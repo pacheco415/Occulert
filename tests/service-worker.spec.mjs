@@ -11,19 +11,19 @@ test('the service worker installs its offline shell', async ({ page, context, br
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
   await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
   await expect.poll(() => page.evaluate(async () => {
-    const cache = await caches.open('occulert-v52');
+    const cache = await caches.open('occulert-v53');
     return Boolean(await cache.match('/app.html'));
   })).toBe(true);
   const refreshedScript = await page.evaluate(async () => {
-    const cache = await caches.open('occulert-v52');
-    await cache.put('/driver-app.v57.js', new Response('stale-driver-script'));
-    return fetch('/driver-app.v57.js').then(response => response.text());
+    const cache = await caches.open('occulert-v53');
+    await cache.put('/driver-app.v59.js', new Response('stale-driver-script'));
+    return fetch('/driver-app.v59.js').then(response => response.text());
   });
   expect(refreshedScript).toContain("FACE_MESH_VERSION='0.4.1633559619'");
   expect(refreshedScript).not.toContain('stale-driver-script');
   await expect.poll(() => page.evaluate(async () => {
-    const cache = await caches.open('occulert-v52');
-    const response = await cache.match('/driver-app.v57.js');
+    const cache = await caches.open('occulert-v53');
+    const response = await cache.match('/driver-app.v59.js');
     return response ? response.text() : '';
   })).toContain("FACE_MESH_VERSION='0.4.1633559619'");
 
@@ -34,7 +34,7 @@ test('the service worker installs its offline shell', async ({ page, context, br
   await context.setOffline(true);
   try {
     const offlineShell = await page.evaluate(async () => {
-      const [response, driverScript] = await Promise.all([fetch('/app.html'), fetch('/driver-app.v57.js')]);
+      const [response, driverScript] = await Promise.all([fetch('/app.html'), fetch('/driver-app.v59.js')]);
       return { ok: response.ok, text: await response.text(), driverText: await driverScript.text() };
     });
     expect(offlineShell.ok).toBe(true);

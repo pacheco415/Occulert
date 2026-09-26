@@ -160,7 +160,7 @@ test('Build 30 pins its iOS toolchain and exposes local aggregate diagnostics', 
 
 test('web monitoring defers MediaPipe and prevents overlapping inference', async () => {
   const app = read('app.html');
-  const driver = read('driver-app.v57.js');
+  const driver = read('driver-app.v59.js');
   assert.doesNotMatch(app, /<script[^>]+@mediapipe\/face_mesh/);
   assert.match(app, /loading="lazy"/);
   assert.match(driver, /function loadFaceMeshScript\(\)/);
@@ -444,9 +444,9 @@ test('a previous session wake lock cannot replace the current session lock', asy
 
 test('service-worker upgrade evicts stale website caches', async () => {
   const source = read('sw.js');
-  assert.match(source, /const CACHE = 'occulert-v52'/);
+  assert.match(source, /const CACHE = 'occulert-v53'/);
   assert.match(source, /const NETWORK_FIRST_ASSETS = new Set\(\[/);
-  assert.match(source, /'\/driver-app\.v57\.js'/);
+  assert.match(source, /'\/driver-app\.v59\.js'/);
   assert.match(source, /const NETWORK_FIRST_TIMEOUT_MS = 2500/);
   assert.match(source, /event\.waitUntil\(cacheUpdate\)/);
 
@@ -490,7 +490,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   const cache = {
     add: async url => {
       url = typeof url === 'string' ? url : new URL(url.url).pathname;
-      if (url === '/driver-app.v57.js') throw new Error('transient detector download failure');
+      if (url === '/driver-app.v59.js') throw new Error('transient detector download failure');
       cached.add(url);
     },
     match: async url => cached.has(url) ? { ok: true } : null,
@@ -516,7 +516,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await assert.rejects(installation, /Critical offline assets were not cached/);
   assert.equal(skipped, false);
-  assert.deepEqual(deleted, ['occulert-v52']);
+  assert.deepEqual(deleted, ['occulert-v53']);
 });
 
 test('service-worker bounds network and cache writes while preserving a known-good detector', async () => {
@@ -553,7 +553,7 @@ test('service-worker bounds network and cache writes while preserving a known-go
     },
   };
   runInNewContext(source, context);
-  const request = { method: 'GET', mode: 'same-origin', url: 'https://www.occulert.com/driver-app.v57.js' };
+  const request = { method: 'GET', mode: 'same-origin', url: 'https://www.occulert.com/driver-app.v59.js' };
   let responsePromise;
   let lifetimePromise;
   const dispatch = () => listeners.fetch({
@@ -731,7 +731,7 @@ for (const navigation of [false, true]) {
     };
     runInNewContext(read('sw.js'), context);
     listeners.fetch({
-      request: { method: 'GET', mode: navigation ? 'navigate' : 'same-origin', url: 'https://www.occulert.com/' + (navigation ? 'app.html' : 'driver-app.v57.js') },
+      request: { method: 'GET', mode: navigation ? 'navigate' : 'same-origin', url: 'https://www.occulert.com/' + (navigation ? 'app.html' : 'driver-app.v59.js') },
       respondWith: promise => { responsePromise = promise; promise.then(() => { delivered = true; }); },
       waitUntil: promise => { lifetimePromise = promise; },
     });
@@ -777,7 +777,7 @@ for (const navigation of [false, true]) {
       self: { location: { origin: 'https://www.occulert.com' }, addEventListener: (name, handler) => { listeners[name] = handler; } },
     };
     runInNewContext(read('sw.js'), context);
-    const request = { method: 'GET', mode: navigation ? 'navigate' : 'same-origin', url: 'https://www.occulert.com/' + (navigation ? 'app.html' : 'driver-app.v57.js') };
+    const request = { method: 'GET', mode: navigation ? 'navigate' : 'same-origin', url: 'https://www.occulert.com/' + (navigation ? 'app.html' : 'driver-app.v59.js') };
     const dispatch = () => listeners.fetch({ request,
       respondWith: promise => { responsePromise = promise; },
       waitUntil: promise => { lifetimePromise = promise; },
