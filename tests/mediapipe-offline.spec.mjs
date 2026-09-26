@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import { prepareDetectorPage, detectBlankFrame } from './helpers/detector-runtime.mjs';
+import { observePageLoads } from './helpers/page-load-diagnostics.mjs';
 
 test.use({ serviceWorkers: 'allow' });
 const root = resolve('.');
@@ -13,8 +14,10 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 
 for (const scalar of [false, true]) {
 for (const upgrade of [false, true]) {
-  test(`${upgrade ? 'failed upgrade preserves v48' : 'failed fresh install stays inactive'} until the selected ${scalar ? "scalar" : "SIMD"} runtime is verified`, async ({ page }) => {
+  test(`${upgrade ? 'failed upgrade preserves v48' : 'failed fresh install stays inactive'} until the selected ${scalar ? "scalar" : "SIMD"} runtime is verified`, async ({ page }, testInfo) => {
     test.setTimeout(120_000);
+    const diagnostics = await observePageLoads(page);
+    let failed = false;
     const requested = [];
     const state = { old: upgrade, failure: upgrade ? null : 'missing', offline: false };
     const server = createServer((request, response) => {
@@ -42,6 +45,7 @@ for (const upgrade of [false, true]) {
       const bytes = readFileSync(file);
       response.end(scalar && path === '/sw.js' && !state.old ? Buffer.from('WebAssembly.validate = () => false;\n' + bytes) : bytes);
     });
+    diagnostics.observeServer(server, () => ({ ...state }));
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const origin = `http://127.0.0.1:${server.address().port}`;
     const register = async (update = false) => page.evaluate(async update => {
@@ -56,8 +60,10 @@ for (const upgrade of [false, true]) {
         registration = await navigator.serviceWorker.register('/sw.js');
         discovered = registration.installing || registration.waiting || registration.active;
       }
+      window.__occulertPageLoadRecord?.('worker-discovered', { worker: { script: new URL(discovered.scriptURL).pathname, state: discovered.state } });
       if (['activated', 'redundant'].includes(discovered.state)) return discovered.state;
       return new Promise(resolve => discovered.addEventListener('statechange', () => {
+        window.__occulertPageLoadRecord?.('worker-state', { worker: { script: new URL(discovered.scriptURL).pathname, state: discovered.state } });
         if (['activated', 'redundant'].includes(discovered.state)) resolve(discovered.state);
       }));
     }, update);
@@ -74,7 +80,7 @@ for (const upgrade of [false, true]) {
       }
       expect(await register(upgrade)).toBe('redundant');
       const keys = await page.evaluate(() => caches.keys());
-      expect(keys).not.toContain('occulert-v51');
+      expect(keys).not.toContain('occulert-v52');
       if (upgrade) {
         expect(keys).toContain('occulert-v48');
         expect(await page.evaluate(async () => (await (await caches.open('occulert-v48')).match('/app.html')).text())).toContain('/driver-app.v48.js');
@@ -84,24 +90,44 @@ for (const upgrade of [false, true]) {
       state.failure = null;
       // A failed first registration may have no active registration remaining.
       expect(await register(upgrade)).toBe('activated');
-      await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
-      const cached = await page.evaluate(async () => (await (await caches.open('occulert-v51')).keys()).map(request => new URL(request.url).pathname));
+      await expect.poll(() => page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration();
+        return navigator.serviceWorker.controller === registration?.active && registration?.active?.state === 'activated';
+      })).toBe(true);
+      const cached = await page.evaluate(async () => (await (await caches.open('occulert-v52')).keys()).map(request => new URL(request.url).pathname));
       for (const file of Object.keys(manifest.files)) {
         const excluded = scalar ? file.includes('solution_simd_wasm_bin.') : file.includes('solution_wasm_bin.');
         if (excluded) { expect(cached).not.toContain(runtimeRoot + file); expect(requested).not.toContain(runtimeRoot + file); }
         else expect(cached).toContain(runtimeRoot + file);
       }
       expect(await page.evaluate(() => caches.has('occulert-v48'))).toBe(false);
+      diagnostics.record('offline-cut-ready', await page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration();
+        return { controllerIsActive: navigator.serviceWorker.controller === registration.active,
+          controllerState: navigator.serviceWorker.controller?.state, activeState: registration.active?.state,
+          cacheNames: await caches.keys(), initModelType: typeof window.initModel };
+      }));
       state.offline = true;
+      diagnostics.record('origin-offline');
       // Cut the actual origin connection. Unlike Playwright's WebKit offline
       // emulation, this lets WebKit's service worker handle the network failure.
       await page.goto(origin + '/app.html', { waitUntil: 'domcontentloaded' });
       const result = await detectBlankFrame(page);
       expect(result.generation).toBeGreaterThan(0);
       expect(await page.evaluate(() => window.detectorCspViolations)).toEqual([]);
+    } catch (error) {
+      failed = true;
+      diagnostics.record('test-failed', { message: error.message.slice(0, 500).replace(/https?:\/\/[^\s]+/g, value => value.split(/[?#]/, 1)[0]) });
+      throw error;
     } finally {
-      server.closeAllConnections();
-      await new Promise(resolve => server.close(resolve));
+      try {
+        diagnostics.record('server-cleanup-start', { listening: server.listening });
+        if (failed) await diagnostics.attach(testInfo);
+        server.closeAllConnections();
+        diagnostics.record('server-connections-closed');
+        await new Promise(resolve => server.close(resolve));
+        if (failed) await diagnostics.attach(testInfo, 'page-load-cleanup');
+      } finally { diagnostics.stop(); }
     }
   });
 }

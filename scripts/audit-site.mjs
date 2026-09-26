@@ -535,7 +535,7 @@ assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigati
 assertIncludes("fleet-dashboard.html", "await boundedProtectedFleetRequest(()=>backend.getSession(),cancelled)", "fleet access must validate or refresh the stored session within a bounded wait");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v51'", "the camera-selection repair must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v52'", "complete-transfer recovery must advance the offline cache");
 assertNotIncludes("sw.js", "occulert-v41", "the performance repair must not reuse the stale driver-script cache");
 assertIncludes("sw.js", "'/portal.v47.css'", "the service worker must cache the current shared portal stylesheet");
 assertNotIncludes("sw.js", "occulert-v40", "the external driver script must not reuse the previous offline cache");

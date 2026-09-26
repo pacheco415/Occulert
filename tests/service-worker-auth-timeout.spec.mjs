@@ -38,7 +38,7 @@ test(`a network-only account script stalled ${partialBody ? 'mid-body' : 'before
     });
     await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
     await page.evaluate(async () => {
-      const cache = await caches.open('occulert-v51');
+      const cache = await caches.open('occulert-v52');
       await cache.put('/occulert-backend.v58.js', new Response('window.cachedAccountScriptUsed = true;', { headers: { 'Content-Type': 'text/javascript' } }));
     });
     state.stall = true;
@@ -48,7 +48,7 @@ test(`a network-only account script stalled ${partialBody ? 'mid-body' : 'before
     expect(await page.evaluate(() => ({ detectorReady: typeof initModel, cachedAccountScriptUsed: window.cachedAccountScriptUsed === true, accountClientLoaded: Boolean(window.OcculertBackend) })))
       .toEqual({ detectorReady: 'function', cachedAccountScriptUsed: false, accountClientLoaded: false });
     await expect(page.locator('#startBtn')).toBeVisible();
-    expect(await page.evaluate(async () => (await (await caches.open('occulert-v51')).match('/occulert-backend.v58.js')).text()))
+    expect(await page.evaluate(async () => (await (await caches.open('occulert-v52')).match('/occulert-backend.v58.js')).text()))
       .toBe('window.cachedAccountScriptUsed = true;');
   } finally {
     server.closeAllConnections();

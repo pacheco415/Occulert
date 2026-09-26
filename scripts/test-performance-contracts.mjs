@@ -444,7 +444,7 @@ test('a previous session wake lock cannot replace the current session lock', asy
 
 test('service-worker upgrade evicts stale website caches', async () => {
   const source = read('sw.js');
-  assert.match(source, /const CACHE = 'occulert-v51'/);
+  assert.match(source, /const CACHE = 'occulert-v52'/);
   assert.match(source, /const NETWORK_FIRST_ASSETS = new Set\(\[/);
   assert.match(source, /'\/driver-app\.v57\.js'/);
   assert.match(source, /const NETWORK_FIRST_TIMEOUT_MS = 2500/);
@@ -516,22 +516,22 @@ test('service-worker install cannot replace a usable cache without its detector'
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await assert.rejects(installation, /Critical offline assets were not cached/);
   assert.equal(skipped, false);
-  assert.deepEqual(deleted, ['occulert-v51']);
+  assert.deepEqual(deleted, ['occulert-v52']);
 });
 
 test('service-worker bounds network and cache writes while preserving a known-good detector', async () => {
   const source = read('sw.js');
   const listeners = {};
   const cachedResponse = { source: 'cache', ok: true };
-  const freshResponse = { source: 'network', ok: true, clone: () => ({ source: 'copy' }) };
-  let networkResponse = { source: 'server-error', ok: false, status: 503 };
+  const freshResponse = new Response('window.freshDetector = true;', { headers: { 'content-type': 'text/javascript' } });
+  let networkResponse = new Response('Unavailable', { status: 503 });
   let cacheWriteMode = 'ok';
   const context = {
     AbortController,
     URL,
     Request,
     Promise,
-    Response: { error: () => ({ source: 'network-error', ok: false }) },
+    Response, Headers,
     Set,
     clearTimeout,
     fetch: async () => networkResponse,
@@ -707,6 +707,115 @@ test('network-only script headers and a partial body share one deadline and igno
   assert.equal(cacheAccess, 0);
   assert.equal(timers.size, 0);
 });
+
+for (const navigation of [false, true]) {
+  test(`network-first ${navigation ? 'navigation' : 'detector'} headers and partial body share one deadline and preserve the verified cache`, async () => {
+    const listeners = {}, timers = new Map(), headers = deferred(), writes = [];
+    let timerId = 0, streamController, networkSignal, delivered = false, responsePromise, lifetimePromise;
+    const cached = new Response(navigation ? '<html>Verified offline page</html>' : 'window.cachedDetector = true;');
+    const stream = new ReadableStream({ start(controller) {
+      streamController = controller;
+      controller.enqueue(new TextEncoder().encode(navigation ? '<html>Partial network page' : 'window.partialDetector = '));
+    } });
+    const partial = new Response(stream, { headers: { 'content-type': navigation ? 'text/html' : 'text/javascript' } });
+    const context = {
+      AbortController, URL, Request, Promise, Set, Response, Headers,
+      setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
+      clearTimeout: id => timers.delete(id),
+      fetch: (_request, options) => { networkSignal = options.signal; return headers.promise; },
+      caches: {
+        match: async () => cached,
+        open: async () => ({ put: async (request, response) => { writes.push({ request, response }); } }),
+      },
+      self: { location: { origin: 'https://www.occulert.com' }, addEventListener: (name, handler) => { listeners[name] = handler; } },
+    };
+    runInNewContext(read('sw.js'), context);
+    listeners.fetch({
+      request: { method: 'GET', mode: navigation ? 'navigate' : 'same-origin', url: 'https://www.occulert.com/' + (navigation ? 'app.html' : 'driver-app.v57.js') },
+      respondWith: promise => { responsePromise = promise; promise.then(() => { delivered = true; }); },
+      waitUntil: promise => { lifetimePromise = promise; },
+    });
+    const [[deadlineId, deadline]] = [...timers];
+    await drainTasks();
+    headers.resolve(partial);
+    try {
+      await drainTasks();
+      assert.equal(delivered, false, 'partial bytes cannot release an unfinished network response');
+      assert.deepEqual([...timers.keys()], [deadlineId], 'header arrival must not restart the deadline');
+      assert.equal(deadline.delay, 2500);
+      assert.equal(writes.length, 0, 'partial responses cannot overwrite the verified cache');
+      timers.delete(deadlineId); deadline.callback();
+      assert.equal(await responsePromise, cached, 'the current verified cache wins after body timeout');
+      await lifetimePromise;
+      assert.equal(networkSignal.aborted, true, 'the deadline also aborts the body transfer');
+      streamController.enqueue(new TextEncoder().encode(navigation ? '</html>' : 'true;'));
+      streamController.close();
+      await drainTasks();
+      assert.equal(await responsePromise, cached, 'late completion cannot replace delivered fallback');
+      assert.equal(writes.length, 0, 'late body completion cannot replace the verified cache');
+      assert.equal(timers.size, 0);
+    } finally {
+      try { streamController.close(); } catch (_) {}
+    }
+  });
+}
+
+for (const navigation of [false, true]) {
+  test(`network-first ${navigation ? 'navigation' : 'detector'} complete bodies preserve native response metadata and body failures use the installed cache`, async () => {
+    const listeners = {}, timers = new Map(), writes = [];
+    let timerId = 0, network, cacheMode = 'exact', responsePromise, lifetimePromise;
+    const cached = new Response('Verified cached bytes'), home = new Response('Verified home fallback');
+    const context = {
+      AbortController, URL, Request, Promise, Set, Response, Headers,
+      setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
+      clearTimeout: id => timers.delete(id),
+      fetch: async () => network,
+      caches: {
+        match: async request => cacheMode === 'exact' ? cached : cacheMode === 'home' && request === '/index.html' ? home : null,
+        open: async () => ({ put: async (request, response) => { writes.push({ request, text: await response.text() }); } }),
+      },
+      self: { location: { origin: 'https://www.occulert.com' }, addEventListener: (name, handler) => { listeners[name] = handler; } },
+    };
+    runInNewContext(read('sw.js'), context);
+    const request = { method: 'GET', mode: navigation ? 'navigate' : 'same-origin', url: 'https://www.occulert.com/' + (navigation ? 'app.html' : 'driver-app.v57.js') };
+    const dispatch = () => listeners.fetch({ request,
+      respondWith: promise => { responsePromise = promise; },
+      waitUntil: promise => { lifetimePromise = promise; },
+    });
+    const bytes = navigation ? '<html>Complete decoded page</html>' : 'window.completeDriver = true;';
+    network = new Response(bytes, { status: 200, statusText: 'Complete response', headers: {
+      'content-type': navigation ? 'text/html' : 'text/javascript', 'content-encoding': 'gzip', 'content-length': '12',
+      'content-security-policy': "default-src 'self'", 'x-source': 'fresh-network',
+    } });
+    Object.defineProperties(network, { url: { value: 'https://www.occulert.com/redirected/current' }, redirected: { value: true }, type: { value: 'basic' } });
+    dispatch();
+    const delivered = await responsePromise;
+    assert.equal(delivered, network, 'return the original native response after complete transfer');
+    assert.equal(delivered.bodyUsed, false, 'verification must not consume the body delivered to the browser');
+    assert.equal(delivered.url, 'https://www.occulert.com/redirected/current');
+    assert.equal(delivered.redirected, true);
+    assert.equal(delivered.type, 'basic');
+    assert.equal(delivered.statusText, 'Complete response');
+    assert.equal(delivered.headers.get('content-security-policy'), "default-src 'self'");
+    assert.equal(delivered.headers.get('content-encoding'), 'gzip', 'native response retains its own decoding metadata');
+    assert.equal(delivered.headers.get('content-length'), '12');
+    assert.equal(await delivered.clone().text(), bytes);
+    await lifetimePromise;
+    assert.deepEqual(writes, [{ request, text: bytes }], 'only complete bytes update the current cache');
+    assert.equal(timers.size, 0);
+    for (cacheMode of navigation ? ['exact', 'home', 'empty'] : ['exact', 'empty']) {
+      network = new Response(new ReadableStream({ start(controller) { controller.error(new Error('Body transfer failed')); } }));
+      dispatch();
+      const failed = await responsePromise;
+      if (cacheMode === 'exact') assert.equal(failed, cached);
+      else if (cacheMode === 'home') assert.equal(failed, home);
+      else assert.equal(failed.type, 'error', 'no partial response can escape when cache is empty');
+      await lifetimePromise;
+      assert.equal(writes.length, 1, 'failed transfers cannot update the cache');
+      assert.equal(timers.size, 0);
+    }
+  });
+}
 
 test('fleet refreshes adapt to activity and throttle protected event queries', () => {
   const api = read('api/fleet-summary.js');
@@ -973,16 +1082,16 @@ test('service-worker navigation falls back on a stalled connection and preserves
   const listeners = {};
   const cachedPage = { source: 'cached-page', ok: true };
   const homePage = { source: 'cached-home', ok: true };
-  const freshPage = { source: 'fresh-page', ok: true, clone: () => ({}) };
+  const freshPage = new Response('<html>Current page</html>', { headers: { 'content-type': 'text/html', 'content-security-policy': "default-src 'self'" } });
   let networkMode = 'hang', cacheMode = 'page', writeMode = 'ok', networkSignal;
   const context = {
     AbortController, URL, Request, Promise, Set, clearTimeout,
-    Response: { error: () => ({ source: 'network-error', ok: false }) },
+    Response, Headers,
     setTimeout: (callback, timeout) => setTimeout(callback, Math.min(timeout, 10)),
     fetch: (_request, options) => {
       networkSignal = options.signal;
       return networkMode === 'hang' ? new Promise(() => {}) : Promise.resolve(
-        networkMode === 'fresh' ? freshPage : { source: 'error-page', ok: false, status: 503 });
+        networkMode === 'fresh' ? freshPage : new Response('Unavailable', { status: 503 }));
     },
     caches: {
       match: async request => cacheMode === 'page' ? cachedPage : request === '/index.html' ? homePage : null,
