@@ -13,7 +13,7 @@ export function parseCsv(text) {
   const table = parseTable(text);
   const headers = table.headers.map(header => header.toLowerCase());
   if (!headers.includes("label") || !headers.includes("ear")) throw new Error("CSV must contain label and ear columns");
-  return table.rows.map((source, index) => {
+  const rows = table.rows.map((source, index) => {
     const row = Object.fromEntries(Object.entries(source).map(([key, value]) => [key.toLowerCase(), value]));
     if (!validEar(row.ear)) throw new Error(`Invalid EAR value on record ${index + 2}`);
     row.ear = Number(row.ear);
@@ -21,6 +21,23 @@ export function parseCsv(text) {
     if (row.label !== "awake" && !DROWSY_LABELS.has(row.label)) throw new Error(`Unknown label on record ${index + 2}: ${row.label}`);
     return row;
   });
+  validateSplits(rows);
+  return rows;
+}
+
+// Check the entire input before selecting a held-out subset. A manually edited
+// or externally prepared table must not hide train/test participant leakage.
+export function validateSplits(rows) {
+  if (!rows.some((row) => "split" in row)) return;
+  const participants = new Map();
+  for (const [index, row] of rows.entries()) {
+    if (row.split !== "train" && row.split !== "test") throw new Error(`Invalid split on record ${index + 2}: expected train or test.`);
+    const participant = typeof row.participant === "string" ? row.participant.trim() : "";
+    if (!participant) throw new Error(`Missing participant for split validation on record ${index + 2}.`);
+    const previous = participants.get(participant);
+    if (previous && previous !== row.split) throw new Error(`Participant leakage across train/test splits on record ${index + 2}.`);
+    participants.set(participant, row.split);
+  }
 }
 
 export function score(rows, threshold) {
@@ -45,7 +62,9 @@ export function run(rows) {
 }
 
 export function selectSplit(rows, split) {
+  validateSplits(rows);
   if (!split) return rows;
+  if (split !== "train" && split !== "test") throw new Error("Requested split must be train or test.");
   if (!rows.some((row) => "split" in row)) {
     throw new Error(`--split ${split} requested but the CSV has no split column. Run prepare-dataset.mjs first.`);
   }
@@ -111,6 +130,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const jsonOut = arg("--json");
 
   const allRows = parseCsv(await readFile(input, "utf8"));
+  if (sliceBy && allRows.length && !Object.hasOwn(allRows[0], sliceBy)) {
+    throw new Error(`Slice column "${sliceBy}" is absent from the input CSV.`);
+  }
   const rows = selectSplit(allRows, split);
   if (!rows.length) {
     console.error(`No rows matched${split ? ` split "${split}"` : ""}.`);

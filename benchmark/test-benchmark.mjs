@@ -1,4 +1,9 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseCsv, run, runSliced, selectSplit, provenance, THRESHOLDS } from "./run-benchmark.mjs";
 import { prepare, assignSplit, shouldExclude, parseDelimited, toCsv, CANONICAL_LABELS } from "./prepare-dataset.mjs";
 
@@ -37,6 +42,22 @@ assert.equal(rich[2].lighting, "night");
 assert.equal(selectSplit(rich, "test").length, 2);
 assert.equal(selectSplit(rich, undefined).length, 4);
 assert.throws(() => selectSplit(rows, "test"), /no split column/);
+assert.throws(() => selectSplit(rich, "validation"), /train or test/);
+for (const csv of [
+  "label,ear,participant,split\nawake,0.3,p1,train\ndrowsy,0.1,p1,test",
+  "label,ear,participant,split\nawake,0.3,p1,train\ndrowsy,0.1, p1 ,test",
+]) {
+  assert.throws(() => parseCsv(csv), /Participant leakage/);
+}
+assert.throws(() => parseCsv("label,ear,participant,split\nawake,0.3,,test"), /Missing participant/);
+assert.throws(() => parseCsv("label,ear,split\nawake,0.3,test"), /Missing participant/);
+for (const split of ["", "validation", "Test"]) {
+  assert.throws(() => parseCsv(`label,ear,participant,split\nawake,0.3,p1,${split}`), /Invalid split/);
+}
+assert.throws(() => selectSplit([
+  { label: "awake", ear: 0.3, participant: "p1", split: "train" },
+  { label: "drowsy", ear: 0.1, participant: "p1", split: "test" },
+], "test"), /Participant leakage/, "validation checks both sides before selecting test rows");
 
 // --- slicing ----------------------------------------------------------------
 
@@ -63,6 +84,9 @@ assert.equal(assignSplit("p1", "seed-a", 0.3), assignSplit("p1", "seed-a", 0.3))
 assert.ok(["train", "test"].includes(assignSplit("p1", "seed-a", 0.3)));
 assert.equal(assignSplit("p1", "seed-a", 0), "train", "testFraction 0 sends everyone to train");
 assert.equal(assignSplit("p1", "seed-a", 1), "test", "testFraction 1 sends everyone to test");
+for (const fraction of [-0.1, 1.1, NaN, Infinity, "0.3"]) {
+  assert.throws(() => assignSplit("p1", "seed-a", fraction), /finite number/);
+}
 
 // --- exclusions -------------------------------------------------------------
 
@@ -112,6 +136,25 @@ s4,v4,9,0.20,1,day
 s5,v5,0,,1,day`).rows;
 
 const prepared = prepare(raw, config);
+
+// Malformed configuration must fail before creating an apparently governed
+// dataset. In particular, slices cannot overwrite a generated split or id.
+for (const name of ["label", "ear", "participant", "clip", "split", "Split", " lighting ", ""]) {
+  assert.throws(() => prepare(raw, { ...config, slices: { [name]: "light" } }), /Slice name/);
+}
+assert.throws(() => prepare(raw, { ...config, slices: { lighting: "" } }), /source column/);
+for (const value of ["clip", [], null, 0]) {
+  assert.throws(() => prepare(raw, { ...config, split: value }), /split config must be an object/);
+  assert.throws(() => prepare(raw, { ...config, slices: value }), /slices config must be an object/);
+}
+assert.throws(() => prepare(raw, { ...config, split: { ...config.split, by: "clip" } }), /participant-level/);
+for (const fraction of [0, 1, -0.1, 1.1, NaN, Infinity, "0.3"]) {
+  assert.throws(() => prepare(raw, { ...config, split: { ...config.split, testFraction: fraction } }), /testFraction/);
+}
+assert.throws(() => prepare(raw, { ...config, split: { ...config.split, seed: " " } }), /seed/);
+const prototypeSlice = prepare([{ label: "awake", ear: "0.3", participant: "p1", lighting: "day" }], JSON.parse('{"slices":{"__proto__":"lighting"}}'));
+assert.equal(Object.hasOwn(prototypeSlice.rows[0], "__proto__"), true);
+assert.equal(parseCsv(toCsv(prototypeSlice.headers, prototypeSlice.rows))[0].__proto__, "day", "slice values must survive names with prototype setters");
 
 assert.equal(prepared.rows.length, 4, "only the four clean, mappable rows survive");
 assert.equal(prepared.manifest.counts.excludedRows, 4);
@@ -165,6 +208,33 @@ for (const csv of [
 ]) {
   assert.throws(() => parseCsv(csv), /CSV/);
   assert.throws(() => parseDelimited(csv), /CSV/);
+}
+
+// Exercise command-line boundaries as well as helpers: invalid governance must
+// not write a canonical table or print accuracy metrics.
+const scratch = mkdtempSync(join(tmpdir(), "occulert-benchmark-"));
+try {
+  const inputPath = join(scratch, "input.csv"), configPath = join(scratch, "config.json"), outputPath = join(scratch, "prepared.csv");
+  writeFileSync(inputPath, "label,ear,participant,split\nawake,0.3,p1,train\ndrowsy,0.1,p1,test\n");
+  let cli = spawnSync(process.execPath, [fileURLToPath(new URL("./run-benchmark.mjs", import.meta.url)), "--input", inputPath, "--split", "test"], { encoding: "utf8" });
+  assert.notEqual(cli.status, 0);
+  assert.match(cli.stderr, /Participant leakage/);
+  assert.equal(cli.stdout, "", "leaky input must not print metrics");
+  writeFileSync(inputPath, "label,ear,participant\nawake,0.3,p1\n");
+  for (const column of ["lighting", "constructor", "toString", "__proto__"]) {
+    cli = spawnSync(process.execPath, [fileURLToPath(new URL("./run-benchmark.mjs", import.meta.url)), "--input", inputPath, "--slice-by", column], { encoding: "utf8" });
+    assert.notEqual(cli.status, 0);
+    assert.match(cli.stderr, /Slice column.*absent/);
+    assert.equal(cli.stdout, "");
+  }
+  writeFileSync(configPath, JSON.stringify({ slices: { split: "lighting" } }));
+  cli = spawnSync(process.execPath, [fileURLToPath(new URL("./prepare-dataset.mjs", import.meta.url)), "--input", inputPath, "--config", configPath, "--output", outputPath], { encoding: "utf8" });
+  assert.notEqual(cli.status, 0);
+  assert.match(cli.stderr, /Slice name/);
+  assert.equal(existsSync(outputPath), false);
+  assert.equal(existsSync(join(scratch, "prepared-manifest.json")), false);
+} finally {
+  rmSync(scratch, { recursive: true, force: true });
 }
 
 console.log("Occulert benchmark runner and dataset-preparation tests passed.");

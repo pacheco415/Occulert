@@ -22,7 +22,7 @@ for (const rule of cspRules) {
 }
 const appCsp = cspRules.find(rule => rule.source === '/app.html' && rule.headers.some(h => h.key === 'Content-Security-Policy'));
 assert.ok(appCsp && !JSON.stringify(appCsp).includes('cdn.jsdelivr.net'), 'Monitor policy must not depend on the detector CDN');
-assert.ok(readFileSync('driver-app.v48.js', 'utf8').includes("FACE_MESH_ASSET_BASE='/vendor/mediapipe/"));
-assert.equal(createHash('sha384').update(readFileSync(root + 'face_mesh.js')).digest('base64'), readFileSync('driver-app.v48.js', 'utf8').match(/FACE_MESH_SCRIPT_INTEGRITY='sha384-([^']+)'/)[1]);
+assert.ok(readFileSync('driver-app.v57.js', 'utf8').includes("FACE_MESH_ASSET_BASE='/vendor/mediapipe/"));
+assert.equal(createHash('sha384').update(readFileSync(root + 'face_mesh.js')).digest('base64'), readFileSync('driver-app.v57.js', 'utf8').match(/FACE_MESH_SCRIPT_INTEGRITY='sha384-([^']+)'/)[1]);
 assert.equal(createHash('sha256').update(readFileSync('driver-app.v47.js')).digest('hex'), '51827e0997c51078958ac6ef7b85f4311b67a3e3523134e118b4d171b3beb56b', 'Previously published driver bytes must remain immutable');
 console.log('Self-hosted MediaPipe integrity, offline asset set and CSP checks passed.');

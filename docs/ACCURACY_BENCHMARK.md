@@ -47,6 +47,17 @@ Both input paths support quoted commas, escaped quotes, and multiline fields.
 Malformed quoting, duplicate or blank column names, and inconsistent column
 counts stop processing so corrupted metadata cannot silently affect results.
 
+Preparation supports participant-level splitting only, with a non-empty seed
+and a numeric test fraction greater than zero and less than one. Slice names
+must be unique and lowercase and cannot replace `label`, `ear`, `participant`,
+`clip`, or the generated `split`. Invalid configuration stops before files are
+written. The runner also checks supplied split tables independently: every row
+needs a participant and a `train` or `test` split, and a participant cannot
+appear on both sides, even when only one side is selected for scoring. A
+requested slice column must exist; blank values within that column remain
+`(unspecified)`. Minimal `label,ear` tables remain supported for frame-level
+exploration, but do not establish a held-out evaluation.
+
 ```csv
 label,ear
 awake,0.31

@@ -59,5 +59,8 @@
   "fleet-display.v56.js": "8bd42e31880a812b074b78962a291c0a31bbbae83c2b3173468ac2993a17b1bd",
   "fleet-display.v56.css": "2a55682fc1c960ae0c6051723d4561917927a7b138a78e316db978a67d47e2a4",
   "fleet-pilot-report.v56.js": "fee2138386b2ecde3e5059435dcc3285f0d3d08ad550a0e27ae2cf16ddc48300",
-  "fleet-pilot-report.v56.css": "56298609e575d48e9ada76c86a2f2b716e9733a4a27fe327d28ee17d8e30edc4"
+  "fleet-pilot-report.v56.css": "56298609e575d48e9ada76c86a2f2b716e9733a4a27fe327d28ee17d8e30edc4",
+  "driver-app.v57.js": "241b77f88a0ef7bad886bf65a0b03e5758f34d260941c97ef03d4474a4334690",
+  "session-history-page-2.v57.js": "23d7046ebac764a3bd872de48d74163cae21b30935be405b9605e294769eae4f",
+  "fleet-followups.v57.js": "c335e99759ca9c415496f9c13244989645bfb908a0552e53b0d3e9f396ecbec7"
 }

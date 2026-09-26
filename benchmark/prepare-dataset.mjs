@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url";
 import { parseTable, validEar } from "./csv.mjs";
 
 export const CANONICAL_LABELS = new Set(["awake", "drowsy", "high_fatigue"]);
+const CANONICAL_COLUMNS = new Set(["label", "ear", "participant", "clip", "split"]);
 
 export function parseDelimited(text) {
   return parseTable(text);
@@ -30,6 +31,9 @@ export function toCsv(headers, rows) {
 // Deterministic and seed-stable: the same participant always lands in the same
 // split for a given seed, so a split can be reproduced without shipping it.
 export function assignSplit(key, seed, testFraction) {
+  if (typeof testFraction !== "number" || !Number.isFinite(testFraction) || testFraction < 0 || testFraction > 1) {
+    throw new Error("Split testFraction must be a finite number between 0 and 1.");
+  }
   const digest = createHash("sha256").update(`${seed}:${key}`).digest();
   const unit = digest.readUInt32BE(0) / 0x1_00_00_00_00;
   return unit < testFraction ? "test" : "train";
@@ -56,10 +60,30 @@ export function shouldExclude(row, exclude = {}, labelColumn = "label") {
 }
 
 export function prepare(rawRows, config) {
+  if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("Dataset config must be an object.");
+  for (const name of ["split", "slices"]) {
+    if (config[name] !== undefined && (!config[name] || typeof config[name] !== "object" || Array.isArray(config[name]))) {
+      throw new Error(`Dataset ${name} config must be an object.`);
+    }
+  }
   const columns = config.columns ?? {};
   const labelMap = config.labelMap ?? {};
   const slices = config.slices ?? {};
   const split = { by: "participant", testFraction: 0.3, seed: "occulert", ...(config.split ?? {}) };
+  if (split.by !== "participant") throw new Error("Only participant-level splitting is supported.");
+  if (typeof split.testFraction !== "number" || !Number.isFinite(split.testFraction) || split.testFraction <= 0 || split.testFraction >= 1) {
+    throw new Error("Dataset split testFraction must be greater than 0 and less than 1.");
+  }
+  if (typeof split.seed !== "string" || !split.seed.trim()) throw new Error("Split seed must be a non-empty string.");
+  const sliceNames = new Set();
+  for (const [name, sourceColumn] of Object.entries(slices)) {
+    const normalized = name.trim().toLowerCase();
+    if (!normalized || normalized !== name || CANONICAL_COLUMNS.has(normalized) || sliceNames.has(normalized)) {
+      throw new Error(`Slice name "${name}" must be unique, lowercase, and must not replace a canonical column.`);
+    }
+    if (typeof sourceColumn !== "string" || !sourceColumn.trim()) throw new Error(`Slice "${name}" needs a source column.`);
+    sliceNames.add(normalized);
+  }
 
   const kept = [];
   const exclusions = new Map();
@@ -102,13 +126,17 @@ export function prepare(rawRows, config) {
       split: assignSplit(participant, split.seed, split.testFraction),
     };
     for (const [sliceName, sourceColumn] of Object.entries(slices)) {
-      row[sliceName] = raw[sourceColumn] ?? "";
+      Object.defineProperty(row, sliceName, { value: raw[sourceColumn] ?? "", enumerable: true, configurable: true, writable: true });
     }
     kept.push(row);
   }
 
   const participants = new Map();
-  for (const row of kept) participants.set(row.participant, row.split);
+  const leakedParticipants = new Set();
+  for (const row of kept) {
+    if (participants.has(row.participant) && participants.get(row.participant) !== row.split) leakedParticipants.add(row.participant);
+    participants.set(row.participant, row.split);
+  }
   const testParticipants = [...participants].filter(([, s]) => s === "test").map(([p]) => p);
   const trainParticipants = [...participants].filter(([, s]) => s === "train").map(([p]) => p);
 
@@ -125,10 +153,7 @@ export function prepare(rawRows, config) {
     },
     exclusions: Object.fromEntries(exclusions),
     leakageCheck: {
-      participantsInBothSplits: [...participants.keys()].filter((p) => {
-        const rows = kept.filter((row) => row.participant === p);
-        return new Set(rows.map((row) => row.split)).size > 1;
-      }),
+      participantsInBothSplits: [...leakedParticipants],
     },
     preparedAt: new Date().toISOString(),
   };

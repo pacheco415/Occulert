@@ -1,6 +1,14 @@
 # Occulert Native App
 
-This directory contains the React Native (Expo) scaffold for the Occulert native iOS and Android app.
+This directory contains the React Native (Expo) iPhone and Apple Watch source.
+Android configuration remains source; no released Android app is claimed.
+
+Current private distribution is TestFlight **1.0.0 (52)**: finished build,
+FINISHED submission, Apple VALID / IN_BETA_TESTING, and confirmed embedded
+Watch packaging. **No physical build-52 acceptance is recorded.** Earlier
+build-15/19/36 and build-49 feedback is evidence for those exact builds. There
+are **0 iOS builds left this cycle**; validate the available binary without
+queueing another build. See the [authoritative roadmap](../docs/APP_ROADMAP.md).
 
 ## Why Native?
 
@@ -12,7 +20,9 @@ The PWA at occulert.com is the top-of-funnel entry point, but it has critical li
 - No push notifications
 - No real wakelock guarantee on iOS Safari
 
-A native app removes all of these blockers.
+Native adds device APIs and a packaged Watch companion, but camera monitoring
+still requires the foreground. Permission, accessory availability, and physical
+alert delivery remain separate checks.
 
 ## Stack
 
@@ -29,15 +39,15 @@ A native app removes all of these blockers.
 ## Setup
 
 ### Prerequisites
-- Node.js 18+
-- Expo CLI: `npm install -g expo-cli`
-- iOS: Xcode 15+ with iOS 16+ simulator or physical device
+- Node 24 for source verification; EAS install CI matches Node 22.23.1/npm 10.9.8
+- Use the project's Expo CLI through `npx expo`; native features need a custom development or TestFlight build
+- iOS: SDK 57-compatible Xcode/toolchain; the production EAS profile pins Xcode 26.6
 - Android: Android Studio with API 31+ emulator
 
 ### Install
 ```bash
 cd native-app
-npm install
+npm ci --include=dev
 ```
 
 ### Run
@@ -48,8 +58,8 @@ npx expo start --ios
 # Android emulator  
 npx expo start --android
 
-# Scan QR code with Expo Go app (fastest for testing on real device)
-npx expo start
+# Start the custom native development client; Expo Go cannot run these native modules
+npx expo start --dev-client
 ```
 
 ## Project Structure
@@ -59,7 +69,7 @@ native-app/
 |-- app/                    # Expo Router screens
 |   |-- index.tsx           # Landing / home screen
 |   |-- monitor.tsx         # Main monitoring screen (camera)
-|   |-- pre-drive.tsx       # Pre-drive risk score screen
+|   |-- pre-drive.tsx       # Parked checks + optional local Health context
 |   |-- history.tsx         # Session history
 |   `-- settings.tsx        # Sensitivity + preferences
 |-- components/
@@ -73,7 +83,7 @@ native-app/
 |   |-- sessionHistory.ts   # Serialized local session storage
 |   `-- watchBridge.ts      # iPhone-to-Watch alert delivery
 |-- constants/
-|   `-- thresholds.ts       # Sensitivity presets (mirrors web app)
+|   `-- thresholds.ts       # Native sensitivity presets
 |-- targets/
 |   `-- occulert-watch/     # SwiftUI watchOS companion
 |-- package.json
@@ -83,31 +93,34 @@ native-app/
 
 ## Phase Milestones
 
+Build-15/19 statuses below describe historical evidence. They do not establish
+physical acceptance of the available build 52.
+
 | Milestone | Status |
 |-----------|--------|
 | Expo project initialized | Done - scaffold created |
-| Camera + EAR detection running | Done - `useEyeTracking.ts` + dev simulation loop |
+| Native eye probability + PERCLOS scoring | Implemented - ML Kit + `useEyeTracking.ts`; browser EAR is a separate pipeline |
 | Foreground camera monitoring (iOS) | Done - session-scoped `useKeepAwake` + VisionCamera in `monitor.tsx` |
 | Screen-off / app-backgrounded camera monitoring | Not supported - keep the app foregrounded |
 | Sensitivity slider | Done - `SensitivitySlider.tsx` + AsyncStorage |
 | Alert system (haptic + audio) | Done - `AlertSystem.tsx` - expo-haptics + expo-audio |
 | Earlier sustained-closure escalation | Source complete - prominent alert at 600 ms, stronger stage at 1.2 s; physical calibration pending |
 | Foreground-loss spoken warning | Source complete - camera stops and a local warning begins immediately; physical validation pending |
-| Apple Watch companion + wrist haptics | Done - private TestFlight build 15 validated |
+| Apple Watch companion + wrist haptics | Embedded in build 52; historical build-15 feedback does not accept build-52 delivery |
 | Per-session pre-drive safety confirmation | Done - required before monitoring |
-| Structured session alert review | Done - local correct / false / missed labels |
+| Structured session alert review | Implemented - local felt-right / false / missed / late labels |
 | Structured session test conditions | Done - private TestFlight build 15 |
 | Pilot test-condition coverage summary | Done - private TestFlight build 15 |
 | Tester-reported battery use + phone heat | Done - private TestFlight build 15 |
 | Collapsible session reviews + completion status | Done - private TestFlight build 15 |
 | Per-session app version + native build stamp | Done - private TestFlight build 15 |
 | Local false/missed alert pattern summary | Done - private TestFlight build 15 |
-| Pilot accuracy checkpoint | Implemented - local 10-session Medium progress summary |
+| Pilot review checkpoint | Implemented - local 10-session Medium progress summary; not measured accuracy |
 | Optional protected cloud session sync | Implemented - secure sign-in + explicit consent |
 | Head-nod detection | Experimental local camera and compatible-headphone observations; does not trigger alerts or sync |
 | HealthKit HRV/sleep integration | Done - optional read-only local context validated in private TestFlight build 19 |
 | Pre-drive risk score screen | Foundation in source - factual sleep/HRV context only; no score or alert influence |
-| Private iOS distribution | TestFlight build 19 validated on iPhone and Apple Watch; no external testing or App Review started |
+| Private iOS distribution | TestFlight 1.0.0 (52), FINISHED submission and Apple VALID / IN_BETA_TESTING; physical acceptance pending |
 
 Pilot testers can send general feedback from Settings or attach basic session
 metrics and a structured alert assessment from History. Alert assessments stay
@@ -117,8 +130,8 @@ location.
 
 History can also record lighting, eyewear, and phone position after the tester
 is safely parked. These structured conditions stay local unless the tester
-opens the editable session feedback email. They are included in the validated
-private TestFlight build 19 baseline.
+opens the editable session feedback email. These features are implemented;
+earlier build-19 validation is historical, and build-52 acceptance remains open.
 
 The same local review can capture subjective battery use and phone heat after
 the tester parks. These are explicitly described as tester observations rather
@@ -128,7 +141,7 @@ Occulert and let the iPhone cool before another session.
 
 Each new local session also preserves the sensitivity used for that session.
 History counts reviewed Medium-sensitivity sessions toward the first 10-session
-accuracy checkpoint and summarizes felt-right, false, and missed ratings
+review checkpoint and summarizes felt-right, false, missed, and late ratings
 without uploading those ratings.
 
 When false or missed alerts are reviewed, History also groups their local
@@ -154,7 +167,7 @@ video, audio, GPS location, and structured alert ratings are not uploaded.
 ## PWA Parity Checklist
 
 Before App Store submission, the native app should match or exceed the PWA:
-- [ ] EAR-based eye tracking with PERCLOS
+- [ ] Exact-build native ML Kit eye-probability/PERCLOS acceptance; browser EAR is separate
 - [ ] Sensitivity control (Low / Med / High)
 - [ ] Session event log
 - [x] Fleet dashboard sync (optional)
@@ -164,7 +177,7 @@ Before App Store submission, the native app should match or exceed the PWA:
 
 ---
 
-*Occulert - Native app scaffold - Start here for iOS/Android development*
+*Occulert native source; release and physical evidence are recorded separately.*
 
 ## Connected Devices (AirPods & Apple Watch)
 
@@ -185,7 +198,7 @@ iOS and Android route audio to the connected Bluetooth device automatically;
 you cannot (and don't need to) address AirPods directly. Settings reports this
 as automatic routing instead of presenting a misleading AirPods switch.
 
-### Compatible-headphone motion diagnostics (source only)
+### Compatible-headphone motion diagnostics (observation only)
 
 The private local Expo module in
 `modules/occulert-headphone-motion/` uses Apple's
@@ -200,11 +213,11 @@ feed a separate candidate head-nod detector. Raw motion samples are discarded;
 session history stores only sample and candidate counts plus the source status.
 
 This path is diagnostic only. It does **not** change PERCLOS, fatigue scoring,
-alerts, Watch haptics, or cloud payloads. A new native development/TestFlight
-build and real compatible-headphone calibration are still required before this
-can be treated as a validated signal.
+alerts, Watch haptics, or cloud payloads. Use the available build 52 for physical
+checks; compatible-headphone calibration and independent validation remain
+required before treating these observations as a validated signal.
 
-### Directional in-ear alert pattern (source only)
+### Directional in-ear alert pattern (physical acceptance pending)
 
 Settings keeps the existing centered alert tone as the default and offers an
 opt-in **Alternate L/R** pattern for stereo earbuds. The derived stereo assets
@@ -214,9 +227,8 @@ and tracking-loss alerts always use the centered tone at full audibility.
 
 The pattern never claims to detect a left/right hazard and does not depend on
 headphone-motion observations. Speaker, car-audio, and single-earbud users
-should leave the centered default selected. A new TestFlight build and physical
-stereo-earbud check remain required before this source change is considered
-device-verified.
+should leave the centered default selected. A physical stereo-earbud check on
+the available build 52 remains required before treating this as device-verified.
 
 ### Apple Watch alerts (requires a development / TestFlight build)
 
