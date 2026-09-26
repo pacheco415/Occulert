@@ -294,6 +294,38 @@ try {
   assert.equal(preparationManifest.provenance.configurationSha256, contentSha256(readFileSync(configPath)));
   assert.equal(preparationManifest.provenance.runnerCommit, scored.provenance.runnerCommit);
   assert.deepEqual(preparationManifest.provenance.sourceHashes, scored.provenance.sourceHashes);
+
+  // Distinct malformed UTF-8 bytes decode to the same replacement character.
+  // Provenance must retain their distinct raw identities rather than hashing
+  // that normalized text, without changing the existing CSV decoding behavior.
+  const rawHashes = [], configHashes = [], decodedTables = [];
+  for (const byte of [0xff, 0xfe]) {
+    const rawInput = Buffer.concat([
+      Buffer.from("label,ear,participant,lighting,clip\nawake,0.3,p1,,"),
+      Buffer.from([byte]), Buffer.from("\n"),
+    ]);
+    const rawConfig = Buffer.concat([
+      Buffer.from('{"slices":{"lighting":"lighting"},"dataset":{"notes":"'),
+      Buffer.from([byte]), Buffer.from('"}}'),
+    ]);
+    writeFileSync(inputPath, rawInput);
+    writeFileSync(configPath, rawConfig);
+    cli = spawnSync(process.execPath, [fileURLToPath(new URL("./run-benchmark.mjs", import.meta.url)), "--input", inputPath, "--json", resultsPath], { encoding: "utf8" });
+    assert.equal(cli.status, 0, cli.stderr);
+    const byteResult = JSON.parse(readFileSync(resultsPath, "utf8"));
+    assert.equal(byteResult.provenance.inputSha256, contentSha256(rawInput));
+    rawHashes.push(byteResult.provenance.inputSha256);
+    cli = spawnSync(process.execPath, [fileURLToPath(new URL("./prepare-dataset.mjs", import.meta.url)), "--input", inputPath, "--config", configPath, "--output", outputPath], { encoding: "utf8" });
+    assert.equal(cli.status, 0, cli.stderr);
+    const byteManifest = JSON.parse(readFileSync(join(scratch, "prepared-manifest.json"), "utf8"));
+    assert.equal(byteManifest.provenance.inputSha256, contentSha256(rawInput));
+    assert.equal(byteManifest.provenance.configurationSha256, contentSha256(rawConfig));
+    configHashes.push(byteManifest.provenance.configurationSha256);
+    decodedTables.push(readFileSync(outputPath, "utf8"));
+  }
+  assert.equal(decodedTables[0], decodedTables[1], "raw-byte hashing must preserve existing CSV output");
+  assert.notEqual(rawHashes[0], rawHashes[1], "distinct raw inputs must retain distinct hashes");
+  assert.notEqual(configHashes[0], configHashes[1], "distinct raw configurations must retain distinct hashes");
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

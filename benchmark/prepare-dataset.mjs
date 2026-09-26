@@ -181,15 +181,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exit(2);
   }
 
-  const configText = await readFile(configPath, "utf8");
-  const inputText = await readFile(input, "utf8");
-  const config = JSON.parse(configText);
-  const { headers: rawHeaders, rows: rawRows } = parseDelimited(inputText);
+  const configBytes = await readFile(configPath);
+  const inputBytes = await readFile(input);
+  const config = JSON.parse(configBytes.toString("utf8"));
+  const { headers: rawHeaders, rows: rawRows } = parseDelimited(inputBytes.toString("utf8"));
   const { headers, rows, manifest } = prepare(rawRows, config, rawHeaders);
   manifest.provenance = {
     ...sourceSnapshot(),
-    inputSha256: contentSha256(inputText),
-    configurationSha256: contentSha256(configText),
+    inputSha256: contentSha256(inputBytes),
+    configurationSha256: contentSha256(configBytes),
   };
 
   if (manifest.leakageCheck.participantsInBothSplits.length) {

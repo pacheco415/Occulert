@@ -149,8 +149,20 @@ test('larger font metrics and long option labels cannot widen the fleet trial fo
   await expect(page.locator('#useCase')).toHaveValue('Construction / field crews');
   await page.locator('#useCase').selectOption({ index: 0 });
   await expect(page.locator('#useCase')).toHaveValue('Construction / field crews — regional and overnight operations');
+  await page.locator('#useCase').focus();
+  await page.keyboard.press('m');
+  await expect(page.locator('#useCase')).toBeFocused();
+  await expect(page.locator('#useCase')).toHaveValue('Moving trucks');
+  const focus = await page.locator('#useCase').evaluate(select => {
+    const style = getComputedStyle(select);
+    return { width: parseFloat(style.outlineWidth), style: style.outlineStyle };
+  });
+  expect(focus.width).toBeGreaterThan(0);
+  expect(focus.style).not.toBe('none');
+  await page.locator('#useCase').selectOption({ index: 0 });
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth), { timeout: 2_000 }).toBeLessThanOrEqual(width);
     const form = await page.locator('#pilotForm').boundingBox();
     expect(form.x).toBeGreaterThanOrEqual(0);
     expect(form.x + form.width).toBeLessThanOrEqual(width);
@@ -163,5 +175,25 @@ test('larger font metrics and long option labels cannot widen the fleet trial fo
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+});
+
+test('account dropdown arrows and keyboard selection survive both themes and reduced transparency', async ({ page }) => {
+  await page.route('**/liquid-glass.v47.css', async route => {
+    const response = await route.fetch();
+    // Exercise the actual fallback stylesheet without depending on OS settings.
+    const body = (await response.text()).replace('@media (prefers-reduced-transparency: reduce)', '@media all');
+    await route.fulfill({ response, body });
+  });
+  await page.goto('/account.html');
+  for (const theme of ['dark', 'light']) {
+    await page.locator('html').evaluate((html, theme) => html.setAttribute('data-theme', theme), theme);
+    await expect(page.locator('#role')).toHaveCSS('background-image', /linear-gradient/);
+    await page.locator('#role').selectOption('driver');
+    await page.locator('#role').focus();
+    await page.keyboard.press('f');
+    await expect(page.locator('#role')).toHaveValue('fleet');
+    await expect(page.locator('#role')).toBeFocused();
+    await expect(page.locator('#role')).toHaveCSS('outline-style', 'solid');
   }
 });

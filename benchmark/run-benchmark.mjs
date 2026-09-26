@@ -87,10 +87,11 @@ export function runSliced(rows, column) {
 }
 
 // A result with no provenance is not reproducible, so this is not optional.
-export function provenance({ input, inputText, split, dataset }) {
+export function provenance({ input, inputBytes, inputText, split, dataset }) {
+  const inputContent = inputBytes ?? inputText;
   return {
     ...sourceSnapshot(),
-    inputSha256: inputText === undefined ? null : contentSha256(inputText),
+    inputSha256: inputContent === undefined ? null : contentSha256(inputContent),
     thresholds: THRESHOLDS,
     input: input ?? null,
     split: split ?? "all",
@@ -128,8 +129,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const dataset = arg("--dataset");
   const jsonOut = arg("--json");
 
-  const inputText = await readFile(input, "utf8");
-  const allRows = parseCsv(inputText);
+  const inputBytes = await readFile(input);
+  const allRows = parseCsv(inputBytes.toString("utf8"));
   if (sliceBy && allRows.length && !Object.hasOwn(allRows[0], sliceBy)) {
     throw new Error(`Slice column "${sliceBy}" is absent from the input CSV.`);
   }
@@ -139,7 +140,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exit(1);
   }
 
-  const meta = provenance({ input, inputText, split, dataset });
+  const meta = provenance({ input, inputBytes, split, dataset });
   const overall = run(rows);
   const slices = sliceBy ? runSliced(rows, sliceBy) : null;
 

@@ -40,6 +40,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
+      - name: Check native form controls on Linux WebKit
+        run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit
       - run: npm run test:browser
       - name: Preserve browser failure and retry diagnostics
         if: ${{ !cancelled() }}
