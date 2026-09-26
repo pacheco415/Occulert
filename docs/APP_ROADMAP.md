@@ -76,6 +76,28 @@ merge and deployment evidence for this package. It changes no native binary or
 detection thresholds and evaluates no real dataset. Build-52 physical
 acceptance remains separate.
 
+## Fleet refresh recovery package
+
+Dashboard and TV refresh stages have eight-second deadlines, restored manual
+controls, and automatic retries after interruptions. Cached summaries remain
+visible only for the same stored owner and are labeled stale; protected report
+sharing remains withheld after a failed refresh. Account changes invalidate
+pending work, and late results cannot replace recovered views or sign out a
+newer session. Browser account refreshes preserve newer credentials and retain
+the stored account when a transient failure cannot confirm sign-out. A stalled
+public configuration lookup is bounded and retried. Network-only account
+scripts have a bounded service-worker wait through headers and body so a stalled request cannot hold
+driver-page startup; they never fall back to cached account scripts.
+
+Protected summaries and saved follow-ups select the same latest 50 sessions,
+using session ID to break equal start times. Regression coverage checks tied
+records across the cutoff, owner scoping, hung requests, recovery, and late
+responses. Browser CI preserves failure traces even when a retry succeeds;
+the earlier intermittent WebKit offline-upgrade cause remains unconfirmed.
+The [release tracker](https://github.com/pacheco415/Occulert/issues/6) records
+source, merge, and deployment evidence. This package changes no native binary
+or detection thresholds and adds no pilot or device observations.
+
 ## Validating
 
 1. **Native acceptance:** install or confirm the available TestFlight

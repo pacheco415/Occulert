@@ -444,7 +444,7 @@ test('a previous session wake lock cannot replace the current session lock', asy
 
 test('service-worker upgrade evicts stale website caches', async () => {
   const source = read('sw.js');
-  assert.match(source, /const CACHE = 'occulert-v50'/);
+  assert.match(source, /const CACHE = 'occulert-v51'/);
   assert.match(source, /const NETWORK_FIRST_ASSETS = new Set\(\[/);
   assert.match(source, /'\/driver-app\.v57\.js'/);
   assert.match(source, /const NETWORK_FIRST_TIMEOUT_MS = 2500/);
@@ -516,7 +516,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await assert.rejects(installation, /Critical offline assets were not cached/);
   assert.equal(skipped, false);
-  assert.deepEqual(deleted, ['occulert-v50']);
+  assert.deepEqual(deleted, ['occulert-v51']);
 });
 
 test('service-worker bounds network and cache writes while preserving a known-good detector', async () => {
@@ -583,6 +583,131 @@ test('service-worker bounds network and cache writes while preserving a known-go
   await lifetimePromise;
 });
 
+test('network-only account scripts time out without exposing cached auth and preserve valid network responses', async () => {
+  const listeners = {}, timers = new Map(), fetches = [];
+  let timerId = 0, network, cacheReads = 0, cacheWrites = 0, lifetimeUpdates = 0;
+  const fresh = new Response('window.accountScript = "current";', { status: 200, statusText: 'Current script', headers: {
+    'content-type': 'text/javascript', 'content-encoding': 'gzip', 'content-length': '12', 'x-script-source': 'online',
+  } });
+  const sensitiveCached = { source: 'cached-account-script', ok: true };
+  const context = {
+    AbortController, URL, Request, Promise, Set, Response, Headers,
+    setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
+    clearTimeout: id => timers.delete(id),
+    fetch: (request, options) => { fetches.push({ request, options }); return network(); },
+    caches: {
+      match: async () => { cacheReads++; return sensitiveCached; },
+      open: async () => { cacheWrites++; return { put: async () => { cacheWrites++; } }; },
+    },
+    self: { location: { origin: 'https://www.occulert.com' }, addEventListener: (name, handler) => { listeners[name] = handler; } },
+  };
+  runInNewContext(read('sw.js'), context);
+  let responsePromise;
+  const dispatch = path => listeners.fetch({
+    request: { method: 'GET', mode: 'no-cors', destination: 'script', url: 'https://www.occulert.com' + path },
+    respondWith: promise => { responsePromise = promise; },
+    waitUntil: () => { lifetimeUpdates++; },
+  });
+  for (const path of ['/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', '/supabase-loader.v47.js']) {
+    const old = deferred();
+    network = () => old.promise;
+    dispatch(path);
+    await drainTasks();
+    const request = fetches.at(-1);
+    assert.equal(request.options.cache, 'no-store');
+    assert.equal(request.options.signal.aborted, false);
+    const [id, timer] = [...timers][0];
+    assert.equal(timer.delay, 2500);
+    timers.delete(id); timer.callback();
+    assert.equal((await responsePromise).type, 'error', path + ' must settle after its deadline');
+    assert.equal(request.options.signal.aborted, true);
+    assert.equal(cacheReads, 0, 'a failed account script must never fall back to cached auth');
+    assert.equal(cacheWrites, 0);
+    old.resolve(fresh);
+    await drainTasks();
+    assert.equal(cacheWrites, 0, 'a late response must not be cached');
+  }
+  network = async () => fresh;
+  dispatch('/occulert-backend.v58.js');
+  const valid = await responsePromise;
+  assert.equal(valid.status, 200);
+  assert.equal(valid.statusText, 'Current script');
+  assert.equal(await valid.text(), 'window.accountScript = "current";', 'a complete online account script remains available');
+  assert.equal(valid.headers.get('content-type'), 'text/javascript');
+  assert.equal(valid.headers.get('x-script-source'), 'online');
+  assert.equal(valid.headers.has('content-encoding'), false, 'the buffered body already contains decoded bytes');
+  assert.equal(valid.headers.has('content-length'), false, 'the original wire length does not describe decoded bytes');
+  assert.equal(fetches.at(-1).options.cache, 'no-store');
+  assert.equal(fetches.at(-1).options.signal.aborted, false);
+  assert.equal(timers.size, 0, 'successful delivery clears its deadline');
+  network = async () => { throw new Error('Connection lost'); };
+  dispatch('/occulert-backend.v58.js');
+  assert.equal((await responsePromise).type, 'error');
+  network = async () => new Response('Unavailable', { status: 503, statusText: 'Service Unavailable' });
+  dispatch('/occulert-backend.v58.js');
+  const denied = await responsePromise;
+  assert.equal(denied.status, 503, 'network denial is preserved without cached substitution');
+  assert.equal(denied.statusText, 'Service Unavailable');
+  assert.equal(await denied.text(), 'Unavailable');
+  for (const status of [204, 205, 304]) {
+    network = async () => new Response(null, { status });
+    dispatch('/occulert-backend.v58.js');
+    const empty = await responsePromise;
+    assert.equal(empty.status, status, 'body-forbidden response status remains valid');
+    assert.equal(empty.body, null);
+  }
+  assert.equal(cacheReads, 0);
+  assert.equal(cacheWrites, 0);
+  assert.equal(lifetimeUpdates, 0, 'network-only assets schedule no cache writes');
+  assert.equal(timers.size, 0);
+});
+
+test('network-only script headers and a partial body share one deadline and ignore late completion', async () => {
+  const listeners = {}, timers = new Map(), headers = deferred();
+  let timerId = 0, streamController, networkSignal, networkOptions, delivered = false, cacheAccess = 0;
+  const body = new ReadableStream({ start(controller) {
+    streamController = controller;
+    controller.enqueue(new TextEncoder().encode('window.accountScript = "partial'));
+  } });
+  const partial = new Response(body, { status: 200, headers: { 'content-type': 'text/javascript' } });
+  const context = {
+    AbortController, URL, Request, Promise, Set, Response, Headers,
+    setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
+    clearTimeout: id => timers.delete(id),
+    fetch: (_request, options) => { networkOptions = options; networkSignal = options.signal; return headers.promise; },
+    caches: {
+      match: async () => { cacheAccess++; return new Response('window.cachedAuthWasExecuted=true;'); },
+      open: async () => { cacheAccess++; return { put: async () => { cacheAccess++; } }; },
+    },
+    self: { location: { origin: 'https://www.occulert.com' }, addEventListener: (name, handler) => { listeners[name] = handler; } },
+  };
+  runInNewContext(read('sw.js'), context);
+  let responsePromise;
+  listeners.fetch({
+    request: { method: 'GET', mode: 'no-cors', destination: 'script', url: 'https://www.occulert.com/occulert-backend.v58.js' },
+    respondWith: promise => { responsePromise = promise; promise.then(() => { delivered = true; }); },
+  });
+  const [[deadlineId, deadline]] = [...timers];
+  await drainTasks();
+  assert.equal(networkOptions.cache, 'no-store');
+  headers.resolve(partial);
+  await drainTasks();
+  assert.equal(delivered, false, 'headers and partial bytes cannot release a still-loading script');
+  assert.deepEqual([...timers.keys()], [deadlineId], 'header arrival must not restart the deadline');
+  assert.equal(deadline.delay, 2500);
+  timers.delete(deadlineId); deadline.callback();
+  const failed = await responsePromise;
+  assert.equal(failed.type, 'error');
+  assert.equal(networkSignal.aborted, true, 'deadline aborts the response body transfer');
+  assert.equal(cacheAccess, 0, 'partial account scripts cannot expose cached auth');
+  streamController.enqueue(new TextEncoder().encode(' but now complete";'));
+  streamController.close();
+  await drainTasks();
+  assert.equal(await responsePromise, failed, 'late body completion cannot replace the failed response');
+  assert.equal(cacheAccess, 0);
+  assert.equal(timers.size, 0);
+});
+
 test('fleet refreshes adapt to activity and throttle protected event queries', () => {
   const api = read('api/fleet-summary.js');
   const dashboard = read('fleet-dashboard.html');
@@ -640,6 +765,207 @@ test('fleet dashboard restarts its relative-time clock after returning to a visi
   await context.schedulingForTest.handleVisibilityChange();
   assert.equal(intervalCalls, 1, 'visible dashboards must restart the relative-time interval');
   assert.equal(context.dashboardRefreshTimer, 11);
+});
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
+}
+const drainTasks = () => new Promise(done => setImmediate(done));
+function dashboardRefreshHarness({ empty = false } = {}) {
+  const source = read('fleet-dashboard.html'), timers = new Map(), elements = new Map(), requests = [], views = [];
+  const now = Date.parse('2026-09-26T12:00:00Z');
+  let user = { id: 'owner' }, timerId = 0, sessionImpl = async () => ({ user }), summaryImpl = async () => summary('Recovered fleet');
+  function summary(name) { return { ok: true, body: { fleet: { company_name: name }, drivers: [{ id: name, name, active: true }],
+    sessions: [], events: [], events_included: true, telemetry_trust: 'unverified_client_report',
+    privacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false } } }; }
+  function element(id) {
+    if (!elements.has(id)) elements.set(id, { textContent: '', disabled: false, attributes: {}, hidden: false,
+      classList: { toggle(name, value) { elements.get(id).hidden = name === 'hidden' && value; } },
+      setAttribute(name, value) { this.attributes[name] = value; } });
+    return elements.get(id);
+  }
+  class ClockDate extends Date { static now() { return now; } }
+  let context;
+  const window = { OcculertBackend: { currentUser: () => user, getSession: () => { requests.push('session'); return sessionImpl(); },
+    getFleetSummary: options => { requests.push({ summary: options }); return summaryImpl(); }, signOut: () => { requests.push('signOut'); user = null; } },
+    OcculertFollowups: { reset() {}, show() {} }, OcculertPilotReport: { reset() {}, update() {} } };
+  context = { Date: ClockDate, window, document: { hidden: false, getElementById: element }, navigator: { connection: {} },
+    syncProtectedControls() {}, render: () => views.push(context.state().protectedFleetName),
+    refreshDashboardIfNeeded: () => views.push(context.state().protectedFleetName), protectedHistoryOpen: () => false,
+    setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
+    clearTimeout: id => timers.delete(id), setInterval: () => 1, clearInterval() {},
+  };
+  const globals = source.slice(source.indexOf('let cloudRows='), source.indexOf('function esc('));
+  const auth = source.slice(source.indexOf('async function handleAuthStorageChange('), source.indexOf('async function boot('));
+  runInNewContext(globals + markedBlock(source, 'fleet-refresh-policy') + markedBlock(source, 'fleet-summary-projection') +
+    markedBlock(source, 'fleet-refresh-request') + markedBlock(source, 'fleet-refresh-scheduling') + auth + `
+      globalThis.state=()=>({fleetMode,protectedUserId,protectedFleetName,protectedDrivers,protectedSessions,protectedEvents,
+        protectedLastSuccessfulAt,protectedRefreshFailures,protectedFleetLoading,protectedFleetGeneration,
+        protectedTelemetryTrust,protectedReportPrivacy,protectedReportShape});
+      globalThis.seed=input=>{({fleetMode,protectedUserId,protectedFleetName,protectedDrivers,protectedSessions,
+        protectedEvents,protectedLastSuccessfulAt,protectedRefreshFailures,protectedTelemetryTrust,
+        protectedReportPrivacy,protectedReportShape}=input)};`, context);
+  context.seed({ ...context.state(), ...(empty ? {} : { fleetMode: true, protectedUserId: 'owner', protectedFleetName: 'Cached private fleet',
+    protectedDrivers: [{ id: 'driver', name: 'Private Driver' }], protectedSessions: [{ id: 'private-session' }], protectedEvents: [{ id: 'private-event' }],
+    protectedLastSuccessfulAt: now, protectedRefreshFailures: 0, protectedTelemetryTrust: 'unverified_client_report',
+    protectedReportPrivacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false }, protectedReportShape: true }) });
+  return { context, timers, elements, requests, views, summary, state: context.state, user: value => { user = value; },
+    auth: fn => { sessionImpl = fn; }, fetch: fn => { summaryImpl = fn; },
+    expire: delay => { const entry = Array.from(timers.entries()).find(([, timer]) => timer.delay === delay); assert.ok(entry, `timer ${delay} must exist`);
+      timers.delete(entry[0]); entry[1].callback(); },
+  };
+}
+
+test('hung dashboard account checks release controls, preserve same-owner stale data, and recover manually', async () => {
+  const app = dashboardRefreshHarness(), old = deferred();
+  app.auth(() => old.promise);
+  const attempt = app.context.refreshProtectedFleetNow();
+  await drainTasks();
+  assert.equal(app.elements.get('refreshNow').disabled, true);
+  app.expire(8000);
+  await attempt;
+  assert.equal(app.state().protectedFleetLoading, false);
+  assert.equal(app.elements.get('refreshNow').disabled, false);
+  assert.equal(app.elements.get('refreshNow').textContent, 'Refresh now');
+  assert.match(app.elements.get('cloudStatus').textContent, /Account check unavailable or timed out\. Sign-out was not confirmed/);
+  assert.equal(app.state().fleetMode, true);
+  assert.equal(app.state().protectedFleetName, 'Cached private fleet');
+  assert.equal(app.state().protectedRefreshFailures, 1, 'stale protected exports must remain withheld');
+  assert.equal(app.requests.filter(request => typeof request === 'object').length, 0, 'unconfirmed auth cannot fetch protected summary');
+  assert.ok(Array.from(app.timers.values()).some(timer => timer.delay === 180000), 'existing backoff starts after the failure');
+  old.resolve({ user: { id: 'owner' } });
+  await drainTasks();
+  assert.equal(app.requests.filter(request => typeof request === 'object').length, 0, 'late auth must not resume the expired request');
+  app.auth(async () => ({ user: { id: 'owner' } }));
+  await app.context.refreshProtectedFleetNow();
+  assert.equal(app.state().protectedFleetName, 'Recovered fleet');
+  assert.equal(app.state().protectedRefreshFailures, 0);
+  assert.equal(app.elements.get('refreshNow').disabled, false);
+  assert.ok(Array.from(app.timers.values()).some(timer => timer.delay === 90000));
+});
+
+test('startup account timeout exposes retry without substituting local/demo data or confirming sign-out', async () => {
+  const app = dashboardRefreshHarness({ empty: true });
+  app.auth(() => new Promise(() => {}));
+  const attempt = app.context.refreshProtectedFleetNow();
+  await drainTasks(); app.expire(8000); await attempt;
+  assert.equal(app.state().fleetMode, true);
+  assert.equal(app.state().protectedUserId, 'owner');
+  assert.equal(app.state().protectedFleetName, '');
+  assert.equal(app.state().protectedReportShape, false);
+  assert.equal(app.elements.get('refreshNow').hidden, false);
+  assert.equal(app.elements.get('refreshNow').disabled, false);
+  app.auth(async () => ({ user: { id: 'owner' } }));
+  await app.context.refreshProtectedFleetNow();
+  assert.equal(app.state().protectedFleetName, 'Recovered fleet');
+});
+
+test('hung dashboard summaries recover without a late response or late 401 replacing fresh data', async () => {
+  for (const late of ['success', '401']) {
+    const app = dashboardRefreshHarness(), old = deferred();
+    app.fetch(() => old.promise);
+    const attempt = app.context.refreshProtectedFleetNow();
+    await drainTasks(); app.expire(8000); await attempt;
+    assert.equal(app.state().protectedFleetName, 'Cached private fleet');
+    assert.equal(app.state().protectedRefreshFailures, 1);
+    assert.equal(app.elements.get('refreshNow').disabled, false);
+    assert.match(app.elements.get('cloudStatus').textContent, /timed out/);
+    app.fetch(async () => app.summary('Fresh fleet'));
+    await app.context.refreshProtectedFleetNow();
+    old.resolve(late === 'success' ? app.summary('Expired private fleet') : { ok: false, status: 401, body: {} });
+    await drainTasks();
+    assert.equal(app.state().protectedFleetName, 'Fresh fleet');
+    assert.equal(app.state().protectedRefreshFailures, 0);
+    assert.equal(app.state().fleetMode, true, 'late 401 cannot sign out a recovered request');
+    assert.ok(!app.views.includes('Expired private fleet'));
+  }
+});
+
+test('dashboard account events cancel hung work immediately and discard old owner outcomes', async () => {
+  for (const stage of ['auth', 'summary']) {
+    const app = dashboardRefreshHarness(), old = deferred();
+    if (stage === 'auth') app.auth(() => old.promise); else app.fetch(() => old.promise);
+    const attempt = app.context.refreshProtectedFleetNow();
+    await drainTasks();
+    app.user({ id: 'new-owner' });
+    app.auth(async () => ({ user: { id: 'new-owner' } }));
+    app.fetch(async () => app.summary('New owner fleet'));
+    await app.context.handleAuthStorageChange({ key: 'occulert-auth' });
+    assert.equal(app.state().protectedFleetName, '', 'old private data clears before new protected fetch');
+    assert.equal(app.state().protectedReportShape, false);
+    await attempt; await drainTasks();
+    assert.equal(app.state().protectedUserId, 'new-owner');
+    assert.equal(app.state().protectedFleetName, 'New owner fleet');
+    old.resolve(stage === 'auth' ? { user: { id: 'owner' } } : app.summary('Old owner private fleet'));
+    await drainTasks();
+    assert.equal(app.state().protectedFleetName, 'New owner fleet');
+    assert.equal(app.state().protectedFleetLoading, false);
+    assert.ok(!app.views.includes('Old owner private fleet'));
+    assert.ok(!Array.from(app.timers.values()).some(timer => timer.delay === 8000), 'cancelled deadline timers are cleared');
+  }
+});
+
+test('same-owner credential replacement cancels an old summary and cannot sign out refreshed credentials', async () => {
+  for (const late of ['success', '401']) {
+    const app = dashboardRefreshHarness(), old = deferred();
+    app.fetch(() => old.promise);
+    const attempt = app.context.refreshProtectedFleetNow();
+    await drainTasks();
+    const generation = app.state().protectedFleetGeneration;
+    app.fetch(async () => app.summary('Fresh credential fleet'));
+    await app.context.handleAuthStorageChange({ key: 'occulert-auth' });
+    assert.ok(app.state().protectedFleetGeneration > generation);
+    assert.equal(app.state().protectedFleetName, 'Cached private fleet', 'same-owner cache need not disappear during credential recheck');
+    await attempt; await drainTasks();
+    assert.equal(app.state().protectedFleetName, 'Fresh credential fleet');
+    old.resolve(late === 'success' ? app.summary('Expired credential fleet') : { ok: false, status: 401, body: {} });
+    await drainTasks();
+    assert.equal(app.state().protectedFleetName, 'Fresh credential fleet');
+    assert.equal(app.state().protectedFleetLoading, false);
+    assert.ok(!app.requests.includes('signOut'), 'expired credentials cannot sign out a newer session');
+  }
+});
+
+test('uncertain account failures retry automatically while confirmed empty auth clears protected data', async () => {
+  for (const auth of [() => Promise.reject(new Error('Account service unreachable')), async () => null]) {
+    const app = dashboardRefreshHarness();
+    app.auth(auth);
+    await app.context.refreshProtectedFleetNow();
+    assert.equal(app.state().protectedFleetName, 'Cached private fleet');
+    assert.equal(app.state().protectedRefreshFailures, 1);
+    assert.equal(app.elements.get('refreshNow').disabled, false);
+    app.auth(async () => ({ user: { id: 'owner' } }));
+    app.expire(180000); await drainTasks();
+    assert.equal(app.state().protectedFleetName, 'Recovered fleet', 'the scheduled retry executes after uncertainty');
+    assert.equal(app.state().protectedRefreshFailures, 0);
+  }
+  const signedOut = dashboardRefreshHarness();
+  signedOut.auth(async () => { signedOut.user(null); return null; });
+  await signedOut.context.refreshProtectedFleetNow();
+  assert.equal(signedOut.state().fleetMode, false);
+  assert.equal(signedOut.state().protectedFleetName, '');
+  assert.equal(signedOut.state().protectedReportShape, false);
+  assert.match(signedOut.elements.get('cloudStatus').textContent, /Not signed in/);
+});
+
+test('same-tab account changes and sign-out are rechecked on timeout before retaining cached records', async () => {
+  for (const user of [null, { id: 'new-owner' }]) {
+    const app = dashboardRefreshHarness(), old = deferred();
+    app.fetch(() => old.promise);
+    const attempt = app.context.refreshProtectedFleetNow();
+    await drainTasks(); app.user(user);
+    app.auth(async () => ({ user })); app.fetch(async () => app.summary('New owner fleet'));
+    app.expire(8000); await attempt; await drainTasks();
+    assert.equal(app.state().protectedUserId, user?.id || '');
+    assert.equal(app.state().protectedFleetName, user ? 'New owner fleet' : '');
+    assert.equal(app.state().fleetMode, Boolean(user));
+    assert.equal(app.state().protectedFleetLoading, false);
+    assert.equal(app.elements.get('refreshNow').disabled, false);
+    old.resolve(app.summary('Expired owner fleet')); await drainTasks();
+    assert.notEqual(app.state().protectedFleetName, 'Expired owner fleet');
+  }
 });
 
 

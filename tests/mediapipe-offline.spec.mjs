@@ -74,7 +74,7 @@ for (const upgrade of [false, true]) {
       }
       expect(await register(upgrade)).toBe('redundant');
       const keys = await page.evaluate(() => caches.keys());
-      expect(keys).not.toContain('occulert-v50');
+      expect(keys).not.toContain('occulert-v51');
       if (upgrade) {
         expect(keys).toContain('occulert-v48');
         expect(await page.evaluate(async () => (await (await caches.open('occulert-v48')).match('/app.html')).text())).toContain('/driver-app.v48.js');
@@ -85,7 +85,7 @@ for (const upgrade of [false, true]) {
       // A failed first registration may have no active registration remaining.
       expect(await register(upgrade)).toBe('activated');
       await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
-      const cached = await page.evaluate(async () => (await (await caches.open('occulert-v50')).keys()).map(request => new URL(request.url).pathname));
+      const cached = await page.evaluate(async () => (await (await caches.open('occulert-v51')).keys()).map(request => new URL(request.url).pathname));
       for (const file of Object.keys(manifest.files)) {
         const excluded = scalar ? file.includes('solution_simd_wasm_bin.') : file.includes('solution_wasm_bin.');
         if (excluded) { expect(cached).not.toContain(runtimeRoot + file); expect(requested).not.toContain(runtimeRoot + file); }

@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v50';
+const CACHE = 'occulert-v51';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -74,6 +74,7 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passkey-auth.v47.js',
   '/auth-helper.v49.js',
   '/occulert-backend.v47.js',
+  '/occulert-backend.v58.js',
   '/passkey-auth.v49.js',
   '/supabase-loader.v47.js',
   '/passwordless-auth.v49.js',
@@ -105,9 +106,9 @@ function settleWithin(promise, timeoutMs, fallback = null) {
   });
 }
 
-function fetchWithDeadline(request, timeoutMs = NETWORK_FIRST_TIMEOUT_MS) {
+function fetchWithDeadline(request, timeoutMs = NETWORK_FIRST_TIMEOUT_MS, fetchOptions, readResponse) {
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
-  const requestPromise = Promise.resolve().then(() => fetch(request, controller ? { signal: controller.signal } : undefined));
+  const options = Object.assign({}, fetchOptions, controller ? { signal: controller.signal } : {});
   return new Promise(resolve => {
     let settled = false;
     const finish = response => {
@@ -120,7 +121,23 @@ function fetchWithDeadline(request, timeoutMs = NETWORK_FIRST_TIMEOUT_MS) {
       if (controller) controller.abort();
       finish(null);
     }, timeoutMs);
-    requestPromise.then(finish, () => finish(null));
+    Promise.resolve().then(() => fetch(request, options)).then(response => {
+      if (settled) return null;
+      return readResponse ? readResponse(response, () => !settled) : response;
+    }).then(finish, () => finish(null));
+  });
+}
+
+function bufferNetworkOnlyScript(response, isPending) {
+  return response.arrayBuffer().then(bytes => {
+    if (!isPending()) return null;
+    const headers = new Headers(response.headers);
+    // Fetch decodes the body. Forwarding the original wire length or encoding
+    // would describe different bytes in the reconstructed script response.
+    headers.delete('content-encoding');
+    headers.delete('content-length');
+    const body = [204, 205, 304].includes(response.status) ? null : bytes;
+    return new Response(body, { status: response.status, statusText: response.statusText, headers });
   });
 }
 
@@ -184,7 +201,8 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
   if (url.origin === self.location.origin && NETWORK_ONLY_ASSETS.has(url.pathname)) {
-    event.respondWith(fetch(req, { cache: 'no-store' }));
+    event.respondWith(fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, { cache: 'no-store' }, bufferNetworkOnlyScript)
+      .then(response => response || Response.error()));
     return;
   }
   if (url.origin === self.location.origin && NETWORK_FIRST_ASSETS.has(url.pathname)) {

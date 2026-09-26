@@ -13,6 +13,7 @@ on:
       - "playwright.config.mjs"
       - "tests/**"
       - "vercel.json"
+      - ".github/workflows/browser-smoke.yml"
   push:
     branches: [main]
     paths:
@@ -26,6 +27,7 @@ on:
       - "playwright.config.mjs"
       - "tests/**"
       - "vercel.json"
+      - ".github/workflows/browser-smoke.yml"
 
 jobs:
   smoke:
@@ -39,3 +41,11 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:browser
+      - name: Preserve browser failure and retry diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-diagnostics
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

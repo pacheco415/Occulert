@@ -6,7 +6,7 @@
   "portal.css": "portal.v47.css",
   "driver-app.js": "driver-app.v57.js",
   "auth-helper.js": "auth-helper.v49.js",
-  "occulert-backend.js": "occulert-backend.v47.js",
+  "occulert-backend.js": "occulert-backend.v58.js",
   "passkey-auth.js": "passkey-auth.v49.js",
   "security-utils.js": "security-utils.v47.js",
   "supabase-loader.js": "supabase-loader.v47.js",
@@ -53,7 +53,7 @@
   "passwordless-auth.js": "passwordless-auth.v49.js",
   "fleet-followups.js": "fleet-followups.v57.js",
   "fleet-display.css": "fleet-display.v56.css",
-  "fleet-display.js": "fleet-display.v56.js",
+  "fleet-display.js": "fleet-display.v58.js",
   "pilot-guide-page-1.css": "pilot-guide-page-1.v55.css",
   "fleet-pilot-report.js": "fleet-pilot-report.v56.js",
   "fleet-pilot-report.css": "fleet-pilot-report.v56.css"
