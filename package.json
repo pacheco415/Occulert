@@ -25,7 +25,7 @@
     "test:native-setup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-native-setup-reliability.mjs scripts/test-device-readiness.mjs",
     "test:performance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-performance-contracts.mjs",
     "test:native-perclos": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-native-perclos.mjs",
-    "test:watch-status": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-watch-status.mjs",
+    "test:watch-status": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-watch-status.mjs scripts/test-watch-bridge-reliability.mjs",
     "test:fleet-history": "node --test scripts/test-fleet-session-history.mjs",
     "test:fleet-display": "node --test scripts/test-fleet-display.mjs",
     "test:pilot-launch": "node --test scripts/test-pilot-launch-checklist.mjs scripts/test-pilot-guide.mjs",

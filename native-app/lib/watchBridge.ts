@@ -46,6 +46,8 @@ let triedLoad = false;
 let watchModuleLoadedAt = 0;
 const WATCH_STATUS_CACHE_MS = 5_000;
 let cachedWatchStatus: { value: WatchStatus; checkedAt: number } | null = null;
+let watchStatusRevision = 0;
+const WATCH_STATUS_TIMEOUT_MS = 1_500;
 const WATCH_LIVE_ACK_TIMEOUT_MS = 1_500;
 const WATCH_ACTIVATION_SETTLE_MS = 500;
 
@@ -126,8 +128,10 @@ export async function sendAlertToWatch(payload: WatchAlertPayload): Promise<Watc
   ]);
   const available = status.paired && status.appInstalled;
   return {
-    accepted: available && (accepted || live.acknowledged),
-    reachable: status.reachable,
+    // A live reply confirms the companion received this message even when
+    // separately queried activation flags are still false or unavailable.
+    accepted: live.acknowledged || (available && accepted),
+    reachable: live.acknowledged || status.reachable,
     acknowledged: live.acknowledged,
     roundTripMs: live.roundTripMs,
   };
@@ -193,38 +197,54 @@ export async function getWatchStatus(maxAgeMs = 0): Promise<WatchStatus> {
   if (
     maxAgeMs > 0 &&
     cachedWatchStatus &&
+    now >= cachedWatchStatus.checkedAt &&
     now - cachedWatchStatus.checkedAt < maxAgeMs
   ) {
     return cachedWatchStatus.value;
   }
+  const revision = ++watchStatusRevision;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let value: WatchStatus;
   try {
     // WCSession activates when the native module loads. Immediate reads can
     // briefly report false for an already working companion, so allow one
     // bounded settle before publishing the parked-device snapshot.
-    const settleRemaining = WATCH_ACTIVATION_SETTLE_MS - (now - watchModuleLoadedAt);
+    const settleRemaining = Math.min(
+      WATCH_ACTIVATION_SETTLE_MS,
+      WATCH_ACTIVATION_SETTLE_MS - (now - watchModuleLoadedAt),
+    );
     if (settleRemaining > 0) {
       await new Promise<void>(resolve => setTimeout(resolve, settleRemaining));
     }
-    const [paired, appInstalled, reachable] = await Promise.all([
-      mod.getIsPaired?.() ?? Promise.resolve(false),
-      mod.getIsWatchAppInstalled?.() ?? Promise.resolve(false),
-      mod.getReachability?.() ?? Promise.resolve(false),
+    const [paired, appInstalled, reachable] = await Promise.race([
+      Promise.all([
+        mod.getIsPaired?.() ?? Promise.resolve(false),
+        mod.getIsWatchAppInstalled?.() ?? Promise.resolve(false),
+        mod.getReachability?.() ?? Promise.resolve(false),
+      ]),
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error('Watch connection check timed out.')), WATCH_STATUS_TIMEOUT_MS);
+      }),
     ]);
     // Reachability is stronger live evidence: a reachable companion is both
     // paired and installed even if those activation flags arrive a beat later.
-    const value = {
+    value = {
       moduleAvailable: true,
       paired: paired || reachable,
       appInstalled: appInstalled || reachable,
       reachable,
     };
-    cachedWatchStatus = { value, checkedAt: now };
-    return value;
   } catch {
-    const value = { moduleAvailable: true, paired: false, appInstalled: false, reachable: false };
-    cachedWatchStatus = { value, checkedAt: now };
-    return value;
+    value = { moduleAvailable: true, paired: false, appInstalled: false, reachable: false };
+  } finally {
+    clearTimeout(timeout);
   }
+  // Cache only the newest check. A delayed bridge reply cannot replace a
+  // recovered connection; Promise.race also consumes results after timeout.
+  if (revision === watchStatusRevision) {
+    cachedWatchStatus = { value, checkedAt: Date.now() };
+  }
+  return value;
 }
 
 export async function isWatchAvailable(): Promise<boolean> {

@@ -10,17 +10,23 @@ Development status is maintained in the [authoritative roadmap](docs/APP_ROADMAP
 The protected Supabase fleet workflow, reporting, TV aggregate view, and pilot
 launch checklist are released web features. PR #138 shipped quick start,
 printable reporting, data-quality explanations, and TV controls; PR #139 shipped
-the native clean-install and stale Watch-feedback repair. Recorded PR #139
-release baseline is `969849b`. TestFlight 1.0.0 (52) is built/submitted, Apple VALID / IN_BETA_TESTING,
-with embedded Watch packaging confirmed. On September 26, the user reported
-TestFlight installation and a general functional pass: "testflight was downloaded
-and everything works", then confirmed installed build 52 and working iPhone
-functionality. The iPhone model/iOS and individual audio, recovery,
-accessibility, and battery checks are not documented. Watch installation/update
-and testing remain pending; no Watch download/update prompt has been reported.
-There are 0 iOS builds left this cycle. Pilot owner/participant details
-remain unanswered. Distribution and source checks do not establish detection
-accuracy, device acceptance, or safety effectiveness.
+the native clean-install and stale Watch-feedback repair. PR #144 is merged at
+`d3ae5a3`, and its website/backend audit release is live; its native source fixes
+await a future binary. TestFlight 1.0.0 (52) remains the binary from `969849b`,
+with finished submission, Apple VALID / IN_BETA_TESTING, and embedded Watch
+packaging confirmed. On September 26, the user reported an iPhone installation
+and general functional pass, Watch launch, and urgent alert display/wrist
+vibration in both the foreground and after returning to the watch face. The
+reported devices are iPhone 17 Pro Max on iOS 27.2 and Apple Watch Ultra 4, with
+Watch software described as the same version 27.2; these details are not
+independently verified. Exact alert delay, Focus/permission variations, and
+individual audio, recovery, accessibility, battery/heat checks remain undocumented.
+Included iOS build usage is 15/15; the next period begins September 30 at
+5 p.m. Pacific. No new build, submission, or OTA update is queued. Pilot
+owner/participant details remain unanswered. Source checks and these limited
+device reports do not establish full device acceptance, detection accuracy,
+or safety effectiveness. Physical Safari/PWA offline acceptance remains open
+after an unresolved WebKit emulated-offline failure.
 
 ---
 
@@ -70,7 +76,7 @@ Occulert is an assistive prototype. It cannot guarantee crash prevention, driver
 occulert/
 ├── index.html              # Landing page
 ├── app.html                # Driver monitoring app
-├── driver-app.v57.js       # Versioned browser monitoring and alerts
+├── driver-app.v60.js       # Versioned browser monitoring and alerts
 ├── fleet-dashboard.html    # Protected manager workflow + separate demo
 ├── fleet-display.html      # Protected read-only TV aggregate view
 ├── pilot-guide.html        # Released manager-and-driver quick start
@@ -85,7 +91,7 @@ occulert/
 ├── accept-invite.html      # Invitation acceptance
 ├── manifest.json           # PWA manifest
 ├── sw.js                   # Service worker
-├── occulert-backend.v58.js  # Browser client for Supabase Auth + /api routes
+├── occulert-backend.v60.js  # Browser client for Supabase Auth + /api routes
 ├── api/                    # Vercel serverless endpoints
 ├── db/schema.sql           # Initial schema and RLS policies
 ├── supabase/migrations/    # Subsequent protected schema/function changes

@@ -8,20 +8,20 @@ release status is in the [authoritative roadmap](APP_ROADMAP.md).
 
 - Private TestFlight 1.0.0 (52) has a finished build and FINISHED submission;
   Apple reports VALID / IN_BETA_TESTING, and the embedded Watch app is confirmed.
-  On September 26, the user reported "testflight was downloaded and everything
-  works", then confirmed installed build 52 and working iPhone functionality:
-  a user-reported installation and general phone functional pass. The iPhone
-  model/iOS are not provided. Watch installation/update and checks remain
-  pending; no Watch download/update prompt has been reported. Individual audio,
-  recovery, accessibility, and battery/thermal checks are not documented by this
-  general report. Record
-  the actual version/build and conditions for each detailed session.
+  On September 26, the user reported its iPhone installation/general functional
+  pass, Watch launch, and foreground/background urgent display and wrist
+  vibration. The [authoritative roadmap](APP_ROADMAP.md) records the reported
+  device details and evidence limits. Exact delay, Focus/permission variations
+  and individual audio, safe-stop, recovery, accessibility, battery/thermal
+  checks remain undocumented. Record the actual version/build and conditions
+  for each detailed session.
 - Earlier build-19/36 feedback and build-49 parked checks remain historical.
-  There are 0 iOS builds left this cycle; validate the available build 52 and
-  continue source work without queueing another build.
+  Included iOS usage is 15/15; see the roadmap for the next period. Validate
+  the available build 52 and continue source work; no new build is queued.
 - The implemented native behaviors below are included in build 52. Their
   individual physical checks are not documented; binary packaging is complete.
-  The current browser reliability branch does not change that native binary.
+  PR #144 shipped the website/backend audit release; its merged native fixes
+  await a future binary and separate physical acceptance.
 - Session History lets testers label a completed session as **Felt right**,
   **False alert**, **Missed alert**, or **Late alert**.
 - New sessions preserve the active sensitivity setting, and Session History

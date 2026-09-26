@@ -2,16 +2,14 @@
 
 Current private distribution is TestFlight 1.0.0 (52): finished build,
 FINISHED submission, Apple VALID / IN_BETA_TESTING, and confirmed embedded
-Watch packaging. On September 26, the user reported TestFlight installation
-and a general functional pass: "testflight was downloaded and everything works".
-The user then confirmed installed build 52 and working iPhone functionality;
-iPhone model/iOS and the individual checks below are not documented.
-Watch installation/update and checks remain pending, with no download/update
-prompt reported. This does not contradict the confirmed embedded packaging.
-The checks below
-apply to the actual installed version/build, not to source checks or Apple
-availability. There are 0 iOS builds left this cycle; use the available binary
-without queueing a new build. See the [authoritative roadmap](APP_ROADMAP.md).
+Watch packaging. On September 26, the user reported build-52 iPhone installation
+and general functionality, Watch launch, and foreground/background urgent alert
+display and wrist vibration. The [authoritative roadmap](APP_ROADMAP.md)
+records the reported device details, evidence limits, and build availability.
+Exact delay, Focus/permission variations and the individual readiness checks
+below remain undocumented. These checks apply to the actual installed
+version/build; the later merged native audit fixes require a future binary and
+separate physical acceptance. Included iOS usage is 15/15; no new build is queued.
 
 The current SDK 57 package versions are recorded in `native-app/package.json`
 and its lockfile. Clean installation must remain reproducible with `npm ci`;
