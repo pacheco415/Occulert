@@ -30,6 +30,26 @@ async function invitationFixture(page, signedIn = false) {
   return { token, unexpected, calls: () => page.evaluate(() => window.invitationCalls) };
 }
 
+async function expectSelectTextFits(control) {
+  const textSpace = await control.evaluate(select => {
+    const style = getComputedStyle(select);
+    const inset = ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth']
+      .reduce((sum, property) => sum + parseFloat(style[property]), 0);
+    // Native selects may report "normal" even when an author line-height is set.
+    // Measure that browser/font's actual text line instead of guessing its metrics.
+    const line = document.createElement('span');
+    line.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
+    line.style.font = style.font;
+    line.style.lineHeight = style.lineHeight;
+    line.textContent = 'Ag';
+    document.body.append(line);
+    const lineHeight = line.getBoundingClientRect().height;
+    line.remove();
+    return { contentHeight: select.getBoundingClientRect().height - inset, lineHeight };
+  });
+  expect(textSpace.contentHeight).toBeGreaterThanOrEqual(textSpace.lineHeight);
+}
+
 test('invitation account creation focuses invalid fields before contacting signup', async ({ page }) => {
   const fixture = await invitationFixture(page);
   const create = page.getByRole('button', { name: 'Create Account', exact: true });
@@ -107,9 +127,41 @@ for (const [path, fields, selects] of [
       for (const id of selects) {
         const bounds = await page.locator(`#${id}`).boundingBox();
         expect(bounds.height).toBeGreaterThanOrEqual(44);
+        await expectSelectTextFits(page.locator(`#${id}`));
         expect(bounds.x).toBeGreaterThanOrEqual(0);
         expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
       }
     }
   });
 }
+
+test('larger font metrics and long option labels cannot widen the fleet trial form', async ({ page }) => {
+  await page.goto('/pilot-signup.html');
+  await page.locator('#pilotForm select').evaluateAll(selects => {
+    for (const select of selects) {
+      select.style.fontSize = '22px';
+      select.style.lineHeight = '1.25';
+    }
+    const option = document.querySelector('#useCase option');
+    option.textContent = 'Construction / field crews — regional and overnight operations';
+  });
+  await page.locator('#useCase').selectOption({ index: 3 });
+  await expect(page.locator('#useCase')).toHaveValue('Construction / field crews');
+  await page.locator('#useCase').selectOption({ index: 0 });
+  await expect(page.locator('#useCase')).toHaveValue('Construction / field crews — regional and overnight operations');
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const form = await page.locator('#pilotForm').boundingBox();
+    expect(form.x).toBeGreaterThanOrEqual(0);
+    expect(form.x + form.width).toBeLessThanOrEqual(width);
+    for (const id of ['fleet', 'useCase', 'plan', 'timeline', 'goal']) {
+      const bounds = await page.locator(`#${id}`).boundingBox();
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+      await expectSelectTextFits(page.locator(`#${id}`));
+      expect(bounds.x).toBeGreaterThanOrEqual(form.x);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(form.x + form.width);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+});
