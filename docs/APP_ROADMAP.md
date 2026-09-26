@@ -98,6 +98,26 @@ The [release tracker](https://github.com/pacheco415/Occulert/issues/6) records
 source, merge, and deployment evidence. This package changes no native binary
 or detection thresholds and adds no pilot or device observations.
 
+## Complete-transfer offline recovery
+
+Driver-script and HTML network-first requests share a 2.5-second deadline
+through both response headers and the complete body. A stalled or failed body
+falls back to the installed offline shell; partial or late responses cannot
+replace its cached bytes. Complete transfers preserve the native response's
+final URL, redirects, decoding metadata, and security headers. Account scripts
+remain network-only. The offline cache advances to v52 without changing
+published versioned asset bytes or detector runtime selection.
+
+Real-origin Chromium and WebKit tests reproduce stalled driver and page bodies
+before this repair and verify recovery, transport cancellation, cache
+preservation, and complete compressed/redirected responses after it. Browser
+loading failures also retain bounded request/server/controller diagnostics.
+The intermittent hosted WebKit loading cause remains unconfirmed; the
+separately reproduced body stalls do not establish that cause. Merge and
+production evidence are recorded in the
+[release tracker](https://github.com/pacheco415/Occulert/issues/6). No native
+build, physical-device observation, pilot result, or accuracy claim is added.
+
 ## Validating
 
 1. **Native acceptance:** install or confirm the available TestFlight

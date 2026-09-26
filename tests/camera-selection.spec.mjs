@@ -1,4 +1,15 @@
 import { test, expect } from "@playwright/test";
+import { observePageLoads } from "./helpers/page-load-diagnostics.mjs";
+
+test.beforeEach(async ({ page }, testInfo) => {
+  testInfo.pageLoadDiagnostics = await observePageLoads(page);
+});
+test.afterEach(async ({}, testInfo) => {
+  const diagnostics = testInfo.pageLoadDiagnostics;
+  try {
+    if (testInfo.status !== testInfo.expectedStatus) await diagnostics?.attach(testInfo);
+  } finally { diagnostics?.stop(); }
+});
 
 function installCameraFixture({ mobile = false, ipadDesktop = false, savedDeviceId = "", failSelected = false, labelsInitiallyHidden = false } = {}) {
   window.__cameraDevices = [

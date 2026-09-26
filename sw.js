@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v51';
+const CACHE = 'occulert-v52';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -141,6 +141,12 @@ function bufferNetworkOnlyScript(response, isPending) {
   });
 }
 
+function completeNetworkResponse(response, isPending) {
+  // Verify the complete transfer before delivering or caching it. Returning
+  // the native response preserves its final URL, redirects, and decoding.
+  return response.clone().arrayBuffer().then(() => isPending() ? response : null);
+}
+
 function cacheResponseBestEffort(request, response, timeoutMs = CACHE_WRITE_TIMEOUT_MS) {
   let copy;
   try {
@@ -206,7 +212,7 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (url.origin === self.location.origin && NETWORK_FIRST_ASSETS.has(url.pathname)) {
-    const networkAttempt = fetchWithDeadline(req);
+    const networkAttempt = fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
     const cacheUpdate = networkAttempt
       .then(response => response && response.ok ? cacheResponseBestEffort(req, response) : null)
       .catch(() => null);
@@ -222,7 +228,7 @@ self.addEventListener('fetch', event => {
   }
 
   if (req.mode === 'navigate' || req.url.endsWith('.html')) {
-    const networkAttempt = fetchWithDeadline(req);
+    const networkAttempt = fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
     const cacheUpdate = networkAttempt
       .then(response => response && response.ok ? cacheResponseBestEffort(req, response) : null)
       .catch(() => null);
