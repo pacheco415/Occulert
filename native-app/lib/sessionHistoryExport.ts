@@ -1,3 +1,5 @@
+import { formatSessionAlertCount } from './sessionAlertCount.ts';
+
 export interface ExportableSessionSummary {
   savedAt?: string;
   updatedAt?: string;
@@ -31,7 +33,7 @@ function durationLabel(seconds: number | undefined): string {
 export function buildSessionHistoryExport(sessions: ExportableSessionSummary[]): string {
   const summaries = sessions.map((item, index) => [
     `Session ${index + 1} · ${safeDate(item)}`,
-    `Duration: ${durationLabel(item.durationSec)} · Alerts: ${Math.max(0, Math.floor(item.alertCount || 0))}`,
+    `Duration: ${durationLabel(item.durationSec)} · Alerts: ${formatSessionAlertCount(item.alertCount)}`,
     `Average fatigue: ${item.avgFatigue == null ? 'Not recorded' : Math.round(item.avgFatigue)} · Sensitivity: ${item.sensitivity || 'Not recorded'}`,
     `Review: ${item.alertAssessment ? ASSESSMENT_LABELS[item.alertAssessment] || 'Reviewed' : 'Not reviewed'}${item.recoveredFromInterruption ? ' · Recovered partial session' : ''}`,
   ].join('\n'));

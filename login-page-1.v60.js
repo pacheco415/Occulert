@@ -3,11 +3,11 @@ let authMode='signin';
 let enrollmentActive=false;
 let emailLinkPending=false;
 let profileRenderVersion=0;
-let loginContext=null,loginGeneration=0;
+let loginContext=null,loginGeneration=0,loginPendingAction=null;
 function loginViewCurrent(context=loginContext){return Boolean(context&&context===loginContext&&window.OcculertBackend.isAuthContextCurrent(context))}
 function loginRequireView(context){if(loginViewCurrent(context))return true;if(context&&context===loginContext)refreshLoginState();return false}
 function clearLoginView(){
-  loginContext=null;profileRenderVersion++;enrollmentActive=false;emailLinkPending=false;
+  loginContext=null;loginPendingAction=null;profileRenderVersion++;enrollmentActive=false;emailLinkPending=false;
   ['name','company','vehicle','email','password'].forEach(id=>document.getElementById(id).value='');
   ['status','passkeyStatus','passkeySetupStatus','completionStatus','passkeySetupEmail'].forEach(id=>{let el=document.getElementById(id);if(el)el.textContent=''});
   document.getElementById('profileBox').innerHTML='<div class="notice">Checking your signed-in account…</div>';
@@ -29,13 +29,40 @@ async function refreshLoginState(){
   }catch(err){if(generation===loginGeneration){setAuthBusy(false);show('Account verification is unavailable. Reload this page to retry.','bad')}}
 }
 function loginActionContext(){if(loginViewCurrent())return loginContext;refreshLoginState();return null}
+function retainUnchangedLoginContext(context,generation,attempt){
+  if(generation!==loginGeneration||context!==loginContext)return false;
+  const backend=window.OcculertBackend,current=backend.captureAuthContext(),before=context.auth,after=current.auth;
+  const unchanged=!before&&!after||before&&after&&before.access_token===after.access_token&&before.refresh_token===after.refresh_token&&before.expires_at===after.expires_at&&before.user?.id===after.user?.id&&before.user?.email===after.user?.email;
+  if(!unchanged){refreshLoginState();return false}
+  if(!backend.isAuthContextCurrent(attempt)){
+    loginGeneration++;clearLoginView();show('Your sign-in changed. Refresh this page before trying again.','bad');return false;
+  }
+  // A failed auth attempt advances the revision without changing credentials.
+  // Keep the form usable only for the exact attempt started by this action.
+  loginContext=attempt;return true;
+}
+function beginLoginAction(){
+  if(loginPendingAction)return null;
+  const context=loginActionContext();if(!context)return null;
+  const action={context,generation:loginGeneration,attempt:context};loginPendingAction=action;return action;
+}
+function finishLoginAction(action){
+  if(loginPendingAction!==action)return false;
+  loginPendingAction=null;
+  if(action.generation!==loginGeneration||!loginViewCurrent())return false;
+  setAuthBusy(false);return true;
+}
 function acceptLoginResult(profile,generation){
   if(generation!==loginGeneration)return false;
   const backend=window.OcculertBackend,context=backend.captureAuthContext();
   if(!context.auth||context.auth.user?.id!==profile?.uid){refreshLoginState();return false}
   loginContext=context;return true;
 }
-function checkLoginContext(){if(loginContext&&!loginViewCurrent()||!loginContext&&window.OcculertBackend.currentUser())refreshLoginState()}
+function checkLoginContext(){
+  const action=loginPendingAction;
+  if(action&&action.generation===loginGeneration&&window.OcculertBackend.isAuthContextCurrent(action.attempt))return;
+  if(loginContext&&!loginViewCurrent()||!loginContext&&window.OcculertBackend.currentUser())refreshLoginState();
+}
 if(window.addEventListener){window.addEventListener('storage',event=>{if(event.key==='occulert-auth'||event.key===null)refreshLoginState()});window.addEventListener('focus',checkLoginContext)}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkLoginContext()});
 function setRole(role){selectedRole=role;let driver=document.getElementById('driverRole'),fleet=document.getElementById('fleetRole');driver.classList.toggle('active',role==='driver');fleet.classList.toggle('active',role==='fleet');driver.setAttribute('aria-pressed',String(role==='driver'));fleet.setAttribute('aria-pressed',String(role==='fleet'))}
@@ -77,24 +104,23 @@ function showAuthMode(mode){
 function passkeySupported(){return Boolean(window.OcculertPasskeys&&window.OcculertPasskeys.isSupported())}
 function setAuthBusy(busy){let form=document.getElementById('authForm'),submit=document.getElementById('submitBtn'),passkey=document.getElementById('passkeySignInBtn'),retry=document.getElementById('passkeyRetryBtn');form.setAttribute('aria-busy',String(busy));submit.disabled=busy||submit.dataset.rateLimited===authMode;passkey.disabled=busy||!passkeySupported();retry.disabled=busy;document.getElementById('signInModeBtn').disabled=busy;document.getElementById('signUpModeBtn').disabled=busy;document.getElementById('forgotPasswordBtn').disabled=busy;document.getElementById('backToSignInBtn').disabled=busy}
 async function signInPasskey(retry){
-  const context=loginActionContext(),generation=loginGeneration;if(!context)return;
+  const action=beginLoginAction();if(!action)return;const{context,generation}=action;
   clearStatus();clearPasskeyStatus();setPasskeyRetry(false);setAuthBusy(true);
   let button=document.getElementById('passkeySignInBtn');button.textContent='Waiting for passkey...';
   showPasskey('Checking this device for a saved Occulert passkey…','pending');
-  try{if(retry&&window.OcculertPasskeys&&window.OcculertPasskeys.retry)await window.OcculertPasskeys.retry();if(generation!==loginGeneration||!loginRequireView(context))return;let profile=await window.OcculertAuth.signInPasskey();if(!acceptLoginResult(profile,generation))return;renderProfile(window.OcculertBackend&&window.OcculertBackend.currentUser(),profile);showPasskey('Signed in with your passkey. Choose where to continue.','good');focusSignInContinuation()}
-  catch(err){if(generation!==loginGeneration)return;showPasskey(window.OcculertPasskeys?window.OcculertPasskeys.message(err,'signin'):'Passkey sign-in is unavailable. Use email and password.','bad');setPasskeyRetry(Boolean(window.OcculertPasskeys&&window.OcculertPasskeys.canRetry&&window.OcculertPasskeys.canRetry(err)))}
-  finally{if(generation===loginGeneration){button.textContent='Sign in with a passkey';setAuthBusy(false)}}
+  try{if(retry&&window.OcculertPasskeys&&window.OcculertPasskeys.retry)await window.OcculertPasskeys.retry();if(generation!==loginGeneration||!loginRequireView(context))return;const request=window.OcculertAuth.signInPasskey();action.attempt=window.OcculertBackend.captureAuthContext();let profile=await request;if(!acceptLoginResult(profile,generation))return;renderProfile(window.OcculertBackend&&window.OcculertBackend.currentUser(),profile);showPasskey('Signed in with your passkey. Choose where to continue.','good');focusSignInContinuation()}
+  catch(err){if(!retainUnchangedLoginContext(context,generation,action.attempt))return;showPasskey(window.OcculertPasskeys?window.OcculertPasskeys.message(err,'signin'):'Passkey sign-in is unavailable. Use email and password.','bad');setPasskeyRetry(Boolean(window.OcculertPasskeys&&window.OcculertPasskeys.canRetry&&window.OcculertPasskeys.canRetry(err)))}
+  finally{if(finishLoginAction(action))button.textContent='Sign in with a passkey'}
 }
 function initPasskeySignIn(){let button=document.getElementById('passkeySignInBtn'),help=document.getElementById('passkeyHelp');if(passkeySupported()){button.disabled=false;return}button.disabled=true;help.textContent='Passkeys require a supported browser on a secure Occulert page. Email and password remain available.'}
 async function submitAuth(e){
-  e.preventDefault();const context=loginActionContext(),generation=loginGeneration;if(!context)return;if(emailLinkPending)return;setAuthBusy(true);
+  e.preventDefault();const action=beginLoginAction();if(!action)return;const{context,generation}=action;setAuthBusy(true);
   let email=document.getElementById('email').value.trim();
   try{
     if(authMode==='signup'||authMode==='email'){
       emailLinkPending=true;
-      await window.OcculertPasswordless.start(email,authMode==='signup'?extras():null);
-      if(generation!==loginGeneration)return;
-      loginContext=window.OcculertBackend.captureAuthContext();
+      const request=window.OcculertPasswordless.start(email,authMode==='signup'?extras():null);action.attempt=window.OcculertBackend.captureAuthContext();await request;
+      if(!retainUnchangedLoginContext(context,generation,action.attempt))return;
       show('Check your email for a secure link. Open it to '+(authMode==='signup'?'confirm your account and create a passkey.':'sign in.')+' You can request another link after one minute.','good');
       return;
     }
@@ -105,17 +131,17 @@ async function submitAuth(e){
       show('If an Occulert account uses that email, a password reset link is on the way. Check your inbox and spam folder.','good');
       return;
     }
-    let p=await window.OcculertAuth.signInEmail(email,document.getElementById('password').value,authMode,authMode==='signup'?extras():{});
+    const request=window.OcculertAuth.signInEmail(email,document.getElementById('password').value,authMode,authMode==='signup'?extras():{});action.attempt=window.OcculertBackend.captureAuthContext();let p=await request;
     if(!acceptLoginResult(p,generation))return;
     renderProfile(window.OcculertBackend&&window.OcculertBackend.currentUser(),p);
     show(authMode==='signup'?'Account created. Check your email if confirmation is required.':'Signed in. Choose where to continue.','good');
     if(authMode==='signin')focusSignInContinuation();
   }catch(err){
-    if(generation!==loginGeneration)return;
+    if(!retainUnchangedLoginContext(context,generation,action.attempt))return;
     let message=err.message||String(err);
     if(authMode==='signup'&&message.startsWith('Too many confirmation emails'))document.getElementById('submitBtn').dataset.rateLimited='signup';
     show(message,err.code==='confirmation_required'?'good':'bad');
-  }finally{if(generation===loginGeneration){emailLinkPending=false;setAuthBusy(false)}}
+  }finally{if(loginPendingAction===action){emailLinkPending=false;finishLoginAction(action)}}
 }
 async function logout(){const context=loginActionContext();if(!context)return;const cleanup=window.OcculertAuth.signOut(),cleared=window.OcculertBackend.captureAuthContext();await cleanup;if(!window.OcculertBackend.isAuthContextCurrent(cleared)){refreshLoginState();return}await refreshLoginState();if(loginViewCurrent()&&!window.OcculertBackend.currentUser()){show('Signed out on this browser.','good');focusSignInForm()}}
 function profileUserId(user){return String(user&&(user.uid||user.id)||'')}

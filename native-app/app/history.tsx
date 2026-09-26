@@ -37,6 +37,7 @@ import {
   type HistoryFilter,
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
+import { formatSessionAlertCount } from '../lib/sessionAlertCount';
 import { buildPilotProgressExport } from '../lib/pilotProgressExport';
 import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
 import {
@@ -915,6 +916,7 @@ export default function HistoryScreen() {
           const reviewProgress = getSessionReviewProgress(item);
           const reviewComplete = reviewProgress.complete;
           const isExpanded = expandedSessions[sessionKey] ?? false;
+          const alertCountLabel = formatSessionAlertCount(item.alertCount);
           return (
           <View
             key={sessionKey}
@@ -938,7 +940,7 @@ export default function HistoryScreen() {
             </View>
             <View style={s.stats}>
               <View style={s.stat}>
-                <Text style={s.statVal}>{item.alertCount ?? 0}</Text>
+                <Text style={alertCountLabel === 'Not recorded' ? s.statValSmall : s.statVal}>{alertCountLabel}</Text>
                 <Text style={s.statLbl}>Alerts</Text>
               </View>
               <View style={s.stat}>

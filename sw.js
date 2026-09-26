@@ -61,12 +61,12 @@ const STATIC_ASSETS = [
   '/liquid-glass.v47.css',
   '/accessibility.v52.css',
   '/portal.v47.css',
-  '/homepage.js',
+  '/homepage.v60.js',
   '/driver-app.v47.css',
   '/driver-app.v60.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
-  '/static-page.v52.js'
+  '/static-page.v60.js'
 ];
 
 const NETWORK_ONLY_ASSETS = new Set([

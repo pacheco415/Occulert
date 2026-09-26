@@ -1,8 +1,8 @@
 // ── Theme System ──
 const html=document.documentElement;
 const THEME_KEY='occulert-theme';
-function getTheme(){return localStorage.getItem(THEME_KEY)||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}
-function setTheme(t){html.setAttribute('data-theme',t);localStorage.setItem(THEME_KEY,t);const btn=document.getElementById('themeToggle');if(btn)btn.textContent=t==='light'?'\u2600\uFE0F':'\u263E';document.querySelector('meta[name="theme-color"]')?.setAttribute('content',t==='light'?'#f0f4f8':'#0a0e1a');const ts=document.getElementById('themeStatus');if(ts)ts.textContent=t==='light'?'Light':'Dark'}
+function getTheme(){try{const stored=localStorage.getItem(THEME_KEY);if(stored)return stored}catch(err){}return window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'}
+function setTheme(t){html.setAttribute('data-theme',t);try{localStorage.setItem(THEME_KEY,t)}catch(err){}const btn=document.getElementById('themeToggle');if(btn)btn.textContent=t==='light'?'\u2600\uFE0F':'\u263E';document.querySelector('meta[name="theme-color"]')?.setAttribute('content',t==='light'?'#f0f4f8':'#0a0e1a');const ts=document.getElementById('themeStatus');if(ts)ts.textContent=t==='light'?'Light':'Dark'}
 setTheme(getTheme());
 document.getElementById('themeToggle')?.addEventListener('click',()=>setTheme(html.getAttribute('data-theme')==='light'?'dark':'light'));
 // ── Profile Logic ──

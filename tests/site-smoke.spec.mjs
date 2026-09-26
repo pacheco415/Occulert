@@ -37,7 +37,7 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   expect(await page.locator('link[href="/homepage.v51.css"]').count()).toBe(1);
   expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1-640.avif"][type="image/avif"]').count()).toBe(1);
   expect(await page.locator('link[href="/homepage.css"]').count()).toBe(0);
-  expect(await page.locator('script[src="/homepage.js"]').count()).toBe(1);
+  expect(await page.locator('script[src="/homepage.v60.js"]').count()).toBe(1);
   await page.locator(".skip-link").focus();
   await expect(page.locator(".skip-link")).toBeFocused();
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
@@ -103,7 +103,7 @@ test("public information pages share accessible mobile navigation", async ({ pag
   await page.setViewportSize({ width: 390, height: 844 });
   for (const path of ["/about.html", "/faq.html", "/features.html", "/how-it-works.html", "/install.html"]) {
     await page.goto(path, { waitUntil: "domcontentloaded" });
-    await expect(page.locator('script[src="/public-page.v51.js"]')).toHaveCount(1);
+    await expect(page.locator('script[src="/public-page.v60.js"]')).toHaveCount(1);
     const skipLink = page.getByRole("link", { name: "Skip to main content" });
     await skipLink.focus();
     await page.keyboard.press("Enter");
@@ -133,7 +133,7 @@ test("product, safety, privacy, and fleet pages offer a keyboard shortcut to mai
 
   for (const path of ["/product-hub.html", "/safety.html", "/privacy.html", "/fleet-pricing.html", "/fleet-dashboard.html", "/driver-profiles.html", "/pilot-signup.html", "/session-history.html"]) {
     await page.goto(path, { waitUntil: "domcontentloaded" });
-    await expect(page.locator('script[src="/static-page.v52.js"]')).toHaveCount(1);
+    await expect(page.locator('script[src="/static-page.v60.js"]')).toHaveCount(1);
   }
 });
 
@@ -231,13 +231,13 @@ test("sign-in continuation and account switching preserve keyboard focus", async
   await page.goto("/login.html", { waitUntil: "domcontentloaded" });
   await page.evaluate(() => {
     let user = null;
-    window.OcculertBackend.currentUser = () => user;
     window.OcculertBackend.getFleet = async () => ({ ok: false, status: 404, body: { error: "fleet_not_found" } });
     window.OcculertAuth.signInEmail = async (email) => {
       user = { id: "focus-driver", email };
-      return { role: "driver", email, authenticated: true };
+      window.OcculertBackend.adoptSession({access_token:"focus-access",refresh_token:"focus-refresh",expires_at:Date.now()/1000+3600,user});
+      return { uid: user.id, role: "driver", email, authenticated: true };
     };
-    window.OcculertAuth.signOut = async () => { user = null; };
+    window.OcculertAuth.signOut = async () => { user = null; window.OcculertBackend.signOut(); };
   });
 
   await page.locator("#email").fill("focus@example.com");

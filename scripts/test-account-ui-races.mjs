@@ -14,16 +14,16 @@ function element(id) {
     setAttribute(k,v){this[k]=String(v)},getAttribute(){return 'dark'},addEventListener(name,fn){listeners.set(name,fn)},dispatch(name,event={}){listeners.get(name)?.(event)},focus(){},select(){},listeners,
   };
 }
-async function boot(page='account-page-2', initial='A') {
-  const store = new Map(), elements = new Map(), listeners = new Map(), calls = [], timers=[];
-  const hooks = { fetch:null, passkeys:null }, el = id => {if(!elements.has(id))elements.set(id,element(id));return elements.get(id)};
-  store.set('occulert-auth',JSON.stringify(session(initial)));store.set('occulert-profile',JSON.stringify({uid:initial,driverId:initial,name:'Private '+initial,email:initial+'@example.com',company:'Company '+initial,role:'driver',authenticated:true}));
+async function boot(page='account-page-2', initial='A', options={}) {
+  const store = new Map(), elements = new Map(), listeners = new Map(), documentListeners = new Map(), calls = [], timers=[];
+  const hooks = { fetch:null, passkeys:null, otp:null }, el = id => {if(!elements.has(id))elements.set(id,element(id));return elements.get(id)};
+  if(initial){store.set('occulert-auth',JSON.stringify(session(initial)));store.set('occulert-profile',JSON.stringify({uid:initial,driverId:initial,name:'Private '+initial,email:initial+'@example.com',company:'Company '+initial,role:'driver',authenticated:true}));}
   const context = { console,URL,URLSearchParams,Response,AbortController,setTimeout(fn,ms){const timer=setTimeout(fn,ms);timers.push(timer);return timer},clearTimeout,
-    document:{documentElement:element('html'),getElementById:el,querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){},hidden:false},
+    document:{documentElement:element('html'),getElementById:el,querySelector:()=>null,querySelectorAll:()=>[],addEventListener(name,fn){if(!documentListeners.has(name))documentListeners.set(name,[]);documentListeners.get(name).push(fn)},hidden:false},
     location:{origin:'https://www.occulert.com',pathname:'/account.html',search:'',hash:''},history:{replaceState(){}},matchMedia:()=>({matches:false}),isSecureContext:true,
     navigator:{platform:'fixture',userAgent:'fixture',credentials:{},clipboard:{async writeText(value){calls.push({action:'copy',value})}}},
     confirm:()=>true,prompt:()=> 'new name',
-    localStorage:{ get length(){return store.size},key:i=>[...store.keys()][i],getItem:key=>store.get(key)??null,setItem:(key,value)=>store.set(key,String(value)),removeItem:key=>store.delete(key)},
+    localStorage:{ get length(){return store.size},key:i=>[...store.keys()][i],getItem(key){if(options.blockStorage||options.blockTheme&&key==='occulert-theme')throw new Error('fixture storage unavailable');return store.get(key)??null},setItem(key,value){if(options.blockStorage||options.blockTheme&&key==='occulert-theme')throw new Error('fixture storage unavailable');store.set(key,String(value))},removeItem:key=>store.delete(key)},
     addEventListener(name,fn){if(!listeners.has(name))listeners.set(name,[]);listeners.get(name).push(fn)},
     fetch(url,options={}){
       const call={url:String(url),options};calls.push(call);
@@ -38,9 +38,12 @@ async function boot(page='account-page-2', initial='A') {
     },
   };
   context.window=context;vm.createContext(context);vm.runInContext(source('occulert-backend'),context);vm.runInContext(source('auth-helper'),context);
+  const sdk={createClient(){return {auth:{async signInWithOtp(value){calls.push({action:'otp',value});return hooks.otp?hooks.otp(value):{error:null}}}}}};
+  context.OcculertSupabaseLoader={load:async()=>sdk,retry:async()=>sdk};
+  vm.runInContext(source('passwordless-auth'),context);
   context.OcculertPasskeys={isSupported:()=>true,message:()=> 'mapped',canRetry:()=>false,async list(){const owner=context.OcculertBackend.currentUser()?.id;calls.push({action:'list-passkeys',owner});return hooks.passkeys?hooks.passkeys(owner):[{id:'11111111-1111-4111-8111-111111111111',friendly_name:'Private key '+owner}]},async register(){calls.push({action:'register'})},async remove(){calls.push({action:'remove'})},async rename(){calls.push({action:'rename'})},async retry(){calls.push({action:'retry'})},async signOutLocal(){}};
   vm.runInContext(source(page),context,{filename:page+'.v60.js'});await tick();await tick();
-  return {context,backend:context.OcculertBackend,store,calls,hooks,el,cleanup(){timers.forEach(clearTimeout)},switchTo(id,event=true){if(id)store.set('occulert-auth',JSON.stringify(session(id)));else store.delete('occulert-auth');if(event)for(const fn of listeners.get('storage')||[])fn({key:'occulert-auth'})},storageEvent(key='occulert-auth'){for(const fn of listeners.get('storage')||[])fn({key})}};
+  return {context,backend:context.OcculertBackend,store,calls,hooks,el,cleanup(){timers.forEach(clearTimeout)},switchTo(id,event=true){if(id)store.set('occulert-auth',JSON.stringify(session(id)));else store.delete('occulert-auth');if(event)for(const fn of listeners.get('storage')||[])fn({key:'occulert-auth'})},storageEvent(key='occulert-auth'){for(const fn of listeners.get('storage')||[])fn({key})},focusEvent(){for(const fn of listeners.get('focus')||[])fn()},visibilityEvent(){context.document.hidden=false;for(const fn of documentListeners.get('visibilitychange')||[])fn()}};
 }
 const preventDefault=()=>{};
 
@@ -157,5 +160,151 @@ test('legitimate credential request that refreshes tokens re-verifies and restor
     b.backend.updatePassword=async()=>{b.backend.adoptSession({...session('A'),access_token:'refreshed-A'});return {ok:true}};
     b.el('newPassword').value='fixture-password';await b.context.changePassword({preventDefault});await tick();await tick();
     assert.equal(b.el('newPassword').value,'');assert.equal(b.el('passwordBtn').disabled,false);assert.match(b.el('securityIntro').textContent,/A@example/);
+  }finally{b.cleanup()}
+});
+
+for(const mode of ['signup','email'])test(`failed ${mode} email request preserves inputs and actual auth context for the next submit`,async()=>{
+  const b=await boot('login-page-1',null);try{
+    b.context.showAuthMode(mode);b.el('email').value='new@example.com';b.el('name').value='New driver';b.el('company').value='New company';b.el('vehicle').value='New vehicle';
+    let attempts=0;b.hooks.otp=()=>({error:++attempts===1?{status:500}:null});
+    const before=b.backend.captureAuthContext();await b.context.submitAuth({preventDefault});
+    assert.equal(attempts,1);assert.equal(b.backend.isAuthContextCurrent(before),false,'actual passwordless beginAuthAttempt advances revision');
+    assert.match(b.el('status').textContent,/could not be sent/);assert.equal(b.el('email').value,'new@example.com');assert.equal(b.el('submitBtn').disabled,false);
+    assert.equal(b.el('name').value,'New driver');assert.equal(b.el('company').value,'New company');assert.equal(b.el('vehicle').value,'New vehicle');
+    await b.context.submitAuth({preventDefault});assert.equal(attempts,2);assert.match(b.el('status').textContent,/Check your email/);assert.equal(b.el('email').value,'new@example.com');
+    const requests=b.calls.filter(call=>call.action==='otp');assert.equal(requests[1].value.email,'new@example.com');
+    if(mode==='signup')assert.equal(requests[1].value.options.data.name,'New driver');
+  }finally{b.cleanup()}
+});
+
+for(const change of ['account','same-owner-token','signout','storage-event'])test(`failed email request cannot rebind stale inputs after ${change}`,async()=>{
+  const b=await boot('login-page-1');try{
+    b.context.showAuthMode('email');b.el('email').value='private-A@example.com';const pending=deferred();b.hooks.otp=()=>pending.promise;
+    const old=b.context.submitAuth({preventDefault});await tick();assert.equal(b.calls.filter(call=>call.action==='otp').length,1);
+    b.backend.getSession=()=>new Promise(()=>{});
+    if(change==='account')b.switchTo('B',false);
+    else if(change==='same-owner-token')b.backend.adoptSession({...session('A'),access_token:'rotated-A',refresh_token:'rotated-refresh-A'});
+    else if(change==='signout')b.backend.signOut();
+    else b.switchTo('B');
+    pending.resolve({error:{status:500}});await old;
+    assert.equal(b.el('email').value,'');assert.doesNotMatch(b.el('status').textContent,/could not be sent|Check your email/);assert.equal(b.el('submitBtn').disabled,true);
+    await b.context.submitAuth({preventDefault});assert.equal(b.calls.filter(call=>call.action==='otp').length,1,'no retry using stale inputs or owner');
+  }finally{b.cleanup()}
+});
+
+for(const blockStorage of [false,true])test(`Account boots when ${blockStorage?'all storage':'optional theme storage'} throws without exposing unverifiable identity`,async()=>{
+  const b=await boot('account-page-2','A',{blockTheme:true,blockStorage});try{
+    assert.equal(typeof b.context.accountActionContext,'function');assert.doesNotThrow(()=>b.el('themeToggle').dispatch('click'));
+    if(blockStorage){
+      assert.equal(b.backend.currentUser(),null);assert.doesNotMatch(b.el('profileBox').innerHTML,/Private A|A@example/);assert.equal(b.el('securityForms').classList.contains('hidden'),true);assert.equal(b.el('deleteAccountBtn').disabled,true);
+      b.calls.length=0;b.el('newPassword').value='fixture-password';await b.context.changePassword({preventDefault});assert.equal(b.calls.length,0);
+    }else{
+      assert.match(b.el('securityIntro').textContent,/A@example/);assert.equal(b.el('passwordBtn').disabled,false);assert.equal(b.el('newEmail').value,'A@example.com');
+    }
+  }finally{b.cleanup()}
+});
+
+test('failed password sign-in keeps credentials usable after the real backend advances its attempt revision',async()=>{
+  const b=await boot('login-page-1',null);try{
+    b.el('email').value='new@example.com';b.el('password').value='fixture-password';let attempts=0;
+    b.hooks.fetch=call=>String(call.url).includes('/auth/v1/token')?(attempts++,new Response(JSON.stringify({error:'invalid_grant'}),{status:400})):null;
+    await b.context.submitAuth({preventDefault});const error=b.el('status').textContent;assert.ok(error);assert.equal(b.el('email').value,'new@example.com');assert.equal(b.el('password').value,'fixture-password');
+    await b.context.submitAuth({preventDefault});assert.equal(attempts,2);assert.equal(b.el('status').textContent,error);assert.equal(b.el('submitBtn').disabled,false);
+  }finally{b.cleanup()}
+});
+
+test('failed passkey sign-in can retry after the actual helper starts a new auth attempt',async()=>{
+  const b=await boot('login-page-1',null);try{
+    b.el('email').value='new@example.com';b.el('password').value='fixture-password';let attempts=0;
+    b.context.OcculertPasskeys.signIn=async attempt=>{attempts++;b.backend.requireAuthContext(attempt);throw new Error('fixture ceremony cancelled')};
+    const before=b.backend.captureAuthContext();await b.context.signInPasskey(false);
+    assert.equal(b.backend.isAuthContextCurrent(before),false);assert.equal(b.el('passkeyStatus').textContent,'mapped');assert.equal(b.el('email').value,'new@example.com');assert.equal(b.el('password').value,'fixture-password');
+    await b.context.signInPasskey(false);assert.equal(attempts,2);assert.equal(b.el('passkeyStatus').textContent,'mapped');assert.equal(b.el('passkeySignInBtn').disabled,false);
+  }finally{b.cleanup()}
+});
+
+for(const kind of ['password','email-link','passkey'])test(`old ${kind} failure cannot retain a separate newer auth intent with unchanged tokens`,async()=>{
+  const b=await boot('login-page-1',null);try{
+    b.el('email').value='old@example.com';b.el('password').value='fixture-password';const pending=deferred();
+    if(kind==='password')b.hooks.fetch=call=>String(call.url).includes('/auth/v1/token')?pending.promise:null;
+    if(kind==='email-link'){b.context.showAuthMode('email');b.hooks.otp=()=>pending.promise}
+    if(kind==='passkey')b.context.OcculertPasskeys.signIn=async attempt=>{await pending.promise;b.backend.requireAuthContext(attempt);throw new Error('fixture cancellation')};
+    const old=kind==='passkey'?b.context.signInPasskey(false):b.context.submitAuth({preventDefault});await tick();
+    const external=b.backend.beginAuthAttempt();
+    pending.resolve(kind==='password'?new Response(JSON.stringify({error:'invalid_grant'}),{status:400}):{error:{status:500}});await old;
+    assert.equal(b.backend.isAuthContextCurrent(external),true,'old UI may not supersede or adopt the newer intent');
+    assert.equal(vm.runInContext('loginContext',b.context),null);assert.equal(b.el('email').value,'');assert.equal(b.el('password').value,'');
+    assert.equal(b.el('submitBtn').disabled,true);assert.equal(b.el('passkeySignInBtn').disabled,true);assert.doesNotMatch(b.el('status').textContent,/auth_session_changed|Signed in\.|Check your email/);
+  }finally{b.cleanup()}
+});
+
+test('email-link success cannot rebind a separate newer auth intent without token changes',async()=>{
+  const b=await boot('login-page-1',null);try{
+    b.context.showAuthMode('email');b.el('email').value='old@example.com';const pending=deferred();b.hooks.otp=()=>pending.promise;
+    const old=b.context.submitAuth({preventDefault});await tick();const external=b.backend.beginAuthAttempt();pending.resolve({error:null});await old;
+    assert.equal(b.backend.isAuthContextCurrent(external),true);assert.equal(vm.runInContext('loginContext',b.context),null);assert.equal(b.el('email').value,'');assert.equal(b.el('submitBtn').disabled,true);assert.doesNotMatch(b.el('status').textContent,/Check your email/);
+  }finally{b.cleanup()}
+});
+
+for(const[first,second]of[['password','password'],['password','passkey'],['passkey','password'],['passkey','passkey']])test(`synchronous pending guard prevents duplicate ${first} then ${second} entry`,async()=>{
+  const b=await boot('login-page-1',null);try{
+    b.el('email').value='new@example.com';b.el('password').value='fixture-password';const pending=deferred();let passwordCalls=0,passkeyCalls=0;
+    b.hooks.fetch=call=>String(call.url).includes('/auth/v1/token')?(passwordCalls++,pending.promise):null;
+    b.context.OcculertPasskeys.signIn=async attempt=>{passkeyCalls++;await pending.promise;b.backend.requireAuthContext(attempt);throw new Error('fixture cancellation')};
+    const invoke=kind=>kind==='password'?b.context.submitAuth({preventDefault}):b.context.signInPasskey(false);
+    const old=invoke(first),attempt=b.backend.captureAuthContext();await invoke(second);await tick();
+    assert.equal(b.backend.isAuthContextCurrent(attempt),true);assert.equal(passwordCalls+passkeyCalls,1);assert.equal(b.el('email').value,'new@example.com');assert.equal(b.el('submitBtn').disabled,true);
+    pending.resolve(first==='password'?new Response(JSON.stringify({error:'invalid_grant'}),{status:400}):null);await old;
+    assert.equal(b.el('submitBtn').disabled,false);assert.equal(b.el('email').value,'new@example.com');assert.equal(passwordCalls+passkeyCalls,1);
+  }finally{b.cleanup()}
+});
+
+test('old generation finally cannot release a newer pending login action',async()=>{
+  const b=await boot('login-page-1',null);try{
+    const oldResponse=deferred(),newResponse=deferred();let calls=0;b.hooks.fetch=call=>String(call.url).includes('/auth/v1/token')?(++calls===1?oldResponse:newResponse).promise:null;
+    b.el('email').value='old@example.com';b.el('password').value='old-password';const old=b.context.submitAuth({preventDefault});await tick();
+    b.switchTo(null);await tick();b.el('email').value='new@example.com';b.el('password').value='new-password';const fresh=b.context.submitAuth({preventDefault});await tick();
+    const currentAction=vm.runInContext('loginPendingAction',b.context);oldResponse.resolve(new Response(JSON.stringify({error:'invalid_grant'}),{status:400}));await old;
+    assert.equal(vm.runInContext('loginPendingAction',b.context),currentAction);assert.equal(b.el('email').value,'new@example.com');assert.equal(b.el('password').value,'new-password');assert.equal(b.el('submitBtn').disabled,true);assert.equal(b.el('status').textContent,'');
+    newResponse.resolve(new Response(JSON.stringify({error:'invalid_grant'}),{status:400}));await fresh;assert.equal(b.el('submitBtn').disabled,false);assert.equal(b.el('email').value,'new@example.com');
+  }finally{b.cleanup()}
+});
+
+for(const kind of ['password','passkey'])test(`healthy ${kind} helper adoption remains usable after its own successful revision change`,async()=>{
+  const b=await boot('login-page-1',null);try{
+    b.el('email').value='new@example.com';b.el('password').value='fixture-password';const verified={...session('new'),user:{...session('new').user,user_metadata:{name:'New driver'}}};
+    b.hooks.fetch=call=>String(call.url).includes('/auth/v1/token')?new Response(JSON.stringify(verified)):null;
+    b.context.OcculertPasskeys.signIn=async attempt=>{b.backend.adoptSession(verified,attempt);return verified.user};
+    const before=b.backend.captureAuthContext();await(kind==='password'?b.context.submitAuth({preventDefault}):b.context.signInPasskey(false));
+    assert.equal(b.backend.isAuthContextCurrent(before),false);assert.equal(b.backend.currentUser().id,'new');assert.match(b.el('profileBox').innerHTML,/new@example/);assert.equal(b.el('submitBtn').disabled,false);assert.equal(b.el('passkeySignInBtn').disabled,false);
+    assert.match(b.el(kind==='password'?'status':'passkeyStatus').textContent,/Signed in/);
+  }finally{b.cleanup()}
+});
+
+for(const kind of ['password','email-link','passkey'])test(`focus and visibility preserve the page's exact pending ${kind} attempt and healthy completion`,async()=>{
+  const b=await boot('login-page-1',null);try{
+    b.el('email').value='new@example.com';b.el('password').value='fixture-password';const pending=deferred(),verified=session('new');
+    if(kind==='password')b.hooks.fetch=call=>String(call.url).includes('/auth/v1/token')?pending.promise:null;
+    if(kind==='email-link'){b.context.showAuthMode('email');b.hooks.otp=()=>pending.promise}
+    if(kind==='passkey')b.context.OcculertPasskeys.signIn=async attempt=>{await pending.promise;b.backend.adoptSession(verified,attempt);return verified.user};
+    const old=kind==='passkey'?b.context.signInPasskey(false):b.context.submitAuth({preventDefault});await tick();
+    const action=vm.runInContext('loginPendingAction',b.context),attempt=b.backend.captureAuthContext();b.focusEvent();b.visibilityEvent();await tick();
+    assert.equal(vm.runInContext('loginPendingAction',b.context),action);assert.equal(b.backend.isAuthContextCurrent(attempt),true);assert.equal(b.el('email').value,'new@example.com');assert.equal(b.el('password').value,'fixture-password');assert.equal(b.el('submitBtn').disabled,true);
+    pending.resolve(kind==='password'?new Response(JSON.stringify(verified)):{error:null});await old;
+    assert.equal(b.el('submitBtn').disabled,false);
+    if(kind==='email-link')assert.match(b.el('status').textContent,/Check your email/);
+    else{assert.equal(b.backend.currentUser().id,'new');assert.match(b.el(kind==='password'?'status':'passkeyStatus').textContent,/Signed in/)}
+  }finally{b.cleanup()}
+});
+
+for(const event of ['focus','visibility'])for(const change of ['newer-intent','account','same-owner-token'])test(`${event} still clears a superseded pending action after ${change}`,async()=>{
+  const b=await boot('login-page-1');try{
+    b.el('email').value='old@example.com';b.el('password').value='fixture-password';const pending=deferred();b.hooks.fetch=call=>String(call.url).includes('/auth/v1/token')?pending.promise:null;
+    const old=b.context.submitAuth({preventDefault});await tick();b.backend.getSession=()=>new Promise(()=>{});
+    if(change==='newer-intent')b.backend.beginAuthAttempt();else if(change==='account')b.switchTo('B',false);else b.backend.adoptSession({...session('A'),access_token:'replacement-A',refresh_token:'replacement-refresh-A'});
+    if(event==='focus')b.focusEvent();else b.visibilityEvent();
+    assert.equal(b.el('email').value,'');assert.equal(b.el('password').value,'');assert.equal(vm.runInContext('loginPendingAction',b.context),null);assert.equal(b.el('submitBtn').disabled,true);
+    pending.resolve(new Response(JSON.stringify({error:'invalid_grant'}),{status:400}));await old;
+    assert.equal(b.el('submitBtn').disabled,true);assert.equal(b.el('status').textContent,'');
   }finally{b.cleanup()}
 });

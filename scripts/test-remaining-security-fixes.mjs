@@ -411,7 +411,7 @@ test('fleet telemetry is explicitly labeled client-reported and unverified', () 
 });
 
 test('pilot contacts are server-only and disclosed accurately', () => {
-  const signup = read('pilot-signup.html') + read('static-page.v52.js') + read('pilot-signup-page-2.v60.js');
+  const signup = read('pilot-signup.html') + read('static-page.v60.js') + read('pilot-signup-page-2.v60.js');
   const viewer = read('pilot-leads.html');
   const privacy = read('privacy.html');
   assert.doesNotMatch(signup, /occulert-pilot-leads|savePilotLead|firebase/i);

@@ -47,7 +47,7 @@ function assertSingleH1(path) {
 
 walk(root);
 
-for (const scriptPath of ["driver-app.v60.js", "homepage.js", "lang.v47.js", "passkey-auth.v60.js", "supabase-loader.v47.js"]) {
+for (const scriptPath of ["driver-app.v60.js", "homepage.v60.js", "lang.v47.js", "passkey-auth.v60.js", "supabase-loader.v47.js"]) {
   try { new Function(read(scriptPath)); }
   catch (error) { fail(`${scriptPath} does not parse (${error.message})`); }
 }
@@ -93,7 +93,7 @@ assertNotIncludes("index.html", "href=\"/homepage.css\"", "homepage must not reu
 assertIncludes("index.html", "href=\"/homepage-journey-cinematic-v1.avif\"", "homepage must preload its optimized cinematic journey image");
 assertIncludes("index.html", "class=\"journey-frame journey-frame-enter\"", "homepage must render the cinematic enter frame");
 assertNotIncludes("index.html", "class=\"car-shell\"", "homepage must not render the retired flat CSS car");
-assertIncludes("index.html", "<script src=\"/homepage.js\" defer></script>", "homepage must load its external behavior script");
+assertIncludes("index.html", "<script src=\"/homepage.v60.js\" defer></script>", "homepage must load its external behavior script");
 assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
 const homepageInlineScripts = [...read("index.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
 if (homepageInlineScripts !== 1) fail(`homepage must contain only the early password-recovery handoff script (found ${homepageInlineScripts})`);
@@ -107,13 +107,13 @@ assertIncludes("index.html", "Occulert must remain open and visible.", "homepage
 assertIncludes("index.html", "cannot make it safe to continue driving while tired", "homepage product demo must preserve the safe-stop boundary");
 assertIncludes("index.html", "data-journey-step=\"3\"", "homepage safety journey must include the alert and safe-stop stage");
 assertNotIncludes("index.html", "class=\"phone-wrap\"", "homepage must not retain the broken phone mockup");
-assertIncludes("homepage.js", "prefers-reduced-motion: reduce", "homepage journey must honor reduced-motion preferences");
-assertIncludes("homepage.js", "aria-selected", "homepage journey controls must expose their selected state");
+assertIncludes("homepage.v60.js", "prefers-reduced-motion: reduce", "homepage journey must honor reduced-motion preferences");
+assertIncludes("homepage.v60.js", "aria-selected", "homepage journey controls must expose their selected state");
 assertIncludes("index.html", "class=\"skip-link\"", "homepage must provide a keyboard skip link");
 assertIncludes("index.html", "aria-controls=\"mobileMenu\"", "homepage menu button must identify its controlled menu");
-assertIncludes("homepage.js", "setAttribute('aria-expanded',String(open))", "homepage menu must announce expanded state");
-assertIncludes("homepage.js", "event.key==='Escape'", "homepage menu must close with Escape");
-assertIncludes("homepage.js", "querySelector('.faq-q')?.setAttribute('aria-expanded','false')", "homepage FAQ must announce expanded state");
+assertIncludes("homepage.v60.js", "setAttribute('aria-expanded',String(open))", "homepage menu must announce expanded state");
+assertIncludes("homepage.v60.js", "event.key==='Escape'", "homepage menu must close with Escape");
+assertIncludes("homepage.v60.js", "querySelector('.faq-q')?.setAttribute('aria-expanded','false')", "homepage FAQ must announce expanded state");
 assertIncludes("homepage.v51.css", ".journey-scene{position:relative;height:340px;margin:14px -4px 10px;overflow:hidden", "homepage journey must clip its moving road inside the scene");
 assertIncludes("homepage.v51.css", ".journey-copy{position:relative;z-index:2", "homepage journey copy must stay above animated scene layers");
 for (const page of ["about.html", "faq.html", "features.html", "how-it-works.html", "install.html"]) {
@@ -123,12 +123,12 @@ for (const page of ["about.html", "faq.html", "features.html", "how-it-works.htm
   assertIncludes(page, 'class="skip-link" href="#main-content"', `${page} must let keyboard users skip repeated navigation`);
   assertIncludes(page, 'id="main-content" tabindex="-1"', `${page} must expose a focusable main destination`);
   assertIncludes(page, '<link rel="stylesheet" href="/accessibility.v52.css" />', `${page} must use the shared keyboard-navigation layer`);
-  assertIncludes(page, '<script src="/public-page.v51.js"></script>', `${page} must use the shared accessible navigation behavior`);
+  assertIncludes(page, '<script src="/public-page.v60.js"></script>', `${page} must use the shared accessible navigation behavior`);
 }
 assertIncludes("about.html", '<h1 class="section-title">Why We Are Testing Occulert</h1>', "About must expose its page title as the main heading");
 assertIncludes("faq.html", '<h1 class="section-title">Common Questions</h1>', "FAQ must expose its page title as the main heading");
-assertIncludes("public-page.v51.js", "setAttribute('aria-expanded',String(open))", "public-page menus must announce expanded state");
-assertIncludes("public-page.v51.js", "event.key==='Escape'", "public-page menus must close with Escape");
+assertIncludes("public-page.v60.js", "setAttribute('aria-expanded',String(open))", "public-page menus must announce expanded state");
+assertIncludes("public-page.v60.js", "event.key==='Escape'", "public-page menus must close with Escape");
 assertNotIncludes("about.html", "™<!DOCTYPE html>", "About must start with a valid doctype");
 for (const unsupportedStat of ["1 in 6", "100,000+", "91%", "Crashes involve driver fatigue"]) {
   assertNotIncludes("index.html", unsupportedStat, `homepage must not present the unsupported statistic: ${unsupportedStat}`);
@@ -151,10 +151,10 @@ for (let index = 1; index <= 4; index += 1) {
 assertIncludes("sw.js", "'/homepage.v51.css'", "service worker must cache the versioned homepage stylesheet");
 assertNotIncludes("sw.js", "'/homepage.css',", "service worker must not recache the stale unversioned homepage stylesheet");
 assertNotIncludes("sw.js", "'/homepage-journey-cinematic-v1.jpg'", "service worker install must not preload the large cinematic journey image");
-assertIncludes("sw.js", "'/homepage.js'", "service worker must cache the external homepage behavior script");
+assertIncludes("sw.js", "'/homepage.v60.js'", "service worker must cache the external homepage behavior script");
 assertIncludes("sw.js", "'/liquid-glass.v47.css'", "service worker must cache the current shared Liquid Glass stylesheet");
 assertIncludes("sw.js", "'/accessibility.v52.css'", "service worker must cache the shared skip-link stylesheet");
-assertIncludes("sw.js", "'/static-page.v52.js'", "service worker must cache the consolidated static-page behavior");
+assertIncludes("sw.js", "'/static-page.v60.js'", "service worker must cache the consolidated static-page behavior");
 assertNotIncludes("sw.js", "'/liquid-glass.css',", "service worker must not retain the stale unversioned Liquid Glass stylesheet");
 for (const path of [
   "about.html",
@@ -187,10 +187,10 @@ for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "pilot-guide.h
   assertIncludes(path, '<link rel="stylesheet" href="/accessibility.v52.css" />', `${path} must use the shared keyboard-navigation layer`);
 }
 for (const path of ["driver-profiles.html", "pilot-signup.html", "session-history.html"]) {
-  assertIncludes(path, '<script src="/static-page.v52.js" defer></script>', `${path} must reuse consolidated static-page behavior`);
+  assertIncludes(path, '<script src="/static-page.v60.js" defer></script>', `${path} must reuse consolidated static-page behavior`);
 }
 for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "pilot-guide.html", "privacy.html", "product-hub.html", "safety.html"]) {
-  assertIncludes(path, '<script src="/static-page.v52.js" defer></script>', `${path} must use consolidated static-page behavior`);
+  assertIncludes(path, '<script src="/static-page.v60.js" defer></script>', `${path} must use consolidated static-page behavior`);
 }
 assertIncludes("fleet-dashboard.html", 'id="cloudStatus" role="status" aria-live="polite"', "fleet connection updates must be announced without stealing focus");
 assertIncludes("fleet-dashboard.html", 'href="/fleet-display.html">Open TV display', "fleet managers must be able to open the shared-screen display");
