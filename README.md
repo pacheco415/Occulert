@@ -11,8 +11,10 @@ The protected Supabase fleet workflow, reporting, TV aggregate view, and pilot
 launch checklist are released web features. PR #138 shipped quick start,
 printable reporting, data-quality explanations, and TV controls; PR #139 shipped
 the native clean-install and stale Watch-feedback repair. PR #144 is merged at
-`d3ae5a3`, and its website/backend audit release is live; its native source fixes
-await a future binary. TestFlight 1.0.0 (52) remains the binary from `969849b`,
+`d3ae5a3`, and its website/backend audit release is live. PR #145 is merged at
+`1c340e3` with confirmed-reply preservation and bounded Watch connection checks;
+both releases' native source fixes await a future binary.
+TestFlight 1.0.0 (52) remains the binary from `969849b`,
 with finished submission, Apple VALID / IN_BETA_TESTING, and embedded Watch
 packaging confirmed. On September 26, the user reported an iPhone installation
 and general functional pass, Watch launch, and urgent alert display/wrist

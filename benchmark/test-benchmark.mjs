@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseCsv, run, runSliced, selectSplit, provenance, THRESHOLDS } from "./run-benchmark.mjs";
+import { parseCsv, run, runSliced, score, selectSplit, provenance, THRESHOLDS } from "./run-benchmark.mjs";
 import { prepare, assignSplit, shouldExclude, parseDelimited, toCsv, CANONICAL_LABELS } from "./prepare-dataset.mjs";
+import { contentSha256 } from "./provenance.mjs";
 
 // --- scoring (unchanged contract) ------------------------------------------
 
@@ -25,6 +26,25 @@ assert.equal(results.medium.fp, 1);
 assert.equal(results.high.tp, 3);
 assert.equal(results.high.fp, 1);
 assert.ok(results.medium.recall > results.low.recall);
+
+// A single-class or empty slice must distinguish missing metric support from
+// a measured zero. F1 uses its count denominator, so real all-error cases
+// remain zero even when precision or recall individually lacks support.
+assert.deepEqual(score(parseCsv("label,ear\nawake,0.3"), 0.18), {
+  tp: 0, fp: 0, tn: 1, fn: 0, precision: null, recall: null, f1: null, falseAlertRate: 0,
+});
+assert.deepEqual(score(parseCsv("label,ear\ndrowsy,0.1"), 0.18), {
+  tp: 1, fp: 0, tn: 0, fn: 0, precision: 1, recall: 1, f1: 1, falseAlertRate: null,
+});
+assert.deepEqual(score(parseCsv("label,ear\nawake,0.1"), 0.18), {
+  tp: 0, fp: 1, tn: 0, fn: 0, precision: 0, recall: null, f1: 0, falseAlertRate: 1,
+});
+assert.deepEqual(score(parseCsv("label,ear\nawake,0.3\ndrowsy,0.3"), 0.18), {
+  tp: 0, fp: 0, tn: 1, fn: 1, precision: null, recall: 0, f1: 0, falseAlertRate: 0,
+});
+assert.deepEqual(score([], 0.18), {
+  tp: 0, fp: 0, tn: 0, fn: 0, precision: null, recall: null, f1: null, falseAlertRate: null,
+});
 
 // --- extra columns survive parsing -----------------------------------------
 
@@ -77,6 +97,10 @@ assert.equal(meta.dataset, "demo@1");
 assert.deepEqual(meta.thresholds, THRESHOLDS);
 assert.ok(meta.ranAt, "results must carry a timestamp");
 assert.ok(meta.runnerCommit, "results must carry a runner commit");
+assert.ok(Object.values(meta.sourceHashes).every(hash => /^[a-f0-9]{64}$/.test(hash)), "actual source hashes must accompany the commit");
+assert.ok(Object.hasOwn(meta.sourceHashes, "benchmark/provenance.mjs"));
+assert.equal(provenance({ inputText: "original input" }).inputSha256, contentSha256("original input"));
+assert.notEqual(provenance({ inputText: "modified input" }).inputSha256, contentSha256("original input"));
 
 // --- deterministic, leak-free splits ----------------------------------------
 
@@ -143,6 +167,11 @@ for (const name of ["label", "ear", "participant", "clip", "split", "Split", " l
   assert.throws(() => prepare(raw, { ...config, slices: { [name]: "light" } }), /Slice name/);
 }
 assert.throws(() => prepare(raw, { ...config, slices: { lighting: "" } }), /source column/);
+assert.throws(() => prepare(raw, { ...config, slices: { lighting: "misspelled_light" } }), /source column "misspelled_light" is absent/);
+const blankCondition = prepare([{ label: "awake", ear: "0.3", participant: "p1", lighting: "" }], { slices: { lighting: "lighting" } });
+assert.equal(blankCondition.rows[0].lighting, "", "genuinely blank values in existing columns remain valid");
+assert.deepEqual(prepare([], { slices: { lighting: "light" } }, ["label", "ear", "participant", "light"]).rows, [], "headers distinguish an empty export from an absent mapped column");
+assert.throws(() => prepare([], { slices: { lighting: "light" } }, ["label", "ear", "participant"]), /source column "light" is absent/);
 for (const value of ["clip", [], null, 0]) {
   assert.throws(() => prepare(raw, { ...config, split: value }), /split config must be an object/);
   assert.throws(() => prepare(raw, { ...config, slices: value }), /slices config must be an object/);
@@ -233,6 +262,38 @@ try {
   assert.match(cli.stderr, /Slice name/);
   assert.equal(existsSync(outputPath), false);
   assert.equal(existsSync(join(scratch, "prepared-manifest.json")), false);
+
+  // A misspelled mapped source cannot produce apparent unspecified coverage.
+  writeFileSync(configPath, JSON.stringify({ slices: { lighting: "missing_light" } }));
+  cli = spawnSync(process.execPath, [fileURLToPath(new URL("./prepare-dataset.mjs", import.meta.url)), "--input", inputPath, "--config", configPath, "--output", outputPath], { encoding: "utf8" });
+  assert.notEqual(cli.status, 0);
+  assert.match(cli.stderr, /source column "missing_light" is absent/);
+  assert.equal(cli.stdout, "");
+  assert.equal(existsSync(outputPath), false);
+  assert.equal(existsSync(join(scratch, "prepared-manifest.json")), false);
+
+  // Successful CLI output from outside the checkout must resolve the scripts'
+  // source checkout rather than the caller's working directory.
+  const resultsPath = join(scratch, "results.json");
+  writeFileSync(inputPath, "label,ear,participant,lighting\nawake,0.3,p1,\n");
+  cli = spawnSync(process.execPath, [fileURLToPath(new URL("./run-benchmark.mjs", import.meta.url)), "--input", inputPath, "--slice-by", "lighting", "--json", resultsPath], { cwd: scratch, encoding: "utf8" });
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.match(cli.stdout, /not estimable/);
+  const scored = JSON.parse(readFileSync(resultsPath, "utf8"));
+  assert.equal(scored.overall.medium.recall, null);
+  assert.equal(scored.overall.medium.falseAlertRate, 0, "supported zero rates are preserved in JSON");
+  assert.equal(scored.slices["(unspecified)"].samples, 1);
+  assert.equal(scored.provenance.inputSha256, contentSha256(readFileSync(inputPath)));
+  assert.equal(scored.provenance.runnerCommit, provenance({}).runnerCommit);
+  assert.equal(typeof scored.provenance.sourceDirty, "boolean");
+  writeFileSync(configPath, JSON.stringify({ slices: { lighting: "lighting" } }));
+  cli = spawnSync(process.execPath, [fileURLToPath(new URL("./prepare-dataset.mjs", import.meta.url)), "--input", inputPath, "--config", configPath, "--output", outputPath], { cwd: scratch, encoding: "utf8" });
+  assert.equal(cli.status, 0, cli.stderr);
+  const preparationManifest = JSON.parse(readFileSync(join(scratch, "prepared-manifest.json"), "utf8"));
+  assert.equal(preparationManifest.provenance.inputSha256, contentSha256(readFileSync(inputPath)));
+  assert.equal(preparationManifest.provenance.configurationSha256, contentSha256(readFileSync(configPath)));
+  assert.equal(preparationManifest.provenance.runnerCommit, scored.provenance.runnerCommit);
+  assert.deepEqual(preparationManifest.provenance.sourceHashes, scored.provenance.sourceHashes);
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

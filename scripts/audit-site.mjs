@@ -354,12 +354,12 @@ assertIncludes("fleet-onboarding-page-1.v60.js", "resendFleetInvitation", "fleet
 assertIncludes("fleet-onboarding-page-1.v60.js", "mailto:", "fleet onboarding must support no-cost sharing through the manager's mail app");
 assertIncludes("fleet-onboarding.html", "Copy Link", "fleet onboarding must preserve a copy-link fallback");
 assertIncludes("accept-invite-page-1.v47.js", "history.replaceState", "invite pages must immediately remove tokens from the visible URL");
-assertIncludes("accept-invite-page-2.v47.js", "sessionStorage", "invite tokens must stay out of persistent local storage");
+assertIncludes("accept-invite-page-2.v61.js", "sessionStorage", "invite tokens must stay out of persistent local storage");
 assertIncludes("accept-invite-page-1.v47.css", ".hidden{display:none!important}", "invite success actions must remain hidden until acceptance succeeds");
-assertIncludes("accept-invite-page-2.v47.js", "OcculertBackend.authMessage", "invite auth failures must show actionable messages");
+assertIncludes("accept-invite-page-2.v61.js", "OcculertBackend.authMessage", "invite auth failures must show actionable messages");
 assertIncludes("accept-invite.html", "Resend Confirmation", "invite signup must recover when the confirmation email is missing");
 assertIncludes("accept-invite.html", "Forgot Password?", "invite signup must recover when the invited email already has an account");
-assertIncludes("accept-invite-page-2.v47.js", "setAuthBusy(true)", "invite auth actions must prevent duplicate in-flight requests");
+assertIncludes("accept-invite-page-2.v61.js", "setAuthBusy(true)", "invite auth actions must prevent duplicate in-flight requests");
 assertNotIncludes("app.html", "oninput=\"typeof setSensitivity", "driver app must not keep the conflicting numeric sensitivity slider");
 for (const path of ["features.html", "how-it-works.html", "install.html"]) assertSingleH1(path);
 assertIncludes("account-page-2.v60.js", "function esc(v)", "account.html must escape rendered profile fields");

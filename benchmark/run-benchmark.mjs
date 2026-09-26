@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { parseTable, validEar } from "./csv.mjs";
+import { contentSha256, sourceSnapshot } from "./provenance.mjs";
 
 export const THRESHOLDS = { low: 0.15, medium: 0.18, high: 0.21 };
 const DROWSY_LABELS = new Set(["drowsy", "high_fatigue", "sleepy"]);
@@ -50,10 +50,14 @@ export function score(rows, threshold) {
     else if (!actual) counts.tn += 1;
     else counts.fn += 1;
   }
-  const precision = counts.tp / Math.max(1, counts.tp + counts.fp);
-  const recall = counts.tp / Math.max(1, counts.tp + counts.fn);
-  const f1 = (2 * precision * recall) / Math.max(Number.EPSILON, precision + recall);
-  const falseAlertRate = counts.fp / Math.max(1, counts.fp + counts.tn);
+  // Zero denominator means that the metric cannot be estimated from this
+  // sample/slice. Preserve real zero rates, but never turn missing support
+  // into apparently measured 0% performance.
+  const ratio = (numerator, denominator) => denominator ? numerator / denominator : null;
+  const precision = ratio(counts.tp, counts.tp + counts.fp);
+  const recall = ratio(counts.tp, counts.tp + counts.fn);
+  const f1 = ratio(2 * counts.tp, 2 * counts.tp + counts.fp + counts.fn);
+  const falseAlertRate = ratio(counts.fp, counts.fp + counts.tn);
   return { ...counts, precision, recall, f1, falseAlertRate };
 }
 
@@ -83,15 +87,10 @@ export function runSliced(rows, column) {
 }
 
 // A result with no provenance is not reproducible, so this is not optional.
-export function provenance({ input, split, dataset }) {
-  let commit = "unknown";
-  try {
-    commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-  } catch {
-    // Running outside a checkout is allowed; the field stays "unknown".
-  }
+export function provenance({ input, inputText, split, dataset }) {
   return {
-    runnerCommit: commit,
+    ...sourceSnapshot(),
+    inputSha256: inputText === undefined ? null : contentSha256(inputText),
     thresholds: THRESHOLDS,
     input: input ?? null,
     split: split ?? "all",
@@ -100,7 +99,7 @@ export function provenance({ input, split, dataset }) {
   };
 }
 
-function percent(value) { return `${(value * 100).toFixed(1)}%`; }
+function percent(value) { return value === null ? "not estimable" : `${(value * 100).toFixed(1)}%`; }
 
 function table(results) {
   const lines = [
@@ -129,7 +128,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const dataset = arg("--dataset");
   const jsonOut = arg("--json");
 
-  const allRows = parseCsv(await readFile(input, "utf8"));
+  const inputText = await readFile(input, "utf8");
+  const allRows = parseCsv(inputText);
   if (sliceBy && allRows.length && !Object.hasOwn(allRows[0], sliceBy)) {
     throw new Error(`Slice column "${sliceBy}" is absent from the input CSV.`);
   }
@@ -139,7 +139,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exit(1);
   }
 
-  const meta = provenance({ input, split, dataset });
+  const meta = provenance({ input, inputText, split, dataset });
   const overall = run(rows);
   const slices = sliceBy ? runSliced(rows, sliceBy) : null;
 

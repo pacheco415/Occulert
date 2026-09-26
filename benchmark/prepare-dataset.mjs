@@ -12,6 +12,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { parseTable, validEar } from "./csv.mjs";
+import { contentSha256, sourceSnapshot } from "./provenance.mjs";
 
 export const CANONICAL_LABELS = new Set(["awake", "drowsy", "high_fatigue"]);
 const CANONICAL_COLUMNS = new Set(["label", "ear", "participant", "clip", "split"]);
@@ -59,7 +60,7 @@ export function shouldExclude(row, exclude = {}, labelColumn = "label") {
   return null;
 }
 
-export function prepare(rawRows, config) {
+export function prepare(rawRows, config, rawHeaders) {
   if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("Dataset config must be an object.");
   for (const name of ["split", "slices"]) {
     if (config[name] !== undefined && (!config[name] || typeof config[name] !== "object" || Array.isArray(config[name]))) {
@@ -82,6 +83,12 @@ export function prepare(rawRows, config) {
       throw new Error(`Slice name "${name}" must be unique, lowercase, and must not replace a canonical column.`);
     }
     if (typeof sourceColumn !== "string" || !sourceColumn.trim()) throw new Error(`Slice "${name}" needs a source column.`);
+    // An existing column may legitimately contain blank measurements. An
+    // absent mapped column instead indicates a broken export/configuration.
+    const hasSourceColumn = rawHeaders
+      ? rawHeaders.includes(sourceColumn)
+      : rawRows.some(row => Object.hasOwn(row, sourceColumn));
+    if (!hasSourceColumn) throw new Error(`Slice "${name}" source column "${sourceColumn}" is absent from the raw input CSV.`);
     sliceNames.add(normalized);
   }
 
@@ -174,9 +181,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exit(2);
   }
 
-  const config = JSON.parse(await readFile(configPath, "utf8"));
-  const { rows: rawRows } = parseDelimited(await readFile(input, "utf8"));
-  const { headers, rows, manifest } = prepare(rawRows, config);
+  const configText = await readFile(configPath, "utf8");
+  const inputText = await readFile(input, "utf8");
+  const config = JSON.parse(configText);
+  const { headers: rawHeaders, rows: rawRows } = parseDelimited(inputText);
+  const { headers, rows, manifest } = prepare(rawRows, config, rawHeaders);
+  manifest.provenance = {
+    ...sourceSnapshot(),
+    inputSha256: contentSha256(inputText),
+    configurationSha256: contentSha256(configText),
+  };
 
   if (manifest.leakageCheck.participantsInBothSplits.length) {
     console.error("Participant leakage detected across splits:", manifest.leakageCheck.participantsInBothSplits);

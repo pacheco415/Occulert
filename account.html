@@ -25,6 +25,7 @@
 <script src="/account-page-1.v47.js"></script>
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/portal.v47.css" />
+<link rel="stylesheet" href="/form-controls.v61.css" />
 </head>
 <body class="portal-page account-page">
 <div class="top">
@@ -50,15 +51,15 @@
     <p style="color:var(--text2);font-size:13px;margin:0 0 16px">These device-only driver app settings do not grant access to a protected fleet.</p>
     <form class="form" onsubmit="saveProfile(event)">
       <div class="split">
-        <div class="field"><label>Name</label><input id="name" placeholder="Your name" autocomplete="name"></div>
-        <div class="field"><label>Local app role</label><select id="role"><option value="driver">Driver</option><option value="fleet">Fleet Manager</option></select></div>
+        <div class="field"><label for="name">Name</label><input id="name" placeholder="Your name" autocomplete="name"></div>
+        <div class="field"><label for="role">Local app role</label><select id="role"><option value="driver">Driver</option><option value="fleet">Fleet Manager</option></select></div>
       </div>
       <div class="split">
-        <div class="field"><label>Company</label><input id="company" placeholder="Occulert"></div>
-        <div class="field"><label>Fleet ID</label><input id="fleetId" placeholder="OCCULERT-DEMO"></div>
+        <div class="field"><label for="company">Company</label><input id="company" placeholder="Occulert"></div>
+        <div class="field"><label for="fleetId">Fleet ID</label><input id="fleetId" placeholder="OCCULERT-DEMO"></div>
       </div>
-      <div class="field"><label>Vehicle / Route</label><input id="vehicle" placeholder="Van 12 · Bay Area Route"></div>
-      <div class="field"><label>Bio / Notes</label><textarea id="bio" rows="2" placeholder="Optional notes about your route or vehicle..."></textarea></div>
+      <div class="field"><label for="vehicle">Vehicle / Route</label><input id="vehicle" placeholder="Van 12 · Bay Area Route"></div>
+      <div class="field"><label for="bio">Bio / Notes</label><textarea id="bio" rows="2" placeholder="Optional notes about your route or vehicle..."></textarea></div>
       <button class="btn green" type="submit">Save Profile</button>
     </form>
   </div>
