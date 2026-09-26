@@ -286,7 +286,8 @@ window.OcculertBackend = (function () {
         var refreshed = loadAuth();
         if (!refreshed || refreshed.access_token !== result.body.access_token
           || refreshed.refresh_token !== result.body.refresh_token
-          || !refreshed.user || refreshed.user.id !== auth.user.id) throw refreshError("cloud_unavailable");
+          || !refreshed.user || refreshed.user.id !== auth.user.id
+          || !Number.isFinite(refreshed.expires_at) || refreshed.expires_at <= Math.floor(Date.now() / 1000)) throw refreshError("cloud_unavailable");
         return refreshed;
       }
       if ([400, 401, 403].indexOf(result.status) >= 0) {

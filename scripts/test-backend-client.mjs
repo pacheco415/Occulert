@@ -256,14 +256,16 @@ for (const status of [400, 401, 403]) {
   assert.equal(h.backend.currentUser(), null, 'definitively rejected current token must still sign out');
 }
 
-{
+for (const reuseTokens of [false, true]) {
   const h = refreshHarness();
   const refresh = h.backend.getSession();
   const rejected = assert.rejects(refresh, { code: 'cloud_unavailable' });
   await waitForRefresh(h);
   const expected = h.storage.get('occulert-auth');
   h.blockWrites();
-  h.pending[0](response({ ...h.fresh, user: { id: 'owner-a' } }));
+  h.pending[0](response({ access_token: reuseTokens ? h.expired.access_token : h.fresh.access_token,
+    refresh_token: reuseTokens ? h.expired.refresh_token : h.fresh.refresh_token,
+    expires_in: 3600, user: { id: 'owner-a' } }));
   await rejected;
   assert.equal(h.storage.get('occulert-auth'), expected, 'failed refresh persistence must preserve the prior stored account');
 }
