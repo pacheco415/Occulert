@@ -160,7 +160,7 @@ test('Build 30 pins its iOS toolchain and exposes local aggregate diagnostics', 
 
 test('web monitoring defers MediaPipe and prevents overlapping inference', async () => {
   const app = read('app.html');
-  const driver = read('driver-app.v48.js');
+  const driver = read('driver-app.v57.js');
   assert.doesNotMatch(app, /<script[^>]+@mediapipe\/face_mesh/);
   assert.match(app, /loading="lazy"/);
   assert.match(driver, /function loadFaceMeshScript\(\)/);
@@ -319,11 +319,134 @@ test('legacy local driver identity migrates once across the driver app and accou
   assert.equal(harness.get("JSON.parse(localStorage.getItem('occulert-profile')).driverId"), migratedId);
 });
 
+test('completed browser sessions survive app reopening without cloud consent or duplicate latest rows', async () => {
+  const harness = createAppHarness();
+  harness.startSession();
+  harness.run('alerts=2;maxFatigue=50');
+  harness.clock.advance(10_000);
+  await harness.run('stop()');
+  const firstEnd = harness.get("JSON.parse(localStorage.getItem('occulert-session-history'))[0].endedAt");
+  harness.clock.advance(1_000);
+  await harness.run('stop()');
+  assert.equal(harness.get("JSON.parse(localStorage.getItem('occulert-session-history')).length"), 1);
+  assert.equal(harness.get("JSON.parse(localStorage.getItem('occulert-session-history'))[0].endedAt"), firstEnd,
+    'an extra stop must not extend the completed session');
+  harness.startSession();
+  harness.run('alerts=3;maxFatigue=80');
+  harness.clock.advance(20_000);
+  await harness.run('stop()');
+  const records = JSON.parse(harness.get("localStorage.getItem('occulert-session-history')"));
+  assert.equal(records.length, 2);
+  assert.notEqual(records[0].id, records[1].id);
+  assert.equal(records[0].alerts, 3);
+  assert.equal(records[1].alerts, 2);
+  assert.equal(records[0].cloudConsent, false);
+  assert.equal(Date.parse(records[0].endedAt) - Date.parse(records[0].startedAt), 20_000);
+  assert.equal(Date.parse(records[1].endedAt) - Date.parse(records[1].startedAt), 10_000);
+  for (const record of records) {
+    assert.equal(record.location, null);
+    assert.deepEqual(record.route, []);
+    assert.ok(!('audio' in record) && !('landmarks' in record) && !('rawMotion' in record));
+  }
+  const keys = ['occulert-driver-id', 'occulert-session-history', 'occulert-live-session'];
+  const initialStorage = Object.fromEntries(keys.map(key => [key, harness.get(`localStorage.getItem('${key}')`)]));
+  const reopened = createAppHarness({ initialStorage });
+  assert.equal(reopened.get("localStorage.getItem('occulert-live-session')"), initialStorage['occulert-live-session'],
+    'idle app loading must not replace the last completed record with a perfect empty score');
+  reopened.run(read('session-history-page-2.v57.js'));
+  assert.equal(reopened.get('getHistory().length'), 2, 'latest saved snapshot must not duplicate its history record');
+  assert.equal(reopened.el('sessions').textContent, 2);
+});
+
+test('stopping before monitoring creates no history and blocked storage cannot prevent local cleanup', async () => {
+  const harness = createAppHarness();
+  await harness.run('stop()');
+  assert.equal(harness.get("localStorage.getItem('occulert-session-history')"), null);
+  assert.equal(harness.get("localStorage.getItem('occulert-live-session')"), null);
+  harness.startSession();
+  harness.run("localStorage.setItem=()=>{throw new Error('storage blocked')}");
+  await harness.run('stop()');
+  await Promise.resolve();
+  assert.equal(harness.get('running'), false);
+  assert.equal(harness.el('report').style.display, 'block');
+  assert.match(harness.el('report').textContent, /Local history: Not saved/);
+  assert.equal(harness.el('startBtn').textContent, 'START MONITORING');
+  assert.ok(harness.el('log').children.some(entry => /Local history could not be saved/.test(entry.textContent)));
+  assert.ok(harness.el('log').children.some(entry => /Local session snapshot could not be saved/.test(entry.textContent)));
+});
+
+test('browser local history retains the latest 50 and reports a failed save without clearing existing records', async () => {
+  const harness = createAppHarness();
+  for (let index = 0; index < 51; index += 1) {
+    harness.startSession();
+    harness.run(`alerts=${index}`);
+    harness.clock.advance(1_000);
+    await harness.run('stop()');
+  }
+  const records = JSON.parse(harness.get("localStorage.getItem('occulert-session-history')"));
+  assert.equal(records.length, 50);
+  assert.equal(records[0].alerts, 50);
+  assert.equal(records.at(-1).alerts, 1);
+  const saved = harness.get("localStorage.getItem('occulert-session-history')");
+  harness.startSession();
+  harness.run(`const originalSetItem=localStorage.setItem;
+    localStorage.setItem=(key,value)=>{if(key==='occulert-session-history')throw new Error('quota exceeded');originalSetItem(key,value)};`);
+  await harness.run('stop()');
+  assert.equal(harness.get("localStorage.getItem('occulert-session-history')"), saved);
+  assert.ok(harness.el('log').children.some(entry => /Local history could not be saved/.test(entry.textContent)));
+});
+
+function wakeLockHarness() {
+  const harness = createAppHarness();
+  harness.run(`navigator.mediaDevices={getUserMedia:async()=>null};
+    globalThis.wakeRequests=[];globalThis.gpsStarts=0;
+    navigator.wakeLock={request:()=>new Promise(resolve=>{wakeRequests.push(resolve)})};
+    initModel=async()=>{};
+    openSelectedCamera=async()=>({getTracks:()=>[{stop(){}}],getVideoTracks:()=>[]});
+    verifyFirstInference=async()=>{};
+    startGPS=()=>{gpsStarts++};`);
+  return harness;
+}
+
+test('a pending optional wake lock cannot stall startup or restart GPS after foreground stop', async () => {
+  const harness = wakeLockHarness();
+  await harness.run('start()');
+  assert.equal(harness.get('running'), true);
+  assert.equal(harness.get('starting'), false, 'camera monitoring must not wait for the optional wake lock');
+  assert.equal(harness.get('gpsStarts'), 1);
+  harness.run('document.hidden=true');
+  await harness.run('handleVisibilityChange(true)');
+  harness.run('wakeRequests[0]({release:async()=>{globalThis.released=true}})');
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(harness.get('running'), false);
+  assert.equal(harness.get('wakeLock'), null);
+  assert.equal(harness.get('released'), true);
+  assert.equal(harness.get('gpsStarts'), 1, 'late resolution must not reopen optional location monitoring');
+  assert.equal(harness.el('startBtn').textContent, 'START MONITORING');
+});
+
+test('a previous session wake lock cannot replace the current session lock', async () => {
+  const harness = wakeLockHarness();
+  await harness.run('start()');
+  await harness.run('stop()');
+  harness.clock.advance(1_000);
+  await harness.run('start()');
+  harness.run("wakeRequests[1]({session:'current',release:async()=>{globalThis.currentReleased=true}})");
+  await Promise.resolve(); await Promise.resolve();
+  harness.run("wakeRequests[0]({session:'previous',release:async()=>{globalThis.previousReleased=true}})");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(harness.get('wakeLock.session'), 'current');
+  assert.equal(harness.get('previousReleased'), true);
+  assert.equal(harness.get('globalThis.currentReleased || false'), false);
+  await harness.run('stop()');
+  assert.equal(harness.get('currentReleased'), true);
+});
+
 test('service-worker upgrade evicts stale website caches', async () => {
   const source = read('sw.js');
-  assert.match(source, /const CACHE = 'occulert-v49'/);
+  assert.match(source, /const CACHE = 'occulert-v50'/);
   assert.match(source, /const NETWORK_FIRST_ASSETS = new Set\(\[/);
-  assert.match(source, /'\/driver-app\.v48\.js'/);
+  assert.match(source, /'\/driver-app\.v57\.js'/);
   assert.match(source, /const NETWORK_FIRST_TIMEOUT_MS = 2500/);
   assert.match(source, /event\.waitUntil\(cacheUpdate\)/);
 
@@ -367,7 +490,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   const cache = {
     add: async url => {
       url = typeof url === 'string' ? url : new URL(url.url).pathname;
-      if (url === '/driver-app.v48.js') throw new Error('transient detector download failure');
+      if (url === '/driver-app.v57.js') throw new Error('transient detector download failure');
       cached.add(url);
     },
     match: async url => cached.has(url) ? { ok: true } : null,
@@ -393,7 +516,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await assert.rejects(installation, /Critical offline assets were not cached/);
   assert.equal(skipped, false);
-  assert.deepEqual(deleted, ['occulert-v49']);
+  assert.deepEqual(deleted, ['occulert-v50']);
 });
 
 test('service-worker bounds network and cache writes while preserving a known-good detector', async () => {
@@ -430,7 +553,7 @@ test('service-worker bounds network and cache writes while preserving a known-go
     },
   };
   runInNewContext(source, context);
-  const request = { method: 'GET', mode: 'same-origin', url: 'https://www.occulert.com/driver-app.v48.js' };
+  const request = { method: 'GET', mode: 'same-origin', url: 'https://www.occulert.com/driver-app.v57.js' };
   let responsePromise;
   let lifetimePromise;
   const dispatch = () => listeners.fetch({
@@ -517,4 +640,56 @@ test('fleet dashboard restarts its relative-time clock after returning to a visi
   await context.schedulingForTest.handleVisibilityChange();
   assert.equal(intervalCalls, 1, 'visible dashboards must restart the relative-time interval');
   assert.equal(context.dashboardRefreshTimer, 11);
+});
+
+
+test('service-worker navigation falls back on a stalled connection and preserves fresh responses through failed cache writes', async () => {
+  const listeners = {};
+  const cachedPage = { source: 'cached-page', ok: true };
+  const homePage = { source: 'cached-home', ok: true };
+  const freshPage = { source: 'fresh-page', ok: true, clone: () => ({}) };
+  let networkMode = 'hang', cacheMode = 'page', writeMode = 'ok', networkSignal;
+  const context = {
+    AbortController, URL, Request, Promise, Set, clearTimeout,
+    Response: { error: () => ({ source: 'network-error', ok: false }) },
+    setTimeout: (callback, timeout) => setTimeout(callback, Math.min(timeout, 10)),
+    fetch: (_request, options) => {
+      networkSignal = options.signal;
+      return networkMode === 'hang' ? new Promise(() => {}) : Promise.resolve(
+        networkMode === 'fresh' ? freshPage : { source: 'error-page', ok: false, status: 503 });
+    },
+    caches: {
+      match: async request => cacheMode === 'page' ? cachedPage : request === '/index.html' ? homePage : null,
+      open: async () => ({ put: async () => {
+        if (writeMode === 'reject') throw new Error('quota exceeded');
+        if (writeMode === 'hang') return new Promise(() => {});
+      } }),
+    },
+    self: { location: { origin: 'https://www.occulert.com' }, addEventListener: (name, handler) => { listeners[name] = handler; } },
+  };
+  runInNewContext(read('sw.js'), context);
+  let responsePromise, lifetimePromise;
+  const dispatch = () => listeners.fetch({
+    request: { method: 'GET', mode: 'navigate', url: 'https://www.occulert.com/app.html' },
+    respondWith: promise => { responsePromise = promise; },
+    waitUntil: promise => { lifetimePromise = promise; },
+  });
+  dispatch();
+  assert.equal(await responsePromise, cachedPage, 'an unanswered connection must use the installed app shell');
+  assert.equal(networkSignal.aborted, true);
+  await lifetimePromise;
+  networkMode = 'error';
+  dispatch();
+  assert.equal(await responsePromise, cachedPage, 'a 503 must not discard the cached page');
+  await lifetimePromise;
+  cacheMode = 'home';
+  dispatch();
+  assert.equal(await responsePromise, homePage, 'the existing homepage fallback remains available');
+  await lifetimePromise;
+  networkMode = 'fresh';
+  for (writeMode of ['reject', 'hang']) {
+    dispatch();
+    assert.equal(await responsePromise, freshPage, 'cache failure must not delay or discard a fresh page');
+    await lifetimePromise;
+  }
 });

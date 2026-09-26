@@ -8,11 +8,14 @@ Occulert is a prototype real-time AI drowsiness detection platform that uses you
 
 Development status is maintained in the [authoritative roadmap](docs/APP_ROADMAP.md).
 The protected Supabase fleet workflow, reporting, TV aggregate view, and pilot
-launch checklist are released web features. Quick start and current reporting,
-data-quality, and TV-control upgrades remain branch source work. Private native
-distribution and physical-device evidence are recorded separately; source
-changes do not update an installed TestFlight build. Detection accuracy has not
-been established by a labeled dataset benchmark.
+launch checklist are released web features. PR #138 shipped quick start,
+printable reporting, data-quality explanations, and TV controls; PR #139 shipped
+the native clean-install and stale Watch-feedback repair. Recorded PR #139
+release baseline is `969849b`. TestFlight 1.0.0 (52) is built/submitted, Apple VALID / IN_BETA_TESTING,
+with embedded Watch packaging confirmed. Physical build-52 acceptance is not
+recorded, and 0 iOS builds remain this cycle. Pilot owner/participant details
+remain unanswered. Distribution and source checks do not establish detection
+accuracy, device acceptance, or safety effectiveness.
 
 ---
 
@@ -62,10 +65,10 @@ Occulert is an assistive prototype. It cannot guarantee crash prevention, driver
 occulert/
 ├── index.html              # Landing page
 ├── app.html                # Driver monitoring app
-├── driver-app.v48.js       # Versioned browser monitoring and alerts
+├── driver-app.v57.js       # Versioned browser monitoring and alerts
 ├── fleet-dashboard.html    # Protected manager workflow + separate demo
 ├── fleet-display.html      # Protected read-only TV aggregate view
-├── pilot-guide.html        # Quick-start source on the unmerged branch
+├── pilot-guide.html        # Released manager-and-driver quick start
 ├── fleet-pricing.html      # Managed early-access fleet plans
 ├── pilot-signup.html       # Pilot and rollout qualification form
 ├── session-history.html    # Local session history

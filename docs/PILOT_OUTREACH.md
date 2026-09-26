@@ -1,16 +1,20 @@
 # Occulert pilot recruitment package
 
-Prepared September 25, 2026. **Drafts only: no messages have been sent.**
+Status updated September 26, 2026. **Drafts only: no messages have been sent.**
 This package supports recruitment of one fleet owner and up to five voluntary
 drivers for a 30-day introductory trial. Larger organizations may begin with
 that same five-driver subset. Existing session approval covers preparation;
 external sending needs authorized recipients and final messages.
 
 Use the [one-page overview](PILOT_OVERVIEW.md) for partner conversations and
-the [authoritative roadmap](APP_ROADMAP.md) to distinguish live features from
-unmerged source and future plans. Do not promise the quick-start branch,
-new reports workspace, data-quality upgrades, TV controls, or a new native
-build until released and verified.
+the [authoritative roadmap](APP_ROADMAP.md) for current release and evidence
+status. PR #138 shipped quick start, printable reports, data-quality
+explanations, and TV controls. Private TestFlight 1.0.0 (52) is built/submitted
+and Apple VALID / IN_BETA_TESTING, with embedded Watch packaging confirmed;
+physical build-52 acceptance remains open and 0 iOS builds remain this cycle.
+Pilot/physical-validation preparation is approved, but the fleet owner and
+participants have not been supplied. Do not invent enrollment, consent, or
+results or promise a new native build.
 
 ## Recruitment fit
 

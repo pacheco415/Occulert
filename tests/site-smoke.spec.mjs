@@ -510,7 +510,7 @@ test("driver app external assets preserve layout and monitoring behavior", async
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
 
   expect(await page.locator('link[href="/driver-app.v47.css"]').count()).toBe(1);
-  expect(await page.locator('script[src="/driver-app.v48.js"]').count()).toBe(1);
+  expect(await page.locator('script[src="/driver-app.v57.js"]').count()).toBe(1);
   expect(await page.locator("script:not([src])").count()).toBe(0);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator(".top")).toHaveCSS("min-height", "74px");

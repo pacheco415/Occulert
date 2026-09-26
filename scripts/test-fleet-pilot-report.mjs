@@ -232,7 +232,7 @@ test('dashboard passes returned metadata, clears it on reset, and gates the prot
   assert.match(dashboard, /protectedReportPrivacy=result\.body\.privacy\|\|null/);
   assert.match(dashboard, /function clearProtectedFleetCache\(\).*OcculertPilotReport\?\.reset\(\);protectedTelemetryTrust='';protectedReportPrivacy=null/);
   const exporter = dashboard.slice(dashboard.indexOf('function exportPilotReport()'), dashboard.indexOf('function eventHistoryHtml('));
-  assert.ok(exporter.indexOf('if(!permission?.available)') < exporter.indexOf('let metrics=pilotMetrics()'));
+  assert.ok(exporter.indexOf('if(!allowProtectedShare())return') < exporter.indexOf('let metrics=pilotMetrics()'));
   assert.match(dashboard, /\/fleet-pilot-report\.v56\.js/);
   assert.match(dashboard, /\/fleet-pilot-report\.v56\.css/);
 });

@@ -1,6 +1,6 @@
 # Occulert backend implementation and next steps
 
-Status recorded September 25, 2026. Product/release status lives in the
+Status recorded September 26, 2026. Product/release status lives in the
 [authoritative roadmap](APP_ROADMAP.md). This describes the existing Supabase
 implementation; choosing a backend or building accounts from scratch is not
 pending work.
@@ -29,8 +29,9 @@ through `/api/public-config`.
   without storing a second checklist state.
 - Contact requests use validated, rate-limited `/api/pilot-leads`; contact
   details are not retained in browser localStorage.
-- Quick start and new reports/data-quality/TV-control upgrades remain branch
-  source work until released and production-verified.
+- Quick start, printable reports, data-quality explanations, and TV controls
+  shipped in PR #138. Recorded PR #139 release baseline is `969849b`;
+  release verification is separate from real-pilot operating evidence.
 
 See [BACKEND_SETUP.md](../BACKEND_SETUP.md) for setup and operational checks.
 The initial schema is [db/schema.sql](../db/schema.sql); later account deletion,
@@ -74,8 +75,8 @@ sessions; missing is not a measured zero.
 
 ## Next work
 
-Complete and verify branch reporting, data-quality, and TV changes, then use
-the existing workflow with an authorized pilot of up to five drivers. Review
+Use the released workflow with an authorized pilot of up to five drivers.
+The actual fleet owner and participant details remain unanswered. Review
 day-7/day-30 participation, source completeness, manager workflow, and support
 issues without accuracy claims.
 

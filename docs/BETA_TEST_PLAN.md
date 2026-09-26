@@ -4,13 +4,19 @@ Purpose: collect controlled observations about correct, false, missed, and late
 alerts before changing detection thresholds or making accuracy claims. Current
 release status is in the [authoritative roadmap](APP_ROADMAP.md).
 
-## Recorded evidence and current source
+## Release status and recorded evidence
 
-- Earlier iPhone/Watch evidence, including build 19 and the dated audit's build
-  36, is historical. The September 21 release record includes build-49 parked
-  camera-load/readiness feedback and build-50 submission/availability. Confirm
-  the installed version/build for each new session; this plan does not identify
-  the latest installed binary or accept subsequent source changes.
+- Private TestFlight 1.0.0 (52) has a finished build and FINISHED submission;
+  Apple reports VALID / IN_BETA_TESTING, and the embedded Watch app is confirmed.
+  No physical build-52 acceptance is recorded. Confirm the actual installed
+  version/build for each session; distribution does not establish installation,
+  alert delivery, battery/thermal performance, or acceptance.
+- Earlier build-19/36 feedback and build-49 parked checks remain historical.
+  There are 0 iOS builds left this cycle; validate the available build 52 and
+  continue source work without queueing another build.
+- The implemented native behaviors below are included in build 52. Their
+  physical acceptance is pending, not binary packaging. The current browser
+  reliability branch does not change that native binary.
 - Session History lets testers label a completed session as **Felt right**,
   **False alert**, **Missed alert**, or **Late alert**.
 - New sessions preserve the active sensitivity setting, and Session History
@@ -30,11 +36,11 @@ release status is in the [authoritative roadmap](APP_ROADMAP.md).
 - A local alert-pattern summary groups reviewed false and missed alerts by
   sensitivity, lighting, eyewear, and phone position. It shows observation
   counts, not accuracy or error rates.
-- Current source adds local compatible-headphone motion diagnostics. Raw motion
+- Build 52 includes local compatible-headphone motion diagnostics. Raw motion
   readings are discarded; only source status, sample count, and candidate
   head-nod count are saved. This signal is not calibrated and does not affect
   scores, alerts, Watch haptics, or cloud sync.
-- Current source adds an optional parked camera check for face framing, mount
+- Build 52 includes an optional parked camera check for face framing, mount
   angle, and eye visibility. The check is on-device, stores no frames, and
   returns before fatigue scoring or alert delivery.
 - Active monitoring stores an aggregate local checkpoint every 15 seconds. If
@@ -145,7 +151,9 @@ These are participant experience ratings, not measured accuracy. Rate:
 ## Fleet pilot target
 
 Prepare one fleet owner and up to five willing drivers for a 30-day controlled
-pilot. Before operating, review the ten-session checkpoint, varied conditions,
+pilot. The owner and participant details remain unanswered; no enrollment,
+consent, or operating results are recorded by this plan. Before operating,
+review the ten-session checkpoint, varied conditions,
 and unresolved setup/alert concerns; do not interpret enrollment as device or
 accuracy acceptance. Agree:
 

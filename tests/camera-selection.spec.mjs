@@ -207,3 +207,57 @@ test("camera mute recovery debounces a brief pause and catches a sustained pause
   });
   await expect.poll(() => page.evaluate(() => window.__guardFailure), { timeout: 4000 }).toBe("CameraPausedError");
 });
+
+
+test("completed local browser history survives reopening the app", async ({ page }) => {
+  await page.addInitScript(installCameraFixture, {});
+  await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(async () => {
+    for (const count of [2, 3]) {
+      running = true;
+      sessionStart = Date.now() - 10_000;
+      localSessionId = createLocalDriverId();
+      alerts = count;
+      maxFatigue = count * 10;
+      await stop();
+    }
+  });
+  const before = await page.evaluate(() => ({
+    history: JSON.parse(localStorage.getItem('occulert-session-history')),
+    latest: localStorage.getItem('occulert-live-session'),
+  }));
+  expect(before.history).toHaveLength(2);
+  expect(before.history.map(record => record.alerts)).toEqual([3, 2]);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  expect(await page.evaluate(() => localStorage.getItem('occulert-live-session'))).toBe(before.latest);
+  await page.goto("/session-history.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator('#sessions')).toHaveText('2');
+  await expect(page.locator('#alerts')).toHaveText('5');
+});
+
+test("late screen wake lock is released after monitoring leaves the foreground", async ({ page }) => {
+  await page.addInitScript(installCameraFixture, {});
+  await page.goto("/app.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(async () => {
+    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: {
+      request: () => new Promise(resolve => { window.__resolveWakeLock = resolve; }),
+    } });
+    initModel = async () => {};
+    openSelectedCamera = async () => new MediaStream();
+    video.play = async () => {};
+    verifyFirstInference = async () => {};
+    window.__gpsStarts = 0;
+    startGPS = () => { window.__gpsStarts += 1; };
+    await start();
+  });
+  expect(await page.evaluate(() => ({ running, starting, gpsStarts: window.__gpsStarts })))
+    .toEqual({ running: true, starting: false, gpsStarts: 1 });
+  await page.evaluate(async () => {
+    await handleVisibilityChange(true);
+    window.__resolveWakeLock({ release: async () => { window.__wakeReleased = true; } });
+  });
+  await expect.poll(() => page.evaluate(() => window.__wakeReleased)).toBe(true);
+  expect(await page.evaluate(() => ({ running, holdsLock: !!wakeLock, gpsStarts: window.__gpsStarts })))
+    .toEqual({ running: false, holdsLock: false, gpsStarts: 1 });
+  await expect(page.locator('#startBtn')).toHaveText('START MONITORING');
+});

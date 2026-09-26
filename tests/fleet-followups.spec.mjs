@@ -2,15 +2,16 @@ import { test, expect } from '@playwright/test';
 
 const owner = '11111111-1111-4111-8111-111111111111';
 const id = '33333333-3333-4333-8333-333333333333';
-async function setup(page, { fail = false, conflict = false, slow = false } = {}) {
+async function setup(page, { fail = false, conflict = false, slow = false, sessions = null } = {}) {
   const state = { followup: { session_id: id, status: 'open', version: 0, updated_at: null }, posts: 0 };
   const session = { id, driver_id: 'driver', started_at: new Date().toISOString(), ended_at: new Date().toISOString(), alert_count: 2, safety_score: 65 };
+  const records = sessions || [session];
   await page.route('**/occulert-backend.v47.js', route => route.fulfill({ contentType: 'application/javascript', body: `
     window.fixtureUser = { id: '${owner}' };
     window.OcculertBackend = {
       currentUser: () => window.fixtureUser,
       getSession: async () => ({user: window.fixtureUser,access_token:'fixture-token'}),
-      getFleetSummary: async () => ({ok:true,body:{fleet:{id:'fleet',company_name:'Example fleet'},drivers:[{id:'driver',name:'Avery Example',active:true}],sessions:[${JSON.stringify(session)}],events:[]}}),
+      getFleetSummary: async () => ({ok:true,body:{fleet:{id:'fleet',company_name:'Example fleet'},drivers:[{id:'driver',name:'Avery Example',active:true}],sessions:${JSON.stringify(records)},events:[]}}),
       signOut: () => {window.fixtureUser=null;}
     };` }));
   await page.route('**/api/fleet-followups', async route => {
@@ -23,7 +24,9 @@ async function setup(page, { fail = false, conflict = false, slow = false } = {}
       return route.fulfill({ json: { ok: true, followup: state.followup } });
     }
     if (fail) return route.fulfill({ status: 503, json: { ok: false, error: 'followups_not_enabled' } });
-    return route.fulfill({ json: { ok: true, limit: 50, sessions: [{ ...session, driver_name: 'Avery Example <script>', followup: state.followup }] } });
+    return route.fulfill({ json: { ok: true, limit: 50, sessions: records.map(record => ({ ...record,
+      driver_name: record.driver_name || 'Avery Example <script>', followup: { ...state.followup, session_id: record.id },
+    })) } });
   });
   await page.goto('/fleet-dashboard.html');
   await expect(page.locator('#fleetFollowups')).toBeVisible();
@@ -71,6 +74,36 @@ test('account changes clear protected outcomes and discard in-flight loads', asy
   await expect(page.locator('#fleetFollowups')).toBeHidden();
   await page.waitForTimeout(300);
   await expect(page.locator('#followupList')).toBeEmpty();
+});
+
+test('session descriptions distinguish recorded completion and measured zero from missing or invalid telemetry', async ({ page }) => {
+  const now = Date.now(), iso = offset => new Date(now + offset).toISOString();
+  const base = { driver_id: 'driver', started_at: iso(-3_600_000), ended_at: iso(-1_800_000), alert_count: 2 };
+  const cases = [
+    { name: 'Completed record', state: 'Completed session', alert: '2 reported alerts' },
+    { name: 'Measured zero', changes: { alert_count: 0 }, state: 'Completed session', alert: '0 reported alerts' },
+    { name: 'No recorded end', changes: { ended_at: null, alert_count: null }, state: 'No recorded end time', alert: 'Alert count not recorded' },
+    { name: 'Invalid end', changes: { ended_at: 'invalid', alert_count: false }, state: 'Invalid recorded dates', alert: 'Alert count not recorded' },
+    { name: 'Future end', changes: { ended_at: iso(86_400_000), alert_count: 'withheld' }, state: 'Invalid recorded dates', alert: 'Alert count not recorded' },
+    { name: 'End before start', changes: { ended_at: iso(-7_200_000), alert_count: -1 }, state: 'Invalid recorded dates', alert: 'Alert count not recorded' },
+    { name: 'Missing start', changes: { started_at: null, alert_count: 1.5 }, state: 'Invalid recorded dates', alert: 'Alert count not recorded', missingDate: true },
+    { name: 'Missing alert field', changes: { alert_count: undefined }, state: 'Completed session', alert: 'Alert count not recorded' },
+    { name: 'Blank alert field', changes: { alert_count: '' }, state: 'Completed session', alert: 'Alert count not recorded' },
+  ];
+  await setup(page, { sessions: cases.map((entry, index) => ({ ...base, ...entry.changes, id: `record-${index}`, driver_name: entry.name })) });
+  await expect(page.locator('.followup-item')).toHaveCount(cases.length);
+  for (const entry of cases) {
+    const item = page.locator('.followup-item').filter({ has: page.getByRole('heading', { name: entry.name, exact: true }) });
+    const description = item.locator('p.muted');
+    await expect(description).toContainText(entry.state);
+    await expect(description).toContainText(entry.alert);
+    await expect(description).not.toContainText('Session in progress');
+    if (entry.state !== 'Completed session') await expect(description).not.toContainText('Completed session');
+    if (entry.alert === 'Alert count not recorded') await expect(description).not.toContainText('0 reported alerts');
+    if (entry.missingDate) await expect(description).toContainText('Date unavailable');
+    await expect(item.locator('.followup-saved')).toHaveText('Saved status: Open (not yet saved)');
+    await expect(item.getByRole('button', { name: 'Save follow-up', exact: true })).toBeEnabled();
+  }
 });
 
 test('mobile follow-up controls fit and have usable touch targets', async ({ page }, testInfo) => {

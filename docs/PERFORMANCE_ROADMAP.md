@@ -1,9 +1,11 @@
 # Occulert Performance Roadmap
 
-Status reference updated: 2026-09-25. The
+Status reference updated: 2026-09-26. The
 [authoritative roadmap](APP_ROADMAP.md) records shipped/source status. The
-implemented contracts and acceptance targets below do not establish a new
-release, production latency, or device acceptance.
+implemented contracts and acceptance targets below do not establish measured
+production latency or device acceptance. PR #138 and PR #139 are shipped; native
+TestFlight 1.0.0 (52) is built/submitted and Apple VALID / IN_BETA_TESTING, with
+embedded Watch packaging confirmed. Physical build-52 acceptance remains open.
 
 This roadmap separates source optimizations from physical-device, live-service,
 and accuracy evidence. A green source check means the implementation is ready
@@ -27,7 +29,7 @@ accuracy, or safe real-world behavior.
 | Parked camera setup | Reuses the on-device face detector in an optional preview to guide framing, mount angle, and eye visibility at no more than four interface updates per second | Setup samples return before fatigue scoring and alert delivery; no frames or setup samples are stored |
 | Interrupted-session recovery | Writes a serialized local summary checkpoint every 15 seconds and converts a recent interrupted checkpoint into a clearly labeled partial Session History record | Checkpoints contain aggregate session values only; normal completion clears the matching checkpoint and recovered records are never presented as complete cloud sessions |
 | Connected-device readiness | Refreshes independent Watch preference, Watch status, and headphone-motion status reads concurrently behind a single-flight control | Primary phone alerts remain independent of optional accessory availability |
-| Build reproducibility | Pins the production profile to the validated SDK 57/Xcode 26.6 EAS image | Queueing, TestFlight submission, and device validation remain separate gates |
+| Build reproducibility | Pins the SDK 57/Xcode 26.6 EAS image; repaired optional peer lock entry and separate Node 22.23.1/npm 10.9.8 clean-install CI match the EAS package manager | Build-52 packaging/submission is complete; source checks and Apple availability do not establish physical acceptance |
 | Regression coverage | Adds deterministic timing, cadence, lazy-loading, overlap, and conditional-history contracts to `npm run verify` | Tests establish code contracts, not physical-device performance |
 
 ## Performance budgets
@@ -66,8 +68,8 @@ These are acceptance targets, not measured production claims.
 - Detection accuracy still needs an authorized labeled dataset and the
   participant-safe workflow in `ACCURACY_BENCHMARK.md`. No accuracy percentage
   is claimed by this performance work.
-- Battery, thermal, camera, Watch, headphone, and car-audio results require a
-  physical build and devices.
+- Battery, thermal, camera, Watch, headphone, and car-audio results require
+  physical checks on the available build 52 and actual devices.
 - Camera-setup framing and interrupted-session recovery require physical
   preview plus force-quit/relaunch checks on the exact native build.
 - Production fleet latency requires a signed-in owner and an agreed read-only
@@ -79,10 +81,9 @@ These are acceptance targets, not measured production claims.
   install metadata; the original high-resolution logo remains available for
   social previews and brand use.
 - Published managed-plan descriptions do not activate billing or enforce
-  entitlements. Payment activation and native-build submission remain distinct
-  from the authorized source/release workflow. The remaining reserved native
-  build is held for a frozen package and final authorization; none is queued
-  by this performance work.
+  entitlements. Build 52 has a FINISHED submission and Apple beta availability;
+  there are 0 iOS builds left this cycle. Continue source checks and physical
+  validation of the existing binary without queueing another iOS build.
 
 ## Later scaling work
 

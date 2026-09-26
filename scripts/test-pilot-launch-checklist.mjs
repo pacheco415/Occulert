@@ -26,6 +26,7 @@ test('pilot launch state progresses only from protected-record inputs', () => {
     sevenDayReady: false,
     thirtyDayReady: false,
     pilotDay: 0,
+    pilotAgeLimited: false,
   });
 
   const active = state({
@@ -46,6 +47,48 @@ test('pilot launch state progresses only from protected-record inputs', () => {
   assert.equal(active.sevenDayReady, true);
   assert.equal(active.thirtyDayReady, true);
   assert.equal(active.pilotDay, 30);
+});
+
+test('future and invalid starts cannot launch a pilot; latest-50 age is a lower bound', () => {
+  const now = Date.parse('2026-09-26T12:00:00Z');
+  const future = state({ now, sessions: [{ started_at: '2026-09-27T12:00:00Z' }, { started_at: 'invalid' }] });
+  assert.equal(future.firstSessionReady, false);
+  assert.equal(future.sessionCount, 0);
+  assert.equal(future.pilotDay, 0);
+
+  const sessions = Array.from({ length: 155 }, (_, i) => ({ started_at: new Date(now - i * 0.2 * 86400000).toISOString() }));
+  const limited = state({ now, sessions });
+  assert.equal(limited.sessionCount, 50);
+  assert.equal(limited.pilotAgeLimited, true);
+  assert.equal(limited.pilotDay, 10);
+  assert.equal(limited.sevenDayReady, true);
+  assert.equal(limited.thirtyDayReady, false, 'an omitted old record must not imply a complete 30-day window');
+  assert.equal(state({ now, sessions: [{ started_at: new Date(now - 30 * 86400000).toISOString() }, ...sessions] }).thirtyDayReady, true,
+    'a recorded start at least 30 days old supports the lower bound');
+});
+
+test('capped launch UI labels unknown pilot age and known lower bounds', () => {
+  const now = Date.parse('2026-09-26T12:00:00Z'), elements = new Map();
+  class ClockDate extends Date { static now() { return now; } }
+  const ui = { Date: ClockDate, fleetMode: true, protectedFleetName: 'Fleet', protectedDrivers: [{ active: true }],
+    protectedSessions: [], document: { getElementById: id => {
+      if (!elements.has(id)) elements.set(id, { textContent: '', dataset: {} });
+      return elements.get(id);
+    } } };
+  vm.runInNewContext(block, ui);
+  const render = days => {
+    ui.protectedSessions = Array.from({ length: 50 }, () => ({ started_at: new Date(now - days * 86400000).toISOString() }));
+    ui.renderPilotLaunchChecklist();
+  };
+  render(1);
+  assert.equal(elements.get('pilotLaunchBadge').textContent, 'At least day 2 · limited history');
+  assert.equal(elements.get('launchSessionStatus').textContent, '50 recent protected sessions recorded · 50-record limit');
+  assert.equal(elements.get('launchReviewStatus').textContent, 'Pilot age unknown · earlier sessions may be omitted');
+  render(7);
+  assert.equal(elements.get('launchReviewStatus').textContent, 'At least 7 days recorded · review available');
+  render(30);
+  assert.equal(elements.get('pilotLaunchBadge').textContent, '30-day review ready · limited history');
+  assert.equal(elements.get('launchReviewStatus').textContent, 'At least 30 days recorded · review available');
 });
 
 test('pilot checklist exposes the approved manager actions without creating new telemetry', () => {

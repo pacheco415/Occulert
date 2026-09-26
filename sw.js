@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v49';
+const CACHE = 'occulert-v50';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -63,7 +63,7 @@ const STATIC_ASSETS = [
   '/portal.v47.css',
   '/homepage.js',
   '/driver-app.v47.css',
-  '/driver-app.v48.js',
+  '/driver-app.v57.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
   '/static-page.v52.js'
@@ -79,14 +79,14 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passwordless-auth.v49.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
-  '/driver-app.v48.js',
+  '/driver-app.v57.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
   '/base.v47.css',
   '/app.html',
   '/driver-app.v47.css',
-  '/driver-app.v48.js',
+  '/driver-app.v57.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;
@@ -204,17 +204,17 @@ self.addEventListener('fetch', event => {
   }
 
   if (req.mode === 'navigate' || req.url.endsWith('.html')) {
-    event.respondWith(
-      fetch(req)
-        .then(res => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then(cache => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(req).then(match => match || caches.match('/index.html')))
-    );
+    const networkAttempt = fetchWithDeadline(req);
+    const cacheUpdate = networkAttempt
+      .then(response => response && response.ok ? cacheResponseBestEffort(req, response) : null)
+      .catch(() => null);
+    if (typeof event.waitUntil === 'function') event.waitUntil(cacheUpdate);
+    event.respondWith((async () => {
+      const networkResponse = await networkAttempt;
+      if (networkResponse && networkResponse.ok) return networkResponse;
+      const cachedResponse = await caches.match(req) || await caches.match('/index.html');
+      return cachedResponse || networkResponse || Response.error();
+    })());
     return;
   }
 

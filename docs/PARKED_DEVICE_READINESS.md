@@ -1,12 +1,16 @@
 # Parked device readiness
 
-This batch also aligns installed packages with Expo SDK 57's recommended
-maintenance versions, including Expo 57.0.24, audio 57.0.5, haptics 57.0.3,
-router 57.0.22, and SecureStore 57.0.4. The native lockfile is updated and
-must remain reproducible with `npm ci`. It follows the supported
-[Expo dependency alignment workflow](https://docs.expo.dev/workflow/upgrading-expo-sdk-walkthrough/).
-Because native dependencies change, distribution requires a new native build;
-the existing installed TestFlight build is not changed by this source work.
+Current private distribution is TestFlight 1.0.0 (52): finished build,
+FINISHED submission, Apple VALID / IN_BETA_TESTING, and confirmed embedded
+Watch packaging. No physical build-52 acceptance is recorded. The checks below
+apply to the actual installed version/build, not to source checks or Apple
+availability. There are 0 iOS builds left this cycle; use the available binary
+without queueing a new build. See the [authoritative roadmap](APP_ROADMAP.md).
+
+The current SDK 57 package versions are recorded in `native-app/package.json`
+and its lockfile. Clean installation must remain reproducible with `npm ci`;
+the EAS-matching Node 22.23.1/npm 10.9.8 job and Node 24 source verification
+check different runtime contracts.
 
 The pre-drive screen now shows a read-only snapshot of front-camera availability
 and permission, saved phone alert settings, optional Watch alert readiness, and
@@ -37,7 +41,7 @@ monitor-start checks, scoring, or alert logic. Phone-only use remains supported.
 failure, and timeout regressions. Also run the root `npm run verify`, native
 TypeScript checks, and the iOS JavaScript bundle export.
 
-Before treating the new screen as device-verified, check the exact native build:
+Before treating the screen as device-verified, check the installed build 52:
 
 - Open pre-drive with no Watch or headphones; review the phone-only status.
 - Try camera permission denied and granted. Grant/revoke access in iOS Settings
@@ -54,6 +58,6 @@ Before treating the new screen as device-verified, check the exact native build:
 - Check VoiceOver and the largest supported text sizes; all actions remain usable.
 - Proceed through the existing confirmations and camera setup to monitoring.
 
-These checks require the native development/TestFlight build and physical
-accessories. Passing a bundle export or simulated readiness tests is not evidence
+These checks require the installed native TestFlight build and any physical
+accessories included in the test. Passing a bundle export or simulated readiness tests is not evidence
 of real alert delivery, fatigue accuracy, or simultaneous-camera support.
