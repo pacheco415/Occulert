@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v52';
+const CACHE = 'occulert-v53';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -63,7 +63,7 @@ const STATIC_ASSETS = [
   '/portal.v47.css',
   '/homepage.js',
   '/driver-app.v47.css',
-  '/driver-app.v57.js',
+  '/driver-app.v59.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
   '/static-page.v52.js'
@@ -80,14 +80,14 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passwordless-auth.v49.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
-  '/driver-app.v57.js',
+  '/driver-app.v59.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
   '/base.v47.css',
   '/app.html',
   '/driver-app.v47.css',
-  '/driver-app.v57.js',
+  '/driver-app.v59.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;

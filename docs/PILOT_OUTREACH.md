@@ -11,7 +11,11 @@ the [authoritative roadmap](APP_ROADMAP.md) for current release and evidence
 status. PR #138 shipped quick start, printable reports, data-quality
 explanations, and TV controls. Private TestFlight 1.0.0 (52) is built/submitted
 and Apple VALID / IN_BETA_TESTING, with embedded Watch packaging confirmed;
-physical build-52 acceptance remains open and 0 iOS builds remain this cycle.
+the user reported build 52 installed and working iPhone functionality on
+September 26. The iPhone model/iOS and individual audio, recovery, and battery
+checks are not documented. Watch installation/update and checks remain pending;
+no Watch download/update prompt has been reported. There are 0 iOS builds left
+this cycle.
 Pilot/physical-validation preparation is approved, but the fleet owner and
 participants have not been supplied. Do not invent enrollment, consent, or
 results or promise a new native build.

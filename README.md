@@ -12,8 +12,13 @@ launch checklist are released web features. PR #138 shipped quick start,
 printable reporting, data-quality explanations, and TV controls; PR #139 shipped
 the native clean-install and stale Watch-feedback repair. Recorded PR #139
 release baseline is `969849b`. TestFlight 1.0.0 (52) is built/submitted, Apple VALID / IN_BETA_TESTING,
-with embedded Watch packaging confirmed. Physical build-52 acceptance is not
-recorded, and 0 iOS builds remain this cycle. Pilot owner/participant details
+with embedded Watch packaging confirmed. On September 26, the user reported
+TestFlight installation and a general functional pass: "testflight was downloaded
+and everything works", then confirmed installed build 52 and working iPhone
+functionality. The iPhone model/iOS and individual audio, recovery,
+accessibility, and battery checks are not documented. Watch installation/update
+and testing remain pending; no Watch download/update prompt has been reported.
+There are 0 iOS builds left this cycle. Pilot owner/participant details
 remain unanswered. Distribution and source checks do not establish detection
 accuracy, device acceptance, or safety effectiveness.
 

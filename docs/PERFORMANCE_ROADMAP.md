@@ -5,7 +5,11 @@ Status reference updated: 2026-09-26. The
 implemented contracts and acceptance targets below do not establish measured
 production latency or device acceptance. PR #138 and PR #139 are shipped; native
 TestFlight 1.0.0 (52) is built/submitted and Apple VALID / IN_BETA_TESTING, with
-embedded Watch packaging confirmed. Physical build-52 acceptance remains open.
+embedded Watch packaging confirmed. On September 26, the user reported
+TestFlight build 52 installed and working iPhone functionality: a general phone
+functional pass. The iPhone model/iOS, individual audio/accessory checks, and
+sustained battery/heat measurements are not documented. Watch installation/update
+and checks remain pending; no Watch download/update prompt has been reported.
 
 This roadmap separates source optimizations from physical-device, live-service,
 and accuracy evidence. A green source check means the implementation is ready

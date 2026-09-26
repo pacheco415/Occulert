@@ -27,7 +27,10 @@ Existing TV and launch-checklist releases remain part of this baseline.
 Private TestFlight **1.0.0 (52)** has a finished build and `FINISHED` submission;
 Apple reports `VALID` and `IN_BETA_TESTING`. The archive's embedded Watch app
 is confirmed. Its exact source is
-`969849b0c551edb2de6f9230cbeecdce89346b6f`. **No physical build-52 acceptance is recorded.** Earlier
+`969849b0c551edb2de6f9230cbeecdce89346b6f`. **The user confirms build 52
+installed and generally working on iPhone.** The phone model/iOS and individual
+test conditions are not documented. Watch installation/update and checks remain
+pending: the user has not received a Watch download/update prompt. Earlier
 iPhone/Watch feedback applies to its exact tested build, not automatically to
 52. There are **0 iOS builds left in the current cycle**; continue source work
 and validate the available binary without queueing another iOS build.
@@ -42,7 +45,7 @@ and validate the available binary without queueing another iOS build.
 | Managed early-access offers | Shipped web pages and qualification | Card-free 30-day trial for up to five active drivers; introductory Starter/Growth comparison and rollout requests. No payment collection, automatic renewal, billing, or entitlement enforcement. |
 | Fleet TV display | Shipped web, PR #136 and PR #138 | Authenticated read-only browser/AirPlay aggregate view, 7/30-day selection, large text, connection details, and fullscreen controls. No names, vehicles, locations, individual scores, raw events, local fallback, or editing. Native tvOS remains future. |
 | Pilot launch checklist | Shipped web, PR #137 | Setup, joined-driver, first-session, 7/30-day milestones derive from protected records. It cannot confirm offline tasks or fitness to drive. |
-| iPhone and Apple Watch | Private TestFlight 1.0.0 (52): finished build/submission, Apple VALID / IN_BETA_TESTING | Embedded Watch packaging confirmed; no physical build-52 acceptance recorded. Native uses ML Kit; browser uses MediaPipe. Prior build-49 parked checks and build-36 feedback in the [dated audit](AUDIT.md) are historical evidence. |
+| iPhone and Apple Watch | Private TestFlight 1.0.0 (52): user-reported iPhone installation and general functional pass | Embedded Watch packaging confirmed; Watch installation/update and checks pending. Phone model/iOS and individual parked-test results remain undocumented. Native uses ML Kit; browser uses MediaPipe. Prior build-49 parked checks and build-36 feedback in the [dated audit](AUDIT.md) are historical evidence. |
 
 ## Current capabilities and remaining evidence
 
@@ -54,9 +57,9 @@ and validate the available binary without queueing another iOS build.
 | TV operating controls | Shipped web, PR #138 | Confirm 7/30-day selection, large text, connection/fullscreen behavior on the pilot's intended display. No native TV build or Apple TV device acceptance is claimed. |
 | Native clean installation and Watch alert feedback | Released source, PR #139; private TestFlight 52 available | EAS peer-lockfile repair and stale Watch feedback guard passed source checks. Node 24 verification and separate EAS-matching Node 22.23.1/npm 10.9.8 clean-install checks remain distinct from physical Watch delivery evidence. |
 | Pilot recruitment package | Prepared documents; outreach unsent; owner/participants not supplied | [One-page overview, qualification, unsent emails, 30-day plan](PILOT_OUTREACH.md). Launch/physical validation preparation is approved, but no fleet owner, enrolled cohort, operating results, or consent is invented. |
-| Parked setup and reliability | Included in TestFlight 52; physical acceptance pending | Exact-build camera guidance, fresh permission/readiness, foreground-loss stop, interruptions, 15-second checkpoints, explicitly partial recovery. See [device readiness](PARKED_DEVICE_READINESS.md). |
-| Local History and privacy controls | Included in TestFlight 52; physical acceptance pending | Install-over-existing-data, save/read failures, aggregate sharing, confirmed individual/all-history deletion, recovery safeguards. Local deletion does not delete cloud records. |
-| Alerts, Watch, accessibility | Included in TestFlight 52; physical acceptance pending | Bounded phone/audio cues, optional directional earbuds, Watch status/haptics/notifications, larger text, VoiceOver, Reduce Motion/Transparency. Retest speaker, headphones, car audio, Watch. |
+| Parked setup and reliability | Included in TestFlight 52; general iPhone pass reported, individual checks pending | Exact-build camera guidance, fresh permission/readiness, foreground-loss stop, interruptions, 15-second checkpoints, explicitly partial recovery. See [device readiness](PARKED_DEVICE_READINESS.md). |
+| Local History and privacy controls | Included in TestFlight 52; general iPhone pass reported, individual checks pending | Install-over-existing-data, save/read failures, aggregate sharing, confirmed individual/all-history deletion, recovery safeguards. Local deletion does not delete cloud records. |
+| Alerts, Watch, accessibility | Included in TestFlight 52; Watch installation/update and individual checks pending | Bounded phone/audio cues, optional directional earbuds, Watch status/haptics/notifications, larger text, VoiceOver, Reduce Motion/Transparency. Retest speaker, headphones, car audio, Watch. |
 | Runtime and fleet performance | Native source included in TestFlight 52; web portions released | Preserve analysis cadence/preferences; measure battery/heat/camera timing on device and signed-in API latency. [Performance Roadmap](PERFORMANCE_ROADMAP.md) contains targets, not measured claims. |
 | Sensor-fusion observations | Included in TestFlight 52, observation only; physical validation pending | Camera/headphone candidate counts, optional Watch availability, bounded co-occurrences, validation coverage, next-session planning. No raw timeline, cloud sync, export, feedback inclusion, score or alert changes. Accessories optional. |
 
@@ -118,13 +121,35 @@ production evidence are recorded in the
 [release tracker](https://github.com/pacheco415/Occulert/issues/6). No native
 build, physical-device observation, pilot result, or accuracy claim is added.
 
+## Driver startup recovery
+
+The browser driver page disables monitoring controls until its complete driver
+script explicitly finishes initialization. Failed requests, malformed or
+partially initialized code, and an eight-second startup deadline show an
+accessible **App could not load** message with **Reload app**. Reload creates
+a fresh document; late scripts cannot reactivate a failed document. Startup
+failure and inactive monitoring display neutral status rather than SAFE/READY.
+The driver uses a new v59 asset and offline cache v53; earlier published assets
+retain their bytes. Camera, model initialization, and cloud work remain behind
+the completed startup gate and existing user actions. Optional account-script
+failure still permits complete local startup.
+
+Source review and Chromium/WebKit regression coverage verify these behaviors;
+the [release tracker](https://github.com/pacheco415/Occulert/issues/6) records
+merge and production evidence. This recovery handles loading failures without
+establishing the cause of the intermittent hosted WebKit loading errors. It
+uses no native build and changes no detection thresholds or accuracy claims.
+
 ## Validating
 
-1. **Native acceptance:** install or confirm the available TestFlight
-   1.0.0 (52), then record model, OS, setup, phone/audio/Watch routing,
+1. **Native acceptance:** build 52 installation and general iPhone functionality
+   have a positive user-reported pass. Record model, OS, setup, phone/audio/Watch routing,
    interruptions, recovery, accessibility, battery, and heat under safe parked
    or passenger conditions. Build/submission and embedded Watch packaging are
-   complete; physical acceptance remains open. No iOS builds remain this cycle.
+   complete; Watch installation/update and individual checks remain open.
+   In TestFlight, open Occulert's App Details under Information and check for
+   the Watch install/update button when the paired Watch is compatible
+   ([Apple instructions](https://testflight.apple.com/)). No iOS builds remain this cycle.
 2. **Pilot readiness and recruitment:** qualify one fleet owner and up to five
    willing drivers. Confirm parked setup, cloud consent, ownership, support,
    and stop/escalation rules. The owner and participant questions remain

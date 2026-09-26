@@ -26,7 +26,7 @@ test('spreadsheet exports neutralize formula cells', () => {
   }
   assert.equal(csvCell('Driver One'), 'Driver One');
   assert.match(read('fleet-dashboard.html'), /OcculertSecurity\.csvCell/);
-  assert.match(read('driver-app.v57.js'), /OcculertSecurity\.csvCell/);
+  assert.match(read('driver-app.v59.js'), /OcculertSecurity\.csvCell/);
 });
 
 test('native cloud writes recheck current consent', () => {
@@ -397,7 +397,7 @@ test('History serializes each session operation and announces pending saves', ()
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
-  const app = read('driver-app.v57.js');
+  const app = read('driver-app.v59.js');
   assert.doesNotMatch(app, /Snooze 5m|function isSnoozed|Alert snoozed/);
   assert.doesNotMatch(app, /alerts will show on Apple Watch/i);
   assert.match(app, /Watch delivery depends on/i);

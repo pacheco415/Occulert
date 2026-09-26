@@ -10,7 +10,7 @@ test.use({ serviceWorkers: 'allow' });
 const root = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
 const workerSource = readFileSync(resolve(root, 'sw.js'), 'utf8');
 const cacheName = workerSource.match(/^const CACHE = '([^']+)';/m)[1];
-const driverPath = '/driver-app.v57.js';
+const driverPath = '/driver-app.v59.js';
 const redirectedDriverPath = '/body-deadline-final-driver.js';
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json' };
 
