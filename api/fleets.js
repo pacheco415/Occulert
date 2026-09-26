@@ -48,13 +48,13 @@ module.exports = async function handler(request, response) {
     return json(response, 405, { ok: false, error: "method_not_allowed" });
   }
 
-  const user = await verifyAccessToken(bearerToken(request));
-  if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
-  if (request.method === "POST" && !emailVerified(user)) {
-    return json(response, 403, { ok: false, error: "email_not_verified" });
-  }
-
+  let user;
   try {
+    user = await verifyAccessToken(bearerToken(request));
+    if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
+    if (request.method === "POST" && !emailVerified(user)) {
+      return json(response, 403, { ok: false, error: "email_not_verified" });
+    }
     const existing = await ownedFleet(user.id);
     if (request.method === "GET") {
       if (!existing) return json(response, 404, { ok: false, error: "fleet_not_found" });

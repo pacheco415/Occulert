@@ -41,9 +41,15 @@ export function ParkedReadinessCard() {
   const [stabilityResult, setStabilityResult] = useState<MultiCamStabilityResult | null>(null);
   const refreshRef = useRef<() => void>(() => {});
   const mountedRef = useRef(true);
+  const stabilityRequestRef = useRef(0);
+  const stabilityPendingRef = useRef(false);
 
   useFocusEffect(useCallback(() => {
     mountedRef.current = true;
+    stabilityRequestRef.current += 1;
+    stabilityPendingRef.current = false;
+    setStabilityBusy(false);
+    setStabilityResult(null);
     const session = createReadinessSession(() => collectDeviceReadiness(deviceReadinessSources), setState);
     const refresh = () => {
       if (AppState.currentState === 'active') void session.refresh();
@@ -52,10 +58,18 @@ export function ParkedReadinessCard() {
     refresh();
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') refresh();
-      else session.invalidate();
+      else {
+        stabilityRequestRef.current += 1;
+        stabilityPendingRef.current = false;
+        setStabilityBusy(false);
+        setStabilityResult(null);
+        session.invalidate();
+      }
     });
     return () => {
       mountedRef.current = false;
+      stabilityRequestRef.current += 1;
+      stabilityPendingRef.current = false;
       session.dispose();
       subscription.remove();
       refreshRef.current = () => {};
@@ -67,14 +81,22 @@ export function ParkedReadinessCard() {
   const stabilityDescription = stabilityResult ? describeStabilityResult(stabilityResult) : null;
   const controlsBusy = busy || stabilityBusy;
   const runStabilityTest = async () => {
-    if (!stabilityEligible || stabilityBusy || AppState.currentState !== 'active') return;
+    if (!mountedRef.current || !stabilityEligible || stabilityPendingRef.current || AppState.currentState !== 'active') return;
+    const request = ++stabilityRequestRef.current;
+    stabilityPendingRef.current = true;
     setStabilityResult(null);
     setStabilityBusy(true);
-    const result = await runMultiCamStabilityTest();
-    if (!mountedRef.current) return;
-    setStabilityResult(result);
-    setStabilityBusy(false);
-    refreshRef.current();
+    try {
+      const result = await runMultiCamStabilityTest();
+      if (!mountedRef.current || request !== stabilityRequestRef.current) return;
+      setStabilityResult(result);
+      refreshRef.current();
+    } finally {
+      if (mountedRef.current && request === stabilityRequestRef.current) {
+        stabilityPendingRef.current = false;
+        setStabilityBusy(false);
+      }
+    }
   };
   return (
     <View style={styles.card}>

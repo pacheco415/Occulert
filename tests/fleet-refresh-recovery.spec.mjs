@@ -17,13 +17,15 @@ for (const surface of ['dashboard', 'display']) {
         access_token: 'owner-access', refresh_token: 'owner-refresh',
         expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'owner-1' },
       })));
-      let requests = 0, releaseLate;
+      let requests = 0, cancelledRequests = 0, releaseLate;
+      page.on('requestfailed', request => { if (request.url().includes('/api/fleet-summary')) cancelledRequests += 1; });
       const late = new Promise(resolve => { releaseLate = resolve; });
       await page.route('**/api/fleet-summary*', async route => {
         requests += 1;
         if (requests === 2) {
           await late;
-          return route.fulfill({ status: lateStatus, json: lateStatus === 200 ? summary('Discarded late fleet') : { error: 'unauthorized' } });
+          try { return await route.fulfill({ status: lateStatus, json: lateStatus === 200 ? summary('Discarded late fleet') : { error: 'unauthorized' } }); }
+          catch (error) { if (!cancelledRequests) throw error; }
         }
         return route.fulfill({ json: summary(requests === 1 ? 'Initial fleet' : 'Recovered fleet') });
       });
@@ -38,6 +40,7 @@ for (const surface of ['dashboard', 'display']) {
         await expect.poll(() => requests).toBe(2);
         await expect(button).toBeDisabled();
         await page.clock.fastForward(8001);
+        await expect.poll(() => cancelledRequests).toBe(1);
         await expect(button).toBeEnabled();
         await expect(status).toContainText(surface === 'dashboard' ? 'timed out' : 'Connection interrupted');
         if (surface === 'dashboard') {
@@ -50,11 +53,9 @@ for (const surface of ['dashboard', 'display']) {
         await button.click();
         await expect(status).toContainText('Protected connection active');
         await expect.poll(() => requests).toBe(3);
-        const delivered = page.waitForResponse(response => response.url().includes('/api/fleet-summary') && response.status() === lateStatus);
         releaseLate();
-        await delivered;
-        // The late transport has completed after a successful replacement
-        // request; it cannot overwrite the view or sign out that owner.
+        // The complete-response deadline cancelled this transport. Releasing
+        // its fixture cannot overwrite the replacement or sign out the owner.
         await expect(status).toContainText('Protected connection active');
         if (surface === 'dashboard') await expect(status).toContainText('Recovered fleet');
         else await expect(page.locator('#displayTitle')).toHaveText('Recovered fleet');

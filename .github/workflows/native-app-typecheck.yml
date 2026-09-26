@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - "native-app/**"
+      - "scripts/test-watch-notification.mjs"
       - ".github/workflows/native-app-typecheck.yml"
   push:
     branches: [main]
     paths:
       - "native-app/**"
+      - "scripts/test-watch-notification.mjs"
       - ".github/workflows/native-app-typecheck.yml"
 
 jobs:
@@ -44,3 +46,13 @@ jobs:
         run: npm install --global npm@10.9.8
       - run: npm ci --include=dev
       - run: npm run verify
+
+  watch-notification:
+    name: Watch notification freshness
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: node --test scripts/test-watch-notification.mjs

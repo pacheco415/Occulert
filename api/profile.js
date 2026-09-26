@@ -35,16 +35,16 @@ module.exports = async function handler(request, response) {
     return json(response, 405, { ok: false, error: "method_not_allowed" });
   }
 
-  const user = await verifyAccessToken(bearerToken(request));
-  if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
-  if (!validBody(request)) return json(response, 415, { ok: false, error: "invalid_json_body" });
-
-  const body = request.body || {};
-  const email = clean(user.email, 240).toLowerCase();
-  const name = clean(body.name, 160) || email.split("@")[0] || "Occulert Driver";
-  const vehicleId = clean(body.vehicle, 120) || null;
-
+  let user;
   try {
+    user = await verifyAccessToken(bearerToken(request));
+    if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
+    if (!validBody(request)) return json(response, 415, { ok: false, error: "invalid_json_body" });
+
+    const body = request.body || {};
+    const email = clean(user.email, 240).toLowerCase();
+    const name = clean(body.name, 160) || email.split("@")[0] || "Occulert Driver";
+    const vehicleId = clean(body.vehicle, 120) || null;
     const existing = await pgFetch("drivers", {
       params: { select: "id,user_id,name,email,vehicle_id,fleet_id,active", user_id: "eq." + user.id, limit: "1" },
     });
@@ -58,10 +58,21 @@ module.exports = async function handler(request, response) {
         body: values,
       });
     } else {
-      rows = await pgFetch("drivers", {
-        method: "POST",
-        body: Object.assign({ user_id: user.id, fleet_id: null }, values),
-      });
+      try {
+        rows = await pgFetch("drivers", {
+          method: "POST",
+          body: Object.assign({ user_id: user.id, fleet_id: null }, values),
+        });
+      } catch (error) {
+        if (!error || !error.details || error.details.code !== "23505") throw error;
+        // Another onboarding request may have created this user's profile
+        // after our read. Update display fields only, keeping its membership.
+        rows = await pgFetch("drivers", {
+          method: "PATCH",
+          params: { user_id: "eq." + user.id },
+          body: values,
+        });
+      }
     }
 
     if (!rows.length) return json(response, 502, { ok: false, error: "profile_not_saved" });

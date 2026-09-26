@@ -40,12 +40,12 @@ response.setHeader("Allow", "GET");
 return json(response, 405, { ok: false, error: "method_not_allowed" });
 }
 
-const user = await verifyAccessToken(bearerToken(request));
-if (!user) {
-return json(response, 401, { ok: false, error: "unauthorized" });
-}
-
+let user;
 try {
+  user = await verifyAccessToken(bearerToken(request));
+  if (!user) {
+  return json(response, 401, { ok: false, error: "unauthorized" });
+  }
 const requestStartedAt = Date.now();
 const fleets = await pgFetch("fleets", {
 params: { select: "id,company_name,plan", owner_user_id: "eq." + user.id, limit: "1" },

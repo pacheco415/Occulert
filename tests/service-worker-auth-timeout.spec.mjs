@@ -13,7 +13,7 @@ test(`a network-only account script stalled ${partialBody ? 'mid-body' : 'before
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json' };
   const server = createServer((request, response) => {
     const pathname = new URL(request.url, 'http://localhost').pathname;
-    if (state.stall && pathname === '/occulert-backend.v58.js') {
+    if (state.stall && pathname === '/occulert-backend.v60.js') {
       state.requested = true;
       response.on('close', () => { state.aborted = !response.writableEnded; });
       if (partialBody) {
@@ -38,8 +38,8 @@ test(`a network-only account script stalled ${partialBody ? 'mid-body' : 'before
     });
     await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
     await page.evaluate(async () => {
-      const cache = await caches.open('occulert-v53');
-      await cache.put('/occulert-backend.v58.js', new Response('window.cachedAccountScriptUsed = true;', { headers: { 'Content-Type': 'text/javascript' } }));
+      const cache = await caches.open('occulert-v54');
+      await cache.put('/occulert-backend.v60.js', new Response('window.cachedAccountScriptUsed = true;', { headers: { 'Content-Type': 'text/javascript' } }));
     });
     state.stall = true;
     await page.goto(origin + '/app.html', { waitUntil: 'domcontentloaded', timeout: 10_000 });
@@ -48,7 +48,7 @@ test(`a network-only account script stalled ${partialBody ? 'mid-body' : 'before
     expect(await page.evaluate(() => ({ detectorReady: typeof initModel, cachedAccountScriptUsed: window.cachedAccountScriptUsed === true, accountClientLoaded: Boolean(window.OcculertBackend) })))
       .toEqual({ detectorReady: 'function', cachedAccountScriptUsed: false, accountClientLoaded: false });
     await expect(page.locator('#startBtn')).toBeVisible();
-    expect(await page.evaluate(async () => (await (await caches.open('occulert-v53')).match('/occulert-backend.v58.js')).text()))
+    expect(await page.evaluate(async () => (await (await caches.open('occulert-v54')).match('/occulert-backend.v60.js')).text()))
       .toBe('window.cachedAccountScriptUsed = true;');
   } finally {
     server.closeAllConnections();

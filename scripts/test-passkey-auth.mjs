@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../passkey-auth.v49.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../passkey-auth.v60.js', import.meta.url), 'utf8');
 
 function boot({ supported = true, signInError = null, sdkAvailable = true, configAvailable = true, storageFailure = false } = {}) {
   const calls = { create: [], adopted: [], sessions: [], register: 0, list: 0, update: [], remove: [], signOut: [], loader: 0, refreshConfig: 0 };
@@ -68,6 +68,9 @@ function boot({ supported = true, signInError = null, sdkAvailable = true, confi
       getAuthConfig: async () => configAvailable ? ({ configured: true, url: 'https://example.supabase.co', anonKey: 'public-key' }) : null,
       refreshAuthConfig: async () => { calls.refreshConfig += 1; return configAvailable ? ({ configured: true, url: 'https://example.supabase.co', anonKey: 'public-key' }) : null; },
       getSession: async () => session,
+      beginAuthAttempt: () => ({}),
+      captureAuthContext: () => ({auth:session}),
+      requireAuthContext: () => {},
       adoptSession(value) { calls.adopted.push(value); return storageFailure ? session : value; },
     },
   };
@@ -111,7 +114,7 @@ test('passkey enrollment and management reuse the existing authenticated session
   assert.equal(JSON.stringify(calls.remove), JSON.stringify([{ passkeyId: listed[0].id }]));
   assert.equal(calls.sessions.length, 4);
   assert.ok(calls.sessions.every((value) => value.access_token === 'existing-access' && value.refresh_token === 'existing-refresh'));
-  assert.equal(JSON.stringify(calls.signOut), JSON.stringify([{ scope: 'local' }]));
+  assert.deepEqual(calls.signOut, [], 'completed nonpersistent SDK clients are released rather than retained until logout');
 });
 
 test('passkey errors are mapped to actionable messages without exposing raw server text', async () => {

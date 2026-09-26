@@ -81,7 +81,7 @@ window.localStorage = localStorage;
 window.navigator = context.navigator;
 window.fetch = fetchMock;
 
-const clientSource = readFileSync(new URL("../occulert-backend.v58.js", import.meta.url), "utf8");
+const clientSource = readFileSync(new URL("../occulert-backend.v60.js", import.meta.url), "utf8");
 vm.runInNewContext(clientSource, context);
 const backend = window.OcculertBackend;
 

@@ -65,5 +65,16 @@
   "fleet-followups.v57.js": "c335e99759ca9c415496f9c13244989645bfb908a0552e53b0d3e9f396ecbec7",
   "occulert-backend.v58.js": "526c00c68e79f6f385dddfa6035db7eb917f0614a233e4b12af691576d483510",
   "fleet-display.v58.js": "b78ca3b96110f70ebf343efb43b82305e4b1ba857fdecd2b7d2caf9d760c07cc",
-  "driver-app.v59.js": "7fc94abaf5cd15e07682c89e35e28a42d2db8dbd2ea837ad8036c114adf120da"
+  "driver-app.v59.js": "7fc94abaf5cd15e07682c89e35e28a42d2db8dbd2ea837ad8036c114adf120da",
+  "occulert-backend.v60.js": "a3fa8ce136aee688ea0a57df182897da74a5b509ea6d55a7be8f71d4bbff61eb",
+  "auth-helper.v60.js": "2e756c9a75281163b476aa37b7bd3a3e37aa35ecd178fb5393980320b6ec515b",
+  "passkey-auth.v60.js": "6e6ac0ccc50981cb74f820f71f24df960f79378333f66fcfc4cef14e63c335cf",
+  "passwordless-auth.v60.js": "b148145163c6273a1ae3536ba18438e78b08a860c7ef30b20eddaec15fde69b1",
+  "driver-profiles-page-2.v60.js": "98ef46cc7bee9dd799d3a12a8219860217378615393c3a627ae031e32bfd4639",
+  "session-history-page-2.v60.js": "b0fd20aae29c5fee43e32f818052dae5a171b7f53bbb10c9525bede0a75516c9",
+  "pilot-signup-page-2.v60.js": "35b7446ed2a3006cb3fc347740bb23b7363287dadbcc2555e151aec9f29cbe37",
+  "driver-app.v60.js": "af3e2b87261f16cf1df3bc765f34b98456637c2b60c45413453021f75e16c71f",
+  "account-page-2.v60.js": "3c857c0ee6032d209fa3c9d7b8fe1ff468df1ef9da295e070aa5aff6384f17c9",
+  "login-page-1.v60.js": "8bdc0238e125549cce8e1133c5b9427c6542c0cd9a09513e177cc35a16c3dd02",
+  "fleet-onboarding-page-1.v60.js": "1e617264706e513e366682df3b827f67e498663b5c2dc6d0861870151bf509e5"
 }

@@ -175,103 +175,46 @@ const unverifiedFleetResult = await invoke(unverifiedFleet, request("POST", { co
 assert.equal(unverifiedFleetResult.status, 403);
 assert.equal(unverifiedFleetResult.body.error, "email_not_verified");
 
-let insertedInvitation;
-let pendingInvitationParams;
-let recentInvitationParams;
+let invitationRpcBody;
 const invitations = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
   if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
-  if (table === "fleet_invitations" && !options.method) {
-    if (options.params.select === "id") recentInvitationParams = options.params;
-    else pendingInvitationParams = options.params;
-    return [];
-  }
-  if (table === "fleet_invitations" && options.method === "POST") {
-    insertedInvitation = options.body;
-    return [{ id: "11111111-1111-4111-8111-111111111111", ...options.body }];
-  }
-  throw new Error(`unexpected invitation call: ${table} ${options.method || "GET"}`);
+  assert.equal(table, "rpc/create_fleet_invitation");
+  assert.equal(options.method, "POST");
+  invitationRpcBody = options.body;
+  return { id: "11111111-1111-4111-8111-111111111111", email: "driver@example.com", expires_at: new Date(Date.now() + 60000).toISOString() };
 });
-const createdInvitation = await invoke(invitations, request("POST", { email: "Driver@Example.com" }));
+const createdInvitation = await invoke(invitations, request("POST", { email: "Driver@Example.com", fleet_id: "attacker-fleet", invited_by: "attacker" }));
 assert.equal(createdInvitation.status, 201);
-assert.equal(insertedInvitation.fleet_id, "fleet-1");
-assert.equal(insertedInvitation.invited_by, "user-1");
-assert.equal(insertedInvitation.email, "driver@example.com");
-assert.match(pendingInvitationParams.expires_at, /^gt\./, "expired invitations must not exhaust the active invitation limit");
-assert.equal(recentInvitationParams.fleet_id, "eq.fleet-1", "hourly invitation limits must use the verified owner's indexed fleet scope");
-assert.match(insertedInvitation.token_hash, /^[0-9a-f]{64}$/);
-assert.equal(Object.hasOwn(insertedInvitation, "token"), false, "raw invitation tokens must never be stored");
+assert.equal(invitationRpcBody.p_fleet_id, "fleet-1");
+assert.equal(invitationRpcBody.p_owner_user_id, "user-1");
+assert.equal(invitationRpcBody.p_email, "driver@example.com");
+assert.match(invitationRpcBody.p_token_hash, /^[0-9a-f]{64}$/);
+const originalHash = invitationRpcBody.p_token_hash;
 const rawInviteToken = createdInvitation.body.invitation.accept_path.split("#token=")[1];
 assert.ok(rawInviteToken.length >= 32);
-assert.equal(JSON.stringify(insertedInvitation).includes(rawInviteToken), false, "the stored invitation must not contain its usable token");
-
-let revokedReplacement;
-let replacementInsert;
-const replacementCallOrder = [];
+assert.equal(JSON.stringify(invitationRpcBody).includes(rawInviteToken), false, "only a digest may reach the database");
+assert.equal(JSON.stringify(createdInvitation.body).includes(originalHash), false);
 const replacementId = "22222222-2222-4222-8222-222222222222";
-const replacementInvitations = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
-  if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
-  if (table !== "fleet_invitations") throw new Error(`unexpected replacement call: ${table}`);
-  if (!options.method && options.params.select !== "id") {
-    return [{ id: replacementId, email: "driver@example.com", expires_at: new Date(Date.now() + 60000).toISOString(), created_at: new Date(Date.now() - 120000).toISOString() }];
-  }
-  if (!options.method) return [];
-  if (options.method === "PATCH") {
-    replacementCallOrder.push("revoke-old");
-    revokedReplacement = options;
-    return [{ id: replacementId }];
-  }
-  if (options.method === "POST") {
-    replacementCallOrder.push("insert-new");
-    replacementInsert = options.body;
-    return [{ id: "33333333-3333-4333-8333-333333333333", ...options.body }];
-  }
-  throw new Error(`unexpected replacement method: ${options.method}`);
-});
-const replacedInvitation = await invoke(replacementInvitations, request("POST", { replace_invitation_id: replacementId, email: "attacker@example.com" }));
+const replacedInvitation = await invoke(invitations, request("POST", { replace_invitation_id: replacementId, email: "attacker@example.com" }));
 assert.equal(replacedInvitation.status, 201);
-assert.deepEqual(replacementCallOrder, ["insert-new", "revoke-old"], "a resend must preserve the old link until its replacement exists");
-assert.equal(revokedReplacement.params.id, "eq." + replacementId, "resending must revoke the selected pending invitation");
-assert.equal(replacementInsert.email, "driver@example.com", "resending must reuse the server-stored invited email");
-assert.notEqual(replacementInsert.token_hash, insertedInvitation.token_hash, "resending must create a fresh one-time token");
+assert.equal(invitationRpcBody.p_replace_invitation_id, replacementId);
+assert.equal(invitationRpcBody.p_email, null, "the transaction reuses the stored invited email");
+assert.notEqual(invitationRpcBody.p_token_hash, originalHash);
 
-const rollbackCalls = [];
-const failedReplacement = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
-  if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
-  if (!options.method && options.params.select !== "id") {
-    return [{ id: replacementId, email: "driver@example.com", expires_at: new Date(Date.now() + 60000).toISOString(), created_at: new Date(Date.now() - 120000).toISOString() }];
-  }
-  if (!options.method) return [];
-  if (options.method === "POST") {
-    rollbackCalls.push("insert-new");
-    return [{ id: "44444444-4444-4444-8444-444444444444", ...options.body }];
-  }
-  if (options.method === "PATCH" && options.params.id === "eq." + replacementId) {
-    rollbackCalls.push("revoke-old-failed");
-    return [];
-  }
-  if (options.method === "PATCH") {
-    rollbackCalls.push("revoke-new");
-    return [{ id: "44444444-4444-4444-8444-444444444444" }];
-  }
-  throw new Error(`unexpected failed replacement call: ${table}`);
-});
-const failedReplacementResult = await invoke(failedReplacement, request("POST", { replace_invitation_id: replacementId }));
-assert.equal(failedReplacementResult.status, 409);
-assert.equal(failedReplacementResult.body.error, "replacement_not_revoked");
-assert.deepEqual(rollbackCalls, ["insert-new", "revoke-old-failed", "revoke-new"], "failed resend must keep the old link and revoke the unused replacement");
-
-const invitationRateLimit = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
-  if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
-  if (table === "fleet_invitations" && !options.method && options.params.select === "id") {
-    return Array.from({ length: 20 }, (_, index) => ({ id: `invite-${index}` }));
-  }
-  if (table === "fleet_invitations" && !options.method) return [];
-  throw new Error("rate-limited invitations must not write to the database");
-});
-const rateLimitedInvitation = await invoke(invitationRateLimit, request("POST", { email: "driver@example.com" }));
-assert.equal(rateLimitedInvitation.status, 429);
-assert.equal(rateLimitedInvitation.body.error, "invitation_rate_limited");
-assert.equal(rateLimitedInvitation.headers["retry-after"], "3600");
+for (const [message, status, retry] of [
+  ["active_invitation_exists", 409], ["too_many_pending_invitations", 429],
+  ["invitation_rate_limited", 429, "3600"], ["resend_too_soon", 429, "60"],
+  ["invitation_not_found", 404], ["fleet_not_found", 403], ["invalid_email", 400],
+]) {
+  const failed = loadHandler("../api/fleet-invitations.js", async (table) => {
+    if (table === "fleets") return [{ id: "fleet-1" }];
+    assert.equal(table, "rpc/create_fleet_invitation");
+    const error = new Error("database detail"); error.details = { code: "P0001", message }; throw error;
+  });
+  const result = await invoke(failed, request("POST", { email: "driver@example.com" }));
+  assert.equal(result.status, status); assert.equal(result.body.error, message);
+  if (retry) assert.equal(result.headers["retry-after"], retry);
+}
 
 let invitationListSelect;
 const listInvitations = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
@@ -550,6 +493,26 @@ const unavailableRateLimit = loadHandler("../api/pilot-leads.js", async (table) 
 const unavailableRateResult = await invoke(unavailableRateLimit, request("POST", validLead, "203.0.113.23"));
 assert.equal(unavailableRateResult.status, 503, "pilot contact writes must fail closed if durable throttling is unavailable");
 assert.equal(unavailableRateResult.body.error, "rate_limit_unavailable");
+
+// A failed or uncertain configured-store write must not send contact data to
+// a second destination. Also cover an empty success response (not saved).
+const originalFetch = globalThis.fetch;
+process.env.PILOT_LEADS_WEBHOOK_URL = "https://webhook.example.invalid/fixture";
+const webhookRequests = [];
+globalThis.fetch = async (...args) => { webhookRequests.push(args); return { ok: true }; };
+try {
+  for (const outcome of ["reject", "empty"]) {
+    const failedStore = loadHandler("../api/pilot-leads.js", async (table) => {
+      if (table === "rpc/check_pilot_lead_rate_limit") return [{ allowed: true }];
+      assert.equal(table, "pilot_leads");
+      if (outcome === "reject") throw new Error("fixture uncertain insert result");
+      return [];
+    });
+    const result = await invoke(failedStore, request("POST", validLead, "203.0.113.99"));
+    assert.equal(result.status, 502); assert.equal(result.body.error, "storage_unavailable");
+  }
+  assert.deepEqual(webhookRequests, [], "contact PII must stay with the configured primary store even if its outcome is uncertain");
+} finally { globalThis.fetch = originalFetch; delete process.env.PILOT_LEADS_WEBHOOK_URL; }
 
 let rateLimited;
 for (let i = 0; i < 6; i += 1) {

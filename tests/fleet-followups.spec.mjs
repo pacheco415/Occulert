@@ -6,7 +6,7 @@ async function setup(page, { fail = false, conflict = false, slow = false, sessi
   const state = { followup: { session_id: id, status: 'open', version: 0, updated_at: null }, posts: 0 };
   const session = { id, driver_id: 'driver', started_at: new Date().toISOString(), ended_at: new Date().toISOString(), alert_count: 2, safety_score: 65 };
   const records = sessions || [session];
-  await page.route('**/occulert-backend.v58.js', route => route.fulfill({ contentType: 'application/javascript', body: `
+  await page.route('**/occulert-backend.v60.js', route => route.fulfill({ contentType: 'application/javascript', body: `
     window.fixtureUser = { id: '${owner}' };
     window.OcculertBackend = {
       currentUser: () => window.fixtureUser,

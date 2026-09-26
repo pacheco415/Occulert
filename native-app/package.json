@@ -8,14 +8,15 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
-    "postinstall": "node ./scripts/patch-watch-connectivity.mjs",
+    "postinstall": "node ./scripts/patch-watch-connectivity.mjs && node ./scripts/patch-query-decoder.mjs",
     "check:dependencies": "expo install --check",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run check:dependencies && npm run typecheck",
+    "verify": "npm run check:dependencies && npm run typecheck && npm run test:dependencies",
     "build:dev": "eas build --profile development --platform ios",
     "build:ios": "eas build --platform ios",
     "build:android": "eas build --platform android",
-    "submit:ios": "eas submit -p ios"
+    "submit:ios": "eas submit -p ios",
+    "test:dependencies": "node --test scripts/test-dependency-compatibility.mjs"
   },
   "dependencies": {
     "@bacons/apple-targets": "5.0.0",
@@ -54,5 +55,17 @@
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "@bacons/xcode": {
+      "uuid": "11.1.1"
+    },
+    "xcode": {
+      "uuid": "11.1.1"
+    },
+    "query-string": {
+      "decode-uri-component": "0.5.0"
+    },
+    "@xmldom/xmldom@<0.8.15": "0.8.15"
+  }
 }

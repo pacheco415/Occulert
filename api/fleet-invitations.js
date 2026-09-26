@@ -11,10 +11,6 @@ const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const MAX_BODY_LENGTH = 2048;
-const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_PENDING_INVITATIONS = 100;
-const MAX_INVITATIONS_PER_HOUR = 20;
-const RESEND_COOLDOWN_MS = 60 * 1000;
 
 function json(response, status, body) {
   response.statusCode = status;
@@ -59,14 +55,14 @@ module.exports = async function handler(request, response) {
     return json(response, 405, { ok: false, error: "method_not_allowed" });
   }
 
-  const user = await verifyAccessToken(bearerToken(request));
-  if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
-  if (!emailVerified(user)) return json(response, 403, { ok: false, error: "email_not_verified" });
-  if (request.method !== "GET" && !validBody(request)) {
-    return json(response, 415, { ok: false, error: "invalid_json_body" });
-  }
-
   try {
+    const user = await verifyAccessToken(bearerToken(request));
+    if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
+    if (!emailVerified(user)) return json(response, 403, { ok: false, error: "email_not_verified" });
+    if (request.method !== "GET" && !validBody(request)) {
+      return json(response, 415, { ok: false, error: "invalid_json_body" });
+    }
+
     const fleet = await ownedFleet(user.id);
     if (!fleet) return json(response, 403, { ok: false, error: "fleet_not_found" });
 
@@ -99,104 +95,48 @@ module.exports = async function handler(request, response) {
       return json(response, 200, { ok: true, invitation: rows[0] });
     }
 
-    const now = Date.now();
-    const pending = await pgFetch("fleet_invitations", {
-      params: {
-        select: "id,email,expires_at,created_at",
-        fleet_id: "eq." + fleet.id,
-        accepted_at: "is.null",
-        revoked_at: "is.null",
-        expires_at: "gt." + new Date(now).toISOString(),
-        order: "created_at.desc",
-        limit: String(MAX_PENDING_INVITATIONS + 1),
-      },
-    });
     const replacementId = String(request.body && request.body.replace_invitation_id || "");
-    if (replacementId && !validUuid(replacementId)) {
-      return json(response, 400, { ok: false, error: "invalid_invitation_id" });
-    }
-    const replacedInvitation = replacementId ? pending.find((invite) => invite.id === replacementId) : null;
-    if (replacementId && !replacedInvitation) {
-      return json(response, 404, { ok: false, error: "invitation_not_found" });
-    }
-    if (replacedInvitation && now - Date.parse(replacedInvitation.created_at) < RESEND_COOLDOWN_MS) {
-      response.setHeader("Retry-After", "60");
-      return json(response, 429, { ok: false, error: "resend_too_soon" });
-    }
-
-    const email = normalizedEmail(replacedInvitation ? replacedInvitation.email : request.body && request.body.email);
-    if (!email) return json(response, 400, { ok: false, error: "invalid_email" });
-    if (email === normalizedEmail(user.email)) return json(response, 400, { ok: false, error: "cannot_invite_self" });
-    if (pending.length >= MAX_PENDING_INVITATIONS && !replacedInvitation) {
-      return json(response, 429, { ok: false, error: "too_many_pending_invitations" });
-    }
-    if (!replacedInvitation && pending.some((invite) => normalizedEmail(invite.email) === email)) {
-      return json(response, 409, { ok: false, error: "active_invitation_exists" });
-    }
-
-    const recent = await pgFetch("fleet_invitations", {
-      params: {
-        select: "id",
-        fleet_id: "eq." + fleet.id,
-        created_at: "gt." + new Date(now - 60 * 60 * 1000).toISOString(),
-        limit: String(MAX_INVITATIONS_PER_HOUR + 1),
-      },
-    });
-    if (recent.length >= MAX_INVITATIONS_PER_HOUR) {
-      response.setHeader("Retry-After", "3600");
-      return json(response, 429, { ok: false, error: "invitation_rate_limited" });
-    }
+    if (replacementId && !validUuid(replacementId)) return json(response, 400, { ok: false, error: "invalid_invitation_id" });
+    const email = replacementId ? null : normalizedEmail(request.body && request.body.email);
+    if (!replacementId && !email) return json(response, 400, { ok: false, error: "invalid_email" });
+    if (email && email === normalizedEmail(user.email)) return json(response, 400, { ok: false, error: "cannot_invite_self" });
 
     const token = crypto.randomBytes(32).toString("base64url");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-    const expiresAt = new Date(now + INVITE_TTL_MS).toISOString();
-    const rows = await pgFetch("fleet_invitations", {
+    const invitation = await pgFetch("rpc/create_fleet_invitation", {
       method: "POST",
       body: {
-        fleet_id: fleet.id,
-        email: email,
-        token_hash: tokenHash,
-        invited_by: user.id,
-        expires_at: expiresAt,
+        p_fleet_id: fleet.id,
+        p_owner_user_id: user.id,
+        p_owner_email: user.email,
+        p_email: email,
+        p_token_hash: tokenHash,
+        p_replace_invitation_id: replacementId || null,
       },
     });
-    if (!rows.length) return json(response, 502, { ok: false, error: "invitation_not_saved" });
-
-    if (replacedInvitation) {
-      const revoked = await pgFetch("fleet_invitations", {
-        method: "PATCH",
-        params: {
-          id: "eq." + replacedInvitation.id,
-          fleet_id: "eq." + fleet.id,
-          accepted_at: "is.null",
-          revoked_at: "is.null",
-        },
-        body: { revoked_at: new Date(now).toISOString() },
-      });
-      if (!revoked.length) {
-        // Preserve the working old link. Best-effort revoke the just-created
-        // replacement so a failed resend never strands the invited driver.
-        await pgFetch("fleet_invitations", {
-          method: "PATCH",
-          params: { id: "eq." + rows[0].id, fleet_id: "eq." + fleet.id },
-          body: { revoked_at: new Date().toISOString() },
-        }).catch(() => {});
-        return json(response, 409, { ok: false, error: "replacement_not_revoked" });
-      }
-    }
+    if (!invitation || !invitation.id || !invitation.email || !invitation.expires_at) return json(response, 502, { ok: false, error: "invitation_not_saved" });
 
     const acceptPath = "/accept-invite.html#token=" + token;
 
     return json(response, 201, {
       ok: true,
       invitation: {
-        id: rows[0].id,
-        email: email,
-        expires_at: expiresAt,
+        id: invitation.id,
+        email: invitation.email,
+        expires_at: invitation.expires_at,
         accept_path: acceptPath,
       },
     });
-  } catch (_) {
+  } catch (error) {
+    const code = error && error.details && error.details.message;
+    const statuses = { fleet_not_found: 403, invalid_invitation: 400, invitation_not_found: 404,
+      resend_too_soon: 429, invalid_email: 400, cannot_invite_self: 400,
+      active_invitation_exists: 409, too_many_pending_invitations: 429, invitation_rate_limited: 429 };
+    if (error && error.details && error.details.code === "P0001" && Object.prototype.hasOwnProperty.call(statuses, code)) {
+      if (code === "resend_too_soon") response.setHeader("Retry-After", "60");
+      if (code === "invitation_rate_limited") response.setHeader("Retry-After", "3600");
+      return json(response, statuses[code], { ok: false, error: code });
+    }
     return json(response, 502, { ok: false, error: "supabase_error" });
   }
 };

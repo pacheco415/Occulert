@@ -26,15 +26,17 @@ test('spreadsheet exports neutralize formula cells', () => {
   }
   assert.equal(csvCell('Driver One'), 'Driver One');
   assert.match(read('fleet-dashboard.html'), /OcculertSecurity\.csvCell/);
-  assert.match(read('driver-app.v59.js'), /OcculertSecurity\.csvCell/);
+  assert.match(read('driver-app.v60.js'), /OcculertSecurity\.csvCell/);
 });
 
 test('native cloud writes recheck current consent', () => {
   const cloud = read('native-app/lib/cloudSync.ts');
   const alertWrite = cloud.slice(cloud.indexOf('export async function logCloudAlert'), cloud.indexOf('export async function finishCloudSession'));
   const finishWrite = cloud.slice(cloud.indexOf('export async function finishCloudSession'));
-  assert.match(alertWrite, /if \(!await consentEnabled\(\)\) return false/);
-  assert.match(finishWrite, /if \(!await consentEnabled\(\)\) return false/);
+  assert.match(alertWrite, /const syncContext = await currentSyncContext\(\)/);
+  assert.match(alertWrite, /if \(!syncContext\) return false/);
+  assert.match(finishWrite, /const syncContext = await currentSyncContext\(\)/);
+  assert.match(finishWrite, /if \(!syncContext\) return false/);
   assert.match(cloud, /createCachedBooleanPreference/);
   assert.match(cloud, /if \(consentRuntimeOverride !== null\) return consentRuntimeOverride/);
   assert.match(cloud, /if \(!enabled\) consentRuntimeOverride = false/);
@@ -397,7 +399,7 @@ test('History serializes each session operation and announces pending saves', ()
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
-  const app = read('driver-app.v59.js');
+  const app = read('driver-app.v60.js');
   assert.doesNotMatch(app, /Snooze 5m|function isSnoozed|Alert snoozed/);
   assert.doesNotMatch(app, /alerts will show on Apple Watch/i);
   assert.match(app, /Watch delivery depends on/i);
@@ -409,7 +411,7 @@ test('fleet telemetry is explicitly labeled client-reported and unverified', () 
 });
 
 test('pilot contacts are server-only and disclosed accurately', () => {
-  const signup = read('pilot-signup.html') + read('static-page.v52.js') + read('pilot-signup-page-2.v53.js');
+  const signup = read('pilot-signup.html') + read('static-page.v52.js') + read('pilot-signup-page-2.v60.js');
   const viewer = read('pilot-leads.html');
   const privacy = read('privacy.html');
   assert.doesNotMatch(signup, /occulert-pilot-leads|savePilotLead|firebase/i);
@@ -428,10 +430,12 @@ test('pilot-lead throttling is durable and fails closed', () => {
   assert.match(migration, /create or replace function (?:public\.)?check_pilot_lead_rate_limit/i);
 });
 
-test('invitation replacement is created before the old link is revoked', () => {
+test('invitation replacement and revocation share the server-only transaction', () => {
   const api = read('api/fleet-invitations.js');
-  const insertAt = api.indexOf('method: "POST"');
-  const replacementRevokeAt = api.indexOf('replacement_not_revoked');
+  const migration = read('supabase/migrations/20260926010000_atomic_fleet_invitation_creation.sql');
+  assert.match(api, /rpc\/create_fleet_invitation/);
+  const insertAt = migration.indexOf('insert into public.fleet_invitations');
+  const replacementRevokeAt = migration.indexOf('update public.fleet_invitations set revoked_at');
   assert.ok(insertAt >= 0 && replacementRevokeAt > insertAt);
 });
 

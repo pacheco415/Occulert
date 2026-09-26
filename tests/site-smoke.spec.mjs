@@ -510,7 +510,7 @@ test("driver app external assets preserve layout and monitoring behavior", async
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
 
   expect(await page.locator('link[href="/driver-app.v47.css"]').count()).toBe(1);
-  expect(await page.locator('script[src="/driver-app.v59.js"]').count()).toBe(1);
+  expect(await page.locator('script[src="/driver-app.v60.js"]').count()).toBe(1);
   expect(await page.locator('script#driver-startup-guard:not([src])').count()).toBe(1);
   expect(await page.locator('script:not([src]):not(#driver-startup-guard)').count()).toBe(0);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);

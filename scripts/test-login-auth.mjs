@@ -5,7 +5,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../login.html', import.meta.url), 'utf8');
-const inline = readFileSync(new URL('../login-page-1.v49.js', import.meta.url), 'utf8');
+const inline = readFileSync(new URL('../login-page-1.v60.js', import.meta.url), 'utf8');
 
 assert.ok(inline, 'login.html must load the account mode script');
 
@@ -36,11 +36,12 @@ function makeElement(id) {
   };
 }
 
-function boot({ resetResult = { ok: true, body: {} }, fleetResult = { status: 404, ok: false, body: { error: 'fleet_not_found' } }, passkeyError = null, search = '', savedProfile = null, initialUser = null } = {}) {
+async function boot({ resetResult = { ok: true, body: {} }, fleetResult = { status: 404, ok: false, body: { error: 'fleet_not_found' } }, passkeyError = null, search = '', savedProfile = null, initialUser = null } = {}) {
   const elements = new Map();
   const calls = { auth: [], reset: [], fleet: 0, passkey: 0, retry: 0 };
   let currentPasskeyError = passkeyError;
-  let signedInUser = initialUser;
+  let signedInUser = initialUser,revision=0;
+  const authSnapshot=()=>signedInUser?{access_token:"fixture-access",refresh_token:"fixture-refresh",expires_at:9999999999,user:signedInUser}:null;
   const context = {
     console,
     JSON,
@@ -51,6 +52,7 @@ function boot({ resetResult = { ok: true, body: {} }, fleetResult = { status: 40
     Promise,
     URLSearchParams,
     document: {
+      addEventListener() {},
       activeElement: null,
       getElementById(id) {
         if (!elements.has(id)) {
@@ -69,6 +71,9 @@ function boot({ resetResult = { ok: true, body: {} }, fleetResult = { status: 40
     passwordResetMessage: () => 'mapped reset failure',
     isEmailRateLimited: () => false,
     currentUser: () => signedInUser,
+    getSession: async () => authSnapshot(),
+    captureAuthContext: () => ({revision,auth:authSnapshot()}),
+    isAuthContextCurrent: context => !!context&&context.revision===revision&&context.auth?.user?.id===signedInUser?.id,
     getFleet() { calls.fleet += 1; return Promise.resolve(fleetResult); },
   };
   context.window.OcculertPasswordless = { start(email, extra) { calls.auth.push({email, mode: 'signup', extra}); return Promise.resolve(); }, consumeRedirect: () => null };
@@ -86,23 +91,24 @@ function boot({ resetResult = { ok: true, body: {} }, fleetResult = { status: 40
       calls.passkey += 1;
       if (currentPasskeyError) return Promise.reject(currentPasskeyError);
       signedInUser = { id: 'driver-1', email: 'driver@example.com' };
-      return Promise.resolve({ role: 'driver', email: 'driver@example.com', authenticated: true });
+      return Promise.resolve({ uid:'driver-1', role: 'driver', email: 'driver@example.com', authenticated: true });
     },
     signInEmail(email, password, mode, extra) {
       calls.auth.push({ email, password, mode, extra });
       signedInUser = { id: 'driver-1', email };
-      return Promise.resolve({ role: extra.role || 'driver', email, authenticated: true });
+      return Promise.resolve({ uid:'driver-1',role: extra.role || 'driver', email, authenticated: true });
     },
   };
   vm.runInNewContext(inline, context);
+  await new Promise(resolve=>setImmediate(resolve));
   return { context, calls, el: (id) => context.document.getElementById(id) };
 }
 
 const preventDefault = () => {};
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
-test('sign-in shows only email and password fields', () => {
-  const { el } = boot();
+test('sign-in shows only email and password fields', async () => {
+  const { el } = await boot();
   assert.equal(el('profileFields').classList.contains('hidden'), true);
   assert.equal(el('passwordField').classList.contains('hidden'), false);
   assert.equal(el('submitBtn').textContent, 'Sign In');
@@ -110,8 +116,8 @@ test('sign-in shows only email and password fields', () => {
   assert.equal(el('passkeyEntry').classList.contains('hidden'), false);
 });
 
-test('a saved local profile is not presented as a signed-in account', () => {
-  const { el } = boot({ savedProfile: { role: 'driver', email: 'saved@example.com', authenticated: false } });
+test('a saved local profile is not presented as a signed-in account', async () => {
+  const { el } = await boot({ savedProfile: { role: 'driver', email: 'saved@example.com', authenticated: false } });
 
   assert.equal(el('profileStateLabel').textContent, 'Account status');
   assert.match(el('profileBox').innerHTML, /Not signed in/);
@@ -121,7 +127,7 @@ test('a saved local profile is not presented as a signed-in account', () => {
 });
 
 test('only an active backend session is presented as signed in', async () => {
-  const { calls, el } = boot({
+  const { calls, el } = await boot({
     savedProfile: { role: 'driver', email: 'old-local@example.com', authenticated: false },
     initialUser: { id: 'driver-1', email: 'active@example.com' },
   });
@@ -141,7 +147,7 @@ test('only an active backend session is presented as signed in', async () => {
 });
 
 test('server ownership overrides a stale local driver role', async () => {
-  const { calls, el } = boot({
+  const { calls, el } = await boot({
     fleetResult: { status: 200, ok: true, body: { fleet: { id: 'fleet-1', company_name: 'Testing123' } } },
     savedProfile: { role: 'driver', email: 'owner@example.com', authenticated: true },
     initialUser: { id: 'owner-1', email: 'owner@example.com' },
@@ -155,7 +161,7 @@ test('server ownership overrides a stale local driver role', async () => {
 });
 
 test('a failed ownership lookup does not guess a manager role', async () => {
-  const { el } = boot({
+  const { el } = await boot({
     fleetResult: { status: 503, ok: false, body: { error: 'cloud_unavailable' } },
     savedProfile: { role: 'fleet', email: 'unknown@example.com', authenticated: true },
     initialUser: { id: 'unknown-1', email: 'unknown@example.com' },
@@ -170,7 +176,7 @@ test('a failed ownership lookup does not guess a manager role', async () => {
 test('a late ownership response cannot restore signed-in controls after logout', async () => {
   let resolveFleet;
   const fleetResult = new Promise((resolve) => { resolveFleet = resolve; });
-  const { context, el } = boot({
+  const { context, el } = await boot({
     fleetResult,
     savedProfile: { role: 'driver', email: 'owner@example.com', authenticated: true },
     initialUser: { id: 'owner-1', email: 'owner@example.com' },
@@ -190,7 +196,7 @@ test('a late ownership response cannot restore signed-in controls after logout',
 });
 
 test('passkey sign-in does not require email or password input', async () => {
-  const { context, calls, el } = boot();
+  const { context, calls, el } = await boot();
   await context.signInPasskey();
 
   assert.equal(calls.passkey, 1);
@@ -202,7 +208,7 @@ test('passkey sign-in does not require email or password input', async () => {
 });
 
 test('passkey failures stay beside the passkey action instead of below the account notices', async () => {
-  const { context, el } = boot({ passkeyError: new Error('provider detail') });
+  const { context, el } = await boot({ passkeyError: new Error('provider detail') });
   await context.signInPasskey();
 
   assert.match(el('passkeyStatus').textContent, /mapped passkey failure/);
@@ -215,7 +221,7 @@ test('passkey failures stay beside the passkey action instead of below the accou
 test('retryable Safari loader failures reveal a retry action that can recover', async () => {
   const error = new Error('loader unavailable');
   error.code = 'sdk_load_failed';
-  const { context, calls, el } = boot({ passkeyError: error });
+  const { context, calls, el } = await boot({ passkeyError: error });
 
   await context.signInPasskey();
   assert.equal(el('passkeyRetryBtn').classList.contains('hidden'), false);
@@ -228,7 +234,7 @@ test('retryable Safari loader failures reveal a retry action that can recover', 
 });
 
 test('account creation reveals setup fields and sends them only for signup', async () => {
-  const { context, calls, el } = boot();
+  const { context, calls, el } = await boot();
   context.showAuthMode('signup');
   context.setRole('fleet');
   el('name').value = 'Fleet Owner';
@@ -253,7 +259,7 @@ test('account creation reveals setup fields and sends them only for signup', asy
 });
 
 test('password recovery hides the password and returns a privacy-safe message', async () => {
-  const { context, calls, el } = boot();
+  const { context, calls, el } = await boot();
   context.showAuthMode('reset');
   el('email').value = 'forgotten@example.com';
   await context.submitAuth({ preventDefault });
@@ -266,8 +272,8 @@ test('password recovery hides the password and returns a privacy-safe message', 
   assert.equal(el('submitBtn').disabled, false);
 });
 
-test('password recovery has a stable deep link that opens reset mode directly', () => {
-  const { el } = boot({ search: '?mode=reset' });
+test('password recovery has a stable deep link that opens reset mode directly', async () => {
+  const { el } = await boot({ search: '?mode=reset' });
 
   assert.match(source, /id="forgotPasswordBtn" href="\/login\.html\?mode=reset"/);
   assert.match(source, /id="backToSignInBtn" href="\/login\.html"/);

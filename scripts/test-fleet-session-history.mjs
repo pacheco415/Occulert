@@ -95,7 +95,7 @@ function dashboardShareHarness(overrides = {}) {
     ended_at: '2026-09-25T12:30:00Z', safety_score: 80, alert_count: 0 };
   let user = { id: 'owner' }, csv = '';
   const context = {
-    Date: ClockDate, fleetMode: true, protectedUserId: 'owner', protectedFleetName: 'Private Fleet',
+    Date: ClockDate, demoRows: [], fleetMode: true, protectedUserId: 'owner', protectedFleetName: 'Private Fleet',
     protectedFleetPlan: 'trial', protectedDrivers: [{ id: 'driver', name: 'Private Driver', active: true }],
     protectedSessions: [row], protectedEvents: [], protectedTelemetryTrust: 'unverified_client_report',
     protectedReportPrivacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false },

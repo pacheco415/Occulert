@@ -4,7 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
-const driver = readFileSync(new URL('../driver-app.v59.js', import.meta.url), 'utf8');
+const driver = readFileSync(new URL('../driver-app.v60.js', import.meta.url), 'utf8');
 const guard = html.match(/<script\b[^>]*\bid=["']driver-startup-guard["'][^>]*>([\s\S]*?)<\/script>/)?.[1];
 assert.ok(guard, 'The real startup guard must be present in app.html');
 
@@ -107,7 +107,7 @@ function startup({ missingDOM = false, reloadFailure = false } = {}) {
   }
   function capability(overrides = {}, { frozen = true, bindStart = true } = {}) {
     context.recordCall = name => calls.push(name);
-    const core = vm.runInContext(`({ version: 'v59', start: () => recordCall('start'),
+    const core = vm.runInContext(`({ version: 'v60', start: () => recordCall('start'),
       stop: () => recordCall('stop'), findCameraChoices: () => recordCall('findCameraChoices'),
       initModel: () => recordCall('initModel') })`, context);
     Object.assign(core, overrides);
@@ -132,14 +132,14 @@ test('startup remains blocked until an explicit complete core handshake', () => 
   assertBlocked(app);
   app.document.dispatch('DOMContentLoaded');
   app.window.dispatch('load');
-  app.window.dispatch('load', { target: { tagName: 'SCRIPT', src: 'https://www.occulert.com/driver-app.v59.js' } });
+  app.window.dispatch('load', { target: { tagName: 'SCRIPT', src: 'https://www.occulert.com/driver-app.v60.js' } });
   assertBlocked(app);
   app.advance(7999);
   assertBlocked(app);
 });
 
 test('malformed, mutable, and wrong-version core capabilities cannot unlock Start', () => {
-  const cases = [null, undefined, false, 'v59', [], {},
+  const cases = [null, undefined, false, 'v60', [], {},
     app => app.capability({}, { frozen: false }),
     app => app.capability({ version: 'v57' }),
     app => app.capability({ version: undefined }),
@@ -200,10 +200,10 @@ test('the eight-second failure is terminal even when a healthy core arrives late
 });
 
 for (const [name, event] of [
-  ['script resource failure', { target: { tagName: 'SCRIPT', src: 'https://www.occulert.com/driver-app.v59.js' } }],
-  ['versioned script resource failure', { target: { tagName: 'SCRIPT', src: '/driver-app.v59.js?offline=1#cached' } }],
-  ['syntax error', { target: null, filename: 'https://www.occulert.com/driver-app.v59.js', message: 'Unexpected token', error: new SyntaxError('Unexpected token') }],
-  ['runtime error', { target: null, filename: 'https://www.occulert.com/driver-app.v59.js', message: 'Storage unavailable', error: new Error('Storage unavailable') }],
+  ['script resource failure', { target: { tagName: 'SCRIPT', src: 'https://www.occulert.com/driver-app.v60.js' } }],
+  ['versioned script resource failure', { target: { tagName: 'SCRIPT', src: '/driver-app.v60.js?offline=1#cached' } }],
+  ['syntax error', { target: null, filename: 'https://www.occulert.com/driver-app.v60.js', message: 'Unexpected token', error: new SyntaxError('Unexpected token') }],
+  ['runtime error', { target: null, filename: 'https://www.occulert.com/driver-app.v60.js', message: 'Storage unavailable', error: new Error('Storage unavailable') }],
 ]) {
   test(`targeted core ${name} fails immediately and rejects late readiness`, () => {
     const app = startup();
@@ -217,8 +217,8 @@ for (const [name, event] of [
 }
 
 test('backend, security, and unrelated resource/errors do not reject local core readiness', () => {
-  for (const path of ['/occulert-backend.v58.js', '/security-utils.v47.js', '/lang.v47.js',
-    '/driver-app.v47.css', '/driver-app.v57.js', '/unrelated-driver-app.v59.js']) {
+  for (const path of ['/occulert-backend.v60.js', '/security-utils.v47.js', '/lang.v47.js',
+    '/driver-app.v47.css', '/driver-app.v57.js', '/unrelated-driver-app.v60.js']) {
     for (const event of [
       { target: { tagName: 'SCRIPT', src: 'https://www.occulert.com' + path } },
       { target: null, filename: 'https://www.occulert.com' + path, message: 'Failed to initialize', error: new Error('Failed to initialize') },

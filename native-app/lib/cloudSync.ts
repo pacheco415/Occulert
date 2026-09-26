@@ -71,6 +71,7 @@ export interface CloudSignInResult {
 
 let configPromise: Promise<PublicConfig | null> | null = null;
 let consentRuntimeOverride: boolean | null = null;
+let consentMutationVersion = 0;
 let authCache: StoredAuth | null | undefined;
 let authLoadPromise: Promise<StoredAuth | null> | null = null;
 let authRefreshPromise: Promise<StoredAuth | null> | null = null;
@@ -82,11 +83,26 @@ const cloudSyncPreference = createCachedBooleanPreference(
   false,
 );
 
-async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+async function fetchJsonWithTimeout<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<{ response: Response; body: T }> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Cloud request timed out.'));
+    }, REQUEST_TIMEOUT_MS);
+  });
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    return await Promise.race([
+      (async () => {
+        const response = await fetch(url, { ...init, signal: controller.signal });
+        return { response, body: await readJson<T>(response) };
+      })(),
+      deadline,
+    ]);
   } finally {
     clearTimeout(timer);
   }
@@ -104,13 +120,10 @@ async function readJson<T>(response: Response): Promise<T> {
 
 async function loadConfig(): Promise<PublicConfig | null> {
   if (!configPromise) {
-    configPromise = fetchWithTimeout(`${API_BASE}/api/public-config`, {
+    configPromise = fetchJsonWithTimeout<{ supabase?: Partial<PublicConfig> }>(`${API_BASE}/api/public-config`, {
       headers: { Accept: 'application/json' },
     })
-      .then(async response => {
-        const body = await readJson<{
-          supabase?: Partial<PublicConfig>;
-        }>(response);
+      .then(({ response, body }) => {
         const config = body.supabase;
         if (!response.ok || !config?.configured || !config.url || !config.anonKey) return null;
         return {
@@ -142,6 +155,17 @@ function validStoredAuth(value: unknown): value is StoredAuth {
     && typeof auth.expires_at === 'number'
     && typeof auth.user?.id === 'string'
     && typeof auth.user?.email === 'string';
+}
+
+function authIsCurrent(auth: StoredAuth, version: number): boolean {
+  return version === authMutationVersion
+    && authCache?.user.id === auth.user.id
+    && authCache.access_token === auth.access_token
+    && authCache.refresh_token === auth.refresh_token;
+}
+
+function sessionChanged<T>(): ApiResult<T> {
+  return { ok: false, status: 409, body: { error: 'auth_session_changed' } as T & { error: string } };
 }
 
 async function loadAuth(): Promise<StoredAuth | null> {
@@ -190,14 +214,17 @@ async function saveAuth(
     if (expectedVersion !== authMutationVersion) return null;
     authMutationVersion += 1;
     authCache = auth;
+    authRefreshPromise = null;
     return auth;
   });
 }
 
 async function clearAuth(): Promise<void> {
   consentRuntimeOverride = false;
+  consentMutationVersion += 1;
   authMutationVersion += 1;
   authCache = null;
+  authRefreshPromise = null;
   await Promise.allSettled([
     authStorageQueue.run(() => SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS)),
     cloudSyncPreference.set(false),
@@ -210,7 +237,7 @@ async function authFetch(path: string, body: Record<string, unknown>): Promise<A
     return { ok: false, status: 503, body: { error: 'cloud_not_configured' } };
   }
   try {
-    const response = await fetchWithTimeout(`${config.url}/auth/v1${path}`, {
+    const { response, body: resultBody } = await fetchJsonWithTimeout<AuthResponse>(`${config.url}/auth/v1${path}`, {
       method: 'POST',
       headers: {
         apikey: config.anonKey,
@@ -221,7 +248,7 @@ async function authFetch(path: string, body: Record<string, unknown>): Promise<A
     return {
       ok: response.ok,
       status: response.status,
-      body: await readJson<AuthResponse>(response),
+      body: resultBody,
     };
   } catch {
     return { ok: false, status: 503, body: { error: 'cloud_unavailable' } };
@@ -257,6 +284,7 @@ async function refreshAuth(previous: StoredAuth, expectedVersion: number): Promi
   const result = await authFetch('/token?grant_type=refresh_token', {
     refresh_token: previous.refresh_token,
   });
+  if (!authIsCurrent(previous, expectedVersion)) return null;
   if (result.ok) return saveAuth(result.body, previous, expectedVersion);
   if (result.status === 400 || result.status === 401) await clearAuth();
   return null;
@@ -265,6 +293,8 @@ async function refreshAuth(previous: StoredAuth, expectedVersion: number): Promi
 async function refreshIfNeeded(force = false): Promise<StoredAuth | null> {
   const auth = await loadAuth();
   if (!auth) return null;
+  const readVersion = authMutationVersion;
+  if (!authIsCurrent(auth, readVersion)) return null;
   if (!force && auth.expires_at > Math.floor(Date.now() / 1000)) return auth;
   if (!authRefreshPromise) {
     const refreshVersion = authMutationVersion;
@@ -281,11 +311,24 @@ async function backendApi<T>(
   path: string,
   body: Record<string, unknown>,
   retry = true,
+  syncContext?: { ownerId: string; consentVersion: number },
 ): Promise<ApiResult<T>> {
+  const initialVersion = authMutationVersion;
+  const initialAuth = await loadAuth();
+  if (initialAuth && !authIsCurrent(initialAuth, initialVersion)) return sessionChanged<T>();
   const auth = await refreshIfNeeded();
   if (!auth) return { ok: false, status: 401, body: { error: 'sign_in_required' } as T & { error: string } };
+  const requestVersion = authMutationVersion;
+  if (!initialAuth || initialAuth.user.id !== auth.user.id || !authIsCurrent(auth, requestVersion)) return sessionChanged<T>();
+  if (syncContext) {
+    const enabled = await consentEnabled();
+    if (!enabled || syncContext.consentVersion !== consentMutationVersion
+      || syncContext.ownerId !== auth.user.id || !authIsCurrent(auth, requestVersion)) {
+      return sessionChanged<T>();
+    }
+  }
   try {
-    const response = await fetchWithTimeout(`${API_BASE}${path}`, {
+    const { response, body: resultBody } = await fetchJsonWithTimeout<T & { error?: string; message?: string }>(`${API_BASE}${path}`, {
       method,
       headers: {
         Accept: 'application/json',
@@ -294,25 +337,28 @@ async function backendApi<T>(
       },
       body: JSON.stringify(body),
     });
+    if (!authIsCurrent(auth, requestVersion)) return sessionChanged<T>();
     if (response.status === 401 && retry) {
       const refreshed = await refreshIfNeeded(true);
       if (!refreshed) {
         return { ok: false, status: 401, body: { error: 'sign_in_required' } as T & { error: string } };
       }
-      return backendApi<T>(method, path, body, false);
+      if (refreshed.user.id !== auth.user.id || !authIsCurrent(refreshed, authMutationVersion)) return sessionChanged<T>();
+      return backendApi<T>(method, path, body, false, syncContext);
     }
     return {
       ok: response.ok,
       status: response.status,
-      body: await readJson<T & { error?: string; message?: string }>(response),
+      body: resultBody,
     };
   } catch {
+    if (!authIsCurrent(auth, requestVersion)) return sessionChanged<T>();
     return { ok: false, status: 503, body: { error: 'cloud_unavailable' } as T & { error: string } };
   }
 }
 
-async function ensureDriverProfile(): Promise<boolean> {
-  const result = await backendApi<{ driver?: { id?: string } }>('POST', '/api/profile', {});
+async function ensureDriverProfile(syncContext?: { ownerId: string; consentVersion: number }): Promise<boolean> {
+  const result = await backendApi<{ driver?: { id?: string } }>('POST', '/api/profile', {}, true, syncContext);
   return result.ok && Boolean(result.body.driver?.id);
 }
 
@@ -325,21 +371,34 @@ async function consentEnabled(): Promise<boolean> {
   }
 }
 
+async function currentSyncContext(): Promise<{ ownerId: string; consentVersion: number } | null> {
+  const consentVersion = consentMutationVersion;
+  const readVersion = authMutationVersion;
+  const auth = await loadAuth();
+  if (!auth || !authIsCurrent(auth, readVersion) || !await consentEnabled()) return null;
+  if (consentVersion !== consentMutationVersion || !authIsCurrent(auth, readVersion)) return null;
+  return { ownerId: auth.user.id, consentVersion };
+}
+
 export async function getCloudState(): Promise<CloudState> {
   const available = await secureStoreAvailable();
   if (!available) {
     return { available: false, signedIn: false, email: null, syncEnabled: false };
   }
   const auth = await loadAuth();
+  const stateVersion = authMutationVersion;
+  const syncEnabled = Boolean(auth) && await consentEnabled();
+  const currentAuth = auth && authIsCurrent(auth, stateVersion) ? auth : null;
   return {
     available: true,
-    signedIn: Boolean(auth),
-    email: auth?.user.email || null,
-    syncEnabled: Boolean(auth) && await consentEnabled(),
+    signedIn: Boolean(currentAuth),
+    email: currentAuth?.user.email || null,
+    syncEnabled: Boolean(currentAuth) && syncEnabled && consentRuntimeOverride !== false,
   };
 }
 
 export async function signInToCloud(email: string, password: string): Promise<CloudSignInResult> {
+  const signInVersion = authMutationVersion;
   const normalizedEmail = email.trim().toLowerCase();
   if (!await secureStoreAvailable()) {
     return { ok: false, message: 'Secure sign-in storage is unavailable on this device.' };
@@ -351,10 +410,27 @@ export async function signInToCloud(email: string, password: string): Promise<Cl
     email: normalizedEmail,
     password,
   });
-  if (!result.ok || !await saveAuth(result.body)) {
+  const changedMessage = 'Sign-in was cancelled because the account changed. Please sign in again.';
+  if (signInVersion !== authMutationVersion) return { ok: false, message: changedMessage };
+  if (result.ok) {
+    // A new password login must not inherit another account's sharing choice.
+    // Persist the opt-out before saving new tokens so it also holds on restart.
+    consentRuntimeOverride = false;
+    consentMutationVersion += 1;
+    try {
+      await cloudSyncPreference.set(false);
+    } catch {
+      return { ok: false, message: 'Cloud sharing could not be switched off. Sign-in was not saved. Please try again.' };
+    }
+    if (signInVersion !== authMutationVersion) return { ok: false, message: changedMessage };
+  }
+  const signedInAuth = result.ok ? await saveAuth(result.body, null, signInVersion) : null;
+  if (!result.ok || !signedInAuth) {
     return { ok: false, message: authMessage(result) };
   }
+  const signedInVersion = authMutationVersion;
   const profileReady = await ensureDriverProfile();
+  if (!authIsCurrent(signedInAuth, signedInVersion)) return { ok: false, message: changedMessage };
   return {
     ok: true,
     message: profileReady
@@ -364,12 +440,13 @@ export async function signInToCloud(email: string, password: string): Promise<Cl
 }
 
 export async function signOutOfCloud(): Promise<void> {
-  const auth = await loadAuth();
+  // Invalidate pending login/refresh work before any native storage wait.
+  const auth = authCache ?? null;
   await clearAuth();
   if (!auth) return;
   loadConfig().then(config => {
     if (!config) return;
-    return fetchWithTimeout(`${config.url}/auth/v1/logout`, {
+    return fetchJsonWithTimeout(`${config.url}/auth/v1/logout`, {
       method: 'POST',
       headers: {
         apikey: config.anonKey,
@@ -382,34 +459,42 @@ export async function signOutOfCloud(): Promise<void> {
 }
 
 export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
+  const consentRevision = ++consentMutationVersion;
   if (!enabled) consentRuntimeOverride = false;
-  if (enabled && !await refreshIfNeeded()) return false;
+  const auth = enabled ? await refreshIfNeeded() : null;
+  if (consentRevision !== consentMutationVersion) return false;
+  if (enabled && !auth) return false;
+  const consentVersion = authMutationVersion;
   try {
     await cloudSyncPreference.set(enabled);
+    if (consentRevision !== consentMutationVersion) return false;
+    if (enabled && (!auth || !authIsCurrent(auth, consentVersion))) return false;
     consentRuntimeOverride = enabled;
     return true;
   } catch {
-    if (enabled) consentRuntimeOverride = false;
+    if (enabled && consentRevision === consentMutationVersion) consentRuntimeOverride = false;
     return false;
   }
 }
 
 export async function beginCloudSession(): Promise<string | null> {
-  if (!await consentEnabled() || !await ensureDriverProfile()) return null;
+  const syncContext = await currentSyncContext();
+  if (!syncContext || !await ensureDriverProfile(syncContext)) return null;
   const result = await backendApi<{ session?: { id?: string } }>('POST', '/api/sessions', {
     device: `${Platform.OS} ${String(Platform.Version)}`.slice(0, 120),
     browser: `Occulert native app (${Platform.OS})`,
-  });
+  }, true, syncContext);
   return result.ok ? result.body.session?.id || null : null;
 }
 
 export async function logCloudAlert(sessionId: string, fatigueScore: number): Promise<boolean> {
-  if (!await consentEnabled()) return false;
+  const syncContext = await currentSyncContext();
+  if (!syncContext) return false;
   const result = await backendApi('POST', '/api/events', {
     session_id: sessionId,
     type: 'drowsy',
     fatigue_score: Math.max(0, Math.min(100, Math.round(fatigueScore))),
-  });
+  }, true, syncContext);
   return result.ok;
 }
 
@@ -417,7 +502,8 @@ export async function finishCloudSession(
   sessionId: string,
   stats: CloudSessionStats,
 ): Promise<boolean> {
-  if (!await consentEnabled()) return false;
+  const syncContext = await currentSyncContext();
+  if (!syncContext) return false;
   const result = await backendApi('PATCH', '/api/sessions', {
     session_id: sessionId,
     average_fatigue: stats.averageFatigue,
@@ -426,6 +512,6 @@ export async function finishCloudSession(
     alert_count: stats.alertCount,
     // Candidate head-nod observations remain local until device validation.
     head_nod_count: 0,
-  });
+  }, true, syncContext);
   return result.ok;
 }

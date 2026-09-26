@@ -267,9 +267,10 @@ export function AlertSystem({
     // path can stay storage-free while still seeing confirmed changes.
     getWatchAlertsEnabled()
       .then((enabled) => {
-        if (enabled) {
+        if (enabled && sequenceVersion === cueSequenceVersion.current) {
           return sendAlertToWatch({ level: lv, perclos: metrics.perclos, at: now })
             .then((result) => {
+              if (sequenceVersion !== cueSequenceVersion.current) return;
               onTimingEvent?.({
                 kind: 'watch-result',
                 decisionAt: now,

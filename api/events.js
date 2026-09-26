@@ -46,22 +46,22 @@ module.exports = async function handler(request, response) {
     return json(response, 405, { ok: false, error: "method_not_allowed" });
   }
 
-  const user = await verifyAccessToken(bearerToken(request));
-  if (!user) {
-    return json(response, 401, { ok: false, error: "unauthorized" });
-  }
-
-  if (!validJsonBody(request)) {
-    return json(response, 415, { ok: false, error: "invalid_json_body" });
-  }
-
-  const body = typeof request.body === "object" && request.body ? request.body : {};
-  const type = String(body.type || "");
-  if (!body.session_id || ALLOWED_TYPES.indexOf(type) === -1) {
-    return json(response, 400, { ok: false, error: "invalid_event" });
-  }
-
+  let user;
   try {
+    user = await verifyAccessToken(bearerToken(request));
+    if (!user) {
+      return json(response, 401, { ok: false, error: "unauthorized" });
+    }
+
+    if (!validJsonBody(request)) {
+      return json(response, 415, { ok: false, error: "invalid_json_body" });
+    }
+
+    const body = typeof request.body === "object" && request.body ? request.body : {};
+    const type = String(body.type || "");
+    if (!body.session_id || ALLOWED_TYPES.indexOf(type) === -1) {
+      return json(response, 400, { ok: false, error: "invalid_event" });
+    }
     const drivers = await pgFetch("drivers", {
       params: { select: "id", user_id: "eq." + user.id, limit: "1" },
     });
