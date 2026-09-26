@@ -174,13 +174,36 @@ no EAS build, submission, or OTA update was queued by this release.
 
 ## Native Watch connection recovery
 
-Prepared source preserves a confirmed live Watch reply even when separate
-connection flags are false or fail. Native status reads have a 1.5-second
+[PR #145](https://github.com/pacheco415/Occulert/pull/145), merged as
+`1c340e33ee52539260e17012a5011fab0b40937f`, preserves a confirmed live Watch
+reply even when separate connection flags are false or fail. Native status reads have a 1.5-second
 deadline after at most 0.5 seconds of activation settling; older checks cannot
 overwrite a newer cached connection. Runtime fault tests cover delayed and
 failed queries, retries, and out-of-order results. A reply confirms message
 receipt, not visible notification or vibration. No build-52 connection hang
 was reported, and this source change requires a future binary and device checks.
+
+## Pilot preparation and form reliability
+
+September 26 public validation exercised 13 route states at 320 and 390 pixels
+in Chromium and WebKit: all 52 document checks returned 200 without script
+errors or page overflow. This is signed-out browser evidence, not physical
+Safari acceptance or a genuine signed-in fleet walkthrough.
+
+The follow-up source package validates invitation fields before account
+creation or acceptance, associates driver-profile labels with their controls,
+and gives form selectors a 44-pixel minimum height. Existing immutable assets
+remain unchanged. The homepage loads its font stylesheet without blocking
+local styling or navigation when that external request stalls or fails.
+Benchmark preparation also rejects absent mapped slice
+columns, and undefined metric denominators remain unavailable rather than zero.
+Release status and final check evidence are recorded in the
+[release tracker](https://github.com/pacheco415/Occulert/issues/6).
+
+The next native-release packet and a blank five-driver, 30-day pilot packet
+are prepared. The detection rehearsal uses invented rows only; ten-session
+review fields are ready, but no real participants, sessions, labeled accuracy
+result, new native binary, or device acceptance have been recorded.
 
 ## Validating
 
@@ -224,6 +247,7 @@ was reported, and this source change requires a future binary and device checks.
 | Later | Watch complication, Android app/health, device-agnostic engine | Proven need and platform implementation/validation. Android source configuration is not a released Android app. |
 | Later | Native tvOS | Browser/AirPlay pilot establishes demand beyond the existing web TV view. |
 | Exploratory | Smart glasses, earbud heart-rate/HRV | Supported hardware/API evidence and a specific privacy-safe use case. No promised integration. |
+| Exploratory | Driver-and-road dual-camera mode | Parked source diagnostics exist; prove supported simultaneous streams, driver-camera priority, mounting, heat and battery before evaluating road analysis. No released road-hazard detection is claimed. |
 
 ## Release and evidence rules
 

@@ -1,0 +1,2 @@
+/* Native select controls must remain usable in WebKit and on touch screens. */
+.field select{-webkit-appearance:menulist-button;appearance:menulist-button;min-height:44px;height:44px}

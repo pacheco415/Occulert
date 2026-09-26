@@ -20,7 +20,7 @@
   "fleet-pricing-page-1.css": "fleet-pricing-page-1.v47.css",
   "features-page-1.js": "public-page.v60.js",
   "driver-profiles-page-1.css": "driver-profiles-page-1.v47.css",
-  "accept-invite-page-2.js": "accept-invite-page-2.v47.js",
+  "accept-invite-page-2.js": "accept-invite-page-2.v61.js",
   "faq-page-1.css": "faq-page-1.v47.css",
   "pilot-signup-page-1.css": "pilot-signup-page-1.v47.css",
   "pilot-signup-page-1.js": "static-page.v60.js",
@@ -57,5 +57,6 @@
   "pilot-guide-page-1.css": "pilot-guide-page-1.v55.css",
   "fleet-pilot-report.js": "fleet-pilot-report.v56.js",
   "fleet-pilot-report.css": "fleet-pilot-report.v56.css",
-  "homepage.js": "homepage.v60.js"
+  "homepage.js": "homepage.v60.js",
+  "form-controls.css": "form-controls.v63.css"
 }

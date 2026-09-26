@@ -18,7 +18,7 @@ fusion coverage are not substitutes for labeled evaluation.
 | Slice reporting and result provenance | Ready (`--slice-by`, `--json`) |
 | Formal dataset validation | Not completed; authorized access, compatible EAR extraction, and frozen labeled evaluation remain required |
 | Peer-reviewed publication | Not completed |
-| Status reference updated | September 25, 2026 |
+| Status reference updated | September 26, 2026 |
 
 ## Target datasets
 
@@ -53,8 +53,10 @@ must be unique and lowercase and cannot replace `label`, `ear`, `participant`,
 `clip`, or the generated `split`. Invalid configuration stops before files are
 written. The runner also checks supplied split tables independently: every row
 needs a participant and a `train` or `test` split, and a participant cannot
-appear on both sides, even when only one side is selected for scoring. A
-requested slice column must exist; blank values within that column remain
+appear on both sides, even when only one side is selected for scoring.
+An explicitly mapped slice source column must exist in the raw export;
+missing or misspelled source columns stop preparation before output is written.
+A requested slice column must exist; blank values within that column remain
 `(unspecified)`. Minimal `label,ear` tables remain supported for frame-level
 exploration, but do not establish a held-out evaluation.
 
@@ -73,7 +75,13 @@ node benchmark/run-benchmark.mjs --input path/to/labeled-ear.csv
 ```
 
 It reports precision, recall, F1, and false-alert rate for all three
-sensitivity thresholds. Verify the runner itself with:
+sensitivity thresholds. A metric with a zero denominator is shown as
+`not estimable` (JSON `null`), rather than a measured zero. Supported zero
+rates stay zero. Precision uses TP/(TP+FP), recall TP/(TP+FN), F1
+2TP/(2TP+FP+FN), and false-alert rate FP/(FP+TN) among awake frames. This
+last metric is not false alerts per hour or a session error rate. Inspect
+class and participant support before interpreting small condition slices.
+Verify the runner itself with:
 
 ```bash
 npm run test:benchmark
@@ -115,7 +123,9 @@ records provenance.
    participant can appear on both sides — the tool exits non-zero if it ever
    detects otherwise. The same seed always reproduces the same split, so a
    split can be regenerated rather than shipped.
-5. Freeze the split, then score the held-out half only:
+5. Freeze the split, then score the held-out test subset only. The example
+   uses a 30% test fraction; hash assignment does not guarantee an exact
+   proportion, balanced conditions, or a nonempty split for small datasets:
 
    ```bash
    node benchmark/run-benchmark.mjs \
@@ -139,9 +149,19 @@ records provenance.
    Rows with no value for a slice are reported as `(unspecified)` rather than
    silently dropped, so a thin slice is visible instead of invisible.
 7. Keep the emitted `results.json`. It carries the runner commit SHA,
-   thresholds, dataset identifier, split, sample count, and timestamp, which is
-   what makes a published number reproducible. Store it and the prepared table
-   outside the repository whenever the licence requires it.
+   exact benchmark source SHA-256 hashes, benchmark source dirty status,
+   input SHA-256, thresholds, dataset identifier, split, sample count,
+   and timestamp. Preparation manifests also include raw-input and exact
+   configuration SHA-256 hashes. Source provenance resolves the scripts'
+   checkout even when commands run from another directory. A missing Git
+   checkout records an unknown commit/dirty state while preserving source
+   hashes. These records identify inputs; retain the actual approved input,
+   configuration, and source snapshot too. Freeze the separate extractor,
+   landmark/runtime assets, sampling/label-alignment rules, licence provenance,
+   and exclusions before evaluation. Check mapped raw headers and independent
+   participant/event support; do not treat adjacent frames as independent
+   people. Store records outside the repository whenever the licence requires
+   it. Repeated substantive results must agree; run timestamps may differ.
 
 ## Initial targets
 
