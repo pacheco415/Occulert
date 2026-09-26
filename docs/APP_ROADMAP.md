@@ -60,15 +60,21 @@ and validate the available binary without queueing another iOS build.
 | Runtime and fleet performance | Native source included in TestFlight 52; web portions released | Preserve analysis cadence/preferences; measure battery/heat/camera timing on device and signed-in API latency. [Performance Roadmap](PERFORMANCE_ROADMAP.md) contains targets, not measured claims. |
 | Sensor-fusion observations | Included in TestFlight 52, observation only; physical validation pending | Camera/headphone candidate counts, optional Watch availability, bounded co-occurrences, validation coverage, next-session planning. No raw timeline, cloud sync, export, feedback inclusion, score or alert changes. Accessories optional. |
 
-## September 26 browser reliability package — pending release
+## September 26 browser reliability package
 
-Branch `feat/web-pilot-reliability` addresses local-history storage failures,
-late Wake Lock results, offline navigation, protected export/share freshness,
-session dates and the checklist's 50-record history cap, and benchmark split/
-slice governance. Source review and regression checks are ongoing; the package
-is not a production release until the associated PR records merge/deployment
-evidence. It changes no native binary or detection thresholds and evaluates no
-real dataset. Build-52 physical acceptance remains separate.
+[PR #140](https://github.com/pacheco415/Occulert/pull/140) includes durable local
+session history, failed-save guidance, safe handling of late Wake Lock results,
+and bounded offline navigation. Protected CSV and copied summaries check the
+current owner and data freshness. Completion dates, missing alert counts,
+available event samples, and capped pilot age retain their evidence boundaries.
+Benchmark preparation rejects malformed split/slice configuration, and the
+runner checks participant leakage before selecting held-out rows.
+
+Source review and regression coverage are complete. The linked PR and
+[release tracker](https://github.com/pacheco415/Occulert/issues/6) record the
+merge and deployment evidence for this package. It changes no native binary or
+detection thresholds and evaluates no real dataset. Build-52 physical
+acceptance remains separate.
 
 ## Validating
 
