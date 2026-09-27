@@ -5,6 +5,13 @@ published source `7066fcf1a0f27589301282bb10458ed81f7f9279`. The user requested
 continued independent development and deferred all testing. This package is
 source preparation for a future native binary; TestFlight 1.0.0 (52) is unchanged.
 
+After the user's approval, [PR #151](https://github.com/pacheco415/Occulert/pull/151)
+merged this source as `1eb90f16a4083be07d6a73db217c473ee344d390`, now the
+approved native candidate. Automatic website deployment
+`dpl_8tiV2wQaiLYWpoTBnJmjGaahoUjr` is READY with public domains assigned;
+website behavior is unchanged. This is a merge/deployment receipt, not native
+acceptance. All testing remains deferred, and no binary is created or installed.
+
 ## Purpose and scope
 
 Session History already stores four subjective alert assessments. The new view

@@ -1,4 +1,5 @@
 import { formatSessionAlertCount } from './sessionAlertCount.ts';
+import { formatSessionDuration, formatSessionFatigue } from './sessionSummaryValues.ts';
 
 export interface ExportableSessionSummary {
   savedAt?: string;
@@ -25,16 +26,11 @@ function safeDate(item: ExportableSessionSummary): string {
   return Number.isFinite(date.getTime()) ? date.toISOString() : 'Unknown date';
 }
 
-function durationLabel(seconds: number | undefined): string {
-  const safeSeconds = Number.isFinite(seconds) && seconds && seconds > 0 ? Math.floor(seconds) : 0;
-  return `${Math.floor(safeSeconds / 60)}m ${safeSeconds % 60}s`;
-}
-
 export function buildSessionHistoryExport(sessions: ExportableSessionSummary[]): string {
   const summaries = sessions.map((item, index) => [
     `Session ${index + 1} · ${safeDate(item)}`,
-    `Duration: ${durationLabel(item.durationSec)} · Alerts: ${formatSessionAlertCount(item.alertCount)}`,
-    `Average fatigue: ${item.avgFatigue == null ? 'Not recorded' : Math.round(item.avgFatigue)} · Sensitivity: ${item.sensitivity || 'Not recorded'}`,
+    `Duration: ${formatSessionDuration(item.durationSec, 'summary')} · Alerts: ${formatSessionAlertCount(item.alertCount)}`,
+    `Average fatigue: ${formatSessionFatigue(item.avgFatigue)} · Sensitivity: ${item.sensitivity || 'Not recorded'}`,
     `Review: ${item.alertAssessment ? ASSESSMENT_LABELS[item.alertAssessment] || 'Reviewed' : 'Not reviewed'}${item.recoveredFromInterruption ? ' · Recovered partial session' : ''}`,
   ].join('\n'));
 
