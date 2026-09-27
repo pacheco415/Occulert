@@ -23,8 +23,12 @@ Its website deployment is READY; all testing remains deferred at the user's
 request. Publication and runtime acceptance remain separate; see the
 [history browsing release record](docs/HISTORY_BROWSING.md). These additions
 are not part of the previously verified PR #146 release or installed native binary.
-The next prepared source adds a dedicated Help and Support page and a native
-Settings link; see [support preparation](docs/SUPPORT_PREPARATION.md).
+The dedicated Help and Support page is published in
+[PR #148](https://github.com/pacheco415/Occulert/pull/148), source `c4d3610`,
+production READY. Its native Settings link awaits the next binary; see
+[support preparation](docs/SUPPORT_PREPARATION.md). The next prepared website
+source adds driver, date-period and recorded-status filters to loaded fleet
+history; these filters do not search unloaded records or change reports.
 TestFlight 1.0.0 (52) remains the binary from `969849b`,
 with finished submission, Apple VALID / IN_BETA_TESTING, and embedded Watch
 packaging confirmed. On September 26, the user reported an iPhone installation
