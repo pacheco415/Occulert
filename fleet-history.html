@@ -10,9 +10,10 @@
   <link rel="canonical" href="https://www.occulert.com/fleet-history.html">
   <link rel="stylesheet" href="/portal.v47.css">
   <link rel="stylesheet" href="/accessibility.v52.css">
-  <link rel="stylesheet" href="/fleet-history-page.v65.css">
+  <link rel="stylesheet" href="/fleet-history-page.v66.css">
+  <script defer src="/security-utils.v47.js"></script>
   <script defer src="/occulert-backend.v60.js"></script>
-  <script defer src="/fleet-history-page.v65.js"></script>
+  <script defer src="/fleet-history-page.v66.js"></script>
 </head>
 <body class="portal-page fleet-history-page">
   <a class="skip-link" href="#main-content">Skip to session history</a>
@@ -73,6 +74,11 @@
         <p class="muted" id="historyDateHelp">Recent periods include today and the preceding 6 or 29 days in your local calendar, through now. Missing, invalid, or future start dates appear only in All time. Completed means a valid end time was recorded; it does not verify client reports.</p>
       </fieldset>
       <p class="history-matches" id="historyMatches" role="status" aria-live="polite" aria-atomic="true">Verify fleet ownership to filter loaded sessions.</p>
+      <div class="history-export">
+        <button class="btn" id="historyExport" type="button" disabled aria-describedby="historyExportHelp historyExportStatus">Export shown sessions CSV</button>
+        <p class="muted" id="historyExportHelp">Exports the sessions currently shown from loaded records, with the selected filters and browsing limits. It excludes IDs, location, personal media, raw motion, events, and follow-ups. It is a loaded-record snapshot; dashboard and manager reports keep their existing scope. Refresh before exporting if browsing started more than five minutes ago or a loading attempt failed.</p>
+      </div>
+      <p class="history-export-status" id="historyExportStatus" role="status" aria-live="polite" aria-atomic="true">Verify fleet ownership and load sessions before exporting.</p>
       <p class="history-empty" id="historyEmpty" hidden></p>
       <div class="history-list" id="historyList" role="list" aria-busy="false"></div>
       <div class="history-pagination">

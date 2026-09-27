@@ -55,8 +55,8 @@ It uses the existing fleet/date/session index and needs no migration.
 Responses contain fleet name, session dates, driver name/ID and the same
 privacy-limited metric fields as the current fleet summary. They identify
 `unverified_client_report` telemetry. Events, saved follow-ups, location,
-personal media and raw motion are excluded. No total count, whole-period report,
-export or transactional snapshot is claimed: concurrent edits, backdated inserts
+personal media and raw motion are excluded. The API offers no total count,
+whole-period report, server export or transactional snapshot: concurrent edits, backdated inserts
 and deletions may change the records encountered while browsing.
 
 The page checks refreshed account context before and after protected reads,
@@ -64,10 +64,13 @@ discards abandoned results, clears records on account/navigation changes, and
 does not persist protected rows. API responses use `no-store`. The protected
 history document/helper do not use the service worker's offline cache.
 
-## Prepared loaded-record filters
+## Published loaded-record filters
 
-The next website package uses new v65 helper/styles and leaves previously
-published v64 bytes unchanged. It adds composed driver-name substring search,
+The v65 filtering package was published in
+[PR #149](https://github.com/pacheco415/Occulert/pull/149), merged source
+`16241c272fb6befd9f800142ea01effa1bb464fe`, production
+`dpl_8JdMobC9XP34VdQEYtX6xL23oN6h` READY. All testing remains deferred.
+It leaves previously published v64 bytes unchanged and adds composed driver-name substring search,
 All time / Last 7 days / Last 30 days local-calendar periods, and recorded
 completion-status selection. Dated views cover today plus the preceding 6 or
 29 local days through now; invalid, missing and future start dates remain only
@@ -79,9 +82,37 @@ matching session. Load older adds another protected page using the existing
 cursor and 500-row bound, then applies the current filters. There is no
 automatic pagination or new API query. Refresh resets browsing and filters.
 Account/page changes clear protected rows and filter inputs. Filters stay in
-memory and do not enter storage or the URL. Report/export/TV scope remains
+memory and do not enter storage or the URL. Existing dashboard/report/TV scope remains
 latest 50; no export, new backend, database migration or detection change is
-included. This package is prepared source with testing still deferred.
+included in that filtering package. Testing remains deferred.
+
+## Prepared shown-session export
+
+The next source uses new v66 helper/styles, preserving published v65 bytes.
+Export shown sessions CSV is an explicit action on the current rendered
+selection, with its captured time and filters. It does not recompute a different
+selection while downloading. Each record carries loaded-only scope, loaded and
+shown counts, filters, applicable calendar-window boundaries, browsing/export
+times and whether older records remain. It is not a full-fleet or full-period
+report, and no transactional snapshot is claimed.
+
+Only displayed session fields are exported: driver name, recorded dates,
+completion/duration labels, valid scores/counts and unverified telemetry trust.
+Missing or invalid metrics remain empty, while measured zero stays zero. Hidden
+session/driver/fleet identifiers, company name, location, media, raw motion,
+events and saved follow-ups are excluded. All cells use the existing spreadsheet
+formula sanitizer and CSV quoting. The filename contains no personal details.
+
+Export requires the current verified account/context, an unchanged rendered
+view and a successful browsing window no older than five minutes from its first
+load. Loading, failed page loads, account/page changes and cleared or empty views
+invalidate export. Filters do not reset freshness. No new server request is
+issued by the export action. Blob URLs are revoked on failure, after the
+download request, and on account/page changes. The interface says a download
+was requested; it does not claim the browser finished saving a file.
+
+This package is prepared source with all testing deferred. It changes no API,
+database, native app, detection, consent or existing dashboard/report/TV scope.
 
 ## Deferred verification
 
