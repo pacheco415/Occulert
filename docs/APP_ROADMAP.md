@@ -18,9 +18,15 @@ state; they are not the current feature backlog.
   gap remains. Source tests cannot close those gaps.
 - **Future:** proposed capability without an implementation or delivery claim.
 
-The current website/backend release is [PR #144](https://github.com/pacheco415/Occulert/pull/144),
-merged at `d3ae5a30422586cbfa03c9b7092a0fa375d44681` and verified live in
-production. Assets use v60 and offline cache v54. Its native audit fixes are
+The current website release is [PR #146](https://github.com/pacheco415/Occulert/pull/146),
+merged at `9662c3b9e0bfc3cc721796328fd6ff53f7df995e` and verified live in
+production. It adds invitation validation, associated form labels, constrained
+native HTML selectors, nonblocking homepage font loading, and exact-file
+benchmark provenance. Core monitoring/auth assets remain v60, invitation
+behavior uses v61, form controls use v63, and offline cache remains v54.
+The earlier backend/native audit release was [PR #144](https://github.com/pacheco415/Occulert/pull/144),
+merged at `d3ae5a30422586cbfa03c9b7092a0fa375d44681`. Its native fixes and
+[PR #145](https://github.com/pacheco415/Occulert/pull/145)'s Watch repair are
 merged source awaiting a future binary; they are not installed in TestFlight 52.
 The atomic invitation-creation prerequisite was installed before rollout:
 deployed migration `20260926185813 / atomic_fleet_invitation_creation` maps to
@@ -207,6 +213,20 @@ result, new native binary, or device acceptance have been recorded.
 
 ## Validating
 
+The user deferred testing on September 26 and requested independent development
+work. Device, signed-in fleet, pilot and dataset evidence remains pending.
+The next source package adds local-history date filters and a separate bounded
+older-fleet-history browser; existing live summary/report/TV calculations keep
+their latest-50-session scope. These additions were prepared in source
+`0c4c09c5c04287bec19d1741077a56988fbf4422`. The user subsequently approved
+publishing this package on September 26, with all testing still deferred.
+Merge and deployment evidence remains to be recorded in the
+[history browsing release record](HISTORY_BROWSING.md); approval does not
+establish runtime or device acceptance. Native distribution still requires a
+future binary; none was created. App Store listing copy is a prepared draft,
+without submission or invented screenshots, credentials, participant data or
+device results.
+
 1. **Native acceptance:** build 52 installation/general iPhone functionality,
    Watch launch, and foreground/background urgent display/wrist vibration have
    user-reported passes on the reported devices above. Record exact delay,
@@ -241,7 +261,7 @@ result, new native binary, or device acceptance have been recorded.
 | Priority | Capability | Required evidence or decision |
 |---|---|---|
 | Next | Detection tuning | Reviewed Medium sessions with varied conditions and reproducible benchmark evidence. Observation counts alone cannot justify threshold changes or public accuracy claims. |
-| After pilot | Longer history, pagination, retention, aggregates, realtime subscriptions | Observed scale or demonstrated bottleneck, with permissions/deletion/query behavior defined. Protected fleet updates currently use polling. |
+| Source prepared; later scale work | Bounded older-history browsing; later retention, aggregates and realtime subscriptions | The separate history browser is untested development source; larger scaling work still needs observed scale or a demonstrated bottleneck, with permissions/deletion/query behavior defined. Protected fleet updates currently use polling. |
 | After pilot | Billing and enforced entitlements | Agreed commercial terms and explicit activation. Published plans do not activate subscriptions. |
 | After independent validation | Camera/headphone/Watch confidence fusion, pre-drive scoring | Calibration, ground truth, privacy review, value over camera baseline. Health context remains local/read-only information. |
 | Later | Watch complication, Android app/health, device-agnostic engine | Proven need and platform implementation/validation. Android source configuration is not a released Android app. |

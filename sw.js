@@ -69,7 +69,11 @@ const STATIC_ASSETS = [
   '/static-page.v60.js'
 ];
 
+const NETWORK_ONLY_DOCUMENTS = new Set([
+  '/fleet-history.html',
+]);
 const NETWORK_ONLY_ASSETS = new Set([
+  '/fleet-history-page.v64.js',
   '/auth-helper.v47.js',
   '/passkey-auth.v47.js',
   '/auth-helper.v49.js',
@@ -210,6 +214,14 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
+  if (url.origin === self.location.origin && NETWORK_ONLY_DOCUMENTS.has(url.pathname)) {
+    event.respondWith(fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, { cache: 'no-store' }, completeNetworkResponse)
+      .then(response => response || new Response(
+        '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fleet history unavailable</title><main><h1>Fleet history needs a connection</h1><p>Reconnect and reload this page to verify your account and load protected records.</p><a href="/fleet-history.html">Try again</a></main></html>',
+        { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } }
+      )));
+    return;
+  }
   if (url.origin === self.location.origin && NETWORK_ONLY_ASSETS.has(url.pathname)) {
     event.respondWith(fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, { cache: 'no-store' }, bufferNetworkOnlyScript)
       .then(response => response || Response.error()));
