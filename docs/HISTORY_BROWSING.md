@@ -64,6 +64,25 @@ discards abandoned results, clears records on account/navigation changes, and
 does not persist protected rows. API responses use `no-store`. The protected
 history document/helper do not use the service worker's offline cache.
 
+## Prepared loaded-record filters
+
+The next website package uses new v65 helper/styles and leaves previously
+published v64 bytes unchanged. It adds composed driver-name substring search,
+All time / Last 7 days / Last 30 days local-calendar periods, and recorded
+completion-status selection. Dated views cover today plus the preceding 6 or
+29 local days through now; invalid, missing and future start dates remain only
+in All time. A missing end is not an active-session claim.
+
+The shown count is explicitly matches out of loaded records, never the total
+fleet or a full date-range result. No match does not mean the fleet has no
+matching session. Load older adds another protected page using the existing
+cursor and 500-row bound, then applies the current filters. There is no
+automatic pagination or new API query. Refresh resets browsing and filters.
+Account/page changes clear protected rows and filter inputs. Filters stay in
+memory and do not enter storage or the URL. Report/export/TV scope remains
+latest 50; no export, new backend, database migration or detection change is
+included. This package is prepared source with testing still deferred.
+
 ## Deferred verification
 
 Later verification needs to cover local-date boundaries and preference failure,

@@ -10,9 +10,9 @@
   <link rel="canonical" href="https://www.occulert.com/fleet-history.html">
   <link rel="stylesheet" href="/portal.v47.css">
   <link rel="stylesheet" href="/accessibility.v52.css">
-  <link rel="stylesheet" href="/fleet-history-page.v64.css">
+  <link rel="stylesheet" href="/fleet-history-page.v65.css">
   <script defer src="/occulert-backend.v60.js"></script>
-  <script defer src="/fleet-history-page.v64.js"></script>
+  <script defer src="/fleet-history-page.v65.js"></script>
 </head>
 <body class="portal-page fleet-history-page">
   <a class="skip-link" href="#main-content">Skip to session history</a>
@@ -28,7 +28,7 @@
     <section class="history-intro" aria-labelledby="historyTitle">
       <p class="eyebrow">Protected fleet</p>
       <h1 id="historyTitle">Session history</h1>
-      <p class="muted">Browse recorded sessions from newest to oldest, up to 50 at a time. This page shows up to 500 sessions. Refresh starts again with the newest records.</p>
+      <p class="muted">Browse recorded sessions from newest to oldest, up to 50 at a time. This page loads up to 500 sessions. Refresh clears filters and starts again with the newest records.</p>
     </section>
     <div class="history-status" id="historyStatus" role="status" aria-live="polite">Checking protected fleet access…</div>
     <div class="history-access" id="historyAccess" hidden>
@@ -43,6 +43,37 @@
       </div>
       <p class="history-privacy">Session scores and alert counts are unverified client reports. A missing end time does not establish that a session is active. This page excludes location, camera media, audio, raw motion, events, and saved follow-ups.</p>
       <p class="muted">Older records here do not change the dashboard’s latest-50 summaries, manager reports, or TV display.</p>
+      <fieldset class="history-filters" id="historyFilters" disabled aria-describedby="historyFilterHelp historyDateHelp">
+        <legend>Filter loaded sessions</legend>
+        <div class="history-filter-fields">
+          <div class="history-filter-field history-driver-filter">
+            <label for="historyDriver">Driver name contains</label>
+            <input id="historyDriver" type="search" maxlength="80" autocomplete="off" placeholder="Search loaded driver names">
+          </div>
+          <div class="history-filter-field">
+            <label for="historyPeriod">Recorded start date</label>
+            <select id="historyPeriod">
+              <option value="all">All time</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+            </select>
+          </div>
+          <div class="history-filter-field">
+            <label for="historyCompletion">Recorded end status</label>
+            <select id="historyCompletion">
+              <option value="all">All recorded end statuses</option>
+              <option value="completed">Completed session</option>
+              <option value="no_end">No recorded end time</option>
+              <option value="invalid">Invalid recorded dates</option>
+            </select>
+          </div>
+          <button class="btn" id="historyClearFilters" type="button">Clear filters</button>
+        </div>
+        <p class="muted" id="historyFilterHelp">Filters search loaded records only. Load older sessions to search more, up to the 500-session limit. Refresh, an account change, or leaving this page clears filters.</p>
+        <p class="muted" id="historyDateHelp">Recent periods include today and the preceding 6 or 29 days in your local calendar, through now. Missing, invalid, or future start dates appear only in All time. Completed means a valid end time was recorded; it does not verify client reports.</p>
+      </fieldset>
+      <p class="history-matches" id="historyMatches" role="status" aria-live="polite" aria-atomic="true">Verify fleet ownership to filter loaded sessions.</p>
+      <p class="history-empty" id="historyEmpty" hidden></p>
       <div class="history-list" id="historyList" role="list" aria-busy="false"></div>
       <div class="history-pagination">
         <button class="btn primary" id="historyOlder" type="button" hidden>Load older sessions</button>

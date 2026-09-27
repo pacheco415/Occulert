@@ -20,10 +20,11 @@ state; they are not the current feature backlog.
   gap remains. Source tests cannot close those gaps.
 - **Future:** proposed capability without an implementation or delivery claim.
 
-The current published website source is [PR #147](https://github.com/pacheco415/Occulert/pull/147),
-merged at `5b5db0201ea3df17dc70f6b2189ff9b1093b512a`, production deployment
-`dpl_HaWioevunU551T1CqGofjsBAgS5N` READY. It adds protected older-history
-browsing and native local-history date filters. All testing is deferred by the
+The current published website source is [PR #148](https://github.com/pacheco415/Occulert/pull/148),
+merged at `c4d3610dabc5efebcb395a1645a130b1407c3eb9`, production deployment
+`dpl_FFSEXsKLMmZSN5V66tFkjfJjwbkM` READY. It adds Support and the native Help
+link, following PR #147's protected older-history browsing and native date
+filters. All testing of these two packages is deferred by the
 user; deployment does not establish runtime acceptance or change build 52.
 The earlier verified website release is [PR #146](https://github.com/pacheco415/Occulert/pull/146),
 merged at `9662c3b9e0bfc3cc721796328fd6ff53f7df995e`. It adds invitation validation, associated form labels, constrained
@@ -233,12 +234,17 @@ future binary; none was created. App Store listing copy is a prepared draft,
 without submission or invented screenshots, credentials, participant data or
 device results.
 
-The next independent package prepares a dedicated public Support page, links
-from Home, Privacy and Pilot Quick Start, and an accessible native Settings
-link. Contact uses the existing support email; no form, automatic diagnostic
-upload, account requirement, new backend or changed monitoring behavior is
-added. This support package is source preparation with testing deferred;
-see [Support Preparation](SUPPORT_PREPARATION.md).
+The support package was published in PR #148 with links from Home, Privacy and
+Pilot Quick Start, and an accessible native Settings link awaiting a binary.
+Contact uses the existing email; there is no contact form or automatic upload.
+See [Support Preparation](SUPPORT_PREPARATION.md).
+
+The next prepared website source adds driver-name search, local 7/30-day date
+views and recorded-status filtering within the older-history page's loaded
+records. Filters do not search unloaded data, change latest-50 reports or make
+missing/invalid completion dates into active-session claims. It remains
+unpublished source with all testing deferred. See
+[History Browsing](HISTORY_BROWSING.md).
 
 1. **Native acceptance:** build 52 installation/general iPhone functionality,
    Watch launch, and foreground/background urgent display/wrist vibration have

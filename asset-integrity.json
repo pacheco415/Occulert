@@ -85,5 +85,7 @@
   "form-controls.v62.css": "60adecc9dd4ee5a2dc105d3c5624f4d545d611617901a8d47332bc10afac336b",
   "form-controls.v63.css": "c54e82ca6505a4f9a7d04f82e3208cf5c432d2ab79151afb3f5946bad16fa12c",
   "fleet-history-page.v64.js": "5f51daa1dc5a0589d59664b115c508d2f53c00344fee28b15bf8ae2a6bfc8b6f",
-  "fleet-history-page.v64.css": "1bbff354cca790796b19279f504726d89895e3281631371ff39abce205acdb83"
+  "fleet-history-page.v64.css": "1bbff354cca790796b19279f504726d89895e3281631371ff39abce205acdb83",
+  "fleet-history-page.v65.js": "46fd8fb10a8fce55a3ba35e073cae38e36d38b68104dbf730b12fc792091cf16",
+  "fleet-history-page.v65.css": "608c2c610bdbf34e82585aa190c18b41612eee53f6c975d959e67e3fa7dd54c7"
 }
