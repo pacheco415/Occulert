@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share, ActivityIndicator, TextInput,
   type LayoutChangeEvent,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  openFeedback,
+  openFeedbackWithFallback,
   type AlertAssessment,
   type FeedbackSession,
   type SessionDeviceImpact,
@@ -33,15 +33,20 @@ import {
 import {
   filterIndexedSessionsByPeriod,
   filterIndexedSessionsByAssessment,
-  groupIndexedSessionsByDate,
+  filterIndexedSessionsByRecordedConditions,
+  DEFAULT_HISTORY_VIEW,
   hasHistoryAlertAssessment,
   normalizeHistoryAssessmentFilter,
   normalizeHistoryFilter,
   normalizeHistoryPeriod,
-  sortIndexedSessionsNewest,
+  normalizeHistoryViewPreferences,
+  sortIndexedSessions,
+  validateHistoryDateRange,
   type HistoryFilter,
   type HistoryAssessmentFilter,
   type HistoryPeriod,
+  type HistorySort,
+  type HistoryViewPreferences,
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
 import { formatSessionAlertCount } from '../lib/sessionAlertCount';
@@ -57,6 +62,7 @@ import {
 const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
 const HISTORY_PERIOD_KEY = 'occulert-session-history-period';
 const HISTORY_ASSESSMENT_KEY = 'occulert-session-history-assessment';
+const HISTORY_VIEW_KEY = 'occulert-session-history-recorded-view';
 const CHECKPOINT_TARGET = 10;
 
 interface SessionRecord extends FeedbackSession {
@@ -162,6 +168,35 @@ const HISTORY_PERIODS: Array<{ value: HistoryPeriod; label: string }> = [
   { value: 'all', label: 'All time' },
   { value: '7-days', label: 'Last 7 days' },
   { value: '30-days', label: 'Last 30 days' },
+  { value: 'custom', label: 'Custom dates' },
+];
+
+type HistoryRecordedFilterKey = 'sensitivity' | 'lighting' | 'eyewear';
+
+const HISTORY_RECORDED_FILTERS: Array<{
+  key: HistoryRecordedFilterKey;
+  label: string;
+  options: Array<{ value: string; label: string }>;
+}> = [
+  { key: 'sensitivity', label: 'Saved sensitivity', options: [
+    { value: 'all', label: 'All' }, { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' },
+    { value: 'unknown', label: 'Not recorded' },
+  ] },
+  { key: 'lighting', label: 'Saved lighting', options: [
+    { value: 'all', label: 'All' }, { value: 'daylight', label: 'Daylight' },
+    { value: 'low_light', label: 'Low light' }, { value: 'unknown', label: 'Not recorded' },
+  ] },
+  { key: 'eyewear', label: 'Saved eyewear', options: [
+    { value: 'all', label: 'All' }, { value: 'none', label: 'None' },
+    { value: 'glasses', label: 'Glasses' }, { value: 'sunglasses', label: 'Sunglasses' },
+    { value: 'unknown', label: 'Not recorded' },
+  ] },
+];
+
+const HISTORY_SORTS: Array<{ value: HistorySort; label: string }> = [
+  { value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' },
+  { value: 'duration', label: 'Longest first' }, { value: 'alerts', label: 'Most alerts first' },
 ];
 
 const HISTORY_ASSESSMENTS: Array<{ value: HistoryAssessmentFilter; label: string }> = [
@@ -174,7 +209,22 @@ const HISTORY_ASSESSMENTS: Array<{ value: HistoryAssessmentFilter; label: string
 ];
 
 function historyReviewInput(item: SessionRecord): SessionRecord {
-  return hasHistoryAlertAssessment(item.alertAssessment) ? item : { ...item, alertAssessment: undefined };
+  const testConditions = { ...item.testConditions };
+  const deviceImpact = { ...item.deviceImpact };
+  TEST_CONDITION_GROUPS.forEach(group => {
+    if (!group.options.some(option => option.value === testConditions[group.key])) delete testConditions[group.key];
+  });
+  DEVICE_IMPACT_GROUPS.forEach(group => {
+    if (!group.options.some(option => option.value === deviceImpact[group.key])) delete deviceImpact[group.key];
+  });
+  return {
+    ...item,
+    alertAssessment: hasHistoryAlertAssessment(item.alertAssessment) ? item.alertAssessment : undefined,
+    sensitivity: item.sensitivity === 'low' || item.sensitivity === 'medium' || item.sensitivity === 'high'
+      ? item.sensitivity : undefined,
+    testConditions,
+    deviceImpact,
+  };
 }
 
 function hasCompleteHistoryReview(item: SessionRecord): boolean {
@@ -201,11 +251,22 @@ function historyReviewQueue(
   return sessions.filter(({ index }) => indices.has(index));
 }
 
-function historyScopeLabel(period: HistoryPeriod, filter: HistoryFilter, assessment: HistoryAssessmentFilter): string {
-  const periodLabel = HISTORY_PERIODS.find(option => option.value === period)?.label || 'All time';
+function historyScopeLabel(
+  period: HistoryPeriod,
+  filter: HistoryFilter,
+  assessment: HistoryAssessmentFilter,
+  view: HistoryViewPreferences,
+): string {
+  const periodLabel = period === 'custom' && view.range
+    ? `${view.range.start} through ${view.range.end}`
+    : HISTORY_PERIODS.find(option => option.value === period)?.label || 'All time';
   const filterLabel = HISTORY_FILTERS.find(option => option.value === filter)?.label || 'All';
   const assessmentLabel = HISTORY_ASSESSMENTS.find(option => option.value === assessment)?.label || 'All feedback';
-  return `${periodLabel} · ${filterLabel} · ${assessmentLabel}`;
+  const recordedLabels = HISTORY_RECORDED_FILTERS.map(group => (
+    `${group.label}: ${group.options.find(option => option.value === view[group.key])?.label || 'All'}`
+  ));
+  const sortLabel = HISTORY_SORTS.find(option => option.value === view.sort)?.label || 'Newest first';
+  return [periodLabel, filterLabel, assessmentLabel, ...recordedLabels, sortLabel].join(' · ');
 }
 
 function fmtDuration(sec?: number): string {
@@ -220,6 +281,12 @@ function fmtDate(iso?: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return 'Unknown date';
   return d.toLocaleDateString() + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function sessionHistoryDate(item: SessionRecord): string | undefined {
+  return [item.savedAt, item.updatedAt].find(value => (
+    typeof value === 'string' && Number.isFinite(new Date(value).getTime())
+  ));
 }
 
 function sensitivityLabel(value?: SensitivityLevel): string {
@@ -244,7 +311,7 @@ function sessionRecordKey(item: SessionRecord, index: number): string {
   return item.sessionId || `${item.savedAt || item.updatedAt || 'session'}-${index}`;
 }
 
-type SessionOperation = 'saving' | 'deleting';
+type SessionOperation = 'saving' | 'deleting' | 'feedback';
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -255,6 +322,11 @@ export default function HistoryScreen() {
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
   const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>('all');
   const [historyAssessment, setHistoryAssessment] = useState<HistoryAssessmentFilter>('all');
+  const [historyView, setHistoryView] = useState<HistoryViewPreferences>({ ...DEFAULT_HISTORY_VIEW });
+  const [showCustomDates, setShowCustomDates] = useState(false);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [customDateError, setCustomDateError] = useState<string | null>(null);
   const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [showFusionValidation, setShowFusionValidation] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
@@ -266,13 +338,19 @@ export default function HistoryScreen() {
   const filterRevisionRef = useRef(0);
   const periodRevisionRef = useRef(0);
   const assessmentRevisionRef = useRef(0);
+  const recordedViewRevisionRef = useRef(0);
+  const customDraftRevisionRef = useRef(0);
   const viewRevisionRef = useRef(0);
   const historyFilterRef = useRef<HistoryFilter>('all');
   const historyPeriodRef = useRef<HistoryPeriod>('all');
   const historyAssessmentRef = useRef<HistoryAssessmentFilter>('all');
+  const historyViewRef = useRef<HistoryViewPreferences>({ ...DEFAULT_HISTORY_VIEW });
+  const focusedRef = useRef(false);
   const sessionsRef = useRef<SessionRecord[]>([]);
   const periodWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
   const assessmentWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const filterWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const recordedViewWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
   const historyLoadAttemptRef = useRef(0);
   const sessionOperationRunnersRef = useRef(new Map<string, ReturnType<typeof createSingleFlightActionRunner>>());
 
@@ -299,7 +377,7 @@ export default function HistoryScreen() {
     });
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (preserveView = false) => {
     viewRevisionRef.current += 1;
     pendingReviewScrollRef.current = null;
     setReviewQueueMessage(null);
@@ -309,33 +387,52 @@ export default function HistoryScreen() {
     const filterRevision = filterRevisionRef.current;
     const periodRevision = periodRevisionRef.current;
     const assessmentRevision = assessmentRevisionRef.current;
+    const recordedViewRevision = recordedViewRevisionRef.current;
+    const customDraftRevision = customDraftRevisionRef.current;
     setHistoryLoadBusy(true);
     try {
-      const [storedSessions, savedFilter, savedPeriod, savedAssessment] = await Promise.all([
+      const [storedSessions, savedFilter, savedPeriod, savedAssessment, savedView] = await Promise.all([
         loadSessionHistory<SessionRecord>(),
-        AsyncStorage.getItem(HISTORY_FILTER_KEY).catch(() => null),
+        filterWriteQueueRef.current
+          .then(() => AsyncStorage.getItem(HISTORY_FILTER_KEY))
+          .catch(() => undefined),
         periodWriteQueueRef.current
           .then(() => AsyncStorage.getItem(HISTORY_PERIOD_KEY))
           .catch(() => undefined),
         assessmentWriteQueueRef.current
           .then(() => AsyncStorage.getItem(HISTORY_ASSESSMENT_KEY))
           .catch(() => undefined),
+        recordedViewWriteQueueRef.current
+          .then(() => AsyncStorage.getItem(HISTORY_VIEW_KEY))
+          .catch(() => undefined),
       ]);
       if (historyLoadAttemptRef.current === loadAttempt && historyRevisionRef.current === revision) {
         sessionsRef.current = storedSessions;
         setSessions(storedSessions);
         setHistoryLoadError(false);
-        if (filterRevisionRef.current === filterRevision) {
+        let restoredView = historyViewRef.current;
+        if (!preserveView && recordedViewRevisionRef.current === recordedViewRevision && savedView !== undefined) {
+          restoredView = normalizeHistoryViewPreferences(savedView);
+          historyViewRef.current = restoredView;
+          setHistoryView(restoredView);
+          if (customDraftRevisionRef.current === customDraftRevision) {
+            setCustomStart(restoredView.range?.start || '');
+            setCustomEnd(restoredView.range?.end || '');
+            setCustomDateError(null);
+          }
+        }
+        if (!preserveView && filterRevisionRef.current === filterRevision && savedFilter !== undefined) {
           const filter = normalizeHistoryFilter(savedFilter);
           historyFilterRef.current = filter;
           setHistoryFilter(filter);
         }
-        if (periodRevisionRef.current === periodRevision && savedPeriod !== undefined) {
-          const period = normalizeHistoryPeriod(savedPeriod);
+        if (!preserveView && periodRevisionRef.current === periodRevision && savedPeriod !== undefined) {
+          const normalizedPeriod = normalizeHistoryPeriod(savedPeriod);
+          const period = normalizedPeriod === 'custom' && !restoredView.range ? 'all' : normalizedPeriod;
           historyPeriodRef.current = period;
           setHistoryPeriod(period);
         }
-        if (assessmentRevisionRef.current === assessmentRevision && savedAssessment !== undefined) {
+        if (!preserveView && assessmentRevisionRef.current === assessmentRevision && savedAssessment !== undefined) {
           const assessment = normalizeHistoryAssessmentFilter(savedAssessment);
           historyAssessmentRef.current = assessment;
           setHistoryAssessment(assessment);
@@ -355,8 +452,10 @@ export default function HistoryScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => {
+    focusedRef.current = true;
     void load();
     return () => {
+      focusedRef.current = false;
       historyLoadAttemptRef.current += 1;
       viewRevisionRef.current += 1;
       pendingReviewScrollRef.current = null;
@@ -365,14 +464,19 @@ export default function HistoryScreen() {
 
   const chooseHistoryFilter = (filter: HistoryFilter) => {
     viewRevisionRef.current += 1;
-    filterRevisionRef.current += 1;
+    const revision = filterRevisionRef.current + 1;
+    filterRevisionRef.current = revision;
     historyFilterRef.current = filter;
     setHistoryFilter(filter);
     setReviewQueueMessage(null);
     pendingReviewScrollRef.current = null;
-    AsyncStorage.setItem(HISTORY_FILTER_KEY, filter).catch(() => {
-      Alert.alert('Could not remember this view', 'The filter still works now, but it may reset next time.');
-    });
+    filterWriteQueueRef.current = filterWriteQueueRef.current
+      .then(() => AsyncStorage.setItem(HISTORY_FILTER_KEY, filter))
+      .catch(() => {
+        if (filterRevisionRef.current === revision) {
+          Alert.alert('Could not remember this view', 'The filter still works now, but it may reset next time.');
+        }
+      });
   };
 
   const chooseHistoryPeriod = (period: HistoryPeriod) => {
@@ -409,9 +513,46 @@ export default function HistoryScreen() {
       });
   };
 
+  const saveHistoryView = (view: HistoryViewPreferences) => {
+    viewRevisionRef.current += 1;
+    const revision = recordedViewRevisionRef.current + 1;
+    recordedViewRevisionRef.current = revision;
+    historyViewRef.current = view;
+    setHistoryView(view);
+    setReviewQueueMessage(null);
+    pendingReviewScrollRef.current = null;
+    recordedViewWriteQueueRef.current = recordedViewWriteQueueRef.current
+      .then(() => AsyncStorage.setItem(HISTORY_VIEW_KEY, JSON.stringify(view)))
+      .catch(() => {
+        if (recordedViewRevisionRef.current === revision) {
+          Alert.alert('Could not remember this view', 'These filters and sorting still work now, but may reset next time.');
+        }
+      });
+  };
+
+  const chooseRecordedFilter = (key: HistoryRecordedFilterKey, value: string) => {
+    // Only the recognized saved choices become preferences; legacy record values stay untouched.
+    saveHistoryView(normalizeHistoryViewPreferences(JSON.stringify({ ...historyViewRef.current, [key]: value })));
+  };
+
+  const applyCustomDates = () => {
+    const result = validateHistoryDateRange(customStart, customEnd);
+    setCustomDateError(result.error);
+    if (!result.range) return;
+    saveHistoryView({ ...historyViewRef.current, range: result.range });
+    chooseHistoryPeriod('custom');
+    setShowCustomDates(false);
+  };
+
   const currentReviewQueue = (excludedIndex?: number) => historyReviewQueue(
     filterIndexedSessionsByAssessment(
-      filterIndexedSessionsByPeriod(sortIndexedSessionsNewest(sessionsRef.current), historyPeriodRef.current),
+      filterIndexedSessionsByRecordedConditions(
+        filterIndexedSessionsByPeriod(
+          sortIndexedSessions(sessionsRef.current, historyViewRef.current.sort),
+          historyPeriodRef.current, Date.now(), historyViewRef.current.range,
+        ),
+        historyViewRef.current,
+      ),
       historyAssessmentRef.current,
     ).filter(({ item }) => matchesHistoryReviewFilter(item, historyFilterRef.current)),
     excludedIndex,
@@ -460,7 +601,7 @@ export default function HistoryScreen() {
     ) {
       setReviewQueueMessage(null);
       const queue = currentReviewQueue(index);
-      const selectedScope = historyScopeLabel(historyPeriodRef.current, historyFilterRef.current, historyAssessmentRef.current);
+      const selectedScope = historyScopeLabel(historyPeriodRef.current, historyFilterRef.current, historyAssessmentRef.current, historyViewRef.current);
       if (queue.length === 0) {
         Alert.alert(
           'Review queue complete',
@@ -491,7 +632,7 @@ export default function HistoryScreen() {
               setExpandedSessions(current => ({ ...current, [key]: true }));
               setReviewQueueMessage({
                 key,
-                text: `Next unfinished review · ${currentQueue.length} ${currentQueue.length === 1 ? 'session' : 'sessions'} remaining in the selected feedback and date view`,
+                text: `Next unfinished review · ${currentQueue.length} ${currentQueue.length === 1 ? 'session' : 'sessions'} remaining with all selected filters and sorting`,
               });
             },
           },
@@ -507,6 +648,20 @@ export default function HistoryScreen() {
       item => ({ ...item, alertAssessment: value, assessmentUpdatedAt: updatedAt }),
       'Could not save review',
       'Please try rating this session again.',
+    );
+  };
+
+  const removeAssessment = async (index: number) => {
+    await saveSessionChanges(
+      index,
+      item => {
+        const updated = { ...item };
+        delete updated.alertAssessment;
+        delete updated.assessmentUpdatedAt;
+        return updated;
+      },
+      'Could not remove assessment',
+      'The saved rating remains unchanged. Please try again.',
     );
   };
 
@@ -540,14 +695,16 @@ export default function HistoryScreen() {
 
   const shareSessions = async (items: SessionRecord[]) => {
     if (items.length === 0) return;
-    const selectedScope = historyScopeLabel(historyPeriod, historyFilter, historyAssessment);
+    const selectedScope = historyScopeLabel(historyPeriod, historyFilter, historyAssessment, historyView);
     const dateScope = historyPeriod === 'all'
       ? 'All saved dates are included.'
-      : 'This period includes today and the preceding local calendar days; unrecorded and future dates are excluded.';
+      : historyPeriod === 'custom'
+        ? 'The applied From and To dates are inclusive local calendar dates on this iPhone; unrecorded and future dates are excluded.'
+        : 'This period includes today and the preceding local calendar days; unrecorded and future dates are excluded.';
     try {
       await Share.share({
         title: 'Occulert session summaries',
-        message: `Shown view: ${selectedScope}\n${dateScope}\nAlert feedback is a saved user observation, not a detection accuracy measure. Recovered sessions are partial summaries.\n\n${buildSessionHistoryExport(items.map(historyReviewInput))}`,
+        message: `Shown view: ${selectedScope}\n${dateScope}\nAlert feedback is a saved user observation, not a detection accuracy measure. Recovered sessions are partial summaries.\n\n${buildSessionHistoryExport(items.map(item => ({ ...historyReviewInput(item), savedAt: sessionHistoryDate(item) })))}`,
       });
     } catch {
       Alert.alert('Could not share summaries', 'Please try exporting the session summaries again.');
@@ -593,6 +750,24 @@ export default function HistoryScreen() {
     );
   };
 
+  const sendSessionFeedback = async (target: SessionRecord, index: number) => {
+    const viewRevision = viewRevisionRef.current;
+    const historyRevision = historyRevisionRef.current;
+    const key = sessionRecordKey(target, index);
+    await runSessionOperation(
+      key,
+      'feedback',
+      () => openFeedbackWithFallback(target, () => (
+        focusedRef.current && viewRevisionRef.current === viewRevision
+        && historyRevisionRef.current === historyRevision
+        && sessionsRef.current.some((item, storedIndex) => sessionRecordKey(item, storedIndex) === key)
+      )),
+      () => {
+        if (focusedRef.current) Alert.alert('Could not open feedback', 'Please try opening the session draft again.');
+      },
+    );
+  };
+
   const evidenceSessions = sessions.filter(item => !item.recoveredFromInterruption);
   const reviewedMedium = evidenceSessions.filter(
     item => item.sensitivity === 'medium' && hasCompleteHistoryReview(item),
@@ -611,33 +786,39 @@ export default function HistoryScreen() {
     Boolean(item.deviceImpact?.batteryImpact) && Boolean(item.deviceImpact?.phoneHeat)
   )).length;
   const pilotCoverage = summarizePilotCoverage(reviewedMedium);
-  const issueInsights = summarizePilotIssues(evidenceSessions);
+  const issueInsights = summarizePilotIssues(evidenceSessions.map(historyReviewInput));
   const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
   const fusionValidation = summarizeFusionValidation(sessions);
   const fusionSessionPlan = planNextFusionValidationSession(sessions);
   const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteHistoryReview(item)).length;
   const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteHistoryReview(item)).length;
   const recoveredCount = sessions.filter(item => item.recoveredFromInterruption).length;
-  const sortedSessions = sortIndexedSessionsNewest(sessions);
-  const periodSessions = filterIndexedSessionsByPeriod(sortedSessions, historyPeriod);
-  const assessmentSessions = filterIndexedSessionsByAssessment(periodSessions, historyAssessment);
+  const sortedSessions = sortIndexedSessions(sessions, historyView.sort);
+  const periodSessions = filterIndexedSessionsByPeriod(sortedSessions, historyPeriod, Date.now(), historyView.range);
+  const recordedSessions = filterIndexedSessionsByRecordedConditions(periodSessions, historyView);
+  const assessmentSessions = filterIndexedSessionsByAssessment(recordedSessions, historyAssessment);
   const filterCounts: Record<HistoryFilter, number> = {
     all: assessmentSessions.length,
     'needs-review': assessmentSessions.filter(({ item }) => matchesHistoryReviewFilter(item, 'needs-review')).length,
     reviewed: assessmentSessions.filter(({ item }) => matchesHistoryReviewFilter(item, 'reviewed')).length,
     recovered: assessmentSessions.filter(({ item }) => matchesHistoryReviewFilter(item, 'recovered')).length,
   };
-  const reviewStatusSessions = periodSessions.filter(({ item }) => matchesHistoryReviewFilter(item, historyFilter));
+  const reviewStatusSessions = recordedSessions.filter(({ item }) => matchesHistoryReviewFilter(item, historyFilter));
   const assessmentCounts = Object.fromEntries(HISTORY_ASSESSMENTS.map(assessment => [
     assessment.value,
     filterIndexedSessionsByAssessment(reviewStatusSessions, assessment.value).length,
   ])) as Record<HistoryAssessmentFilter, number>;
   const filteredSessions = filterIndexedSessionsByAssessment(reviewStatusSessions, historyAssessment);
-  const selectedScope = historyScopeLabel(historyPeriod, historyFilter, historyAssessment);
+  const selectedScope = historyScopeLabel(historyPeriod, historyFilter, historyAssessment, historyView);
   const visibleReviewQueue = historyReviewQueue(filteredSessions);
   const nextReviewSession = visibleReviewQueue[0];
   const shownRecoveredCount = filteredSessions.filter(({ item }) => item.recoveredFromInterruption).length;
-  const groupedFilteredSessions = groupIndexedSessionsByDate(filteredSessions);
+  // A single shown group keeps metric and oldest sorting intact instead of regrouping by date.
+  const groupedFilteredSessions = filteredSessions.length > 0 ? [{
+    key: 'shown',
+    label: HISTORY_SORTS.find(option => option.value === historyView.sort)?.label || 'Newest first',
+    sessions: filteredSessions,
+  }] : [];
   const sessionOperationsBusy = Object.keys(sessionOperations).length > 0;
 
   const continueReviewing = () => {
@@ -653,7 +834,7 @@ export default function HistoryScreen() {
     setExpandedSessions(current => ({ ...current, [key]: true }));
     setReviewQueueMessage({
       key,
-      text: `${currentQueue.length} unfinished ${currentQueue.length === 1 ? 'session' : 'sessions'} in the selected feedback and date view`,
+      text: `${currentQueue.length} unfinished ${currentQueue.length === 1 ? 'session' : 'sessions'} with all selected filters and sorting`,
     });
   };
 
@@ -669,8 +850,23 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView style={s.bg}>
       <AmbientBackground />
-      <ScrollView ref={scrollRef} contentContainerStyle={s.scroll}>
+      <ScrollView ref={scrollRef} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <Text style={s.title}>Session History</Text>
+        <Text style={s.periodNote}>
+          This iPhone keeps up to 50 recent local session summaries. Choose Share shown summaries to keep a copy elsewhere. Cloud sharing remains your separate account choice.
+        </Text>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={historyLoadBusy ? 'Refreshing local history' : 'Refresh local history'}
+          accessibilityHint="Rereads summaries and saved sync badges on this iPhone while preserving current filters, sorting, and date drafts"
+          accessibilityState={{ disabled: historyLoadBusy || sessionOperationsBusy, busy: historyLoadBusy }}
+          disabled={historyLoadBusy || sessionOperationsBusy}
+          style={[s.refreshButton, (historyLoadBusy || sessionOperationsBusy) && s.operationDisabled]}
+          onPress={() => { void load(true); }}
+        >
+          {historyLoadBusy ? <ActivityIndicator size="small" color="#93c5fd" /> : <Ionicons name="refresh-outline" size={17} color="#93c5fd" />}
+          <Text style={s.refreshText}>{historyLoadBusy ? 'Reading local history…' : 'Refresh local history'}</Text>
+        </TouchableOpacity>
 
         {!loaded && historyLoadBusy && (
           <View
@@ -699,9 +895,9 @@ export default function HistoryScreen() {
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={historyLoadBusy ? 'Retrying local session history' : 'Retry local session history'}
-                accessibilityState={{ disabled: historyLoadBusy, busy: historyLoadBusy }}
-                disabled={historyLoadBusy}
-                onPress={() => { void load(); }}
+                accessibilityState={{ disabled: historyLoadBusy || sessionOperationsBusy, busy: historyLoadBusy }}
+                disabled={historyLoadBusy || sessionOperationsBusy}
+                onPress={() => { void load(true); }}
                 style={s.loadRetry}
               >
                 <Text style={s.loadRetryText}>{historyLoadBusy ? 'Retrying…' : 'Try again'}</Text>
@@ -732,8 +928,8 @@ export default function HistoryScreen() {
             {nextReviewSession && (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={`Continue reviewing the newest unfinished session from ${fmtDate(nextReviewSession.item.savedAt || nextReviewSession.item.updatedAt)}`}
-                accessibilityHint="Shows the unfinished review queue matching the selected feedback and date view, and expands its newest session"
+                accessibilityLabel={`Continue reviewing the next shown unfinished session from ${fmtDate(sessionHistoryDate(nextReviewSession.item))}`}
+                accessibilityHint="Expands the first unfinished session matching all selected filters in the selected sort order"
                 accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
                 disabled={sessionOperationsBusy}
                 onPress={continueReviewing}
@@ -745,7 +941,7 @@ export default function HistoryScreen() {
                 <View style={s.continueReviewCopy}>
                   <Text style={s.continueReviewTitle}>Continue reviewing</Text>
                   <Text style={s.continueReviewDetail}>
-                    Newest unfinished session · {selectedScope} · All history: {checkpointProgress} of {CHECKPOINT_TARGET} Medium reviews complete
+                    Next shown unfinished session · {selectedScope} · All history: {checkpointProgress} of {CHECKPOINT_TARGET} Medium reviews complete
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -761,10 +957,20 @@ export default function HistoryScreen() {
                     accessibilityLabel={period.label}
                     accessibilityHint={period.value === 'all'
                       ? 'Shows saved sessions from every date'
-                      : 'Includes today and the preceding local calendar days; excludes unrecorded and future dates'}
+                      : period.value === 'custom'
+                        ? 'Enter and apply inclusive From and To local calendar dates'
+                        : 'Includes today and the preceding local calendar days; excludes unrecorded and future dates'}
                     accessibilityState={{ selected }}
                     style={[s.filterButton, selected && s.filterButtonSelected]}
-                    onPress={() => chooseHistoryPeriod(period.value)}
+                    onPress={() => {
+                      if (period.value === 'custom') {
+                        setShowCustomDates(true);
+                        setCustomDateError(null);
+                      } else {
+                        chooseHistoryPeriod(period.value);
+                        setShowCustomDates(false);
+                      }
+                    }}
                   >
                     <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>
                       {period.label}
@@ -773,11 +979,96 @@ export default function HistoryScreen() {
                 );
               })}
             </View>
+            {showCustomDates && (
+              <View style={s.customDateBox}>
+                <Text style={s.conditionsTitle}>Custom local dates</Text>
+                <Text style={s.periodNote}>Enter YYYY-MM-DD. Both dates are included, from 1900 through today. Apply to change the shown view; typing leaves the applied filters unchanged.</Text>
+                <View style={s.customDateRow}>
+                  <View style={s.customDateField}>
+                    <Text style={s.conditionLabel}>From</Text>
+                    <TextInput
+                      accessibilityLabel="From date, YYYY-MM-DD"
+                      value={customStart}
+                      maxLength={10}
+                      autoCorrect={false}
+                      autoCapitalize="none"
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor="#6592a5"
+                      style={s.customDateInput}
+                      onChangeText={value => { customDraftRevisionRef.current += 1; setCustomStart(value); setCustomDateError(null); }}
+                    />
+                  </View>
+                  <View style={s.customDateField}>
+                    <Text style={s.conditionLabel}>To</Text>
+                    <TextInput
+                      accessibilityLabel="To date, YYYY-MM-DD"
+                      value={customEnd}
+                      maxLength={10}
+                      autoCorrect={false}
+                      autoCapitalize="none"
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor="#6592a5"
+                      style={s.customDateInput}
+                      onChangeText={value => { customDraftRevisionRef.current += 1; setCustomEnd(value); setCustomDateError(null); }}
+                    />
+                  </View>
+                </View>
+                {customDateError && <Text accessibilityRole="alert" style={s.customDateError}>{customDateError}</Text>}
+                <View style={s.filterRow}>
+                  <TouchableOpacity accessibilityRole="button" style={[s.filterButton, s.filterButtonSelected]} onPress={applyCustomDates}>
+                    <Text style={s.filterButtonTextSelected}>Apply dates</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" accessibilityHint="Keeps the applied filters unchanged" style={s.filterButton} onPress={() => { setShowCustomDates(false); setCustomDateError(null); }}>
+                    <Text style={s.filterButtonText}>Close date editor</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
             {historyPeriod !== 'all' && (
               <Text style={s.periodNote}>
-                Includes today and the previous {historyPeriod === '7-days' ? 6 : 29} days. Unrecorded and future dates stay in All time.
+                {historyPeriod === 'custom' && historyView.range
+                  ? `Applied ${historyView.range.start} through ${historyView.range.end}, including both local calendar dates.`
+                  : `Includes today and the previous ${historyPeriod === '7-days' ? 6 : 29} days.`} Unrecorded and future dates stay in All time.
               </Text>
             )}
+            {HISTORY_RECORDED_FILTERS.map(group => (
+              <React.Fragment key={group.key}>
+                <Text style={s.scopeLabel}>{group.label.toUpperCase()}</Text>
+                <View accessibilityRole="tablist" accessibilityLabel={group.label} style={s.filterRow}>
+                  {group.options.map(option => {
+                    const selected = historyView[group.key] === option.value;
+                    return (
+                      <TouchableOpacity
+                        key={option.value}
+                        accessibilityRole="tab"
+                        accessibilityLabel={`${group.label}: ${option.label}`}
+                        accessibilityHint={option.value === 'unknown' ? 'Includes missing or unrecognized saved values' : 'Combines with all other selected filters'}
+                        accessibilityState={{ selected }}
+                        style={[s.filterButton, selected && s.filterButtonSelected]}
+                        onPress={() => chooseRecordedFilter(group.key, option.value)}
+                      >
+                        <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>{option.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </React.Fragment>
+            ))}
+            <Text style={s.periodNote}>Not recorded includes missing or unrecognized saved values. Lighting and eyewear are saved tester observations.</Text>
+            <Text style={s.scopeLabel}>SORT SHOWN SESSIONS</Text>
+            <View accessibilityRole="tablist" accessibilityLabel="Session sort order" style={s.filterRow}>
+              {HISTORY_SORTS.map(option => {
+                const selected = historyView.sort === option.value;
+                return (
+                  <TouchableOpacity key={option.value} accessibilityRole="tab" accessibilityLabel={option.label}
+                    accessibilityState={{ selected }} style={[s.filterButton, selected && s.filterButtonSelected]}
+                    onPress={() => saveHistoryView({ ...historyViewRef.current, sort: option.value })}>
+                    <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>{option.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={s.periodNote}>Missing sort values appear last. Equal durations or alert counts use newest date first. Recovered sessions remain partial summaries.</Text>
             <Text style={s.scopeLabel}>REVIEW STATUS</Text>
             <View accessibilityRole="tablist" accessibilityLabel="Session review status" style={s.filterRow}>
               {HISTORY_FILTERS.map(filter => {
@@ -787,7 +1078,7 @@ export default function HistoryScreen() {
                     key={filter.value}
                     accessibilityRole="tab"
                     accessibilityLabel={`${filter.label}, ${filterCounts[filter.value]} sessions`}
-                    accessibilityHint="Filters sessions matching the selected date period and alert feedback"
+                    accessibilityHint="Combines with the selected date, recorded conditions, and alert feedback filters"
                     accessibilityState={{ selected }}
                     style={[s.filterButton, selected && s.filterButtonSelected]}
                     onPress={() => chooseHistoryFilter(filter.value)}
@@ -834,7 +1125,7 @@ export default function HistoryScreen() {
                 accessibilityLabel={sessionOperationsBusy
                   ? 'Wait for session changes before sharing summaries'
                   : `Share ${filteredSessions.length} visible session summaries`}
-                accessibilityHint="Shares only the shown sessions and identifies the selected date, review status, and alert feedback filters"
+                accessibilityHint="Shares only the shown sessions in their displayed order and identifies all selected filters"
                 accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
                 disabled={sessionOperationsBusy}
                 style={[s.exportButton, sessionOperationsBusy && s.operationDisabled]}
@@ -1099,7 +1390,10 @@ export default function HistoryScreen() {
           </View>
         )}
 
-        {loaded && sessions.length > 0 && filteredSessions.length === 0 && (historyFilter !== 'all' || historyPeriod !== 'all' || historyAssessment !== 'all') && (
+        {loaded && sessions.length > 0 && filteredSessions.length === 0 && (
+          historyFilter !== 'all' || historyPeriod !== 'all' || historyAssessment !== 'all'
+          || historyView.sensitivity !== 'all' || historyView.lighting !== 'all' || historyView.eyewear !== 'all'
+        ) && (
           <View style={s.filteredEmpty}>
             <Ionicons name="filter-outline" size={32} color="#4a7a8a" />
             <Text style={s.emptyTitle}>
@@ -1113,9 +1407,14 @@ export default function HistoryScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Show all saved sessions"
-              accessibilityHint="Clears the date period, review status, and alert feedback filters"
+              accessibilityHint="Clears all applied filters while keeping the selected sort order"
               style={s.clearFilterButton}
-              onPress={() => { chooseHistoryFilter('all'); chooseHistoryPeriod('all'); chooseHistoryAssessment('all'); }}
+              onPress={() => {
+                chooseHistoryFilter('all'); chooseHistoryPeriod('all'); chooseHistoryAssessment('all');
+                saveHistoryView({ ...historyViewRef.current, sensitivity: 'all', lighting: 'all', eyewear: 'all' });
+                setShowCustomDates(false);
+                setCustomDateError(null);
+              }}
             >
               <Text style={s.clearFilterText}>Show all sessions</Text>
             </TouchableOpacity>
@@ -1160,7 +1459,7 @@ export default function HistoryScreen() {
               </View>
             )}
             <View style={s.rowBetween}>
-              <Text style={s.date}>{fmtDate(item.savedAt || item.updatedAt)}</Text>
+              <Text style={s.date}>{fmtDate(sessionHistoryDate(item))}</Text>
               <Text style={s.dur}>{formatSessionDuration(item.durationSec)}</Text>
             </View>
             <View style={s.stats}>
@@ -1291,7 +1590,9 @@ export default function HistoryScreen() {
                     ? 'Saving changes…'
                     : sessionOperation === 'deleting'
                       ? 'Deleting session…'
-                      : reviewComplete ? 'Review complete' : hasHistoryAlertAssessment(item.alertAssessment) ? 'Rating saved' : 'Needs review'}
+                      : sessionOperation === 'feedback'
+                        ? 'Opening feedback…'
+                        : reviewComplete ? 'Review complete' : hasHistoryAlertAssessment(item.alertAssessment) ? 'Rating saved' : 'Needs review'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -1376,6 +1677,20 @@ export default function HistoryScreen() {
                   );
                 })}
               </View>
+              {hasHistoryAlertAssessment(item.alertAssessment) && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove this session's alert assessment"
+                  accessibilityHint="Returns the rating to Not assessed while keeping the session summary, test conditions, and device observations"
+                  accessibilityState={{ disabled: sessionBusy, busy: sessionBusy }}
+                  disabled={sessionBusy}
+                  style={[s.removeAssessmentButton, sessionBusy && s.operationDisabled]}
+                  onPress={() => { void removeAssessment(i); }}
+                >
+                  <Ionicons name="remove-circle-outline" size={16} color="#93c5fd" />
+                  <Text style={s.removeAssessmentText}>Remove assessment · keep session</Text>
+                </TouchableOpacity>
+              )}
               <Text style={s.reviewPrivacy}>
                 This alert rating stays only on this iPhone. Choose the best match after parking. It is included only if you choose to send feedback.
               </Text>
@@ -1388,6 +1703,7 @@ export default function HistoryScreen() {
               {TEST_CONDITION_GROUPS.map(group => (
                 <View key={group.key} style={s.conditionGroup}>
                   <Text style={s.conditionLabel}>{group.label}</Text>
+                  <Text style={s.reviewPrivacy}>Saved: {group.options.find(option => option.value === item.testConditions?.[group.key])?.label || 'Not recorded'}</Text>
                   <View style={s.conditionOptions}>
                     {group.options.map(option => {
                       const selected = item.testConditions?.[group.key] === option.value;
@@ -1422,6 +1738,7 @@ export default function HistoryScreen() {
               {DEVICE_IMPACT_GROUPS.map(group => (
                 <View key={group.key} style={s.conditionGroup}>
                   <Text style={s.conditionLabel}>{group.label}</Text>
+                  <Text style={s.reviewPrivacy}>Saved: {group.options.find(option => option.value === item.deviceImpact?.[group.key])?.label || 'Not recorded'}</Text>
                   <View style={s.conditionOptions}>
                     {group.options.map(option => {
                       const selected = item.deviceImpact?.[group.key] === option.value;
@@ -1459,18 +1776,14 @@ export default function HistoryScreen() {
               accessibilityState={{ disabled: sessionBusy, busy: sessionBusy }}
               disabled={sessionBusy}
               style={[s.feedbackBtn, sessionBusy && s.operationDisabled]}
-              onPress={async () => {
-                if (!await openFeedback(item)) {
-                  Alert.alert('Mail is unavailable', 'Email hello@occulert.com to share pilot feedback.');
-                }
-              }}
+              onPress={() => { void sendSessionFeedback(item, i); }}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={16} color="#93c5fd" />
               <Text style={s.feedbackTxt}>Send session feedback</Text>
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={`Delete session from ${fmtDate(item.savedAt || item.updatedAt)}`}
+              accessibilityLabel={`Delete session from ${fmtDate(sessionHistoryDate(item))}`}
               accessibilityHint="Permanently removes this local session after confirmation"
               accessibilityState={{ disabled: sessionBusy, busy: sessionBusy }}
               disabled={sessionBusy}
@@ -1502,6 +1815,13 @@ const s = StyleSheet.create({
   loadErrorDetail: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 3 },
   loadRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 18 },
   loadRetryText: { color: '#93c5fd', fontSize: 12, fontWeight: '900' },
+  refreshButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 16, paddingHorizontal: 12, borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10 },
+  refreshText: { flexShrink: 1, color: '#93c5fd', fontSize: 12, fontWeight: '800' },
+  customDateBox: { padding: 12, borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10, marginBottom: 10 },
+  customDateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 },
+  customDateField: { flexGrow: 1, flexBasis: 120, minWidth: 0 },
+  customDateInput: { minHeight: 44, color: '#e0f2fe', fontSize: 14, borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginTop: 5 },
+  customDateError: { color: '#fbbf24', fontSize: 11, lineHeight: 17, marginBottom: 9 },
   historySummary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', backgroundColor: colors.materialStrong, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, paddingVertical: 13, marginBottom: 12 },
   historySummaryItem: { flexGrow: 1, flexBasis: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   historySummaryValue: { color: '#e0f2fe', fontSize: 19, fontWeight: '900' },
@@ -1654,6 +1974,8 @@ const s = StyleSheet.create({
   reviewOptionText: { color: '#4a7a8a', fontSize: 10, fontWeight: '800', textAlign: 'center' },
   reviewOptionTextSelected: { color: '#dbeafe' },
   reviewPrivacy: { color: '#4a7a8a', fontSize: 10, lineHeight: 14, marginTop: 8 },
+  removeAssessmentButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 6 },
+  removeAssessmentText: { flexShrink: 1, color: '#93c5fd', fontSize: 11, fontWeight: '800' },
   conditions: { borderTopWidth: 1, borderTopColor: '#1a3a4a', marginTop: 14, paddingTop: 14 },
   conditionsTitle: { color: '#c8e8f0', fontSize: 12, fontWeight: '800' },
   conditionsSafety: { color: '#fbbf24', fontSize: 10, fontWeight: '700', marginTop: 4, marginBottom: 10 },

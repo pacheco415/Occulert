@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert, Linking, AppState, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SensitivitySlider, loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { SensitivityLevel } from '../constants/thresholds';
-import { openFeedback } from '../lib/feedback';
+import { openFeedbackWithFallback } from '../lib/feedback';
 import { getWatchStatus, sendAlertToWatch, type WatchStatus } from '../lib/watchBridge';
 import {
   getWatchAlertsEnabled,
@@ -140,6 +140,7 @@ export default function SettingsScreen() {
   const [recoveryDataUnreadable, setRecoveryDataUnreadable] = useState(false);
   const [localDataStatusBusy, setLocalDataStatusBusy] = useState(true);
   const [localDataBusy, setLocalDataBusy] = useState(false);
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
   // This parked-only test must release the shared iOS audio session when the
   // tone ends so music and navigation audio can return to their normal level.
   const audioTestPlayer = useAudioPlayer(ALERT_SOUND);
@@ -147,7 +148,10 @@ export default function SettingsScreen() {
   const watchTestRunnerRef = useRef(createSingleFlightActionRunner());
   const deviceRefreshRunnerRef = useRef(createSingleFlightActionRunner());
   const localDataStatusRunnerRef = useRef(createSingleFlightActionRunner());
+  const feedbackRunnerRef = useRef(createSingleFlightActionRunner());
   const settingsMountedRef = useRef(true);
+  const settingsFocusedRef = useRef(false);
+  const settingsViewRevisionRef = useRef(0);
   const audioTestAbortRef = useRef<AbortController | null>(null);
   const watchAvailable = watchStatus.paired && watchStatus.appInstalled;
   const appBuildLabel = formatAppBuildLabel(currentAppBuildInfo());
@@ -207,6 +211,7 @@ export default function SettingsScreen() {
 
   useFocusEffect(useCallback(() => {
     let active = true;
+    settingsFocusedRef.current = true;
     Promise.all([
       getWatchStatus(),
       getWatchAlertsEnabled(true),
@@ -218,8 +223,30 @@ export default function SettingsScreen() {
       setHeadphoneMotionStatus(motionStatus);
     }).catch(() => {});
     refreshLocalDataStatus();
-    return () => { active = false; };
+    return () => {
+      active = false;
+      settingsFocusedRef.current = false;
+      settingsViewRevisionRef.current += 1;
+    };
   }, [refreshLocalDataStatus]));
+
+  const sendFeedback = () => {
+    const revision = settingsViewRevisionRef.current;
+    const isActive = () => settingsMountedRef.current
+      && settingsFocusedRef.current
+      && revision === settingsViewRevisionRef.current
+      && AppState.currentState === 'active';
+    if (!isActive()) return;
+    void feedbackRunnerRef.current.run({
+      action: () => openFeedbackWithFallback(undefined, isActive),
+      onBusyChange: busy => {
+        if (settingsMountedRef.current) setFeedbackBusy(busy);
+      },
+      onError: () => {
+        if (isActive()) Alert.alert('Feedback unavailable', 'Try again, or email hello@occulert.com from your preferred email app.');
+      },
+    });
+  };
 
   const saveBooleanSetting = (
     key: string,
@@ -487,7 +514,8 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={s.bg}>
       <AmbientBackground />
-      <ScrollView contentContainerStyle={s.scroll}>
+      <KeyboardAvoidingView style={s.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <Text style={s.eyebrow}>OCCULERT</Text>
         <Text style={s.title}>Settings</Text>
         <View style={s.priorityCard}>
@@ -686,6 +714,10 @@ export default function SettingsScreen() {
             <Ionicons name="cloud-outline" size={14} color="#4a7a8a" />
             <Text style={s.privTxt}>Cloud session summaries are separate and sync only when you enable cloud sync while signed in. Deleting local data here does not delete cloud records.</Text>
           </View>
+          <View style={s.privNote}>
+            <Ionicons name="time-outline" size={14} color="#4a7a8a" />
+            <Text style={s.privTxt}>Local history keeps up to 50 recent summaries. New saves can remove the oldest local records. Share selected summaries from History if you want to keep a text copy elsewhere. Local reviews and test conditions are not included in automatic cloud sync.</Text>
+          </View>
           <View accessibilityLiveRegion="polite" style={s.localDataStatus}>
             <Text style={s.localDataStatusText}>
               {localDataStatusBusy
@@ -791,29 +823,28 @@ export default function SettingsScreen() {
           <View style={s.div} />
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Send pilot feedback"
-            accessibilityHint="Opens a draft email for your review"
-            style={s.row}
-            onPress={async () => {
-              if (!await openFeedback()) {
-                Alert.alert('Mail is unavailable', 'Email hello@occulert.com to share pilot feedback.');
-              }
-            }}
+            accessibilityLabel={feedbackBusy ? 'Preparing pilot feedback draft' : 'Prepare pilot feedback'}
+            accessibilityHint="Opens an email draft; if Mail is unavailable, offers a separate choice to share the draft"
+            accessibilityState={{ disabled: feedbackBusy, busy: feedbackBusy }}
+            disabled={feedbackBusy}
+            style={[s.row, feedbackBusy && s.localDataActionDisabled]}
+            onPress={sendFeedback}
           >
-            <View style={s.rowL}><Ionicons name="chatbubble-ellipses-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Send feedback</Text><Text style={s.sub}>Report an alert issue or share a suggestion</Text></View></View>
+            <View style={s.rowL}><Ionicons name="chatbubble-ellipses-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>{feedbackBusy ? 'Preparing feedback…' : 'Prepare feedback'}</Text><Text style={s.sub}>Review the draft before choosing whether to send it</Text></View></View>
             <Ionicons name="chevron-forward" size={18} color="#4a7a8a" />
           </TouchableOpacity>
-          <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>Feedback opens in Mail for your review. No camera video, audio, or location is attached.</Text></View>
+          <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>Feedback opens as a draft in Mail, or you can choose another app if Mail is unavailable. Nothing is sent automatically. No camera video, audio, raw motion readings, or location is attached.</Text></View>
         </View>
         <Text accessibilityLabel={`Occulert ${appBuildLabel}`} style={s.ver}>
           Occulert™ · {appBuildLabel} · San Francisco, CA
         </Text>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 const s = StyleSheet.create({
-  bg:{flex:1,backgroundColor:colors.background}, scroll:{padding:20,paddingBottom:48},
+  bg:{flex:1,backgroundColor:colors.background}, keyboard:{flex:1}, scroll:{padding:20,paddingBottom:48},
   eyebrow:{color:colors.cyan,fontSize:10,fontWeight:'800',letterSpacing:1.5,marginTop:6,marginBottom:5},
   title:{color:colors.text,fontSize:32,fontWeight:'800',letterSpacing:-0.8,marginBottom:12},
   priorityCard:{flexDirection:'row',alignItems:'flex-start',gap:11,backgroundColor:'rgba(100,210,255,0.07)',borderWidth:1,borderColor:'rgba(100,210,255,0.2)',borderRadius:radii.medium,padding:14,marginBottom:18},
