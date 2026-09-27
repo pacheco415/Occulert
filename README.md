@@ -9,9 +9,11 @@ Occulert is a prototype real-time AI drowsiness detection platform that uses you
 Development and release status is maintained in the
 [authoritative roadmap](docs/APP_ROADMAP.md).
 
-- **Website:** the last recorded production source before this batch is PR #152,
-  `26d2fb4`, deployment READY. Fleet browsing/export and Support are published,
-  with recent testing deferred. Source publication does not establish runtime acceptance.
+- **Current source package:** [PR #153](https://github.com/pacheco415/Occulert/pull/153)
+  implements the approved app and website improvements. See that PR's release
+  receipt for the final source and website deployment status. The previous
+  production receipt is PR #152, `26d2fb4`, deployment READY. Source publication
+  does not establish runtime acceptance.
 - **Installed private native app:** TestFlight **1.0.0 (52)** from `969849b`.
   The user reported general iPhone functionality and foreground/background Watch
   urgent display/vibration. Exact-device coverage and sustained performance remain open.
@@ -28,7 +30,7 @@ Development and release status is maintained in the
   and evidence requirements in the roadmap. Existing pilot and App Store materials
   do not establish participants, device acceptance, accuracy or public store availability.
 
-Dated PR #138–#152 evidence remains in the roadmap and linked release records.
+Dated PR #138–#153 evidence remains in the roadmap and linked release records.
 
 ---
 

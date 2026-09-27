@@ -34,9 +34,12 @@ custom dates and condition filters, sorting, assessment removal and feedback
 fallback; loaded fleet History dates/sorting/printing, follow-up filters and
 preserved drafts, invitation search/refresh/delivery clarity, consistent CSV
 behavior; public installation/FAQ/support/accessibility and consolidated release
-records. See [approved upgrades](APPROVED_UPGRADES_2026_09_26.md) for scope and
-implementation details. These are source changes for review. Publication,
-installed-native distribution and runtime acceptance must be recorded separately.
+records. All 21 are implemented in
+[PR #153](https://github.com/pacheco415/Occulert/pull/153), with text/diff and
+independent source review complete. See [approved upgrades](APPROVED_UPGRADES_2026_09_26.md)
+for scope and implementation details. The PR's release receipt records final
+merged source and website deployment status. Installed-native distribution and
+runtime acceptance remain separate; build 52 does not include this package.
 All tests, type checks, browser and device checks remain explicitly deferred by
 the user's instruction, including this batch. No paid build or billing change,
 new native binary, submission or outreach is part of the batch.

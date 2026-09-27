@@ -1,8 +1,11 @@
 # Approved app and website upgrades — September 26, 2026
 
-The user approved the full 21-item development menu. This document records the
-source scope; deployment, installed-native distribution and runtime acceptance
-are separate facts recorded in the authoritative [roadmap](APP_ROADMAP.md).
+The user approved the full 21-item development menu. All 21 are implemented in
+[PR #153](https://github.com/pacheco415/Occulert/pull/153); text/diff and independent
+source review are complete. This document records the source scope. The PR's
+release receipt records final source and website deployment status; installed-native
+distribution and runtime acceptance remain separate facts in the authoritative
+[roadmap](APP_ROADMAP.md).
 All testing, type checks, parsing/bundle checks and browser/device execution are
 deferred at the user's request. Text and diff review are permitted.
 
