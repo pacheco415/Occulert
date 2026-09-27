@@ -27,13 +27,14 @@
 <link rel="stylesheet" href="/features-page-1.v47.css" />
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
+<link rel="stylesheet" href="/public-guidance.v67.css" />
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <nav>
   <a class="logo" href="/" aria-label="Occulert home"><span class="logo-mark"><svg width="23" height="23" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></span>Occulert</a>
   <div class="nav-links">
-    <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a><a href="/app.html" class="launch" data-i18n="nav_launch">Launch App</a>
+    <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a><a href="/support.html">Support</a><a href="/app.html" class="launch" data-i18n="nav_launch">Launch App</a>
   </div>
   <div class="nav-right">
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
@@ -41,7 +42,7 @@
   </div>
 </nav>
 <div class="mobile-menu" id="mobileMenu" aria-hidden="true">
-  <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a>
+  <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a><a href="/support.html">Support</a>
   <a href="/app.html" class="launch" style="text-align:center;border-radius:9px">Launch App</a>
   <div class="mobile-menu-footer"><span>Theme</span><button class="theme-toggle-mobile" id="themeToggleMobile">🌙 Dark Mode</button></div>
 </div>
@@ -55,10 +56,11 @@
     <div class="feature"><div class="feature-icon">👁</div><h3>Real-Time Eye Tracking</h3><p>Monitors blink rate, eye closure duration, and PERCLOS, then applies prototype thresholds to patterns associated with fatigue. It may miss events or trigger false alerts.</p></div>
     <div class="feature"><div class="feature-icon">🧠</div><h3>On-Device AI</h3><p>All processing happens on your phone. No video is recorded or sent to any server. Your privacy is protected by design.</p></div>
     <div class="feature"><div class="feature-icon">🚨</div><h3>Escalating Alerts</h3><p>Visual flash, vibration, and audio tone alerts that escalate in intensity as fatigue increases, prompting you to pull over and rest.</p></div>
-    <div class="feature"><div class="feature-icon">📊</div><h3>Session Reports</h3><p>Every session generates a detailed safety report including fatigue score, microsleeps detected, head nods, and distraction time.</p></div>
-    <div class="feature"><div class="feature-icon">🚗</div><h3>Fleet Ready</h3><p>Optional cloud sync connects to the fleet dashboard so managers can monitor driver safety across their entire team.</p></div>
-    <div class="feature"><div class="feature-icon">🔒</div><h3>Privacy First</h3><p>GPS and cloud sync are always opt-in. No camera data ever leaves your device. You control exactly what is shared.</p></div>
+    <div class="feature"><div class="feature-icon">📊</div><h3>Session Reports</h3><p>Saved summaries show available duration, fatigue and alert observations. Native History offers date and assessment views, with further refinements arriving through app updates. Interrupted recovery records are explicitly partial; missing values are not measured zeroes.</p></div>
+    <div class="feature"><div class="feature-icon">🚗</div><h3>Fleet Ready</h3><p>Owners can review consented, unverified session summaries in a protected dashboard. Browse older sessions, filter the loaded records and export shown summaries. Loaded lists and reporting windows are limited; they are not a complete fleet archive.</p></div>
+    <div class="feature"><div class="feature-icon">🔒</div><h3>Privacy First</h3><p>Cloud sharing and browser GPS are optional. Camera frames stay on the device. Native cloud sharing excludes media, audio, location and alert assessments; local deletion and cloud account deletion are separate controls.</p></div>
   </div>
+  <section class="availability-card" aria-labelledby="features-availability"><h2 id="features-availability">Browser, iPhone and optional Watch</h2><p>The browser monitor is available from this website. The native iPhone app and optional Watch companion use private TestFlight invitations. Features and update timing differ between them; choose the setup path for the app you use.</p><div class="availability-links"><a href="/install.html">Choose an app</a><a href="/support.html">Help and support</a><a href="/fleet-history.html">Fleet session browser</a></div></section>
 </div>
 </main>
 <footer>
@@ -74,7 +76,7 @@
       </div>
       <div>
         <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--text3);margin-bottom:12px">Company</div>
-        <div class="footer-links"><a href="#about">About</a><a href="/pilot-signup.html">Pilot Program</a><a href="/privacy.html" data-i18n="footer_privacy">Privacy Policy</a><a href="/safety.html" data-i18n="footer_safety">Safety Info</a><a href="mailto:rich@occulert.com">Contact</a></div>
+        <div class="footer-links"><a href="/about.html">About</a><a href="/pilot-signup.html">Pilot Program</a><a href="/support.html">Help and Support</a><a href="/privacy.html" data-i18n="footer_privacy">Privacy Policy</a><a href="/safety.html" data-i18n="footer_safety">Safety Info</a><a href="mailto:rich@occulert.com">Contact</a></div>
       </div>
     </div>
     <div class="footer-bottom">
@@ -84,7 +86,7 @@
   </div>
 </footer>
 <button class="scroll-top" id="scrollTop" aria-label="Back to top">↑</button>
-<script src="/public-page.v60.js"></script>
+<script src="/public-page.v67.js"></script>
   <script src="/lang.v47.js" defer></script>
 </body>
 </html>

@@ -20,15 +20,34 @@ state; they are not the current feature backlog.
   gap remains. Source tests cannot close those gaps.
 - **Future:** proposed capability without an implementation or delivery claim.
 
-The current merged source and approved native candidate is
-[PR #151](https://github.com/pacheco415/Occulert/pull/151),
-`1eb90f16a4083be07d6a73db217c473ee344d390`. Its automatic production deployment
-`dpl_8tiV2wQaiLYWpoTBnJmjGaahoUjr` is READY without changing website behavior.
-PR #150 added CSV export of shown loaded records with captured filters and scope,
-following PR #149's loaded-history
-driver/date/status filters, PR #148's Support/Help and PR #147's protected older-history
-browsing and native date filters. All testing of these packages is deferred by the
-user; deployment does not establish runtime acceptance or change build 52.
+## Current release and approved development batch
+
+The last merged source and native candidate before this batch is
+[PR #152](https://github.com/pacheco415/Occulert/pull/152),
+`26d2fb42391a08f0b45ba546869520f9d93b04b1`. Its recorded production deployment
+`dpl_9xKy6YyTcdJX86D3uNx8LKCLok5F` is READY. Native TestFlight remains
+**1.0.0 (52)** from `969849b0c551edb2de6f9230cbeecdce89346b6f`.
+
+The user approved all **21 source upgrades** on September 26: account recovery,
+recoverable cloud status, keyboard access, local History refresh/retention,
+custom dates and condition filters, sorting, assessment removal and feedback
+fallback; loaded fleet History dates/sorting/printing, follow-up filters and
+preserved drafts, invitation search/refresh/delivery clarity, consistent CSV
+behavior; public installation/FAQ/support/accessibility and consolidated release
+records. See [approved upgrades](APPROVED_UPGRADES_2026_09_26.md) for scope and
+implementation details. These are source changes for review. Publication,
+installed-native distribution and runtime acceptance must be recorded separately.
+All tests, type checks, browser and device checks remain explicitly deferred by
+the user's instruction, including this batch. No paid build or billing change,
+new native binary, submission or outreach is part of the batch.
+
+PR #150 added CSV export of shown loaded records, following PR #149's loaded
+History driver/date/status filters, PR #148's Support/Help and PR #147's older
+History browsing and native date filters. PR #151 added feedback filters;
+PR #152 aligned missing/invalid duration and fatigue labels while preserving
+valid zero. Those native changes are not installed in build 52. Earlier records
+below preserve their dated evidence; they do not certify this batch.
+
 The earlier verified website release is [PR #146](https://github.com/pacheco415/Occulert/pull/146),
 merged at `9662c3b9e0bfc3cc721796328fd6ff53f7df995e`. It adds invitation validation, associated form labels, constrained
 native HTML selectors, nonblocking homepage font loading, and exact-file
@@ -62,7 +81,7 @@ individual accessory, safe-stop, recovery, accessibility, battery/heat checks
 remain undocumented. Earlier iPhone/Watch feedback applies to its exact tested
 build, not automatically to 52. Included iOS build usage is **15/15**; the next
 period begins **September 30 at 5 p.m. Pacific**. No new build, submission, or
-OTA update is queued. Continue source work and available-binary validation;
+OTA update is queued. Continue approved source work with testing deferred;
 the merged native audit fixes require a future authorized binary and its own
 physical acceptance.
 
@@ -314,8 +333,10 @@ deferred, and build 52 is unchanged; see
 
 ## Release and evidence rules
 
-Run repository verification, relevant responsive-browser coverage, and native
-type/bundle checks for native changes. Review the full diff and repair findings
+The current user instruction skips all testing, including repository verification,
+responsive-browser coverage and native type/bundle checks. Record these as deferred
+for this approved batch. Source and diff review remain permitted. The usual
+verification requirements below apply when the user resumes testing. Review the full diff and repair findings
 before advancing the authorized release workflow. Record Preview, merged
 source, production, installed binary, and device evidence separately. Existing
 session authorization governs current work; this document does not require

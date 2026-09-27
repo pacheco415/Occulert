@@ -10,10 +10,10 @@
   <link rel="canonical" href="https://www.occulert.com/fleet-history.html">
   <link rel="stylesheet" href="/portal.v47.css">
   <link rel="stylesheet" href="/accessibility.v52.css">
-  <link rel="stylesheet" href="/fleet-history-page.v66.css">
+  <link rel="stylesheet" href="/fleet-history-page.v67.css">
   <script defer src="/security-utils.v47.js"></script>
   <script defer src="/occulert-backend.v60.js"></script>
-  <script defer src="/fleet-history-page.v66.js"></script>
+  <script defer src="/fleet-history-page.v67.js"></script>
 </head>
 <body class="portal-page fleet-history-page">
   <a class="skip-link" href="#main-content">Skip to session history</a>
@@ -57,6 +57,7 @@
               <option value="all">All time</option>
               <option value="7">Last 7 days</option>
               <option value="30">Last 30 days</option>
+              <option value="custom">Custom dates</option>
             </select>
           </div>
           <div class="history-filter-field">
@@ -68,17 +69,28 @@
               <option value="invalid">Invalid recorded dates</option>
             </select>
           </div>
+          <div class="history-filter-field">
+            <label for="historySort">Sort shown sessions</label>
+            <select id="historySort"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="alerts">Most reported alerts</option><option value="fatigue">Highest maximum fatigue</option><option value="score">Lowest safety score</option><option value="duration">Longest recorded duration</option></select>
+          </div>
           <button class="btn" id="historyClearFilters" type="button">Clear filters</button>
         </div>
+        <div class="history-custom-dates" id="historyCustomDates" hidden>
+          <div class="history-filter-field"><label for="historyFrom">From date</label><input id="historyFrom" type="date" aria-describedby="historyDateHelp historyDateStatus"></div>
+          <div class="history-filter-field"><label for="historyTo">To date</label><input id="historyTo" type="date" aria-describedby="historyDateHelp historyDateStatus"></div>
+        </div>
+        <p class="history-date-status" id="historyDateStatus" role="status" aria-live="polite"></p>
         <p class="muted" id="historyFilterHelp">Filters search loaded records only. Load older sessions to search more, up to the 500-session limit. Refresh, an account change, or leaving this page clears filters.</p>
-        <p class="muted" id="historyDateHelp">Recent periods include today and the preceding 6 or 29 days in your local calendar, through now. Missing, invalid, or future start dates appear only in All time. Completed means a valid end time was recorded; it does not verify client reports.</p>
+        <p class="muted" id="historyDateHelp">Recent periods include today and the preceding 6 or 29 local calendar days, through now. Custom dates include each selected local day; either boundary can be left open, but enter at least one date. Future starts are excluded from date ranges. Missing or invalid starts appear only in All time. Sorting applies to loaded records; loading older sessions continues in the server’s newest-first order. Missing sort values appear last. Completed means a valid end was recorded; it does not verify client reports.</p>
       </fieldset>
       <p class="history-matches" id="historyMatches" role="status" aria-live="polite" aria-atomic="true">Verify fleet ownership to filter loaded sessions.</p>
       <div class="history-export">
         <button class="btn" id="historyExport" type="button" disabled aria-describedby="historyExportHelp historyExportStatus">Export shown sessions CSV</button>
-        <p class="muted" id="historyExportHelp">Exports the sessions currently shown from loaded records, with the selected filters and browsing limits. It excludes IDs, location, personal media, raw motion, events, and follow-ups. It is a loaded-record snapshot; dashboard and manager reports keep their existing scope. Refresh before exporting if browsing started more than five minutes ago or a loading attempt failed.</p>
+        <button class="btn" id="historyPrint" type="button" disabled aria-describedby="historyExportHelp historyPrintStatus">Print shown sessions / Save PDF</button>
+        <p class="muted" id="historyExportHelp">CSV and print use exactly the shown sessions in their displayed order, with filters, sort order, time, loaded counts and browsing limits. Both exclude IDs, location, personal media, raw motion, events, and follow-ups. These are loaded-record snapshots; dashboard and manager reports keep their existing scope. Refresh if browsing started more than five minutes ago or a loading attempt failed. Your browser’s print dialog offers Save as PDF.</p>
       </div>
       <p class="history-export-status" id="historyExportStatus" role="status" aria-live="polite" aria-atomic="true">Verify fleet ownership and load sessions before exporting.</p>
+      <p class="history-export-status" id="historyPrintStatus" role="status" aria-live="polite" aria-atomic="true">Verify fleet ownership and load sessions before printing.</p>
       <p class="history-empty" id="historyEmpty" hidden></p>
       <div class="history-list" id="historyList" role="list" aria-busy="false"></div>
       <div class="history-pagination">
@@ -89,5 +101,6 @@
     <noscript><p class="history-status">Enable JavaScript to verify fleet ownership and load protected history.</p></noscript>
   </main>
   <footer class="history-footer">Occulert — protected fleet history is available only to the server-verified fleet owner.</footer>
+  <article class="history-print-report" id="historyPrintReport" aria-label="Printable shown fleet sessions"><h1>Protected history unavailable for printing</h1><p>Verify fleet ownership, load sessions and use Print shown sessions to prepare the current view.</p></article>
 </body>
 </html>

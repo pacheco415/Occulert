@@ -4,9 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Install — Occulert</title>
-<meta name="description" content="Install Occulert as a Progressive Web App on iPhone or Android. No app store required." />
+<meta name="description" content="Choose browser installation or the private iPhone and Watch pilot, with parked setup and support guidance." />
   <meta property="og:title" content="Install — Occulert" />
-  <meta property="og:description" content="Install Occulert as a Progressive Web App on iPhone or Android. No app store required." />
+  <meta property="og:description" content="Choose browser installation or the private iPhone and Watch pilot, with parked setup and support guidance." />
   <meta property="og:image" content="https://www.occulert.com/occulert-logo-main-512.png" />
   <meta property="og:url" content="https://www.occulert.com/install.html" />
   <meta property="og:type" content="website" />
@@ -27,13 +27,14 @@
 <link rel="stylesheet" href="/install-page-1.v47.css" />
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
+<link rel="stylesheet" href="/public-guidance.v67.css" />
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <nav>
   <a class="logo" href="/" aria-label="Occulert home"><span class="logo-mark"><svg width="23" height="23" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></span>Occulert</a>
   <div class="nav-links">
-    <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a><a href="/app.html" class="launch" data-i18n="nav_launch">Launch App</a>
+    <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a><a href="/support.html">Support</a><a href="/app.html" class="launch" data-i18n="nav_launch">Launch App</a>
   </div>
   <div class="nav-right">
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
@@ -41,7 +42,7 @@
   </div>
 </nav>
 <div class="mobile-menu" id="mobileMenu" aria-hidden="true">
-  <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a>
+  <a href="/features.html" data-i18n="nav_features">Features</a><a href="/how-it-works.html" data-i18n="nav_how">How It Works</a><a href="/install.html" data-i18n="nav_install">Install</a><a href="/about.html" data-i18n="nav_about">About</a><a href="/faq.html" data-i18n="nav_faq">FAQ</a><a href="/product-hub.html" data-i18n="nav_hub">Product Hub</a><a href="/support.html">Support</a>
   <a href="/app.html" class="launch" style="text-align:center;border-radius:9px">Launch App</a>
   <div class="mobile-menu-footer"><span>Theme</span><button class="theme-toggle-mobile" id="themeToggleMobile">🌙 Dark Mode</button></div>
 </div>
@@ -49,30 +50,42 @@
 <main id="main-content" tabindex="-1" style="padding-top:72px">
 <div class="container section" id="install">
   <div class="section-label">Get Started</div>
-  <h1 class="section-title">Add to Your Home Screen</h1>
-  <p class="section-desc">Occulert works as a Progressive Web App. Add it to your home screen for the best experience with no app store required.</p>
-  <div class="install-section">
-    <div>
-      <h3 style="font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px">Quick Install Guide</h3>
-      <p style="font-size:14px;color:var(--text2)">Follow these steps on your phone to install Occulert like a native app.</p>
-      <div class="install-steps">
-        <div class="install-step"><div class="install-num">1</div><div><h4>Open in Browser</h4><p>Visit occulert.com in Safari on iPhone or Chrome on Android.</p></div></div>
-        <div class="install-step"><div class="install-num">2</div><div><h4>Tap Share or Menu</h4><p>On iPhone, tap the Share button at the bottom of Safari. On Android, tap the three-dot menu in Chrome.</p></div></div>
-        <div class="install-step"><div class="install-num">3</div><div><h4>Add to Home Screen</h4><p>Select "Add to Home Screen" and confirm. Occulert will appear as an app icon on your device.</p></div></div>
-        <div class="install-step"><div class="install-num">4</div><div><h4>Launch and Drive</h4><p>Open from your home screen for the full-screen experience with no browser chrome.</p></div></div>
+  <h1 class="section-title">Choose Your Occulert App</h1>
+  <p class="section-desc">Use the browser monitor now, or follow your private pilot invitation for the iPhone app and optional Watch companion. Their local histories, sign-in sessions and update delivery are separate.</p>
+  <div class="availability-links" aria-label="Installation choices"><a href="#browser-install">Browser monitor</a><a href="#native-install">Private iPhone and Watch pilot</a><a href="/support.html">Setup help</a></div>
+  <section class="availability-card" id="browser-install" aria-labelledby="browser-install-title">
+    <h2 id="browser-install-title">Browser monitor</h2>
+    <p>Open <a href="/app.html">the browser driver app</a> in Safari on iPhone or Chrome on Android while online. You can use it in the browser or add it to your Home Screen. Core local monitoring does not require an account.</p>
+    <div class="install-section">
+      <div>
+        <h3>iPhone browser setup</h3>
+        <ol class="install-steps">
+          <li class="install-step"><span class="install-num" aria-hidden="true">1</span><div><h4>Open Safari</h4><p>Visit occulert.com/app.html while connected.</p></div></li>
+          <li class="install-step"><span class="install-num" aria-hidden="true">2</span><div><h4>Open Share</h4><p>Use Safari's Share control, or open the page menu and choose Share, depending on your layout.</p></div></li>
+          <li class="install-step"><span class="install-num" aria-hidden="true">3</span><div><h4>Add to Home Screen</h4><p>Choose Add to Home Screen. If Open as Web App is offered, enable it, then add the icon.</p></div></li>
+        </ol>
+        <p><a href="https://support.apple.com/guide/iphone/iphea86e5236/ios">Apple's Home Screen instructions</a></p>
+      </div>
+      <div>
+        <h3>Android browser setup</h3>
+        <ol class="install-steps">
+          <li class="install-step"><span class="install-num" aria-hidden="true">1</span><div><h4>Open Chrome</h4><p>Visit occulert.com/app.html while connected.</p></div></li>
+          <li class="install-step"><span class="install-num" aria-hidden="true">2</span><div><h4>Open the menu</h4><p>Choose Install and create shortcut, then Install. Menu wording may differ by browser version.</p></div></li>
+          <li class="install-step"><span class="install-num" aria-hidden="true">3</span><div><h4>Follow the prompts</h4><p>Open the resulting icon and complete the parked camera setup.</p></div></li>
+        </ol>
+        <p><a href="https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&amp;hl=en">Google's web app instructions</a></p>
       </div>
     </div>
-    <div>
-      <h3 style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:16px">Device Compatibility</h3>
-      <div class="device-cards">
-        <div class="device-card"><div class="device-badge badge-ios">iOS</div><h4>iPhone</h4><p>Safari 15 or later recommended. Keep Safari open and screen unlocked while driving. Disable Low Power Mode for best performance.</p></div>
-        <div class="device-card"><div class="device-badge badge-android">Android</div><h4>Android</h4><p>Chrome or Edge browser recommended. Allow camera permissions when prompted. Works on most Android 9 or later devices.</p></div>
-      </div>
-      <div style="margin-top:20px;padding:16px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:12px">
-        <p style="font-size:13px;color:var(--text2);line-height:1.6"><strong style="color:var(--text)">Tip:</strong> Use a dashboard phone mount with your screen facing you at eye level. Avoid direct sunlight glare on the camera for best tracking results.</p>
-      </div>
-    </div>
-  </div>
+    <p>A Home Screen web app runs the website. Camera, audio, vibration and offline availability depend on the device and browser. Keep it visible with the screen awake. Visit while online and allow the offline bundle to finish before relying on cached files; cloud and map services still need connectivity.</p>
+  </section>
+  <section class="availability-card" id="native-install" aria-labelledby="native-install-title">
+    <h2 id="native-install-title">Private iPhone and Watch pilot</h2>
+    <p>The native iPhone app and optional Watch companion are distributed through private TestFlight invitations. Follow your invitation to install or update the iPhone app, then install the companion on your paired Watch if you want to try Watch alerts.</p>
+    <p>The iPhone remains the primary monitoring and alert device. Keep camera monitoring in the foreground and complete the parked setup. A Watch is optional, and a connection status does not guarantee that a notification or vibration was delivered.</p>
+    <p>A public App Store release is planned. You can <a href="/pilot-signup.html">express interest in the pilot</a>; submitting interest does not guarantee an invitation. Existing participants can use <a href="/support.html#alerts">Watch setup guidance</a>.</p>
+    <p>Website updates arrive separately from TestFlight updates. Use the version and build shown in iPhone Settings inside Occulert when asking for help.</p>
+  </section>
+  <div class="disclaimer"><p><strong>Before starting:</strong> Park safely, secure the phone, allow camera access and follow the displayed readiness steps. Do not handle the app while moving. Occulert is a supplemental prototype and may miss events or trigger false alerts.</p></div>
 </div>
 </main>
 <footer>
@@ -80,7 +93,7 @@
     <div class="footer-inner">
       <div>
         <div class="footer-brand"><span style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#06b6d4);display:flex;align-items:center;justify-content:center"><svg width="18" height="18" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></span>Occulert™</div>
-        <p class="footer-desc">AI-powered drowsiness detection for drivers. Built to make roads safer for everyone.</p>
+        <p class="footer-desc">Prototype eye-closure monitoring and supplemental alerts for driver-safety testing.</p>
       </div>
       <div>
         <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--text3);margin-bottom:12px">Product</div>
@@ -88,7 +101,7 @@
       </div>
       <div>
         <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--text3);margin-bottom:12px">Company</div>
-        <div class="footer-links"><a href="#about">About</a><a href="/pilot-signup.html">Pilot Program</a><a href="/privacy.html" data-i18n="footer_privacy">Privacy Policy</a><a href="/safety.html" data-i18n="footer_safety">Safety Info</a><a href="mailto:rich@occulert.com">Contact</a></div>
+        <div class="footer-links"><a href="/about.html">About</a><a href="/pilot-signup.html">Pilot Program</a><a href="/support.html">Help and Support</a><a href="/privacy.html" data-i18n="footer_privacy">Privacy Policy</a><a href="/safety.html" data-i18n="footer_safety">Safety Info</a><a href="mailto:rich@occulert.com">Contact</a></div>
       </div>
     </div>
     <div class="footer-bottom">
@@ -98,7 +111,7 @@
   </div>
 </footer>
 <button class="scroll-top" id="scrollTop" aria-label="Back to top">↑</button>
-<script src="/public-page.v60.js"></script>
+<script src="/public-page.v67.js"></script>
   <script src="/lang.v47.js" defer></script>
 </body>
 </html>

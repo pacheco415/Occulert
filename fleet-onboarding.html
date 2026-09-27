@@ -8,14 +8,16 @@
   <meta name="theme-color" content="#0a0e1a">
   <link rel="canonical" href="https://www.occulert.com/fleet-onboarding.html">
   <script src="/occulert-backend.v60.js"></script>
-  <link rel="stylesheet" href="/fleet-onboarding-page-1.v47.css" />
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/portal.v47.css" />
+  <link rel="stylesheet" href="/accessibility.v52.css">
+  <link rel="stylesheet" href="/fleet-onboarding-page-1.v67.css">
 </head>
 <body class="portal-page fleet-setup-page">
+  <a class="skip-link" href="#main-content">Skip to fleet setup</a>
   <header class="top"><a class="brand" href="/" style="text-decoration:none">Occulert</a><nav class="nav" aria-label="Fleet setup navigation"><a class="btn" href="/fleet-dashboard.html">Dashboard</a><a class="btn" href="/account.html">Account</a><a class="btn" href="/">Home</a></nav></header>
-  <main class="wrap">
-    <section class="hero"><p class="eyebrow">Fleet setup</p><h1>Set up your fleet</h1><p class="muted">Create your protected fleet, invite drivers by email, then return to the dashboard. Each invitation works once and expires after seven days.</p></section>
+  <main class="wrap" id="main-content" tabindex="-1">
+    <section class="hero"><p class="eyebrow">Fleet setup</p><h1>Set up your fleet</h1><p class="muted">Create your protected fleet and invitation links, then return to the dashboard. You choose how to deliver each link. Each invitation works once and expires after seven days.</p></section>
 
     <div class="notice" id="pageStatus" role="status">Checking your signed-in account…</div>
 
@@ -32,21 +34,28 @@
     <section class="card hidden" id="inviteCard">
       <p class="step-label">Step 2 of 2</p>
       <h2 id="fleetName">Invite drivers</h2>
-      <p class="muted">Enter the exact email the driver will use for their Occulert account. Occulert creates a one-time link you can email from your own mail app or copy securely.</p>
+      <p class="muted">Enter the exact email the driver will use for their Occulert account. Create invitation makes a one-time link; it does not email the driver. Email link opens a draft in your mail app for you to review and send. Copy link lets you deliver it through your chosen channel.</p>
       <form class="form" onsubmit="createInvite(event)">
         <div class="field"><label for="driverEmail">Driver email</label><input id="driverEmail" type="email" required maxlength="240" autocomplete="email" placeholder="driver@example.com"></div>
-        <button class="btn primary" id="createInviteBtn" type="submit">Send Invite</button>
+        <button class="btn primary" id="createInviteBtn" type="submit">Create invitation</button>
       </form>
-      <div class="invite-link hidden" id="inviteLinkBox"><input id="inviteLink" readonly aria-label="New driver invitation link"><div class="invite-actions"><a class="btn" id="emailInvite" href="#">Email Link</a><button class="btn" type="button" onclick="copyInvite()">Copy Link</button></div></div>
+      <div class="invite-link hidden" id="inviteLinkBox"><input id="inviteLink" readonly aria-label="New driver invitation link"><div class="invite-actions"><a class="btn" id="emailInvite" href="#">Email link</a><button class="btn" type="button" onclick="copyInvite()">Copy link</button></div><p class="muted invite-delivery">This usable link is shown once. Copy it or prepare your email before leaving. Occulert cannot confirm that the email was sent or delivered.</p></div>
       <div class="notice hidden" id="inviteStatus" role="status"></div>
     </section>
 
     <section class="card hidden" id="listCard">
-      <h2>Invitations</h2>
+      <div class="invitation-heading"><h2>Invitations</h2><button class="btn" id="refreshInvitations" type="button">Refresh invitations</button></div>
+      <fieldset class="invitation-filters" id="invitationFilters">
+        <legend>Filter loaded invitations</legend>
+        <div class="field"><label for="invitationSearch">Email contains</label><input id="invitationSearch" type="search" maxlength="240" autocomplete="off" placeholder="Search loaded email addresses"></div>
+        <div class="field"><label for="invitationStatusFilter">Status</label><select id="invitationStatusFilter"><option value="all">All statuses</option><option value="pending">Pending</option><option value="accepted">Accepted</option><option value="expired">Expired</option><option value="revoked">Revoked</option></select></div>
+      </fieldset>
+      <p class="muted" id="invitationCounts" role="status" aria-live="polite">No invitations loaded.</p>
+      <p class="notice" id="invitationListStatus" role="status" aria-live="polite"></p>
       <div class="list" id="inviteList"></div>
     </section>
   </main>
   <footer class="footer">Occulert prototype — fleet access is enforced by authenticated server-side ownership.</footer>
-<script src="/fleet-onboarding-page-1.v60.js"></script>
+<script src="/fleet-onboarding-page-1.v67.js"></script>
 </body>
 </html>
