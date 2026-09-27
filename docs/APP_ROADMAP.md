@@ -217,10 +217,15 @@ The user deferred testing on September 26 and requested independent development
 work. Device, signed-in fleet, pilot and dataset evidence remains pending.
 The next source package adds local-history date filters and a separate bounded
 older-fleet-history browser; existing live summary/report/TV calculations keep
-their latest-50-session scope. These additions are development source, with
-testing, merge, deployment and native distribution deferred. App Store listing
-copy is being prepared as a draft, without submission or invented screenshots,
-credentials, participant data or device results.
+their latest-50-session scope. These additions were prepared in source
+`0c4c09c5c04287bec19d1741077a56988fbf4422`. The user subsequently approved
+publishing this package on September 26, with all testing still deferred.
+Merge and deployment evidence remains to be recorded in the
+[history browsing release record](HISTORY_BROWSING.md); approval does not
+establish runtime or device acceptance. Native distribution still requires a
+future binary; none was created. App Store listing copy is a prepared draft,
+without submission or invented screenshots, credentials, participant data or
+device results.
 
 1. **Native acceptance:** build 52 installation/general iPhone functionality,
    Watch launch, and foreground/background urgent display/wrist vibration have

@@ -1,10 +1,14 @@
 # History browsing source package
 
-Prepared September 26, 2026 on `development/independent-feature-work`.
-Implementation and source review only: the user deferred testing. No automated
-tests, type checks, browser/device runs, builds, deployment or database changes
-were performed for this package. The live website remains PR #146 at `9662c3b`;
-installed TestFlight remains 1.0.0 (52).
+Prepared September 26, 2026 on `development/independent-feature-work`, with
+implementation source `0c4c09c5c04287bec19d1741077a56988fbf4422`. The user
+approved publishing this prepared package on September 26 while retaining the
+instruction to skip testing. No automated tests, type checks, browser/device
+runs, native builds or database changes were performed for this package.
+Publication approval is not a deployment receipt or runtime acceptance; merge
+and deployment identifiers must be recorded when those actions complete.
+The previously verified website baseline is PR #146 at `9662c3b`. Installed
+TestFlight remains 1.0.0 (52); these native date filters require a future binary.
 
 ## Local app history
 
