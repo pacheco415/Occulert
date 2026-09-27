@@ -1,3 +1,5 @@
+import type { AlertAssessment } from './feedback';
+
 export type HistoryFilter = 'all' | 'needs-review' | 'reviewed' | 'recovered';
 
 const HISTORY_FILTERS = new Set<HistoryFilter>([
@@ -9,6 +11,29 @@ const HISTORY_FILTERS = new Set<HistoryFilter>([
 
 export function normalizeHistoryFilter(value: string | null | undefined): HistoryFilter {
   return value && HISTORY_FILTERS.has(value as HistoryFilter) ? value as HistoryFilter : 'all';
+}
+
+export type HistoryAssessmentFilter = 'all' | AlertAssessment | 'not-assessed';
+
+const ALERT_ASSESSMENTS = new Set<string>(['accurate', 'false_alert', 'missed_alert', 'late_alert']);
+
+export function hasHistoryAlertAssessment(value: unknown): value is AlertAssessment {
+  return typeof value === 'string' && ALERT_ASSESSMENTS.has(value);
+}
+
+export function normalizeHistoryAssessmentFilter(value: string | null | undefined): HistoryAssessmentFilter {
+  return value === 'not-assessed' || hasHistoryAlertAssessment(value) ? value : 'all';
+}
+
+/** Unrecognized legacy ratings remain unassessed without rewriting saved records. */
+export function filterIndexedSessionsByAssessment<T extends { alertAssessment?: unknown }>(
+  sessions: Array<{ item: T; index: number }>,
+  filter: HistoryAssessmentFilter,
+): Array<{ item: T; index: number }> {
+  if (filter === 'all') return sessions;
+  return sessions.filter(({ item }) => filter === 'not-assessed'
+    ? !hasHistoryAlertAssessment(item.alertAssessment)
+    : item.alertAssessment === filter);
 }
 
 export type HistoryPeriod = 'all' | '7-days' | '30-days';

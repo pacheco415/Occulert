@@ -20,10 +20,11 @@ state; they are not the current feature backlog.
   gap remains. Source tests cannot close those gaps.
 - **Future:** proposed capability without an implementation or delivery claim.
 
-The current published website source is [PR #149](https://github.com/pacheco415/Occulert/pull/149),
-merged at `16241c272fb6befd9f800142ea01effa1bb464fe`, production deployment
-`dpl_8JdMobC9XP34VdQEYtX6xL23oN6h` READY. It adds loaded-history driver/date/status
-filters, following PR #148's Support/Help and PR #147's protected older-history
+The current published website source is [PR #150](https://github.com/pacheco415/Occulert/pull/150),
+merged at `7066fcf1a0f27589301282bb10458ed81f7f9279`, production deployment
+`dpl_32JhAvUCFR4wLoRcNP8YSWSfMmiq` READY. It adds CSV export of the shown
+loaded records with captured filters and scope, following PR #149's loaded-history
+driver/date/status filters, PR #148's Support/Help and PR #147's protected older-history
 browsing and native date filters. All testing of these packages is deferred by the
 user; deployment does not establish runtime acceptance or change build 52.
 The earlier verified website release is [PR #146](https://github.com/pacheco415/Occulert/pull/146),
@@ -244,11 +245,20 @@ filtering within the older-history page's loaded records. These filters do not
 search unloaded data or change latest-50 reports. Missing end times do not
 establish active sessions.
 
-The next prepared website source adds Export shown sessions CSV, tied to the
+PR #150 published Export shown sessions CSV, tied to the
 current rendered selection and its filter/scope metadata. It requires the same
 account and a fresh, successful browsing window, excludes hidden identifiers
-and personal media, and does not broaden existing reports. It is unpublished
-source with all testing deferred; see [History Browsing](HISTORY_BROWSING.md).
+and personal media, and does not broaden existing reports. All testing remains
+deferred; see [History Browsing](HISTORY_BROWSING.md).
+
+The next native source package adds saved alert-feedback filters in Session
+History: All feedback, Felt right, Unnecessary alert, Missed alert, Too late
+and Not assessed. They compose with the existing local date and review-status
+views. Counts, review navigation and deliberate summary sharing follow the
+selected scope, while All-history pilot and fusion progress retain their scope.
+Ratings are user observations, never detection-accuracy measurements. This is
+untested source for a future binary, not installed in build 52; see
+[Alert Feedback Preparation](HISTORY_ALERT_FEEDBACK.md).
 
 1. **Native acceptance:** build 52 installation/general iPhone functionality,
    Watch launch, and foreground/background urgent display/wrist vibration have

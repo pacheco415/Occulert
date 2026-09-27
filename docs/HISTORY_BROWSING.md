@@ -86,9 +86,12 @@ memory and do not enter storage or the URL. Existing dashboard/report/TV scope r
 latest 50; no export, new backend, database migration or detection change is
 included in that filtering package. Testing remains deferred.
 
-## Prepared shown-session export
+## Published shown-session export
 
-The next source uses new v66 helper/styles, preserving published v65 bytes.
+PR #150 published source `7066fcf1a0f27589301282bb10458ed81f7f9279`, production
+`dpl_32JhAvUCFR4wLoRcNP8YSWSfMmiq` READY with public domains assigned and no
+alias error. All testing remains deferred. This is a deployment receipt, not
+browser or signed-in acceptance. It uses new v66 helper/styles, preserving published v65 bytes.
 Export shown sessions CSV is an explicit action on the current rendered
 selection, with its captured time and filters. It does not recompute a different
 selection while downloading. Each record carries loaded-only scope, loaded and
@@ -111,8 +114,17 @@ issued by the export action. Blob URLs are revoked on failure, after the
 download request, and on account/page changes. The interface says a download
 was requested; it does not claim the browser finished saving a file.
 
-This package is prepared source with all testing deferred. It changes no API,
+This package is published with all testing deferred. It changes no API,
 database, native app, detection, consent or existing dashboard/report/TV scope.
+
+## Prepared native alert-feedback filters
+
+The next app source adds stored alert-assessment filters composed with date and
+review-status views, including an explicit Not assessed choice. Matching counts,
+review navigation and shared summaries retain that scope and original storage
+identities. Full-history progress remains separate, and partial recovered
+records stay labeled. See [Alert Feedback Preparation](HISTORY_ALERT_FEEDBACK.md).
+All testing remains deferred, and installed build 52 is unchanged.
 
 ## Deferred verification
 
