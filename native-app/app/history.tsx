@@ -32,11 +32,15 @@ import {
 } from '../lib/fusionValidationSummary';
 import {
   filterIndexedSessionsByPeriod,
+  filterIndexedSessionsByAssessment,
   groupIndexedSessionsByDate,
+  hasHistoryAlertAssessment,
+  normalizeHistoryAssessmentFilter,
   normalizeHistoryFilter,
   normalizeHistoryPeriod,
   sortIndexedSessionsNewest,
   type HistoryFilter,
+  type HistoryAssessmentFilter,
   type HistoryPeriod,
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
@@ -51,6 +55,7 @@ import {
 
 const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
 const HISTORY_PERIOD_KEY = 'occulert-session-history-period';
+const HISTORY_ASSESSMENT_KEY = 'occulert-session-history-assessment';
 const CHECKPOINT_TARGET = 10;
 
 interface SessionRecord extends FeedbackSession {
@@ -158,6 +163,50 @@ const HISTORY_PERIODS: Array<{ value: HistoryPeriod; label: string }> = [
   { value: '30-days', label: 'Last 30 days' },
 ];
 
+const HISTORY_ASSESSMENTS: Array<{ value: HistoryAssessmentFilter; label: string }> = [
+  { value: 'all', label: 'All feedback' },
+  { value: 'accurate', label: 'Felt right' },
+  { value: 'false_alert', label: 'Unnecessary alert' },
+  { value: 'missed_alert', label: 'Missed alert' },
+  { value: 'late_alert', label: 'Too late' },
+  { value: 'not-assessed', label: 'Not assessed' },
+];
+
+function historyReviewInput(item: SessionRecord): SessionRecord {
+  return hasHistoryAlertAssessment(item.alertAssessment) ? item : { ...item, alertAssessment: undefined };
+}
+
+function hasCompleteHistoryReview(item: SessionRecord): boolean {
+  return hasCompleteSessionReview(historyReviewInput(item));
+}
+
+function matchesHistoryReviewFilter(item: SessionRecord, filter: HistoryFilter): boolean {
+  if (filter === 'recovered') return Boolean(item.recoveredFromInterruption);
+  if (filter === 'reviewed') return !item.recoveredFromInterruption && hasCompleteHistoryReview(item);
+  if (filter === 'needs-review') return !item.recoveredFromInterruption && !hasCompleteHistoryReview(item);
+  return true;
+}
+
+function historyReviewQueue(
+  sessions: Array<{ item: SessionRecord; index: number }>,
+  excludedIndex?: number,
+): Array<{ item: SessionRecord; index: number }> {
+  const unfinished = incompleteSessionReviewQueue(
+    sessions.map(({ item, index }) => ({ item: historyReviewInput(item), index })),
+    excludedIndex,
+  );
+  const indices = new Set(unfinished.map(({ index }) => index));
+  // Return the original records and storage indices, rather than normalized copies.
+  return sessions.filter(({ index }) => indices.has(index));
+}
+
+function historyScopeLabel(period: HistoryPeriod, filter: HistoryFilter, assessment: HistoryAssessmentFilter): string {
+  const periodLabel = HISTORY_PERIODS.find(option => option.value === period)?.label || 'All time';
+  const filterLabel = HISTORY_FILTERS.find(option => option.value === filter)?.label || 'All';
+  const assessmentLabel = HISTORY_ASSESSMENTS.find(option => option.value === assessment)?.label || 'All feedback';
+  return `${periodLabel} · ${filterLabel} · ${assessmentLabel}`;
+}
+
 function fmtDuration(sec?: number): string {
   if (!sec || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);
@@ -204,6 +253,7 @@ export default function HistoryScreen() {
   const [historyLoadBusy, setHistoryLoadBusy] = useState(true);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
   const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>('all');
+  const [historyAssessment, setHistoryAssessment] = useState<HistoryAssessmentFilter>('all');
   const [showReviewProgress, setShowReviewProgress] = useState(false);
   const [showFusionValidation, setShowFusionValidation] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
@@ -214,8 +264,14 @@ export default function HistoryScreen() {
   const historyRevisionRef = useRef(0);
   const filterRevisionRef = useRef(0);
   const periodRevisionRef = useRef(0);
+  const assessmentRevisionRef = useRef(0);
+  const viewRevisionRef = useRef(0);
+  const historyFilterRef = useRef<HistoryFilter>('all');
   const historyPeriodRef = useRef<HistoryPeriod>('all');
+  const historyAssessmentRef = useRef<HistoryAssessmentFilter>('all');
+  const sessionsRef = useRef<SessionRecord[]>([]);
   const periodWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const assessmentWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
   const historyLoadAttemptRef = useRef(0);
   const sessionOperationRunnersRef = useRef(new Map<string, ReturnType<typeof createSingleFlightActionRunner>>());
 
@@ -243,30 +299,45 @@ export default function HistoryScreen() {
   };
 
   const load = useCallback(async () => {
+    viewRevisionRef.current += 1;
+    pendingReviewScrollRef.current = null;
+    setReviewQueueMessage(null);
     const loadAttempt = historyLoadAttemptRef.current + 1;
     historyLoadAttemptRef.current = loadAttempt;
     const revision = historyRevisionRef.current;
     const filterRevision = filterRevisionRef.current;
     const periodRevision = periodRevisionRef.current;
+    const assessmentRevision = assessmentRevisionRef.current;
     setHistoryLoadBusy(true);
     try {
-      const [storedSessions, savedFilter, savedPeriod] = await Promise.all([
+      const [storedSessions, savedFilter, savedPeriod, savedAssessment] = await Promise.all([
         loadSessionHistory<SessionRecord>(),
         AsyncStorage.getItem(HISTORY_FILTER_KEY).catch(() => null),
         periodWriteQueueRef.current
           .then(() => AsyncStorage.getItem(HISTORY_PERIOD_KEY))
           .catch(() => undefined),
+        assessmentWriteQueueRef.current
+          .then(() => AsyncStorage.getItem(HISTORY_ASSESSMENT_KEY))
+          .catch(() => undefined),
       ]);
       if (historyLoadAttemptRef.current === loadAttempt && historyRevisionRef.current === revision) {
+        sessionsRef.current = storedSessions;
         setSessions(storedSessions);
         setHistoryLoadError(false);
         if (filterRevisionRef.current === filterRevision) {
-          setHistoryFilter(normalizeHistoryFilter(savedFilter));
+          const filter = normalizeHistoryFilter(savedFilter);
+          historyFilterRef.current = filter;
+          setHistoryFilter(filter);
         }
         if (periodRevisionRef.current === periodRevision && savedPeriod !== undefined) {
           const period = normalizeHistoryPeriod(savedPeriod);
           historyPeriodRef.current = period;
           setHistoryPeriod(period);
+        }
+        if (assessmentRevisionRef.current === assessmentRevision && savedAssessment !== undefined) {
+          const assessment = normalizeHistoryAssessmentFilter(savedAssessment);
+          historyAssessmentRef.current = assessment;
+          setHistoryAssessment(assessment);
         }
       }
     } catch {
@@ -284,19 +355,27 @@ export default function HistoryScreen() {
 
   useFocusEffect(useCallback(() => {
     void load();
-    return () => { historyLoadAttemptRef.current += 1; };
+    return () => {
+      historyLoadAttemptRef.current += 1;
+      viewRevisionRef.current += 1;
+      pendingReviewScrollRef.current = null;
+    };
   }, [load]));
 
   const chooseHistoryFilter = (filter: HistoryFilter) => {
+    viewRevisionRef.current += 1;
     filterRevisionRef.current += 1;
+    historyFilterRef.current = filter;
     setHistoryFilter(filter);
     setReviewQueueMessage(null);
+    pendingReviewScrollRef.current = null;
     AsyncStorage.setItem(HISTORY_FILTER_KEY, filter).catch(() => {
       Alert.alert('Could not remember this view', 'The filter still works now, but it may reset next time.');
     });
   };
 
   const chooseHistoryPeriod = (period: HistoryPeriod) => {
+    viewRevisionRef.current += 1;
     const revision = periodRevisionRef.current + 1;
     periodRevisionRef.current = revision;
     historyPeriodRef.current = period;
@@ -312,6 +391,31 @@ export default function HistoryScreen() {
       });
   };
 
+  const chooseHistoryAssessment = (assessment: HistoryAssessmentFilter) => {
+    viewRevisionRef.current += 1;
+    const revision = assessmentRevisionRef.current + 1;
+    assessmentRevisionRef.current = revision;
+    historyAssessmentRef.current = assessment;
+    setHistoryAssessment(assessment);
+    setReviewQueueMessage(null);
+    pendingReviewScrollRef.current = null;
+    assessmentWriteQueueRef.current = assessmentWriteQueueRef.current
+      .then(() => AsyncStorage.setItem(HISTORY_ASSESSMENT_KEY, assessment))
+      .catch(() => {
+        if (assessmentRevisionRef.current === revision) {
+          Alert.alert('Could not remember this feedback view', 'The feedback filter still works now, but it may reset next time.');
+        }
+      });
+  };
+
+  const currentReviewQueue = (excludedIndex?: number) => historyReviewQueue(
+    filterIndexedSessionsByAssessment(
+      filterIndexedSessionsByPeriod(sortIndexedSessionsNewest(sessionsRef.current), historyPeriodRef.current),
+      historyAssessmentRef.current,
+    ).filter(({ item }) => matchesHistoryReviewFilter(item, historyFilterRef.current)),
+    excludedIndex,
+  );
+
   const saveSessionChanges = async (
     index: number,
     update: SessionRecordMutation<SessionRecord>,
@@ -321,7 +425,9 @@ export default function HistoryScreen() {
     const target = sessions[index];
     if (!target) return;
 
-    const completesReview = !hasCompleteSessionReview(target) && hasCompleteSessionReview(update(target));
+    const completesReview = !hasCompleteHistoryReview(target) && hasCompleteHistoryReview(update(target));
+    const saveViewRevision = viewRevisionRef.current;
+    let operationRevision = 0;
 
     let commitSucceeded = false;
     const operationCompleted = await runSessionOperation(
@@ -329,53 +435,62 @@ export default function HistoryScreen() {
       'saving',
       async () => {
         historyRevisionRef.current += 1;
+        operationRevision = historyRevisionRef.current;
         commitSucceeded = await commitSessionHistoryEdit({
           update,
           persist: mutation => updateSessionHistory<SessionRecord>(stored => (
             updateMatchingSessionRecord(stored, target, index, mutation)
           )),
-          apply: mutation => setSessions(current => (
-            updateMatchingSessionRecord(current, target, index, mutation)
-          )),
+          apply: mutation => {
+            const updated = updateMatchingSessionRecord(sessionsRef.current, target, index, mutation);
+            sessionsRef.current = updated;
+            setSessions(updated);
+          },
           onError: () => Alert.alert(errorTitle, errorMessage),
         });
       },
       () => Alert.alert(errorTitle, errorMessage),
     );
 
-    if (operationCompleted && commitSucceeded && completesReview && !target.recoveredFromInterruption) {
+    if (
+      operationCompleted && commitSucceeded && completesReview && !target.recoveredFromInterruption
+      && saveViewRevision === viewRevisionRef.current
+      && operationRevision === historyRevisionRef.current
+    ) {
       setReviewQueueMessage(null);
-      const reviewPeriod = historyPeriodRef.current;
-      const queue = incompleteSessionReviewQueue(
-        filterIndexedSessionsByPeriod(sortIndexedSessionsNewest(sessions), reviewPeriod),
-        index,
-      );
+      const queue = currentReviewQueue(index);
+      const selectedScope = historyScopeLabel(historyPeriodRef.current, historyFilterRef.current, historyAssessmentRef.current);
       if (queue.length === 0) {
         Alert.alert(
           'Review queue complete',
-          reviewPeriod === 'all'
-            ? 'Every completed session has a full review. Your ratings remain saved on this iPhone.'
-            : 'Every completed session in this period has a full review. Other dates remain available in All time.',
+          `No unfinished completed-session reviews remain in the selected view: ${selectedScope}. Your saved ratings remain on this iPhone. Other views may have unfinished reviews.`,
         );
         return;
       }
 
       const next = queue[0];
+      const nextKey = sessionRecordKey(next.item, next.index);
+      const queueViewRevision = viewRevisionRef.current;
+      const queueHistoryRevision = historyRevisionRef.current;
       Alert.alert(
         'Review complete',
-        `${queue.length} unfinished ${queue.length === 1 ? 'session remains' : 'sessions remain'} in this period.`,
+        `${queue.length} unfinished ${queue.length === 1 ? 'session remains' : 'sessions remain'} in the selected view: ${selectedScope}.`,
         [
           { text: 'Done', style: 'cancel' },
           {
             text: 'Review Next',
             onPress: () => {
-              const key = sessionRecordKey(next.item, next.index);
-              pendingReviewScrollRef.current = key;
+              if (queueViewRevision !== viewRevisionRef.current || queueHistoryRevision !== historyRevisionRef.current) return;
+              const currentQueue = currentReviewQueue(index);
+              const currentNext = currentQueue.find(({ item, index: storedIndex }) => sessionRecordKey(item, storedIndex) === nextKey);
+              if (!currentNext) return;
+              const key = sessionRecordKey(currentNext.item, currentNext.index);
               chooseHistoryFilter('needs-review');
+              pendingReviewScrollRef.current = key;
               setExpandedSessions(current => ({ ...current, [key]: true }));
               setReviewQueueMessage({
                 key,
-                text: `Next unfinished review · ${queue.length} ${queue.length === 1 ? 'session' : 'sessions'} remaining`,
+                text: `Next unfinished review · ${currentQueue.length} ${currentQueue.length === 1 ? 'session' : 'sessions'} remaining in the selected feedback and date view`,
               });
             },
           },
@@ -424,15 +539,14 @@ export default function HistoryScreen() {
 
   const shareSessions = async (items: SessionRecord[]) => {
     if (items.length === 0) return;
-    const periodLabel = HISTORY_PERIODS.find(period => period.value === historyPeriod)?.label || 'All time';
-    const filterLabel = HISTORY_FILTERS.find(filter => filter.value === historyFilter)?.label || 'All';
+    const selectedScope = historyScopeLabel(historyPeriod, historyFilter, historyAssessment);
     const dateScope = historyPeriod === 'all'
       ? 'All saved dates are included.'
       : 'This period includes today and the preceding local calendar days; unrecorded and future dates are excluded.';
     try {
       await Share.share({
         title: 'Occulert session summaries',
-        message: `Shown view: ${periodLabel} · ${filterLabel}\n${dateScope}\n\n${buildSessionHistoryExport(items)}`,
+        message: `Shown view: ${selectedScope}\n${dateScope}\nAlert feedback is a saved user observation, not a detection accuracy measure. Recovered sessions are partial summaries.\n\n${buildSessionHistoryExport(items.map(historyReviewInput))}`,
       });
     } catch {
       Alert.alert('Could not share summaries', 'Please try exporting the session summaries again.');
@@ -443,7 +557,7 @@ export default function HistoryScreen() {
     try {
       await Share.share({
         title: 'Occulert pilot progress',
-        message: buildPilotProgressExport(sessions, CHECKPOINT_TARGET),
+        message: buildPilotProgressExport(sessions.map(historyReviewInput), CHECKPOINT_TARGET),
       });
     } catch {
       Alert.alert('Could not share pilot progress', 'Please try exporting the aggregate pilot report again.');
@@ -459,7 +573,9 @@ export default function HistoryScreen() {
         await updateSessionHistory<SessionRecord>(stored => (
           removeMatchingSessionRecord(stored, target, index)
         ));
-        setSessions(current => removeMatchingSessionRecord(current, target, index));
+        const updated = removeMatchingSessionRecord(sessionsRef.current, target, index);
+        sessionsRef.current = updated;
+        setSessions(updated);
       },
       () => Alert.alert('Could not delete session', 'The session remains saved. Please try again.'),
     );
@@ -478,7 +594,7 @@ export default function HistoryScreen() {
 
   const evidenceSessions = sessions.filter(item => !item.recoveredFromInterruption);
   const reviewedMedium = evidenceSessions.filter(
-    item => item.sensitivity === 'medium' && hasCompleteSessionReview(item),
+    item => item.sensitivity === 'medium' && hasCompleteHistoryReview(item),
   );
   const checkpointProgress = Math.min(reviewedMedium.length, CHECKPOINT_TARGET);
   const accurateCount = reviewedMedium.filter(item => item.alertAssessment === 'accurate').length;
@@ -498,57 +614,45 @@ export default function HistoryScreen() {
   const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
   const fusionValidation = summarizeFusionValidation(sessions);
   const fusionSessionPlan = planNextFusionValidationSession(sessions);
-  const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteSessionReview(item)).length;
-  const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteSessionReview(item)).length;
+  const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteHistoryReview(item)).length;
+  const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteHistoryReview(item)).length;
   const recoveredCount = sessions.filter(item => item.recoveredFromInterruption).length;
   const sortedSessions = sortIndexedSessionsNewest(sessions);
   const periodSessions = filterIndexedSessionsByPeriod(sortedSessions, historyPeriod);
-  const periodNeedsReviewCount = periodSessions.filter(({ item }) => (
-    !item.recoveredFromInterruption && !hasCompleteSessionReview(item)
-  )).length;
+  const assessmentSessions = filterIndexedSessionsByAssessment(periodSessions, historyAssessment);
   const filterCounts: Record<HistoryFilter, number> = {
-    all: periodSessions.length,
-    'needs-review': periodNeedsReviewCount,
-    reviewed: periodSessions.filter(({ item }) => !item.recoveredFromInterruption && hasCompleteSessionReview(item)).length,
-    recovered: periodSessions.filter(({ item }) => item.recoveredFromInterruption).length,
+    all: assessmentSessions.length,
+    'needs-review': assessmentSessions.filter(({ item }) => matchesHistoryReviewFilter(item, 'needs-review')).length,
+    reviewed: assessmentSessions.filter(({ item }) => matchesHistoryReviewFilter(item, 'reviewed')).length,
+    recovered: assessmentSessions.filter(({ item }) => matchesHistoryReviewFilter(item, 'recovered')).length,
   };
-  const historyPeriodLabel = HISTORY_PERIODS.find(period => period.value === historyPeriod)?.label || 'All time';
-  const nextReviewSession = periodSessions.find(({ item }) => (
-    !item.recoveredFromInterruption && !hasCompleteSessionReview(item)
-  ));
-  const filteredSessions = periodSessions
-    .filter(({ item }) => {
-      if (historyFilter === 'recovered') return Boolean(item.recoveredFromInterruption);
-      if (historyFilter === 'reviewed') return !item.recoveredFromInterruption && hasCompleteSessionReview(item);
-      if (historyFilter === 'needs-review') return !item.recoveredFromInterruption && !hasCompleteSessionReview(item);
-      return true;
-    });
+  const reviewStatusSessions = periodSessions.filter(({ item }) => matchesHistoryReviewFilter(item, historyFilter));
+  const assessmentCounts = Object.fromEntries(HISTORY_ASSESSMENTS.map(assessment => [
+    assessment.value,
+    filterIndexedSessionsByAssessment(reviewStatusSessions, assessment.value).length,
+  ])) as Record<HistoryAssessmentFilter, number>;
+  const filteredSessions = filterIndexedSessionsByAssessment(reviewStatusSessions, historyAssessment);
+  const selectedScope = historyScopeLabel(historyPeriod, historyFilter, historyAssessment);
+  const visibleReviewQueue = historyReviewQueue(filteredSessions);
+  const nextReviewSession = visibleReviewQueue[0];
+  const shownRecoveredCount = filteredSessions.filter(({ item }) => item.recoveredFromInterruption).length;
   const groupedFilteredSessions = groupIndexedSessionsByDate(filteredSessions);
   const sessionOperationsBusy = Object.keys(sessionOperations).length > 0;
-  const filteredEmptyCopy: Record<Exclude<HistoryFilter, 'all'>, { title: string; detail: string }> = {
-    'needs-review': {
-      title: 'All caught up',
-      detail: 'Every completed session in this period has a full review.',
-    },
-    reviewed: {
-      title: 'No completed reviews in this period',
-      detail: 'Finish a session review or choose another date period to see completed reviews.',
-    },
-    recovered: {
-      title: 'No recovered sessions in this period',
-      detail: 'Sessions restored after an unexpected interruption will appear here for their saved date.',
-    },
-  };
 
   const continueReviewing = () => {
     if (!nextReviewSession || sessionOperationsBusy) return;
-    const key = sessionRecordKey(nextReviewSession.item, nextReviewSession.index);
-    pendingReviewScrollRef.current = key;
+    const currentQueue = currentReviewQueue();
+    const currentNext = currentQueue.find(({ item, index }) => (
+      sessionRecordKey(item, index) === sessionRecordKey(nextReviewSession.item, nextReviewSession.index)
+    ));
+    if (!currentNext) return;
+    const key = sessionRecordKey(currentNext.item, currentNext.index);
     chooseHistoryFilter('needs-review');
+    pendingReviewScrollRef.current = key;
     setExpandedSessions(current => ({ ...current, [key]: true }));
     setReviewQueueMessage({
       key,
-      text: `${periodNeedsReviewCount} unfinished ${periodNeedsReviewCount === 1 ? 'session' : 'sessions'} in this period’s review queue`,
+      text: `${currentQueue.length} unfinished ${currentQueue.length === 1 ? 'session' : 'sessions'} in the selected feedback and date view`,
     });
   };
 
@@ -628,7 +732,7 @@ export default function HistoryScreen() {
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={`Continue reviewing the newest unfinished session from ${fmtDate(nextReviewSession.item.savedAt || nextReviewSession.item.updatedAt)}`}
-                accessibilityHint="Shows the Needs Review queue within the selected date period and expands its newest unfinished session"
+                accessibilityHint="Shows the unfinished review queue matching the selected feedback and date view, and expands its newest session"
                 accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
                 disabled={sessionOperationsBusy}
                 onPress={continueReviewing}
@@ -640,13 +744,13 @@ export default function HistoryScreen() {
                 <View style={s.continueReviewCopy}>
                   <Text style={s.continueReviewTitle}>Continue reviewing</Text>
                   <Text style={s.continueReviewDetail}>
-                    Newest unfinished session · {historyPeriodLabel} · All history: {checkpointProgress} of {CHECKPOINT_TARGET} Medium reviews complete
+                    Newest unfinished session · {selectedScope} · All history: {checkpointProgress} of {CHECKPOINT_TARGET} Medium reviews complete
                   </Text>
                 </View>
               </TouchableOpacity>
             )}
             <Text style={s.scopeLabel}>SESSION DATES</Text>
-            <View accessibilityRole="tablist" style={s.filterRow}>
+            <View accessibilityRole="tablist" accessibilityLabel="Session dates" style={s.filterRow}>
               {HISTORY_PERIODS.map(period => {
                 const selected = historyPeriod === period.value;
                 return (
@@ -673,7 +777,8 @@ export default function HistoryScreen() {
                 Includes today and the previous {historyPeriod === '7-days' ? 6 : 29} days. Unrecorded and future dates stay in All time.
               </Text>
             )}
-            <View accessibilityRole="tablist" style={s.filterRow}>
+            <Text style={s.scopeLabel}>REVIEW STATUS</Text>
+            <View accessibilityRole="tablist" accessibilityLabel="Session review status" style={s.filterRow}>
               {HISTORY_FILTERS.map(filter => {
                 const selected = historyFilter === filter.value;
                 return (
@@ -681,7 +786,7 @@ export default function HistoryScreen() {
                     key={filter.value}
                     accessibilityRole="tab"
                     accessibilityLabel={`${filter.label}, ${filterCounts[filter.value]} sessions`}
-                    accessibilityHint="Filters the sessions in the selected date period"
+                    accessibilityHint="Filters sessions matching the selected date period and alert feedback"
                     accessibilityState={{ selected }}
                     style={[s.filterButton, selected && s.filterButtonSelected]}
                     onPress={() => chooseHistoryFilter(filter.value)}
@@ -693,8 +798,34 @@ export default function HistoryScreen() {
                 );
               })}
             </View>
+            <Text style={s.scopeLabel}>ALERT FEEDBACK · USER OBSERVATIONS</Text>
+            <View accessibilityRole="tablist" accessibilityLabel="Saved alert feedback" style={s.filterRow}>
+              {HISTORY_ASSESSMENTS.map(assessment => {
+                const selected = historyAssessment === assessment.value;
+                return (
+                  <TouchableOpacity
+                    key={assessment.value}
+                    accessibilityRole="tab"
+                    accessibilityLabel={`${assessment.label}, ${assessmentCounts[assessment.value]} sessions`}
+                    accessibilityHint={assessment.value === 'not-assessed'
+                      ? 'Shows sessions without a recognized saved alert rating, within the selected date and review status'
+                      : 'Shows matching saved user observations within the selected date and review status; this is not measured accuracy'}
+                    accessibilityState={{ selected }}
+                    style={[s.filterButton, selected && s.filterButtonSelected]}
+                    onPress={() => chooseHistoryAssessment(assessment.value)}
+                  >
+                    <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>
+                      {assessment.label} · {assessmentCounts[assessment.value]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={s.periodNote}>
+              Saved alert feedback reflects user observations, not measured detection accuracy. Not assessed includes missing or unrecognized ratings. Recovered checkpoints remain partial sessions.
+            </Text>
             <Text accessibilityLiveRegion="polite" style={s.filterResult}>
-              {historyPeriodLabel} · Showing {filteredSessions.length} of {periodSessions.length} sessions in this period · {sessions.length} saved overall
+              {selectedScope} · Showing {filteredSessions.length} of {periodSessions.length} sessions in this period · {shownRecoveredCount} shown recovered partial sessions · {sessions.length} saved overall
             </Text>
             {filteredSessions.length > 0 && (
               <TouchableOpacity
@@ -702,7 +833,7 @@ export default function HistoryScreen() {
                 accessibilityLabel={sessionOperationsBusy
                   ? 'Wait for session changes before sharing summaries'
                   : `Share ${filteredSessions.length} visible session summaries`}
-                accessibilityHint="Shares only the shown sessions and identifies the selected date period and review filter"
+                accessibilityHint="Shares only the shown sessions and identifies the selected date, review status, and alert feedback filters"
                 accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
                 disabled={sessionOperationsBusy}
                 style={[s.exportButton, sessionOperationsBusy && s.operationDisabled]}
@@ -967,21 +1098,23 @@ export default function HistoryScreen() {
           </View>
         )}
 
-        {loaded && sessions.length > 0 && filteredSessions.length === 0 && (historyFilter !== 'all' || historyPeriod !== 'all') && (
+        {loaded && sessions.length > 0 && filteredSessions.length === 0 && (historyFilter !== 'all' || historyPeriod !== 'all' || historyAssessment !== 'all') && (
           <View style={s.filteredEmpty}>
-            <Ionicons name="checkmark-circle-outline" size={32} color="#4a7a8a" />
+            <Ionicons name="filter-outline" size={32} color="#4a7a8a" />
             <Text style={s.emptyTitle}>
-              {periodSessions.length === 0 ? 'No sessions in this period' : historyFilter !== 'all' ? filteredEmptyCopy[historyFilter].title : 'No sessions shown'}
+              {periodSessions.length === 0 ? 'No sessions in this period' : 'No sessions match these filters'}
             </Text>
             <Text style={s.emptySub}>
               {periodSessions.length === 0
                 ? 'Your saved history is unchanged. Choose All time to see older sessions and sessions with unrecorded or future dates.'
-                : historyFilter !== 'all' ? filteredEmptyCopy[historyFilter].detail : 'Choose another view to see your saved sessions.'}
+                : `No saved sessions match ${selectedScope}. Your saved history is unchanged. Change a filter or choose Show all sessions.`}
             </Text>
             <TouchableOpacity
               accessibilityRole="button"
+              accessibilityLabel="Show all saved sessions"
+              accessibilityHint="Clears the date period, review status, and alert feedback filters"
               style={s.clearFilterButton}
-              onPress={() => { chooseHistoryFilter('all'); chooseHistoryPeriod('all'); }}
+              onPress={() => { chooseHistoryFilter('all'); chooseHistoryPeriod('all'); chooseHistoryAssessment('all'); }}
             >
               <Text style={s.clearFilterText}>Show all sessions</Text>
             </TouchableOpacity>
@@ -1003,7 +1136,7 @@ export default function HistoryScreen() {
           const sessionKey = sessionRecordKey(item, i);
           const sessionOperation = sessionOperations[sessionKey];
           const sessionBusy = Boolean(sessionOperation);
-          const reviewProgress = getSessionReviewProgress(item);
+          const reviewProgress = getSessionReviewProgress(historyReviewInput(item));
           const reviewComplete = reviewProgress.complete;
           const isExpanded = expandedSessions[sessionKey] ?? false;
           const alertCountLabel = formatSessionAlertCount(item.alertCount);
@@ -1156,7 +1289,7 @@ export default function HistoryScreen() {
                     ? 'Saving changes…'
                     : sessionOperation === 'deleting'
                       ? 'Deleting session…'
-                      : reviewComplete ? 'Review complete' : item.alertAssessment ? 'Rating saved' : 'Needs review'}
+                      : reviewComplete ? 'Review complete' : hasHistoryAlertAssessment(item.alertAssessment) ? 'Rating saved' : 'Needs review'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -1215,9 +1348,9 @@ export default function HistoryScreen() {
             </View>
             <View style={s.review}>
               <Text style={s.reviewTitle}>How did the alerts feel?</Text>
-              {item.alertAssessment && (
+              {hasHistoryAlertAssessment(item.alertAssessment) && (
                 <Text accessibilityLiveRegion="polite" style={s.reviewPrivacy}>
-                  Saved: {ASSESSMENT_OPTIONS.find(option => option.value === item.alertAssessment)?.label || 'Reviewed'}
+                  Saved: {ASSESSMENT_OPTIONS.find(option => option.value === item.alertAssessment)?.label}
                 </Text>
               )}
               <View style={s.reviewOptions}>

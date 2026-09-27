@@ -155,6 +155,15 @@ History counts reviewed Medium-sensitivity sessions toward the first 10-session
 review checkpoint and summarizes felt-right, false, missed, and late ratings
 without uploading those ratings.
 
+The next native source package adds Session History alert-feedback filters:
+All feedback, Felt right, Unnecessary alert, Missed alert, Too late and Not
+assessed. They compose with date and review-status filters, and shown summaries
+and review navigation keep that selected scope. Counts are saved user
+observations, not detection accuracy. Recovered partial records remain labeled
+and excluded from complete-session progress. These additions are untested at
+the user's request and are not installed in TestFlight 1.0.0 (52); see
+[alert-feedback preparation](../docs/HISTORY_ALERT_FEEDBACK.md).
+
 When false or missed alerts are reviewed, History also groups their local
 observation counts by sensitivity, lighting, eyewear, and phone position. The
 app labels these as observations rather than error rates and calls out missing
