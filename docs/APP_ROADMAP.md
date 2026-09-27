@@ -9,6 +9,8 @@ state; they are not the current feature backlog.
 
 - **Shipped web:** merged and production-verified website behavior. This does
   not establish real-fleet usefulness or detection accuracy.
+- **Published web, testing deferred:** merged source with a READY production
+  deployment, without source-test or runtime-acceptance results for that package.
 - **Private native release:** distribution status for a particular TestFlight
   build. Packaging and Apple availability do not establish installation or
   physical-device acceptance. A source merge does not update an installed binary.
@@ -18,9 +20,13 @@ state; they are not the current feature backlog.
   gap remains. Source tests cannot close those gaps.
 - **Future:** proposed capability without an implementation or delivery claim.
 
-The current website release is [PR #146](https://github.com/pacheco415/Occulert/pull/146),
-merged at `9662c3b9e0bfc3cc721796328fd6ff53f7df995e` and verified live in
-production. It adds invitation validation, associated form labels, constrained
+The current published website source is [PR #147](https://github.com/pacheco415/Occulert/pull/147),
+merged at `5b5db0201ea3df17dc70f6b2189ff9b1093b512a`, production deployment
+`dpl_HaWioevunU551T1CqGofjsBAgS5N` READY. It adds protected older-history
+browsing and native local-history date filters. All testing is deferred by the
+user; deployment does not establish runtime acceptance or change build 52.
+The earlier verified website release is [PR #146](https://github.com/pacheco415/Occulert/pull/146),
+merged at `9662c3b9e0bfc3cc721796328fd6ff53f7df995e`. It adds invitation validation, associated form labels, constrained
 native HTML selectors, nonblocking homepage font loading, and exact-file
 benchmark provenance. Core monitoring/auth assets remain v60, invitation
 behavior uses v61, form controls use v63, and offline cache remains v54.
@@ -220,12 +226,19 @@ older-fleet-history browser; existing live summary/report/TV calculations keep
 their latest-50-session scope. These additions were prepared in source
 `0c4c09c5c04287bec19d1741077a56988fbf4422`. The user subsequently approved
 publishing this package on September 26, with all testing still deferred.
-Merge and deployment evidence remains to be recorded in the
-[history browsing release record](HISTORY_BROWSING.md); approval does not
-establish runtime or device acceptance. Native distribution still requires a
+PR #147 is merged at `5b5db02` and its production deployment is READY, as
+recorded in the [history browsing release record](HISTORY_BROWSING.md).
+Publication does not establish runtime or device acceptance. Native distribution still requires a
 future binary; none was created. App Store listing copy is a prepared draft,
 without submission or invented screenshots, credentials, participant data or
 device results.
+
+The next independent package prepares a dedicated public Support page, links
+from Home, Privacy and Pilot Quick Start, and an accessible native Settings
+link. Contact uses the existing support email; no form, automatic diagnostic
+upload, account requirement, new backend or changed monitoring behavior is
+added. This support package is source preparation with testing deferred;
+see [Support Preparation](SUPPORT_PREPARATION.md).
 
 1. **Native acceptance:** build 52 installation/general iPhone functionality,
    Watch launch, and foreground/background urgent display/wrist vibration have
@@ -261,7 +274,7 @@ device results.
 | Priority | Capability | Required evidence or decision |
 |---|---|---|
 | Next | Detection tuning | Reviewed Medium sessions with varied conditions and reproducible benchmark evidence. Observation counts alone cannot justify threshold changes or public accuracy claims. |
-| Source prepared; later scale work | Bounded older-history browsing; later retention, aggregates and realtime subscriptions | The separate history browser is untested development source; larger scaling work still needs observed scale or a demonstrated bottleneck, with permissions/deletion/query behavior defined. Protected fleet updates currently use polling. |
+| Published web, testing deferred; later scale work | Bounded older-history browsing; later retention, aggregates and realtime subscriptions | The separate history browser is published in PR #147 without runtime acceptance; larger scaling work still needs observed scale or a demonstrated bottleneck, with permissions/deletion/query behavior defined. Protected fleet updates currently use polling. |
 | After pilot | Billing and enforced entitlements | Agreed commercial terms and explicit activation. Published plans do not activate subscriptions. |
 | After independent validation | Camera/headphone/Watch confidence fusion, pre-drive scoring | Calibration, ground truth, privacy review, value over camera baseline. Health context remains local/read-only information. |
 | Later | Watch complication, Android app/health, device-agnostic engine | Proven need and platform implementation/validation. Android source configuration is not a released Android app. |

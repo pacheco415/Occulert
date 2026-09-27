@@ -15,13 +15,16 @@ the native clean-install and stale Watch-feedback repair. PR #144 is merged at
 `1c340e3` with confirmed-reply preservation and bounded Watch connection checks;
 both releases' native source fixes await a future binary.
 PR #146 is merged at `9662c3b`; its invitation/form/font repairs and benchmark
-provenance update are the current production website release. Monitoring/auth
+provenance update are the earlier verified website release. Monitoring/auth
 assets remain v60 and offline cache v54. Subsequent local-history date filters
-and older-fleet-history browsing were prepared in source `0c4c09c`. The user
-approved publishing this package on September 26 with all testing still
-deferred. Publication and runtime acceptance remain separate; see the
+and older-fleet-history browsing were prepared in source `0c4c09c` and merged
+in [PR #147](https://github.com/pacheco415/Occulert/pull/147) at `5b5db02`.
+Its website deployment is READY; all testing remains deferred at the user's
+request. Publication and runtime acceptance remain separate; see the
 [history browsing release record](docs/HISTORY_BROWSING.md). These additions
 are not part of the previously verified PR #146 release or installed native binary.
+The next prepared source adds a dedicated Help and Support page and a native
+Settings link; see [support preparation](docs/SUPPORT_PREPARATION.md).
 TestFlight 1.0.0 (52) remains the binary from `969849b`,
 with finished submission, Apple VALID / IN_BETA_TESTING, and embedded Watch
 packaging confirmed. On September 26, the user reported an iPhone installation

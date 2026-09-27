@@ -5,8 +5,12 @@ implementation source `0c4c09c5c04287bec19d1741077a56988fbf4422`. The user
 approved publishing this prepared package on September 26 while retaining the
 instruction to skip testing. No automated tests, type checks, browser/device
 runs, native builds or database changes were performed for this package.
-Publication approval is not a deployment receipt or runtime acceptance; merge
-and deployment identifiers must be recorded when those actions complete.
+Publication completed in [PR #147](https://github.com/pacheco415/Occulert/pull/147),
+merged source `5b5db0201ea3df17dc70f6b2189ff9b1093b512a`. Vercel production
+`dpl_HaWioevunU551T1CqGofjsBAgS5N` is READY with the public domain assigned.
+This is deployment metadata, not runtime acceptance. GitHub Actions runs were
+skipped for this package using per-commit markers; workflow configuration was
+unchanged. No browser or signed-in checks were performed after publication.
 The previously verified website baseline is PR #146 at `9662c3b`. Installed
 TestFlight remains 1.0.0 (52); these native date filters require a future binary.
 

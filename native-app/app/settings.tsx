@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -460,6 +460,22 @@ export default function SettingsScreen() {
     );
   };
 
+  const openSupportPage = async () => {
+    const url = 'https://www.occulert.com/support.html';
+    try {
+      if (await Linking.canOpenURL(url)) {
+        if (!settingsMountedRef.current) return;
+        await Linking.openURL(url);
+        return;
+      }
+    } catch {
+      // Offer the same manual recovery if the browser cannot open the link.
+    }
+    if (settingsMountedRef.current) {
+      Alert.alert('Help page unavailable', 'Open occulert.com/support.html in Safari, or email hello@occulert.com for support.');
+    }
+  };
+
   const localHistoryDeleteDisabled = localDataBusy
     || localDataStatusBusy
     || localSessionCount === null
@@ -762,6 +778,17 @@ export default function SettingsScreen() {
         </View>
         <View style={s.card}>
           <Text style={s.cardTitle}>PILOT SUPPORT</Text>
+          <TouchableOpacity
+            accessibilityRole="link"
+            accessibilityLabel="Help and support"
+            accessibilityHint="Opens Occulert setup, troubleshooting, and contact guidance in your browser"
+            style={s.row}
+            onPress={() => { void openSupportPage(); }}
+          >
+            <View style={s.rowL}><Ionicons name="help-circle-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Help and support</Text><Text style={s.sub}>Setup, troubleshooting, and contact guidance</Text></View></View>
+            <Ionicons name="open-outline" size={18} color="#4a7a8a" />
+          </TouchableOpacity>
+          <View style={s.div} />
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Send pilot feedback"
