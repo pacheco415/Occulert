@@ -34,9 +34,14 @@ only. [PR #150](https://github.com/pacheco415/Occulert/pull/150), source
 `7066fcf`, published CSV download of the shown records with filter and
 loaded-only scope metadata. Production is READY with all testing deferred;
 no full-fleet report is claimed.
-The next native source package adds alert-feedback filters to Session History,
-composed with date and review-status views. It remains untested source for a
-future binary; see [alert-feedback preparation](docs/HISTORY_ALERT_FEEDBACK.md).
+[PR #151](https://github.com/pacheco415/Occulert/pull/151), source `1eb90f1`,
+merged alert-feedback filters composed with date and review-status views.
+The automatic production deployment is READY without changing website behavior;
+the app changes remain untested source for a future binary. See
+[alert-feedback preparation](docs/HISTORY_ALERT_FEEDBACK.md).
+The next native source repair keeps missing or invalid saved duration/fatigue
+values labeled Not recorded in History and shared summaries, while preserving
+valid numeric zero; see [summary-value preparation](docs/HISTORY_SUMMARY_VALUES.md).
 TestFlight 1.0.0 (52) remains the binary from `969849b`,
 with finished submission, Apple VALID / IN_BETA_TESTING, and embedded Watch
 packaging confirmed. On September 26, the user reported an iPhone installation

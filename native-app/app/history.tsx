@@ -45,6 +45,7 @@ import {
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
 import { formatSessionAlertCount } from '../lib/sessionAlertCount';
+import { formatSessionDuration, formatSessionFatigue } from '../lib/sessionSummaryValues';
 import { buildPilotProgressExport } from '../lib/pilotProgressExport';
 import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
 import {
@@ -1140,6 +1141,7 @@ export default function HistoryScreen() {
           const reviewComplete = reviewProgress.complete;
           const isExpanded = expandedSessions[sessionKey] ?? false;
           const alertCountLabel = formatSessionAlertCount(item.alertCount);
+          const fatigueLabel = formatSessionFatigue(item.avgFatigue);
           return (
           <View
             key={sessionKey}
@@ -1159,7 +1161,7 @@ export default function HistoryScreen() {
             )}
             <View style={s.rowBetween}>
               <Text style={s.date}>{fmtDate(item.savedAt || item.updatedAt)}</Text>
-              <Text style={s.dur}>{fmtDuration(item.durationSec)}</Text>
+              <Text style={s.dur}>{formatSessionDuration(item.durationSec)}</Text>
             </View>
             <View style={s.stats}>
               <View style={s.stat}>
@@ -1167,7 +1169,7 @@ export default function HistoryScreen() {
                 <Text style={s.statLbl}>Alerts</Text>
               </View>
               <View style={s.stat}>
-                <Text style={s.statVal}>{item.avgFatigue != null ? Math.round(item.avgFatigue) : '-'}</Text>
+                <Text style={fatigueLabel === 'Not recorded' ? s.statValSmall : s.statVal}>{fatigueLabel}</Text>
                 <Text style={s.statLbl}>Avg Fatigue</Text>
               </View>
               <View style={s.stat}>

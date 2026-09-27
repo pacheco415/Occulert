@@ -20,10 +20,12 @@ state; they are not the current feature backlog.
   gap remains. Source tests cannot close those gaps.
 - **Future:** proposed capability without an implementation or delivery claim.
 
-The current published website source is [PR #150](https://github.com/pacheco415/Occulert/pull/150),
-merged at `7066fcf1a0f27589301282bb10458ed81f7f9279`, production deployment
-`dpl_32JhAvUCFR4wLoRcNP8YSWSfMmiq` READY. It adds CSV export of the shown
-loaded records with captured filters and scope, following PR #149's loaded-history
+The current merged source and approved native candidate is
+[PR #151](https://github.com/pacheco415/Occulert/pull/151),
+`1eb90f16a4083be07d6a73db217c473ee344d390`. Its automatic production deployment
+`dpl_8tiV2wQaiLYWpoTBnJmjGaahoUjr` is READY without changing website behavior.
+PR #150 added CSV export of shown loaded records with captured filters and scope,
+following PR #149's loaded-history
 driver/date/status filters, PR #148's Support/Help and PR #147's protected older-history
 browsing and native date filters. All testing of these packages is deferred by the
 user; deployment does not establish runtime acceptance or change build 52.
@@ -251,7 +253,7 @@ account and a fresh, successful browsing window, excludes hidden identifiers
 and personal media, and does not broaden existing reports. All testing remains
 deferred; see [History Browsing](HISTORY_BROWSING.md).
 
-The next native source package adds saved alert-feedback filters in Session
+PR #151 merged saved alert-feedback filters in Session
 History: All feedback, Felt right, Unnecessary alert, Missed alert, Too late
 and Not assessed. They compose with the existing local date and review-status
 views. Counts, review navigation and deliberate summary sharing follow the
@@ -259,6 +261,14 @@ selected scope, while All-history pilot and fusion progress retain their scope.
 Ratings are user observations, never detection-accuracy measurements. This is
 untested source for a future binary, not installed in build 52; see
 [Alert Feedback Preparation](HISTORY_ALERT_FEEDBACK.md).
+
+The next native source repair aligns saved-session duration and fatigue labels
+between History and shared summaries. Missing or invalid values become Not
+recorded, valid numeric zero remains zero, and fractional duration seconds use
+whole elapsed seconds. The repair reads stored values without rewriting records
+or changing monitoring, detection, recovery or cloud behavior. All testing is
+deferred, and build 52 is unchanged; see
+[Summary Value Preparation](HISTORY_SUMMARY_VALUES.md).
 
 1. **Native acceptance:** build 52 installation/general iPhone functionality,
    Watch launch, and foreground/background urgent display/wrist vibration have
