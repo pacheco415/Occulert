@@ -20,11 +20,11 @@ state; they are not the current feature backlog.
   gap remains. Source tests cannot close those gaps.
 - **Future:** proposed capability without an implementation or delivery claim.
 
-The current published website source is [PR #148](https://github.com/pacheco415/Occulert/pull/148),
-merged at `c4d3610dabc5efebcb395a1645a130b1407c3eb9`, production deployment
-`dpl_FFSEXsKLMmZSN5V66tFkjfJjwbkM` READY. It adds Support and the native Help
-link, following PR #147's protected older-history browsing and native date
-filters. All testing of these two packages is deferred by the
+The current published website source is [PR #149](https://github.com/pacheco415/Occulert/pull/149),
+merged at `16241c272fb6befd9f800142ea01effa1bb464fe`, production deployment
+`dpl_8JdMobC9XP34VdQEYtX6xL23oN6h` READY. It adds loaded-history driver/date/status
+filters, following PR #148's Support/Help and PR #147's protected older-history
+browsing and native date filters. All testing of these packages is deferred by the
 user; deployment does not establish runtime acceptance or change build 52.
 The earlier verified website release is [PR #146](https://github.com/pacheco415/Occulert/pull/146),
 merged at `9662c3b9e0bfc3cc721796328fd6ff53f7df995e`. It adds invitation validation, associated form labels, constrained
@@ -239,12 +239,16 @@ Pilot Quick Start, and an accessible native Settings link awaiting a binary.
 Contact uses the existing email; there is no contact form or automatic upload.
 See [Support Preparation](SUPPORT_PREPARATION.md).
 
-The next prepared website source adds driver-name search, local 7/30-day date
-views and recorded-status filtering within the older-history page's loaded
-records. Filters do not search unloaded data, change latest-50 reports or make
-missing/invalid completion dates into active-session claims. It remains
-unpublished source with all testing deferred. See
-[History Browsing](HISTORY_BROWSING.md).
+PR #149 published driver-name search, local 7/30-day date views and recorded-status
+filtering within the older-history page's loaded records. These filters do not
+search unloaded data or change latest-50 reports. Missing end times do not
+establish active sessions.
+
+The next prepared website source adds Export shown sessions CSV, tied to the
+current rendered selection and its filter/scope metadata. It requires the same
+account and a fresh, successful browsing window, excludes hidden identifiers
+and personal media, and does not broaden existing reports. It is unpublished
+source with all testing deferred; see [History Browsing](HISTORY_BROWSING.md).
 
 1. **Native acceptance:** build 52 installation/general iPhone functionality,
    Watch launch, and foreground/background urgent display/wrist vibration have

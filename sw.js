@@ -75,6 +75,7 @@ const NETWORK_ONLY_DOCUMENTS = new Set([
 const NETWORK_ONLY_ASSETS = new Set([
   '/fleet-history-page.v64.js',
   '/fleet-history-page.v65.js',
+  '/fleet-history-page.v66.js',
   '/auth-helper.v47.js',
   '/passkey-auth.v47.js',
   '/auth-helper.v49.js',
