@@ -51,6 +51,7 @@ interface AuthResponse {
 }
 
 export interface CloudState {
+  readStatus: 'confirmed' | 'unavailable';
   available: boolean;
   signedIn: boolean;
   email: string | null;
@@ -82,6 +83,18 @@ const cloudSyncPreference = createCachedBooleanPreference(
   CONSENT_KEY,
   false,
 );
+
+async function withCloudReadDeadline<T>(read: () => Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error('Cloud status read timed out.')), REQUEST_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([read(), deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function fetchJsonWithTimeout<T>(
   url: string,
@@ -141,7 +154,7 @@ async function loadConfig(): Promise<PublicConfig | null> {
 
 async function secureStoreAvailable(): Promise<boolean> {
   try {
-    return await SecureStore.isAvailableAsync();
+    return await withCloudReadDeadline(() => SecureStore.isAvailableAsync());
   } catch {
     return false;
   }
@@ -172,16 +185,25 @@ async function loadAuth(): Promise<StoredAuth | null> {
   if (authCache !== undefined) return authCache;
   if (!authLoadPromise) {
     const readVersion = authMutationVersion;
-    const pending = SecureStore.getItemAsync(AUTH_KEY, SECURE_OPTIONS)
+    // Resolve the native read before parsing/caching, so a timed-out read
+    // cannot later restore credentials or keep future retries waiting on it.
+    const pending = withCloudReadDeadline(() => SecureStore.getItemAsync(AUTH_KEY, SECURE_OPTIONS))
       .then(raw => {
         if (readVersion !== authMutationVersion) return authCache ?? null;
-        const parsed: unknown = raw ? JSON.parse(raw) : null;
+        let parsed: unknown = null;
+        try {
+          parsed = raw ? JSON.parse(raw) : null;
+        } catch {
+          // The native read succeeded but these saved bytes cannot sign in.
+          // Keep them untouched and allow an explicit new sign-in to replace
+          // them, rather than trapping the user in a status-only Retry loop.
+        }
         authCache = validStoredAuth(parsed) ? parsed : null;
         return authCache;
       })
       .catch(() => {
         if (readVersion !== authMutationVersion) return authCache ?? null;
-        // A transient keychain or JSON read failure must remain retryable.
+        // A transient keychain read failure must remain retryable.
         // Cache null only after a successful read proves no valid auth exists.
         return null;
       })
@@ -381,20 +403,45 @@ async function currentSyncContext(): Promise<{ ownerId: string; consentVersion: 
 }
 
 export async function getCloudState(): Promise<CloudState> {
-  const available = await secureStoreAvailable();
-  if (!available) {
-    return { available: false, signedIn: false, email: null, syncEnabled: false };
-  }
-  const auth = await loadAuth();
+  const unavailable = (): CloudState => ({
+    readStatus: 'unavailable', available: false, signedIn: false, email: null, syncEnabled: false,
+  });
   const stateVersion = authMutationVersion;
-  const syncEnabled = Boolean(auth) && await consentEnabled();
-  const currentAuth = auth && authIsCurrent(auth, stateVersion) ? auth : null;
-  return {
-    available: true,
-    signedIn: Boolean(currentAuth),
-    email: currentAuth?.user.email || null,
-    syncEnabled: Boolean(currentAuth) && syncEnabled && consentRuntimeOverride !== false,
-  };
+  const consentVersion = consentMutationVersion;
+  let active = true;
+  const current = () => active
+    && stateVersion === authMutationVersion
+    && consentVersion === consentMutationVersion;
+  try {
+    return await withCloudReadDeadline(async () => {
+      const available = await secureStoreAvailable();
+      if (!current() || !available) return unavailable();
+      const auth = await loadAuth();
+      // Undefined means the keychain read failed, rather than confirmed no
+      // saved sign-in. Leave it retryable and never present it as signed out.
+      if (!current() || authCache === undefined || (auth && !authIsCurrent(auth, stateVersion))) return unavailable();
+      let syncEnabled = false;
+      if (auth) {
+        // The operational preference cache intentionally falls back to off.
+        // A status check must distinguish a failed read from a confirmed off.
+        syncEnabled = consentRuntimeOverride !== null
+          ? consentRuntimeOverride
+          : await withCloudReadDeadline(() => AsyncStorage.getItem(CONSENT_KEY)).then(value => value === 'true');
+      }
+      if (!current() || (auth && !authIsCurrent(auth, stateVersion))) return unavailable();
+      return {
+        readStatus: 'confirmed',
+        available: true,
+        signedIn: Boolean(auth),
+        email: auth?.user.email || null,
+        syncEnabled: Boolean(auth) && syncEnabled,
+      };
+    });
+  } catch {
+    return unavailable();
+  } finally {
+    active = false;
+  }
 }
 
 export async function signInToCloud(email: string, password: string): Promise<CloudSignInResult> {

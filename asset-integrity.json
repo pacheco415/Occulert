@@ -89,5 +89,14 @@
   "fleet-history-page.v65.js": "46fd8fb10a8fce55a3ba35e073cae38e36d38b68104dbf730b12fc792091cf16",
   "fleet-history-page.v65.css": "608c2c610bdbf34e82585aa190c18b41612eee53f6c975d959e67e3fa7dd54c7",
   "fleet-history-page.v66.js": "ac7e1b17221c8c0dda74da9daecf6801da0cf694bb0416ade309a84409a00123",
-  "fleet-history-page.v66.css": "3b5efe888ba533bbb6efd1c92452d209cee9896aac46f477bce467960033ae51"
+  "fleet-history-page.v66.css": "3b5efe888ba533bbb6efd1c92452d209cee9896aac46f477bce467960033ae51",
+  "public-page.v67.js": "616def4d856b9088e1dca0ba5819ca81528b1bd7112ffc7407ce07ee4a9bc22c",
+  "homepage.v67.js": "d49849b4f25190fd19cfcc76f2aede73c98db2851a270b3b541704413873a6e8",
+  "public-guidance.v67.css": "2b32ac2bfd6ca56e46aa5449420c8e64bf59926e91fff344434428c51478ba40",
+  "fleet-history-page.v67.js": "14d7f8481597607af8894fb9f5d17126b4fd52fa6823093cbb4757631b85519b",
+  "fleet-history-page.v67.css": "dfc553dfee1febee924ce7480cf39b3452c658644838d6529e2fee2429334292",
+  "fleet-followups.v67.js": "5abdb1426c2d11cc38074ac937e3c4418f5197c46e8a3f1e42767d9cf71a0da5",
+  "fleet-followups.v67.css": "be467ecfa0d3927b69f9494bf5f2f005e4c74e37f7973b46f3a4a17e402057ff",
+  "fleet-onboarding-page-1.v67.js": "fe6ec42f55ee1fe383720e58a31a3737548e29fb59754af7bd79a3a47486da23",
+  "fleet-onboarding-page-1.v67.css": "53fd97b191cb2817617765d679bcdb34251a78a84d4be0c92599228e038e6e73"
 }

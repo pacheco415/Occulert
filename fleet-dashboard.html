@@ -18,7 +18,7 @@
   <script defer src="/lang.v47.js"></script>
   <script src="/occulert-backend.v60.js"></script>
   <script src="/security-utils.v47.js"></script>
-  <script src="/fleet-followups.v57.js" defer></script>
+  <script src="/fleet-followups.v67.js" defer></script>
   <script src="/fleet-pilot-report.v56.js" defer></script>
   <script src="/static-page.v60.js" defer></script>
   <style>
@@ -38,6 +38,7 @@
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/portal.v47.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
+<link rel="stylesheet" href="/fleet-followups.v67.css" />
 <link rel="stylesheet" href="/fleet-pilot-report.v56.css" />
 <style>
   .dashboard-page .btn,.dashboard-page .input,.dashboard-page .select{min-height:44px}
@@ -101,7 +102,7 @@
       </div>
       <details class="panel-details dashboard-tools">
         <summary>Dashboard tools</summary>
-        <div class="hero-actions"><a class="btn" href="/pilot-guide.html">Pilot quick start</a><a class="btn good" href="/fleet-display.html">Open TV display</a><button class="btn" onclick="exportFleetCSV()">Export CSV</button><button class="btn warn" onclick="seedDemoData()">Load Demo Data</button><button class="btn ghost" onclick="clearDemoData()">Clear Demo</button></div>
+        <div class="hero-actions"><a class="btn" href="/pilot-guide.html">Pilot quick start</a><a class="btn good" href="/fleet-display.html">Open TV display</a><button class="btn" onclick="exportFleetCSV()" title="Export loaded dashboard rows; driver filters are not applied">Export CSV</button><button class="btn warn" onclick="seedDemoData()">Load Demo Data</button><button class="btn ghost" onclick="clearDemoData()">Clear Demo</button></div>
       </details>
     </section>
     <details class="privacy-details privacy-note">
@@ -217,7 +218,7 @@
     <section class="card history-section" aria-labelledby="sessionHistoryTitle">
       <div class="section-title">
         <div><h2 id="sessionHistoryTitle">Protected Session History</h2><div class="sub">Recent sessions and events for the signed-in manager's server-verified fleet.</div></div>
-        <div class="toolbar"><a class="btn" href="/fleet-history.html">Browse older sessions</a><button class="btn" onclick="exportSessionHistoryCSV()">Export Session CSV</button></div>
+        <div class="toolbar"><a class="btn" href="/fleet-history.html">Browse older sessions</a><button class="btn" onclick="exportSessionHistoryCSV()">Export Session CSV</button><span class="sub">Up to 50 recent sessions; older History and complete-period reports are separate.</span></div>
       </div>
       <div class="notice privacy-note"><strong>Client-reported and unverified:</strong> Session scores and events are operational observations, not independently measured evidence. This history excludes GPS coordinates, camera media, audio, and raw motion.</div>
       <div class="history-list" id="sessionHistory" role="list"></div>
@@ -309,12 +310,50 @@ function renderPilotLaunchChecklist(){let state=pilotLaunchState({fleetReady:fle
 /* pilot-launch-checklist:end */
 function pilotMetrics(){let days=pilotWindowDays(),sessions=pilotWindowSessions(days),activeDrivers=fleetMode?protectedDrivers.filter(driver=>driver.active!==false):getDrivers().filter(driver=>driver.active!==false),sessionDrivers=new Set(sessions.map(session=>session.driverId||session.driverName).filter(Boolean)),activeDriverIds=new Set(activeDrivers.map(driver=>String(driver.id||driver.driverId||driver.name||''))),coveredDrivers=fleetMode?new Set(Array.from(sessionDrivers).filter(driverId=>activeDriverIds.has(String(driverId)))):sessionDrivers,rosterCount=fleetMode?activeDrivers.length:Math.max(activeDrivers.length,coveredDrivers.size),coverage=rosterCount?Math.min(100,Math.round(coveredDrivers.size/rosterCount*100)):0,scored=sessions.filter(session=>metricValue(session.safetyScore)!=='--'),average=scored.length?Math.round(scored.reduce((sum,session)=>sum+Number(session.safetyScore),0)/scored.length):null,review=sessions.filter(session=>Number(session.alertCount||0)>0||(metricValue(session.safetyScore)!=='--'&&Number(session.safetyScore)<70)),completed=sessions.filter(session=>sessionCompletionState(session)==='Completed').length,alerts=sessions.reduce((sum,session)=>sum+Math.max(0,Number(session.alertCount)||0),0);return{days,sessions,sessionDrivers,coveredDrivers,rosterCount,coverage,scored,average,review,completed,alerts}}
 function renderPilotValue(){let metrics=pilotMetrics(),plan=protectedFleetPlan?protectedFleetPlan.replace(/[_-]+/g,' '):fleetMode?'fleet':'trial';document.getElementById('fleetPlanBadge').textContent=plan+' workspace';document.getElementById('pilotWindowLabel').textContent=`Last ${metrics.days} days · ${metrics.sessions.length} of up to 50 recent sessions`;document.getElementById('valueSessions').textContent=metrics.sessions.length;document.getElementById('valueSessionsSub').textContent=metrics.completed+' completed';document.getElementById('valueCoverage').textContent=metrics.coverage+'%';document.getElementById('valueCoverageSub').textContent=metrics.rosterCount?`${metrics.coveredDrivers.size} of ${metrics.rosterCount} active drivers reporting`:'no participating drivers';document.getElementById('valueReview').textContent=metrics.review.length;document.getElementById('valueReviewSub').textContent=metrics.alerts?metrics.alerts+' client-reported alerts':'no reported alerts';document.getElementById('valueScore').textContent=metrics.average??'--';document.getElementById('valueScoreSub').textContent=metrics.scored.length?metrics.scored.length+' sessions with scores':'no recorded scores';document.getElementById('pilotValueStory').textContent=metrics.sessions.length?`${metrics.sessions.length} sessions across ${metrics.sessionDrivers.size} drivers created ${metrics.review.length} manager review candidate${metrics.review.length===1?'':'s'} in this window.`:'Start recording protected sessions to build a manager-ready trial report.';window.OcculertPilotReport?.update()}
-function exportPilotReport(){if(!allowProtectedShare())return;let metrics=pilotMetrics();if(!metrics.sessions.length){toast('No sessions in this reporting window');return}let header=['fleet','window_days','driver','started','ended','duration','safety_score','alert_count','head_nod_count','telemetry_trust'],rows=metrics.sessions.map(session=>[protectedFleetName||'Local trial',metrics.days,session.driverName,session.startedAt||'',session.endedAt||'',durationLabel(session.startedAt,session.endedAt),session.safetyScore??'',session.alertCount??'',session.headNodCount??'','unverified_client_report']),csv=[header].concat(rows).map(row=>row.map(value=>`"${OcculertSecurity.csvCell(value).replace(/"/g,'""')}"`).join(',')).join('\n'),blob=new Blob([csv],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`occulert-trial-report-${metrics.days}d.csv`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href);toast('Trial report downloaded')}
+const dashboardDownloadUrls=new Map();
+function clearDashboardDownloads(){
+  for(const [url,timer] of dashboardDownloadUrls){clearTimeout(timer);URL.revokeObjectURL(url)}
+  dashboardDownloadUrls.clear();
+}
+window.addEventListener('pagehide',clearDashboardDownloads);
+function requestDashboardCSVDownload(csv,filename,protectedOnly=false){
+  const owner=currentProtectedOwner(),generation=protectedFleetGeneration,mode=fleetMode;
+  if(protectedOnly?!allowProtectedShare():!allowDashboardShare())return;
+  let url='',anchor=null;
+  try{
+    url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    anchor=document.createElement('a');anchor.href=url;anchor.download=filename;
+    document.body.appendChild(anchor);
+    if(owner!==currentProtectedOwner()||generation!==protectedFleetGeneration||mode!==fleetMode||(protectedOnly?!allowProtectedShare():!allowDashboardShare()))return;
+    anchor.click();
+    const downloadUrl=url;
+    dashboardDownloadUrls.set(downloadUrl,setTimeout(()=>{URL.revokeObjectURL(downloadUrl);dashboardDownloadUrls.delete(downloadUrl)},15000));
+    url='';
+    toast('Download requested — check your browser downloads');
+  }catch(error){toast('Download unavailable — refresh and try again')}
+  finally{anchor?.remove();if(url)URL.revokeObjectURL(url)}
+}
+function exportPilotReport(){
+  if(!allowProtectedShare())return;
+  const metrics=pilotMetrics();if(!metrics.sessions.length){toast('No sessions in this reporting window');return}
+  const header=['fleet','window_days','driver','started','ended','duration','safety_score','alert_count','head_nod_count','telemetry_trust','report_scope','exported_record_count'];
+  const rows=metrics.sessions.map(session=>[protectedFleetName||'Local trial',metrics.days,session.driverName,session.startedAt||'',session.endedAt||'',durationLabel(session.startedAt,session.endedAt),session.safetyScore??'',session.alertCount??'',session.headNodCount??'','unverified_client_report','selected_window_within_latest_50_sessions_incomplete_period',metrics.sessions.length]);
+  const csv=[header,...rows].map(row=>row.map(value=>`"${OcculertSecurity.csvCell(value).replace(/"/g,'""')}"`).join(',')).join('\n');
+  requestDashboardCSVDownload(csv,`occulert-trial-report-${metrics.days}d.csv`,true);
+}
 function eventHistoryHtml(event){let type=String(event.type||'event').replace(/_/g,' ').slice(0,40),fatigue=metricValue(event.fatigue_score??event.fatigueScore,'/100'),confidence=metricValue(event.confidence,'%');return `<div class="history-event"><span class="history-event-type">${esc(type)}</span><span>${esc(dateLabel(event.created_at||event.createdAt))}</span><span class="sub">Fatigue ${esc(fatigue)} · confidence ${esc(confidence)}</span></div>`}
 function renderSessionHistory(){let root=document.getElementById('sessionHistory'),panel=document.querySelector('.history-details');if(!root)return;if(panel&&!panel.open){sessionHistoryDirty=true;return}let sessions=sessionHistoryRows();if(!sessions.length){root.innerHTML=`<div class="notice history-empty">${fleetMode?'No protected sessions have been recorded for this fleet yet.':'Sign in as a verified fleet owner to view protected history. Local-only session history will remain available on this browser.'}</div>`;sessionHistoryDirty=false;return}root.innerHTML=sessions.map(session=>{let events=eventsForSession(session),status=sessionCompletionState(session);return `<article class="history-item" role="listitem"><div class="history-head"><div><div class="name">${esc(session.driverName)}</div><div class="sub">Started ${esc(dateLabel(session.startedAt))} · ${esc(durationLabel(session.startedAt,session.endedAt))}</div></div><span class="pill ${status==='Completed'?'safe':'watch'}">${esc(status)}</span></div><div class="history-metrics"><div class="history-metric"><div class="label">Safety</div><strong>${esc(metricValue(session.safetyScore))}</strong></div><div class="history-metric"><div class="label">Avg fatigue</div><strong>${esc(metricValue(session.averageFatigue))}</strong></div><div class="history-metric"><div class="label">Max fatigue</div><strong>${esc(metricValue(session.maxFatigue))}</strong></div><div class="history-metric"><div class="label">Alerts</div><strong>${esc(metricValue(session.alertCount))}</strong></div><div class="history-metric"><div class="label">Head nods</div><strong>${esc(metricValue(session.headNodCount))}</strong></div><div class="history-metric"><div class="label">Device</div><strong>${esc(session.device)}</strong></div></div><div class="history-events">${events.length?events.map(eventHistoryHtml).join(''):'<div class="trust-note">No alert events in the available sample. Events may not be loaded or may be omitted.</div>'}</div><div class="trust-note">Client-reported telemetry · GPS and personal media excluded · ${fleetMode?'Events show up to 20 per session from up to 200 recent fleet events.':'Local events show up to 20 per session.'}</div></article>`}).join('');sessionHistoryDirty=false}
 function protectedHistoryOpen(){return document.querySelector('.history-details')?.open===true}
 function handleHistoryToggle(event){if(!event.currentTarget.open)return;if(sessionHistoryDirty)renderSessionHistory();if(fleetMode&&shouldRefreshProtectedEvents({historyOpen:true,lastLoadedAt:protectedEventsLoadedAt}))void refreshProtectedFleetNow({forceEvents:true})}
-function exportSessionHistoryCSV(){if(!allowDashboardShare())return;let sessions=sessionHistoryRows();if(!sessions.length){toast('No session history to export');return}let header=['driver','started','ended','duration','safety_score','average_fatigue','max_fatigue','alert_count','head_nod_count','device','available_event_count','telemetry_trust'];let rows=sessions.map(session=>[session.driverName,session.startedAt||'',session.endedAt||'',durationLabel(session.startedAt,session.endedAt),session.safetyScore??'',session.averageFatigue??'',session.maxFatigue??'',session.alertCount??'',session.headNodCount??'',session.device,eventsForSession(session).length,'unverified_client_report']);let csv=[header].concat(rows).map(row=>row.map(value=>`"${OcculertSecurity.csvCell(value).replace(/"/g,'""')}"`).join(',')).join('\n');let blob=new Blob([csv],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fleetMode?'occulert-protected-session-history.csv':'occulert-local-demo-session-history.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href);toast('Session history CSV exported')}
+function exportSessionHistoryCSV(){
+  if(!allowDashboardShare())return;
+  const sessions=sessionHistoryRows();if(!sessions.length){toast('No session history to export');return}
+  const header=['driver','started','ended','duration','safety_score','average_fatigue','max_fatigue','alert_count','head_nod_count','device','available_event_count','telemetry_trust','report_scope','exported_record_count'];
+  const scope=fleetMode?'latest_up_to_50_protected_sessions_incomplete_period':demoRows.length?'loaded_local_demo_rows':'latest_up_to_50_local_sessions';
+  const rows=sessions.map(session=>[session.driverName,session.startedAt||'',session.endedAt||'',durationLabel(session.startedAt,session.endedAt),session.safetyScore??'',session.averageFatigue??'',session.maxFatigue??'',session.alertCount??'',session.headNodCount??'',session.device,eventsForSession(session).length,'unverified_client_report',scope,sessions.length]);
+  const csv=[header,...rows].map(row=>row.map(value=>`"${OcculertSecurity.csvCell(value).replace(/"/g,'""')}"`).join(',')).join('\n');
+  requestDashboardCSVDownload(csv,fleetMode?'occulert-protected-session-history.csv':'occulert-local-demo-session-history.csv');
+}
 /* protected-session-history:end */
 function dashboardDataSnapshot(){let local=fleetMode?null:getLocal(),rawRows=cloudRows.length||fleetMode?cloudRows:local?[local]:[];return JSON.stringify({fleetMode,protectedFleetName,protectedFleetPlan,cloudRows,protectedDrivers,protectedSessions,protectedEvents,local,localDrivers:fleetMode?null:getDrivers(),localHistory:fleetMode?null:getJSON('occulert-session-history',[]),freshness:rawRows.map(row=>[String(row.driverId||row.id||row.name||''),timestamp(row),fresh(row)])})}
 function captureDashboardFocus(){let active=document.activeElement,key=active&&active.getAttribute&&active.getAttribute('data-focus-key');return key?{key}:null}
@@ -328,7 +367,15 @@ function toast(msg){let el=document.getElementById('toast');el.textContent=msg;e
 /* dashboard-sharing:start */
 function copyOpsSummary(){if(!allowDashboardShare()||!lastOpsSummary)return;try{navigator.clipboard.writeText(lastOpsSummary);toast('Action summary copied')}catch(e){alert(lastOpsSummary)}}
 function copyDriver(id){if(!allowDashboardShare())return;id=fromArg(id);let d=lastRows.find(x=>x.driverId===id);if(!d)return;let score=d.hasSafetyScore?d.safetyScore+'/100':'not recorded',metrics=d.hasSession?`, fatigue ${d.fatigue}/100, alerts ${d.alerts}`:', no recorded session metrics',text=`${d.name}: ${d.status}\nScore ${score}${metrics}\nUpdated ${d.hasSession?ageLabel(d):'not recorded'}${!fleetMode&&d.location?`\nGPS ${d.location.lat.toFixed(4)}, ${d.location.lng.toFixed(4)}`:''}`;try{navigator.clipboard.writeText(text);toast('Driver summary copied')}catch(e){alert(text)}}
-function exportFleetCSV(){if(!allowDashboardShare())return;let rows=lastRows.length?lastRows:[];let header=['name','status','safetyScore','fatigue','confidence','alerts','perclos','escalation','gps','lat','lng','updated'];let csv=[header.join(',')].concat(rows.map(d=>[d.name,d.status,d.hasSafetyScore?d.safetyScore:'',d.hasSession?d.fatigue:'',d.hasSession?d.confidence:'',d.hasSession?d.alerts:'',d.hasSession?d.perclos:'',d.hasSession?d.escalationLevel:'',!fleetMode&&!!d.location,!fleetMode&&d.location?d.location.lat:'',!fleetMode&&d.location?d.location.lng:'',d.lastUpdate||''].map(v=>`"${OcculertSecurity.csvCell(v).replace(/"/g,'""')}"`).join(','))).join('\n');let blob=new Blob([csv],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fleetMode?'occulert-protected-fleet-dashboard.csv':'occulert-local-demo-fleet-dashboard.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href);toast('CSV exported')}
+function exportFleetCSV(){
+  if(!allowDashboardShare())return;
+  const rows=lastRows.length?lastRows:[];if(!rows.length){toast('No dashboard rows to export');return}
+  const header=['name','status','safetyScore','fatigue','confidence','alerts','perclos','escalation','gps','lat','lng','updated','report_scope','exported_record_count'];
+  const scope=fleetMode?'loaded_protected_dashboard_rows_driver_filters_not_applied':'loaded_local_demo_dashboard_rows_driver_filters_not_applied';
+  const values=rows.map(d=>[d.name,d.status,d.hasSafetyScore?d.safetyScore:'',d.hasSession?d.fatigue:'',d.hasSession?d.confidence:'',d.hasSession?d.alerts:'',d.hasSession?d.perclos:'',d.hasSession?d.escalationLevel:'',!fleetMode&&!!d.location,!fleetMode&&d.location?d.location.lat:'',!fleetMode&&d.location?d.location.lng:'',d.lastUpdate||'',scope,rows.length]);
+  const csv=[header,...values].map(row=>row.map(value=>`"${OcculertSecurity.csvCell(value).replace(/"/g,'""')}"`).join(',')).join('\n');
+  requestDashboardCSVDownload(csv,fleetMode?'occulert-protected-fleet-dashboard.csv':'occulert-local-demo-fleet-dashboard.csv');
+}
 /* dashboard-sharing:end */
 function seedDemoData(){if(fleetMode||currentProtectedOwner()){toast('Sign out before loading local demo data');return}let now=Date.now(),rows=[{name:'Avery R.',driverId:'demo-avery',route:'Route 12 / Van 4',status:'ALERT',safetyScore:48,fatigue:86,confidence:91,alerts:3,perclos:42,escalationLevel:3,microsleeps:1,headNods:2,location:{lat:37.7749,lng:-122.4194},speedMph:21,distanceMiles:14.2,lastUpdate:new Date(now-42000).toISOString(),cloudConsent:true},{name:'Mina S.',driverId:'demo-mina',route:'Airport shuttle',status:'WATCH',safetyScore:72,fatigue:58,confidence:88,alerts:1,perclos:22,escalationLevel:1,location:{lat:37.6213,lng:-122.3790},speedMph:34,distanceMiles:22.8,lastUpdate:new Date(now-120000).toISOString(),cloudConsent:true},{name:'Jordan K.',driverId:'demo-jordan',route:'Warehouse return',status:'SAFE',safetyScore:93,fatigue:12,confidence:94,alerts:0,perclos:4,escalationLevel:0,lastUpdate:new Date(now-8*60000).toISOString(),cloudConsent:false}];demoRows=rows;cloudRows=demoRows;sessionHistoryDirty=true;render();toast('Demo data loaded — saved local sessions are unchanged')}
 function clearDemoData(){demoRows=[];if(!fleetMode){cloudRows=[];sessionHistoryDirty=true;render()}toast('Demo data cleared — saved local sessions are unchanged')}

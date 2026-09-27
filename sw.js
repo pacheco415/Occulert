@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v54';
+const CACHE = 'occulert-v55';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -61,7 +61,8 @@ const STATIC_ASSETS = [
   '/liquid-glass.v47.css',
   '/accessibility.v52.css',
   '/portal.v47.css',
-  '/homepage.v60.js',
+  '/homepage.v67.js',
+  '/public-guidance.v67.css',
   '/driver-app.v47.css',
   '/driver-app.v60.js',
   '/lang.v47.js',
@@ -76,6 +77,7 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/fleet-history-page.v64.js',
   '/fleet-history-page.v65.js',
   '/fleet-history-page.v66.js',
+  '/fleet-history-page.v67.js',
   '/auth-helper.v47.js',
   '/passkey-auth.v47.js',
   '/auth-helper.v49.js',

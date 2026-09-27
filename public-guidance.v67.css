@@ -1,0 +1,23 @@
+/* Setup and support guidance shared by the public pages. */
+.availability-links{display:flex;flex-wrap:wrap;gap:12px;margin:22px 0}
+.availability-links a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 16px;border:1px solid var(--card-border,#385474);border-radius:10px;color:var(--text);background:var(--card-bg,rgba(37,99,235,.08));text-decoration:none;overflow-wrap:anywhere}
+.availability-card{margin:24px 0;padding:24px;border:1px solid var(--card-border,#385474);border-radius:16px;background:var(--card-bg,rgba(37,99,235,.06));scroll-margin-top:100px}
+.availability-card h2{font-size:22px;margin:0 0 12px;color:var(--text)}
+.availability-card p,.availability-card li{color:var(--text2);line-height:1.7;overflow-wrap:anywhere}
+.availability-card p+p{margin-top:12px}
+.availability-card a{color:var(--text);text-underline-offset:.2em}
+.availability-card ul{padding-left:22px;margin:14px 0}
+.nav-links a,.mobile-menu a,.footer-links a{overflow-wrap:anywhere}
+.faq-q{min-height:44px;overflow-wrap:anywhere}
+.faq-q:focus-visible,.availability-links a:focus-visible,.availability-card a:focus-visible{outline:3px solid #60a5fa;outline-offset:4px}
+.faq-a{max-height:none;transition:none}
+.faq-a[hidden]{display:none}
+.faq-item.open .faq-a{max-height:none}
+@media(max-width:600px){.availability-card{padding:18px}.availability-links a{flex:1 1 180px}.faq-q{padding:18px}.faq-a p{padding:0 18px 18px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.faq-icon,.faq-item{transition:none}}
+
+.availability-card .install-steps{list-style:none;padding:0}
+.mobile-menu{max-height:calc(100dvh - 90px);overflow-y:auto}
+.mobile-menu a{min-height:44px;display:flex;align-items:center}
+.nav-links a:focus-visible,.mobile-menu a:focus-visible,.footer-links a:focus-visible{outline:3px solid #60a5fa;outline-offset:3px}
+@media(max-width:1100px){nav .nav-links{display:none}nav .hamburger{display:flex}}

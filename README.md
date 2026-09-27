@@ -6,57 +6,31 @@ Occulert is a prototype real-time AI drowsiness detection platform that uses you
 
 🌐 **Live at [occulert.com](https://www.occulert.com)**
 
-Development status is maintained in the [authoritative roadmap](docs/APP_ROADMAP.md).
-The protected Supabase fleet workflow, reporting, TV aggregate view, and pilot
-launch checklist are released web features. PR #138 shipped quick start,
-printable reporting, data-quality explanations, and TV controls; PR #139 shipped
-the native clean-install and stale Watch-feedback repair. PR #144 is merged at
-`d3ae5a3`, and its website/backend audit release is live. PR #145 is merged at
-`1c340e3` with confirmed-reply preservation and bounded Watch connection checks;
-both releases' native source fixes await a future binary.
-PR #146 is merged at `9662c3b`; its invitation/form/font repairs and benchmark
-provenance update are the earlier verified website release. Monitoring/auth
-assets remain v60 and offline cache v54. Subsequent local-history date filters
-and older-fleet-history browsing were prepared in source `0c4c09c` and merged
-in [PR #147](https://github.com/pacheco415/Occulert/pull/147) at `5b5db02`.
-Its website deployment is READY; all testing remains deferred at the user's
-request. Publication and runtime acceptance remain separate; see the
-[history browsing release record](docs/HISTORY_BROWSING.md). These additions
-are not part of the previously verified PR #146 release or installed native binary.
-The dedicated Help and Support page is published in
-[PR #148](https://github.com/pacheco415/Occulert/pull/148), source `c4d3610`,
-production READY. Its native Settings link awaits the next binary; see
-[support preparation](docs/SUPPORT_PREPARATION.md). Driver, date-period and
-recorded-status filters were published in
-[PR #149](https://github.com/pacheco415/Occulert/pull/149), source `16241c2`,
-production READY with all testing deferred. These filters search loaded records
-only. [PR #150](https://github.com/pacheco415/Occulert/pull/150), source
-`7066fcf`, published CSV download of the shown records with filter and
-loaded-only scope metadata. Production is READY with all testing deferred;
-no full-fleet report is claimed.
-[PR #151](https://github.com/pacheco415/Occulert/pull/151), source `1eb90f1`,
-merged alert-feedback filters composed with date and review-status views.
-The automatic production deployment is READY without changing website behavior;
-the app changes remain untested source for a future binary. See
-[alert-feedback preparation](docs/HISTORY_ALERT_FEEDBACK.md).
-The next native source repair keeps missing or invalid saved duration/fatigue
-values labeled Not recorded in History and shared summaries, while preserving
-valid numeric zero; see [summary-value preparation](docs/HISTORY_SUMMARY_VALUES.md).
-TestFlight 1.0.0 (52) remains the binary from `969849b`,
-with finished submission, Apple VALID / IN_BETA_TESTING, and embedded Watch
-packaging confirmed. On September 26, the user reported an iPhone installation
-and general functional pass, Watch launch, and urgent alert display/wrist
-vibration in both the foreground and after returning to the watch face. The
-reported devices are iPhone 17 Pro Max on iOS 27.2 and Apple Watch Ultra 4, with
-Watch software described as the same version 27.2; these details are not
-independently verified. Exact alert delay, Focus/permission variations, and
-individual audio, recovery, accessibility, battery/heat checks remain undocumented.
-Included iOS build usage is 15/15; the next period begins September 30 at
-5 p.m. Pacific. No new build, submission, or OTA update is queued. Pilot
-owner/participant details remain unanswered. Source checks and these limited
-device reports do not establish full device acceptance, detection accuracy,
-or safety effectiveness. Physical Safari/PWA offline acceptance remains open
-after an unresolved WebKit emulated-offline failure.
+Development and release status is maintained in the
+[authoritative roadmap](docs/APP_ROADMAP.md).
+
+- **Current source package:** [PR #153](https://github.com/pacheco415/Occulert/pull/153)
+  implements the approved app and website improvements. See that PR's release
+  receipt for the final source and website deployment status. The previous
+  production receipt is PR #152, `26d2fb4`, deployment READY. Source publication
+  does not establish runtime acceptance.
+- **Installed private native app:** TestFlight **1.0.0 (52)** from `969849b`.
+  The user reported general iPhone functionality and foreground/background Watch
+  urgent display/vibration. Exact-device coverage and sustained performance remain open.
+- **Approved development:** [21 app and website upgrades](docs/APPROVED_UPGRADES_2026_09_26.md)
+  cover account access, History, fleet workflows, public guidance and release records.
+  All tests and type/browser/device checks remain skipped at the user's request.
+  Native changes require a later binary; source merges and website updates do not
+  update the installed iPhone or Watch app.
+- **Native capacity:** the recorded allowance is 15/15 used, renewing September 30
+  at 5 p.m. Pacific. Recheck before building. No paid upgrade, build, submission
+  or OTA update is queued.
+- **Later projects:** detection tuning, fusion, complete-period fleet reports,
+  realtime updates, paid entitlements and additional platforms retain the decisions
+  and evidence requirements in the roadmap. Existing pilot and App Store materials
+  do not establish participants, device acceptance, accuracy or public store availability.
+
+Dated PR #138–#153 evidence remains in the roadmap and linked release records.
 
 ---
 
@@ -68,7 +42,7 @@ after an unresolved WebKit emulated-offline failure.
 - 📍 **Opt-In GPS** — Location tracking is off by default and only starts when enabled.
 - ☁️ **Opt-In Cloud Sync** — Fleet cloud sync is off by default. When enabled it uses Supabase Auth with fleet-scoped row-level security.
 - 📊 **Session Event Log** — Alerts and fatigue metrics can be saved locally in the browser.
-- 📱 **PWA Installable** — Add to iPhone or Android home screen like a native app.
+- 📱 **PWA Installable** — Add the browser monitor to an iPhone or Android Home Screen. Native iPhone/Watch distribution is separate.
 
 ---
 

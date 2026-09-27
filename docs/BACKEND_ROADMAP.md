@@ -5,6 +5,15 @@ Status recorded September 26, 2026. Product/release status lives in the
 implementation; choosing a backend or building accounts from scratch is not
 pending work.
 
+## Approved interface upgrades
+
+The September 26 [approved source batch](APPROVED_UPGRADES_2026_09_26.md)
+adds loaded-view dates/sorting/printing, follow-up filters and draft preservation,
+and invitation search/refresh/delivery clarity. It changes no protected API,
+retention, database schema, permissions, billing or telemetry fields. Older
+History stays at 500 loaded records; follow-ups stay within the latest-50 list.
+All execution and testing remain deferred by user instruction.
+
 ## Current architecture
 
 Supabase Auth supplies identity. Vercel `/api` endpoints verify access tokens,

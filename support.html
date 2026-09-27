@@ -32,14 +32,27 @@
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
-  <nav aria-label="Main navigation"><a href="/" class="logo">Occulert</a><a href="/pilot-guide.html" class="back">Pilot quick start</a></nav>
+  <nav aria-label="Main navigation"><a href="/" class="logo">Occulert</a><a href="/install.html" class="back">Choose your app</a><a href="/faq.html" class="back">FAQ</a><a href="/pilot-guide.html" class="back">Pilot quick start</a></nav>
   <main id="main-content" tabindex="-1">
     <h1>Help and support</h1>
     <p class="sub">Setup guidance for the iPhone app, optional Watch companion and website.</p>
     <p>Configure or troubleshoot while safely parked. Camera monitoring requires Occulert to remain in the foreground. If you feel tired, pull over safely and rest, whether or not an alert appears.</p>
     <div class="support-links" role="navigation" aria-label="Support topics">
-      <a href="#setup">Camera setup</a><a href="#alerts">Phone and Watch alerts</a><a href="#history">History and privacy</a><a href="#fleet">Fleet access</a><a href="#contact">Contact support</a>
+      <a href="#accounts">Accounts and sign-in</a><a href="#setup">Camera setup</a><a href="#alerts">Phone and Watch alerts</a><a href="#history">History and privacy</a><a href="#fleet">Fleet access</a><a href="#contact">Contact support</a>
     </div>
+
+    <section class="sec" id="accounts" aria-labelledby="accounts-title">
+      <h2 id="accounts-title">Account and sign-in problems</h2>
+      <h3>I cannot sign in to the iPhone app</h3>
+      <ol>
+        <li>Use the email address for your existing Occulert driver account. Local monitoring and History remain available without signing in.</li>
+        <li>If you created an account with an email link or passkey and have no password, use <a href="/login.html?mode=reset">password recovery</a> to set one before native password sign-in.</li>
+        <li>For a temporarily unavailable cloud-status message, retry while connected. Do not clear local history to fix a sign-in problem.</li>
+      </ol>
+      <h3>I need account or cloud-data controls</h3>
+      <p>Open signed-in <a href="/account.html">Account Settings</a> in your browser. Browser sign-in is separate from iPhone sign-in. Local deletion and permanent account deletion are separate actions; review each confirmation before continuing.</p>
+      <div class="support-links"><a href="/login.html?mode=reset">Reset password</a><a href="/account.html">Manage account</a><a href="/install.html">Choose your app</a></div>
+    </section>
 
     <section class="sec" id="setup" aria-labelledby="setup-title">
       <h2 id="setup-title">Camera setup and interruptions</h2>
@@ -66,7 +79,7 @@
     <section class="sec" id="history" aria-labelledby="history-title">
       <h2 id="history-title">Session history and privacy controls</h2>
       <ul>
-        <li>In the iPhone app, open Session History to review local summaries. Settings &rarr; Privacy &amp; Local Data provides history and recovery-data controls.</li>
+        <li>In the iPhone app, open Session History to review up to 50 recent local summaries. Share the summaries you intend to keep before older records roll off. Settings &rarr; Privacy &amp; Local Data provides history and recovery-data controls.</li>
         <li>Browser history belongs to the browser and device where it was saved. It is separate from native history and protected fleet records.</li>
         <li>A recovered interrupted session is a partial record, not a completed drive. Missing values are not measured zeroes.</li>
         <li>If saving fails, follow the displayed retry or recovery guidance. Before removing local data, review or share the summaries you intend to keep.</li>
@@ -79,13 +92,13 @@
       <h2 id="fleet-title">Fleet invitations and older sessions</h2>
       <p>Accept the invitation from your fleet owner using the intended account. If the invitation has expired or was already used, ask the owner for a new one. Drivers must choose whether to enable cloud sharing; a local session alone does not establish a synced fleet record.</p>
       <p>Managers should sign in as the fleet owner to see protected records. The dashboard, report and shared TV view summarize the latest 50 sessions. Browse older sessions opens a separate view that loads up to 50 at a time, with a limit of 500 loaded records. Browsing older records does not expand the report's calculation window.</p>
-      <p>Protected history requires a connection and clears when the account or page changes. Refresh starts again with the newest records. Session scores and counts are unverified client reports.</p>
+      <p>Protected history requires a connection and clears when the account or page changes. Refresh starts again with the newest records. Filters, sorted views, CSV and printing cover only the records loaded and selected in this browser. Session scores and counts are unverified client reports.</p>
       <div class="support-links"><a href="/fleet-dashboard.html">Fleet dashboard</a><a href="/fleet-history.html">Browse older sessions</a><a href="/pilot-guide.html#manager-start">Manager quick start</a></div>
     </section>
 
     <section class="sec" id="contact" aria-labelledby="contact-title">
       <h2 id="contact-title">Contact Occulert</h2>
-      <p>Email <a href="mailto:hello@occulert.com">hello@occulert.com</a> for help, feedback, or assistance locating a data control. Opening the email link does not send a message; review the details before sending.</p>
+      <p>Email <a href="mailto:hello@occulert.com">hello@occulert.com</a> for help, feedback, or assistance locating a data control. Opening the email link does not send a message; review the details before sending. If no email app opens, compose a message in your usual email service. Updated iPhone builds also offer a separate Share draft choice after Mail fails; you choose the destination and whether to send.</p>
       <h3>Useful details to include</h3>
       <ul>
         <li>Whether you used the iPhone app or website, and the app version/build or browser version.</li>

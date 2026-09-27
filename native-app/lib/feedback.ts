@@ -1,4 +1,4 @@
-import { Linking, Platform } from 'react-native';
+import { Alert, AppState, Linking, Platform, Share } from 'react-native';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { currentAppBuildInfo } from './appBuildInfo';
 import { formatSessionAlertCount } from './sessionAlertCount';
@@ -56,14 +56,14 @@ function assessmentLabel(value?: AlertAssessment): string {
 }
 
 function conditionLabel(value?: string): string {
-  if (!value) return '-';
+  if (typeof value !== 'string' || !value) return '-';
   return value
     .split('_')
     .map(part => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 }
 
-export function feedbackUrl(session?: FeedbackSession): string {
+function feedbackDraft(session?: FeedbackSession): { subject: string; body: string } {
   const subject = session ? 'Occulert pilot session feedback' : 'Occulert pilot feedback';
   const currentBuild = currentAppBuildInfo();
   const lines = [
@@ -101,7 +101,15 @@ export function feedbackUrl(session?: FeedbackSession): string {
   }
 
   lines.push('', 'No camera images, video, audio, raw motion readings, or location are attached.');
-  return 'mailto:' + FEEDBACK_EMAIL + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(lines.join('\n'));
+  return { subject, body: lines.join('\n') };
+}
+
+function draftUrl(draft: { subject: string; body: string }): string {
+  return 'mailto:' + FEEDBACK_EMAIL + '?subject=' + encodeURIComponent(draft.subject) + '&body=' + encodeURIComponent(draft.body);
+}
+
+export function feedbackUrl(session?: FeedbackSession): string {
+  return draftUrl(feedbackDraft(session));
 }
 
 export async function openFeedback(session?: FeedbackSession): Promise<boolean> {
@@ -111,4 +119,54 @@ export async function openFeedback(session?: FeedbackSession): Promise<boolean> 
   } catch {
     return false;
   }
+}
+
+/** Keep the same draft when Mail fails; sharing requires a second user choice. */
+export async function openFeedbackWithFallback(
+  session?: FeedbackSession,
+  isActive: () => boolean = () => true,
+): Promise<void> {
+  const current = () => AppState.currentState === 'active' && isActive();
+  if (!current()) return;
+  const draft = feedbackDraft(session);
+  try {
+    if (!current()) return;
+    await Linking.openURL(draftUrl(draft));
+    return;
+  } catch {
+    if (!current()) return;
+  }
+
+  await new Promise<void>(resolve => {
+    let choiceMade = false;
+    Alert.alert(
+      'Mail is unavailable',
+      'Your feedback draft is ready. Share it with an app you choose, then review it before sending to hello@occulert.com. Nothing is sent automatically.',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => { choiceMade = true; resolve(); } },
+        {
+          text: 'Share draft',
+          onPress: () => {
+            choiceMade = true;
+            if (!current()) { resolve(); return; }
+            void (async () => {
+              try {
+                await Share.share({
+                  title: draft.subject,
+                  message: 'To: ' + FEEDBACK_EMAIL + '\nSubject: ' + draft.subject + '\n\n' + draft.body,
+                });
+              } catch {
+                if (current()) {
+                  Alert.alert('Feedback draft unavailable', 'The share sheet could not open. Try again, or email hello@occulert.com from your preferred email app.');
+                }
+              } finally {
+                resolve();
+              }
+            })();
+          },
+        },
+      ],
+      { cancelable: true, onDismiss: () => { if (!choiceMade) resolve(); } },
+    );
+  });
 }
