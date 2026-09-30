@@ -21,38 +21,31 @@ module.exports = function handler(request, response) {
   if (pathname && Object.hasOwn(handlers, pathname)) {
     const routeName = pathname.slice('/api/'.length);
     const query = request.query;
-    if (pathname === '/api/fleet-period-report' && process.env.VERCEL_ENV === 'preview') {
-      const urlParams = publicUrl.searchParams;
-      const queryKeys = query && typeof query === 'object' ? Object.keys(query) : [];
-      response.setHeader('X-Occulert-Preview-Route', [
-        'ue=' + urlParams.getAll('endpoint').length,
-        'uem=' + Number(urlParams.get('endpoint') === routeName),
-        'ud=' + urlParams.getAll('days').length,
-        'ud7=' + Number(urlParams.get('days') === '7'),
-        'uo=' + [...urlParams.keys()].filter(key => key !== 'endpoint' && key !== 'days').length,
-        'qe=' + (Array.isArray(query?.endpoint) ? 'array' : typeof query?.endpoint),
-        'qem=' + Number(query?.endpoint === routeName),
-        'qd=' + (Array.isArray(query?.days) ? 'array' : typeof query?.days),
-        'qd7=' + Number(query?.days === '7'),
-        'qo=' + queryKeys.filter(key => key !== 'endpoint' && key !== 'days').length,
-      ].join(';'));
-    }
     if (query && Object.hasOwn(query, 'endpoint') && query.endpoint !== routeName) {
       response.statusCode = 400;
       response.setHeader('Content-Type', 'application/json; charset=utf-8');
       response.setHeader('Cache-Control', 'no-store');
       return response.end(JSON.stringify({ error: 'invalid_query' }));
     }
-    // Vercel may add routing metadata to request.query, and its query property
-    // can be a getter. Build the forwarded query from the public URL instead.
-    // The original URL remains intact for duplicate/unknown-key validation.
+    // Vercel adds one matching [endpoint] parameter to both request.url and
+    // request.query. Remove exactly one from the forwarded URL. Extra values
+    // that survive Vercel's same-name query normalization, and all other
+    // caller parameters and duplicates, remain for strict handlers to reject.
     // Preserve the original request stream for Stripe's raw-body signature.
     if (pathname === '/api/billing-webhook') {
       return handlers[pathname](request, response);
     }
+    const urlEntries = [...publicUrl.searchParams.entries()];
+    const platformEntry = query?.endpoint === routeName
+      ? urlEntries.findIndex(([key, value]) => key === 'endpoint' && value === routeName)
+      : -1;
+    if (platformEntry !== -1) urlEntries.splice(platformEntry, 1);
+    const search = new URLSearchParams(urlEntries).toString();
+    const normalizedUrl = pathname + (search ? '?' + search : '');
     const forwarded = Object.create(request);
+    Object.defineProperty(forwarded, 'url', { value: normalizedUrl, enumerable: true });
     Object.defineProperty(forwarded, 'query', {
-      value: Object.fromEntries(publicUrl.searchParams), enumerable: true,
+      value: Object.fromEntries(urlEntries), enumerable: true,
     });
     return handlers[pathname](forwarded, response);
   }

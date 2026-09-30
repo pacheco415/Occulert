@@ -33,24 +33,29 @@ test('dynamic API dispatch uses the path and ignores caller-supplied route queri
 
   for (const route of routed) {
     const response = { statusCode: 200, setHeader() {}, end() {} };
-    const request = { url: `/api/${route}?days=7`, query: { endpoint: route, days: '7' } };
+    const request = { url: `/api/${route}?days=7&endpoint=${route}`,
+      query: { endpoint: route, days: '7' } };
     await dispatch(request, response);
     assert.equal(called.at(-1).route, route);
     assert.deepEqual(called.at(-1).request.query, route === 'billing-webhook'
       ? { endpoint: route, days: '7' } : { days: '7' });
     if (route === 'billing-webhook') assert.equal(called.at(-1).request, request);
-    else assert.notEqual(called.at(-1).request, request);
+    else {
+      assert.notEqual(called.at(-1).request, request);
+      assert.equal(called.at(-1).request.url, `/api/${route}?days=7`);
+    }
     assert.equal(response.statusCode, 200);
   }
   assert.deepEqual(called.map(item => item.route), routed);
 
-  const vercelRequest = { url: '/api/fleet-period-report?days=7' };
+  const vercelRequest = { url: '/api/fleet-period-report?days=7&endpoint=fleet-period-report' };
   Object.defineProperty(vercelRequest, 'query', { get: () => ({
     endpoint: 'fleet-period-report', days: '7', vercel_internal: 'route-metadata',
   }) });
   await dispatch(vercelRequest, { statusCode: 200, setHeader() {}, end() {} });
   assert.equal(called.at(-1).route, 'fleet-period-report');
   assert.deepEqual(called.at(-1).request.query, { days: '7' });
+  assert.equal(called.at(-1).request.url, '/api/fleet-period-report?days=7');
   assert.equal(Object.hasOwn(called.at(-1).request, 'query'), true);
 
   const response = { statusCode: 200, headers: {}, body: '',
@@ -90,7 +95,8 @@ test('fleet query validators accept Vercel path metadata but reject caller endpo
   async function invoke(route, suffix = '', callerQuery = {}) {
     const response = { statusCode: 200, setHeader() {},
       end(value) { this.body = JSON.parse(value); } };
-    const request = { method: 'GET', url: `/api/${route}${suffix}`,
+    const request = { method: 'GET',
+      url: `/api/${route}${suffix}${suffix.includes('?') ? '&' : '?'}endpoint=${route}`,
       headers: { authorization: 'Bearer fixture' } };
     Object.defineProperty(request, 'query', { get: () => ({
       endpoint: route, vercel_internal: 'route-metadata', ...callerQuery,
@@ -101,6 +107,12 @@ test('fleet query validators accept Vercel path metadata but reject caller endpo
   assert.equal((await invoke('fleet-period-report', '?days=7', { days: '7' })).statusCode, 403);
   assert.equal((await invoke('fleet-session-history')).statusCode, 403);
   assert.equal((await invoke('fleet-period-report', '?days=7&endpoint=fleet-period-report',
+    { days: '7' })).statusCode, 400);
+  assert.equal((await invoke('fleet-period-report', '?days=7&endpoint=unexpected',
+    { days: '7' })).statusCode, 400);
+  assert.equal((await invoke('fleet-period-report', '?days=7&days=30',
+    { days: '7' })).statusCode, 400);
+  assert.equal((await invoke('fleet-period-report', '?days=7&unknown=1',
     { days: '7' })).statusCode, 400);
   assert.equal((await invoke('fleet-session-history', '?endpoint=fleet-session-history')).statusCode, 400);
 });
