@@ -21,6 +21,10 @@ function harness(asset, initial = {}) {
     location: { search: '' }, URLSearchParams, AbortController, Date,
     setInterval() {}, setTimeout: callback => { const id = ++timerId; timers.set(id, callback); return id; },
     clearTimeout: id => timers.delete(id), fetch: () => { throw Error('Unexpected network request'); } });
+  if (asset === 'pilot-signup-page-2.js') {
+    element('plan').value = 'conversation';
+    element('plan').form = { elements: { fleet: element('fleet') } };
+  }
   vm.runInContext(readFileSync(new URL('../' + versions[asset], import.meta.url), 'utf8'), context);
   return { context, storage, elements, element, localStorage, alerts, timers };
 }
@@ -79,7 +83,7 @@ test('profile creation remains available without randomUUID', () => {
 
 test('successful lead submission preserves fields edited while sending', async () => {
   const app = harness('pilot-signup-page-2.js');
-  for (const [id, value] of Object.entries({ name: 'Tester', company: 'Test fleet', email: 'test@example.com', timeline: '30-days', goal: 'safety' })) app.element(id).value = value;
+  for (const [id, value] of Object.entries({ name: 'Tester', company: 'Test fleet', email: 'test@example.com' })) app.element(id).value = value;
   let complete;
   app.context.fetch = () => new Promise(resolve => { complete = resolve; });
   const pending = app.context.saveLead({ preventDefault() {} });
@@ -118,7 +122,7 @@ test('history CSV neutralizes spreadsheet formulas while preserving commas and q
 
 for (const stalledPart of ['headers', 'body']) test(`lead submission recovers from stalled ${stalledPart} and ignores late success`, async () => {
   const app = harness('pilot-signup-page-2.js');
-  for (const [id, value] of Object.entries({ name: 'Tester', company: 'Test fleet', email: 'test@example.com', timeline: '30-days', goal: 'safety' })) app.element(id).value = value;
+  for (const [id, value] of Object.entries({ name: 'Tester', company: 'Test fleet', email: 'test@example.com' })) app.element(id).value = value;
   let finish, signal, calls = 0;
   const stalled = new Promise(resolve => { finish = resolve; });
   app.context.fetch = async (_url, options) => { calls += 1; signal = options.signal;

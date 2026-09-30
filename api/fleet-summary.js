@@ -61,7 +61,7 @@ const rosterResults = await Promise.all([pgFetch("drivers", {
 params: { select: "id,name,active,vehicle_id", fleet_id: "eq." + fleet.id },
 }), pgFetch("sessions", {
 params: {
-select: "id,driver_id,started_at,ended_at,average_fatigue,max_fatigue,safety_score,alert_count,head_nod_count",
+select: "id,driver_id,started_at,ended_at,average_fatigue,max_fatigue,safety_score,alert_count,head_nod_count,detector_pipeline,detector_version,app_version",
 fleet_id: "eq." + fleet.id,
 order: "started_at.desc,id.desc",
 limit: "50",
@@ -113,6 +113,7 @@ sessions: sessions,
 events: events,
 events_included: includeEvents,
 telemetry_trust: "unverified_client_report",
+detector_provenance_trust: "client_declared",
 privacy: {
 includes_location: false,
 includes_personal_media: false,

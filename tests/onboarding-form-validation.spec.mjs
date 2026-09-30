@@ -5,7 +5,7 @@ async function invitationFixture(page, signedIn = false) {
   page.on('request', request => {
     if (/\/(?:api|auth|rest)\//.test(request.url())) unexpected.push(request.url());
   });
-  await page.route('**/occulert-backend.v60.js', route => route.fulfill({
+  await page.route('**/occulert-backend.v68.js', route => route.fulfill({
     contentType: 'application/javascript',
     body: `
       window.invitationCalls = [];
@@ -111,7 +111,7 @@ test('signed-in invitation acceptance requires a driver name before profile or m
 for (const [path, fields, selects] of [
   ['/account.html', [['Name', 'name'], ['Local app role', 'role'], ['Company', 'company'], ['Fleet ID', 'fleetId'], ['Vehicle / Route', 'vehicle'], ['Bio / Notes', 'bio']], ['role']],
   ['/driver-profiles.html', [['Name', 'name'], ['Vehicle / route', 'route'], ['Status', 'status']], ['status']],
-  ['/pilot-signup.html', [], ['fleet', 'useCase', 'plan', 'timeline', 'goal']],
+  ['/pilot-signup.html', [], ['fleet', 'plan']],
 ]) {
   test(`${path} labels focus their fields and select controls fit small touch screens`, async ({ page }) => {
     await page.goto(path);
@@ -142,31 +142,28 @@ test('larger font metrics and long option labels cannot widen the fleet trial fo
       select.style.fontSize = '22px';
       select.style.lineHeight = '1.25';
     }
-    const option = document.querySelector('#useCase option');
-    option.textContent = 'Construction / field crews — regional and overnight operations';
+  const option = document.querySelector('#fleet option:last-child');
+  option.value = 'large-fleet';
+  option.textContent = '100+ vehicles — regional and overnight operations';
   });
-  await page.locator('#useCase').selectOption({ index: 3 });
-  await expect(page.locator('#useCase')).toHaveValue('Construction / field crews');
-  await page.locator('#useCase').selectOption({ index: 0 });
-  await expect(page.locator('#useCase')).toHaveValue('Construction / field crews — regional and overnight operations');
-  await page.locator('#useCase').focus();
-  await page.keyboard.press('m');
-  await expect(page.locator('#useCase')).toBeFocused();
-  await expect(page.locator('#useCase')).toHaveValue('Moving trucks');
-  const focus = await page.locator('#useCase').evaluate(select => {
+  await page.locator('#fleet').selectOption('large-fleet');
+  await expect(page.locator('#fleet')).toHaveValue('large-fleet');
+  await page.locator('#fleet').focus();
+  await expect(page.locator('#fleet')).toBeFocused();
+  const focus = await page.locator('#fleet').evaluate(select => {
     const style = getComputedStyle(select);
     return { width: parseFloat(style.outlineWidth), style: style.outlineStyle };
   });
   expect(focus.width).toBeGreaterThan(0);
   expect(focus.style).not.toBe('none');
-  await page.locator('#useCase').selectOption({ index: 0 });
+  await page.locator('#fleet').selectOption({ index: 0 });
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth), { timeout: 2_000 }).toBeLessThanOrEqual(width);
     const form = await page.locator('#pilotForm').boundingBox();
     expect(form.x).toBeGreaterThanOrEqual(0);
     expect(form.x + form.width).toBeLessThanOrEqual(width);
-    for (const id of ['fleet', 'useCase', 'plan', 'timeline', 'goal']) {
+    for (const id of ['fleet', 'plan']) {
       const bounds = await page.locator(`#${id}`).boundingBox();
       expect(bounds.height).toBeGreaterThanOrEqual(44);
       await expectSelectTextFits(page.locator(`#${id}`));

@@ -1,6 +1,6 @@
 # Occulert pilot recruitment package
 
-Status updated September 26, 2026. **Drafts only: no messages have been sent.**
+Status updated September 27, 2026. **Drafts only: no messages have been sent.**
 This package supports recruitment of one fleet owner and up to five voluntary
 drivers for a 30-day introductory trial. Larger organizations may begin with
 that same five-driver subset. Existing session approval covers preparation;
@@ -143,8 +143,8 @@ fleet@occulert.com
 |---|---|---|
 | Before enrollment | Confirm qualified fit, available release/build, consent, mounted parked setup, phone-only alert test, support/exit plan. Create fleet/invitations deliberately. | Agreed cohort size, device/build scope, goal, review dates; avoid unnecessary personal data. |
 | First session | Each willing driver chooses cloud consent, sets up while parked, monitors in the foreground, and reviews after parking. Owner checks the protected record. | Successful/failed setup and sync; no record is not a measured zero. |
-| Day 7 | Review participation, stale/missing/unfinished records, repeated setup problems, and voluntary false/missed/late-alert reports. Agree support fixes or pause. | Bounded 7-day dashboard snapshot and coverage limits, follow-up actions, non-sensitive observations. |
-| Day 30 | Repeat review, compare agreed workflow goals, decide stop/continue/separate rollout. Explain local versus cloud deletion. | Bounded 30-day snapshot, unresolved issues, participant feedback, explicit next decision. |
+| Day 7 | Review participation, stale/missing/unfinished records, repeated setup problems, and voluntary false/missed/late-alert reports. Agree support fixes or pause. | Fresh 7-day report with its full-period coverage state, follow-up actions, non-sensitive observations. If full coverage is unavailable, label the result partial. |
+| Day 30 | Repeat review, compare agreed workflow goals, decide stop/continue/separate rollout. Explain local versus cloud deletion. | Fresh 30-day report with its full-period coverage state, unresolved issues, participant feedback, explicit next decision. If full coverage is unavailable, label the result partial. |
 
 An operating goal can be three to five willing participants and several
 naturally occurring sessions each; this is a proposed participation target,

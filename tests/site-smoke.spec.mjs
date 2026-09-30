@@ -37,11 +37,12 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   expect(await page.locator('link[href="/homepage.v51.css"]').count()).toBe(1);
   expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1-640.avif"][type="image/avif"]').count()).toBe(1);
   expect(await page.locator('link[href="/homepage.css"]').count()).toBe(0);
-  expect(await page.locator('script[src="/homepage.v60.js"]').count()).toBe(1);
+  expect(await page.locator('script[src="/homepage.v67.js"]').count()).toBe(1);
   await page.locator(".skip-link").focus();
   await expect(page.locator(".skip-link")).toBeFocused();
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator("#safetyJourney")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Request a 30-day free trial." })).toBeVisible();
   await expect(page.locator("#safetyJourney")).toHaveAttribute("aria-describedby", "journeyBoundary");
   await expect(page.locator(".journey-topline")).toContainText("Interactive product demo");
   await expect(page.locator("#journeyStep0")).toContainText("Camera off");
@@ -103,7 +104,7 @@ test("public information pages share accessible mobile navigation", async ({ pag
   await page.setViewportSize({ width: 390, height: 844 });
   for (const path of ["/about.html", "/faq.html", "/features.html", "/how-it-works.html", "/install.html"]) {
     await page.goto(path, { waitUntil: "domcontentloaded" });
-    await expect(page.locator('script[src="/public-page.v60.js"]')).toHaveCount(1);
+    await expect(page.locator('script[src="/public-page.v67.js"]')).toHaveCount(1);
     const skipLink = page.getByRole("link", { name: "Skip to main content" });
     await skipLink.focus();
     await page.keyboard.press("Enter");
@@ -302,6 +303,7 @@ test("expired browser auth is revalidated before signed-in controls appear", asy
 
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#cloudStatus")).toContainText("Not signed in");
+  await expect(page.locator("#fleetPlanBadge")).toHaveText("evaluation workspace");
   await expect(page.locator("#fleetPrimaryNav")).toHaveText("Sign In");
   await expect(page.locator("#fleetPrimaryNav")).toHaveAttribute("href", "/login.html");
 });
@@ -509,8 +511,8 @@ test("fleet filtering preserves input focus and updates only the visible roster"
 test("driver app external assets preserve layout and monitoring behavior", async ({ page }) => {
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
 
-  expect(await page.locator('link[href="/driver-app.v47.css"]').count()).toBe(1);
-  expect(await page.locator('script[src="/driver-app.v60.js"]').count()).toBe(1);
+  expect(await page.locator('link[href="/driver-app.v68.css"]').count()).toBe(1);
+  expect(await page.locator('script[src="/driver-app.v68.js"]').count()).toBe(1);
   expect(await page.locator('script#driver-startup-guard:not([src])').count()).toBe(1);
   expect(await page.locator('script:not([src]):not(#driver-startup-guard)').count()).toBe(0);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
@@ -574,7 +576,7 @@ test("driver startup self-test verifies WebAssembly and the pinned model graph",
   expect(probe.lastResult).toBeGreaterThan(0);
 });
 
-test("driver alerts enhance only successful triggers and sensitivity is unambiguous", async ({ page }) => {
+test("parked alert check does not create a detection event and sensitivity is unambiguous", async ({ page }) => {
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
   expect(await page.locator('[data-sensitivity="low"]').count()).toBe(1);
   expect(await page.locator('[data-sensitivity="medium"]').count()).toBe(1);
@@ -582,16 +584,12 @@ test("driver alerts enhance only successful triggers and sensitivity is unambigu
   expect(await page.locator('input[oninput*="setSensitivity"]').count()).toBe(0);
 
   await page.evaluate(() => demoAlert());
-  await expect(page.locator("#overlay")).toHaveClass(/hide/);
+  await expect(page.locator("#alertScreen")).toHaveClass(/show/);
+  await expect(page.locator("#alertCheckResult")).toContainText("Test sent to this device");
   await expect(page.getByRole("heading", { level: 1, name: "Driver monitoring" })).toBeVisible();
-  await expect(page.locator("#alerts")).toHaveText("1");
+  await expect(page.locator("#alerts")).toHaveText("0");
   const firstAlertLogs = await page.evaluate(() => _sessionLog.filter((entry) => entry.type === "alert").length);
-  expect(firstAlertLogs).toBe(1);
-
-  await page.evaluate(() => trigger("Cooldown check"));
-  await expect(page.locator("#alerts")).toHaveText("1");
-  const cooldownAlertLogs = await page.evaluate(() => _sessionLog.filter((entry) => entry.type === "alert").length);
-  expect(cooldownAlertLogs).toBe(1);
+  expect(firstAlertLogs).toBe(0);
 
   await page.locator('[data-sensitivity="high"]').click();
   expect(await page.evaluate(() => localStorage.getItem("occulert-sensitivity"))).toBe("high");
@@ -692,10 +690,8 @@ test("pilot request controls use an accessible form", async ({ page }) => {
   await expect(page.getByLabel("Company")).toHaveAttribute("required", "");
   await expect(page.getByLabel("Email")).toHaveAttribute("required", "");
   await expect(page.getByLabel("Interested plan")).toHaveValue("conversation");
-  await expect(page.getByLabel("Desired start")).toHaveAttribute("required", "");
-  await expect(page.getByLabel("Desired start")).toHaveValue("");
-  await expect(page.getByLabel("Primary operating goal")).toHaveAttribute("required", "");
-  await expect(page.getByLabel("Primary operating goal")).toHaveValue("");
+  await expect(page.locator("#fleet")).toHaveValue("");
+  await expect(page.locator("#pilotForm")).not.toContainText("Desired start");
 });
 
 test("fleet request validation identifies and focuses the field needing attention", async ({ page }) => {
@@ -730,29 +726,26 @@ test("fleet dashboard paid-rollout path reuses the protected lead form with clea
   await page.goto("/pilot-signup.html?interest=paid-rollout&plan=starter", { waitUntil: "domcontentloaded" });
 
   await expect(page.locator(".brand")).toHaveText("Occulert Fleet Rollout");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turn your Occulert trial into an operating plan");
-  await expect(page.locator(".steps")).toContainText("1. Review outcomes");
-  await expect(page.locator(".steps")).toContainText("2. Define rollout");
-  await expect(page.locator(".steps")).toContainText("3. Agree on scope");
-  await expect(page.locator(".list")).toContainText("What the rollout covers");
-  await expect(page.locator(".list")).toContainText("What happens next");
-  await expect(page.locator(".list")).toContainText("submitting this form does not start a paid service");
-  await expect(page.locator("main")).not.toContainText(/\bpilot\b/i);
-  await expect(page.locator("form h2")).toHaveText("Discuss a paid rollout");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Discuss a paid fleet rollout");
+  await expect(page.locator(".steps")).toContainText("1. Send a request");
+  await expect(page.locator(".steps")).toContainText("3. Start after agreement");
+  await expect(page.locator("#formIntro")).toContainText("does not start a subscription");
+  await expect(page.locator("form h2")).toHaveText("Request a rollout conversation");
   await expect(page.getByLabel("Interested plan")).toHaveValue("starter");
   await expect(page.locator('#plan option[value="free-trial"]')).toBeDisabled();
   await expect(page.locator('#plan option[value="conversation"]')).toBeDisabled();
-  await expect(page.locator("#message")).toHaveValue(/affordable Occulert fleet rollout/i);
+  await expect(page.locator("#message")).toHaveValue("");
   await expect(page.locator("#saveBtn")).toHaveText("Request Rollout Conversation");
   await page.getByLabel("Interested plan").selectOption("growth");
   await page.getByLabel("Name").fill("Fleet Owner");
   await page.getByLabel("Company").fill("Safe Transit");
   await page.getByLabel("Email").fill("owner@example.com");
-  await page.getByLabel("Desired start").selectOption("within-30-days");
-  await page.getByLabel("Primary operating goal").selectOption("manager-workflow");
   await page.locator("#saveBtn").click();
-  await expect(page.locator("#success")).toContainText("Rollout conversation requested");
+  await expect(page.locator("#success")).toContainText("No subscription has started");
+  await expect(page.locator("#nextSteps")).toBeVisible();
   expect(submittedLead).toMatchObject({ interest: "paid_rollout", plan: "growth" });
+  expect(submittedLead.timeline).toBeUndefined();
+  expect(submittedLead.goal).toBeUndefined();
 });
 
 test("fleet lead form rejects contradictory interest and plan URLs", async ({ page }) => {
@@ -771,26 +764,24 @@ test("fleet lead form rejects contradictory interest and plan URLs", async ({ pa
 test("affordable fleet plans preserve a card-free trial handoff", async ({ page }) => {
   await page.goto("/fleet-pricing.html", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Start small. Keep the cost predictable.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Start small. Review the cost together.");
   await expect(page.getByText("$0", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("$9", { exact: true })).toBeVisible();
   await expect(page.getByText("$25", { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Fleet plan comparison" })).toBeVisible();
-  await expect(page.locator("main")).not.toContainText(/\bpilot\b/i);
-  const trialLink = page.locator(".pilot-card").getByRole("link", { name: "Start free trial", exact: true });
+  await expect(page.getByRole("region", { name: "Fleet plan comparison" })).not.toContainText("Priority email");
+  const trialLink = page.locator(".pilot-card").getByRole("link", { name: "Request free trial", exact: true });
   await expect(trialLink).toHaveAttribute("href", "/pilot-signup.html?interest=free-trial&plan=free-trial");
   await trialLink.click();
 
   await expect(page.locator(".brand")).toHaveText("Occulert Free Fleet Trial");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Try Occulert free for 30 days");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Request a free Occulert fleet trial");
   await expect(page.getByLabel("Interested plan")).toHaveValue("free-trial");
   await expect(page.locator('#plan option[value="conversation"]')).toBeDisabled();
   await expect(page.locator('#plan option[value="starter"]')).toBeDisabled();
   await expect(page.locator('#plan option[value="growth"]')).toBeDisabled();
   await expect(page.locator('#plan option[value="custom"]')).toBeDisabled();
-  await expect(page.getByLabel("Desired start")).toHaveValue("");
-  await expect(page.getByLabel("Primary operating goal")).toHaveValue("");
-  await expect(page.locator("#saveBtn")).toHaveText("Start Free Trial");
+  await expect(page.locator("#saveBtn")).toHaveText("Send Trial Request");
   await expect(page.getByText(/no credit card and no automatic renewal/i)).toBeVisible();
 });
 
@@ -805,7 +796,7 @@ test("monthly plan anchor clears the sticky fleet navigation", async ({ page }) 
       navigationBottom: document.querySelector(".top")?.getBoundingClientRect().bottom ?? 0,
     }));
     expect(position.sectionTop).toBeGreaterThan(position.navigationBottom);
-    await expect(page.getByRole("heading", { name: "Choose the smallest plan that fits the active roster." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Discuss a plan that fits your roster." })).toBeVisible();
   }
 });
 
@@ -940,6 +931,7 @@ test("fleet managers can email invitations and replace pending one-time links", 
         contentType: "application/json",
         body: JSON.stringify({
           ok: true,
+          fleet: { id: "fleet-1" },
           invitations: [{
             id: "11111111-1111-4111-8111-111111111111",
             email: "pending@example.com",
@@ -964,24 +956,24 @@ test("fleet managers can email invitations and replace pending one-time links", 
           id: renewed ? "22222222-2222-4222-8222-222222222222" : "33333333-3333-4333-8333-333333333333",
           email: renewed ? "pending@example.com" : body.email,
           expires_at: new Date(Date.now() + 86400000).toISOString(),
-          accept_path: `/accept-invite.html#token=${renewed ? "renewed-token" : "new-token"}`,
+          accept_path: `/accept-invite.html#token=${renewed ? "r".repeat(43) : "n".repeat(43)}`,
         },
       }),
     });
   });
 
   await page.goto("/fleet-onboarding.html", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("button", { name: "Send New Link" })).toBeVisible();
-  await page.getByRole("button", { name: "Send New Link" }).click();
-  await expect(page.locator("#inviteStatus")).toContainText("Choose Email Link or Copy Link");
-  await expect(page.locator("#inviteLink")).toHaveValue(/renewed-token$/);
+  await expect(page.getByRole("button", { name: "Replace invitation link for pending@example.com" })).toBeVisible();
+  await page.getByRole("button", { name: "Replace invitation link for pending@example.com" }).click();
+  await expect(page.locator("#inviteStatus")).toContainText("Choose Email link to review and send a draft");
+  await expect(page.locator("#inviteLink")).toHaveValue(new RegExp("r{43}$"));
   await expect(page.locator("#emailInvite")).toHaveAttribute("href", /^mailto:pending%40example\.com/);
   expect(invitationPosts[0]).toEqual({ replace_invitation_id: "11111111-1111-4111-8111-111111111111" });
 
   await page.locator("#driverEmail").fill("new-driver@example.com");
-  await page.getByRole("button", { name: "Send Invite" }).click();
-  await expect(page.locator("#inviteStatus")).toContainText("Choose Email Link or Copy Link");
-  await expect(page.locator("#inviteLink")).toHaveValue(/new-token$/);
+  await page.getByRole("button", { name: "Create invitation" }).click();
+  await expect(page.locator("#inviteStatus")).toContainText("Choose Email link to review and send a draft");
+  await expect(page.locator("#inviteLink")).toHaveValue(new RegExp("n{43}$"));
   await expect(page.locator("#emailInvite")).toHaveAttribute("href", /^mailto:new-driver%40example\.com/);
   expect(invitationPosts[1]).toEqual({ email: "new-driver@example.com" });
 });
@@ -1193,12 +1185,13 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
   await expect(page.locator("#valueScore")).toHaveText("77");
   await expect(page.locator(".value-metric:has(#valueScore) .label")).toHaveText("Average reported safety score");
   await expect(page.locator("#pilotValueStory")).toContainText("3 sessions across 2 drivers");
-  await expect(page.locator("#pilotLaunchBadge")).toHaveText("30-day review ready");
+  await expect(page.locator("#pilotLaunchBadge")).toHaveText(/Earliest loaded session: 40 days ago/);
   await expect(page.locator("#launchFleetStep")).toHaveAttribute("data-state", "complete");
   await expect(page.locator("#launchDriversStatus")).toHaveText("3 of 5 active drivers");
   await expect(page.locator("#launchSessionStatus")).toHaveText("4 protected sessions recorded");
   await expect(page.locator("#launchDisplayStatus")).toHaveText("Privacy-safe display available");
-  await expect(page.locator("#launchReviewStatus")).toHaveText("30-day decision window ready");
+  await expect(page.locator("#launchReviewStatus")).toHaveText("Oldest loaded session is at least 30 days old · use agreed review dates");
+  await expect(page.locator("#launchReviewStep")).toHaveAttribute("data-state", "available");
 
   const alexAction = page.locator("#actionQueue .ops-row").filter({ hasText: "Alex Driver" });
   await expect(alexAction).toContainText("Watch follow-up");
@@ -1219,7 +1212,7 @@ test("fleet dashboard turns recent protected history into an actionable pilot re
   expect(csv).toContain("'=WEBSERVICE");
   expect(csv).not.toMatch(/latitude|longitude|GPS|personal media|raw motion/i);
   await expect(page.getByRole("link", { name: "View affordable plans" })).toHaveAttribute("href", "/fleet-pricing.html");
-  await expect(page.getByRole("link", { name: "Start free trial" })).toHaveAttribute("href", "/pilot-signup.html?interest=free-trial&plan=free-trial");
+  await expect(page.getByRole("link", { name: "Request free trial" })).toHaveAttribute("href", "/pilot-signup.html?interest=free-trial&plan=free-trial");
 });
 
 test("protected fleet history shows scoped events and exports formula-safe rows without coordinates", async ({ page }) => {

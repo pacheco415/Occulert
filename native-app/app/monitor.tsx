@@ -1001,7 +1001,7 @@ export default function MonitorScreen() {
     open: '#00ff88',
     watch: '#fbbf24',
     closed: '#ff3344',
-    noFace: '#4a7a8a',
+    noFace: '#fbbf24',
   }[metrics.state];
   const recoveryRequired = Boolean(sensorFault?.startsWith('Monitoring did not start'));
   const monitorStatusLabel = sensorFault
@@ -1017,11 +1017,11 @@ export default function MonitorScreen() {
               open: 'TRACKING',
               watch: 'CHECKING EYES',
               closed: 'DROWSINESS ALERT',
-              noFace: 'ADJUST CAMERA',
+              noFace: 'TRACKING UNAVAILABLE',
             } as const)[metrics.state]
           : setupPreviewActive
             ? cameraSetup.ready ? 'SETUP READY' : 'CHECKING SETUP'
-            : 'READY WHILE PARKED';
+            : 'NOT MONITORING';
   const monitorStatusColor = sensorFault
     ? '#ef4444'
     : cameraRecovering
@@ -1243,6 +1243,7 @@ export default function MonitorScreen() {
             <LiveMetrics
               metrics={metrics}
               alertCount={alertCount}
+              cameraRecovering={cameraRecovering}
               isRunning={isRunning}
               sessionStartedAt={sessionStartedAt}
               sessionEndedAt={sessionEndedAt}

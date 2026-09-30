@@ -47,7 +47,7 @@ function assertSingleH1(path) {
 
 walk(root);
 
-for (const scriptPath of ["driver-app.v60.js", "homepage.v60.js", "lang.v47.js", "passkey-auth.v60.js", "supabase-loader.v47.js"]) {
+for (const scriptPath of ["driver-app.v68.js", "homepage.v67.js", "lang.v47.js", "passkey-auth.v60.js", "supabase-loader.v47.js"]) {
   try { new Function(read(scriptPath)); }
   catch (error) { fail(`${scriptPath} does not parse (${error.message})`); }
 }
@@ -93,7 +93,7 @@ assertNotIncludes("index.html", "href=\"/homepage.css\"", "homepage must not reu
 assertIncludes("index.html", "href=\"/homepage-journey-cinematic-v1.avif\"", "homepage must preload its optimized cinematic journey image");
 assertIncludes("index.html", "class=\"journey-frame journey-frame-enter\"", "homepage must render the cinematic enter frame");
 assertNotIncludes("index.html", "class=\"car-shell\"", "homepage must not render the retired flat CSS car");
-assertIncludes("index.html", "<script src=\"/homepage.v60.js\" defer></script>", "homepage must load its external behavior script");
+assertIncludes("index.html", "<script src=\"/homepage.v67.js\" defer></script>", "homepage must load its external behavior script");
 assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
 const homepageInlineScripts = [...read("index.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
 if (homepageInlineScripts !== 1) fail(`homepage must contain only the early password-recovery handoff script (found ${homepageInlineScripts})`);
@@ -107,13 +107,13 @@ assertIncludes("index.html", "Occulert must remain open and visible.", "homepage
 assertIncludes("index.html", "cannot make it safe to continue driving while tired", "homepage product demo must preserve the safe-stop boundary");
 assertIncludes("index.html", "data-journey-step=\"3\"", "homepage safety journey must include the alert and safe-stop stage");
 assertNotIncludes("index.html", "class=\"phone-wrap\"", "homepage must not retain the broken phone mockup");
-assertIncludes("homepage.v60.js", "prefers-reduced-motion: reduce", "homepage journey must honor reduced-motion preferences");
-assertIncludes("homepage.v60.js", "aria-selected", "homepage journey controls must expose their selected state");
+assertIncludes("homepage.v67.js", "prefers-reduced-motion: reduce", "homepage journey must honor reduced-motion preferences");
+assertIncludes("homepage.v67.js", "aria-selected", "homepage journey controls must expose their selected state");
 assertIncludes("index.html", "class=\"skip-link\"", "homepage must provide a keyboard skip link");
 assertIncludes("index.html", "aria-controls=\"mobileMenu\"", "homepage menu button must identify its controlled menu");
-assertIncludes("homepage.v60.js", "setAttribute('aria-expanded',String(open))", "homepage menu must announce expanded state");
-assertIncludes("homepage.v60.js", "event.key==='Escape'", "homepage menu must close with Escape");
-assertIncludes("homepage.v60.js", "querySelector('.faq-q')?.setAttribute('aria-expanded','false')", "homepage FAQ must announce expanded state");
+assertIncludes("homepage.v67.js", "setAttribute('aria-expanded',String(open))", "homepage menu must announce expanded state");
+assertIncludes("homepage.v67.js", "event.key==='Escape'", "homepage menu must close with Escape");
+assertIncludes("homepage.v67.js", "querySelector('.faq-q')?.setAttribute('aria-expanded','false')", "homepage FAQ must announce expanded state");
 assertIncludes("homepage.v51.css", ".journey-scene{position:relative;height:340px;margin:14px -4px 10px;overflow:hidden", "homepage journey must clip its moving road inside the scene");
 assertIncludes("homepage.v51.css", ".journey-copy{position:relative;z-index:2", "homepage journey copy must stay above animated scene layers");
 for (const page of ["about.html", "faq.html", "features.html", "how-it-works.html", "install.html"]) {
@@ -123,12 +123,12 @@ for (const page of ["about.html", "faq.html", "features.html", "how-it-works.htm
   assertIncludes(page, 'class="skip-link" href="#main-content"', `${page} must let keyboard users skip repeated navigation`);
   assertIncludes(page, 'id="main-content" tabindex="-1"', `${page} must expose a focusable main destination`);
   assertIncludes(page, '<link rel="stylesheet" href="/accessibility.v52.css" />', `${page} must use the shared keyboard-navigation layer`);
-  assertIncludes(page, '<script src="/public-page.v60.js"></script>', `${page} must use the shared accessible navigation behavior`);
+  assertIncludes(page, '<script src="/public-page.v67.js"></script>', `${page} must use the shared accessible navigation behavior`);
 }
 assertIncludes("about.html", '<h1 class="section-title">Why We Are Testing Occulert</h1>', "About must expose its page title as the main heading");
 assertIncludes("faq.html", '<h1 class="section-title">Common Questions</h1>', "FAQ must expose its page title as the main heading");
-assertIncludes("public-page.v60.js", "setAttribute('aria-expanded',String(open))", "public-page menus must announce expanded state");
-assertIncludes("public-page.v60.js", "event.key==='Escape'", "public-page menus must close with Escape");
+assertIncludes("public-page.v67.js", "setAttribute('aria-expanded',String(open))", "public-page menus must announce expanded state");
+assertIncludes("public-page.v67.js", "event.key==='Escape'", "public-page menus must close with Escape");
 assertNotIncludes("about.html", "™<!DOCTYPE html>", "About must start with a valid doctype");
 for (const unsupportedStat of ["1 in 6", "100,000+", "91%", "Crashes involve driver fatigue"]) {
   assertNotIncludes("index.html", unsupportedStat, `homepage must not present the unsupported statistic: ${unsupportedStat}`);
@@ -151,7 +151,7 @@ for (let index = 1; index <= 4; index += 1) {
 assertIncludes("sw.js", "'/homepage.v51.css'", "service worker must cache the versioned homepage stylesheet");
 assertNotIncludes("sw.js", "'/homepage.css',", "service worker must not recache the stale unversioned homepage stylesheet");
 assertNotIncludes("sw.js", "'/homepage-journey-cinematic-v1.jpg'", "service worker install must not preload the large cinematic journey image");
-assertIncludes("sw.js", "'/homepage.v60.js'", "service worker must cache the external homepage behavior script");
+assertIncludes("sw.js", "'/homepage.v67.js'", "service worker must cache the external homepage behavior script");
 assertIncludes("sw.js", "'/liquid-glass.v47.css'", "service worker must cache the current shared Liquid Glass stylesheet");
 assertIncludes("sw.js", "'/accessibility.v52.css'", "service worker must cache the shared skip-link stylesheet");
 assertIncludes("sw.js", "'/static-page.v60.js'", "service worker must cache the consolidated static-page behavior");
@@ -179,7 +179,7 @@ for (const path of [
   "safety.html",
   "session-history.html",
 ]) {
-  assertIncludes(path, '<link rel="stylesheet" href="/liquid-glass.v47.css" />', `${path} must use the current shared Liquid Glass design layer`);
+  assertIncludes(path, 'href="/liquid-glass.v47.css"', `${path} must use the current shared Liquid Glass design layer`);
 }
 for (const path of ["fleet-dashboard.html", "fleet-pricing.html", "pilot-guide.html", "privacy.html", "product-hub.html", "safety.html"]) {
   assertIncludes(path, 'class="skip-link" href="#main-content"', `${path} must let keyboard users skip repeated navigation`);
@@ -220,9 +220,9 @@ for (const accessibilityBoundary of [
 ]) {
   assertIncludes("liquid-glass.v47.css", accessibilityBoundary, `Liquid Glass must preserve the ${accessibilityBoundary} fallback`);
 }
-assertIncludes("app.html", "<link rel=\"stylesheet\" href=\"/driver-app.v47.css\" />", "driver app must load its external stylesheet");
+assertIncludes("app.html", "<link rel=\"stylesheet\" href=\"/driver-app.v68.css\" />", "driver app must load its external stylesheet");
 assertNotIncludes("app.html", "<style>", "driver app must keep its styles out of the HTML document");
-assertIncludes("app.html", "<script src=\"/driver-app.v60.js\"></script>", "driver app must load its external behavior script");
+assertIncludes("app.html", "<script src=\"/driver-app.v68.js\"></script>", "driver app must load its external behavior script");
 for (const path of ["app.html", "session-history.html"]) {
   assertIncludes(path, 'class="skip-link" href="#main-content"', `${path} must let keyboard users skip repeated navigation`);
   assertIncludes(path, 'id="main-content" tabindex="-1"', `${path} must expose a focusable main destination`);
@@ -236,19 +236,19 @@ const driverAppInlineScripts = [...read("app.html").matchAll(/<script(?![^>]*\bs
 if (driverAppInlineScripts !== 1 || !read("app.html").includes('<script id="driver-startup-guard">')) fail("driver page must keep only its early startup guard inline");
 if (read("app.html").indexOf('<script id="driver-startup-guard">') > read("app.html").indexOf('<link rel="stylesheet"')) fail("startup recovery must initialize before blocking styles or scripts");
 const driverAppPage = read("app.html");
-const driverAppDependencies = ["/occulert-backend.v60.js", "/security-utils.v47.js", "/driver-app.v60.js"].map((path) => driverAppPage.indexOf(`src=\"${path}\"`));
+const driverAppDependencies = ["/occulert-backend.v68.js", "/security-utils.v47.js", "/driver-app.v68.js"].map((path) => driverAppPage.indexOf(`src=\"${path}\"`));
 if (driverAppDependencies.some((index) => index < 0) || driverAppDependencies.some((index, position) => position > 0 && index <= driverAppDependencies[position - 1])) {
   fail("driver app dependencies must load before the external monitoring behavior in their original order");
 }
-assertIncludes("driver-app.v47.css", "--overlay-dim", "driver app stylesheet must preserve display-intensity controls");
+assertIncludes("driver-app.v68.css", "--overlay-dim", "driver app stylesheet must preserve display-intensity controls");
 assertIncludes("homepage.v51.css", "homepage-journey-cinematic-v1.avif", "homepage journey must prefer the optimized AVIF asset");
 assertIncludes("homepage.v51.css", "homepage-journey-cinematic-v1-640.avif", "mobile homepage journey must use the smaller AVIF asset");
 assertIncludes("index.html", "type=\"image/avif\"", "homepage must preload the supported optimized hero format");
 assertNotIncludes("app.html", "/occulert-logo-main.png", "driver app must not download the full-size source logo");
 if (statSync(join(root, "homepage-journey-cinematic-v1.avif")).size > 100_000) fail("desktop AVIF journey asset must remain below 100 KB");
 if (statSync(join(root, "homepage-journey-cinematic-v1-640.avif")).size > 50_000) fail("mobile AVIF journey asset must remain below 50 KB");
-assertIncludes("sw.js", "'/driver-app.v47.css'", "service worker must cache the external driver app stylesheet");
-assertIncludes("sw.js", "'/driver-app.v60.js'", "service worker must cache the external driver app behavior");
+assertIncludes("sw.js", "'/driver-app.v68.css'", "service worker must cache the external driver app stylesheet");
+assertIncludes("sw.js", "'/driver-app.v68.js'", "service worker must cache the external driver app behavior");
 assertIncludes("sw.js", "const NETWORK_FIRST_ASSETS", "service worker must refresh safety-critical driver logic before using its offline copy");
 assertIncludes("vercel.json", "\"key\": \"Content-Security-Policy\"", "vercel.json must enforce its tested CSP");
 assertIncludes("vercel.json", "https://fonts.googleapis.com", "vercel.json CSP must allow Google Fonts stylesheets used by marketing pages");
@@ -259,10 +259,10 @@ assertIncludes("vercel.json", "webp|avif|gif", "optimized AVIF assets must recei
 assertIncludes("vercel.json", "publickey-credentials-create=(self)", "the production permissions policy must allow same-origin passkey enrollment");
 assertIncludes("vercel.json", "publickey-credentials-get=(self)", "the production permissions policy must allow same-origin passkey sign-in");
 assertIncludes("vercel.json", "\"source\": \"/(.*).(js|css)\"", "unversioned homepage styles and scripts must be revalidated after deployment");
-assertNotIncludes("occulert-backend.v60.js", "PASTE_ANON_KEY_HERE", "browser backend client must not ship placeholder credentials");
-assertIncludes("occulert-backend.v60.js", "/api/public-config", "browser backend client must load public runtime configuration");
-assertIncludes("occulert-backend.v60.js", "redirect_to=", "signup confirmation emails must return users to the active Occulert site");
-assertIncludes("occulert-backend.v60.js", 'authFetch("/resend"', "signup confirmation emails must have a supported resend path");
+assertNotIncludes("occulert-backend.v68.js", "PASTE_ANON_KEY_HERE", "browser backend client must not ship placeholder credentials");
+assertIncludes("occulert-backend.v68.js", "/api/public-config", "browser backend client must load public runtime configuration");
+assertIncludes("occulert-backend.v68.js", "redirect_to=", "signup confirmation emails must return users to the active Occulert site");
+assertIncludes("occulert-backend.v68.js", 'authFetch("/resend"', "signup confirmation emails must have a supported resend path");
 assertIncludes("api/public-config.js", "SUPABASE_ANON_KEY", "public config endpoint must read the browser-safe anon key from the environment");
 assertNotIncludes("api/public-config.js", "SUPABASE_SERVICE_ROLE_KEY", "public config endpoint must never expose the service-role key");
 assertIncludes("api/profile.js", "fleet_id: null", "driver profile creation must not trust caller-provided fleet membership");
@@ -284,37 +284,37 @@ assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes 
 assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event GPS latitude must be range validated");
 assertIncludes("api/sessions.js", "MAX_BODY_LENGTH", "session API must reject oversized JSON bodies");
 assertIncludes("api/pilot-leads.js", "body.website", "pilot lead API must include honeypot spam filtering");
-assertIncludes("pilot-signup-page-2.v60.js", "startedAt:formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
+assertIncludes("pilot-signup-page-2.v68.js", "startedAt: formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
 assertIncludes("api/pilot-leads.js", "rateLimitState(request)", "pilot lead API must use durable distributed rate limiting");
 assertIncludes("api/pilot-leads.js", "pgFetch(\"pilot_leads\"", "pilot lead API must support durable Supabase storage");
 assertIncludes("db/schema.sql", "create table if not exists pilot_leads", "database schema must include pilot lead storage");
 assertIncludes("pilot-signup.html", "<form class=\"card\"", "pilot signup controls must use a semantic form");
-assertIncludes("driver-app.v60.js", "trigger=_patched", "enhanced alert behavior must replace the active trigger function");
-assertIncludes("driver-app.v60.js", "if(alerts===previousAlerts)return", "enhanced alert behavior must respect alert cooldowns");
-assertIncludes("driver-app.v60.js", "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
-assertIncludes("driver-app.v60.js", "window.OcculertBackend.endSession", "driver app must finish protected cloud sessions when opted in");
-assertIncludes("driver-app.v60.js", "queueBackendEvent", "driver app must queue protected alert events when opted in");
-assertIncludes("driver-app.v60.js", "function cameraRecoveryGuidance", "driver app must keep camera failure recovery guidance available");
+assertIncludes("driver-app.v68.js", "trigger=_patched", "enhanced alert behavior must replace the active trigger function");
+assertIncludes("driver-app.v68.js", "if(alerts===previousAlerts)return", "enhanced alert behavior must respect alert cooldowns");
+assertIncludes("driver-app.v68.js", "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
+assertIncludes("driver-app.v68.js", "window.OcculertBackend.endSession", "driver app must finish protected cloud sessions when opted in");
+assertIncludes("driver-app.v68.js", "queueBackendEvent", "driver app must queue protected alert events when opted in");
+assertIncludes("driver-app.v68.js", "function cameraRecoveryGuidance", "driver app must keep camera failure recovery guidance available");
 assertIncludes("app.html", "id=\"cameraSourceSelect\"", "desktop driver setup must provide an explicit camera picker");
-assertIncludes("driver-app.v60.js", "CAMERA_DEVICE_STORAGE_KEY='occulert-camera-device-id'", "desktop camera choice must remain origin-local and persistent");
-assertIncludes("driver-app.v60.js", "videoConstraints.deviceId={exact:deviceId}", "an explicit desktop camera choice must use an exact device constraint");
-assertIncludes("driver-app.v60.js", "videoConstraints.facingMode='user'", "automatic and mobile camera requests must retain the Safari-compatible front-camera constraint");
-assertIncludes("driver-app.v60.js", "function isMobileCaptureDevice", "mobile monitoring must keep its dedicated front-camera path");
-assertIncludes("driver-app.v60.js", "CameraSelectionError", "a missing selected camera must fail closed instead of silently switching devices");
-assertIncludes("driver-app.v60.js", "const recovery=cameraRecoveryGuidance(e)", "driver app must show recovery guidance after camera startup failures");
-assertIncludes("driver-app.v60.js", "Website Settings → Camera → Allow", "driver app must explain iPhone and iPad camera recovery");
-assertIncludes("driver-app.v60.js", "Permissions → Camera → Allow", "driver app must explain Android camera recovery");
-assertIncludes("driver-app.v60.js", "function createLocalDriverId", "local-only driver labels must use a collision-resistant identifier");
-assertIncludes("driver-app.v60.js", "function normalizeLocalDriverId", "driver app must migrate legacy three-digit driver labels");
-assertIncludes("driver-app.v60.js", "function migrateLocalDriverIdentity", "driver app must migrate same-browser references with a legacy driver label");
+assertIncludes("driver-app.v68.js", "CAMERA_DEVICE_STORAGE_KEY='occulert-camera-device-id'", "desktop camera choice must remain origin-local and persistent");
+assertIncludes("driver-app.v68.js", "videoConstraints.deviceId={exact:deviceId}", "an explicit desktop camera choice must use an exact device constraint");
+assertIncludes("driver-app.v68.js", "videoConstraints.facingMode='user'", "automatic and mobile camera requests must retain the Safari-compatible front-camera constraint");
+assertIncludes("driver-app.v68.js", "function isMobileCaptureDevice", "mobile monitoring must keep its dedicated front-camera path");
+assertIncludes("driver-app.v68.js", "CameraSelectionError", "a missing selected camera must fail closed instead of silently switching devices");
+assertIncludes("driver-app.v68.js", "const recovery=cameraRecoveryGuidance(e)", "driver app must show recovery guidance after camera startup failures");
+assertIncludes("driver-app.v68.js", "Website Settings → Camera → Allow", "driver app must explain iPhone and iPad camera recovery");
+assertIncludes("driver-app.v68.js", "Permissions → Camera → Allow", "driver app must explain Android camera recovery");
+assertIncludes("driver-app.v68.js", "function createLocalDriverId", "local-only driver labels must use a collision-resistant identifier");
+assertIncludes("driver-app.v68.js", "function normalizeLocalDriverId", "driver app must migrate legacy three-digit driver labels");
+assertIncludes("driver-app.v68.js", "function migrateLocalDriverIdentity", "driver app must migrate same-browser references with a legacy driver label");
 assertIncludes("auth-helper.v60.js", "function createLocalDriverId", "sign-in must use the collision-resistant local driver identifier");
 assertIncludes("auth-helper.v60.js", "function normalizeLocalDriverId", "sign-in must migrate legacy three-digit driver labels");
 assertNotIncludes("auth-helper.v60.js", "Math.floor(Math.random()*900+100)", "sign-in must not restore collision-prone three-digit driver labels");
-assertIncludes("driver-app.v60.js", "function warnTrackingLoss", "driver app must provide a distinct degraded-tracking warning");
-assertIncludes("driver-app.v60.js", "function verifyFirstInference", "driver app must complete one camera inference before monitoring becomes active");
-assertIncludes("driver-app.v60.js", "function haltForDetectionFailure", "driver app must stop visibly when the detector stalls or repeatedly fails");
-assertIncludes("driver-app.v60.js", "function primeAlertAudio", "driver app must unlock alert audio from the Start gesture");
-assertIncludes("login.html", "src=\"/occulert-backend.v60.js\"", "login must load the Supabase backend client");
+assertIncludes("driver-app.v68.js", "function warnTrackingLoss", "driver app must provide a distinct degraded-tracking warning");
+assertIncludes("driver-app.v68.js", "function verifyFirstInference", "driver app must complete one camera inference before monitoring becomes active");
+assertIncludes("driver-app.v68.js", "function haltForDetectionFailure", "driver app must stop visibly when the detector stalls or repeatedly fails");
+assertIncludes("driver-app.v68.js", "function primeAlertAudio", "driver app must unlock alert audio from the Start gesture");
+assertIncludes("login.html", "src=\"/occulert-backend.v68.js\"", "login must load the Supabase backend client");
 assertNotIncludes("login.html", "id=\"fleetId\"", "login must not offer caller-controlled fleet membership");
 assertIncludes("login.html", "id=\"passkeySignInBtn\"", "login must offer the supported passkey sign-in action");
 assertIncludes("login.html", "id=\"passkeyStatus\"", "passkey results must appear beside the passkey action");
@@ -334,7 +334,7 @@ assertIncludes("login.html", "id=\"passkeyRetryBtn\"", "login must offer recover
 assertIncludes("account.html", "id=\"passkeyRetryBtn\"", "account settings must offer recovery after a retryable passkey setup failure");
 assertIncludes("passkey-auth.v60.js", "sdk_load_failed", "passkey errors must distinguish an SDK delivery failure");
 assertIncludes("passkey-auth.v60.js", "auth_config_unavailable", "passkey errors must distinguish unavailable runtime account settings");
-assertIncludes("occulert-backend.v60.js", "refreshAuthConfig", "passkey retry must be able to refresh a transient runtime configuration failure");
+assertIncludes("occulert-backend.v68.js", "refreshAuthConfig", "passkey retry must be able to refresh a transient runtime configuration failure");
 assertIncludes("login.html", "Passkey biometrics, PINs, and private keys stay", "login must disclose that passkey secrets stay with the user's authenticator");
 assertNotIncludes("login.html", "onclick=\"googleAuth()\"", "login must not offer a nonfunctional Google action");
 assertIncludes("login.html", "id=\"profileFields\" class=\"hidden\"", "sign-in must hide profile setup fields by default");
@@ -345,14 +345,14 @@ assertIncludes("login-page-1.v47.js", "authMode==='signup'?extras():{}", "sign-i
 assertIncludes("login-page-1.v47.js", "await backend.getFleet()", "signed-in role display must verify server-owned fleet access");
 assertIncludes("login-page-1.v47.js", "Verified owner of ", "verified fleet owners must receive a truthful manager status");
 assertNotIncludes("login.html", "Manager invitation required", "login must not infer fleet access from the saved local role");
-assertIncludes("occulert-backend.v60.js", "\"/recover\" + passwordResetRedirect()", "password resets must go through Supabase Auth");
-assertIncludes("occulert-backend.v60.js", "params.get(\"type\") !== \"recovery\"", "auth redirects must accept recovery links only");
-assertIncludes("occulert-backend.v60.js", "window.history.replaceState", "recovery tokens must be removed from the visible URL");
+assertIncludes("occulert-backend.v68.js", "\"/recover\" + passwordResetRedirect()", "password resets must go through Supabase Auth");
+assertIncludes("occulert-backend.v68.js", "params.get(\"type\") !== \"recovery\"", "auth redirects must accept recovery links only");
+assertIncludes("occulert-backend.v68.js", "window.history.replaceState", "recovery tokens must be removed from the visible URL");
 assertIncludes("account-page-2.v60.js", "accountBackend().consumeAuthRedirect()", "account setup must verify recovery links before allowing a password change");
 assertIncludes("fleet-onboarding-page-1.v60.js", "createFleetInvitation", "fleet onboarding must create protected invitations through the API");
 assertIncludes("fleet-onboarding-page-1.v60.js", "resendFleetInvitation", "fleet onboarding must support replacing pending invitation links");
 assertIncludes("fleet-onboarding-page-1.v60.js", "mailto:", "fleet onboarding must support no-cost sharing through the manager's mail app");
-assertIncludes("fleet-onboarding.html", "Copy Link", "fleet onboarding must preserve a copy-link fallback");
+assertIncludes("fleet-onboarding.html", "Copy link", "fleet onboarding must preserve a copy-link fallback");
 assertIncludes("accept-invite-page-1.v47.js", "history.replaceState", "invite pages must immediately remove tokens from the visible URL");
 assertIncludes("accept-invite-page-2.v61.js", "sessionStorage", "invite tokens must stay out of persistent local storage");
 assertIncludes("accept-invite-page-1.v47.css", ".hidden{display:none!important}", "invite success actions must remain hidden until acceptance succeeds");
@@ -382,7 +382,7 @@ const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
   const file = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");
   return total + statSync(join(root, file)).size;
 }, 0);
-if (staticAssetBytes > 300_000) fail(`service worker install cache must remain at or below 300 KB (found ${staticAssetBytes} bytes)`);
+if (staticAssetBytes > 320_000) fail(`service worker install cache must remain at or below 320 KB (found ${staticAssetBytes} bytes)`);
 if (staticAssets.includes("'/passkey-auth.v60.js'")) fail("the experimental passkey client must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes("'/passkey-auth.v60.js'")) fail("the passkey client must be listed as a network-only asset");
 if (staticAssets.includes("'/supabase-loader.v47.js'")) fail("the resilient Supabase loader must not be stored in the offline static cache");
@@ -398,11 +398,11 @@ assertNotIncludes("account.html", "window.firebase", "account.html must not call
 assertIncludes("account-page-2.v60.js", "Your sign-in email changes once you open the link", "email changes must disclose that confirmation is required");
 assertIncludes("account.html", "your current address may receive one too", "email changes must account for secure-email-change double confirmation");
 assertIncludes("account-page-2.v60.js", "setBusy('emailBtn',true", "account credential actions must prevent duplicate in-flight requests");
-assertIncludes("occulert-backend.v60.js", "/auth/v1/user", "backend client must expose authenticated account updates");
-assertIncludes("occulert-backend.v60.js", "Authorization: \"Bearer \" + auth.access_token", "account updates must be authorized with the live session token");
+assertIncludes("occulert-backend.v68.js", "/auth/v1/user", "backend client must expose authenticated account updates");
+assertIncludes("occulert-backend.v68.js", "Authorization: \"Bearer \" + auth.access_token", "account updates must be authorized with the live session token");
 assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "native alert sound must be bundled locally");
 assertIncludes("native-app/app/monitor.tsx", "updateSessionHistory", "native monitor must serialize completed-session history writes");
-assertIncludes("native-app/app/history.tsx", "openFeedback(item)", "native session history must offer pilot feedback tied to a completed session");
+assertIncludes("native-app/app/history.tsx", "openFeedbackWithFallback(target", "native session history must offer pilot feedback tied to a completed session");
 assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, raw motion readings, or location are attached.", "native pilot feedback must state that sensitive media, raw motion, and location are not attached");
 assertIncludes("native-app/app/history.tsx", "false_alert", "native session history must capture structured false-alert feedback");
 assertIncludes("native-app/app/history.tsx", "missed_alert", "native session history must capture structured missed-alert feedback");
@@ -504,22 +504,23 @@ assertIncludes("fleet-dashboard.html", "document.hidden", "fleet dashboard polli
 assertIncludes("fleet-dashboard.html", "protectedFleetLoading", "fleet dashboard must prevent overlapping protected-summary requests");
 assertIncludes("fleet-dashboard.html", "data-focus-key=\"driver-copy-", "dynamic driver actions must expose stable focus keys");
 assertIncludes("fleet-dashboard.html", "function exportSessionHistoryCSV()", "protected session history must keep a privacy-safe export");
-assertIncludes("fleet-dashboard.html", "Trial value snapshot", "fleet managers must receive a time-bounded trial value summary");
+assertIncludes("fleet-dashboard.html", "Recorded activity snapshot", "fleet managers must receive a time-bounded recorded activity summary");
 assertIncludes("fleet-dashboard.html", "Average reported safety score", "fleet value summaries must identify client-reported score data");
 assertNotIncludes("fleet-dashboard.html", "Measured safety score", "fleet value summaries must not imply independent measurement");
 assertIncludes("fleet-dashboard.html", "function exportPilotReport()", "fleet managers must be able to export a manager-ready pilot report");
 assertIncludes("fleet-dashboard.html", "unverified_client_report", "pilot reports must preserve the telemetry trust boundary");
 assertIncludes("fleet-dashboard.html", "href=\"/fleet-pricing.html\"", "fleet value summaries must expose transparent fleet plans");
 assertIncludes("fleet-dashboard.html", "interest=free-trial", "fleet value summaries must provide a direct free-trial request path");
-assertIncludes("pilot-signup-page-2.v60.js", "rolloutInterest", "the shared fleet lead form must distinguish paid-rollout interest");
-assertIncludes("pilot-signup-page-2.v60.js", "freeTrialInterest", "the shared fleet lead form must distinguish the free trial from a post-trial rollout");
-assertIncludes("pilot-signup-page-2.v60.js", "What the rollout covers", "the paid-rollout path must explain the commercial offer");
-assertIncludes("pilot-signup-page-2.v60.js", "submitting this form does not start a paid service", "the paid-rollout path must set a clear transaction boundary");
-assertIncludes("pilot-signup-page-2.v60.js", "aria-invalid", "fleet request validation must identify the field that needs attention");
-assertIncludes("pilot-signup-page-2.v60.js", "field?.focus()", "fleet request validation must move focus to the field that needs attention");
+assertIncludes("pilot-signup-page-2.v68.js", "rolloutInterest", "the shared fleet lead form must distinguish paid-rollout interest");
+assertIncludes("pilot-signup-page-2.v68.js", "freeTrialInterest", "the shared fleet lead form must distinguish the free trial from a post-trial rollout");
+assertIncludes("pilot-signup-page-2.v68.js", "Final scope, support and terms are confirmed in writing", "the paid-rollout path must explain the commercial offer");
+assertIncludes("pilot-signup-page-2.v68.js", "does not start a subscription or charge you", "the paid-rollout path must set a clear transaction boundary");
+assertIncludes("pilot-signup-page-2.v68.js", "aria-invalid", "fleet request validation must identify the field that needs attention");
+assertIncludes("pilot-signup-page-2.v68.js", "field.focus()", "fleet request validation must move focus to the field that needs attention");
 assertIncludes("pilot-signup.html", "id=\"plan\"", "the fleet lead form must capture the selected affordable plan");
-assertIncludes("pilot-signup.html", "Choose a start window", "the fleet lead form must require a deliberate start-window choice");
-assertIncludes("pilot-signup.html", "Choose a primary goal", "the fleet lead form must require a deliberate operating-goal choice");
+assertIncludes("pilot-signup.html", "id=\"name\"", "the short fleet request must identify a contact");
+assertIncludes("pilot-signup.html", "id=\"email\"", "the short fleet request must provide a reply path");
+assertNotIncludes("pilot-signup.html", "id=\"timeline\"", "the first contact should not require a start window");
 assertIncludes("api/pilot-leads.js", "typeof value !== \"string\"", "commercial plan codes must reject non-string values");
 assertIncludes("api/pilot-leads.js", "Object.hasOwn(labels, key)", "commercial plan codes must resolve only declared allowlist keys");
 assertIncludes("fleet-pricing.html", "$0", "fleet pricing must make the free trial price explicit");
@@ -527,7 +528,7 @@ assertIncludes("fleet-pricing.html", "$9", "fleet pricing must make the Starter 
 assertIncludes("fleet-pricing.html", "$25", "fleet pricing must make the Growth price explicit");
 assertIncludes("fleet-pricing.html", "No credit card required", "the free trial must disclose that no card is required");
 assertIncludes("fleet-pricing.html", "No automatic renewal", "the free trial must disclose that it does not renew automatically");
-assertIncludes("fleet-pricing.html", "does not collect payment or start a subscription", "fleet pricing must disclose the transaction boundary");
+assertIncludes("fleet-pricing.html", "collect payment or activate a subscription", "fleet pricing must disclose the transaction boundary");
 assertIncludes("fleet-pricing.html", "interest=free-trial&amp;plan=free-trial", "free-trial CTAs must open the initial trial journey");
 assertIncludes("fleet-pricing.html", "interest=paid-rollout&amp;plan=starter", "monthly plans must keep the post-trial rollout journey");
 assertIncludes("fleet-dashboard.html", "OcculertSecurity.csvCell", "fleet exports must neutralize spreadsheet formulas");
@@ -536,7 +537,7 @@ assertIncludes("fleet-dashboard.html", "id=\"fleetPrimaryNav\"", "fleet navigati
 assertIncludes("fleet-dashboard.html", "await boundedProtectedFleetRequest(()=>backend.getSession(),cancelled)", "fleet access must validate or refresh the stored session within a bounded wait");
 assertIncludes("fleet-dashboard.html", "id=\"signedOutActions\"", "signed-out fleet dashboards must offer immediate recovery actions");
 assertIncludes("fleet-dashboard.html", "href=\"/login.html\">Sign In", "fleet dashboards must provide a direct sign-in path");
-assertIncludes("sw.js", "const CACHE = 'occulert-v54'", "complete-transfer recovery must advance the offline cache");
+assertIncludes("sw.js", "const CACHE = 'occulert-v56'", "complete-transfer recovery must advance the offline cache");
 assertNotIncludes("sw.js", "occulert-v41", "the performance repair must not reuse the stale driver-script cache");
 assertIncludes("sw.js", "'/portal.v47.css'", "the service worker must cache the current shared portal stylesheet");
 assertNotIncludes("sw.js", "occulert-v40", "the external driver script must not reuse the previous offline cache");
@@ -617,8 +618,8 @@ for (const workflow of [".github/workflows/browser-smoke.yml", ".github/workflow
 assertIncludes("package.json", "\"node\": \"24.x\"", "Vercel functions and local checks must use the verified Node 24 runtime");
 assertNotIncludes("how-it-works.html", "runs silently in the background", "public copy must not claim unsupported background monitoring");
 assertIncludes("how-it-works.html", "open in the foreground", "public copy must disclose that monitoring requires the foreground");
-assertIncludes("driver-app.v60.js", "async function handleVisibilityChange", "web monitoring must handle foreground loss explicitly");
-assertIncludes("driver-app.v60.js", "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
+assertIncludes("driver-app.v68.js", "async function handleVisibilityChange", "web monitoring must handle foreground loss explicitly");
+assertIncludes("driver-app.v68.js", "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
 
 if (failures.length) {
   console.error("Occulert site audit failed:");

@@ -7,19 +7,30 @@
   <meta name="description" content="Create an Occulert fleet and securely invite drivers with expiring one-time links.">
   <meta name="theme-color" content="#0a0e1a">
   <link rel="canonical" href="https://www.occulert.com/fleet-onboarding.html">
-  <script src="/occulert-backend.v60.js"></script>
+  <script src="/occulert-backend.v68.js"></script>
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/portal.v47.css" />
   <link rel="stylesheet" href="/accessibility.v52.css">
-  <link rel="stylesheet" href="/fleet-onboarding-page-1.v67.css">
+  <link rel="stylesheet" href="/fleet-onboarding-page-1.v68.css">
 </head>
 <body class="portal-page fleet-setup-page">
   <a class="skip-link" href="#main-content">Skip to fleet setup</a>
   <header class="top"><a class="brand" href="/" style="text-decoration:none">Occulert</a><nav class="nav" aria-label="Fleet setup navigation"><a class="btn" href="/fleet-dashboard.html">Dashboard</a><a class="btn" href="/account.html">Account</a><a class="btn" href="/">Home</a></nav></header>
   <main class="wrap" id="main-content" tabindex="-1">
-    <section class="hero"><p class="eyebrow">Fleet setup</p><h1>Set up your fleet</h1><p class="muted">Create your protected fleet and invitation links, then return to the dashboard. You choose how to deliver each link. Each invitation works once and expires after seven days.</p></section>
+    <section class="hero"><p class="eyebrow">Fleet setup</p><h1>Set up your fleet</h1><p class="muted">Create your protected fleet and invitation links, then return to the dashboard. You choose how to deliver each link. Each invitation works once and expires after seven days.</p><p class="muted">For a managed free trial, <a href="/pilot-signup.html?interest=free-trial&amp;plan=free-trial">send a trial request</a>. Creating a fleet here does not enroll it, start the 30-day clock or activate a paid plan.</p></section>
 
     <div class="notice" id="pageStatus" role="status">Checking your signed-in account…</div>
+
+    <section class="card setup-path" aria-labelledby="setupPathTitle">
+      <h2 id="setupPathTitle">From setup to first report</h2>
+      <ol>
+        <li><strong>Account:</strong> <span id="setupAccountStatus">Checking your sign-in.</span></li>
+        <li><strong>Fleet:</strong> <span id="setupFleetStatus">Checking for a protected fleet.</span></li>
+        <li><strong>Drivers:</strong> <span id="setupDriverStatus">Create invitations, deliver each link, then check accepted status below.</span></li>
+        <li><strong>First report:</strong> <a href="/fleet-dashboard.html">Open the fleet dashboard</a> after a driver deliberately enables sharing and completes a session. Local-only sessions do not appear there.</li>
+      </ol>
+      <p class="muted">Trial start and end dates are confirmed with Occulert; this page does not display a verified trial period. See the <a href="/pilot-guide.html">pilot quick start</a> for parked setup and day-7/day-30 reviews.</p>
+    </section>
 
     <section class="card hidden" id="createCard">
       <p class="step-label">Step 1 of 2</p>
@@ -56,6 +67,6 @@
     </section>
   </main>
   <footer class="footer">Occulert prototype — fleet access is enforced by authenticated server-side ownership.</footer>
-<script src="/fleet-onboarding-page-1.v67.js"></script>
+<script src="/fleet-onboarding-page-1.v68.js"></script>
 </body>
 </html>

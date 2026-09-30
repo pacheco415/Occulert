@@ -156,6 +156,8 @@ module.exports = async function handler(request, response) {
   const commercialInterest = freeTrialInterest || paidRolloutInterest;
   const planKey = typeof body.plan === "string" ? clean(body.plan, 80) : "";
   const planLabel = allowlistedLabel(body.plan, COMMERCIAL_PLANS);
+  const timelineKey = typeof body.timeline === "string" ? clean(body.timeline, 80) : "";
+  const goalKey = typeof body.goal === "string" ? clean(body.goal, 80) : "";
   const timelineLabel = allowlistedLabel(body.timeline, ROLLOUT_TIMELINES);
   const goalLabel = allowlistedLabel(body.goal, OPERATING_GOALS);
   const validInterestPlan = freeTrialInterest
@@ -163,7 +165,10 @@ module.exports = async function handler(request, response) {
     : paidRolloutInterest
       ? PAID_ROLLOUT_PLANS.has(planKey)
       : true;
-  if (commercialInterest && (!validInterestPlan || !planLabel || !timelineLabel || !goalLabel)) {
+  if (commercialInterest && (!validInterestPlan || !planLabel ||
+    (body.timeline != null && typeof body.timeline !== "string") ||
+    (body.goal != null && typeof body.goal !== "string") ||
+    (timelineKey && !timelineLabel) || (goalKey && !goalLabel))) {
     return json(response, 400, { ok: false, error: "invalid_lead" });
   }
   const qualificationMessage = [

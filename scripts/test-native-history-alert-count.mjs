@@ -4,6 +4,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 import vm from 'node:vm';
 import { formatSessionAlertCount } from '../native-app/lib/sessionAlertCount.ts';
+import { formatSessionFatigue } from '../native-app/lib/sessionSummaryValues.ts';
 import { buildSessionHistoryExport } from '../native-app/lib/sessionHistoryExport.ts';
 import { parseSessionHistory } from '../native-app/lib/sessionHistoryData.ts';
 
@@ -30,8 +31,9 @@ const alertsExpression = historySource.match(/<Text[^>]*>\{([^{}]*)\}<\/Text>\s*
 assert.ok(renderBindings && alertsExpression, 'the production history Alerts render must be located');
 function displayedAlerts(item) {
   return vm.runInNewContext(`${renderBindings}\nString(${alertsExpression});`, {
-    item, i: 0, formatSessionAlertCount, sessionRecordKey: () => 'fixture',
-    sessionOperations: {}, getSessionReviewProgress: () => ({ complete: false }), expandedSessions: {},
+    item, i: 0, formatSessionAlertCount, formatSessionFatigue, sessionRecordKey: () => 'fixture',
+    sessionOperations: {}, historyReviewInput: record => record,
+    getSessionReviewProgress: () => ({ complete: false }), expandedSessions: {},
   }, { timeout: 1000 });
 }
 

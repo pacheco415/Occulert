@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { createAsyncMutationQueue } from './asyncMutationQueue';
 import { createCachedBooleanPreference } from './cachedBooleanPreference';
+import { currentAppBuildInfo, formatAppBuildLabel } from './appBuildInfo';
 
 const API_BASE = 'https://www.occulert.com';
 const AUTH_KEY = 'occulert.cloud.auth.v1';
@@ -527,9 +528,16 @@ export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
 export async function beginCloudSession(): Promise<string | null> {
   const syncContext = await currentSyncContext();
   if (!syncContext || !await ensureDriverProfile(syncContext)) return null;
+  const platform = Platform.OS;
+  const detectorPipeline = platform === 'ios'
+    ? 'ios_mlkit_eye_probability'
+    : platform === 'android' ? 'android_mlkit_eye_probability' : null;
   const result = await backendApi<{ session?: { id?: string } }>('POST', '/api/sessions', {
-    device: `${Platform.OS} ${String(Platform.Version)}`.slice(0, 120),
-    browser: `Occulert native app (${Platform.OS})`,
+    device: `${platform} ${String(Platform.Version)}`.slice(0, 120),
+    browser: `Occulert native app (${platform})`,
+    detector_pipeline: detectorPipeline,
+    detector_version: 'mlkit-probability-perclos-1',
+    app_version: formatAppBuildLabel(currentAppBuildInfo()),
   }, true, syncContext);
   return result.ok ? result.body.session?.id || null : null;
 }

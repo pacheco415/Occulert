@@ -36,7 +36,10 @@ off for this pilot unless separately justified and consented.
 Protected manager reports exclude coordinates, personal media, and raw motion.
 They contain client-reported metrics, not independently verified telemetry.
 The TV display also excludes names, vehicles, individual scores, and raw events.
-The latest-50-session history limit can make a 7/30-day report incomplete.
+Recent dashboard cards and history are limited to the latest 50 stored sessions.
+The separate 7/30-day report must explicitly confirm fresh full-period server
+coverage before it is treated as complete; it cannot count sessions that were
+never synced.
 
 ## Safe participation
 

@@ -12,7 +12,7 @@
 <!-- Run before any stylesheet or dependency can hold up the driver page. -->
 <script id="driver-startup-guard">
 (() => {
-  const corePath = '/driver-app.v60.js';
+  const corePath = '/driver-app.v68.js';
   let state = 'loading';
   const byId = id => document.getElementById(id);
   const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
@@ -67,7 +67,7 @@
     refresh: () => { if (state !== 'ready') refresh(); },
     ready: core => {
       if (state !== 'loading') { if (state === 'failed') refresh(); return false; }
-      if (!core || core.version !== 'v60' || !Object.isFrozen(core) ||
+      if (!core || core.version !== 'v68' || !Object.isFrozen(core) ||
           !['start', 'stop', 'findCameraChoices', 'initModel'].every(key => typeof core[key] === 'function') ||
           typeof byId('startBtn')?.onclick !== 'function') { fail(); return false; }
       state = 'ready'; clearTimeout(deadline); observer.disconnect(); refresh(); return true;
@@ -78,7 +78,7 @@
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 <!-- The supported cloud path uses authenticated Occulert API endpoints. -->
-<link rel="stylesheet" href="/driver-app.v47.css" />
+<link rel="stylesheet" href="/driver-app.v68.css" />
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
 <script src="/static-page.v60.js" defer></script>
@@ -137,9 +137,23 @@
 
     <!-- ── Background / Screen-Lock Warning ─────────────────────────────── -->
     <div class="screen-warning" id="screenWarning" style="display:none">
-      ⚠️ <strong>Screen locked or app backgrounded</strong> — Occulert may have paused. Return to this tab and keep your screen on.
+      ⚠️ <strong>Monitoring stopped after screen lock or leaving this tab.</strong> Return to Occulert and restart only while safely parked.
     </div>
 
+    <button class="btn primary" id="startBtn" disabled>Loading app…</button>
+    <div class="timer-card" id="timerCard"><span class="timer-label">Session Time</span><span class="timer-value" id="sessionTimer">00:00</span></div>
+    <div class="card state-card" id="stateCard" role="status" aria-live="polite" aria-atomic="true"><div class="label">Monitoring Status</div><div class="state-value" id="driveState">NOT MONITORING</div><p class="metric-note" id="driveHint">Monitoring has not started.</p></div>
+    <div class="card notice-card"><div class="label">Safety Notice</div><p class="small">Occulert is a supplemental prototype only, not a certified safety, medical, emergency, insurance, legal, employment, fleet compliance, or transportation compliance device. It may miss drowsiness and may trigger false alerts. If you feel tired or unsafe, pull over safely and rest.</p></div>
+
+    <div id="breakBanner" role="alert" style="display:none;background:rgba(255,170,0,.12);border:1px solid #ffaa00;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13px;color:#ffcc44;font-weight:700;line-height:1.5;"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center" aria-live="polite">
+      <span id="trackingBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(0,255,136,.08);border:1px solid currentColor;white-space:nowrap">Tracking status unknown</span>
+      <span id="lightBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,170,0,.08);border:1px solid currentColor;white-space:nowrap">Low light</span>
+      <span id="batteryBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,68,68,.08);border:1px solid currentColor;color:#ff6666;white-space:nowrap"></span>
+    </div>
+
+    <section id="parkedControls" aria-label="Parked setup and diagnostics">
+    <p class="small">Set up and review these controls only while safely parked. They are hidden during monitoring.</p>
     <div class="camera-source-row" id="cameraSourceRow" hidden>
       <label for="cameraSourceSelect">Camera</label>
       <div class="camera-source-controls">
@@ -150,11 +164,6 @@
       </div>
       <p class="camera-source-hint" id="cameraSourceHint" aria-live="polite">Choose your Mac camera to keep Safari from using your iPhone.</p>
     </div>
-    <button class="btn primary" id="startBtn" disabled>Loading app…</button>
-    <div class="timer-card" id="timerCard"><span class="timer-label">Session Time</span><span class="timer-value" id="sessionTimer">00:00</span></div>
-<button class="btn" id="recalBtn" style="background:rgba(6,182,212,.08);border-color:rgba(6,182,212,.35);color:#06b6d4;display:none;margin-bottom:12px;font-size:13px;padding:11px 15px;letter-spacing:.5px" title="Recalibrate to personalize detection for your eyes">↻ Recalibrate Eyes</button>
-    <div class="card state-card" id="stateCard"><div class="label">Driving Status</div><div class="state-value" id="driveState">NOT MONITORING</div><p class="metric-note" id="driveHint">Monitoring has not started.</p></div>
-    <div class="card notice-card"><div class="label">Safety Notice</div><p class="small">Occulert is a supplemental prototype only, not a certified safety, medical, emergency, insurance, legal, employment, fleet compliance, or transportation compliance device. It may miss drowsiness and may trigger false alerts. If you feel tired or unsafe, pull over safely and rest.</p></div>
 
     <!-- Display Intensity Controls -->
     <div class="intensity-row">
@@ -201,26 +210,34 @@
       <div class="card"><div class="label">Cloud Sync</div><div class="value" id="sync">LOCAL</div></div>
       <div class="card"><div class="label">Location</div><div class="value" id="location">--</div></div>
     </div>
-    <details class="dev-tools"><summary>Developer Tools</summary><button class="btn demo" id="demoBtn">Simulate Drowsy Alert</button><button class="btn" id="resetBtn" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8;margin-top:8px;margin-bottom:0;font-size:12px;padding:10px">Reset Session Data</button></details>
+    <details class="dev-tools"><summary>Parked diagnostics</summary><p class="small">Run the alert check while parked. It does not add an alert or change a saved session.</p><button class="btn demo" id="demoBtn" type="button">Test sound and vibration</button><p class="small" id="alertCheckResult" role="status" aria-live="polite"></p><button class="btn" id="resetBtn" type="button" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8;margin-top:8px;margin-bottom:0;font-size:12px;padding:10px">Clear on-screen diagnostics</button></details>
     <div class="card"><div class="label">Session Report</div><div class="report" id="report"></div></div>
+    <div class="card" id="feedbackCard" hidden>
+      <div class="label">Post-drive alert feedback</div>
+      <p class="small">Review this drive while parked. Your observation stays in this browser's local history unless you choose to share it.</p>
+      <form id="feedbackForm">
+        <fieldset style="border:0;padding:0;margin:0">
+          <legend class="small">How were the alerts on this drive?</legend>
+          <label class="small review-option"><input type="radio" name="alertReview" value="useful" required> Useful</label>
+          <label class="small review-option"><input type="radio" name="alertReview" value="unnecessary"> Unnecessary</label>
+          <label class="small review-option"><input type="radio" name="alertReview" value="missed"> Missed an alert</label>
+          <label class="small review-option"><input type="radio" name="alertReview" value="late"> Too late</label>
+          <label class="small review-option"><input type="radio" name="alertReview" value="not_assessed"> Cannot assess</label>
+        </fieldset>
+        <label class="small" for="feedbackNote">Optional note about when and what happened</label>
+        <textarea id="feedbackNote" maxlength="500" rows="3" style="width:100%;box-sizing:border-box;margin:8px 0;background:var(--bg2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px"></textarea>
+        <button class="btn" type="submit">Save review on this device</button>
+      </form>
+      <p id="feedbackStatus" class="small" role="status" aria-live="polite"></p>
+    </div>
     <div class="card"><div class="label">Event Log</div><div id="log"></div></div>
   
     <!-- ── NEW FEATURE UI BLOCKS ─────────────────────────────────── -->
-
-    <!-- Break Banner -->
-    <div id="breakBanner" style="display:none;background:rgba(255,170,0,.12);border:1px solid #ffaa00;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13px;color:#ffcc44;font-weight:700;line-height:1.5;"></div>
 
     <!-- Yawn Card -->
     <div class="grid" style="margin-bottom:10px">
       <div class="card"><div class="label">Yawns</div><div class="value" id="yawnCountEl">0</div></div>
       <div class="card"><div class="label">MAR Signal</div><div class="value" style="font-size:12px;color:var(--text2)" id="marEl">--</div></div>
-    </div>
-
-    <!-- Tracking Quality + Light Badge row -->
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center">
-      <span id="trackingBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(0,255,136,.08);border:1px solid currentColor;white-space:nowrap">✓ Tracking Good</span>
-      <span id="lightBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,170,0,.08);border:1px solid currentColor;white-space:nowrap">⚠️ Low Light</span>
-      <span id="batteryBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,68,68,.08);border:1px solid currentColor;color:#ff6666;white-space:nowrap"></span>
     </div>
 
     <!-- Alertness Mini-Chart -->
@@ -243,12 +260,13 @@
       <button onclick="typeof exportCSV==='function'&&exportCSV()" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
       <button id="pwaInstallBtn" onclick="typeof triggerPWAInstall==='function'&&triggerPWAInstall()" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
     </div>
+    </section>
     </fieldset>
 </aside>
 </main>
-<script src="/occulert-backend.v60.js"></script>
+<script src="/occulert-backend.v68.js"></script>
 <script src="/security-utils.v47.js"></script>
-<script src="/driver-app.v60.js"></script>
+<script src="/driver-app.v68.js"></script>
 <script src="/lang.v47.js" defer></script>
 
 <!-- iOS Add to Home Screen Modal -->

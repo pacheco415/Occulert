@@ -60,8 +60,13 @@ async function invoke(handler, req) {
 let allowSessionUpdate = false;
 let sessionPatchParams;
 let patchedSession;
+let insertedSession;
 const sessions = loadHandler("../api/sessions.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
+  if (table === "sessions" && options.method === "POST") {
+    insertedSession = options.body;
+    return [{ id: "session-1", ...options.body }];
+  }
   if (table === "sessions" && options.method === "PATCH") {
     sessionPatchParams = options.params;
     patchedSession = options.body;
@@ -69,6 +74,29 @@ const sessions = loadHandler("../api/sessions.js", async (table, options = {}) =
   }
   throw new Error(`unexpected sessions call: ${table}`);
 });
+
+const startedSession = await invoke(sessions, request("POST", {
+  device: "iPhone",
+  detector_pipeline: "ios_mlkit_eye_probability",
+  detector_version: "mlkit-probability-perclos-1",
+  app_version: "v1.0.0 (52)",
+  fleet_id: "attacker-fleet",
+}));
+assert.equal(startedSession.status, 200);
+assert.equal(insertedSession.driver_id, "driver-1");
+assert.equal(insertedSession.fleet_id, "fleet-1", "client cannot choose fleet for its session");
+assert.equal(insertedSession.detector_pipeline, "ios_mlkit_eye_probability");
+assert.equal(insertedSession.detector_version, "mlkit-probability-perclos-1");
+assert.equal(insertedSession.app_version, "v1.0.0 (52)");
+
+await invoke(sessions, request("POST", {
+  detector_pipeline: "attacker_pipeline",
+  detector_version: "<script>",
+  app_version: "bad/value",
+}));
+assert.equal(insertedSession.detector_pipeline, null, "only documented detector families are accepted");
+assert.equal(insertedSession.detector_version, null, "provenance labels are limited to safe text");
+assert.equal(insertedSession.app_version, null, "app labels are limited to safe text");
 
 const patchBody = { session_id: "session-1", average_fatigue: 30, max_fatigue: 60, safety_score: 80 };
 const deniedPatch = await invoke(sessions, request("PATCH", patchBody));
@@ -317,7 +345,8 @@ try {
   await orderingDb.exec(`
     create table sessions (id uuid primary key, fleet_id uuid, driver_id uuid,
       started_at timestamptz not null, ended_at timestamptz, average_fatigue numeric,
-      max_fatigue numeric, safety_score numeric, alert_count integer, head_nod_count integer);
+      max_fatigue numeric, safety_score numeric, alert_count integer, head_nod_count integer,
+      detector_pipeline text, detector_version text, app_version text);
     create index sessions_fleet_started_id_idx on sessions (fleet_id, started_at desc, id desc);
   `);
   const sessionId = n => `11111111-1111-4111-8111-${n.toString(16).padStart(12, "0")}`;
@@ -447,6 +476,14 @@ assert.match(storedLead.message, /Desired start: Within 30 days/);
 assert.match(storedLead.message, /Primary goal: Reduce manager review time/);
 assert.match(storedLead.message, /We want a small-fleet rollout\./);
 
+const shortPaidRequest = await invoke(pilotLeads, request("POST", {
+  ...validLead,
+  interest: "paid_rollout",
+  plan: "growth",
+}, "203.0.113.27"));
+assert.equal(shortPaidRequest.status, 200, "the short initial request does not require timing or goal answers");
+assert.equal(storedLead.message, "Plan interest: Growth — $25 / month");
+
 const freeTrial = await invoke(pilotLeads, request("POST", {
   ...validLead,
   interest: "free_trial",
@@ -474,7 +511,8 @@ for (const [index, invalidFields] of [
   { plan: "starter", timeline: "within-30-days", goal: "toString" },
   { plan: ["starter"], timeline: "within-30-days", goal: "manager-workflow" },
   { plan: { toString: () => "starter" }, timeline: "within-30-days", goal: "manager-workflow" },
-  { plan: "starter", timeline: "", goal: "manager-workflow" },
+  { plan: "starter", timeline: ["within-30-days"], goal: "manager-workflow" },
+  { plan: "starter", timeline: "within-30-days", goal: { value: "manager-workflow" } },
   { interest: "free_trial", plan: "starter", timeline: "within-30-days", goal: "manager-workflow" },
   { interest: "paid_rollout", plan: "free-trial", timeline: "within-30-days", goal: "manager-workflow" },
 ].entries()) {

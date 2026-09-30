@@ -20,6 +20,20 @@ function protectedSummary(sessions) {
 function session(id, days, score = 80) {
   return { id, driver_id: 'driver-1', started_at: ago(days), ended_at: ago(days), safety_score: score, alert_count: 0 };
 }
+function completePeriodReport(days) {
+  const count = days === 7 ? 2 : 3;
+  return {
+    version: 1, days, window_start: ago(days), window_end: new Date().toISOString(), complete_period: true,
+    roster_total: 1, active_drivers: 1, reporting_active_drivers: 1,
+    sessions: count, completed: count, no_recorded_end: 0, invalid_recorded_end: 0,
+    scored: count - 1, unscored: 1, average_safety_score: 80,
+    valid_alert_records: count, missing_alert_records: 0, alerts: 0,
+    reviewed: 1, without_reviewed_followup: count - 1,
+    detector_pipelines: { web_mediapipe_ear: 0, ios_mlkit_eye_probability: 0,
+      android_mlkit_eye_probability: 0, unknown: count },
+    interruption_reasons_available: false, unrecorded_sessions_detectable: false,
+  };
+}
 
 test('TV windows filter protected records and retain aggregate privacy in large text', async ({ page }) => {
   await ownerSession(page);
@@ -70,12 +84,16 @@ test('manager print uses protected aggregates and clears on sign-out', async ({ 
   await ownerSession(page);
   const sessions = [session('recent', 2), session('unscored', 3, null), session('older', 10), session('future', -1)];
   await page.route('**/api/fleet-summary*', route => route.fulfill({ json: protectedSummary(sessions) }));
-  await page.route('**/api/fleet-followups*', route => route.fulfill({ json: {
-    ok: true, fleet_id: 'fleet-1', sessions: sessions.map((s, i) => ({
-      ...s, driver_name: 'Private Driver',
-      followup: { status: i === 0 ? 'reviewed' : 'open', version: i === 0 ? 1 : 0 },
-    })),
-  } }));
+  const reportRequests = [];
+  await page.route('**/api/fleet-period-report*', route => {
+    const days = Number(new URL(route.request().url()).searchParams.get('days'));
+    reportRequests.push(days);
+    return route.fulfill({ json: {
+      ok: true, fleet: { id: 'fleet-1', company_name: 'Pilot Transit' }, report: completePeriodReport(days),
+      telemetry_trust: 'unverified_client_report',
+      privacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false },
+    } });
+  });
   await page.goto('/fleet-dashboard.html');
   await expect(page.locator('#cloudStatus')).toContainText('Protected connection active');
   await expect(page.locator('#qualityCompleted')).toHaveText('3');
@@ -84,11 +102,13 @@ test('manager print uses protected aggregates and clears on sign-out', async ({ 
   await expect(page.locator('#qualityMissingReview')).toHaveText('2');
   await expect(page.locator('#qualityInterrupted')).not.toHaveText('0');
   await expect(page.locator('#pilotReportPrint')).toBeEnabled();
+  expect(reportRequests).toContain(30);
   await page.locator('#pilotRange').selectOption('7');
   await expect(page.locator('#qualityCompleted')).toHaveText('2');
   await expect(page.locator('#valueSessions')).toHaveText('2');
   await expect(page.locator('#qualityUnscored')).toHaveText('1');
   await expect(page.locator('#qualityMissingReview')).toHaveText('1');
+  expect(reportRequests).toContain(7);
   await page.evaluate(() => { window.print = () => { window.pilotPrintCalls = (window.pilotPrintCalls || 0) + 1; }; });
   await page.locator('#pilotReportPrint').click();
   expect(await page.evaluate(() => window.pilotPrintCalls)).toBe(1);

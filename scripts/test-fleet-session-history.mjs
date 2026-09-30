@@ -95,15 +95,16 @@ function dashboardShareHarness(overrides = {}) {
     ended_at: '2026-09-25T12:30:00Z', safety_score: 80, alert_count: 0 };
   let user = { id: 'owner' }, csv = '';
   const context = {
-    Date: ClockDate, demoRows: [], fleetMode: true, protectedUserId: 'owner', protectedFleetName: 'Private Fleet',
+    Date: ClockDate, demoRows: [], fleetMode: true, protectedUserId: 'owner', protectedFleetId: 'fleet-owned', protectedFleetName: 'Private Fleet',
     protectedFleetPlan: 'trial', protectedDrivers: [{ id: 'driver', name: 'Private Driver', active: true }],
     protectedSessions: [row], protectedEvents: [], protectedTelemetryTrust: 'unverified_client_report',
     protectedReportPrivacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false },
-    protectedReportShape: true, protectedLastSuccessfulAt: now, protectedRefreshFailures: 0,
+    protectedReportShape: true, protectedLastSuccessfulAt: now, protectedRefreshFailures: 0, protectedFleetGeneration: 1,
     lastRows: [{ driverId: 'driver', name: 'Private Driver', status: 'SAFE', hasSafetyScore: true,
       safetyScore: 80, hasSession: true, fatigue: 20, alerts: 0 }], lastOpsSummary: 'Private Driver needs review',
     getJSON: () => [{ ...row, name: 'Local Demo Driver', driverId: 'demo-driver' }], getDrivers: () => [],
     toast: message => notices.push(message), fromArg: value => value, ageLabel: () => 'recent',
+    currentProtectedOwner: () => user?.id || '', setTimeout: () => 0, clearTimeout: () => {},
     navigator: { clipboard: { writeText: text => copies.push(text) } }, alert: text => copies.push(text),
     OcculertSecurity: { csvCell: value => String(value ?? '') },
     Blob: class { constructor(parts) { this.parts = parts; } },
@@ -111,9 +112,9 @@ function dashboardShareHarness(overrides = {}) {
     document: { getElementById: id => id === 'pilotRange' ? { value: '30' } : null,
       createElement: () => ({ click() { downloads.push({ name: this.download, csv }); }, remove() {} }),
       body: { appendChild() {} } },
-    window: { OcculertBackend: { currentUser: () => user } }, ...overrides,
+    window: { addEventListener() {}, OcculertBackend: { currentUser: () => user } }, ...overrides,
   };
-  vm.runInNewContext(read('fleet-pilot-report.v56.js'), context);
+  vm.runInNewContext(read('fleet-pilot-report.v68.js'), context);
   vm.runInNewContext(markedBlock(dashboard, 'protected-session-history') + markedBlock(dashboard, 'dashboard-sharing'), context);
   return { context, downloads, copies, notices, user: value => { user = value; } };
 }
@@ -165,6 +166,35 @@ test('local session history preserves the saved mean fatigue instead of the fina
   assert.equal(app.context.sessionView({ avgFatigue: 24, fatigue: 70 }).averageFatigue, 24);
   assert.equal(app.context.sessionView({ avgFatigue: 0, fatigue: 70 }).averageFatigue, 0);
   assert.equal(app.context.sessionView({ average_fatigue: 18, avgFatigue: 24, fatigue: 70 }).averageFatigue, 18);
+});
+
+test('protected history displays and exports validated client-declared detector provenance', () => {
+  const app = dashboardShareHarness();
+  Object.assign(app.context.protectedSessions[0], { detector_pipeline: 'web_mediapipe_ear',
+    detector_version: 'web-ear-1.2', app_version: 'web-v68' });
+  const session = app.context.sessionHistoryRows()[0];
+  assert.equal(session.detectorPipeline, 'web_mediapipe_ear');
+  assert.equal(session.detectorVersion, 'web-ear-1.2');
+  assert.equal(session.appVersion, 'web-v68');
+  const history = { innerHTML: '' };
+  app.context.esc = value => String(value ?? '');
+  app.context.document.getElementById = id => id === 'sessionHistory' ? history : { value: '30' };
+  app.context.document.querySelector = () => ({ open: true });
+  app.context.renderSessionHistory();
+  assert.match(history.innerHTML, /Web camera \(MediaPipe EAR\).*web-ear-1\.2.*web-v68/);
+  assert.match(history.innerHTML, /Metadata are client declared when present/);
+  app.context.exportSessionHistoryCSV(); app.context.exportPilotReport();
+  for (const download of app.downloads) {
+    const [header, row] = csvRows(download.csv);
+    assert.equal(row[header.indexOf('detector_pipeline')], 'web_mediapipe_ear');
+    assert.equal(row[header.indexOf('detector_version')], 'web-ear-1.2');
+    assert.equal(row[header.indexOf('app_version')], 'web-v68');
+    assert.equal(row[header.indexOf('detector_provenance_trust')], 'client_declared');
+  }
+  const invalid = app.context.sessionView({ detector_pipeline: '<script>', detector_version: '=cmd', app_version: 'x/y' });
+  assert.equal(invalid.detectorPipeline, null);
+  assert.equal(invalid.detectorVersion, null);
+  assert.equal(invalid.appVersion, null);
 });
 
 function csvRows(csv) {
@@ -232,8 +262,10 @@ test('completion and event samples preserve unavailable recorded state instead o
   assert.doesNotMatch(history.innerHTML, />Active<|No alert events were recorded/);
   app.context.protectedEvents = Array.from({ length: 25 }, () => ({ session_id: 'session' }));
   app.context.exportSessionHistoryCSV();
-  assert.match(app.downloads[0].csv, /"available_event_count"/);
-  assert.match(app.downloads[0].csv, /"20","unverified_client_report"/);
+  const [header, row] = csvRows(app.downloads[0].csv);
+  assert.equal(row[header.indexOf('available_event_count')], '20');
+  assert.equal(row[header.indexOf('detector_provenance_trust')], 'not_recorded');
+  assert.equal(row[header.indexOf('telemetry_trust')], 'unverified_client_report');
 });
 
 test('roadmap and setup docs distinguish source completion from deployment', () => {

@@ -9,9 +9,9 @@ export function contentSha256(content) {
 
 // Resolve the checkout from the scripts, not the caller's working directory.
 // A commit alone cannot identify edited scripts, so retain their exact hashes.
-export function sourceSnapshot() {
+export function sourceSnapshot(extraFiles = []) {
   const root = fileURLToPath(new URL("../", import.meta.url));
-  const files = ["run-benchmark.mjs", "prepare-dataset.mjs", "csv.mjs", "provenance.mjs"];
+  const files = [...new Set(["run-benchmark.mjs", "prepare-dataset.mjs", "csv.mjs", "provenance.mjs", ...extraFiles])];
   const sourceHashes = Object.fromEntries(files.map(name => [
     `benchmark/${name}`, contentSha256(readFileSync(new URL(name, import.meta.url))),
   ]));

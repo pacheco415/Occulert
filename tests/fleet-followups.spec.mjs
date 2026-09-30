@@ -6,11 +6,21 @@ async function setup(page, { fail = false, conflict = false, slow = false, sessi
   const state = { followup: { session_id: id, status: 'open', version: 0, updated_at: null }, posts: 0 };
   const session = { id, driver_id: 'driver', started_at: new Date().toISOString(), ended_at: new Date().toISOString(), alert_count: 2, safety_score: 65 };
   const records = sessions || [session];
-  await page.route('**/occulert-backend.v60.js', route => route.fulfill({ contentType: 'application/javascript', body: `
+  await page.route('**/occulert-backend.v68.js', route => route.fulfill({ contentType: 'application/javascript', body: `
     window.fixtureUser = { id: '${owner}' };
     window.OcculertBackend = {
       currentUser: () => window.fixtureUser,
-      getSession: async () => ({user: window.fixtureUser,access_token:'fixture-token'}),
+      getSession: async () => ({user: window.fixtureUser,access_token:'fixture-token',refresh_token:'fixture-refresh'}),
+      captureAuthContext: () => ({auth: window.fixtureUser ? {
+        user: window.fixtureUser, access_token:'fixture-token', refresh_token:'fixture-refresh'
+      } : null}),
+      isAuthContextCurrent: captured => !!window.fixtureUser &&
+        captured?.auth?.user?.id === window.fixtureUser.id,
+      requireAuthContext: captured => {
+        if (!window.fixtureUser || captured?.auth?.user?.id !== window.fixtureUser.id) throw Error('auth_session_changed');
+        return captured;
+      },
+      fetchWithDeadline: (url, options) => fetch(url, options),
       getFleetSummary: async () => ({ok:true,body:{fleet:{id:'fleet',company_name:'Example fleet'},drivers:[{id:'driver',name:'Avery Example',active:true}],sessions:${JSON.stringify(records)},events:[]}}),
       signOut: () => {window.fixtureUser=null;}
     };` }));
@@ -40,7 +50,7 @@ test('saved follow-up survives refresh and page reload; names are plain text', a
   await expect(page.locator('.followup-item script')).toHaveCount(0);
   await page.getByLabel('Follow-up for Avery Example <script>').selectOption('reviewed');
   await page.getByRole('button', { name: 'Save follow-up', exact: true }).click();
-  await expect(page.locator('#followupNotice')).toHaveText('Follow-up saved.');
+  await expect(page.locator('#followupNotice')).toContainText('Follow-up saved for Avery Example');
   expect(state.posts).toBe(1);
   await page.reload();
   await expect(page.locator('#fleetFollowups')).toBeVisible();
@@ -53,7 +63,9 @@ test('conflicting edits do not claim success or silently overwrite', async ({ pa
   await page.getByLabel('Follow-up for Avery Example <script>').selectOption('reviewed');
   await page.getByRole('button', { name: 'Save follow-up', exact: true }).click();
   await expect(page.locator('#followupNotice')).toContainText('changed elsewhere');
-  await expect(page.locator('.followup-item')).toHaveCount(0);
+  await expect(page.locator('.followup-item')).toHaveCount(1);
+  await expect(page.locator('.followup-issue')).toContainText('Refresh is required');
+  await expect(page.getByRole('button', { name: 'Save follow-up', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Refresh follow-ups', exact: true }).click();
   await expect(page.locator('.followup-saved')).toContainText('Open');
 });
@@ -90,7 +102,8 @@ test('session descriptions distinguish recorded completion and measured zero fro
     { name: 'Missing alert field', changes: { alert_count: undefined }, state: 'Completed session', alert: 'Alert count not recorded' },
     { name: 'Blank alert field', changes: { alert_count: '' }, state: 'Completed session', alert: 'Alert count not recorded' },
   ];
-  await setup(page, { sessions: cases.map((entry, index) => ({ ...base, ...entry.changes, id: `record-${index}`, driver_name: entry.name })) });
+  await setup(page, { sessions: cases.map((entry, index) => ({ ...base, ...entry.changes,
+    id: `33333333-3333-4333-8333-${String(index + 1).padStart(12, '0')}`, driver_name: entry.name })) });
   await expect(page.locator('.followup-item')).toHaveCount(cases.length);
   for (const entry of cases) {
     const item = page.locator('.followup-item').filter({ has: page.getByRole('heading', { name: entry.name, exact: true }) });
@@ -102,7 +115,7 @@ test('session descriptions distinguish recorded completion and measured zero fro
     if (entry.alert === 'Alert count not recorded') await expect(description).not.toContainText('0 reported alerts');
     if (entry.missingDate) await expect(description).toContainText('Date unavailable');
     await expect(item.locator('.followup-saved')).toHaveText('Saved status: Open (not yet saved)');
-    await expect(item.getByRole('button', { name: 'Save follow-up', exact: true })).toBeEnabled();
+    await expect(item.getByRole('button', { name: 'Save follow-up', exact: true })).toBeDisabled();
   }
 });
 

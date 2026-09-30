@@ -43,7 +43,6 @@ test('malformed saved profiles stay intact when a user attempts to save', async 
 async function fillLead(page) {
   await page.locator('#name').fill('Audit tester'); await page.locator('#company').fill('Synthetic fleet');
   await page.locator('#email').fill('audit@example.com');
-  await page.locator('#timeline').selectOption({ index: 1 }); await page.locator('#goal').selectOption({ index: 1 });
 }
 
 test('a stalled fleet request returns control without clearing contact fields', async ({ page }) => {
@@ -51,7 +50,7 @@ test('a stalled fleet request returns control without clearing contact fields', 
   await page.route('**/api/pilot-leads', () => {});
   await page.goto('/pilot-signup.html'); await fillLead(page);
   await page.locator('#saveBtn').click();
-  await expect(page.locator('#saveBtn')).toHaveText('Sending...');
+  await expect(page.locator('#saveBtn')).toHaveText('Sending…');
   await page.clock.fastForward(8100);
   await expect(page.locator('#saveBtn')).toBeEnabled();
   await expect(page.locator('#error')).toContainText('could not confirm');
