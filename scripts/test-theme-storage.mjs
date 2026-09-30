@@ -6,9 +6,9 @@ import vm from 'node:vm';
 
 const baseline = process.env.OCCULERT_THEME_BASELINE === '1';
 const variants = [
-  ['homepage', baseline ? 'homepage.js' : 'homepage.v60.js'],
-  ['public', baseline ? 'public-page.v51.js' : 'public-page.v60.js'],
-  ['static', baseline ? 'static-page.v52.js' : `${assetByStem('static-page.js')}`],
+  ['homepage', baseline ? 'homepage.js' : assetByStem('homepage.js')],
+  ['public', baseline ? 'public-page.v51.js' : assetByStem('public-page.js')],
+  ['static', baseline ? 'static-page.v52.js' : assetByStem('static-page.js')],
 ];
 
 function boot(file, { blockedRead = false, blockedWrite = false, blockedAccess = false,
@@ -31,8 +31,8 @@ function boot(file, { blockedRead = false, blockedWrite = false, blockedAccess =
   }
   const html = element('html'), meta = element('meta'), target = element('target'), skip = element('skip');
   skip.setAttribute('href', '#main-content');
-  const faq = element('faq'), item = element('faq-item'); faq.parentElement = item;
-  item.querySelector = selector => selector === '.faq-q' ? faq : null;
+  const faq = element('faq'), item = element('faq-item'), answer = element('faq-answer'); faq.parentElement = item;
+  item.querySelector = selector => selector === '.faq-q' ? faq : selector === '.faq-a' ? answer : null;
   for (const id of ['themeToggle', 'themeToggleMobile', 'menuBtn', 'mobileMenu', 'scrollTop', 'siteNav']) element(id);
   const context = { document: { documentElement: html,
     getElementById: id => elements.get(id) ?? null,
@@ -41,7 +41,7 @@ function boot(file, { blockedRead = false, blockedWrite = false, blockedAccess =
       : selector === '.skip-link[href^="#"]' ? [skip] : [],
     addEventListener: (name, fn) => handlers.set(name, fn) },
     navigator: { serviceWorker: { register: url => { registrations.push(url); return Promise.resolve(); } } },
-    scrollY: 0, scrollTo() {}, addEventListener() {},
+    location: { pathname: '/' }, scrollY: 0, scrollTo() {}, addEventListener() {},
     requestAnimationFrame: fn => fn(), setInterval: () => 1, clearInterval() {},
   };
   if (!noMedia) context.matchMedia = () => ({ matches: light });

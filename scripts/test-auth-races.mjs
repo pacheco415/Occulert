@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { assetByStem } from './lib/current-assets.mjs';
 
-const sources = Object.fromEntries(['occulert-backend', 'auth-helper', 'passkey-auth', 'passwordless-auth'].map(name => [name, readFileSync(new URL(`../${name}.v60.js`, import.meta.url), 'utf8')]));
+const sources = Object.fromEntries(['occulert-backend', 'auth-helper', 'passkey-auth', 'passwordless-auth'].map(name => {
+  const filename = assetByStem(`${name}.js`);
+  return [name, { filename, source: readFileSync(new URL(`../${filename}`, import.meta.url), 'utf8') }];
+}));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
 function session(id = 'A', token = id) { return { access_token: `access-${token}`, refresh_token: `refresh-${token}`, expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id, email: `${id}@example.com`, email_confirmed_at: '2026-01-01', user_metadata: {} } }; }
@@ -32,7 +36,7 @@ function boot() {
   } };
   context.OcculertSupabaseLoader = { load: async () => context.supabase, retry: async () => context.supabase };
   vm.createContext(context);
-  for (const name of Object.keys(sources)) vm.runInContext(sources[name], context, { filename: `${name}.v60.js` });
+  for (const { filename, source } of Object.values(sources)) vm.runInContext(source, context, { filename });
   return { context, backend: context.OcculertBackend, auth: context.OcculertAuth, passkeys: context.OcculertPasskeys, passwordless: context.OcculertPasswordless, store, calls, hooks, timers, clients,
     expire() { for (const [id, timer] of [...timers]) { timers.delete(id); timer.fn(); } },
   };
