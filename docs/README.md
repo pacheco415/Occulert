@@ -33,7 +33,8 @@ and procedures; dated audit/release notes are historical evidence.
 `asset-versions.json` maps source names to immutable filenames. When editing an
 immutable asset, use a new version suffix, update every reference (imports,
 service-worker lists, Vercel headers, tests), and update `asset-integrity.json`.
-Never publish different bytes at an existing immutable URL. Preserve older
-deployed assets for clients holding older documents. `npm run audit:site`
+Never publish different bytes at an existing immutable URL. Keep superseded
+assets for at least 14 days after their runtime references are removed so clients
+holding older documents can still load them. `npm run audit:site`
 verifies integrity, references, font preconnects, and extracted-page boundaries.
 HTML, manifest.json, and sw.js always revalidate.

@@ -36,7 +36,7 @@ npm run test:browser -- tests/detector-runtime.spec.mjs tests/mediapipe-offline.
 
 The vendoring script checks every input hash and requires exactly one occurrence of each original helper in each variant. It refuses a changed upstream runtime. It copies only the nine runtime files, patches the two JavaScript variants, and regenerates the deployed hash manifest. LICENSE, EMSCRIPTEN-LICENSE and NOTICE are retained separately in the checked-in directory.
 
-For an update, choose a **new immutable directory/patch revision**; never overwrite deployed bytes. Review upstream changes and licensing, update the pinned helper snippets if needed, regenerate all hashes, update the driver URL/SRI, service-worker URLs/integrities, Vercel rules and tests, and advance the service-worker cache version. Keep previously published driver URLs available to clients holding older documents. Do not merely refresh hashes to make a failed audit pass.
+For an update, choose a **new immutable directory/patch revision**; never overwrite deployed bytes. Review upstream changes and licensing, update the pinned helper snippets if needed, regenerate all hashes, update the driver URL/SRI, service-worker URLs/integrities, Vercel rules and tests, and advance the service-worker cache version. Keep superseded driver URLs for at least 14 days after their runtime references are removed. Do not merely refresh hashes to make a failed audit pass.
 
 ## Cache behavior and cost
 
@@ -57,7 +57,7 @@ JavaScript `'unsafe-eval'` is removed from all website CSP headers. The monitor 
 - Real inference callback under the served policy in Chromium and WebKit, with automatic SIMD selection and a forced scalar fallback, while the CDN is unavailable.
 - A normally loaded script proves JavaScript function construction is blocked. DevTools evaluation is not used as evidence of CSP enforcement.
 - Missing-asset fresh installation and corrupt-asset upgrade tests, followed by successful retry and real inference with the origin connection cut off in both engines.
-- An upgrade fixture preserves the actual v47 worker/document; the published `driver-app.v47.js` remains byte-identical.
+- The v48 upgrade fixture checks that a failed update preserves the prior working cache.
 - Existing camera selection, tracking-loss, startup failure, consent, and monitoring lifecycle tests remain required.
 
 A blank-frame inference callback exercises the real runtime/model pipeline; it does not measure face-detection accuracy. Physical Safari/iPhone checks and the authorized dataset benchmark remain separate evidence.
