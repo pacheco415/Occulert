@@ -33,6 +33,10 @@ let portalConfigurationSafe = true;
 let checkoutSessionStatus = "open";
 let checkoutCreateCount = 0;
 let malformedPersistenceResult = false;
+let fleetState = "owned";
+let persistenceErrorStatus = null;
+let stripeSubscriptionTimeout = false;
+const ignoredEvents = new Map();
 const syncLocks = new Map();
 
 function http(statusCode, body) {
@@ -139,7 +143,17 @@ globalThis.fetch = async (url, options = {}) => {
       assert.equal(body.p_customer_id, customerId);
       assert.equal(syncLocks.get(body.p_subscription_id), body.p_sync_token);
       if (malformedPersistenceResult) return http(200, {});
+      if (persistenceErrorStatus) return http(persistenceErrorStatus, { message: "temporary_database_failure" });
+      if (ignoredEvents.has(body.p_event_id)) {
+        return http(200, { ignored: true, reason: ignoredEvents.get(body.p_event_id) });
+      }
       if (appliedEvents.has(body.p_event_id)) return http(200, { applied: false, duplicate: true });
+      const reason = fleetState !== "owned" ? "fleet_owner_mismatch"
+        : billingRow.stripe_customer_id !== body.p_customer_id ? "test_customer_mismatch" : null;
+      if (reason) {
+        ignoredEvents.set(body.p_event_id, reason);
+        return http(200, { ignored: true, reason });
+      }
       appliedEvents.add(body.p_event_id);
       billingRow = {
         ...billingRow,
@@ -196,6 +210,11 @@ globalThis.fetch = async (url, options = {}) => {
       configuration: "bpc_TestSafePortal",
       url: "https://billing.stripe.com/p/session/test_UnitSession",
     });
+    if (target.pathname === "/v1/subscriptions/" + subscriptionId && stripeSubscriptionTimeout) {
+      const error = new Error("Stripe subscription request timed out");
+      error.name = "AbortError";
+      throw error;
+    }
     if (target.pathname === "/v1/subscriptions/" + subscriptionId) return http(200, {
       id: subscriptionId, livemode: false, status: subscriptionState,
       customer: customerId, metadata: { fleet_id: fleetId, owner_user_id: ownerId },
@@ -333,6 +352,41 @@ malformedPersistenceResult = false;
 result = await invoke(webhook, signedWebhook("evt_RetryAfterBadResult", "customer.subscription.updated"));
 assert.equal(result.status, 200);
 assert.equal(result.body.applied, true);
+
+fleetState = "deleted";
+result = await invoke(webhook, signedWebhook("evt_DeletedFleet", "customer.subscription.updated"));
+assert.deepEqual(result.body, { ok: true, ignored: true, reason: "fleet_owner_mismatch" });
+assert.equal(result.status, 200, "a deleted fleet is a permanent webhook mismatch");
+fleetState = "owner_changed";
+result = await invoke(webhook, signedWebhook("evt_ChangedOwner", "customer.subscription.updated"));
+assert.equal(result.status, 200, "an owner change is a permanent webhook mismatch");
+assert.equal(result.body.reason, "fleet_owner_mismatch");
+fleetState = "owned";
+result = await invoke(webhook, signedWebhook("evt_DeletedFleet", "customer.subscription.updated"));
+assert.deepEqual(result.body, { ok: true, ignored: true, reason: "fleet_owner_mismatch" },
+  "the ignored event ID keeps its reason on redelivery");
+billingRow.stripe_customer_id = "cus_AnotherCustomer";
+result = await invoke(webhook, signedWebhook("evt_CustomerMismatch", "customer.subscription.updated"));
+assert.equal(result.status, 200);
+assert.deepEqual(result.body, { ok: true, ignored: true, reason: "test_customer_mismatch" });
+billingRow.stripe_customer_id = customerId;
+persistenceErrorStatus = 503;
+result = await invoke(webhook, signedWebhook("evt_TemporaryDatabaseFailure", "customer.subscription.updated"));
+assert.equal(result.status, 503, "database failures must ask Stripe to retry");
+assert.equal(ignoredEvents.has("evt_TemporaryDatabaseFailure"), false);
+persistenceErrorStatus = null;
+result = await invoke(webhook, signedWebhook("evt_TemporaryDatabaseFailure", "customer.subscription.updated"));
+assert.equal(result.status, 200, "a transient database failure must be retryable");
+assert.equal(result.body.applied, true);
+stripeSubscriptionTimeout = true;
+result = await invoke(webhook, signedWebhook("evt_StripeTimeout", "customer.subscription.updated"));
+assert.equal(result.status, 504, "a Stripe timeout must ask Stripe to retry");
+assert.equal(ignoredEvents.has("evt_StripeTimeout"), false);
+stripeSubscriptionTimeout = false;
+ignoredEvents.set("evt_UnsupportedIgnore", "billing_sync_busy");
+result = await invoke(webhook, signedWebhook("evt_UnsupportedIgnore", "customer.subscription.updated"));
+assert.equal(result.status, 502, "only the two permanent mismatch reasons may be acknowledged");
+ignoredEvents.delete("evt_UnsupportedIgnore");
 
 result = await invoke(status, request("GET"));
 assert.equal(result.status, 200);

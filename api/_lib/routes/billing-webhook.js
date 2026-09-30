@@ -10,6 +10,7 @@ const SUPPORTED = new Set([
   "customer.subscription.created", "customer.subscription.updated",
   "customer.subscription.deleted", "invoice.paid", "invoice.payment_failed",
 ]);
+const PERMANENT_MISMATCHES = new Set(["fleet_owner_mismatch", "test_customer_mismatch"]);
 const STATUSES = new Set([
   "incomplete", "incomplete_expired", "trialing", "active",
   "past_due", "unpaid", "canceled", "paused",
@@ -100,8 +101,11 @@ module.exports = async function handler(request, response) {
           p_sync_token: token,
         },
       });
-      if (!result || (result.applied !== true && result.duplicate !== true) ||
-          (result.applied === true && result.duplicate === true)) {
+      const ignored = result && result.ignored === true && PERMANENT_MISMATCHES.has(result.reason) &&
+        result.applied === undefined && result.duplicate === undefined;
+      const applied = result && result.applied === true && result.duplicate === false;
+      const duplicate = result && result.applied === false && result.duplicate === true;
+      if (Number(ignored) + Number(applied) + Number(duplicate) !== 1) {
         throw new Error("invalid_billing_persistence_result");
       }
     } finally {
@@ -113,9 +117,10 @@ module.exports = async function handler(request, response) {
         });
       } catch (_) {}
     }
-    return billing.json(response, 200, {
-      ok: true, applied: result && result.applied === true, duplicate: result && result.duplicate === true,
-    });
+    if (result.ignored === true) {
+      return billing.json(response, 200, { ok: true, ignored: true, reason: result.reason });
+    }
+    return billing.json(response, 200, { ok: true, applied: result.applied, duplicate: result.duplicate });
   } catch (error) {
     return billing.replyError(response, error);
   }
