@@ -3,10 +3,10 @@ import crypto from "node:crypto";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const checkout = require("../api/billing-checkout.js");
-const portal = require("../api/billing-portal.js");
-const status = require("../api/billing-status.js");
-const webhook = require("../api/billing-webhook.js");
+const checkout = require("../api/_lib/routes/billing-checkout.js");
+const portal = require("../api/_lib/routes/billing-portal.js");
+const status = require("../api/_lib/routes/billing-status.js");
+const webhook = require("../api/_lib/routes/billing-webhook.js");
 const stripe = require("../api/_lib/stripe-test.js");
 
 process.env.SUPABASE_URL = "https://unit-test.supabase.co";

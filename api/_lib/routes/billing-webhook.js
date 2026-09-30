@@ -2,9 +2,9 @@
 // Browser redirects never write billing state. The signed event identifies a
 // subscription; current subscription state is then retrieved from Stripe.
 const crypto = require("node:crypto");
-const { pgFetch } = require("./_lib/supabase");
-const billing = require("./_lib/billing-test");
-const stripe = require("./_lib/stripe-test");
+const { pgFetch } = require("../supabase");
+const billing = require("../billing-test");
+const stripe = require("../stripe-test");
 
 const SUPPORTED = new Set([
   "customer.subscription.created", "customer.subscription.updated",

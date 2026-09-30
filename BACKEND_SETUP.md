@@ -83,6 +83,13 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 `api/fleet-summary.js` will respond with
 `501 backend_not_configured` instead of touching a database.
 
+The Vercel Hobby deployment has a 12-function limit. This source keeps 12
+top-level `api/*.js` entry points: `api/[endpoint].js` dispatches six named
+URLs to handlers in `api/_lib/routes/`. Keep those URLs and the route allowlist
+in sync when editing the API, and run `npm run test:vercel-function-budget`
+before deployment. The Stripe webhook must continue receiving its original
+request stream for signature verification.
+
 `api/pilot-leads.js` will also store validated pilot requests in the
 `pilot_leads` table when the two server-side Supabase variables are present.
 Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the API reports

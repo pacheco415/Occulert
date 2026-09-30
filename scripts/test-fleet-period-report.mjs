@@ -5,7 +5,7 @@ import test from 'node:test';
 
 const require = createRequire(import.meta.url);
 const libPath = require.resolve('../api/_lib/supabase.js');
-const endpointPath = require.resolve('../api/fleet-period-report.js');
+const endpointPath = require.resolve('../api/_lib/routes/fleet-period-report.js');
 const OWNER = '11111111-1111-4111-8111-111111111111';
 const FLEET = '22222222-2222-4222-8222-222222222222';
 process.env.SUPABASE_URL = 'https://example.invalid';

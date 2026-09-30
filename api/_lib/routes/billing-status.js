@@ -1,6 +1,6 @@
 // GET /api/billing-status — informational Stripe test-mode state for owner.
-const billing = require("./_lib/billing-test");
-const stripe = require("./_lib/stripe-test");
+const billing = require("../billing-test");
+const stripe = require("../stripe-test");
 
 module.exports = async function handler(request, response) {
   if (billing.methodOnly(request, response, "GET") || !billing.backendConfigured(response)) return;

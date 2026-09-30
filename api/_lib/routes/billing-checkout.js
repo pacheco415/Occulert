@@ -1,8 +1,8 @@
 // POST /api/billing-checkout — authenticated fleet owner, Stripe test mode.
 const crypto = require("node:crypto");
-const { pgFetch } = require("./_lib/supabase");
-const billing = require("./_lib/billing-test");
-const stripe = require("./_lib/stripe-test");
+const { pgFetch } = require("../supabase");
+const billing = require("../billing-test");
+const stripe = require("../stripe-test");
 
 function fail(message, status) {
   const error = new Error(message);

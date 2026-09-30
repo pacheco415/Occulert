@@ -1,8 +1,8 @@
 // GET /api/fleet-session-history: bounded owner-only session pagination.
 // Cursors exclude newer ordering tuples but are not transactional snapshots:
 // concurrent edits/deletions can still change the visible history.
-const { pgFetch, verifyAccessToken, bearerToken } = require('./_lib/supabase');
-const { requestHistoryQuery, encodeCursor, validTimestamp, validTuple, compareTuples, compareTimestamps, isUuid } = require('./_lib/fleet-history-cursor');
+const { pgFetch, verifyAccessToken, bearerToken } = require('../supabase');
+const { requestHistoryQuery, encodeCursor, validTimestamp, validTuple, compareTuples, compareTimestamps, isUuid } = require('../fleet-history-cursor');
 const PAGE_SIZE = 50;
 const SESSION_SELECT = 'id,driver_id,started_at,ended_at,average_fatigue,max_fatigue,safety_score,alert_count,head_nod_count,detector_pipeline,detector_version,app_version';
 const PIPELINES = new Set(['web_mediapipe_ear', 'ios_mlkit_eye_probability', 'android_mlkit_eye_probability']);

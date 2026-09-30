@@ -1,6 +1,6 @@
 // POST /api/billing-portal — authenticated fleet owner, Stripe test mode.
-const billing = require("./_lib/billing-test");
-const stripe = require("./_lib/stripe-test");
+const billing = require("../billing-test");
+const stripe = require("../stripe-test");
 
 module.exports = async function handler(request, response) {
   if (billing.methodOnly(request, response, "POST") || !billing.backendConfigured(response)) return;

@@ -1,7 +1,7 @@
 // GET /api/fleet-period-report?days=7|30. Complete aggregate from the
 // server-owned fleet; no individual session, driver, or media data is returned.
-const { pgFetch, verifyAccessToken, bearerToken } = require('./_lib/supabase');
-const { isUuid, validTimestamp } = require('./_lib/fleet-history-cursor');
+const { pgFetch, verifyAccessToken, bearerToken } = require('../supabase');
+const { isUuid, validTimestamp } = require('../fleet-history-cursor');
 
 function json(response, status, body) {
   response.statusCode = status;
