@@ -1,6 +1,7 @@
 import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
 import "./audit-assets.mjs";
 import "./audit-mediapipe.mjs";
+import "./audit-retired-assets.mjs";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 
