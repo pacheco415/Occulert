@@ -75,7 +75,7 @@ module.exports = async function handler(request, response) {
     if (!customerId) {
       const customer = await stripe.stripeRequest("/v1/customers", {
         method: "POST",
-        idempotencyKey: stripe.idempotencyKey("customer", [fleet.id]),
+        idempotencyKey: stripe.idempotencyKey("customer", [fleet.id, user.id, user.email]),
         fields: {
           email: user.email,
           "metadata[fleet_id]": fleet.id,
