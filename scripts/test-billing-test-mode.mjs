@@ -24,6 +24,9 @@ const customerId = "cus_TestCustomer";
 const subscriptionId = "sub_TestSubscription";
 let billingRow = null;
 let providerCalls = [];
+let ownerEmail = "owner@example.com";
+let failCustomerRegistrationOnce = false;
+const customerRequests = new Map();
 let appliedEvents = new Set();
 let applyCalls = 0;
 let subscriptionState = "active";
@@ -49,7 +52,7 @@ globalThis.fetch = async (url, options = {}) => {
   if (target.hostname === "unit-test.supabase.co") {
     if (target.pathname === "/auth/v1/user") {
       if (options.headers.Authorization === "Bearer owner-token") return http(200, {
-        id: ownerId, email: "owner@example.com", email_confirmed_at: "2026-09-01T00:00:00Z",
+        id: ownerId, email: ownerEmail, email_confirmed_at: "2026-09-01T00:00:00Z",
       });
       if (options.headers.Authorization === "Bearer other-token") return http(200, {
         id: "33333333-3333-4333-8333-333333333333", email: "other@example.com",
@@ -68,6 +71,10 @@ globalThis.fetch = async (url, options = {}) => {
       const body = JSON.parse(options.body);
       assert.equal(body.p_fleet_id, fleetId);
       assert.equal(body.p_owner_user_id, ownerId);
+      if (failCustomerRegistrationOnce) {
+        failCustomerRegistrationOnce = false;
+        return http(503, { message: "temporary_registration_failure" });
+      }
       billingRow ||= {
         fleet_id: fleetId, stripe_customer_id: body.p_customer_id,
         stripe_subscription_id: null, plan: null, status: "none",
@@ -184,7 +191,14 @@ globalThis.fetch = async (url, options = {}) => {
       id: "price_TestGrowth", livemode: false, active: true, type: "recurring",
       recurring: { interval: "month", interval_count: 1 }, unit_amount: 2500,
     });
-    if (target.pathname === "/v1/customers") return http(200, { id: customerId, livemode: false });
+    if (target.pathname === "/v1/customers") {
+      const key = options.headers["Idempotency-Key"];
+      if (customerRequests.has(key) && customerRequests.get(key) !== options.body) {
+        return http(400, { error: { code: "idempotency_error" } });
+      }
+      customerRequests.set(key, options.body);
+      return http(200, { id: customerId, livemode: false });
+    }
     if (target.pathname === "/v1/checkout/sessions" && options.method === "POST") {
       checkoutCreateCount++;
       const id = "cs_test_UnitSession" + checkoutCreateCount;
@@ -287,9 +301,22 @@ result = await invoke(checkout, request("POST", "owner-token", { plan: "starter"
 assert.equal(result.status, 502, "Stripe key errors must not be returned as owner-auth errors");
 priceErrorStatus = null;
 
+failCustomerRegistrationOnce = true;
+result = await invoke(checkout, request("POST", "owner-token", { plan: "starter" },
+  { "idempotency-key": "test-request-0001" }));
+assert.equal(result.status, 503, "a failed customer registration should be retryable");
+const firstCustomerCall = providerCalls.filter(call => call.path === "/v1/customers").at(-1);
+assert.equal(new URLSearchParams(firstCustomerCall.options.body).get("email"), "owner@example.com");
+ownerEmail = "new-owner@example.com";
 result = await invoke(checkout, request("POST", "owner-token", { plan: "starter" },
   { "idempotency-key": "test-request-0001" }));
 assert.equal(result.status, 200);
+const secondCustomerCall = providerCalls.filter(call => call.path === "/v1/customers").at(-1);
+assert.notEqual(firstCustomerCall.options.headers["Idempotency-Key"],
+  secondCustomerCall.options.headers["Idempotency-Key"],
+  "changed email must get a new customer idempotency key");
+assert.equal(new URLSearchParams(secondCustomerCall.options.body).get("email"), "new-owner@example.com");
+assert.equal(customerRequests.size, 2, "Stripe must accept the retried customer request");
 assert.equal(result.body.test_mode, true);
 assert.match(result.body.checkout_url, /^https:\/\/checkout\.stripe\.com\//);
 assert.equal(billingRow.status, "none", "Checkout must not grant subscription state");
