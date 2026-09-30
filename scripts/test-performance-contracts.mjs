@@ -1,3 +1,4 @@
+import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -160,7 +161,7 @@ test('Build 30 pins its iOS toolchain and exposes local aggregate diagnostics', 
 
 test('web monitoring defers MediaPipe and prevents overlapping inference', async () => {
   const app = read('app.html');
-  const driver = read('driver-app.v68.js');
+  const driver = read(`${assetByStem('driver-app.js')}`);
   assert.doesNotMatch(app, /<script[^>]+@mediapipe\/face_mesh/);
   assert.match(app, /loading="lazy"/);
   assert.match(driver, /function loadFaceMeshScript\(\)/);
@@ -313,7 +314,7 @@ test('legacy local driver identity migrates once across the driver app and accou
   assert.equal(harness.get("JSON.parse(localStorage.getItem('occulert-session-history'))[1].driverId"), 'demo-other');
   assert.equal(harness.get("JSON.parse(localStorage.getItem('occulert-drivers'))[0].driverId"), migratedId);
 
-  harness.run(read('auth-helper.v60.js'));
+  harness.run(read(`${assetByStem('auth-helper.js')}`));
   harness.run('window.OcculertAuth.saveProfile(window.OcculertAuth.getProfile())');
   assert.equal(harness.get("localStorage.getItem('occulert-driver-id')"), migratedId);
   assert.equal(harness.get("JSON.parse(localStorage.getItem('occulert-profile')).driverId"), migratedId);
@@ -353,7 +354,7 @@ test('completed browser sessions survive app reopening without cloud consent or 
   const reopened = createAppHarness({ initialStorage });
   assert.equal(reopened.get("localStorage.getItem('occulert-live-session')"), initialStorage['occulert-live-session'],
     'idle app loading must not replace the last completed record with a perfect empty score');
-  reopened.run(read('session-history-page-2.v60.js'));
+  reopened.run(read(`${assetByStem('session-history-page-2.js')}`));
   assert.equal(reopened.get('getHistory().length'), 2, 'latest saved snapshot must not duplicate its history record');
   assert.equal(reopened.el('sessions').textContent, 2);
 });
@@ -444,9 +445,10 @@ test('a previous session wake lock cannot replace the current session lock', asy
 
 test('service-worker upgrade evicts stale website caches', async () => {
   const source = read('sw.js');
-  assert.match(source, /const CACHE = 'occulert-v56'/);
+  assert.match(cacheName(), /^occulert-v\d+$/);
+  const previousCache = priorReleaseCacheName();
+  if (previousCache) assert.notEqual(cacheName(), previousCache);
   assert.match(source, /const NETWORK_FIRST_ASSETS = new Set\(\[/);
-  assert.match(source, /'\/driver-app\.v60\.js'/);
   assert.match(source, /const NETWORK_FIRST_TIMEOUT_MS = 2500/);
   assert.match(source, /event\.waitUntil\(cacheUpdate\)/);
 
@@ -490,7 +492,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   const cache = {
     add: async url => {
       url = typeof url === 'string' ? url : new URL(url.url).pathname;
-      if (url === '/driver-app.v68.js') throw new Error('transient detector download failure');
+      if (url === `/${assetByStem('driver-app.js')}`) throw new Error('transient detector download failure');
       cached.add(url);
     },
     match: async url => cached.has(url) ? { ok: true } : null,
@@ -516,7 +518,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await assert.rejects(installation, /Critical offline assets were not cached/);
   assert.equal(skipped, false);
-  assert.deepEqual(deleted, ['occulert-v56']);
+  assert.deepEqual(deleted, [cacheName()]);
 });
 
 test('service-worker bounds network and cache writes while preserving a known-good detector', async () => {
@@ -553,7 +555,7 @@ test('service-worker bounds network and cache writes while preserving a known-go
     },
   };
   runInNewContext(source, context);
-  const request = { method: 'GET', mode: 'same-origin', url: 'https://www.occulert.com/driver-app.v68.js' };
+  const request = { method: 'GET', mode: 'same-origin', url: `https://www.occulert.com/${assetByStem('driver-app.js')}` };
   let responsePromise;
   let lifetimePromise;
   const dispatch = () => listeners.fetch({
@@ -608,7 +610,7 @@ test('network-only account scripts time out without exposing cached auth and pre
     respondWith: promise => { responsePromise = promise; },
     waitUntil: () => { lifetimeUpdates++; },
   });
-  for (const path of ['/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', '/occulert-backend.v68.js', '/auth-helper.v60.js', '/passkey-auth.v60.js', '/passwordless-auth.v60.js', '/supabase-loader.v47.js']) {
+  for (const path of ['/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', `/${assetByStem('occulert-backend.js')}`, `/${assetByStem('auth-helper.js')}`, `/${assetByStem('passkey-auth.js')}`, `/${assetByStem('passwordless-auth.js')}`, `/${assetByStem('supabase-loader.js')}`]) {
     const old = deferred();
     network = () => old.promise;
     dispatch(path);
@@ -628,7 +630,7 @@ test('network-only account scripts time out without exposing cached auth and pre
     assert.equal(cacheWrites, 0, 'a late response must not be cached');
   }
   network = async () => fresh;
-  dispatch('/occulert-backend.v68.js');
+  dispatch(`/${assetByStem('occulert-backend.js')}`);
   const valid = await responsePromise;
   assert.equal(valid.status, 200);
   assert.equal(valid.statusText, 'Current script');
@@ -641,17 +643,17 @@ test('network-only account scripts time out without exposing cached auth and pre
   assert.equal(fetches.at(-1).options.signal.aborted, false);
   assert.equal(timers.size, 0, 'successful delivery clears its deadline');
   network = async () => { throw new Error('Connection lost'); };
-  dispatch('/occulert-backend.v68.js');
+  dispatch(`/${assetByStem('occulert-backend.js')}`);
   assert.equal((await responsePromise).type, 'error');
   network = async () => new Response('Unavailable', { status: 503, statusText: 'Service Unavailable' });
-  dispatch('/occulert-backend.v68.js');
+  dispatch(`/${assetByStem('occulert-backend.js')}`);
   const denied = await responsePromise;
   assert.equal(denied.status, 503, 'network denial is preserved without cached substitution');
   assert.equal(denied.statusText, 'Service Unavailable');
   assert.equal(await denied.text(), 'Unavailable');
   for (const status of [204, 205, 304]) {
     network = async () => new Response(null, { status });
-    dispatch('/occulert-backend.v68.js');
+    dispatch(`/${assetByStem('occulert-backend.js')}`);
     const empty = await responsePromise;
     assert.equal(empty.status, status, 'body-forbidden response status remains valid');
     assert.equal(empty.body, null);
@@ -684,7 +686,7 @@ test('network-only script headers and a partial body share one deadline and igno
   runInNewContext(read('sw.js'), context);
   let responsePromise;
   listeners.fetch({
-    request: { method: 'GET', mode: 'no-cors', destination: 'script', url: 'https://www.occulert.com/occulert-backend.v68.js' },
+    request: { method: 'GET', mode: 'no-cors', destination: 'script', url: `https://www.occulert.com/${assetByStem('occulert-backend.js')}` },
     respondWith: promise => { responsePromise = promise; promise.then(() => { delivered = true; }); },
   });
   const [[deadlineId, deadline]] = [...timers];
@@ -731,7 +733,7 @@ for (const navigation of [false, true]) {
     };
     runInNewContext(read('sw.js'), context);
     listeners.fetch({
-      request: { method: 'GET', mode: navigation ? 'navigate' : 'same-origin', url: 'https://www.occulert.com/' + (navigation ? 'app.html' : 'driver-app.v68.js') },
+      request: { method: 'GET', mode: navigation ? 'navigate' : 'same-origin', url: 'https://www.occulert.com/' + (navigation ? 'app.html' : `${assetByStem('driver-app.js')}`) },
       respondWith: promise => { responsePromise = promise; promise.then(() => { delivered = true; }); },
       waitUntil: promise => { lifetimePromise = promise; },
     });
@@ -777,7 +779,7 @@ for (const navigation of [false, true]) {
       self: { location: { origin: 'https://www.occulert.com' }, addEventListener: (name, handler) => { listeners[name] = handler; } },
     };
     runInNewContext(read('sw.js'), context);
-    const request = { method: 'GET', mode: navigation ? 'navigate' : 'same-origin', url: 'https://www.occulert.com/' + (navigation ? 'app.html' : 'driver-app.v68.js') };
+    const request = { method: 'GET', mode: navigation ? 'navigate' : 'same-origin', url: 'https://www.occulert.com/' + (navigation ? 'app.html' : `${assetByStem('driver-app.js')}`) };
     const dispatch = () => listeners.fetch({ request,
       respondWith: promise => { responsePromise = promise; },
       waitUntil: promise => { lifetimePromise = promise; },

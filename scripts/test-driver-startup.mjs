@@ -1,10 +1,11 @@
+import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
 const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
-const driver = readFileSync(new URL('../driver-app.v68.js', import.meta.url), 'utf8');
+const driver = readFileSync(new URL(`../${assetByStem('driver-app.js')}`, import.meta.url), 'utf8');
 const guard = html.match(/<script\b[^>]*\bid=["']driver-startup-guard["'][^>]*>([\s\S]*?)<\/script>/)?.[1];
 assert.ok(guard, 'The real startup guard must be present in app.html');
 
@@ -132,7 +133,7 @@ test('startup remains blocked until an explicit complete core handshake', () => 
   assertBlocked(app);
   app.document.dispatch('DOMContentLoaded');
   app.window.dispatch('load');
-  app.window.dispatch('load', { target: { tagName: 'SCRIPT', src: 'https://www.occulert.com/driver-app.v68.js' } });
+  app.window.dispatch('load', { target: { tagName: 'SCRIPT', src: `https://www.occulert.com/${assetByStem('driver-app.js')}` } });
   assertBlocked(app);
   app.advance(7999);
   assertBlocked(app);
@@ -200,10 +201,10 @@ test('the eight-second failure is terminal even when a healthy core arrives late
 });
 
 for (const [name, event] of [
-  ['script resource failure', { target: { tagName: 'SCRIPT', src: 'https://www.occulert.com/driver-app.v68.js' } }],
-  ['versioned script resource failure', { target: { tagName: 'SCRIPT', src: '/driver-app.v68.js?offline=1#cached' } }],
-  ['syntax error', { target: null, filename: 'https://www.occulert.com/driver-app.v68.js', message: 'Unexpected token', error: new SyntaxError('Unexpected token') }],
-  ['runtime error', { target: null, filename: 'https://www.occulert.com/driver-app.v68.js', message: 'Storage unavailable', error: new Error('Storage unavailable') }],
+  ['script resource failure', { target: { tagName: 'SCRIPT', src: `https://www.occulert.com/${assetByStem('driver-app.js')}` } }],
+  ['versioned script resource failure', { target: { tagName: 'SCRIPT', src: `/${assetByStem('driver-app.js')}?offline=1#cached` } }],
+  ['syntax error', { target: null, filename: `https://www.occulert.com/${assetByStem('driver-app.js')}`, message: 'Unexpected token', error: new SyntaxError('Unexpected token') }],
+  ['runtime error', { target: null, filename: `https://www.occulert.com/${assetByStem('driver-app.js')}`, message: 'Storage unavailable', error: new Error('Storage unavailable') }],
 ]) {
   test(`targeted core ${name} fails immediately and rejects late readiness`, () => {
     const app = startup();
@@ -217,8 +218,8 @@ for (const [name, event] of [
 }
 
 test('backend, security, and unrelated resource/errors do not reject local core readiness', () => {
-  for (const path of ['/occulert-backend.v68.js', '/security-utils.v47.js', '/lang.v47.js',
-    '/driver-app.v68.css', '/driver-app.v57.js', '/unrelated-driver-app.v68.js']) {
+  for (const path of [`/${assetByStem('occulert-backend.js')}`, `/${assetByStem('security-utils.js')}`, `/${assetByStem('lang.js')}`,
+    `/${assetByStem('driver-app.css')}`, '/driver-app.v57.js', '/unrelated-driver-app.v68.js']) {
     for (const event of [
       { target: { tagName: 'SCRIPT', src: 'https://www.occulert.com' + path } },
       { target: null, filename: 'https://www.occulert.com' + path, message: 'Failed to initialize', error: new Error('Failed to initialize') },

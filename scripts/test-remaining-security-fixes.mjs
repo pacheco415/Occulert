@@ -1,3 +1,4 @@
+import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -19,14 +20,14 @@ const pngSize = path => {
 };
 
 test('spreadsheet exports neutralize formula cells', () => {
-  const { csvCell } = require('../security-utils.v47.js');
+  const { csvCell } = require(`../${assetByStem('security-utils.js')}`);
   for (const prefix of ['=', '+', '-', '@']) {
     assert.equal(csvCell(`${prefix}SUM(1,1)`), `'${prefix}SUM(1,1)`);
     assert.equal(csvCell(`  ${prefix}SUM(1,1)`), `  '${prefix}SUM(1,1)`);
   }
   assert.equal(csvCell('Driver One'), 'Driver One');
   assert.match(read('fleet-dashboard.html'), /OcculertSecurity\.csvCell/);
-  assert.match(read('driver-app.v68.js'), /OcculertSecurity\.csvCell/);
+  assert.match(read(`${assetByStem('driver-app.js')}`), /OcculertSecurity\.csvCell/);
 });
 
 test('native cloud writes recheck current consent', () => {
@@ -399,7 +400,7 @@ test('History serializes each session operation and announces pending saves', ()
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
-  const app = read('driver-app.v68.js');
+  const app = read(`${assetByStem('driver-app.js')}`);
   assert.doesNotMatch(app, /Snooze 5m|function isSnoozed|Alert snoozed/);
   assert.doesNotMatch(app, /alerts will show on Apple Watch/i);
   assert.match(app, /Watch delivery depends on/i);
@@ -411,7 +412,7 @@ test('fleet telemetry is explicitly labeled client-reported and unverified', () 
 });
 
 test('pilot contacts are server-only and disclosed accurately', () => {
-  const signup = read('pilot-signup.html') + read('static-page.v60.js') + read('pilot-signup-page-2.v68.js');
+  const signup = read('pilot-signup.html') + read(`${assetByStem('static-page.js')}`) + read(`${assetByStem('pilot-signup-page-2.js')}`);
   const viewer = read('pilot-leads.html');
   const privacy = read('privacy.html');
   assert.doesNotMatch(signup, /occulert-pilot-leads|savePilotLead|firebase/i);
@@ -456,7 +457,7 @@ test('claims, outreach, offline wording, and localized safety copy are bounded',
   assert.doesNotMatch(read('faq.html'), /core AI runs fully offline/i);
   assert.doesNotMatch(read('features.html'), /before they become dangerous/i);
   assert.doesNotMatch(read('about.html'), /Built to Save Lives/i);
-  const lang = read('lang.v47.js');
+  const lang = read(`${assetByStem('lang.js')}`);
   assert.match(lang, /trust3: "Keine Daten verkauft"/);
   assert.match(lang, /English safety wording pending professional translation/);
 });

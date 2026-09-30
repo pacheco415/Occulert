@@ -1,10 +1,11 @@
+import { assetByStem } from '../scripts/lib/current-assets.mjs';
 import { test, expect } from '@playwright/test';
 
 for (const operation of ['read', 'write']) {
   for (const [label, path, script] of [
-    ['homepage', '/', '/homepage.v67.js'],
-    ['public', '/faq.html', '/public-page.v67.js'],
-    ['static', '/product-hub.html', '/static-page.v60.js'],
+    ['homepage', '/', `/${assetByStem('homepage.js')}`],
+    ['public', '/faq.html', `/${assetByStem('public-page.js')}`],
+    ['static', '/product-hub.html', `/${assetByStem('static-page.js')}`],
   ]) {
     test(`${label} controls remain usable with blocked theme ${operation}`, async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });

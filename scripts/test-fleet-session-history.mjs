@@ -1,3 +1,4 @@
+import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -114,7 +115,7 @@ function dashboardShareHarness(overrides = {}) {
       body: { appendChild() {} } },
     window: { addEventListener() {}, OcculertBackend: { currentUser: () => user } }, ...overrides,
   };
-  vm.runInNewContext(read('fleet-pilot-report.v68.js'), context);
+  vm.runInNewContext(read(`${assetByStem('fleet-pilot-report.js')}`), context);
   vm.runInNewContext(markedBlock(dashboard, 'protected-session-history') + markedBlock(dashboard, 'dashboard-sharing'), context);
   return { context, downloads, copies, notices, user: value => { user = value; } };
 }

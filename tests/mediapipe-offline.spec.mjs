@@ -1,3 +1,4 @@
+import { cacheName } from '../scripts/lib/current-assets.mjs';
 import { test, expect } from '@playwright/test';
 import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
@@ -6,6 +7,7 @@ import { prepareDetectorPage, detectBlankFrame } from './helpers/detector-runtim
 import { observePageLoads } from './helpers/page-load-diagnostics.mjs';
 
 test.use({ serviceWorkers: 'allow' });
+const currentCache = cacheName();
 const root = resolve('.');
 const config = JSON.parse(readFileSync('vercel.json', 'utf8'));
 const runtimeRoot = '/vendor/mediapipe/face-mesh-0.4.1633559619-occulert.1/';
@@ -80,7 +82,7 @@ for (const upgrade of [false, true]) {
       }
       expect(await register(upgrade)).toBe('redundant');
       const keys = await page.evaluate(() => caches.keys());
-      expect(keys).not.toContain('occulert-v56');
+      expect(keys).not.toContain(currentCache);
       if (upgrade) {
         expect(keys).toContain('occulert-v48');
         expect(await page.evaluate(async () => (await (await caches.open('occulert-v48')).match('/app.html')).text())).toContain('/driver-app.v48.js');
@@ -94,7 +96,7 @@ for (const upgrade of [false, true]) {
         const registration = await navigator.serviceWorker.getRegistration();
         return navigator.serviceWorker.controller === registration?.active && registration?.active?.state === 'activated';
       })).toBe(true);
-      const cached = await page.evaluate(async () => (await (await caches.open('occulert-v56')).keys()).map(request => new URL(request.url).pathname));
+      const cached = await page.evaluate(async (name) => (await (await caches.open(name)).keys()).map(request => new URL(request.url).pathname), currentCache);
       for (const file of Object.keys(manifest.files)) {
         const excluded = scalar ? file.includes('solution_simd_wasm_bin.') : file.includes('solution_wasm_bin.');
         if (excluded) { expect(cached).not.toContain(runtimeRoot + file); expect(requested).not.toContain(runtimeRoot + file); }

@@ -1,9 +1,10 @@
+import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../fleet-history-page.v68.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL(`../${assetByStem('fleet-history-page.js')}`, import.meta.url), 'utf8');
 const OWNER = '11111111-1111-4111-8111-111111111111';
 const FLEET = '22222222-2222-4222-8222-222222222222';
 const DRIVER = '33333333-3333-4333-8333-333333333333';

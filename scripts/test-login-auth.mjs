@@ -1,3 +1,4 @@
+import { assetByStem } from './lib/current-assets.mjs';
 // Exercises login.html's three account modes without sending real credentials.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -5,7 +6,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../login.html', import.meta.url), 'utf8');
-const inline = readFileSync(new URL('../login-page-1.v60.js', import.meta.url), 'utf8');
+const inline = readFileSync(new URL(`../${assetByStem('login-page-1.js')}`, import.meta.url), 'utf8');
 
 assert.ok(inline, 'login.html must load the account mode script');
 
