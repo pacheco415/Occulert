@@ -44,6 +44,15 @@ test('dynamic API dispatch uses the path and ignores caller-supplied route queri
   }
   assert.deepEqual(called.map(item => item.route), routed);
 
+  const vercelRequest = { url: '/api/fleet-period-report?days=7' };
+  Object.defineProperty(vercelRequest, 'query', { get: () => ({
+    endpoint: 'fleet-period-report', days: '7', vercel_internal: 'route-metadata',
+  }) });
+  await dispatch(vercelRequest, { statusCode: 200, setHeader() {}, end() {} });
+  assert.equal(called.at(-1).route, 'fleet-period-report');
+  assert.deepEqual(called.at(-1).request.query, { days: '7' });
+  assert.equal(Object.hasOwn(called.at(-1).request, 'query'), true);
+
   const response = { statusCode: 200, headers: {}, body: '',
     setHeader(name, value) { this.headers[name] = value; },
     end(value) { this.body = value; } };
@@ -51,13 +60,13 @@ test('dynamic API dispatch uses the path and ignores caller-supplied route queri
     query: { endpoint: 'billing-webhook', days: '7' } }, response);
   assert.equal(response.statusCode, 400);
   assert.equal(JSON.parse(response.body).error, 'invalid_query');
-  assert.deepEqual(called.map(item => item.route), routed);
+  assert.deepEqual(called.map(item => item.route), [...routed, 'fleet-period-report']);
 
   await dispatch({ url: '/api/unknown?endpoint=billing-webhook' }, response);
   assert.equal(response.statusCode, 404);
   assert.equal(response.headers['Cache-Control'], 'no-store');
   assert.equal(JSON.parse(response.body).error, 'not_found');
-  assert.deepEqual(called.map(item => item.route), routed);
+  assert.deepEqual(called.map(item => item.route), [...routed, 'fleet-period-report']);
 });
 
 test('fleet query validators accept Vercel path metadata but reject caller endpoint queries', async () => {
@@ -81,8 +90,12 @@ test('fleet query validators accept Vercel path metadata but reject caller endpo
   async function invoke(route, suffix = '', callerQuery = {}) {
     const response = { statusCode: 200, setHeader() {},
       end(value) { this.body = JSON.parse(value); } };
-    await dispatch({ method: 'GET', url: `/api/${route}${suffix}`,
-      query: { endpoint: route, ...callerQuery }, headers: { authorization: 'Bearer fixture' } }, response);
+    const request = { method: 'GET', url: `/api/${route}${suffix}`,
+      headers: { authorization: 'Bearer fixture' } };
+    Object.defineProperty(request, 'query', { get: () => ({
+      endpoint: route, vercel_internal: 'route-metadata', ...callerQuery,
+    }) });
+    await dispatch(request, response);
     return response;
   }
   assert.equal((await invoke('fleet-period-report', '?days=7', { days: '7' })).statusCode, 403);

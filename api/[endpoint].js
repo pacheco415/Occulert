@@ -10,9 +10,11 @@ const handlers = Object.freeze({
 });
 
 module.exports = function handler(request, response) {
+  let publicUrl;
   let pathname;
   try {
-    pathname = new URL(request.url, "https://occulert.invalid").pathname;
+    publicUrl = new URL(request.url, "https://occulert.invalid");
+    pathname = publicUrl.pathname;
   } catch {
     pathname = null;
   }
@@ -25,16 +27,17 @@ module.exports = function handler(request, response) {
       response.setHeader('Cache-Control', 'no-store');
       return response.end(JSON.stringify({ error: 'invalid_query' }));
     }
-    // Vercel adds the [endpoint] path parameter to request.query. Existing
-    // report handlers strictly validate caller queries, so remove that single
-    // platform field while retaining the URL and all caller query values.
+    // Vercel may add routing metadata to request.query, and its query property
+    // can be a getter. Build the forwarded query from the public URL instead.
+    // The original URL remains intact for duplicate/unknown-key validation.
     // Preserve the original request stream for Stripe's raw-body signature.
-    if (pathname === '/api/billing-webhook' || !query || !Object.hasOwn(query, 'endpoint')) {
+    if (pathname === '/api/billing-webhook') {
       return handlers[pathname](request, response);
     }
     const forwarded = Object.create(request);
-    forwarded.query = { ...query };
-    delete forwarded.query.endpoint;
+    Object.defineProperty(forwarded, 'query', {
+      value: Object.fromEntries(publicUrl.searchParams), enumerable: true,
+    });
     return handlers[pathname](forwarded, response);
   }
   response.statusCode = 404;
