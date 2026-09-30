@@ -610,10 +610,16 @@ for (const path of ["fleet-onboarding.html", "accept-invite.html"]) assertSingle
 assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must reject cross-origin submissions");
 assertIncludes("api/pilot-leads.js", "unsupported_media_type", "pilot lead API must require JSON submissions");
 assertIncludes("api/pilot-leads.js", "url.protocol === \"https:\"", "pilot lead API must only forward to HTTPS webhooks");
+if (read(".nvmrc").trim() !== "24") fail(".nvmrc must select Node 24");
 for (const workflow of [".github/workflows/browser-smoke.yml", ".github/workflows/native-app-typecheck.yml", ".github/workflows/site-audit.yml"]) {
   assertIncludes(workflow, "actions/checkout@v6", `${workflow} must use the Node 24 checkout action`);
   assertIncludes(workflow, "actions/setup-node@v6", `${workflow} must use the Node 24 setup action`);
-  assertIncludes(workflow, "node-version: 24", `${workflow} must test on Node 24`);
+  const source = read(workflow);
+  const setups = [...source.matchAll(/^[ \t]*- uses: actions\/setup-node@v6[ \t]*$/gm)].length;
+  const versionFiles = [...source.matchAll(/^[ \t]*node-version-file: \.nvmrc[ \t]*$/gm)].length;
+  if (setups !== versionFiles || /^[ \t]*node-version:/m.test(source)) {
+    fail(`${workflow} must use .nvmrc for every Node setup`);
+  }
 }
 assertIncludes("package.json", "\"node\": \"24.x\"", "Vercel functions and local checks must use the verified Node 24 runtime");
 assertNotIncludes("how-it-works.html", "runs silently in the background", "public copy must not claim unsupported background monitoring");

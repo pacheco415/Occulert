@@ -2,32 +2,8 @@ name: Browser Smoke Tests
 
 on:
   pull_request:
-    paths:
-      - "**.html"
-      - "**.js"
-      - "**.css"
-      - "scripts/**"
-      - "vendor/mediapipe/**"
-      - "package.json"
-      - "package-lock.json"
-      - "playwright.config.mjs"
-      - "tests/**"
-      - "vercel.json"
-      - ".github/workflows/browser-smoke.yml"
   push:
     branches: [main]
-    paths:
-      - "**.html"
-      - "**.js"
-      - "**.css"
-      - "scripts/**"
-      - "vendor/mediapipe/**"
-      - "package.json"
-      - "package-lock.json"
-      - "playwright.config.mjs"
-      - "tests/**"
-      - "vercel.json"
-      - ".github/workflows/browser-smoke.yml"
 
 jobs:
   smoke:
@@ -36,7 +12,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
