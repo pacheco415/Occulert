@@ -21,6 +21,22 @@ module.exports = function handler(request, response) {
   if (pathname && Object.hasOwn(handlers, pathname)) {
     const routeName = pathname.slice('/api/'.length);
     const query = request.query;
+    if (pathname === '/api/fleet-period-report' && process.env.VERCEL_ENV === 'preview') {
+      const urlParams = publicUrl.searchParams;
+      const queryKeys = query && typeof query === 'object' ? Object.keys(query) : [];
+      response.setHeader('X-Occulert-Preview-Route', [
+        'ue=' + urlParams.getAll('endpoint').length,
+        'uem=' + Number(urlParams.get('endpoint') === routeName),
+        'ud=' + urlParams.getAll('days').length,
+        'ud7=' + Number(urlParams.get('days') === '7'),
+        'uo=' + [...urlParams.keys()].filter(key => key !== 'endpoint' && key !== 'days').length,
+        'qe=' + (Array.isArray(query?.endpoint) ? 'array' : typeof query?.endpoint),
+        'qem=' + Number(query?.endpoint === routeName),
+        'qd=' + (Array.isArray(query?.days) ? 'array' : typeof query?.days),
+        'qd7=' + Number(query?.days === '7'),
+        'qo=' + queryKeys.filter(key => key !== 'endpoint' && key !== 'days').length,
+      ].join(';'));
+    }
     if (query && Object.hasOwn(query, 'endpoint') && query.endpoint !== routeName) {
       response.statusCode = 400;
       response.setHeader('Content-Type', 'application/json; charset=utf-8');
