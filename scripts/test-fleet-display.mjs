@@ -1,10 +1,11 @@
+import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-const source = read('fleet-display.v58.js');
+const source = read(`${assetByStem('fleet-display.js')}`);
 const context = { globalThis: {} };
 context.globalThis.globalThis = context.globalThis;
 vm.runInNewContext(source, context);

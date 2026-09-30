@@ -1,11 +1,12 @@
+import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../fleet-pilot-report.v68.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL(`../${assetByStem('fleet-pilot-report.js')}`, import.meta.url), 'utf8');
 const dashboard = readFileSync(new URL('../fleet-dashboard.html', import.meta.url), 'utf8');
-const css = readFileSync(new URL('../fleet-pilot-report.v56.css', import.meta.url), 'utf8');
+const css = readFileSync(new URL(`../${assetByStem('fleet-pilot-report.css')}`, import.meta.url), 'utf8');
 const privacy = { includes_location: false, includes_personal_media: false, includes_raw_motion: false };
 const FLEET = '22222222-2222-4222-8222-222222222222';
 const now = Date.now();

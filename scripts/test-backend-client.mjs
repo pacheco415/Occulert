@@ -1,3 +1,4 @@
+import { assetByStem } from './lib/current-assets.mjs';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
@@ -81,7 +82,7 @@ window.localStorage = localStorage;
 window.navigator = context.navigator;
 window.fetch = fetchMock;
 
-const clientSource = readFileSync(new URL("../occulert-backend.v68.js", import.meta.url), "utf8");
+const clientSource = readFileSync(new URL(`../${assetByStem('occulert-backend.js')}`, import.meta.url), "utf8");
 vm.runInNewContext(clientSource, context);
 const backend = window.OcculertBackend;
 

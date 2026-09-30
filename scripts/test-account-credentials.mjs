@@ -1,3 +1,4 @@
+import { assetByStem } from './lib/current-assets.mjs';
 // Executes Account's external script against a stub DOM so the credential
 // flows are tested as behavior, not just as source patterns.
 import assert from 'node:assert/strict';
@@ -5,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const inline = readFileSync(new URL('../account-page-2.v60.js', import.meta.url), 'utf8');
+const inline = readFileSync(new URL(`../${assetByStem('account-page-2.js')}`, import.meta.url), 'utf8');
 
 assert.ok(inline, 'account.html must load the credential script');
 

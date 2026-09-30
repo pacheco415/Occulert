@@ -1,9 +1,10 @@
+import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../passkey-auth.v60.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL(`../${assetByStem('passkey-auth.js')}`, import.meta.url), 'utf8');
 
 function boot({ supported = true, signInError = null, sdkAvailable = true, configAvailable = true, storageFailure = false } = {}) {
   const calls = { create: [], adopted: [], sessions: [], register: 0, list: 0, update: [], remove: [], signOut: [], loader: 0, refreshConfig: 0 };

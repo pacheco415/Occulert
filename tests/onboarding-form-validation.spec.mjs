@@ -1,3 +1,4 @@
+import { assetByStem } from '../scripts/lib/current-assets.mjs';
 import { test, expect } from '@playwright/test';
 
 async function invitationFixture(page, signedIn = false) {
@@ -5,7 +6,7 @@ async function invitationFixture(page, signedIn = false) {
   page.on('request', request => {
     if (/\/(?:api|auth|rest)\//.test(request.url())) unexpected.push(request.url());
   });
-  await page.route('**/occulert-backend.v68.js', route => route.fulfill({
+  await page.route(`**/${assetByStem('occulert-backend.js')}`, route => route.fulfill({
     contentType: 'application/javascript',
     body: `
       window.invitationCalls = [];
@@ -176,7 +177,7 @@ test('larger font metrics and long option labels cannot widen the fleet trial fo
 });
 
 test('account dropdown arrows and keyboard selection survive both themes and reduced transparency', async ({ page }) => {
-  await page.route('**/liquid-glass.v47.css', async route => {
+  await page.route(`**/${assetByStem('liquid-glass.css')}`, async route => {
     const response = await route.fetch();
     // Exercise the actual fallback stylesheet without depending on OS settings.
     const body = (await response.text()).replace('@media (prefers-reduced-transparency: reduce)', '@media all');

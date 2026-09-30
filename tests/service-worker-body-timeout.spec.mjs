@@ -1,3 +1,4 @@
+import { assetByStem } from '../scripts/lib/current-assets.mjs';
 import { test, expect } from '@playwright/test';
 import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
@@ -10,7 +11,7 @@ test.use({ serviceWorkers: 'allow' });
 const root = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
 const workerSource = readFileSync(resolve(root, 'sw.js'), 'utf8');
 const cacheName = workerSource.match(/^const CACHE = '([^']+)';/m)[1];
-const driverPath = '/driver-app.v68.js';
+const driverPath = `/${assetByStem('driver-app.js')}`;
 const redirectedDriverPath = '/body-deadline-final-driver.js';
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json' };
 

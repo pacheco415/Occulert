@@ -1,3 +1,4 @@
+import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -7,7 +8,7 @@ const baseline = process.env.OCCULERT_THEME_BASELINE === '1';
 const variants = [
   ['homepage', baseline ? 'homepage.js' : 'homepage.v60.js'],
   ['public', baseline ? 'public-page.v51.js' : 'public-page.v60.js'],
-  ['static', baseline ? 'static-page.v52.js' : 'static-page.v60.js'],
+  ['static', baseline ? 'static-page.v52.js' : `${assetByStem('static-page.js')}`],
 ];
 
 function boot(file, { blockedRead = false, blockedWrite = false, blockedAccess = false,

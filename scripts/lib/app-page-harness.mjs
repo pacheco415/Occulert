@@ -1,5 +1,6 @@
+import { assetByStem } from './current-assets.mjs';
 // Deterministic harness for the driver app's detection pipeline.
-// Loads the REAL external driver-app.v68.js into a Node vm
+// Loads the current external driver app script into a Node vm
 // sandbox with a controllable clock and a minimal DOM stub, so the
 // shipped calibration / PERCLOS / fatigue / alert logic can be tested
 // without a camera, MediaPipe, or a browser.
@@ -8,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import vm from 'node:vm';
 
-const DRIVER_APP = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'driver-app.v68.js');
+const DRIVER_APP = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', `${assetByStem('driver-app.js')}`);
 
 function makeClassList(el) {
   const set = new Set();
@@ -141,7 +142,7 @@ export function createAppHarness({ startAt = 1_700_000_000_000, initialStorage =
   vm.createContext(sandbox);
 
   const code = readFileSync(DRIVER_APP, 'utf8');
-  vm.runInContext(code, sandbox, { filename: 'driver-app.v68.js' });
+  vm.runInContext(code, sandbox, { filename: `${assetByStem('driver-app.js')}` });
 
   const run = (code) => vm.runInContext(code, sandbox, { filename: 'harness-eval' });
 

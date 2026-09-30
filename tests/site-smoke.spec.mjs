@@ -1,3 +1,4 @@
+import { assetByStem } from '../scripts/lib/current-assets.mjs';
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
@@ -34,10 +35,10 @@ test("homepage external assets preserve theme and mobile navigation controls", a
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(() => document.documentElement.style.setProperty("scroll-behavior", "auto", "important"));
 
-  expect(await page.locator('link[href="/homepage.v51.css"]').count()).toBe(1);
+  expect(await page.locator(`link[href="/${assetByStem('homepage.css')}"]`).count()).toBe(1);
   expect(await page.locator('link[rel="preload"][href="/homepage-journey-cinematic-v1-640.avif"][type="image/avif"]').count()).toBe(1);
   expect(await page.locator('link[href="/homepage.css"]').count()).toBe(0);
-  expect(await page.locator('script[src="/homepage.v67.js"]').count()).toBe(1);
+  expect(await page.locator(`script[src="/${assetByStem('homepage.js')}"]`).count()).toBe(1);
   await page.locator(".skip-link").focus();
   await expect(page.locator(".skip-link")).toBeFocused();
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
@@ -104,7 +105,7 @@ test("public information pages share accessible mobile navigation", async ({ pag
   await page.setViewportSize({ width: 390, height: 844 });
   for (const path of ["/about.html", "/faq.html", "/features.html", "/how-it-works.html", "/install.html"]) {
     await page.goto(path, { waitUntil: "domcontentloaded" });
-    await expect(page.locator('script[src="/public-page.v67.js"]')).toHaveCount(1);
+    await expect(page.locator(`script[src="/${assetByStem('public-page.js')}"]`)).toHaveCount(1);
     const skipLink = page.getByRole("link", { name: "Skip to main content" });
     await skipLink.focus();
     await page.keyboard.press("Enter");
@@ -134,7 +135,7 @@ test("product, safety, privacy, and fleet pages offer a keyboard shortcut to mai
 
   for (const path of ["/product-hub.html", "/safety.html", "/privacy.html", "/fleet-pricing.html", "/fleet-dashboard.html", "/driver-profiles.html", "/pilot-signup.html", "/session-history.html"]) {
     await page.goto(path, { waitUntil: "domcontentloaded" });
-    await expect(page.locator('script[src="/static-page.v60.js"]')).toHaveCount(1);
+    await expect(page.locator(`script[src="/${assetByStem('static-page.js')}"]`)).toHaveCount(1);
   }
 });
 
@@ -511,8 +512,8 @@ test("fleet filtering preserves input focus and updates only the visible roster"
 test("driver app external assets preserve layout and monitoring behavior", async ({ page }) => {
   await page.goto("/app.html", { waitUntil: "domcontentloaded" });
 
-  expect(await page.locator('link[href="/driver-app.v68.css"]').count()).toBe(1);
-  expect(await page.locator('script[src="/driver-app.v68.js"]').count()).toBe(1);
+  expect(await page.locator(`link[href="/${assetByStem('driver-app.css')}"]`).count()).toBe(1);
+  expect(await page.locator(`script[src="/${assetByStem('driver-app.js')}"]`).count()).toBe(1);
   expect(await page.locator('script#driver-startup-guard:not([src])').count()).toBe(1);
   expect(await page.locator('script:not([src]):not(#driver-startup-guard)').count()).toBe(0);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
