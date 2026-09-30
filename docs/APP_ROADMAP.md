@@ -1,9 +1,39 @@
 # Occulert development roadmap
 
-Status recorded September 26, 2026. This is the authoritative product roadmap.
+Status updated September 28, 2026. This is the authoritative product roadmap.
 Backend, detection, performance, and pilot documents explain specific contracts
 and evidence procedures. Older audit and release notes describe their dated
 state; they are not the current feature backlog.
+
+## September 27 approved source batch — local review, unreleased
+
+The owner approved the development work described in this conversation. This
+local branch prepares a simpler driver screen, parked output checks, local
+post-drive feedback, server-filtered fleet history, and a complete stored-session
+7/30-day aggregate report. The dashboard's recent-session view remains limited
+to the latest 50 sessions; the new printable aggregate report uses all stored
+sessions in its selected period after the database migration is applied.
+
+Session records now accept **client-declared** detector pipeline, detector
+version, and app version. The period report separates known pipeline counts;
+browser and native fatigue scores have different inputs and windows and are
+not directly comparable. The [event benchmark](EVENT_BENCHMARK.md) is a scoring
+tool for future licensed, independently labeled observations, not a measured
+accuracy result. No such dataset, pilot fleet, or physical-device acceptance
+result is available for this batch.
+
+The trial request, proposed pricing, onboarding, and support materials are
+also updated. The [unit economics worksheet](UNIT_ECONOMICS.md) identifies the
+current $9/$25 proposal as unlikely to fund small-scale support and suggests
+higher prices to test with future qualified fleets. [Stripe billing preparation](BILLING_INTEGRATION.md)
+is isolated to test mode, has no public checkout control, and cannot change
+fleet access. Source checks are being completed locally; no migration, website
+deployment, native binary, Stripe account setup, live payment, or outreach is
+recorded by this branch.
+
+Before any paid release, resolve the contradictory liability caps in the
+current Privacy and Safety pages through legal review, then align the final
+commercial terms with actual billing and support operations.
 
 ## Status definitions
 
@@ -40,9 +70,11 @@ independent source review complete. See [approved upgrades](APPROVED_UPGRADES_20
 for scope and implementation details. The PR's release receipt records final
 merged source and website deployment status. Installed-native distribution and
 runtime acceptance remain separate; build 52 does not include this package.
-All tests, type checks, browser and device checks remain explicitly deferred by
-the user's instruction, including this batch. No paid build or billing change,
-new native binary, submission or outreach is part of the batch.
+Tests, type checks, browser and device checks for the earlier PR #153 package
+were explicitly deferred at that release. This September 27 local batch has
+its own source and browser checks recorded separately; physical-device and
+real-world checks remain pending. No paid build or billing change, new native
+binary, submission or outreach is part of the batch.
 
 PR #150 added CSV export of shown loaded records, following PR #149's loaded
 History driver/date/status filters, PR #148's Support/Help and PR #147's older

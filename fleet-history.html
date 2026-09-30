@@ -12,8 +12,8 @@
   <link rel="stylesheet" href="/accessibility.v52.css">
   <link rel="stylesheet" href="/fleet-history-page.v67.css">
   <script defer src="/security-utils.v47.js"></script>
-  <script defer src="/occulert-backend.v60.js"></script>
-  <script defer src="/fleet-history-page.v67.js"></script>
+  <script defer src="/occulert-backend.v68.js"></script>
+  <script defer src="/fleet-history-page.v68.js"></script>
 </head>
 <body class="portal-page fleet-history-page">
   <a class="skip-link" href="#main-content">Skip to session history</a>
@@ -29,7 +29,7 @@
     <section class="history-intro" aria-labelledby="historyTitle">
       <p class="eyebrow">Protected fleet</p>
       <h1 id="historyTitle">Session history</h1>
-      <p class="muted">Browse recorded sessions from newest to oldest, up to 50 at a time. This page loads up to 500 sessions. Refresh clears filters and starts again with the newest records.</p>
+      <p class="muted">Browse recorded sessions from newest to oldest, up to 50 at a time. Driver and date filters search the protected fleet on the server before pagination; this page displays up to 500 matching sessions.</p>
     </section>
     <div class="history-status" id="historyStatus" role="status" aria-live="polite">Checking protected fleet access…</div>
     <div class="history-access" id="historyAccess" hidden>
@@ -43,13 +43,13 @@
         <button class="btn" id="historyRefresh" type="button">Refresh history</button>
       </div>
       <p class="history-privacy">Session scores and alert counts are unverified client reports. A missing end time does not establish that a session is active. This page excludes location, camera media, audio, raw motion, events, and saved follow-ups.</p>
-      <p class="muted">Older records here do not change the dashboard’s latest-50 summaries, manager reports, or TV display.</p>
+      <p class="muted">The dashboard’s live cards show up to 50 recent sessions. The separate 7- and 30-day printable manager report counts all stored sessions in its window.</p>
       <fieldset class="history-filters" id="historyFilters" disabled aria-describedby="historyFilterHelp historyDateHelp">
-        <legend>Filter loaded sessions</legend>
+        <legend>Filter protected sessions</legend>
         <div class="history-filter-fields">
           <div class="history-filter-field history-driver-filter">
-            <label for="historyDriver">Driver name contains</label>
-            <input id="historyDriver" type="search" maxlength="80" autocomplete="off" placeholder="Search loaded driver names">
+            <label for="historyDriver">Driver</label>
+            <select id="historyDriver"><option value="">All drivers</option></select>
           </div>
           <div class="history-filter-field">
             <label for="historyPeriod">Recorded start date</label>
@@ -80,14 +80,14 @@
           <div class="history-filter-field"><label for="historyTo">To date</label><input id="historyTo" type="date" aria-describedby="historyDateHelp historyDateStatus"></div>
         </div>
         <p class="history-date-status" id="historyDateStatus" role="status" aria-live="polite"></p>
-        <p class="muted" id="historyFilterHelp">Filters search loaded records only. Load older sessions to search more, up to the 500-session limit. Refresh, an account change, or leaving this page clears filters.</p>
-        <p class="muted" id="historyDateHelp">Recent periods include today and the preceding 6 or 29 local calendar days, through now. Custom dates include each selected local day; either boundary can be left open, but enter at least one date. Future starts are excluded from date ranges. Missing or invalid starts appear only in All time. Sorting applies to loaded records; loading older sessions continues in the server’s newest-first order. Missing sort values appear last. Completed means a valid end was recorded; it does not verify client reports.</p>
+        <p class="muted" id="historyFilterHelp">Driver and start-date filters search the whole protected fleet before loading a page. Recorded end status and sorting apply to loaded matching records; load older pages to expand those views. Account changes or leaving this page clear filters.</p>
+        <p class="muted" id="historyDateHelp">Recent periods include today and the preceding 6 or 29 local calendar days, through the time you apply the filter. Custom dates include each selected local day; either boundary can be left open, but enter at least one date. Future starts are excluded from date ranges. Sorting applies to loaded records; loading older sessions continues in the server’s newest-first order. Missing sort values appear last. Completed means a valid end was recorded; it does not verify client reports.</p>
       </fieldset>
       <p class="history-matches" id="historyMatches" role="status" aria-live="polite" aria-atomic="true">Verify fleet ownership to filter loaded sessions.</p>
       <div class="history-export">
         <button class="btn" id="historyExport" type="button" disabled aria-describedby="historyExportHelp historyExportStatus">Export shown sessions CSV</button>
         <button class="btn" id="historyPrint" type="button" disabled aria-describedby="historyExportHelp historyPrintStatus">Print shown sessions / Save PDF</button>
-        <p class="muted" id="historyExportHelp">CSV and print use exactly the shown sessions in their displayed order, with filters, sort order, time, loaded counts and browsing limits. Both exclude IDs, location, personal media, raw motion, events, and follow-ups. These are loaded-record snapshots; dashboard and manager reports keep their existing scope. Refresh if browsing started more than five minutes ago or a loading attempt failed. Your browser’s print dialog offers Save as PDF.</p>
+        <p class="muted" id="historyExportHelp">CSV and print use exactly the shown sessions in their displayed order, with filters, sort order, time, loaded counts and browsing limits. Both exclude IDs, location, personal media, raw motion, events, and follow-ups. These are loaded-record snapshots, even when the driver or date filter searches the server. Refresh if browsing started more than five minutes ago or a loading attempt failed. Your browser’s print dialog offers Save as PDF.</p>
       </div>
       <p class="history-export-status" id="historyExportStatus" role="status" aria-live="polite" aria-atomic="true">Verify fleet ownership and load sessions before exporting.</p>
       <p class="history-export-status" id="historyPrintStatus" role="status" aria-live="polite" aria-atomic="true">Verify fleet ownership and load sessions before printing.</p>

@@ -58,10 +58,25 @@ function compareTuples(left, right) {
   return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
 }
 
+function compareTimestamps(left, right) {
+  const a = microseconds(left), b = microseconds(right);
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 function validCursorShape(value) {
-  return exactKeys(value, ['v', 'snapshot', 'before']) && value.v === 1
-    && validTuple(value.snapshot) && validTuple(value.before)
+  const versionOne = exactKeys(value, ['v', 'snapshot', 'before']) && value.v === 1;
+  const versionTwo = exactKeys(value, ['v', 'snapshot', 'before', 'filters']) && value.v === 2 &&
+    validFilters(value.filters);
+  return (versionOne || versionTwo) && validTuple(value.snapshot) && validTuple(value.before)
     && compareTuples(value.before, value.snapshot) <= 0;
+}
+
+function validFilters(value) {
+  return exactKeys(value, ['driver_id', 'from', 'to']) &&
+    (value.driver_id === null || isUuid(value.driver_id)) &&
+    (value.from === null || validTimestamp(value.from)) &&
+    (value.to === null || validTimestamp(value.to)) &&
+    (value.from === null || value.to === null || compareTimestamps(value.from, value.to) < 0);
 }
 
 function decodeCursor(value) {
@@ -81,12 +96,45 @@ function decodeCursor(value) {
   return decoded;
 }
 
-function encodeCursor(snapshot, before) {
-  const value = { v: 1, snapshot, before };
+function encodeCursor(snapshot, before, filters) {
+  const value = filters ? { v: 2, snapshot, before, filters } : { v: 1, snapshot, before };
   if (!validCursorShape(value)) throw failure('invalid_cursor');
   const encoded = Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
   if (encoded.length > MAX_CURSOR_LENGTH) throw failure('invalid_cursor');
   return encoded;
+}
+
+function requestHistoryQuery(request) {
+  let fromUrl = {};
+  if (request.url) {
+    let params;
+    try { params = new URL(request.url, 'https://www.occulert.com').searchParams; }
+    catch (error) { throw failure('invalid_query'); }
+    const allowed = new Set(['cursor', 'driver_id', 'from', 'to']);
+    if ([...params.keys()].some(key => !allowed.has(key) || params.getAll(key).length > 1)) throw failure('invalid_query');
+    for (const key of allowed) if (params.has(key)) fromUrl[key] = params.get(key);
+  }
+  let fromQuery = {};
+  if (request.query !== undefined) {
+    if (request.query === null || typeof request.query !== 'object' || Array.isArray(request.query) ||
+        Object.keys(request.query).some(key => !['cursor', 'driver_id', 'from', 'to'].includes(key))) throw failure('invalid_query');
+    for (const key of Object.keys(request.query)) {
+      if (typeof request.query[key] !== 'string') throw failure('invalid_query');
+      fromQuery[key] = request.query[key];
+    }
+  }
+  for (const key of Object.keys(fromQuery)) {
+    if (Object.hasOwn(fromUrl, key) && fromUrl[key] !== fromQuery[key]) throw failure('invalid_query');
+  }
+  const params = Object.assign({}, fromUrl, fromQuery);
+  if (Object.hasOwn(params, 'cursor')) {
+    if (Object.keys(params).length !== 1) throw failure('invalid_query');
+    const cursor = decodeCursor(params.cursor);
+    return { cursor, filters: cursor.v === 2 ? cursor.filters : { driver_id: null, from: null, to: null } };
+  }
+  const filters = { driver_id: params.driver_id || null, from: params.from || null, to: params.to || null };
+  if (!validFilters(filters) || Object.keys(params).some(key => params[key] === '')) throw failure('invalid_query');
+  return { cursor: null, filters };
 }
 
 function requestCursor(request) {
@@ -114,4 +162,4 @@ function requestCursor(request) {
   return value === undefined ? null : decodeCursor(value);
 }
 
-module.exports = { requestCursor, decodeCursor, encodeCursor, validTimestamp, validTuple, compareTuples, isUuid };
+module.exports = { requestCursor, requestHistoryQuery, decodeCursor, encodeCursor, validTimestamp, validTuple, compareTuples, compareTimestamps, isUuid };

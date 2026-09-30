@@ -98,5 +98,14 @@
   "fleet-followups.v67.js": "5abdb1426c2d11cc38074ac937e3c4418f5197c46e8a3f1e42767d9cf71a0da5",
   "fleet-followups.v67.css": "be467ecfa0d3927b69f9494bf5f2f005e4c74e37f7973b46f3a4a17e402057ff",
   "fleet-onboarding-page-1.v67.js": "fe6ec42f55ee1fe383720e58a31a3737548e29fb59754af7bd79a3a47486da23",
-  "fleet-onboarding-page-1.v67.css": "53fd97b191cb2817617765d679bcdb34251a78a84d4be0c92599228e038e6e73"
+  "fleet-onboarding-page-1.v67.css": "53fd97b191cb2817617765d679bcdb34251a78a84d4be0c92599228e038e6e73",
+  "driver-app.v68.js": "6bf3b29839af50eb157a62223e7af15dd9783c240c63df2b07a455f5c3d7529f",
+  "fleet-history-page.v68.js": "5ed64e2415b635605d5367f191c6a91336e8d95259414a92170a87425cb4490b",
+  "fleet-onboarding-page-1.v68.css": "fbe83b4966b84854b24f64b3b1189f4744545da36963c7e543bfa119a96b8a8e",
+  "fleet-onboarding-page-1.v68.js": "cdecde9972a506df36e3bbf6e18b59cad9a4175183e75a8b953132d6aafc537a",
+  "fleet-pilot-report.v68.js": "3ed99497b93283d1683e2ac2b6172de7e2a0fbd45ccce423c6c1a0732158944f",
+  "occulert-backend.v68.js": "41dc29dc13992c9d62595356d8091117d47c2e754ec7574cb7da0f615756e7e1",
+  "pilot-signup-page-1.v68.css": "d3313b19a2007808abaab7e504ce6209da5de3face290fa62232030439251b53",
+  "pilot-signup-page-2.v68.js": "312f1b9459a540d4577779a13165a85946c021526e6fe9a53a04916e5a362c29",
+  "driver-app.v68.css": "7e10f3a15eed448154996bbaf45134fabd0506d6040d04ba51547989dfbcdd4f"
 }

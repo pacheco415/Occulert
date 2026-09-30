@@ -83,10 +83,34 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 `api/fleet-summary.js` will respond with
 `501 backend_not_configured` instead of touching a database.
 
+The Vercel Hobby deployment has a 12-function limit. This source keeps 12
+top-level `api/*.js` entry points: `api/[endpoint].js` dispatches six named
+URLs to handlers in `api/_lib/routes/`. Keep those URLs and the route allowlist
+in sync when editing the API, and run `npm run test:vercel-function-budget`
+before deployment. The Stripe webhook must continue receiving its original
+request stream for signature verification.
+
 `api/pilot-leads.js` will also store validated pilot requests in the
 `pilot_leads` table when the two server-side Supabase variables are present.
-Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the browser keeps only its
-local fallback copy and the API reports `stored: false`.
+Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the API reports
+`stored: false`; the request form tells the visitor it could not confirm
+delivery and asks them to retry. It does not claim an offline submission.
+
+For this unreleased source batch, apply these migrations to an existing
+project **in order** before deploying the updated client and fleet routes:
+
+1. `supabase/migrations/20260926200000_session_detector_provenance.sql` adds
+   self-reported detector and app version fields to protected sessions.
+2. `supabase/migrations/20260927010000_fleet_period_report.sql` adds the
+   owner-scoped complete 7/30-day aggregate used by print and aggregate CSV.
+   The dashboard's detailed recent view still uses at most 50 sessions.
+3. `supabase/migrations/20260927030000_stripe_test_billing.sql` is only for
+   the separate Stripe **test-mode** dry run described in
+   `docs/BILLING_INTEGRATION.md`; it does not enable paid access.
+
+The new period route reports `period_report_not_enabled` when its SQL function
+is absent. Do not present a bounded recent-session snapshot as a complete
+period report in that case.
 
 The signed-in Account Settings page uses `DELETE /api/account` for permanent
 account deletion. Apply `supabase/migrations/20260912170153_atomic_account_deletion.sql`

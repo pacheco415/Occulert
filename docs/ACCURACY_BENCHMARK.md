@@ -93,6 +93,11 @@ PERCLOS timing, head-nod logic, the complete fatigue score, or real driving
 behavior. Those must be evaluated by a later full-pipeline harness and a
 properly governed human pilot.
 
+An [event-level observation scorer](EVENT_BENCHMARK.md) now defines how to
+compare exported alerts, usable tracking intervals, and independently labeled
+episodes. It has no real dataset results and does not execute the detector or
+replace exact-build physical testing.
+
 ## Ground-truth workflow
 
 Steps 3 through 7 below are automated so they cannot be done inconsistently by

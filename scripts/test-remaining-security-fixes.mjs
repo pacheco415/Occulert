@@ -26,7 +26,7 @@ test('spreadsheet exports neutralize formula cells', () => {
   }
   assert.equal(csvCell('Driver One'), 'Driver One');
   assert.match(read('fleet-dashboard.html'), /OcculertSecurity\.csvCell/);
-  assert.match(read('driver-app.v60.js'), /OcculertSecurity\.csvCell/);
+  assert.match(read('driver-app.v68.js'), /OcculertSecurity\.csvCell/);
 });
 
 test('native cloud writes recheck current consent', () => {
@@ -350,7 +350,7 @@ test('History commits after persistence and ignores loads started before a newer
   assert.doesNotMatch(history, /AsyncStorage\.getItem\(HISTORY_KEY\)/);
   assert.match(history, /await commitSessionHistoryEdit/);
   assert.match(history, /persist: mutation => updateSessionHistory/);
-  assert.match(history, /apply: mutation => setSessions\(current/);
+  assert.match(history, /apply: mutation => \{[\s\S]*updateMatchingSessionRecord\(sessionsRef\.current, target, index, mutation\)[\s\S]*setSessions\(updated\)/);
   assert.match(history, /historyRevisionRef\.current === revision/);
   assert.doesNotMatch(history, /const updated = sessions\.map/);
   assert.match(storage, /const operation = historyQueue\.then/);
@@ -374,7 +374,7 @@ test('History load failures stay visible without pretending saved sessions are e
   const loadStart = history.indexOf('const load = useCallback');
   const load = history.slice(loadStart, history.indexOf('useFocusEffect', loadStart));
   assert.match(load, /historyLoadAttemptRef\.current === loadAttempt/, 'only the latest history read may update the screen');
-  assert.match(history, /return \(\) => \{ historyLoadAttemptRef\.current \+= 1; \}/, 'leaving History must invalidate its pending read');
+  assert.match(history, /return \(\) => \{\s*focusedRef\.current = false;\s*historyLoadAttemptRef\.current \+= 1;/, 'leaving History must invalidate its pending read');
   assert.match(load, /setHistoryLoadError\(true\)/);
   assert.doesNotMatch(load, /catch \{[\s\S]*setSessions\(\[\]\)/);
   assert.match(history, /Checking local session history/);
@@ -399,7 +399,7 @@ test('History serializes each session operation and announces pending saves', ()
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
-  const app = read('driver-app.v60.js');
+  const app = read('driver-app.v68.js');
   assert.doesNotMatch(app, /Snooze 5m|function isSnoozed|Alert snoozed/);
   assert.doesNotMatch(app, /alerts will show on Apple Watch/i);
   assert.match(app, /Watch delivery depends on/i);
@@ -411,7 +411,7 @@ test('fleet telemetry is explicitly labeled client-reported and unverified', () 
 });
 
 test('pilot contacts are server-only and disclosed accurately', () => {
-  const signup = read('pilot-signup.html') + read('static-page.v60.js') + read('pilot-signup-page-2.v60.js');
+  const signup = read('pilot-signup.html') + read('static-page.v60.js') + read('pilot-signup-page-2.v68.js');
   const viewer = read('pilot-leads.html');
   const privacy = read('privacy.html');
   assert.doesNotMatch(signup, /occulert-pilot-leads|savePilotLead|firebase/i);

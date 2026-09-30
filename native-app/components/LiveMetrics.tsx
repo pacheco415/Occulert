@@ -6,6 +6,7 @@ import { elapsedSessionSeconds, formatSessionTime } from '../lib/monitorPerforma
 interface LiveMetricsProps {
   metrics: EyeMetrics;
   alertCount: number;
+  cameraRecovering: boolean;
   isRunning: boolean;
   sessionStartedAt: number | null;
   sessionEndedAt: number | null;
@@ -29,6 +30,7 @@ const MetricCard = memo(function MetricCard({ label, value, color }: MetricCardP
 export const LiveMetrics = memo(function LiveMetrics({
   metrics,
   alertCount,
+  cameraRecovering,
   isRunning,
   sessionStartedAt,
   sessionEndedAt,
@@ -46,37 +48,51 @@ export const LiveMetrics = memo(function LiveMetrics({
     return () => clearInterval(timer);
   }, [isRunning, sessionEndedAt, sessionStartedAt]);
 
-  const stateColor = {
-    open: '#00ff88',
-    watch: '#fbbf24',
-    closed: '#ff3344',
-    noFace: '#4a7a8a',
-  }[metrics.state];
+  const trackingMessage = cameraRecovering
+    ? 'Camera reconnecting. Fatigue alerts may be missed until tracking resumes.'
+    : metrics.state === 'noFace'
+      ? 'Camera tracking unavailable. Alerts may be missed. Pull over before adjusting the phone.'
+      : metrics.state === 'closed'
+        ? 'Drowsiness alert. Pull over safely and rest.'
+        : metrics.state === 'watch'
+          ? 'Eye closure is being checked. Prepare to stop if you feel tired.'
+          : 'Camera tracking active. Alerts can still miss drowsiness.';
+  const needsAttention = cameraRecovering || metrics.state !== 'open';
 
   return (
-    <View style={styles.metrics}>
-      <MetricCard label="EYE" value={metrics.ear.toFixed(3)} color={stateColor} />
-      <MetricCard
-        label="PERCLOS"
-        value={`${(metrics.perclos * 100).toFixed(0)}%`}
-        color={metrics.perclos > 0.15 ? '#f87171' : '#c8e8f0'}
-      />
-      <MetricCard
-        label="SCORE"
-        value={String(metrics.fatigueScore)}
-        color={metrics.fatigueScore > 60 ? '#f87171' : '#00ff88'}
-      />
-      <MetricCard label="TIME" value={formatSessionTime(elapsedSeconds)} color="#c8e8f0" />
-      <MetricCard
-        label="ALERTS"
-        value={String(alertCount)}
-        color={alertCount > 0 ? '#fbbf24' : '#c8e8f0'}
-      />
+    <View>
+      <Text
+        accessibilityLiveRegion="polite"
+        style={[styles.trackingMessage, needsAttention && styles.trackingAttention]}
+      >
+        {trackingMessage}
+      </Text>
+      <View style={styles.metrics}>
+        <MetricCard label="TIME" value={formatSessionTime(elapsedSeconds)} color="#c8e8f0" />
+        <MetricCard
+          label="ALERTS"
+          value={String(alertCount)}
+          color={alertCount > 0 ? '#fbbf24' : '#c8e8f0'}
+        />
+      </View>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
+  trackingMessage: {
+    backgroundColor: 'rgba(21,26,35,0.9)',
+    borderColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 10,
+    borderWidth: 1,
+    color: '#c8e8f0',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 8,
+    padding: 10,
+    textAlign: 'center',
+  },
+  trackingAttention: { borderColor: '#fbbf24', color: '#f8d98b' },
   metrics: {
     flexDirection: 'row',
     gap: 6,

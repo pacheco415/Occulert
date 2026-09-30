@@ -132,7 +132,7 @@ test('repeated closures can escalate through PERCLOS before one long closure', (
 test('web copy and runtime disclose and enforce foreground-only monitoring', async () => {
   const howItWorks = readFileSync(new URL('../how-it-works.html', import.meta.url), 'utf8');
   const appPage = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
-  const app = readFileSync(new URL('../driver-app.v60.js', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../driver-app.v68.js', import.meta.url), 'utf8');
   assert.doesNotMatch(howItWorks, /runs silently in the background/i);
   assert.match(howItWorks, /open in the foreground/i);
   assert.match(app, /async function handleVisibilityChange/);
@@ -147,7 +147,7 @@ test('web copy and runtime disclose and enforce foreground-only monitoring', asy
     ? app.slice(handlerStart, handlerEnd)
     : '';
   assert.ok(handlerSource, 'foreground-loss handler must remain directly testable');
-  const logs = [];
+  const logs = [], stoppedReasons = [];
   let stopCount = 0;
   const context = {
     document: { visibilityState: 'hidden' },
@@ -159,6 +159,7 @@ test('web copy and runtime disclose and enforce foreground-only monitoring', asy
     hiddenAt: 0,
     Date,
     log: (message) => logs.push(message),
+    showStoppedReason: message => stoppedReasons.push(message),
     setOverlay: () => {},
     stop: async () => {
       stopCount += 1;
@@ -170,6 +171,7 @@ test('web copy and runtime disclose and enforce foreground-only monitoring', asy
   assert.equal(stopCount, 1);
   assert.equal(context.running, false);
   assert.deepEqual(logs, ['Monitoring stopped because Occulert left the foreground']);
+  assert.match(stoppedReasons[0], /Restart only while safely parked/);
   assert.equal(await context.testHandler(true), false);
   assert.equal(stopCount, 1);
   context.running = true;

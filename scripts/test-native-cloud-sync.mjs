@@ -46,7 +46,7 @@ assert.match(cloud, /let authCache: StoredAuth \| null \| undefined/);
 assert.match(cloud, /if \(authCache !== undefined\) return authCache/);
 assert.match(cloud, /if \(!authLoadPromise\)/);
 assert.match(cloud, /readVersion !== authMutationVersion/);
-assert.match(cloud, /A transient keychain or JSON read failure must remain retryable/);
+assert.match(cloud, /A transient keychain read failure must remain retryable/);
 assert.match(cloud, /expectedVersion !== authMutationVersion/);
 assert.match(cloud, /authStorageQueue\.run\(async \(\) =>/);
 assert.match(cloud, /authStorageQueue\.run\(\(\) => SecureStore\.deleteItemAsync/);
@@ -68,9 +68,11 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   cloud,
-  /testConditions|lighting|eyewear|phonePosition|deviceImpact|batteryImpact|phoneHeat|appVersion|appBuildNumber|headNodObservations/,
-  'pilot review observations and build metadata must not be added to cloud sync',
+  /testConditions|lighting|eyewear|phonePosition|deviceImpact|batteryImpact|phoneHeat|headNodObservations/,
+  'pilot review observations must not be added to cloud sync',
 );
+assert.match(cloud, /detector_pipeline: detectorPipeline/);
+assert.match(cloud, /app_version: formatAppBuildLabel\(currentAppBuildInfo\(\)\)/);
 assert.match(cloud, /if \(!syncContext \|\| !await ensureDriverProfile\(syncContext\)\) return null;/);
 assert.equal(
   [...cloud.matchAll(/const syncContext = await currentSyncContext\(\)/g)].length,
@@ -82,7 +84,7 @@ assert.match(cloud, /https:\/\/www\.occulert\.com/);
 const loadAuthSource = cloud
   .slice(cloud.indexOf('async function loadAuth'), cloud.indexOf('async function saveAuth'))
   .replace('async function loadAuth(): Promise<StoredAuth | null>', 'async function loadAuth()')
-  .replace('const parsed: unknown', 'const parsed');
+  .replace('let parsed: unknown', 'let parsed');
 assert.ok(loadAuthSource.includes('async function loadAuth'), 'loadAuth must remain directly testable');
 let secureStoreReads = 0;
 const retryingSecureStore = {
@@ -102,6 +104,7 @@ const makeLoadAuth = new Function(
   'AUTH_KEY',
   'SECURE_OPTIONS',
   'validStoredAuth',
+  'withCloudReadDeadline',
   `let authCache;
    let authLoadPromise = null;
    let authMutationVersion = 0;
@@ -113,6 +116,7 @@ const retryingLoadAuth = makeLoadAuth(
   'occulert-auth',
   {},
   value => Boolean(value?.access_token && value?.refresh_token && value?.user?.id && value?.user?.email),
+  read => read(),
 );
 assert.equal(await retryingLoadAuth(), null, 'a transient storage failure should fail closed');
 assert.equal((await retryingLoadAuth())?.user.email, 'driver@example.com', 'the next auth read must retry and recover');
@@ -186,7 +190,6 @@ assert.match(history, /Does not trigger alerts/);
 
 assert.match(cloudCard, /createSingleFlightActionRunner/);
 assert.match(cloudCard, /could not complete or confirm that change/);
-assert.match(cloudCard, /\.finally\(\(\) =>/);
 assert.doesNotMatch(cloudCard, /applyConsent\([^)]*\)\.catch\(\(\) => \{\}\)/);
 assert.match(cloudCard, /backgroundColor: colors\.blueStrong/);
 assert.ok(

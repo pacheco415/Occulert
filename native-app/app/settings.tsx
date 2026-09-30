@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert, Linking, AppState, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SensitivitySlider, loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { SensitivityLevel } from '../constants/thresholds';
@@ -384,6 +385,22 @@ export default function SettingsScreen() {
     });
   };
 
+  const testHapticOutput = () => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      .then(() => {
+        if (settingsMountedRef.current) Alert.alert(
+          'Vibration check sent',
+          'Confirm you felt it while parked. If you did not, check your iPhone haptic settings and keep an audible alert enabled.',
+        );
+      })
+      .catch(() => {
+        if (settingsMountedRef.current) Alert.alert(
+          'Vibration test unavailable',
+          'Check iPhone haptic settings and keep an audible alert enabled.',
+        );
+      });
+  };
+
   const testWatchAlert = () => {
     void watchTestRunnerRef.current.run({
       action: async () => {
@@ -623,6 +640,17 @@ export default function SettingsScreen() {
             </Text>
           </TouchableOpacity>
           <Text style={s.testNote}>Use only while parked. This plays the selected sound as the centered three-tone critical sequence and does not change your alert setting.</Text>
+          <TouchableOpacity
+            accessibilityHint="Sends a test vibration on this iPhone without changing a session"
+            accessibilityRole="button"
+            accessibilityLabel="Test iPhone vibration"
+            style={s.testRow}
+            onPress={testHapticOutput}
+          >
+            <Ionicons name="phone-portrait-outline" size={17} color="#60a5fa" />
+            <Text style={s.testText}>TEST IPHONE VIBRATION</Text>
+          </TouchableOpacity>
+          <Text style={s.testNote}>Use only while parked. The app cannot confirm you felt the vibration; keep an audible alert enabled if it is hard to notice.</Text>
           <View style={s.div} />
           <View style={s.row}>
             <View style={s.rowL}>

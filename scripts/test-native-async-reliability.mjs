@@ -60,6 +60,8 @@ function cloudFixture(initial, { consent = false } = {}) {
   ], {
     SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage,
     Platform: { OS: 'ios', Version: '26' }, createAsyncMutationQueue, createCachedBooleanPreference,
+    currentAppBuildInfo: () => ({ appVersion: '1.0.0', appBuildNumber: 'test' }),
+    formatAppBuildLabel: ({ appVersion, appBuildNumber }) => `v${appVersion} (${appBuildNumber})`,
     setTimeout: (fn, delay) => { timers.set(++nextTimer, { fn, delay }); return nextTimer; },
     clearTimeout: id => timers.delete(id),
     fetch: async (url, init) => {

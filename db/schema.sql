@@ -58,7 +58,10 @@ create table if not exists sessions (
   alert_count integer default 0,
   head_nod_count integer default 0,
   device text,
-  browser text
+  browser text,
+  detector_pipeline text,
+  detector_version text,
+  app_version text
   );
 
 create table if not exists events (

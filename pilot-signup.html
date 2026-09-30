@@ -1,18 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Occulert Fleet Trial and Rollout</title><meta name="description" content="Request an Occulert fleet trial or discuss a paid rollout for privacy-limited manager reporting and driver fatigue alerts."><meta name="theme-color" content="#0a0e1a">
-<link rel="stylesheet" href="/pilot-signup-page-1.v47.css" /><link rel="canonical" href="https://www.occulert.com/pilot-signup.html">
-<meta property="og:title" content="Fleet Trial Signup — Occulert">
-<meta property="og:description" content="Request an Occulert fleet trial or discuss a paid fleet rollout.">
-<meta property="og:type" content="website">
-<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Occulert"><link rel="manifest" href="/manifest.json"><link rel="apple-touch-icon" href="/occulert-logo-main-192.png">
-
-<script src="/static-page.v60.js" defer></script>
-<link rel="stylesheet" href="/liquid-glass.v47.css" />
-<link rel="stylesheet" href="/form-controls.v63.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Request an Occulert Fleet Trial or Rollout Conversation</title>
+  <meta name="description" content="Request a free 30-day Occulert fleet trial or discuss a paid rollout. A request does not enroll your fleet or start a subscription.">
+  <meta name="theme-color" content="#0a0e1a">
+  <link rel="canonical" href="https://www.occulert.com/pilot-signup.html">
+  <meta property="og:title" content="Fleet Trial Request — Occulert">
+  <meta property="og:description" content="Request an Occulert fleet trial or discuss a paid rollout.">
+  <meta property="og:type" content="website">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Occulert">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/occulert-logo-main-192.png">
+  <link rel="stylesheet" href="/pilot-signup-page-1.v68.css">
+  <link rel="stylesheet" href="/liquid-glass.v47.css">
+  <link rel="stylesheet" href="/form-controls.v63.css">
+  <script src="/static-page.v60.js" defer></script>
 </head>
-<body><div class="top"><div class="brand">Occulert Fleet Trial</div><div class="nav"><a class="btn" href="/">Home</a><a class="btn" href="/fleet-pricing.html">Fleet Plans</a><a class="btn" href="/fleet-dashboard.html">Dashboard</a><a class="btn" href="/app.html">Launch App</a></div></div><main class="wrap"><section class="hero"><div><div class="pill">Fleet Safety Trial</div><h1>Test Occulert with your drivers</h1><p class="muted">Occulert is a prototype driver-fatigue assistant built around AI eye tracking, head-nod detection, instant alerts, safety scoring, and dashboard reporting.</p><div class="steps"><div class="step"><strong>1. Run demo</strong><br><span class="small">Use the phone camera to start a monitoring session.</span></div><div class="step"><strong>2. Review data</strong><br><span class="small">Check alerts, fatigue scores, and session history.</span></div><div class="step"><strong>3. Plan trial</strong><br><span class="small">Test with a small group of drivers and collect feedback.</span></div></div><div class="list"><div class="item"><strong>Good trial fit</strong><br><span class="muted">Delivery fleets, moving trucks, rideshare teams, overnight shifts, long commutes, and local transportation operators.</span></div><div class="item"><strong>Suggested trial structure</strong><br><span class="muted">Up to 5 drivers, 30 days, dashboard review, alert summaries, and driver feedback.</span></div></div><div class="notice"><strong>Prototype disclosure:</strong> Occulert is not a replacement for safe driving, rest breaks, or company safety policies. Contact information is sent to Occulert's protected server endpoint and is not saved in this browser.</div></div><form class="card" id="pilotForm" onsubmit="saveLead(event)"><h2>Request a fleet trial</h2><div class="two"><div class="field"><label for="name">Name</label><input id="name" name="name" autocomplete="name" placeholder="Your name" required></div><div class="field"><label for="role">Role</label><input id="role" name="role" autocomplete="organization-title" placeholder="Owner, manager, dispatcher"></div></div><div class="field"><label for="company">Company</label><input id="company" name="company" autocomplete="organization" placeholder="Company name" required></div><div class="two"><div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" placeholder="name@company.com" required></div><div class="field"><label for="phone">Phone</label><input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="Optional"></div></div><div class="two"><div class="field"><label for="fleet">Fleet size</label><select id="fleet" name="fleet"><option>1–5 vehicles</option><option>6–25 vehicles</option><option>26–100 vehicles</option><option>100+ vehicles</option></select></div><div class="field"><label for="useCase">Use case</label><select id="useCase" name="useCase"><option>Delivery / logistics</option><option>Moving trucks</option><option>Rideshare / taxi</option><option>Construction / field crews</option><option>Other</option></select></div></div><div class="two"><div class="field"><label for="plan">Interested plan</label><select id="plan" name="plan" aria-describedby="planNote"><option value="conversation">Exploratory conversation</option><option value="free-trial">Free Trial — 30 days</option><option value="starter">Starter — $9/month</option><option value="growth">Growth — $25/month</option><option value="custom">Custom fleet scope</option></select></div><div class="field"><label for="timeline">Desired start</label><select id="timeline" name="timeline" required><option value="" selected disabled>Choose a start window</option><option value="within-30-days">Within 30 days</option><option value="one-to-three-months">1–3 months</option><option value="three-plus-months">More than 3 months</option><option value="exploring">Exploring options</option></select></div></div><p class="field-note" id="planNote">Choose the closest plan. The free trial requires no credit card; paid service starts only after a separate agreement.</p><div class="field"><label for="goal">Primary operating goal</label><select id="goal" name="goal" required><option value="" selected disabled>Choose a primary goal</option><option value="participation">Validate driver participation</option><option value="manager-workflow">Reduce manager review time</option><option value="coaching">Support coaching conversations</option><option value="broader-rollout">Prepare a broader rollout</option><option value="other">Other</option></select></div><div class="field"><label for="message">Message</label><textarea id="message" name="message" placeholder="Tell us about your drivers, routes, shift times, or safety goals"></textarea></div><div class="field" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div><button class="btn primary" id="saveBtn" type="submit" style="width:100%">Send Fleet Request</button><div class="success" id="success" role="status">Fleet request sent securely.</div><div class="error" id="error" role="alert">Something went wrong. Please check the required fields and try again.</div></form></section></main>
-<script src="/pilot-signup-page-2.v60.js"></script>
-<footer style="text-align:center;padding:28px 16px 24px;border-top:1px solid #1e293b;color:#4a6070;font-size:12px;margin-top:40px"><a href="/" style="color:#60a5fa;text-decoration:none;font-weight:700">Occulert</a> &nbsp;·&nbsp; <a href="/privacy.html" style="color:#4a6070;text-decoration:none">Privacy</a> &nbsp;·&nbsp; <a href="/safety.html" style="color:#4a6070;text-decoration:none">Safety</a> &nbsp;·&nbsp; <a href="/app.html" style="color:#4a6070;text-decoration:none">Driver App</a><div style="margin-top:8px">© 2026 Occulert. Prototype — not a substitute for rest or safe driving.</div></footer>
-</body></html>
+<body>
+  <div class="top">
+    <div class="brand">Occulert Fleet Request</div>
+    <nav class="nav" aria-label="Fleet request navigation">
+      <a class="btn" href="/">Home</a>
+      <a class="btn" href="/fleet-pricing.html">Fleet Plans</a>
+      <a class="btn" href="/fleet-dashboard.html">Dashboard</a>
+      <a class="btn" href="/app.html">Launch App</a>
+    </nav>
+  </div>
+  <main class="wrap">
+    <section class="hero" aria-labelledby="requestTitle">
+      <div>
+        <div class="pill" id="requestPill">Managed early access</div>
+        <h1 id="requestTitle">Tell us about your fleet</h1>
+        <p class="muted" id="requestIntro">Send a short request to discuss a small, voluntary evaluation of Occulert's driver alerts and manager workflow. Occulert is a prototype and may miss fatigue events or give false alerts.</p>
+        <div class="steps" aria-label="How the request works">
+          <div class="step"><strong>1. Send a request</strong><br><span class="small">Share who to contact and the fleet size.</span></div>
+          <div class="step"><strong>2. Confirm the scope</strong><br><span class="small">Discuss devices, consent, support and the operating goal.</span></div>
+          <div class="step"><strong>3. Start after agreement</strong><br><span class="small">We confirm the start date and available features before enrollment.</span></div>
+        </div>
+        <div class="list">
+          <div class="item"><strong>Free trial</strong><br><span class="muted">Proposed 30 days with up to five willing drivers. No credit card and no automatic renewal.</span></div>
+          <div class="item"><strong>Paid rollout</strong><br><span class="muted">Review scope and introductory pricing together. Sending this form does not activate paid service.</span></div>
+        </div>
+        <div class="notice"><strong>Safety and privacy:</strong> Set up and review Occulert while parked. It cannot make tired driving safe or replace rest and fleet policy. Your contact details are sent to Occulert's protected request endpoint and are not stored in this browser. Read the <a href="/privacy.html">privacy policy</a>.</div>
+      </div>
+      <form class="card" id="pilotForm" onsubmit="saveLead(event)">
+        <h2 id="formTitle">Request a conversation</h2>
+        <p class="field-note" id="formIntro">This sends your interest to Occulert. It does not create an account, reserve a trial date or charge you.</p>
+        <div class="field"><label for="name">Name</label><input id="name" name="name" autocomplete="name" maxlength="160" placeholder="Your name" required></div>
+        <div class="field"><label for="company">Company</label><input id="company" name="company" autocomplete="organization" maxlength="220" placeholder="Company or fleet name" required></div>
+        <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" maxlength="240" placeholder="name@company.com" required></div>
+        <div class="two">
+          <div class="field"><label for="fleet">Fleet size <span class="optional">(optional)</span></label><select id="fleet" name="fleet"><option value="">Choose later</option><option>1–5 vehicles</option><option>6–25 vehicles</option><option>26–100 vehicles</option><option>100+ vehicles</option></select></div>
+          <div class="field"><label for="plan">Interested plan</label><select id="plan" name="plan" aria-describedby="planNote"><option value="conversation">Exploratory conversation</option><option value="free-trial">Free Trial — 30 days</option><option value="starter">Starter — $9/month</option><option value="growth">Growth — $25/month</option><option value="custom">Custom fleet scope</option></select></div>
+        </div>
+        <p class="field-note" id="planNote">Plans are proposed introductory offers. We confirm availability and terms in writing before a trial or paid rollout.</p>
+        <div class="field"><label for="message">What would you like to evaluate? <span class="optional">(optional)</span></label><textarea id="message" name="message" maxlength="800" placeholder="For example, driver participation or manager reports"></textarea></div>
+        <div class="field" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+        <button class="btn primary" id="saveBtn" type="submit" style="width:100%">Send Fleet Request</button>
+        <div class="success" id="success" role="status"></div>
+        <div class="error" id="error" role="alert"></div>
+        <div class="next-steps" id="nextSteps" hidden><strong>Explore the setup while your request is reviewed:</strong> <a href="/login.html?mode=signup">Create an account</a> or <a href="/fleet-onboarding.html">open fleet setup</a> if you already have one. Trial dates and paid access are confirmed separately.</div>
+      </form>
+    </section>
+  </main>
+  <script src="/pilot-signup-page-2.v68.js"></script>
+  <footer style="text-align:center;padding:28px 16px 24px;border-top:1px solid #1e293b;color:#4a6070;font-size:12px;margin-top:40px"><a href="/" style="color:#60a5fa;text-decoration:none;font-weight:700">Occulert</a> &nbsp;·&nbsp; <a href="/privacy.html" style="color:#4a6070;text-decoration:none">Privacy</a> &nbsp;·&nbsp; <a href="/safety.html" style="color:#4a6070;text-decoration:none">Safety</a> &nbsp;·&nbsp; <a href="/app.html" style="color:#4a6070;text-decoration:none">Driver App</a><div style="margin-top:8px">© 2026 Occulert. Prototype — not a substitute for rest or safe driving.</div></footer>
+</body>
+</html>

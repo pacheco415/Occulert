@@ -151,14 +151,14 @@ export function ParkedReadinessCard() {
       </TouchableOpacity>
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel="Open settings and alert tests"
-        accessibilityHint="Opens alert settings and parked audio and Watch tests"
+        accessibilityLabel="Check phone and Watch alerts while parked"
+        accessibilityHint="Opens settings where you can play a phone alert and send an optional Watch alert"
         onPress={() => router.push('/settings')}
         style={styles.secondaryButton}
       >
-        <Text style={styles.secondaryText}>Open settings and alert tests</Text>
+        <Text style={styles.secondaryText}>Check alert sound, vibration, and Watch</Text>
       </TouchableOpacity>
-      <Text style={styles.note}>This does not test fatigue or confirm that it is safe to drive. Cameras start only if you run the parked live test.</Text>
+      <Text style={styles.note}>While parked, confirm you actually hear or feel a phone alert through your current audio setup. A Watch delivery acknowledgment does not prove an alert was noticed. This check does not test fatigue or confirm it is safe to drive.</Text>
     </View>
   );
 }

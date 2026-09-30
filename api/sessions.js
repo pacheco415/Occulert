@@ -10,6 +10,7 @@ const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const MAX_BODY_LENGTH = 4096;
+const PIPELINES = new Set(["web_mediapipe_ear", "ios_mlkit_eye_probability", "android_mlkit_eye_probability"]);
 
 function json(response, status, body) {
 response.statusCode = status;
@@ -24,6 +25,12 @@ if (typeof value === "string" && !value.trim()) return null;
 const n = Number(value);
 if (!Number.isFinite(n)) return null;
 return Math.max(min, Math.min(max, n));
+}
+
+function provenanceText(value, maxLength) {
+if (typeof value !== "string") return null;
+const text = value.trim();
+return text && text.length <= maxLength && /^[a-zA-Z0-9._() -]+$/.test(text) ? text : null;
 }
 
 function isJsonRequest(request) {
@@ -74,6 +81,9 @@ fleet_id: driver.fleet_id,
 started_at: new Date().toISOString(),
 device: body.device ? String(body.device).slice(0, 120) : null,
 browser: body.browser ? String(body.browser).slice(0, 240) : null,
+detector_pipeline: PIPELINES.has(body.detector_pipeline) ? body.detector_pipeline : null,
+detector_version: provenanceText(body.detector_version, 80),
+app_version: provenanceText(body.app_version, 80),
 },
 });
 return json(response, 200, { ok: true, session: created[0] });

@@ -23,10 +23,10 @@ test('pilot launch state progresses only from protected-record inputs', () => {
     firstSessionReady: false,
     sessionCount: 0,
     displayReady: false,
-    sevenDayReady: false,
-    thirtyDayReady: false,
-    pilotDay: 0,
-    pilotAgeLimited: false,
+    sevenDayDataReady: false,
+    thirtyDayDataReady: false,
+    recordedAgeDays: 0,
+    historyLimited: false,
   });
 
   const active = state({
@@ -44,30 +44,30 @@ test('pilot launch state progresses only from protected-record inputs', () => {
   assert.equal(active.overPilotTarget, true);
   assert.equal(active.sessionCount, 2);
   assert.equal(active.displayReady, true);
-  assert.equal(active.sevenDayReady, true);
-  assert.equal(active.thirtyDayReady, true);
-  assert.equal(active.pilotDay, 30);
+  assert.equal(active.sevenDayDataReady, true);
+  assert.equal(active.thirtyDayDataReady, true);
+  assert.equal(active.recordedAgeDays, 35);
 });
 
-test('future and invalid starts cannot launch a pilot; latest-50 age is a lower bound', () => {
+test('future and invalid starts cannot establish recorded-data age; latest 50 bound the view', () => {
   const now = Date.parse('2026-09-26T12:00:00Z');
   const future = state({ now, sessions: [{ started_at: '2026-09-27T12:00:00Z' }, { started_at: 'invalid' }] });
   assert.equal(future.firstSessionReady, false);
   assert.equal(future.sessionCount, 0);
-  assert.equal(future.pilotDay, 0);
+  assert.equal(future.recordedAgeDays, 0);
 
   const sessions = Array.from({ length: 155 }, (_, i) => ({ started_at: new Date(now - i * 0.2 * 86400000).toISOString() }));
   const limited = state({ now, sessions });
   assert.equal(limited.sessionCount, 50);
-  assert.equal(limited.pilotAgeLimited, true);
-  assert.equal(limited.pilotDay, 10);
-  assert.equal(limited.sevenDayReady, true);
-  assert.equal(limited.thirtyDayReady, false, 'an omitted old record must not imply a complete 30-day window');
-  assert.equal(state({ now, sessions: [{ started_at: new Date(now - 30 * 86400000).toISOString() }, ...sessions] }).thirtyDayReady, true,
-    'a recorded start at least 30 days old supports the lower bound');
+  assert.equal(limited.historyLimited, true);
+  assert.equal(limited.recordedAgeDays, 9);
+  assert.equal(limited.sevenDayDataReady, true);
+  assert.equal(limited.thirtyDayDataReady, false, 'an omitted old record must not imply an older loaded session');
+  assert.equal(state({ now, sessions: [{ started_at: new Date(now - 30 * 86400000).toISOString() }, ...sessions] }).thirtyDayDataReady, true,
+    'a recorded start 30 days old supports an oldest-loaded-session statement');
 });
 
-test('capped launch UI labels unknown pilot age and known lower bounds', () => {
+test('capped launch UI describes loaded data age without inventing trial dates', () => {
   const now = Date.parse('2026-09-26T12:00:00Z'), elements = new Map();
   class ClockDate extends Date { static now() { return now; } }
   const ui = { Date: ClockDate, fleetMode: true, protectedFleetName: 'Fleet', protectedDrivers: [{ active: true }],
@@ -81,18 +81,21 @@ test('capped launch UI labels unknown pilot age and known lower bounds', () => {
     ui.renderPilotLaunchChecklist();
   };
   render(1);
-  assert.equal(elements.get('pilotLaunchBadge').textContent, 'At least day 2 · limited history');
+  assert.equal(elements.get('pilotLaunchBadge').textContent, 'Earliest loaded session: 1 day ago · latest 50');
   assert.equal(elements.get('launchSessionStatus').textContent, '50 recent protected sessions recorded · 50-record limit');
-  assert.equal(elements.get('launchReviewStatus').textContent, 'Pilot age unknown · earlier sessions may be omitted');
+  assert.equal(elements.get('launchReviewStatus').textContent, 'Recorded sessions available · use agreed review dates');
+  assert.equal(elements.get('launchReviewStep').dataset.state, 'available');
   render(7);
-  assert.equal(elements.get('launchReviewStatus').textContent, 'At least 7 days recorded · review available');
+  assert.equal(elements.get('launchReviewStatus').textContent, 'Oldest loaded session is at least 7 days old · use agreed review dates');
   render(30);
-  assert.equal(elements.get('pilotLaunchBadge').textContent, '30-day review ready · limited history');
-  assert.equal(elements.get('launchReviewStatus').textContent, 'At least 30 days recorded · review available');
+  assert.equal(elements.get('pilotLaunchBadge').textContent, 'Earliest loaded session: 30 days ago · latest 50');
+  assert.equal(elements.get('launchReviewStatus').textContent, 'Oldest loaded session is at least 30 days old · use agreed review dates');
+  assert.equal(elements.get('launchReviewStep').dataset.state, 'available');
 });
 
 test('pilot checklist exposes the approved manager actions without creating new telemetry', () => {
   assert.match(dashboard, /30-day pilot checklist/);
+  assert.match(dashboard, /Recorded sessions do not start a trial/);
   assert.match(dashboard, /href="\/fleet-onboarding\.html">Invite drivers/);
   assert.match(dashboard, /href="\/app\.html">Open driver app/);
   assert.match(dashboard, /href="\/fleet-display\.html">Open TV display/);

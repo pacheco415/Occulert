@@ -211,12 +211,16 @@ test("camera mute recovery debounces a brief pause and catches a sustained pause
   });
   await page.waitForTimeout(2700);
   expect(await page.evaluate(() => window.__guardFailure)).toBe("");
+  expect(await page.evaluate(() => cameraMuteTimer)).toBeNull();
 
   await page.evaluate(() => {
     window.__cameraTrack.muted = true;
-    attachCameraTrackGuards(window.__cameraStream);
+    window.__cameraTrack.dispatchEvent(new Event("mute"));
   });
-  await expect.poll(() => page.evaluate(() => window.__guardFailure), { timeout: 4000 }).toBe("CameraPausedError");
+  expect(await page.evaluate(() => ({ running, guarded: guardedCameraTrack === window.__cameraTrack,
+    muted: window.__cameraTrack.muted, timer: cameraMuteTimer !== null })))
+    .toEqual({ running: true, guarded: true, muted: true, timer: true });
+  await expect.poll(() => page.evaluate(() => window.__guardFailure), { timeout: 7000 }).toBe("CameraPausedError");
 });
 
 

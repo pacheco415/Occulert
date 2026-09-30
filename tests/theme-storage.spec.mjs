@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 for (const operation of ['read', 'write']) {
   for (const [label, path, script] of [
-    ['homepage', '/', '/homepage.v60.js'],
-    ['public', '/faq.html', '/public-page.v60.js'],
+    ['homepage', '/', '/homepage.v67.js'],
+    ['public', '/faq.html', '/public-page.v67.js'],
     ['static', '/product-hub.html', '/static-page.v60.js'],
   ]) {
     test(`${label} controls remain usable with blocked theme ${operation}`, async ({ page }) => {
