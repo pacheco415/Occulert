@@ -1,0 +1,35 @@
+name: CI Policy
+
+# pull_request_target runs even when a PR's head commit requests a CI skip.
+# Only inspect GitHub metadata here; do not check out or execute PR code.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  skip-token-guard:
+    name: Reject CI skip tokens
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title and every commit message
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const skipToken = /\[(?:skip ci|ci skip)\]/i;
+            const pull = context.payload.pull_request;
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              ...context.repo,
+              pull_number: pull.number,
+              per_page: 100,
+            });
+            const locations = [];
+            if (skipToken.test(pull.title)) locations.push('PR title');
+            for (const commit of commits) {
+              if (skipToken.test(commit.commit.message)) locations.push(`commit ${commit.sha.slice(0, 7)}`);
+            }
+            if (locations.length) {
+              core.setFailed(`CI skip token found in ${locations.join(', ')}. Remove it so all required checks run.`);
+            }
