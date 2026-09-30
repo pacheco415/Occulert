@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { assetByStem } from './lib/current-assets.mjs';
 
-const source = name => readFileSync(new URL(`../${name}.v60.js`, import.meta.url), 'utf8');
+const source = name => readFileSync(new URL(`../${assetByStem(`${name}.js`)}`, import.meta.url), 'utf8');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function deferred() { let resolve; const promise = new Promise(yes => { resolve = yes; }); return { promise, resolve }; }
 const session = id => ({ access_token: 'access-' + id, refresh_token: 'refresh-' + id, expires_at: Math.floor(Date.now()/1000)+3600, user: { id, email: id+'@example.com' } });
@@ -32,8 +33,8 @@ async function boot(page='account-page-2', initial='A', options={}) {
       const owner=String(options.headers?.Authorization||'').replace('Bearer access-','');
       let body={ok:true};
       if(url==='/api/fleets')body={ok:true,fleet:{id:'fleet-'+owner,company_name:'Fleet '+owner}};
-      if(url==='/api/fleet-invitations'&&(!options.method||options.method==='GET'))body={ok:true,invitations:[{id:'11111111-1111-4111-8111-111111111111',email:'Private-'+owner+'@example.com',created_at:'2026-01-01',expires_at:'2099-01-01'}]};
-      if(url==='/api/fleet-invitations'&&options.method==='POST')body={ok:true,invitation:{id:'fixture',email:'new-'+owner+'@example.com',accept_path:'/accept-invite.html#token=secret-'+owner}};
+      if(url==='/api/fleet-invitations'&&(!options.method||options.method==='GET'))body={ok:true,fleet:{id:'fleet-'+owner},invitations:[{id:'11111111-1111-4111-8111-111111111111',email:'Private-'+owner+'@example.com',created_at:'2026-01-01T00:00:00Z',expires_at:'2099-01-01T00:00:00Z',accepted_at:null,revoked_at:null}]};
+      if(url==='/api/fleet-invitations'&&options.method==='POST')body={ok:true,invitation:{id:'11111111-1111-4111-8111-111111111111',email:'new-'+owner+'@example.com',expires_at:'2099-01-01T00:00:00Z',accept_path:'/accept-invite.html#token='+('secret-'+owner).padEnd(43,'x')}};
       return new Response(JSON.stringify(body));
     },
   };
@@ -42,7 +43,7 @@ async function boot(page='account-page-2', initial='A', options={}) {
   context.OcculertSupabaseLoader={load:async()=>sdk,retry:async()=>sdk};
   vm.runInContext(source('passwordless-auth'),context);
   context.OcculertPasskeys={isSupported:()=>true,message:()=> 'mapped',canRetry:()=>false,async list(){const owner=context.OcculertBackend.currentUser()?.id;calls.push({action:'list-passkeys',owner});return hooks.passkeys?hooks.passkeys(owner):[{id:'11111111-1111-4111-8111-111111111111',friendly_name:'Private key '+owner}]},async register(){calls.push({action:'register'})},async remove(){calls.push({action:'remove'})},async rename(){calls.push({action:'rename'})},async retry(){calls.push({action:'retry'})},async signOutLocal(){}};
-  vm.runInContext(source(page),context,{filename:page+'.v60.js'});await tick();await tick();
+  vm.runInContext(source(page),context,{filename:assetByStem(`${page}.js`)});await tick();await tick();
   return {context,backend:context.OcculertBackend,store,calls,hooks,el,cleanup(){timers.forEach(clearTimeout)},switchTo(id,event=true){if(id)store.set('occulert-auth',JSON.stringify(session(id)));else store.delete('occulert-auth');if(event)for(const fn of listeners.get('storage')||[])fn({key:'occulert-auth'})},storageEvent(key='occulert-auth'){for(const fn of listeners.get('storage')||[])fn({key})},focusEvent(){for(const fn of listeners.get('focus')||[])fn()},visibilityEvent(){context.document.hidden=false;for(const fn of documentListeners.get('visibilitychange')||[])fn()}};
 }
 const preventDefault=()=>{};
