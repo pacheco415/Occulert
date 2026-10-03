@@ -43,13 +43,12 @@ function boot({ existing = false, outcomes = [] } = {}) {
   return { loader: window.OcculertSupabaseLoader, appended, outcomes };
 }
 
-test('the pinned same-origin SDK proxy is attempted before the verified CDN fallback', async () => {
-  const { loader, appended } = boot({ outcomes: ['error', 'load'] });
+test('the pinned owned SDK loads without a runtime CDN fallback', async () => {
+  const { loader, appended } = boot({ outcomes: ['load'] });
   await loader.load();
 
   assert.deepEqual(appended, [
-    '/vendor/supabase-2.112.3.min.js',
-    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js',
+    '/vendor/supabase-2.112.3.js',
   ]);
   assert.equal(loader.state().ready, true);
   assert.equal(loader.state().error, null);
@@ -57,13 +56,13 @@ test('the pinned same-origin SDK proxy is attempted before the verified CDN fall
 });
 
 test('a failed Safari SDK load can be retried from the same-origin source', async () => {
-  const { loader, appended, outcomes } = boot({ outcomes: ['error', 'error'] });
+  const { loader, appended, outcomes } = boot({ outcomes: ['error'] });
   await assert.rejects(loader.load(), (error) => error.code === 'sdk_load_failed');
   assert.equal(loader.state().error, 'sdk_load_failed');
 
   outcomes.push('load');
   await loader.retry();
-  assert.equal(appended.at(-1), '/vendor/supabase-2.112.3.min.js');
+  assert.equal(appended.at(-1), '/vendor/supabase-2.112.3.js');
   assert.equal(loader.state().ready, true);
 });
 
