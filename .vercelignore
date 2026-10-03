@@ -14,4 +14,6 @@ playwright.config.mjs
 test-results/
 playwright-report/
 
+.verification-receipts/
+
 asset-size-budgets.json
