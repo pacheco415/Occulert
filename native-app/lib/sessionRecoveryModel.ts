@@ -52,7 +52,9 @@ function validMetricObject(value: unknown): boolean {
   return Object.entries(value).every(([key, item]) => {
     if (typeof item === 'number') return finiteNonnegative(item);
     if (item !== null && typeof item === 'object') return validMetricObject(item);
-    return (item === null && key === 'timeToFirstSampleMs') || typeof item === 'string' || typeof item === 'boolean';
+    return (item === null && key === 'timeToFirstSampleMs')
+      || (typeof item === 'string' && ['mode', 'status'].includes(key))
+      || (typeof item === 'boolean' && ['checked', 'moduleAvailable', 'paired', 'appInstalled', 'reachable'].includes(key));
   });
 }
 

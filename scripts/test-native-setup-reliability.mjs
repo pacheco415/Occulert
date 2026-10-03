@@ -160,6 +160,8 @@ test('checkpoint parser preserves malformed numerical and nested records as unre
     { alertCount: 0.5 }, { avgFatigue: -1 }, { maxFatigue: 101 },
     { headNodObservations: 0.5 }, { monitorPerformance: [] },
     { monitorPerformance: { samples: -1 } },
+    { monitorPerformance: { samples: "invalid" } },
+    { monitorPerformance: { averageInferenceMs: true } },
     { sensorFusion: { camera: { samples: Infinity } } },
   ];
   for (const overrides of invalid) {
