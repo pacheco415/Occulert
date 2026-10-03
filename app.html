@@ -12,7 +12,7 @@
 <!-- Run before any stylesheet or dependency can hold up the driver page. -->
 <script id="driver-startup-guard">
 (() => {
-  const corePath = '/driver-app.v70.js';
+  const corePath = '/driver-app.v71.js';
   let state = 'loading';
   const byId = id => document.getElementById(id);
   const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
@@ -127,6 +127,7 @@
   </div>
   <aside class="panel" aria-label="Occulert controls and metrics">
     <h1 style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>
+<p id="timingExperimentNotice" class="notice" hidden>Experimental timing mode. Parked testing only; session data stays on this device.</p>
 
     <div class="card notice-card" id="startupNotice" role="status" aria-live="polite">
       <h2 id="startupTitle" style="font-size:18px;margin:0 0 8px">Loading app…</h2>
@@ -264,9 +265,9 @@
     </fieldset>
 </aside>
 </main>
-<script src="/occulert-backend.v69.js"></script>
+<script src="/occulert-backend.v71.js"></script>
 <script src="/security-utils.v47.js"></script>
-<script src="/driver-app.v70.js"></script>
+<script src="/driver-app.v71.js"></script>
 <script src="/lang.v47.js" defer></script>
 
 <!-- iOS Add to Home Screen Modal -->

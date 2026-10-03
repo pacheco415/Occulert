@@ -1,0 +1,9 @@
+# Elapsed fatigue experiment
+
+The default web alert pipeline is unchanged. `/app.html?fatigue-timing=elapsed` selects a parked, local-only experiment that scales continuous fatigue and confidence increments/decrements by elapsed time divided by the released 135 ms cadence. Browser elapsed time uses the monotonic performance clock; observed intervals are clamped to 0–500 ms. The first valid frame and a first frame following missing tracking receive zero elapsed credit. Head-nod penalties remain discrete event penalties.
+
+Cloud session sync is disabled in this mode. Local session records declare `elapsed-135ms-experiment` and detector version `web-ear-elapsed-experiment-1`; the UI identifies parked testing. Existing consent and default alert settings are unchanged on ordinary app loads. Source app versions now identify web-v71.
+
+Run `node benchmark/compare-fatigue-cadence.mjs receipt.json` for a source-hashed synthetic comparison using the actual current driver accumulator. With sustained closed-eye input, confirmed high confidence and default thresholds, the released score reaches its alert boundary at 1,333.33/571.43/266.67 ms for 3/7/15 fps. The elapsed experiment reaches it at 666.67/714.29/666.67 ms, a spread of 47.62 ms. These are scoring boundaries, not end-to-end notification delivery or measured driver accuracy.
+
+Limits: sampling quantization remains. A universal 150 ms bound for arbitrary transitions is impossible to establish from this one fixture at 3 fps. EAR smoothing, frame-count PERCLOS, calibration and existing eye/mouth/cooldown episode timers remain separate algorithms. They may still depend on sampling or wall-clock time. This experiment does not validate those algorithms, real phones, alert delivery, battery use or accuracy. Keep it optional until a complete benchmark and physical validation support any default change.
