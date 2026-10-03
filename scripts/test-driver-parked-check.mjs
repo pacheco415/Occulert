@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
+const manifest=JSON.parse(readFileSync(new URL('../asset-versions.json',import.meta.url),'utf8'));
+const historyData=require('../'+manifest['local-history.js']);
 
 const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
 const asset = html.match(/<script src="\/(driver-app\.v\d+\.js)"><\/script>/)?.[1];
@@ -95,6 +99,7 @@ test('post-drive review writes only to matching local history', () => {
     Date,
     JSON,
   };
+  context.browserHistoryStore=()=>historyData.create(context.localStorage);
   vm.runInNewContext(registration, context);
   submit({ preventDefault() {} });
   const rows = JSON.parse(stored);

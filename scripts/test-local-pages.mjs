@@ -25,6 +25,10 @@ function harness(asset, initial = {}) {
     element('plan').value = 'conversation';
     element('plan').form = { elements: { fleet: element('fleet') } };
   }
+  if (asset === 'session-history-page-2.js') {
+    context.window=context;
+    vm.runInContext(readFileSync(new URL('../'+versions['local-history.js'],import.meta.url),'utf8'),context);
+  }
   vm.runInContext(readFileSync(new URL('../' + versions[asset], import.meta.url), 'utf8'), context);
   return { context, storage, elements, element, localStorage, alerts, timers };
 }
