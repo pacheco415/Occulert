@@ -371,7 +371,7 @@
       ]
     },
     {
-      "source": "/(.*)\\.v70\\.(js|css)",
+      "source": "/(.*)\\.v69\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -380,7 +380,7 @@
       ]
     },
     {
-      "source": "/(.*)\\.v69\\.(js|css)",
+      "source": "/(.*)\\.v70\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",

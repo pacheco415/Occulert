@@ -48,3 +48,14 @@ test('fleet History ignores invalid saved dates and clears its view on account c
   await expect(page.locator('#historySort')).toHaveValue('newest');
   expect(await page.evaluate(key=>localStorage.getItem(key),KEY)).toBeNull();
 });
+
+test('fleet History invalid ranges remain editable and recover without a page reload',async({page})=>{
+ await fixture(page,'all');await page.goto('/fleet-history.html');await expect(page.locator('#historyFilters')).toBeEnabled();
+ await page.locator('#historyPeriod').selectOption('custom');
+ await page.locator('#historyFrom').fill('2099-01-01');await page.locator('#historyFrom').dispatchEvent('change');
+ await expect(page.locator('#historyDateStatus')).toContainText('today or earlier');
+ await expect(page.locator('#historyFrom')).toBeEnabled();
+ await page.locator('#historyFrom').fill('2026-01-01');await page.locator('#historyFrom').dispatchEvent('change');
+ await expect(page.locator('#historyFilters')).toBeEnabled();
+ await expect(page.locator('#historyDateStatus')).not.toContainText('today or earlier');
+});

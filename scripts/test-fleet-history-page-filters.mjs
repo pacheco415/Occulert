@@ -150,3 +150,16 @@ test('History storage denial preserves browsing and an account change clears act
   assert.equal(app.elements.get('historySort').value, 'newest');
   assert.equal(app.elements.get('historyList').children.length, 0);
 });
+
+test('invalid and future History ranges can be corrected without losing verified controls', async () => {
+ const app=harness();await settle();
+ app.elements.get('historyPeriod').value='custom';app.elements.get('historyPeriod').trigger('change');
+ app.elements.get('historyFrom').value='2026-02-30';app.elements.get('historyFrom').trigger('change');await settle();
+ assert.equal(app.requests.length,1);assert.equal(app.elements.get('historyFilters').disabled,false);
+ assert.match(app.elements.get('historyDateStatus').textContent,/valid From/);
+ app.elements.get('historyFrom').value='2099-01-01';app.elements.get('historyFrom').trigger('change');await settle();
+ assert.equal(app.requests.length,1);assert.equal(app.storage.has(preferenceKey),false);
+ assert.match(app.elements.get('historyDateStatus').textContent,/today or earlier/);
+ app.elements.get('historyFrom').value='2026-01-01';app.elements.get('historyFrom').trigger('change');await settle();
+ assert.equal(app.requests.length,2);assert.equal(app.elements.get('historyFilters').disabled,false);
+});
