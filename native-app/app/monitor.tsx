@@ -603,10 +603,10 @@ export default function MonitorScreen() {
     const durationSec = elapsedSessionSeconds(sessionStartedAtRef.current, stoppedAt);
     const alerts = alertCountRef.current;
     const activeSessionId = activeSessionIdRef.current;
-    const averageFatigue = fatigueSamplesRef.current
+    const averageFatigue = fatigueSamplesRef.current > 0
       ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
-      : 0;
-    const maxFatigue = maxFatigueRef.current;
+      : null;
+    const maxFatigue = fatigueSamplesRef.current > 0 ? maxFatigueRef.current : null;
     const cloudSession = cloudSessionRef.current;
     const pendingEvents = cloudEventQueueRef.current;
     const monitorPerformance = performanceTrackerRef.current.snapshot(stoppedAt);

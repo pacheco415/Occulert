@@ -17,6 +17,20 @@ test('completed records preserve fields, replace only their identity and retain 
  assert.equal(rows[0].appVersion,'1.0.0');assert.equal(rows[1].unknown,0);assert.ok(Number.isFinite(Date.parse(rows[0].savedAt)));
 });
 
+test('unobserved local averages stay unknown while a sampled zero remains zero',async()=>{
+ for (const [sum,count,expected] of [[0,0,null],[0,2,0],[50,-1,null],[Infinity,2,null],[50,1.5,null],[201,2,null]]) {
+  let rows=[];await saveCompletedNativeSession({...snapshot,fatigueSum:sum,fatigueSamples:count},async update=>{rows=update(rows)});
+  assert.equal(rows[0].avgFatigue,expected);assert.equal(rows[0].alertCount,2);
+ }
+});
+
+test('unobserved cloud scores stay unknown while valid zero fatigue can score 100',async()=>{
+ for (const [maximum,expected] of [[null,null],[0,100],[NaN,null],[101,null]]) {
+  let sent;await finalizeCompletedNativeSession({cloudSession:Promise.resolve('cloud'),pendingEvents:Promise.resolve(),averageFatigue:maximum,maxFatigue:maximum,alerts:0,endedAt:'2026-10-03T12:00:00.000Z'},'local',{finish:async(id,stats)=>{sent=stats;return false},markSynced:async()=>assert.fail('uncertain response')});
+  assert.equal(sent.safetyScore,expected);assert.equal(sent.alertCount,0);
+ }
+});
+
 test('zero-duration completion does not write and a failed save remains a failure',async()=>{
  assert.equal(await saveCompletedNativeSession({...snapshot,durationSec:0},async()=>{throw Error('unexpected')}),null);
  await assert.rejects(saveCompletedNativeSession(snapshot,async()=>{throw Error('disk unavailable')}),/disk unavailable/);
@@ -64,17 +78,18 @@ test('badge writes preserve unrelated records and storage failure is best effort
 });
 
 
-test('the actual monitor disarms before saving and ignores a concurrent stop',async()=>{
+test('the actual monitor preserves unobserved metrics, disarms before saving and ignores a concurrent stop',async()=>{
+ for (const sampleCount of [0,2]) {
  const source=readFileSync(new URL('../native-app/app/monitor.tsx',import.meta.url),'utf8');
  const start=source.indexOf('  const handleStop = useCallback('),end=source.indexOf('  // App-state and hardware-back',start);assert.ok(start>=0&&end>start);
  const pendingSave=deferred(),order=[];
  class FixedDate extends Date {static now(){return 12000}}
  const ref=current=>({current});
  const context={Date:FixedDate,useCallback:fn=>fn,__DEV__:false,elapsedSessionSeconds,completeNativeSessionStop,finalizeCompletedNativeSession,
-  startAttemptRef:ref(0),stoppingRef:ref(false),isRunningRef:ref(true),sessionStartedAtRef:ref(1000),alertCountRef:ref(2),activeSessionIdRef:ref('local'),fatigueSamplesRef:ref(2),fatigueSumRef:ref(40),maxFatigueRef:ref(40),cloudSessionRef:ref(Promise.resolve('cloud')),cloudEventQueueRef:ref(Promise.resolve()),performanceTrackerRef:ref({snapshot:()=>({bounded:true})}),monitoringActiveRef:ref(true),cameraRecoveringRef:ref(false),
+  startAttemptRef:ref(0),stoppingRef:ref(false),isRunningRef:ref(true),sessionStartedAtRef:ref(1000),alertCountRef:ref(2),activeSessionIdRef:ref('local'),fatigueSamplesRef:ref(sampleCount),fatigueSumRef:ref(sampleCount?40:0),maxFatigueRef:ref(40),cloudSessionRef:ref(Promise.resolve('cloud')),cloudEventQueueRef:ref(Promise.resolve()),performanceTrackerRef:ref({snapshot:()=>({bounded:true})}),monitoringActiveRef:ref(true),cameraRecoveringRef:ref(false),
   setIsStopping:value=>order.push('stopping:'+value),setSessionEndedAt:()=>{},setIsRunning:()=>{},setCameraRecovering:()=>{},reset:()=>order.push('reset'),stopHeadphoneMotion:()=>Promise.resolve(),
   saveSession:async(id,duration,alerts)=>{assert.equal(context.monitoringActiveRef.current,false);assert.equal(context.isRunningRef.current,false);assert.equal(context.cloudSessionRef.current,null);assert.equal(duration,11);assert.equal(alerts,2);order.push('save:'+id);await pendingSave.promise;return id},
-  clearActiveSessionCheckpoint:async()=>order.push('cleared'),finishCloudSession:async()=>{order.push('cloud');return true},markSessionSynced:async()=>order.push('badge'),
+  clearActiveSessionCheckpoint:async()=>order.push('cleared'),finishCloudSession:async(id,stats)=>{assert.equal(stats.averageFatigue,sampleCount?20:null);assert.equal(stats.maxFatigue,sampleCount?40:null);assert.equal(stats.safetyScore,sampleCount?58:null);order.push('cloud');return true},markSessionSynced:async()=>order.push('badge'),
  };
  vm.runInNewContext(stripTypeScriptTypes(source.slice(start,end))+'\nglobalThis.stop=handleStop;',context);
  const first=context.stop();await new Promise(resolve=>setImmediate(resolve));await context.stop();
@@ -82,4 +97,5 @@ test('the actual monitor disarms before saving and ignores a concurrent stop',as
  pendingSave.resolve();await first;
  assert.deepEqual(order,['stopping:true','reset','save:local','cleared','cloud','badge','stopping:false']);
  assert.equal(context.activeSessionIdRef.current,null);assert.equal(context.stoppingRef.current,false);
+ }
 });

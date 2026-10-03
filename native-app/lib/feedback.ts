@@ -29,7 +29,7 @@ export interface FeedbackSession {
   recoveredFromInterruption?: boolean;
   durationSec?: number;
   alertCount?: number;
-  avgFatigue?: number;
+  avgFatigue?: number | null;
   headNodObservations?: number;
   cameraHeadNodObservations?: number;
   headphoneHeadNodObservations?: number;

@@ -27,7 +27,10 @@ export async function saveCompletedNativeSession(snapshot: SavedSnapshot, update
     savedAt: new Date().toISOString(),
     durationSec: snapshot.durationSec,
     alertCount: snapshot.alerts,
-    avgFatigue: snapshot.fatigueSamples ? Math.round(snapshot.fatigueSum / snapshot.fatigueSamples) : 0,
+    avgFatigue: Number.isSafeInteger(snapshot.fatigueSamples) && snapshot.fatigueSamples > 0
+      && Number.isFinite(snapshot.fatigueSum) && snapshot.fatigueSum >= 0
+      && snapshot.fatigueSum <= snapshot.fatigueSamples * 100
+      ? Math.round(snapshot.fatigueSum / snapshot.fatigueSamples) : null,
     headNodObservations: snapshot.headNodObservations,
     cameraHeadNodObservations: snapshot.headNodObservations,
     headphoneHeadNodObservations: snapshot.headphoneHeadNodObservations,
@@ -54,8 +57,8 @@ export async function markCompletedNativeSessionSynced(update: HistoryUpdate, lo
 type CloudSnapshot = {
   cloudSession: Promise<string | null> | null;
   pendingEvents: Promise<unknown>;
-  averageFatigue: number;
-  maxFatigue: number;
+  averageFatigue: number | null;
+  maxFatigue: number | null;
   alerts: number;
   endedAt: string;
 };
@@ -67,7 +70,9 @@ export async function finalizeCompletedNativeSession(snapshot: CloudSnapshot, lo
   const cloudId = snapshot.cloudSession ? await snapshot.cloudSession.catch(() => null) : null;
   if (!cloudId) return;
   await snapshot.pendingEvents.catch(() => {});
-  const safetyScore = Math.max(0, 100 - Math.round(snapshot.maxFatigue * 0.65) - snapshot.alerts * 8);
+  const safetyScore = typeof snapshot.maxFatigue === 'number' && Number.isFinite(snapshot.maxFatigue)
+    && snapshot.maxFatigue >= 0 && snapshot.maxFatigue <= 100
+    ? Math.max(0, 100 - Math.round(snapshot.maxFatigue * 0.65) - snapshot.alerts * 8) : null;
   const synced = await services.finish(cloudId, {
     averageFatigue: snapshot.averageFatigue,
     maxFatigue: snapshot.maxFatigue,
