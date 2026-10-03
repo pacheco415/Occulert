@@ -30,6 +30,8 @@ import { useAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import * as Battery from 'expo-battery';
 import { Ionicons } from '@expo/vector-icons';
+import { EYE_BASELINE_EXPERIMENT, ParkedEyeBaseline } from '../lib/eyeBaselineModel';
+import { loadDeviceEyeBaseline, saveDeviceEyeBaseline } from '../lib/eyeBaselineStorage';
 import { useEyeTracking } from '../hooks/useEyeTracking';
 import { AlertSystem, type AlertTimingEvent } from '../components/AlertSystem';
 import { CameraSetupGuide } from '../components/CameraSetupGuide';
@@ -152,6 +154,17 @@ export default function MonitorScreen() {
   const [isStopping, setIsStopping] = useState(false);
   const [sensitivity, setSensitivity] = useState<SensitivityLevel>('medium');
   const [sensitivityLoaded, setSensitivityLoaded] = useState(false);
+  const [eyeBaseline, setEyeBaseline] = useState<number | null>(null);
+  const [baselineLoaded, setBaselineLoaded] = useState(!EYE_BASELINE_EXPERIMENT);
+  const [baselineBusy, setBaselineBusy] = useState(false);
+  const [baselineMessage, setBaselineMessage] = useState('Parked eye-baseline experiment · local sessions only.');
+  const baselineCollectorRef = useRef(new ParkedEyeBaseline());
+  const baselineGenerationRef = useRef(0);
+  const baselineFinishedRef = useRef(false);
+  const baselineCanSaveRef = useRef(false);
+  const baselineBusyRef = useRef(false);
+  const baselineMountedRef = useRef(true);
+  const sessionEyeBaselineRef = useRef<number | null>(null);
   const [sensorFault, setSensorFault] = useState<string | null>(null);
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [sessionEndedAt, setSessionEndedAt] = useState<number | null>(null);
@@ -223,7 +236,7 @@ export default function MonitorScreen() {
     keepAudioSessionActive: true,
   });
 
-  const { processEyeOpenness, processNoFace, reset } = useEyeTracking(sensitivity);
+  const { processEyeOpenness, processNoFace, reset } = useEyeTracking(sensitivity, EYE_BASELINE_EXPERIMENT ? eyeBaseline : null);
   const { detectFaces } = useFaceDetector(FACE_DETECTOR_OPTIONS);
 
   const deliverMonitoringPausedCue = useCallback(() => {
@@ -249,6 +262,20 @@ export default function MonitorScreen() {
     } else {
       performanceTrackerRef.current.recordWatchDelivery(event.decisionAt, event);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!EYE_BASELINE_EXPERIMENT) return;
+    let active = true;baselineMountedRef.current=true;
+    void loadDeviceEyeBaseline().then(value => {
+      if (!active) return;
+      baselineCanSaveRef.current = true;
+      setEyeBaseline(value);
+      setBaselineMessage(value === null ? 'While parked, open Setup check and look forward with eyes open for three seconds.' : 'Saved parked eye baseline · experimental local sessions only.');
+    }).catch(() => {
+      if (active) setBaselineMessage('Saved baseline unavailable. Current presets apply; use Recalibrate in Settings to reset it.');
+    }).finally(() => { if (active) setBaselineLoaded(true); });
+    return () => { active = false; baselineMountedRef.current=false;baselineGenerationRef.current += 1; };
   }, []);
 
   useEffect(() => {
@@ -349,9 +376,12 @@ export default function MonitorScreen() {
   }, [checkpointActiveSession, isRunning]);
 
   const toggleSetupPreview = useCallback(() => {
-    if (isRunningRef.current || startingRef.current || stoppingRef.current) return;
+    if (isRunningRef.current || startingRef.current || stoppingRef.current || baselineBusyRef.current) return;
     const next = !setupPreviewActiveRef.current;
     setupPreviewActiveRef.current = next;
+    baselineGenerationRef.current += 1;
+    baselineCollectorRef.current.reset();
+    baselineFinishedRef.current = false;
     lastCameraSetupUiAtRef.current = 0;
     setSetupPreviewActive(next);
     setCameraSetup(initialCameraSetupAssessment());
@@ -359,7 +389,7 @@ export default function MonitorScreen() {
   }, []);
 
   const handleStart = async () => {
-    if (startingRef.current || isStopping || !sensitivityLoaded) return;
+    if (startingRef.current || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusyRef.current) return;
     const startAttempt = startAttemptRef.current + 1;
     let reservedSessionId: string | null = null;
     let monitoringStarted = false;
@@ -435,6 +465,9 @@ export default function MonitorScreen() {
       }
 
       reset();
+      sessionEyeBaselineRef.current = eyeBaseline;
+      if(EYE_BASELINE_EXPERIMENT)setBaselineMessage(eyeBaseline===null?'Experimental local session uses current presets; no personal baseline was saved.':'Experimental local session uses the saved parked baseline.');
+      baselineGenerationRef.current += 1;
       setupPreviewActiveRef.current = false;
       setSetupPreviewActive(false);
       prevAlertingRef.current = false;
@@ -465,7 +498,7 @@ export default function MonitorScreen() {
       // delaying core camera monitoring, and discard any late result after the
       // session is cancelled or replaced.
       const headphoneStart = startHeadphoneMotion();
-      cloudSessionRef.current = beginCloudSession();
+      cloudSessionRef.current = EYE_BASELINE_EXPERIMENT ? Promise.resolve(null) : beginCloudSession();
       setAlertCount(0);
       alertCountRef.current = 0;
       hasCameraSampleRef.current = false;
@@ -543,6 +576,7 @@ export default function MonitorScreen() {
       monitorPerformance,
       sensorFusion: sensorFusionTrackerRef.current.snapshot(endedAt),
       sensitivity: sessionSensitivityRef.current,
+      ...(EYE_BASELINE_EXPERIMENT ? {eyeBaselineExperiment:{version:1,baseline:sessionEyeBaselineRef.current}} : {}),
       ...currentAppBuildInfo(),
     };
     await updateSessionHistory<Record<string, unknown>>((sessions) => [
@@ -714,6 +748,7 @@ export default function MonitorScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active' && setupPreviewActiveRef.current) {
+        baselineGenerationRef.current += 1;baselineCollectorRef.current.reset();
         setupPreviewActiveRef.current = false;
         setSetupPreviewActive(false);
         setCameraSetup(initialCameraSetupAssessment());
@@ -776,6 +811,7 @@ export default function MonitorScreen() {
   const handleCameraError = useCallback((error: CameraRuntimeError, epoch: number) => {
     if (epoch !== cameraEpochRef.current) return;
     if (setupPreviewActiveRef.current && !isRunningRef.current) {
+      baselineGenerationRef.current += 1;baselineCollectorRef.current.reset();
       setupPreviewActiveRef.current = false;
       setSetupPreviewActive(false);
       setSensorFault('Camera preview could not start. Close other camera apps and try the setup check again.');
@@ -820,6 +856,27 @@ export default function MonitorScreen() {
   ) => {
     const now = Date.now();
     if (setupPreviewActiveRef.current && !isRunningRef.current) {
+      if (EYE_BASELINE_EXPERIMENT && baselineLoaded && eyeBaseline === null && baselineCanSaveRef.current && !baselineFinishedRef.current) {
+        const assessment = assessCameraSetup({faceFound,faceX,faceY,faceWidth,faceHeight,frameWidth,frameHeight,leftEyeOpenProbability:leftProb,rightEyeOpenProbability:rightProb,pitchAngle,yawAngle,rollAngle});
+        const clock = typeof performance !== 'undefined' ? performance.now() : now;
+        const result = baselineCollectorRef.current.add(clock,leftProb,rightProb,assessment.ready);
+        setBaselineMessage(`Parked eyes-open baseline: ${Math.round(result.progress*100)}% · keep looking forward.`);
+        if (result.done) {
+          baselineFinishedRef.current = true;
+          if (result.baseline === null) setBaselineMessage('Too few reliable eyes-open samples. Current presets apply; retry the parked Setup check.');
+          else {
+            const generation = baselineGenerationRef.current, value = result.baseline;
+            baselineBusyRef.current = true;setBaselineBusy(true);
+            void saveDeviceEyeBaseline(value,result.samples).then(() => {
+              if (generation === baselineGenerationRef.current && setupPreviewActiveRef.current && !isRunningRef.current) {
+                setEyeBaseline(value);setBaselineMessage('Parked baseline saved on this device · experimental local sessions only.');
+              }
+            }).catch(() => {
+              if (generation === baselineGenerationRef.current) setBaselineMessage('Baseline was not saved. Current presets apply; retry the parked Setup check.');
+            }).finally(() => { baselineBusyRef.current = false; if (baselineMountedRef.current) setBaselineBusy(false); });
+          }
+        }
+      }
       if (now - lastCameraSetupUiAtRef.current >= CAMERA_SETUP_UI_INTERVAL_MS) {
         lastCameraSetupUiAtRef.current = now;
         const nextSetup = assessCameraSetup({
@@ -946,7 +1003,7 @@ export default function MonitorScreen() {
       }
     }
     prevAlertingRef.current = alerting;
-  }, [processEyeOpenness, processNoFace]);
+  }, [processEyeOpenness, processNoFace, baselineLoaded, eyeBaseline]);
 
   // These native worklet values must outlive ordinary React renders so the
   // frame-processor bridge stays stable throughout a drive.
@@ -1231,11 +1288,12 @@ export default function MonitorScreen() {
         />
 
         <View style={s.ctrl}>
+          {EYE_BASELINE_EXPERIMENT && <Text accessibilityLiveRegion="polite" style={{color:'#22d3ee',padding:12}}>{baselineMessage}</Text>}
           {!isRunning && (
             <CameraSetupGuide
               active={setupPreviewActive}
               assessment={cameraSetup}
-              disabled={isStarting || isStopping}
+              disabled={isStarting || isStopping || baselineBusy}
               onTogglePreview={toggleSetupPreview}
             />
           )}
@@ -1272,11 +1330,11 @@ export default function MonitorScreen() {
               accessibilityRole="button"
               accessibilityLabel="Start fatigue monitoring"
               accessibilityHint="Starts on-device camera monitoring using the current setup"
-              accessibilityState={{ disabled: isStarting || isStopping || !sensitivityLoaded }}
-              disabled={isStarting || isStopping || !sensitivityLoaded}
+              accessibilityState={{ disabled: isStarting || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusy }}
+              disabled={isStarting || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusy}
               style={[
                 s.startBtn,
-                (isStarting || isStopping || !sensitivityLoaded) && s.disabledBtn,
+                (isStarting || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusy) && s.disabledBtn,
               ]}
               onPress={handleStart}
             >
