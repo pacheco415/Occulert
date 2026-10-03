@@ -13,7 +13,7 @@ if (process.argv.includes('--github')) {
   const rows = JSON.parse(execFileSync(process.env.GH_BIN || 'gh', ['pr', 'list', '--repo', repo, '--state', 'closed', '--limit', '1000', '--json', 'number,headRefName'], { encoding: 'utf8', timeout: 30000, maxBuffer: 4 * 1024 * 1024 }));
   for (const row of rows) if (!prs.has(row.headRefName)) prs.set(row.headRefName, row.number);
 }
-const refs = git('for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin').split('\n').filter(ref => ref !== base && ref !== 'origin/HEAD' && ref);
+const refs = git('for-each-ref', '--format=%(refname)', 'refs/remotes/origin').split('\n').filter(ref => ref && ref !== 'refs/remotes/origin/main' && ref !== 'refs/remotes/origin/HEAD').map(ref => ref.replace('refs/remotes/', ''));
 const records = refs.map(ref => {
   const branch = ref.slice('origin/'.length);
   const ancestor = git('merge-base', base, ref);
