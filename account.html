@@ -101,6 +101,16 @@
       <button class="btn red" id="deleteAccountBtn" type="submit">Delete account permanently</button>
     </form>
     <div class="status" id="deleteStatus" role="status" aria-live="polite"></div>
+    <section id="deleteReauthSection" hidden aria-labelledby="deleteReauthTitle">
+      <h3 id="deleteReauthTitle">Confirm your sign-in</h3>
+      <p>Sign in again to continue permanent account deletion. Your data remains until deletion is confirmed.</p>
+      <form id="deleteReauthForm">
+        <div class="field"><label for="deleteReauthPassword">Current password</label><input id="deleteReauthPassword" type="password" autocomplete="current-password" required></div>
+        <button class="btn" id="deleteReauthPasswordBtn" type="submit">Sign in and review deletion</button>
+      </form>
+      <button class="btn" id="deleteReauthPasskeyBtn" type="button">Use a passkey</button>
+      <p><a href="/login.html">Other sign-in options</a></p>
+    </section>
   </div>
 </div>
 <aside class="account-secondary">
@@ -123,7 +133,7 @@
 </aside>
 </section>
 </main>
-<script src="/account-page-2.v60.js"></script>
+<script src="/account-page-2.v61.js"></script>
 
 <footer style="text-align:center;padding:28px 16px 24px;border-top:1px solid #1e293b;color:#4a6070;font-size:12px;margin-top:40px"><a href="/" style="color:#60a5fa;text-decoration:none;font-weight:700">Occulert</a> &nbsp;·&nbsp; <a href="/privacy.html" style="color:#4a6070;text-decoration:none">Privacy</a> &nbsp;·&nbsp; <a href="/safety.html" style="color:#4a6070;text-decoration:none">Safety</a> &nbsp;·&nbsp; <a href="/app.html" style="color:#4a6070;text-decoration:none">Driver App</a><div style="margin-top:8px">© 2026 Occulert. Prototype — not a substitute for rest or safe driving.</div></footer>
 </body>
