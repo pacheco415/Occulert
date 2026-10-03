@@ -42,7 +42,7 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-nitro-modules": "0.36.5",
-    "react-native-safe-area-context": "~5.7.0",
+    "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "~4.26.0",
     "react-native-vision-camera": "^4.7.3",
     "react-native-vision-camera-face-detector": "^1.10.2",
