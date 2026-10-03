@@ -77,7 +77,10 @@ if (refresh) {
   let sw = replace(read('sw.js'));
   const cache = sw.match(/const CACHE\s*=\s*(['"])(occulert-v)(\d+)\1/);
   if (!cache) throw new Error('Cannot find versioned service worker cache');
-  sw = sw.replace(cache[0], `const CACHE = '${cache[2]}${Number(cache[3]) + 1}'`);
+  const cacheHistory = execFileSync('git', ['log', '--all', '--format=', '-p', '--unified=0', '--', 'sw.js'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 });
+  const recordedCacheVersions = [...cacheHistory.matchAll(/^\+const CACHE\s*=\s*['"]occulert-v(\d+)['"]/gm)].map(match => Number(match[1]));
+  const nextCacheVersion = Math.max(Number(cache[3]), ...recordedCacheVersions) + 1;
+  sw = sw.replace(cache[0], `const CACHE = '${cache[2]}${nextCacheVersion}'`);
   changes.set('sw.js', sw);
   const config = parse('vercel.json');
   const versions = new Set([...replacements.values()].map(next => next.match(/\.v(\d+)\./)[1]));
@@ -89,7 +92,7 @@ if (refresh) {
     rule.headers.push({ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' });
     config.headers.push(rule);
   }
-  console.log(JSON.stringify({ copies: Object.fromEntries(replacements), rewrites: [...changes.keys()], cache: `${cache[2]}${Number(cache[3]) + 1}`, dryRun: dry }, null, 2));
+  console.log(JSON.stringify({ copies: Object.fromEntries(replacements), rewrites: [...changes.keys()], cache: `${cache[2]}${nextCacheVersion}`, dryRun: dry }, null, 2));
   if (!dry) {
     for (const [name, source] of changes) writeFileSync(join(root, name), source);
     writeJSON('asset-versions.json', manifest);
