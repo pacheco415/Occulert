@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { parseSessionHistory } from '../native-app/lib/sessionHistoryData.ts';
+import { parseSessionHistory, assignMissingSessionIds } from '../native-app/lib/sessionHistoryData.ts';
 
 test('only a missing storage key means empty session history', () => {
   assert.deepEqual(parseSessionHistory(null), []);
@@ -22,6 +22,19 @@ test('legacy record objects and unknown fields remain intact', () => {
 
 test('both history reads and ordered writes use the fail-closed parser', () => {
   const source = readFileSync(new URL('../native-app/lib/sessionHistory.ts', import.meta.url), 'utf8');
-  assert.match(source, /return parseSessionHistory<T>\(await AsyncStorage\.getItem\(HISTORY_KEY\)\)/);
+  assert.match(source, /const parsed = parseSessionHistory<T>\(await AsyncStorage\.getItem\(HISTORY_KEY\)\)/);
   assert.match(source, /const sessions = parseSessionHistory<T>\(await AsyncStorage\.getItem\(HISTORY_KEY\)\)/);
+});
+
+
+test('legacy duplicates get distinct stable IDs without changing unknown fields or original objects', () => {
+  const original = [{savedAt:'same',unknown:{keep:true}}, {savedAt:'same'}, {sessionId:'existing'}];
+  const ids=['existing','first','first','second'];
+  const migrated=assignMissingSessionIds(original,()=>ids.shift());
+  assert.equal(migrated.changed,true);
+  assert.deepEqual(migrated.sessions.map(row=>row.sessionId),['first','second','existing']);
+  assert.equal(original[0].sessionId,undefined);
+  assert.deepEqual(migrated.sessions[0].unknown,{keep:true});
+  assert.equal(assignMissingSessionIds(migrated.sessions,()=>{throw Error('unexpected')} ).sessions,migrated.sessions);
+  assert.throws(()=>assignMissingSessionIds([{}],()=>''),/identity/);
 });
