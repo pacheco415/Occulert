@@ -383,3 +383,13 @@ Occulert may miss drowsiness or produce false alerts. It cannot guarantee alert
 delivery, crash prevention, alertness, emergency response, or compliance. Setup
 and interaction happen while safely parked or by a passenger. Feeling tired
 means pull over safely and rest, regardless of any score or alert.
+
+### Legacy native history identity (prepared)
+
+Native local history assigns missing record IDs during an ordered storage
+migration. A read exposes migrated IDs only after they are saved, so duplicate
+legacy timestamps can be edited individually after restart. Existing IDs,
+unknown fields, scores and cloud-session references remain unchanged. Existing
+duplicate IDs still use the fail-closed mutation checks; they are not silently
+reassigned. These local IDs confer no cloud authority. Web history and a
+versioned storage envelope remain separate work.
