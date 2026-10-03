@@ -50,7 +50,7 @@ import {
 } from '../lib/historyPreferences';
 import { buildSessionHistoryExport } from '../lib/sessionHistoryExport';
 import { formatSessionAlertCount } from '../lib/sessionAlertCount';
-import { formatSessionDuration, formatSessionFatigue } from '../lib/sessionSummaryValues';
+import { formatSessionDuration, formatSessionFatigue, sessionSavedAt } from '../lib/sessionSummaryValues';
 import { buildPilotProgressExport } from '../lib/pilotProgressExport';
 import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
 import {
@@ -284,9 +284,7 @@ function fmtDate(iso?: string): string {
 }
 
 function sessionHistoryDate(item: SessionRecord): string | undefined {
-  return [item.savedAt, item.updatedAt].find(value => (
-    typeof value === 'string' && Number.isFinite(new Date(value).getTime())
-  ));
+  return sessionSavedAt(item.savedAt, item.updatedAt) || undefined;
 }
 
 function sensitivityLabel(value?: SensitivityLevel): string {
