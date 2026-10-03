@@ -109,5 +109,13 @@
   "driver-app.v68.css": "7e10f3a15eed448154996bbaf45134fabd0506d6040d04ba51547989dfbcdd4f",
   "driver-app.v69.js": "f19725d3577e4ec202a9bce70ae31749a64cf7b14b54a7102f0dd1bba96280de",
   "driver-app.v70.js": "ec82d2a78ac126beb7dc8527a623ec2a9057e756fd3dfe13ef4a66785e6d91c9",
-  "occulert-backend.v69.js": "7b27a73861cefd326c6e243ab8035f8589ab60d9a118bfc0694958bb42a84437"
+  "occulert-backend.v69.js": "7b27a73861cefd326c6e243ab8035f8589ab60d9a118bfc0694958bb42a84437",
+  "liquid-glass.v48.css": "c8e9d2cdcfc97db5df7c83aba9781d306265aa49f6a6c7a5c46a36ac8e59cdf9",
+  "portal.v48.css": "81e07d95d64148103fabee0892a7f5f506392535618c71b513eea9ef15c960af",
+  "account-page-1.v48.css": "b0a83cf522918a650c44853ab4652ed2efbac133ee4214d8ba167a26255ae9f2",
+  "product-hub-page-1.v48.css": "7e9dea537432951b04908a71ffc15fcec6a2c59b9f6cfe162fa63f05fcaf935e",
+  "pilot-guide-page-1.v56.css": "49cdcc472da550f9c86e842e218a73e62900c888b15c2673fe0a0c047001c514",
+  "pilot-signup-page-1.v69.css": "06bd8529df38d85576dfa44c158ba400f8000c580a53f002a0f6f06fbe0aca68",
+  "safety-page-1.v48.css": "09c9787f3fdd7f231786a062e01ce235f2d1907fbd944a603160cea54ca879bd",
+  "privacy-page-1.v48.css": "c3816613ae06cb7bc7f250d1981dbf66ff9c6e5b945f4536ae6bdfaba6c46a74"
 }

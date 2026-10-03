@@ -65,9 +65,11 @@
     "test:session-outbox": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-session-summary-outbox.mjs",
     "test:web-outbox": "node --test scripts/test-web-summary-outbox.mjs",
     "asset:bump": "node scripts/bump-asset.mjs",
-    "test:asset-bump": "node --test scripts/test-bump-asset.mjs"
+    "test:asset-bump": "node --test scripts/test-bump-asset.mjs",
+    "test:accessibility": "playwright test tests/accessibility-baseline.spec.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "^1.54.1"
   },
