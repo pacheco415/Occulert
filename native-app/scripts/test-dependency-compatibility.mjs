@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { Worker } from 'node:worker_threads';
+import { execFileSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { patchQueryDecoder } from './patch-query-decoder.mjs';
 
@@ -80,4 +83,15 @@ test('Watch build plist parser and UUID generation retain their supported APIs',
   const project = require('xcode').project('fixture.pbxproj');
   project.hash = { project: { objects: {} } };
   assert.match(project.generateUuid(), /^[A-F0-9]{24}$/);
+});
+
+// Exercise Expo's real resolver; a JS platform guard cannot prevent Gradle linking.
+test('Android excludes Apple Watch connectivity while iOS and Android cameras stay linked', () => {
+  const cwd = fileURLToPath(new URL('../', import.meta.url));
+  const cli = join(dirname(require.resolve('expo-modules-autolinking/package.json')), 'bin/expo-modules-autolinking.js');
+  const config = platform => JSON.parse(execFileSync(process.execPath, [cli, 'react-native-config', '--platform', platform, '--json'], { cwd, encoding:'utf8', timeout:30000, stdio:['ignore','pipe','pipe'] }));
+  const android = config('android').dependencies, ios = config('ios').dependencies;
+  assert.equal(android['react-native-watch-connectivity'], undefined);
+  assert.ok(ios['react-native-watch-connectivity']?.platforms?.ios);
+  assert.ok(android['react-native-vision-camera']?.platforms?.android);
 });
