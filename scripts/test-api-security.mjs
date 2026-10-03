@@ -67,6 +67,7 @@ const sessions = loadHandler("../api/sessions.js", async (table, options = {}) =
     insertedSession = options.body;
     return [{ id: "session-1", ...options.body }];
   }
+  if (table === "sessions" && !options.method) return allowSessionUpdate ? [{ id: "session-1", started_at: "2026-07-19T00:00:00.000Z", ended_at: null }] : [];
   if (table === "sessions" && options.method === "PATCH") {
     sessionPatchParams = options.params;
     patchedSession = options.body;
@@ -101,7 +102,7 @@ assert.equal(insertedSession.app_version, null, "app labels are limited to safe 
 const patchBody = { session_id: "session-1", average_fatigue: 30, max_fatigue: 60, safety_score: 80 };
 const deniedPatch = await invoke(sessions, request("PATCH", patchBody));
 assert.equal(deniedPatch.status, 404, "a session not owned by the authenticated driver must stay hidden");
-assert.deepEqual(sessionPatchParams, { id: "eq.session-1", driver_id: "eq.driver-1" });
+assert.equal(sessionPatchParams, undefined, "hidden sessions must never be patched");
 
 allowSessionUpdate = true;
 const allowedPatch = await invoke(sessions, request("PATCH", patchBody));
@@ -153,6 +154,38 @@ const eventWithoutLocation = await invoke(events, request("POST", {
 assert.equal(eventWithoutLocation.status, 200);
 assert.equal(insertedEvent.latitude, null, "explicitly absent latitude must not become 0");
 assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must not become 0");
+
+// Finalization is immutable and accepts delayed client finish timestamps.
+for (const finish of ['2026-07-19T00:05:00.000Z', '2026-07-18T00:00:00.000Z', '2999-01-01T00:00:00.000Z', 'invalid']) {
+  let row = { id: "session-1", started_at: "2026-07-19T00:00:00.000Z", ended_at: null };
+  let patches = 0;
+  const finalizing = loadHandler("../api/sessions.js", async (table, options = {}) => {
+    if (table === "drivers") return [{ id: "driver-1" }];
+    assert.equal(options.params.driver_id, "eq.driver-1");
+    if (!options.method) return [row];
+    assert.equal(options.params.ended_at, "is.null");
+    patches++;
+    row = { ...row, ...options.body };
+    return [row];
+  });
+  const before = Date.now();
+  const first = await invoke(finalizing, request("PATCH", { session_id: "session-1", ended_at: finish, safety_score: 80 }));
+  assert.equal(first.status, 200);
+  if (finish === '2026-07-19T00:05:00.000Z') assert.equal(row.ended_at, finish);
+  else assert.ok(Date.parse(row.ended_at) >= before && Date.parse(row.ended_at) <= Date.now());
+  const again = await invoke(finalizing, request("PATCH", { session_id: "session-1", safety_score: 0 }));
+  assert.deepEqual(again.body.session, first.body.session);
+  assert.equal(patches, 1);
+}
+let raceRead = 0;
+const concurrentClose = loadHandler("../api/sessions.js", async (table, options = {}) => {
+  if (table === "drivers") return [{ id: "driver-1" }];
+  if (options.method === "PATCH") return [];
+  return [{ id: "session-1", started_at: "2026-07-19T00:00:00.000Z", ended_at: ++raceRead > 1 ? "2026-07-19T00:05:00.000Z" : null, safety_score: 77 }];
+});
+const raceClose = await invoke(concurrentClose, request("PATCH", { session_id: "session-1", safety_score: 1 }));
+assert.equal(raceClose.status, 200);
+assert.equal(raceClose.body.session.safety_score, 77);
 
 let insertedProfile;
 const profile = loadHandler("../api/profile.js", async (table, options = {}) => {
