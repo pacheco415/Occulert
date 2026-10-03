@@ -14,3 +14,5 @@ playwright.config.mjs
 test-results/
 playwright-report/
 dependency-reports/
+
+.verification-receipts/
