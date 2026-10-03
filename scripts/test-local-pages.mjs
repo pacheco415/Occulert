@@ -148,3 +148,34 @@ for (const stalledPart of ['headers', 'body']) test(`lead submission recovers fr
   assert.equal(app.element('success').style.display, 'none');
   assert.equal(app.element('name').value, 'Tester');
 });
+
+
+test('history missing and invalid counts stay unknown while genuine zeros remain recorded', () => {
+  const app = harness('session-history-page-2.js', { 'occulert-session-history': JSON.stringify([
+    {id:'valid-zero',alerts:0,headNods:'0',safetyScore:0,avgFatigue:0,maxFatigue:0,savedAt:'2026-10-03T12:00:00Z'},
+    {id:'partial',alerts:2,headNods:1.2,safetyScore:101,avgFatigue:false,maxFatigue:'',savedAt:'2026-02-30T12:00:00Z',recoveredInterrupted:true},
+    {id:'unknown',alerts:false,headNods:-1,confidence:'not a measurement'}
+  ]) });
+  assert.equal(String(app.element('alerts').textContent), '2 (partial)');
+  assert.equal(String(app.element('nods').textContent), '0 (partial)');
+  assert.equal(String(app.element('avgScore').textContent), '0');
+  assert.match(app.element('table').innerHTML, /Partial session/);
+  assert.match(app.element('table').innerHTML, /Not recorded/);
+  assert.doesNotMatch(app.element('table').innerHTML, /Invalid Date/);
+  const csv=app.context.buildCSV();
+  assert.doesNotMatch(csv, /2026-02-30|not a measurement|false/);
+  assert.equal(app.context.count(1.2),null);
+  assert.equal(app.context.score(101),null);
+  assert.equal(app.context.dateValue('2026-02-30T12:00:00Z'),null);
+  assert.equal(app.context.dateValue('2024-02-29T12:00:00Z'),Date.parse('2024-02-29T12:00:00Z'));
+});
+
+test('history summaries do not change unknown or partial saved measurements', () => {
+  const initial=[{id:'unknown',unknown:{keep:true},alerts:null,headNods:null,savedAt:'invalid'}];
+  const app=harness('session-history-page-2.js',{'occulert-session-history':JSON.stringify(initial)});
+  assert.equal(String(app.element('alerts').textContent),'--');
+  assert.equal(String(app.element('nods').textContent),'--');
+  const row=app.context.getHistory()[0];
+  assert.equal(row.alerts,null);assert.equal(row.headNods,null);assert.equal(row.savedAt,'invalid');
+  assert.equal(row.unknown.keep,true);
+});
