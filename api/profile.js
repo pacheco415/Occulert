@@ -8,12 +8,7 @@ const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const { validJsonBody } = require("./_lib/validation");
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function clean(value, max) {
   return String(value || "").replace(/\0/g, "").trim().slice(0, max);

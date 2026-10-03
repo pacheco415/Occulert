@@ -18,3 +18,12 @@ test('JSON requests require an exact media type, an object and a bounded seriali
  for(const type of ['','text/plain','not-application/json','application/jsonp'])assert.equal(validJsonBody(request({},type)),false);
  assert.equal(validJsonBody(request({long:'12345'}),5),false);const cyclic={};cyclic.self=cyclic;assert.equal(validJsonBody(request(cyclic)),false);
 });
+
+test('shared route responses retain status, existing method headers, JSON values and no-store policy',()=>{
+ const {json}=require('../api/_lib/responses.js'),headers={'Allow':'POST'};
+ const response={setHeader:(name,value)=>{headers[name]=value},end(value){this.body=value}};
+ json(response,409,{ok:false,error:'conflict',recorded:0,missing:null,message:'Confirmed ✓'});
+ assert.equal(response.statusCode,409);assert.equal(headers.Allow,'POST');
+ assert.equal(headers['Content-Type'],'application/json; charset=utf-8');assert.equal(headers['Cache-Control'],'no-store');
+ assert.deepEqual(JSON.parse(response.body),{ok:false,error:'conflict',recorded:0,missing:null,message:'Confirmed ✓'});
+});

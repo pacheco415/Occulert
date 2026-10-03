@@ -12,12 +12,7 @@ const bearerToken = supabaseLib.bearerToken;
 const { isUuid, numberOrNull, integerOrNull, validJsonBody } = require("./_lib/validation");
 const PIPELINES = new Set(["web_mediapipe_ear", "ios_mlkit_eye_probability", "android_mlkit_eye_probability"]);
 
-function json(response, status, body) {
-response.statusCode = status;
-response.setHeader("Content-Type", "application/json; charset=utf-8");
-response.setHeader("Cache-Control", "no-store");
-response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function provenanceText(value, maxLength) {
 if (typeof value !== "string") return null;

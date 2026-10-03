@@ -9,12 +9,7 @@ const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const { isUuid, numberOrNull, validJsonBody } = require("./_lib/validation");
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 const ALLOWED_TYPES = ["drowsy", "distracted", "head_nod", "yawn", "phone_use", "ok_check_in", "emergency"];
 
