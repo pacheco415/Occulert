@@ -29,6 +29,19 @@ jobs:
       - run: npm ci --include=dev
       - run: npm run verify
 
+      - name: Save source and environment verification evidence
+        if: ${{ !cancelled() }}
+        run: node ../scripts/write-verification-receipt.mjs native '${{ job.status }}'
+      - name: Preserve verification receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verification-native-${{ github.sha }}
+          path: .verification-receipts/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
+
   eas-install:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -47,6 +60,19 @@ jobs:
       - run: npm ci --include=dev
       - run: npm run verify
 
+      - name: Save source and environment verification evidence
+        if: ${{ !cancelled() }}
+        run: node ../scripts/write-verification-receipt.mjs eas-install '${{ job.status }}'
+      - name: Preserve verification receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verification-eas-install-${{ github.sha }}
+          path: .verification-receipts/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
+
   watch-notification:
     name: Watch notification freshness
     runs-on: macos-latest
@@ -57,3 +83,16 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: node --test scripts/test-watch-notification.mjs
+
+      - name: Save source and environment verification evidence
+        if: ${{ !cancelled() }}
+        run: node scripts/write-verification-receipt.mjs watch-notification '${{ job.status }}'
+      - name: Preserve verification receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verification-watch-notification-${{ github.sha }}
+          path: .verification-receipts/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
