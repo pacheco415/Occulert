@@ -38,10 +38,12 @@ function cloudFixture(initial, { consent = false } = {}) {
   let nextTimer = 0;
   const fixture = {
     secure, storage, requests, timers,
-    transport: async (url) => {
+    transport: async (url, options) => {
       if (url.includes('grant_type=password')) return response(200, token('new'));
       if (url.includes('grant_type=refresh_token')) return response(200, token(initial.user.id));
-      if (url.endsWith('/api/sessions')) return response(200, { session: { id: 'session' } });
+      if (url.endsWith('/api/sessions')) return options.method === 'PATCH'
+        ? response(200,{ok:true,session:{id:'session',ended_at:JSON.parse(options.body).ended_at}})
+        : response(200, { session: { id: 'session' } });
       return response(200, {});
     },
   };
@@ -153,8 +155,9 @@ for (const stage of ['headers', 'body']) {
 
 test('concurrent expired-auth operations share one refresh and keep enabled consent', async () => {
   const f = cloudFixture(auth('old'), { consent: true }), started = deferred(), result = deferred();
-  f.transport = url => {
+  f.transport = (url, options) => {
     if (url.includes('grant_type=refresh_token')) { started.resolve(); return result.promise; }
+    if (url.endsWith('/api/sessions')) return response(200,{ok:true,session:{id:'session',ended_at:JSON.parse(options.body).ended_at}});
     return response(200, {});
   };
   const first = f.api.logCloudAlert('session', 40), second = f.api.finishCloudSession('session', {});
@@ -584,7 +587,7 @@ test('failed native finalization retries its original finish time and updates lo
   f.history = [{ sessionId: 'local-one', cloudSynced: false }];
   const payloads = [];
   let available = false;
-  f.transport = (_url, options) => { payloads.push(JSON.parse(options.body)); return response(available ? 200 : 503, {}); };
+  f.transport = (_url, options) => { payloads.push(JSON.parse(options.body)); return response(available ? 200 : 503, {ok:true,session:{id:JSON.parse(options.body).session_id,ended_at:JSON.parse(options.body).ended_at}}); };
   const endedAt = '2026-10-03T12:00:00.000Z';
   assert.equal(await f.api.finishCloudSession('session', { averageFatigue: 12, maxFatigue: 40, safetyScore: 72, alertCount: 1 }, endedAt, 'local-one'), false);
   available = true;
@@ -673,9 +676,24 @@ test('format migration is durable even when every legacy record already has an I
 
 test('native cloud retries preserve unknown fatigue and unvalidated nod counts, including a recorded zero alert count',async()=>{
  const f=cloudFixture(auth('old',4000000000),{consent:true});const payloads=[];let available=false;
- f.transport=(_url,options)=>{payloads.push(JSON.parse(options.body));return response(available?200:503,{})};
+ f.transport=(_url,options)=>{payloads.push(JSON.parse(options.body));return response(available?200:503,{ok:true,session:{id:JSON.parse(options.body).session_id,ended_at:JSON.parse(options.body).ended_at}})};
  const endedAt='2026-10-03T12:00:00.000Z';
  assert.equal(await f.api.finishCloudSession('session',{averageFatigue:null,maxFatigue:null,safetyScore:null,alertCount:0},endedAt),false);
  available=true;await f.api.retryPendingCloudSessions();assert.equal(payloads.length,2);
  assert.deepEqual(payloads[0],{session_id:'session',ended_at:endedAt,average_fatigue:null,max_fatigue:null,safety_score:null,alert_count:0,head_nod_count:null});assert.deepEqual(payloads[1],payloads[0]);
+});
+
+
+test('native success requires the matching stored ended row before acknowledging or dropping a summary',async()=>{
+ const endedAt='2026-10-03T12:00:00.000Z';
+ const malformed=[{},null,[],true,'success',{ok:false,session:{id:'session',ended_at:endedAt}},{ok:true,session:{id:'other',ended_at:endedAt}},{ok:true,session:{id:'session',ended_at:null}},{ok:true,session:{id:'session',ended_at:'invalid'}},{ok:true,session:{id:'session',ended_at:'2026-02-31T12:00:00.000Z'}}];
+ for (const body of malformed) {
+  const f=cloudFixture(auth('old',4000000000),{consent:true});f.history=[{sessionId:'local-one',cloudSynced:false}];
+  f.transport=()=>response(200,body);
+  assert.equal(await f.api.finishCloudSession('session',{averageFatigue:0,maxFatigue:0,safetyScore:100,alertCount:0},endedAt,'local-one'),false);
+  assert.equal(f.history[0].cloudSynced,false);assert.equal((await f.api.getPendingCloudSummaryState()).count,1);
+  f.transport=()=>response(200,{ok:true,session:{id:'session',ended_at:'2026-10-03T12:00:00.000000+00:00'}});
+  await f.api.retryPendingCloudSessions();assert.equal(f.history[0].cloudSynced,true);assert.equal(f.history[0].cloudOwnerId,'old');
+  assert.equal((await f.api.getPendingCloudSummaryState()).count,0);
+ }
 });

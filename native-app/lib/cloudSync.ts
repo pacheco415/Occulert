@@ -573,13 +573,23 @@ export async function logCloudAlert(sessionId: string, fatigueScore: number): Pr
   return result.ok;
 }
 
-function sendPendingSummary(scope: SummaryScope, entry: PendingSessionSummary) {
-  return backendApi('PATCH', '/api/sessions', {
+async function sendPendingSummary(scope: SummaryScope, entry: PendingSessionSummary) {
+  const result = await backendApi<{ ok?: boolean; session?: { id?: unknown; ended_at?: unknown } }>('PATCH', '/api/sessions', {
     session_id: entry.session_id, ended_at: entry.ended_at,
     average_fatigue: entry.average_fatigue, max_fatigue: entry.max_fatigue,
     safety_score: entry.safety_score, alert_count: entry.alert_count,
     head_nod_count: entry.head_nod_count,
   }, true, scope);
+  const stored = result.body?.session;
+  const end = stored?.ended_at;
+  // PostgREST may return Z or a numeric offset and microsecond precision.
+  const ended = typeof end === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(end)
+    && Number.isFinite(Date.parse(end))
+    && new Date(end.slice(0, 10) + 'T00:00:00.000Z').toISOString().slice(0, 10) === end.slice(0, 10);
+  // An HTTP success alone does not acknowledge an immutable stored completion.
+  return { status: result.status, ok: result.ok && result.body?.ok === true
+    && stored?.id === entry.session_id && ended };
 }
 
 export interface PendingCloudSummaryState {
