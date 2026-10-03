@@ -262,12 +262,23 @@ assert.equal(insertedFleet.owner_user_id, "user-1", "fleet ownership must come f
 assert.equal(insertedFleet.plan, "trial", "browser callers must not choose privileged plans");
 assert.equal(Object.hasOwn(insertedFleet, "role"), false, "browser callers must not create privileged roles");
 
+for (const body of [null, true, "text", 3, []]) {
+  assert.equal((await invoke(fleets, request("POST", body))).status, 415);
+}
+
 const unverifiedFleet = loadHandler("../api/fleets.js", async () => {
   throw new Error("database must not be called for an unverified owner");
 }, { id: "user-2", email: "unverified@example.com" });
 const unverifiedFleetResult = await invoke(unverifiedFleet, request("POST", { company_name: "Unverified Fleet" }));
 assert.equal(unverifiedFleetResult.status, 403);
 assert.equal(unverifiedFleetResult.body.error, "email_not_verified");
+
+for (const route of ["../api/fleet-invitations.js", "../api/accept-invitation.js"]) {
+  const malformed = loadHandler(route, async () => { throw new Error("invalid bodies must not reach storage"); });
+  for (const body of [null, true, "text", 3, []]) {
+    assert.equal((await invoke(malformed, request("POST", body))).status, 415);
+  }
+}
 
 let invitationRpcBody;
 const invitations = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
