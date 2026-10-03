@@ -155,6 +155,46 @@ assert.equal(eventWithoutLocation.status, 200);
 assert.equal(insertedEvent.latitude, null, "explicitly absent latitude must not become 0");
 assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must not become 0");
 
+// Client event time must stay inside the owned session; finished sessions have a short delivery grace.
+{
+  const now = Date.now();
+  const start = new Date(now - 600000).toISOString();
+  const finish = new Date(now - 30000).toISOString();
+  let row = { id: "session-1", started_at: start, ended_at: finish };
+  let writes = 0;
+  let saved;
+  const timedEvents = loadHandler("../api/events.js", async (table, options = {}) => {
+    if (table === "drivers") return [{ id: "driver-1" }];
+    if (table === "sessions") {
+      assert.equal(options.params.driver_id, "eq.driver-1");
+      assert.equal(options.params.select, "id,started_at,ended_at");
+      return [row];
+    }
+    assert.equal(table, "events");
+    writes++;
+    saved = options.body;
+    return [{ id: "event-1", ...saved }];
+  });
+  for (const occurred_at of [start, finish]) {
+    assert.equal((await invoke(timedEvents, request("POST", { ...eventBody, occurred_at }))).status, 200);
+    assert.equal(saved.created_at, occurred_at);
+  }
+  const previousWrites = writes;
+  for (const occurred_at of [new Date(now - 600001).toISOString(), new Date(now).toISOString(), "invalid", null, 42]) {
+    const result = await invoke(timedEvents, request("POST", { ...eventBody, occurred_at }));
+    assert.equal(result.status, 400);
+    assert.equal(result.body.error, "invalid_occurred_at");
+  }
+  assert.equal(writes, previousWrites, "invalid event time must not write data");
+  row.ended_at = new Date(now - 180000).toISOString();
+  const stale = await invoke(timedEvents, request("POST", eventBody));
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.error, "session_ended");
+  assert.equal(writes, previousWrites);
+  row.ended_at = null;
+  assert.equal((await invoke(timedEvents, request("POST", { ...eventBody, occurred_at: finish }))).status, 200);
+}
+
 // Finalization is immutable and accepts delayed client finish timestamps.
 for (const finish of ['2026-07-19T00:05:00.000Z', '2026-07-18T00:00:00.000Z', '2999-01-01T00:00:00.000Z', 'invalid']) {
   let row = { id: "00000000-0000-4000-8000-000000000001", started_at: "2026-07-19T00:00:00.000Z", ended_at: null };

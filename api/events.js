@@ -73,10 +73,29 @@ module.exports = async function handler(request, response) {
     }
 
     const sessions = await pgFetch("sessions", {
-      params: { select: "id", id: "eq." + body.session_id, driver_id: "eq." + driver.id, limit: "1" },
+      params: { select: "id,started_at,ended_at", id: "eq." + body.session_id, driver_id: "eq." + driver.id, limit: "1" },
     });
     if (!sessions.length) {
       return json(response, 404, { ok: false, error: "session_not_found" });
+    }
+
+    const session = sessions[0];
+    const now = Date.now();
+    const endedAt = session.ended_at ? Date.parse(session.ended_at) : null;
+    if (endedAt !== null && Number.isFinite(endedAt) && endedAt < now - 120000) {
+      return json(response, 409, { ok: false, error: "session_ended" });
+    }
+    let occurredAt = new Date(now).toISOString();
+    if (Object.hasOwn(body, "occurred_at")) {
+      const timestamp = typeof body.occurred_at === "string" ? Date.parse(body.occurred_at) : NaN;
+      const startedAt = Date.parse(session.started_at);
+      const upperBound = endedAt === null ? now : Math.min(endedAt, now);
+      if (!Number.isFinite(timestamp) || !Number.isFinite(startedAt)
+        || !/^\d{4}-\d{2}-\d{2}T/.test(body.occurred_at)
+        || timestamp < startedAt || timestamp > upperBound) {
+        return json(response, 400, { ok: false, error: "invalid_occurred_at" });
+      }
+      occurredAt = new Date(timestamp).toISOString();
     }
 
     const created = await pgFetch("events", {
@@ -90,7 +109,7 @@ module.exports = async function handler(request, response) {
         // explicitly enabled location sharing on the client.
         latitude: numberOrNull(body.latitude, -90, 90),
         longitude: numberOrNull(body.longitude, -180, 180),
-        created_at: new Date().toISOString(),
+        created_at: occurredAt,
       },
     });
     return json(response, 200, {
