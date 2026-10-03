@@ -912,7 +912,7 @@ function dashboardRefreshHarness({ empty = false } = {}) {
   };
   const globals = source.slice(source.indexOf('let demoRows='), source.indexOf('function esc('));
   const auth = source.slice(source.indexOf('async function handleAuthStorageChange('), source.indexOf('async function boot('));
-  runInNewContext(globals + markedBlock(source, 'fleet-refresh-policy') + markedBlock(source, 'fleet-summary-projection') +
+  runInNewContext(globals + markedBlock(source, 'fleet-view-preferences') + markedBlock(source, 'fleet-refresh-policy') + markedBlock(source, 'fleet-summary-projection') +
     markedBlock(source, 'fleet-refresh-request') + markedBlock(source, 'fleet-refresh-scheduling') + auth + `
       globalThis.state=()=>({fleetMode,protectedUserId,protectedFleetName,protectedDrivers,protectedSessions,protectedEvents,
         protectedLastSuccessfulAt,protectedRefreshFailures,protectedFleetLoading,protectedFleetGeneration,
