@@ -101,11 +101,20 @@ if (!body.session_id) {
 return json(response, 400, { ok: false, error: "missing_session_id" });
 }
 if (typeof body.session_id !== "string" || !UUID.test(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
+const ownedParams = { id: "eq." + body.session_id, driver_id: "eq." + driver.id };
+const existing = await pgFetch("sessions", { params: { ...ownedParams, select: "*", limit: "1" } });
+if (!existing.length) return json(response, 404, { ok: false, error: "session_not_found" });
+if (existing[0].ended_at) return json(response, 200, { ok: true, session: existing[0] });
+const now = Date.now();
+const startedAt = Date.parse(existing[0].started_at);
+const clientEnd = typeof body.ended_at === "string" && /^\d{4}-\d{2}-\d{2}T/.test(body.ended_at) ? Date.parse(body.ended_at) : NaN;
+const endedAt = Number.isFinite(clientEnd) && clientEnd >= startedAt && clientEnd <= now + 120000
+  ? new Date(clientEnd).toISOString() : new Date(now).toISOString();
 const updated = await pgFetch("sessions", {
 method: "PATCH",
-params: { id: "eq." + body.session_id, driver_id: "eq." + driver.id },
+params: { ...ownedParams, ended_at: "is.null" },
 body: {
-ended_at: new Date().toISOString(),
+ended_at: endedAt,
 average_fatigue: numberOrNull(body.average_fatigue, 0, 100),
 max_fatigue: numberOrNull(body.max_fatigue, 0, 100),
 safety_score: numberOrNull(body.safety_score, 0, 100),
@@ -114,6 +123,9 @@ head_nod_count: integerOrNull(body.head_nod_count),
 },
 });
 if (!updated.length) {
+// Another finalizer may have won after the read. Return its stored result.
+const stored = await pgFetch("sessions", { params: { ...ownedParams, select: "*", limit: "1" } });
+if (stored[0]?.ended_at) return json(response, 200, { ok: true, session: stored[0] });
 return json(response, 404, { ok: false, error: "session_not_found" });
 }
 return json(response, 200, { ok: true, session: updated[0] });
