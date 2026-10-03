@@ -65,13 +65,13 @@ const sessions = loadHandler("../api/sessions.js", async (table, options = {}) =
   if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
   if (table === "sessions" && options.method === "POST") {
     insertedSession = options.body;
-    return [{ id: "session-1", ...options.body }];
+    return [{ id: "00000000-0000-4000-8000-000000000001", ...options.body }];
   }
-  if (table === "sessions" && !options.method) return allowSessionUpdate ? [{ id: "session-1", started_at: "2026-07-19T00:00:00.000Z", ended_at: null }] : [];
+  if (table === "sessions" && !options.method) return allowSessionUpdate ? [{ id: "00000000-0000-4000-8000-000000000001", started_at: "2026-07-19T00:00:00.000Z", ended_at: null }] : [];
   if (table === "sessions" && options.method === "PATCH") {
     sessionPatchParams = options.params;
     patchedSession = options.body;
-    return allowSessionUpdate ? [{ id: "session-1" }] : [];
+    return allowSessionUpdate ? [{ id: "00000000-0000-4000-8000-000000000001" }] : [];
   }
   throw new Error(`unexpected sessions call: ${table}`);
 });
@@ -99,7 +99,7 @@ assert.equal(insertedSession.detector_pipeline, null, "only documented detector 
 assert.equal(insertedSession.detector_version, null, "provenance labels are limited to safe text");
 assert.equal(insertedSession.app_version, null, "app labels are limited to safe text");
 
-const patchBody = { session_id: "session-1", average_fatigue: 30, max_fatigue: 60, safety_score: 80 };
+const patchBody = { session_id: "00000000-0000-4000-8000-000000000001", average_fatigue: 30, max_fatigue: 60, safety_score: 80 };
 const deniedPatch = await invoke(sessions, request("PATCH", patchBody));
 assert.equal(deniedPatch.status, 404, "a session not owned by the authenticated driver must stay hidden");
 assert.equal(sessionPatchParams, undefined, "hidden sessions must never be patched");
@@ -109,7 +109,7 @@ const allowedPatch = await invoke(sessions, request("PATCH", patchBody));
 assert.equal(allowedPatch.status, 200, "the authenticated driver must still be able to finish their own session");
 
 const blankMetricsPatch = await invoke(sessions, request("PATCH", {
-  session_id: "session-1",
+  session_id: "00000000-0000-4000-8000-000000000001",
   average_fatigue: null,
   max_fatigue: "",
   safety_score: false,
@@ -123,7 +123,7 @@ let allowEventSession = false;
 let insertedEvent;
 const events = loadHandler("../api/events.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1" }];
-  if (table === "sessions") return allowEventSession ? [{ id: "session-1" }] : [];
+  if (table === "sessions") return allowEventSession ? [{ id: "00000000-0000-4000-8000-000000000001" }] : [];
   if (table === "events") {
     insertedEvent = options.body;
     return [{ id: "event-1", ...options.body }];
@@ -131,7 +131,7 @@ const events = loadHandler("../api/events.js", async (table, options = {}) => {
   throw new Error(`unexpected events call: ${table}`);
 });
 
-const eventBody = { session_id: "session-1", type: "drowsy", fatigue_score: 140, confidence: -5, latitude: 120, longitude: -240 };
+const eventBody = { session_id: "00000000-0000-4000-8000-000000000001", type: "drowsy", fatigue_score: 140, confidence: -5, latitude: 120, longitude: -240 };
 const deniedEvent = await invoke(events, request("POST", eventBody));
 assert.equal(deniedEvent.status, 404, "events must not be written to another driver's session");
 
@@ -145,7 +145,7 @@ assert.equal(insertedEvent.latitude, 90);
 assert.equal(insertedEvent.longitude, -180);
 
 const eventWithoutLocation = await invoke(events, request("POST", {
-  session_id: "session-1",
+  session_id: "00000000-0000-4000-8000-000000000001",
   type: "drowsy",
   fatigue_score: 25,
   latitude: null,
@@ -197,7 +197,7 @@ assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must no
 
 // Finalization is immutable and accepts delayed client finish timestamps.
 for (const finish of ['2026-07-19T00:05:00.000Z', '2026-07-18T00:00:00.000Z', '2999-01-01T00:00:00.000Z', 'invalid']) {
-  let row = { id: "session-1", started_at: "2026-07-19T00:00:00.000Z", ended_at: null };
+  let row = { id: "00000000-0000-4000-8000-000000000001", started_at: "2026-07-19T00:00:00.000Z", ended_at: null };
   let patches = 0;
   const finalizing = loadHandler("../api/sessions.js", async (table, options = {}) => {
     if (table === "drivers") return [{ id: "driver-1" }];
@@ -209,11 +209,11 @@ for (const finish of ['2026-07-19T00:05:00.000Z', '2026-07-18T00:00:00.000Z', '2
     return [row];
   });
   const before = Date.now();
-  const first = await invoke(finalizing, request("PATCH", { session_id: "session-1", ended_at: finish, safety_score: 80 }));
+  const first = await invoke(finalizing, request("PATCH", { session_id: "00000000-0000-4000-8000-000000000001", ended_at: finish, safety_score: 80 }));
   assert.equal(first.status, 200);
   if (finish === '2026-07-19T00:05:00.000Z') assert.equal(row.ended_at, finish);
   else assert.ok(Date.parse(row.ended_at) >= before && Date.parse(row.ended_at) <= Date.now());
-  const again = await invoke(finalizing, request("PATCH", { session_id: "session-1", safety_score: 0 }));
+  const again = await invoke(finalizing, request("PATCH", { session_id: "00000000-0000-4000-8000-000000000001", safety_score: 0 }));
   assert.deepEqual(again.body.session, first.body.session);
   assert.equal(patches, 1);
 }
@@ -221,11 +221,27 @@ let raceRead = 0;
 const concurrentClose = loadHandler("../api/sessions.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1" }];
   if (options.method === "PATCH") return [];
-  return [{ id: "session-1", started_at: "2026-07-19T00:00:00.000Z", ended_at: ++raceRead > 1 ? "2026-07-19T00:05:00.000Z" : null, safety_score: 77 }];
+  return [{ id: "00000000-0000-4000-8000-000000000001", started_at: "2026-07-19T00:00:00.000Z", ended_at: ++raceRead > 1 ? "2026-07-19T00:05:00.000Z" : null, safety_score: 77 }];
 });
-const raceClose = await invoke(concurrentClose, request("PATCH", { session_id: "session-1", safety_score: 1 }));
+const raceClose = await invoke(concurrentClose, request("PATCH", { session_id: "00000000-0000-4000-8000-000000000001", safety_score: 1 }));
 assert.equal(raceClose.status, 200);
 assert.equal(raceClose.body.session.safety_score, 77);
+
+for (const badId of ['not-a-uuid', 7, {}, '00000000-0000-4000-8000-000000000001.extra']) {
+  const session = await invoke(sessions, request("PATCH", { session_id: badId }));
+  assert.equal(session.status, 400);
+  assert.equal(session.body.error, "invalid_session_id");
+  const event = await invoke(events, request("POST", { session_id: badId, type: "drowsy" }));
+  assert.equal(event.status, 400);
+  assert.equal(event.body.error, "invalid_session_id");
+}
+await invoke(sessions, request("PATCH", { session_id: "00000000-0000-4000-8000-000000000001", alert_count: 2.7, head_nod_count: 1.2 }));
+assert.equal(patchedSession.alert_count, 3);
+assert.equal(patchedSession.head_nod_count, 1);
+for (const body of [null, true, "text", 3, []]) {
+  assert.equal((await invoke(sessions, request("POST", body))).status, 415);
+  assert.equal((await invoke(events, request("POST", body))).status, 415);
+}
 
 let insertedProfile;
 const profile = loadHandler("../api/profile.js", async (table, options = {}) => {

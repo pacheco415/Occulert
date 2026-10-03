@@ -8,6 +8,7 @@ const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const MAX_BODY_LENGTH = 4096;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function json(response, status, body) {
   response.statusCode = status;
@@ -28,8 +29,8 @@ function numberOrNull(value, min, max) {
 
 function validJsonBody(request) {
   if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = typeof request.body === "object" && request.body ? request.body : {};
-  return !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
+  const body = request.body;
+  return body !== null && typeof body === "object" && !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
 }
 
 module.exports = async function handler(request, response) {
@@ -62,6 +63,7 @@ module.exports = async function handler(request, response) {
     if (!body.session_id || ALLOWED_TYPES.indexOf(type) === -1) {
       return json(response, 400, { ok: false, error: "invalid_event" });
     }
+    if (typeof body.session_id !== "string" || !UUID.test(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
     const drivers = await pgFetch("drivers", {
       params: { select: "id", user_id: "eq." + user.id, limit: "1" },
     });
