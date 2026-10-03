@@ -45,5 +45,6 @@ jobs:
         with:
           name: verification-browser-${{ github.sha }}
           path: .verification-receipts/
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14

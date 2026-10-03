@@ -38,6 +38,7 @@ jobs:
         with:
           name: verification-native-${{ github.sha }}
           path: .verification-receipts/
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
 
@@ -68,6 +69,7 @@ jobs:
         with:
           name: verification-eas-install-${{ github.sha }}
           path: .verification-receipts/
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
 
@@ -91,5 +93,6 @@ jobs:
         with:
           name: verification-watch-notification-${{ github.sha }}
           path: .verification-receipts/
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
