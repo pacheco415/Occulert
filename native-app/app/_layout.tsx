@@ -1,9 +1,19 @@
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
+import { retryPendingCloudSessions } from '../lib/cloudSync';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '../constants/theme';
 
 export default function RootLayout() {
+  useEffect(() => {
+    void retryPendingCloudSessions();
+    const listener = AppState.addEventListener('change', state => {
+      if (state === 'active') void retryPendingCloudSessions();
+    });
+    return () => listener.remove();
+  }, []);
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
