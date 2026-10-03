@@ -606,6 +606,7 @@ export default function MonitorScreen() {
       console.info('Occulert monitor performance', monitorPerformance);
     }
 
+    const cloudEndedAt = new Date(stoppedAt).toISOString();
     const finalizeCloud = async (localSessionId: string | null) => {
       const cloudSessionId = cloudSession ? await cloudSession.catch(() => null) : null;
       if (!cloudSessionId) return;
@@ -616,7 +617,7 @@ export default function MonitorScreen() {
         maxFatigue,
         safetyScore,
         alertCount: alerts,
-      });
+      }, cloudEndedAt, localSessionId || undefined);
       if (synced && localSessionId) {
         await markSessionSynced(localSessionId, cloudSessionId);
       }
