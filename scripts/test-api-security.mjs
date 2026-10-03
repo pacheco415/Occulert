@@ -641,4 +641,12 @@ for (let i = 0; i < 6; i += 1) {
 assert.equal(rateLimited.status, 429, "submission bursts must be rate limited");
 assert.ok(Number(rateLimited.headers["retry-after"]) > 0);
 
+
+for(const mediaType of ['application/jsonp','not-application/json','text/plain']){
+ for(const handler of [sessions,events]){
+  const req=request('POST',{});req.headers['content-type']=mediaType;
+  assert.equal((await invoke(handler,req)).status,415);
+ }
+}
+
 console.log("Occulert API security tests passed.");

@@ -290,7 +290,10 @@ assertIncludes("sw.js", "url.pathname.startsWith('/api/')", "service worker must
 assertIncludes("api/sessions.js", "driver_id: \"eq.\" + driver.id", "session updates must be scoped to the authenticated driver's own sessions");
 assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes must verify the session belongs to the authenticated driver");
 assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event GPS latitude must be range validated");
-assertIncludes("api/sessions.js", "MAX_BODY_LENGTH", "session API must reject oversized JSON bodies");
+assertIncludes("api/sessions.js", "validJsonBody(request)", "session API must use bounded shared JSON validation");
+assertIncludes("api/_lib/validation.js", "maxLength = 4096", "shared session JSON validation must retain the request size limit");
+assertIncludes("api/_lib/validation.js", "JSON.stringify(body).length <= maxLength", "shared JSON validation must enforce its limit");
+assertIncludes("api/profile.js", "validJsonBody(request, 2048)", "profile requests must retain their smaller size limit");
 assertIncludes("api/pilot-leads.js", "body.website", "pilot lead API must include honeypot spam filtering");
 assertIncludes(`${assetByStem('pilot-signup-page-2.js')}`, "startedAt: formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
 assertIncludes("api/pilot-leads.js", "rateLimitState(request)", "pilot lead API must use durable distributed rate limiting");
