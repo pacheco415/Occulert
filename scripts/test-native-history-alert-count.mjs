@@ -4,7 +4,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 import vm from 'node:vm';
 import { formatSessionAlertCount } from '../native-app/lib/sessionAlertCount.ts';
-import { formatSessionFatigue } from '../native-app/lib/sessionSummaryValues.ts';
+import { formatSessionFatigue, formatSessionDuration, sessionSavedAt } from '../native-app/lib/sessionSummaryValues.ts';
 import { buildSessionHistoryExport } from '../native-app/lib/sessionHistoryExport.ts';
 import { parseSessionHistory, assignMissingSessionIds } from '../native-app/lib/sessionHistoryData.ts';
 
@@ -18,7 +18,7 @@ function executeNativeModule(path, names, bindings) {
 }
 
 const { feedbackUrl } = executeNativeModule('native-app/lib/feedback.ts', ['feedbackUrl'], {
-  formatSessionAlertCount, Platform: { OS: 'ios' }, Linking: {},
+  formatSessionAlertCount, formatSessionFatigue, formatSessionDuration, sessionSavedAt, Platform: { OS: 'ios' }, Linking: {},
   currentAppBuildInfo: () => ({ appVersion: 'synthetic', appBuildNumber: 'synthetic' }),
 });
 const feedbackBody = item => new URL(feedbackUrl(item)).searchParams.get('body');
@@ -88,4 +88,23 @@ test('migrating and presenting mixed legacy history preserves saved fields and s
   assert.equal(writes, 1, 'only the identity migration writes');
   await loadSessionHistory();
   assert.equal(writes, 1, 'later reads do not rewrite migrated history');
+});
+
+
+for (const [label, value] of [['missing',undefined],['negative',-1],['boolean',false],['blank',''],['numeric string','0'],['nonfinite',Infinity],['NaN',NaN]]) {
+ test(`${label} summary values stay unknown in both feedback and export`,()=>{
+  const item={durationSec:value,avgFatigue:value,savedAt:'invalid-date',updatedAt:'invalid-too'};
+  const feedback=feedbackBody(item),exported=buildSessionHistoryExport([item]);
+  assert.match(feedback,/Saved: Unknown date/);assert.match(exported,/Unknown date/);
+  assert.match(feedback,/Duration seconds: Not recorded/);assert.match(exported,/Duration: Not recorded/);
+  assert.match(feedback,/Average fatigue: Not recorded/);assert.match(exported,/Average fatigue: Not recorded/);
+ });
+}
+test('real zeros, fallback dates and recovered partial summaries remain explicit',()=>{
+ const item={durationSec:0,avgFatigue:0,alertCount:0,savedAt:'invalid',updatedAt:'2026-10-03T12:00:00Z',recoveredFromInterruption:true,cloudSessionId:'exclude-me',location:{lat:40},rawMotion:[1]};
+ const before=JSON.stringify(item),feedback=feedbackBody(item),exported=buildSessionHistoryExport([item]);
+ assert.match(feedback,/Duration seconds: 0/);assert.match(feedback,/Average fatigue: 0/);
+ assert.match(exported,/Duration: 0m 0s/);assert.match(exported,/Average fatigue: 0/);
+ for(const text of [feedback,exported]){assert.match(text,/2026-10-03T12:00:00.000Z/);assert.match(text,/Recovered partial session/);assert.doesNotMatch(text,/exclude-me|rawMotion|lat:/)}
+ assert.equal(JSON.stringify(item),before);
 });
