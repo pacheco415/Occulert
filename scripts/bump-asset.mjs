@@ -40,13 +40,17 @@ if (refresh) {
       }
     }
   }
+  // A URL already used on another prepared branch must never be reused with
+  // different immutable bytes. Include deleted assets retained in known history.
+  if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: root, encoding: 'utf8' }).trim() !== 'false') throw new Error('Fetch full Git history before choosing new immutable asset URLs');
+  const historicalAssets = new Set(execFileSync('git', ['log', '--all', '--format=', '--name-only', '--', ':(top,glob)*.v*.js', ':(top,glob)*.v*.css'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 }).split(/\r?\n/).map(name => name.trim()).filter(Boolean));
   const replacements = new Map();
   for (const name of selected) {
     if (digest(sources.get(name)) !== integrity[name]) throw new Error(`Published asset integrity mismatch: ${name}`);
     const match = name.match(/^(.+)\.v(\d+)\.(js|css)$/);
     if (!match) throw new Error(`Asset is not versioned: ${name}`);
     let version = Number(match[2]) + 1, next;
-    do { next = `${match[1]}.v${version++}.${match[3]}`; } while (existsSync(join(root, next)) || [...replacements.values()].includes(next));
+    do { next = `${match[1]}.v${version++}.${match[3]}`; } while (existsSync(join(root, next)) || historicalAssets.has(next) || [...replacements.values()].includes(next));
     replacements.set(name, next);
   }
   const escaped = [...replacements.keys()].map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
