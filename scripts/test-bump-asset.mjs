@@ -66,3 +66,28 @@ test('the complete site audits pass after a sample asset release', () => {
     assert.match(output, /passed/i);
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
+
+test('a prepared branch and its deleted URLs reserve immutable asset versions',()=>{
+ const cwd=mkdtempSync(join(tmpdir(),'occulert-reserved-'));
+ try{
+  const source='const sample = 1;\n';
+  writeFileSync(join(cwd,'leaf.v1.js'),source);
+  writeFileSync(join(cwd,'asset-versions.json'),JSON.stringify({'leaf.js':'leaf.v1.js'}));
+  writeFileSync(join(cwd,'asset-integrity.json'),JSON.stringify({'leaf.v1.js':sha(source)}));
+  writeFileSync(join(cwd,'index.html'),'<script src="/leaf.v1.js"></script>');
+  writeFileSync(join(cwd,'sw.js'),"const CACHE = 'occulert-v1'; const files=['/leaf.v1.js'];\n");
+  writeFileSync(join(cwd,'vercel.json'),JSON.stringify({headers:[{source:'/(.*)\\.(js|css)',headers:[]}]}));
+  fixtureGit(cwd,['init','-q']);fixtureGit(cwd,['add','.']);
+  fixtureGit(cwd,['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','Initial release']);
+  const initial=fixtureGit(cwd,['rev-parse','--abbrev-ref','HEAD']).toString().trim();
+  fixtureGit(cwd,['checkout','-qb','prepared-release']);
+  writeFileSync(join(cwd,'leaf.v2.js'),'const otherPreparedBytes=2;\n');writeFileSync(join(cwd,'sw.js'),"const CACHE = 'occulert-v2'; const files=['/leaf.v2.js'];\n");fixtureGit(cwd,['add','.']);
+  fixtureGit(cwd,['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','Prepared URL']);
+  fixtureGit(cwd,['rm','leaf.v2.js']);writeFileSync(join(cwd,'leaf.v3.js'),'const otherPreparedBytes=3;\n');writeFileSync(join(cwd,'sw.js'),"const CACHE = 'occulert-v3'; const files=['/leaf.v3.js'];\n");fixtureGit(cwd,['add','.']);
+  fixtureGit(cwd,['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','Replacement URL']);
+  fixtureGit(cwd,['checkout','-q',initial]);
+  const dry=JSON.parse(run(cwd,'leaf.js','--dry-run'));assert.equal(dry.copies['leaf.v1.js'],'leaf.v4.js');assert.equal(dry.cache,'occulert-v4');
+  run(cwd,'leaf.js');assert.equal(JSON.parse(read(cwd,'asset-versions.json'))['leaf.js'],'leaf.v4.js');
+  assert.equal(read(cwd,'leaf.v1.js'),source);assert.equal(read(cwd,'leaf.v4.js'),source);assert.match(read(cwd,'sw.js'),/occulert-v4/);
+ }finally{rmSync(cwd,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
+});
