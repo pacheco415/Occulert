@@ -259,8 +259,8 @@ assertIncludes("sw.js", `'/${assetByStem('driver-app.css')}'`, "service worker m
 assertIncludes("sw.js", `'/${assetByStem('driver-app.js')}'`, "service worker must cache the external driver app behavior");
 assertIncludes("sw.js", "const NETWORK_FIRST_ASSETS", "service worker must refresh safety-critical driver logic before using its offline copy");
 assertIncludes("vercel.json", "\"key\": \"Content-Security-Policy\"", "vercel.json must enforce its tested CSP");
-assertIncludes("vercel.json", "https://fonts.googleapis.com", "vercel.json CSP must allow Google Fonts stylesheets used by marketing pages");
-assertIncludes("vercel.json", "font-src 'self' https://fonts.gstatic.com", "vercel.json CSP must allow Google Fonts font files");
+assertNotIncludes("vercel.json", "https://fonts.googleapis.com", "font stylesheets must be owned static assets");
+assertNotIncludes("vercel.json", "https://fonts.gstatic.com", "fonts must be served from owned static assets");
 assertIncludes("vercel.json", "https://*.supabase.co", "vercel.json CSP must allow configured Supabase Auth requests");
 assertIncludes("vercel.json", "'wasm-unsafe-eval'", "vercel.json CSP must permit MediaPipe WebAssembly compilation");
 assertIncludes("vercel.json", "webp|avif|gif", "optimized AVIF assets must receive immutable cache headers");

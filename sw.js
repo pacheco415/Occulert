@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v60';
+const CACHE = 'occulert-v66';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -50,6 +50,7 @@ function selectedRuntimeAssets() {
 }
 const SELECTED_RUNTIME_ASSETS = selectedRuntimeAssets();
 const STATIC_ASSETS = [
+  '/inter-fonts.v1.css',
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
   '/',
   '/index.html',
