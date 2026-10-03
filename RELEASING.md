@@ -33,3 +33,7 @@ For releases with database migrations, apply the migrations in timestamp order
 before deploying routes or clients that use the new schema or functions.
 
 Use `npm run asset:bump -- <logical-name> --dry-run` to review an asset release plan, then run without `--dry-run` to copy the asset and any active versioned importers, rewrite page references, update manifests and cache lists, and add immutable headers. Edit the new file, then use `npm run asset:bump -- <logical-name> --refresh` before committing to refresh its integrity digest. Refresh rejects assets already active in HEAD. Review the plan and run all release verification before committing or publishing.
+
+### Prepared branch asset names
+
+Before choosing a new asset URL, fetch the current main and relevant remote branches into a full-history checkout. The release tool reserves filenames found anywhere in known Git history, including other local/remote-tracking branches and deleted files. It does not contact GitHub automatically or know branches that have never been fetched. Never reuse an immutable URL from another prepared release, even after its file is deleted.
