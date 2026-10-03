@@ -21,7 +21,8 @@ function clean(value, max) {
 
 function validBody(request) {
   if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = typeof request.body === "object" && request.body ? request.body : {};
+  const body = request.body;
+  if (!body || typeof body !== "object") return false;
   return !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
 }
 
@@ -45,6 +46,11 @@ module.exports = async function handler(request, response) {
     const email = clean(user.email, 240).toLowerCase();
     const name = clean(body.name, 160) || email.split("@")[0] || "Occulert Driver";
     const vehicleId = clean(body.vehicle, 120) || null;
+    // Empty onboarding requests refresh identity without erasing display fields.
+    const updates = { email: email || null };
+    if (Object.hasOwn(body, "name") && clean(body.name, 160)) updates.name = clean(body.name, 160);
+    // A supplied empty vehicle is an intentional clear from the account form.
+    if (Object.hasOwn(body, "vehicle")) updates.vehicle_id = vehicleId;
     const existing = await pgFetch("drivers", {
       params: { select: "id,user_id,name,email,vehicle_id,fleet_id,active", user_id: "eq." + user.id, limit: "1" },
     });
@@ -55,7 +61,7 @@ module.exports = async function handler(request, response) {
       rows = await pgFetch("drivers", {
         method: "PATCH",
         params: { id: "eq." + existing[0].id, user_id: "eq." + user.id },
-        body: values,
+        body: updates,
       });
     } else {
       try {
@@ -70,7 +76,7 @@ module.exports = async function handler(request, response) {
         rows = await pgFetch("drivers", {
           method: "PATCH",
           params: { user_id: "eq." + user.id },
-          body: values,
+          body: updates,
         });
       }
     }

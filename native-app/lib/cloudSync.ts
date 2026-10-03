@@ -381,6 +381,7 @@ async function backendApi<T>(
 }
 
 async function ensureDriverProfile(syncContext?: { ownerId: string; consentVersion: number }): Promise<boolean> {
+  // Create if missing; omit display fields so onboarding preserves an existing profile.
   const result = await backendApi<{ driver?: { id?: string } }>('POST', '/api/profile', {}, true, syncContext);
   return result.ok && Boolean(result.body.driver?.id);
 }
