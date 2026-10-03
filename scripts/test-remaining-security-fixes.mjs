@@ -37,7 +37,8 @@ test('native cloud writes recheck current consent', () => {
   assert.match(alertWrite, /const syncContext = await currentSyncContext\(\)/);
   assert.match(alertWrite, /if \(!syncContext\) return false/);
   assert.match(finishWrite, /const syncContext = await currentSyncContext\(\)/);
-  assert.match(finishWrite, /if \(!syncContext\) return false/);
+  assert.match(finishWrite, /if \(!syncContext \|\| sessionScope.ownerId !== syncContext.ownerId/);
+  assert.match(finishWrite, /sessionScope.consentVersion !== syncContext.consentVersion/);
   assert.match(cloud, /createCachedBooleanPreference/);
   assert.match(cloud, /if \(consentRuntimeOverride !== null\) return consentRuntimeOverride/);
   assert.match(cloud, /if \(!enabled\) consentRuntimeOverride = false/);
