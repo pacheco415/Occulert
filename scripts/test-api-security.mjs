@@ -641,4 +641,50 @@ for (let i = 0; i < 6; i += 1) {
 assert.equal(rateLimited.status, 429, "submission bursts must be rate limited");
 assert.ok(Number(rateLimited.headers["retry-after"]) > 0);
 
+
+
+// Repeat-safe starts use the existing UUID primary key, without a new schema.
+const retryStartId = "f89d1cf9-893f-4fb6-a924-6669b4568221";
+const originalStart = { id: retryStartId, driver_id: "driver-1", fleet_id: "old-fleet", started_at: "2026-10-03T10:00:00.000Z", device: "Original device", ended_at: null };
+for (const race of [false, true]) {
+ let reads = 0, inserts = 0;
+ const handler = loadHandler("../api/sessions.js", async (table, options = {}) => {
+  if (table === "drivers") return [{ id: "driver-1", fleet_id: "new-fleet" }];
+  assert.equal(table, "sessions");
+  if (!options.method) {
+   assert.deepEqual(options.params, { id: "eq." + retryStartId, driver_id: "eq.driver-1", select: "*", limit: "1" });
+   reads++;
+   return race && reads === 1 ? [] : [originalStart];
+  }
+  assert.equal(options.method, "POST");inserts++;
+  assert.equal(options.body.id, retryStartId);
+  throw { details: { code: "23505" } };
+ });
+ const replay = await invoke(handler, request("POST", { session_id: retryStartId, fleet_id: "attacker-fleet", device: "Changed device" }));
+ assert.equal(replay.status, 200);assert.deepEqual(replay.body.session, originalStart);
+ assert.equal(replay.body.session_start_protocol, "client_uuid_v1");assert.equal(inserts, race ? 1 : 0);
+}
+let firstStart;
+const freshStart = loadHandler("../api/sessions.js", async (table, options = {}) => {
+ if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
+ if (!options.method) return [];
+ firstStart = options.body;return [{ ...options.body }];
+});
+assert.equal((await invoke(freshStart, request("POST", { session_id: retryStartId, driver_id: "attacker", fleet_id: "attacker" }))).status, 200);
+assert.equal(firstStart.id, retryStartId);assert.equal(firstStart.driver_id, "driver-1");assert.equal(firstStart.fleet_id, "fleet-1");
+for (const session_id of [null, "", "bad", 42, {}, []]) assert.equal((await invoke(freshStart, request("POST", { session_id }))).status, 400);
+const foreignStart = loadHandler("../api/sessions.js", async (table, options = {}) => {
+ if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
+ if (!options.method) { assert.equal(options.params.driver_id, "eq.driver-1");return []; }
+ throw { details: { code: "23505" } };
+});
+const conflict = await invoke(foreignStart, request("POST", { session_id: retryStartId }));
+assert.equal(conflict.status, 409);assert.deepEqual(conflict.body, { ok: false, error: "session_id_conflict" });
+const failedStart = loadHandler("../api/sessions.js", async (table, options = {}) => {
+ if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
+ if (!options.method) return [];
+ throw { details: { code: "23503" } };
+});
+assert.equal((await invoke(failedStart, request("POST", { session_id: retryStartId }))).status, 502);
+
 console.log("Occulert API security tests passed.");
