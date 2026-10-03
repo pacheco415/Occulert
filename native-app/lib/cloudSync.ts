@@ -62,9 +62,9 @@ export interface CloudState {
 }
 
 export interface CloudSessionStats {
-  averageFatigue: number;
-  maxFatigue: number;
-  safetyScore: number;
+  averageFatigue: number | null;
+  maxFatigue: number | null;
+  safetyScore: number | null;
   alertCount: number;
 }
 
@@ -629,13 +629,13 @@ export async function finishCloudSession(
     cloudSessionScopes.delete(sessionId);
     return false;
   }
-  const metric = (value: number, max = 100) => Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : null;
+  const metric = (value: number | null, max = 100) => typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : null;
   const entry: PendingSessionSummary = {
     session_id: sessionId, ended_at: endedAt, local_session_id: localSessionId,
     average_fatigue: metric(stats.averageFatigue), max_fatigue: metric(stats.maxFatigue),
     safety_score: metric(stats.safetyScore), alert_count: metric(stats.alertCount, 10000),
     // Candidate head-nod observations remain local until device validation.
-    head_nod_count: 0,
+    head_nod_count: null,
   };
   try {
     if (!await sessionOutbox.enqueue(syncContext, entry)) return false;

@@ -669,3 +669,13 @@ test('format migration is durable even when every legacy record already has an I
  await assert.rejects(api.loadSessionHistory(),/unsupported format version/);
  await assert.rejects(api.updateSessionHistory(()=>[]),/unsupported format version/);assert.equal(stored,future);
 });
+
+
+test('native cloud retries preserve unknown fatigue and unvalidated nod counts, including a recorded zero alert count',async()=>{
+ const f=cloudFixture(auth('old',4000000000),{consent:true});const payloads=[];let available=false;
+ f.transport=(_url,options)=>{payloads.push(JSON.parse(options.body));return response(available?200:503,{})};
+ const endedAt='2026-10-03T12:00:00.000Z';
+ assert.equal(await f.api.finishCloudSession('session',{averageFatigue:null,maxFatigue:null,safetyScore:null,alertCount:0},endedAt),false);
+ available=true;await f.api.retryPendingCloudSessions();assert.equal(payloads.length,2);
+ assert.deepEqual(payloads[0],{session_id:'session',ended_at:endedAt,average_fatigue:null,max_fatigue:null,safety_score:null,alert_count:0,head_nod_count:null});assert.deepEqual(payloads[1],payloads[0]);
+});

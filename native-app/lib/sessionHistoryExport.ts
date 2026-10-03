@@ -6,7 +6,7 @@ export interface ExportableSessionSummary {
   updatedAt?: string;
   durationSec?: number;
   alertCount?: number;
-  avgFatigue?: number;
+  avgFatigue?: number | null;
   sensitivity?: string;
   alertAssessment?: string;
   recoveredFromInterruption?: boolean;
