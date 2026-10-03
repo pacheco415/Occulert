@@ -14,6 +14,8 @@ import {
   type SessionTestConditions,
 } from '../lib/feedback';
 import { loadSessionHistory, updateSessionHistory } from '../lib/sessionHistory';
+import { getPendingCloudSummaryState, pendingCloudSummaryStateIsCurrent, retryPendingCloudSessions, type PendingCloudSummaryState } from '../lib/cloudSync';
+import { cloudSummaryPresentation } from '../lib/cloudSummaryPresentation';
 import {
   commitSessionHistoryEdit,
   removeMatchingSessionRecord,
@@ -314,6 +316,10 @@ type SessionOperation = 'saving' | 'deleting' | 'feedback';
 export default function HistoryScreen() {
   const router = useRouter();
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  const [pendingCloud, setPendingCloud] = useState<PendingCloudSummaryState>({scope:null,count:0,localIds:[]});
+  const [retryCloudBusy, setRetryCloudBusy] = useState(false);
+  const retryCloudBusyRef = useRef(false);
+  const retryCloudRunnerRef = useRef(createSingleFlightActionRunner());
   const [loaded, setLoaded] = useState(false);
   const [historyLoadError, setHistoryLoadError] = useState(false);
   const [historyLoadBusy, setHistoryLoadBusy] = useState(true);
@@ -388,8 +394,9 @@ export default function HistoryScreen() {
     const recordedViewRevision = recordedViewRevisionRef.current;
     const customDraftRevision = customDraftRevisionRef.current;
     setHistoryLoadBusy(true);
+    setPendingCloud({scope:null,count:0,localIds:[]});
     try {
-      const [storedSessions, savedFilter, savedPeriod, savedAssessment, savedView] = await Promise.all([
+      const [storedSessions, savedFilter, savedPeriod, savedAssessment, savedView, pendingSummaries] = await Promise.all([
         loadSessionHistory<SessionRecord>(),
         filterWriteQueueRef.current
           .then(() => AsyncStorage.getItem(HISTORY_FILTER_KEY))
@@ -403,10 +410,12 @@ export default function HistoryScreen() {
         recordedViewWriteQueueRef.current
           .then(() => AsyncStorage.getItem(HISTORY_VIEW_KEY))
           .catch(() => undefined),
+        getPendingCloudSummaryState(),
       ]);
       if (historyLoadAttemptRef.current === loadAttempt && historyRevisionRef.current === revision) {
         sessionsRef.current = storedSessions;
         setSessions(storedSessions);
+        setPendingCloud(pendingCloudSummaryStateIsCurrent(pendingSummaries) ? pendingSummaries : {scope:null,count:0,localIds:[]});
         setHistoryLoadError(false);
         let restoredView = historyViewRef.current;
         if (!preserveView && recordedViewRevisionRef.current === recordedViewRevision && savedView !== undefined) {
@@ -451,6 +460,7 @@ export default function HistoryScreen() {
 
   useFocusEffect(useCallback(() => {
     focusedRef.current = true;
+    setRetryCloudBusy(retryCloudBusyRef.current);
     void load();
     return () => {
       focusedRef.current = false;
@@ -459,6 +469,20 @@ export default function HistoryScreen() {
       pendingReviewScrollRef.current = null;
     };
   }, [load]));
+
+  const retrySavedCloudSummaries = async () => {
+    const pending = pendingCloud;
+    if (!pending.scope || !pendingCloudSummaryStateIsCurrent(pending)) { await load(true); return; }
+    const attempt = historyLoadAttemptRef.current;
+    await retryCloudRunnerRef.current.run({
+      action: async () => {
+        await retryPendingCloudSessions(pending.scope!);
+        if (focusedRef.current && historyLoadAttemptRef.current === attempt) await load(true);
+      },
+      onBusyChange: busy => { retryCloudBusyRef.current=busy; if (focusedRef.current) setRetryCloudBusy(busy); },
+      onError: () => { if (focusedRef.current) Alert.alert('Cloud completion not confirmed', 'Your local summaries remain saved. Refresh and try again when connected.'); },
+    });
+  };
 
   const chooseHistoryFilter = (filter: HistoryFilter) => {
     viewRevisionRef.current += 1;
@@ -865,6 +889,18 @@ export default function HistoryScreen() {
           {historyLoadBusy ? <ActivityIndicator size="small" color="#93c5fd" /> : <Ionicons name="refresh-outline" size={17} color="#93c5fd" />}
           <Text style={s.refreshText}>{historyLoadBusy ? 'Reading local history…' : 'Refresh local history'}</Text>
         </TouchableOpacity>
+
+        {pendingCloud.count > 0 && pendingCloudSummaryStateIsCurrent(pendingCloud) && (
+          <TouchableOpacity accessibilityRole="button"
+            accessibilityLabel={`Retry ${pendingCloud.count} pending cloud summaries`}
+            accessibilityHint="Retries only saved session endings for the current signed-in owner with cloud sharing enabled"
+            accessibilityState={{disabled:retryCloudBusy||historyLoadBusy,busy:retryCloudBusy}}
+            disabled={retryCloudBusy||historyLoadBusy}
+            style={[s.refreshButton,(retryCloudBusy||historyLoadBusy)&&s.operationDisabled]}
+            onPress={()=>{void retrySavedCloudSummaries();}}>
+            <Text style={s.refreshText}>{retryCloudBusy?'Checking saved cloud summaries…':`Retry ${pendingCloud.count} pending cloud summaries`}</Text>
+          </TouchableOpacity>
+        )}
 
         {!loaded && historyLoadBusy && (
           <View
@@ -1487,12 +1523,12 @@ export default function HistoryScreen() {
             )}
             <View style={s.storageRow}>
               <Ionicons
-                name={item.cloudSynced ? 'cloud-done-outline' : 'phone-portrait-outline'}
+                name={cloudSummaryPresentation(item,pendingCloudSummaryStateIsCurrent(pendingCloud)?pendingCloud.localIds:[]).icon}
                 size={14}
-                color={item.cloudSynced ? '#34d399' : '#4a7a8a'}
+                color={cloudSummaryPresentation(item,pendingCloud.localIds).confirmed ? '#34d399' : '#4a7a8a'}
               />
-              <Text style={[s.storageText, item.cloudSynced && s.storageTextSynced]}>
-                {item.cloudSynced ? 'Summary synced to your protected account' : 'Saved only on this iPhone'}
+              <Text style={[s.storageText, cloudSummaryPresentation(item,pendingCloud.localIds).confirmed && s.storageTextSynced]}>
+                {cloudSummaryPresentation(item,pendingCloudSummaryStateIsCurrent(pendingCloud)?pendingCloud.localIds:[]).label}
               </Text>
             </View>
             <Text style={s.buildInfo}>
