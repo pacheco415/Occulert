@@ -47,6 +47,12 @@ function assertSingleH1(path) {
   if (count !== 1) fail(`${path} must contain exactly one h1 (found ${count})`);
 }
 
+// Keep deployment source exclusions explicit and reviewable.
+const deploymentExclusions = new Set(read('.vercelignore').split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')));
+for (const path of ['tests/', 'docs/', 'native-app/', 'supabase/', 'db/', 'scripts/', 'benchmark/', 'brand/', '.github/', '*.md', 'playwright.config.mjs']) {
+  if (!deploymentExclusions.has(path)) fail(`.vercelignore must exclude ${path}`);
+}
+
 walk(root);
 
 for (const scriptPath of [`${assetByStem('driver-app.js')}`, `${assetByStem('homepage.js')}`, `${assetByStem('lang.js')}`, `${assetByStem('passkey-auth.js')}`, `${assetByStem('supabase-loader.js')}`]) {

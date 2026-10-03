@@ -1,2 +1,15 @@
-# Browser fixtures and test-only scripts are not production site assets.
+# Source, fixtures and internal documentation are not public site assets.
+# Keep package manifests and Node configuration for the Vercel build.
 tests/
+docs/
+native-app/
+supabase/
+db/
+scripts/
+benchmark/
+brand/
+.github/
+*.md
+playwright.config.mjs
+test-results/
+playwright-report/
