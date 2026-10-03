@@ -335,9 +335,10 @@ assertIncludes(`${assetByStem('auth-helper.js')}`, "await window.OcculertBackend
 assertIncludes("login.html", `src=\"/${assetByStem('supabase-loader.js')}\"`, "login must use the resilient same-site Supabase loader");
 assertIncludes("account.html", `src=\"/${assetByStem('supabase-loader.js')}\"`, "account settings must use the same resilient Supabase loader");
 assertIncludes(`${assetByStem('supabase-loader.js')}`, "var VERSION = \"2.112.3\"", "the resilient loader must pin a passkey-capable Supabase SDK version");
-assertIncludes(`${assetByStem('supabase-loader.js')}`, "sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC", "every Supabase loader path must verify the pinned SDK integrity");
-assertIncludes(`${assetByStem('supabase-loader.js')}`, "/vendor/supabase-", "the Supabase loader must prefer the Occulert same-origin proxy");
-assertIncludes("vercel.json", "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js", "the same-origin proxy must target the pinned SDK artifact");
+assertIncludes(`${assetByStem('supabase-loader.js')}`, "sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg", "every Supabase loader path must verify the pinned SDK integrity");
+assertIncludes(`${assetByStem('supabase-loader.js')}`, "/vendor/supabase-", "the Supabase loader must use the owned pinned SDK");
+assertIncludes("vercel.json", "/vendor/supabase-2.112.3.js", "the owned pinned SDK must have an explicit cache policy");
+assertNotIncludes(assetByStem('supabase-loader.js'), "cdn.jsdelivr.net", "new SDK loaders must not request a runtime CDN fallback");
 assertIncludes("login.html", "id=\"passkeyRetryBtn\"", "login must offer recovery after a retryable Safari loader failure");
 assertIncludes("account.html", "id=\"passkeyRetryBtn\"", "account settings must offer recovery after a retryable passkey setup failure");
 assertIncludes(`${assetByStem('passkey-auth.js')}`, "sdk_load_failed", "passkey errors must distinguish an SDK delivery failure");

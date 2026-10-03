@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v60';
+const CACHE = 'occulert-v65';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -74,6 +74,7 @@ const NETWORK_ONLY_DOCUMENTS = new Set([
   '/fleet-history.html',
 ]);
 const NETWORK_ONLY_ASSETS = new Set([
+  '/vendor/supabase-2.112.3.js',
   '/fleet-history-page.v64.js',
   '/fleet-history-page.v65.js',
   '/fleet-history-page.v66.js',
@@ -89,6 +90,8 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v69.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
+  '/supabase-loader.v48.js',
+  // Retain the previous loader through the release compatibility window.
   '/supabase-loader.v47.js',
   '/passwordless-auth.v49.js',
   '/passwordless-auth.v60.js',
