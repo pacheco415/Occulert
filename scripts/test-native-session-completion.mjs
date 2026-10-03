@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
+import {stripTypeScriptTypes} from 'node:module';
+import vm from 'node:vm';
+import {elapsedSessionSeconds} from '../native-app/lib/monitorPerformance.ts';
 import {saveCompletedNativeSession,markCompletedNativeSessionSynced,finalizeCompletedNativeSession,completeNativeSessionStop} from '../native-app/lib/sessionCompletion.ts';
 const snapshot={sessionId:'local',durationSec:60,alerts:2,fatigueSum:91,fatigueSamples:3,headNodObservations:4,headphoneHeadNodObservations:1,headphoneMotionSamples:12,headphoneMotionStatus:'ready',monitorPerformance:{bounded:true},sensorFusion:{observationOnly:true},sensitivity:'medium',extra:{appVersion:'1.0.0'}};
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}}
@@ -57,4 +61,25 @@ test('badge writes preserve unrelated records and storage failure is best effort
  await markCompletedNativeSessionSynced(async update=>{rows=update(rows)},'local','cloud');
  assert.deepEqual(rows,[{sessionId:'local',unknown:42,cloudSynced:true,cloudSessionId:'cloud'},{sessionId:'other',cloudSynced:false}]);
  await markCompletedNativeSessionSynced(async()=>{throw Error('disk denied')},'local','cloud');
+});
+
+
+test('the actual monitor disarms before saving and ignores a concurrent stop',async()=>{
+ const source=readFileSync(new URL('../native-app/app/monitor.tsx',import.meta.url),'utf8');
+ const start=source.indexOf('  const handleStop = useCallback('),end=source.indexOf('  // App-state and hardware-back',start);assert.ok(start>=0&&end>start);
+ const pendingSave=deferred(),order=[];
+ class FixedDate extends Date {static now(){return 12000}}
+ const ref=current=>({current});
+ const context={Date:FixedDate,useCallback:fn=>fn,__DEV__:false,elapsedSessionSeconds,completeNativeSessionStop,finalizeCompletedNativeSession,
+  startAttemptRef:ref(0),stoppingRef:ref(false),isRunningRef:ref(true),sessionStartedAtRef:ref(1000),alertCountRef:ref(2),activeSessionIdRef:ref('local'),fatigueSamplesRef:ref(2),fatigueSumRef:ref(40),maxFatigueRef:ref(40),cloudSessionRef:ref(Promise.resolve('cloud')),cloudEventQueueRef:ref(Promise.resolve()),performanceTrackerRef:ref({snapshot:()=>({bounded:true})}),monitoringActiveRef:ref(true),cameraRecoveringRef:ref(false),
+  setIsStopping:value=>order.push('stopping:'+value),setSessionEndedAt:()=>{},setIsRunning:()=>{},setCameraRecovering:()=>{},reset:()=>order.push('reset'),stopHeadphoneMotion:()=>Promise.resolve(),
+  saveSession:async(id,duration,alerts)=>{assert.equal(context.monitoringActiveRef.current,false);assert.equal(context.isRunningRef.current,false);assert.equal(context.cloudSessionRef.current,null);assert.equal(duration,11);assert.equal(alerts,2);order.push('save:'+id);await pendingSave.promise;return id},
+  clearActiveSessionCheckpoint:async()=>order.push('cleared'),finishCloudSession:async()=>{order.push('cloud');return true},markSessionSynced:async()=>order.push('badge'),
+ };
+ vm.runInNewContext(stripTypeScriptTypes(source.slice(start,end))+'\nglobalThis.stop=handleStop;',context);
+ const first=context.stop();await new Promise(resolve=>setImmediate(resolve));await context.stop();
+ assert.equal(order.filter(item=>item==='save:local').length,1);assert.equal(order.includes('cloud'),false);
+ pendingSave.resolve();await first;
+ assert.deepEqual(order,['stopping:true','reset','save:local','cleared','cloud','badge','stopping:false']);
+ assert.equal(context.activeSessionIdRef.current,null);assert.equal(context.stoppingRef.current,false);
 });
