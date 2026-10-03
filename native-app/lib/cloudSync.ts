@@ -582,10 +582,34 @@ function sendPendingSummary(scope: SummaryScope, entry: PendingSessionSummary) {
   }, true, scope);
 }
 
-export async function retryPendingCloudSessions(): Promise<void> {
+export interface PendingCloudSummaryState {
+  scope: SummaryScope | null;
+  count: number;
+  localIds: string[];
+}
+
+export function pendingCloudSummaryStateIsCurrent(state: PendingCloudSummaryState): boolean {
+  return Boolean(state.scope && authCache?.user.id === state.scope.ownerId
+    && consentRuntimeOverride !== false && consentMutationVersion === state.scope.consentVersion);
+}
+
+export async function getPendingCloudSummaryState(): Promise<PendingCloudSummaryState> {
+  const unavailable = (): PendingCloudSummaryState => ({scope:null,count:0,localIds:[]});
+  try {
+    return await withCloudReadDeadline(async () => {
+      const scope = await currentSyncContext();
+      if (!scope) return unavailable();
+      const entries = await sessionOutbox.pendingEntries(scope);
+      const result = {scope,count:entries.length,localIds:entries.flatMap(entry=>entry.local_session_id?[entry.local_session_id]:[])};
+      return pendingCloudSummaryStateIsCurrent(result) ? result : unavailable();
+    });
+  } catch { return unavailable(); }
+}
+
+export async function retryPendingCloudSessions(expectedScope?: SummaryScope): Promise<void> {
   try {
     const scope = await currentSyncContext();
-    if (!scope) return;
+    if (!scope || expectedScope && (scope.ownerId !== expectedScope.ownerId || scope.consentVersion !== expectedScope.consentVersion)) return;
     await sessionOutbox.flush(scope, entry => sendPendingSummary(scope, entry));
   }
   catch { /* Preserve unreadable or unavailable storage for local recovery. */ }
