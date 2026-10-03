@@ -18,3 +18,5 @@ dependency-reports/
 .verification-receipts/
 
 asset-size-budgets.json
+
+startup-performance-budgets.json
