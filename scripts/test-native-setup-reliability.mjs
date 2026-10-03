@@ -154,6 +154,23 @@ test('checkpoint parser distinguishes no checkpoint from unreadable stored data'
   }
 });
 
+test('checkpoint parser preserves malformed numerical and nested records as unreadable', () => {
+  const invalid = [
+    { startedAt: 1e20 }, { checkpointedAt: 500 }, { durationSec: Infinity },
+    { alertCount: 0.5 }, { avgFatigue: -1 }, { maxFatigue: 101 },
+    { headNodObservations: 0.5 }, { monitorPerformance: [] },
+    { monitorPerformance: { samples: -1 } },
+    { monitorPerformance: { samples: "invalid" } },
+    { monitorPerformance: { averageInferenceMs: true } },
+    { sensorFusion: { camera: { samples: Infinity } } },
+  ];
+  for (const overrides of invalid) {
+    assert.throws(() => parseActiveSessionCheckpoint(JSON.stringify({ ...CHECKPOINT, ...overrides })), ActiveSessionCheckpointUnreadableError);
+  }
+  const overflowing = JSON.stringify(CHECKPOINT).replace('"durationSec":30', '"durationSec":1e309');
+  assert.throws(() => parseActiveSessionCheckpoint(overflowing), ActiveSessionCheckpointUnreadableError);
+});
+
 test('checkpoint reads, writes, and scoped cleanup preserve unreadable data', () => {
   const storage = read('native-app/lib/sessionRecovery.ts');
   const home = read('native-app/app/index.tsx');
