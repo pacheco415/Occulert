@@ -65,12 +65,12 @@ const sessions = loadHandler("../api/sessions.js", async (table, options = {}) =
   if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
   if (table === "sessions" && options.method === "POST") {
     insertedSession = options.body;
-    return [{ id: "session-1", ...options.body }];
+    return [{ id: "00000000-0000-4000-8000-000000000001", ...options.body }];
   }
   if (table === "sessions" && options.method === "PATCH") {
     sessionPatchParams = options.params;
     patchedSession = options.body;
-    return allowSessionUpdate ? [{ id: "session-1" }] : [];
+    return allowSessionUpdate ? [{ id: "00000000-0000-4000-8000-000000000001" }] : [];
   }
   throw new Error(`unexpected sessions call: ${table}`);
 });
@@ -98,17 +98,17 @@ assert.equal(insertedSession.detector_pipeline, null, "only documented detector 
 assert.equal(insertedSession.detector_version, null, "provenance labels are limited to safe text");
 assert.equal(insertedSession.app_version, null, "app labels are limited to safe text");
 
-const patchBody = { session_id: "session-1", average_fatigue: 30, max_fatigue: 60, safety_score: 80 };
+const patchBody = { session_id: "00000000-0000-4000-8000-000000000001", average_fatigue: 30, max_fatigue: 60, safety_score: 80 };
 const deniedPatch = await invoke(sessions, request("PATCH", patchBody));
 assert.equal(deniedPatch.status, 404, "a session not owned by the authenticated driver must stay hidden");
-assert.deepEqual(sessionPatchParams, { id: "eq.session-1", driver_id: "eq.driver-1" });
+assert.deepEqual(sessionPatchParams, { id: "eq.00000000-0000-4000-8000-000000000001", driver_id: "eq.driver-1" });
 
 allowSessionUpdate = true;
 const allowedPatch = await invoke(sessions, request("PATCH", patchBody));
 assert.equal(allowedPatch.status, 200, "the authenticated driver must still be able to finish their own session");
 
 const blankMetricsPatch = await invoke(sessions, request("PATCH", {
-  session_id: "session-1",
+  session_id: "00000000-0000-4000-8000-000000000001",
   average_fatigue: null,
   max_fatigue: "",
   safety_score: false,
@@ -122,7 +122,7 @@ let allowEventSession = false;
 let insertedEvent;
 const events = loadHandler("../api/events.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1" }];
-  if (table === "sessions") return allowEventSession ? [{ id: "session-1" }] : [];
+  if (table === "sessions") return allowEventSession ? [{ id: "00000000-0000-4000-8000-000000000001" }] : [];
   if (table === "events") {
     insertedEvent = options.body;
     return [{ id: "event-1", ...options.body }];
@@ -130,7 +130,7 @@ const events = loadHandler("../api/events.js", async (table, options = {}) => {
   throw new Error(`unexpected events call: ${table}`);
 });
 
-const eventBody = { session_id: "session-1", type: "drowsy", fatigue_score: 140, confidence: -5, latitude: 120, longitude: -240 };
+const eventBody = { session_id: "00000000-0000-4000-8000-000000000001", type: "drowsy", fatigue_score: 140, confidence: -5, latitude: 120, longitude: -240 };
 const deniedEvent = await invoke(events, request("POST", eventBody));
 assert.equal(deniedEvent.status, 404, "events must not be written to another driver's session");
 
@@ -144,7 +144,7 @@ assert.equal(insertedEvent.latitude, 90);
 assert.equal(insertedEvent.longitude, -180);
 
 const eventWithoutLocation = await invoke(events, request("POST", {
-  session_id: "session-1",
+  session_id: "00000000-0000-4000-8000-000000000001",
   type: "drowsy",
   fatigue_score: 25,
   latitude: null,
@@ -153,6 +153,22 @@ const eventWithoutLocation = await invoke(events, request("POST", {
 assert.equal(eventWithoutLocation.status, 200);
 assert.equal(insertedEvent.latitude, null, "explicitly absent latitude must not become 0");
 assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must not become 0");
+
+for (const badId of ['not-a-uuid', 7, {}, '00000000-0000-4000-8000-000000000001.extra']) {
+  const session = await invoke(sessions, request("PATCH", { session_id: badId }));
+  assert.equal(session.status, 400);
+  assert.equal(session.body.error, "invalid_session_id");
+  const event = await invoke(events, request("POST", { session_id: badId, type: "drowsy" }));
+  assert.equal(event.status, 400);
+  assert.equal(event.body.error, "invalid_session_id");
+}
+await invoke(sessions, request("PATCH", { session_id: "00000000-0000-4000-8000-000000000001", alert_count: 2.7, head_nod_count: 1.2 }));
+assert.equal(patchedSession.alert_count, 3);
+assert.equal(patchedSession.head_nod_count, 1);
+for (const body of [null, true, "text", 3, []]) {
+  assert.equal((await invoke(sessions, request("POST", body))).status, 415);
+  assert.equal((await invoke(events, request("POST", body))).status, 415);
+}
 
 let insertedProfile;
 const profile = loadHandler("../api/profile.js", async (table, options = {}) => {
