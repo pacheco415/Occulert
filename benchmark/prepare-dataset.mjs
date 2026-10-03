@@ -8,6 +8,7 @@
 //
 // It never copies raw media. Input and output are tabular derived values only.
 
+import geometry from "../ear-geometry.v1.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
@@ -68,6 +69,15 @@ export function prepare(rawRows, config, rawHeaders) {
     }
   }
   const columns = config.columns ?? {};
+  let earGeometry=null;
+  if(config.earGeometry!==undefined){
+    if(!config.earGeometry||typeof config.earGeometry!=='object'||Array.isArray(config.earGeometry)||config.earGeometry.mode!=='pixel_landmarks')throw new Error('EAR geometry must declare pixel_landmarks mode');
+    earGeometry={mode:'pixel_landmarks',landmarksColumn:'landmarks',widthColumn:'video_width',heightColumn:'video_height',...config.earGeometry};
+    for(const key of ['landmarksColumn','widthColumn','heightColumn']){
+      const name=earGeometry[key];
+      if(typeof name!=='string'||!name.trim()||(rawHeaders?!rawHeaders.includes(name):!rawRows.some(row=>Object.hasOwn(row,name))))throw new Error(`EAR geometry source column ${key} is absent`);
+    }
+  }
   const labelMap = config.labelMap ?? {};
   const slices = config.slices ?? {};
   const split = { by: "participant", testFraction: 0.3, seed: "occulert", ...(config.split ?? {}) };
@@ -112,7 +122,11 @@ export function prepare(rawRows, config, rawHeaders) {
       continue;
     }
 
-    const earValue = raw[columns.ear ?? "ear"];
+    let earValue = raw[columns.ear ?? "ear"];
+    if(earGeometry){
+      try{earValue=geometry.meanEyes(JSON.parse(raw[earGeometry.landmarksColumn]),Number(raw[earGeometry.widthColumn]),Number(raw[earGeometry.heightColumn]));}
+      catch{earValue=NaN;}
+    }
     if (!validEar(earValue)) {
       note("invalid or missing EAR");
       continue;
@@ -162,6 +176,7 @@ export function prepare(rawRows, config, rawHeaders) {
     leakageCheck: {
       participantsInBothSplits: [...leakedParticipants],
     },
+    earGeometry: earGeometry ?? {mode:"provided_ear_geometry_unverified"},
     preparedAt: new Date().toISOString(),
   };
 
@@ -188,6 +203,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const { headers, rows, manifest } = prepare(rawRows, config, rawHeaders);
   manifest.provenance = {
     ...sourceSnapshot(),
+    earGeometrySourceSha256: config.earGeometry ? contentSha256(await readFile(new URL("../ear-geometry.v1.js", import.meta.url))) : undefined,
     inputSha256: contentSha256(inputBytes),
     configurationSha256: contentSha256(configBytes),
   };

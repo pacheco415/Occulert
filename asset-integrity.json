@@ -109,5 +109,8 @@
   "driver-app.v68.css": "7e10f3a15eed448154996bbaf45134fabd0506d6040d04ba51547989dfbcdd4f",
   "driver-app.v69.js": "f19725d3577e4ec202a9bce70ae31749a64cf7b14b54a7102f0dd1bba96280de",
   "driver-app.v70.js": "ec82d2a78ac126beb7dc8527a623ec2a9057e756fd3dfe13ef4a66785e6d91c9",
-  "occulert-backend.v69.js": "7b27a73861cefd326c6e243ab8035f8589ab60d9a118bfc0694958bb42a84437"
+  "occulert-backend.v69.js": "7b27a73861cefd326c6e243ab8035f8589ab60d9a118bfc0694958bb42a84437",
+  "driver-app.v72.js": "6a16dcdd42f0919180e24e23c463493fa1c6e11b62f2cae53469d8fa53328ba9",
+  "occulert-backend.v72.js": "ea0665a04d08e901cdf3033ce47ae72328bd1b0c4cc8a2c879e25430ee3a768d",
+  "ear-geometry.v1.js": "a7ad86dc6bb64a7d397e06948eea39c93afec2309f54e9fd08f28f87c8bd1f2b"
 }

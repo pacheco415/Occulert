@@ -235,3 +235,13 @@ Only replace `TBD` with reproducible results from an authorized dataset. After
 that, update `README.md`, `safety.html`, and the related GitHub roadmap issue
 with the exact dataset, split, metric definitions, and limitations — and never
 publish a single headline percentage without them.
+
+## Optional pixel EAR experiment
+
+The released default stays in normalized landmark units. `/app.html?ear-units=pixels` selects parked, local-only testing of `ear-geometry.v1.js`, shared by the browser and dataset preparation. It scales landmark x by video width and y by video height before distance calculations. Missing dimensions or degenerate eye points stay unavailable rather than producing a fabricated open-eye measurement. Camera resolution and orientation changes reset observations and restart calibration in this experimental mode.
+
+A 360×480 reference fixture was chosen to preserve the existing 3:4 portrait behavior; this is not evidence that it is the most common device. Old normalized EAR equals physical EAR × width/height. The experiment therefore converts default thresholds, sample gates, clamps and sensitivity offsets once by 480/360 = 4/3. Its calibrated baseline is measured directly in pixel units. Thresholds use that fixed reference conversion rather than changing when a device rotates. Ordinary app loads keep the released values.
+
+`node benchmark/compare-ear-geometry.mjs receipt.json` uses the actual active driver and shared geometry code with a synthetic 60-pixel-wide eye whose opposing vertical distances are 18 pixels. Legacy normalized EAR is 0.225 at 360×480 and 0.400 at 480×360; pixel EAR is 0.300 in both, matching the dataset extractor. This verifies geometry, not camera accuracy, calibration suitability or driving safety.
+
+Dataset preparation may declare `earGeometry: {mode: "pixel_landmarks", landmarksColumn: "landmarks", widthColumn: "video_width", heightColumn: "video_height"}`. Each source row must then provide JSON MediaPipe landmarks and its actual frame dimensions. The tool outputs derived EAR, never the raw landmarks, and records the extractor hash and mapping. Existing EAR-only exports remain unchanged and explicitly carry unverified geometry provenance. Do not multiply old EAR-only CSV values by an assumed aspect ratio. Licensed dataset access and frozen evaluation are still required before changing the default.
