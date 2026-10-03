@@ -93,3 +93,13 @@ test('the monitor captures finish time before waiting for pending event delivery
   assert.equal(h.get('window.pendingSummary.endedAt'), expected);
   assert.equal(h.get('window.pendingSummary.sessionId'), 'cloud-one');
 });
+
+test('read-only pending snapshots are copied, owner-scoped and cannot clear a newer account', () => {
+  const f=fixture();f.outbox.enqueue(scope,entry('read'));
+  const rows=f.outbox.pendingEntries(scope);rows[0].stats.safety_score=0;
+  assert.equal(f.outbox.pendingEntries(scope)[0].stats.safety_score,70);
+  assert.equal(f.outbox.pendingEntries({...scope,ownerId:'different'}).length,0);
+  f.values.set('occulert-auth',JSON.stringify({access_token:'new',refresh_token:'new',expires_at:9999999999,user:{id:'different'}}));
+  assert.equal(f.outbox.clearOwner(scope),false);
+  assert.equal(JSON.parse(f.values.get(KEY)).length,1);
+});

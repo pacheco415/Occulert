@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const versions = JSON.parse(readFileSync(new URL('../asset-versions.json', import.meta.url), 'utf8'));
 function harness(asset, initial = {}) {
   const storage = new Map(Object.entries(initial));
-  const elements = new Map(), alerts = [], timers = new Map();
+  const elements = new Map(), alerts = [], timers = new Map(), windowEvents = new Map();
   let timerId = 0;
   const element = id => {
     if (!elements.has(id)) elements.set(id, { value: '', textContent: '', innerHTML: '', hidden: true,
@@ -27,10 +27,13 @@ function harness(asset, initial = {}) {
   }
   if (asset === 'session-history-page-2.js') {
     context.window=context;
+    context.navigator={};
+    context.addEventListener=(name,callback)=>windowEvents.set(name,callback);
+    vm.runInContext(readFileSync(new URL('../'+versions['occulert-backend.js'],import.meta.url),'utf8'),context);
     vm.runInContext(readFileSync(new URL('../'+versions['local-history.js'],import.meta.url),'utf8'),context);
   }
   vm.runInContext(readFileSync(new URL('../' + versions[asset], import.meta.url), 'utf8'), context);
-  return { context, storage, elements, element, localStorage, alerts, timers };
+  return { context, storage, elements, element, localStorage, alerts, timers, windowEvents };
 }
 
 test('driver profiles tolerate malformed saved values and members', () => {
@@ -178,4 +181,31 @@ test('history summaries do not change unknown or partial saved measurements', ()
   const row=app.context.getHistory()[0];
   assert.equal(row.alerts,null);assert.equal(row.headNods,null);assert.equal(row.savedAt,'invalid');
   assert.equal(row.unknown.keep,true);
+});
+
+const cloudAuth={access_token:'test-token',refresh_token:'test-refresh',expires_at:9999999999,user:{id:'owner-a'}};
+const cloudEntry={ownerId:'owner-a',sessionId:'cloud-one',localSessionId:'local-one',endedAt:'2026-10-03T12:00:00.000Z',stats:{average_fatigue:20,max_fatigue:40,safety_score:70,alert_count:1,head_nod_count:0}};
+function cloudHistory(){return harness('session-history-page-2.js',{'occulert-auth':JSON.stringify(cloudAuth),'occulert-cloud-outbox':JSON.stringify([cloudEntry]),'occulert-session-history':JSON.stringify([{id:'local-one',localRecordId:'local-one',historyVersion:1,alerts:1,savedAt:'2026-10-03T12:00:00Z'}])})}
+test('History reads pending outcomes without sending and retries only after deliberate permission', async () => {
+  const app=cloudHistory();let calls=0;
+  app.context.fetch=async(url)=>{calls++;if(url==='/api/public-config')return Response.json({ok:true,supabase:{configured:true,url:'https://example.supabase.co',anonKey:'public'}});return Response.json({ok:true,session:{id:'cloud-one'}})};
+  assert.match(app.element('table').innerHTML,/Cloud summary pending/);
+  await app.context.retryHistoryCloudSummaries();assert.equal(calls,0);
+  app.element('historyCloudConsent').checked=true;
+  await app.context.retryHistoryCloudSummaries();
+  assert.equal(calls,1);
+  assert.match(app.element('table').innerHTML,/Cloud summary confirmed/);
+  assert.equal(JSON.parse(app.storage.get('occulert-cloud-outbox')).length,0);
+});
+test('History consent revocation blocks late acknowledgement and removes only this owner queue', async () => {
+  const app=cloudHistory();let complete,ready;
+  const started=new Promise(resolve=>{ready=resolve});
+  app.context.fetch=async url=>url==='/api/public-config'?Response.json({ok:true,supabase:{configured:true,url:'https://example.supabase.co',anonKey:'public'}}):new Promise(resolve=>{complete=resolve;ready()});
+  app.element('historyCloudConsent').checked=true;
+  const pending=app.context.retryHistoryCloudSummaries();await started;
+  const duplicate=app.context.retryHistoryCloudSummaries();await duplicate;
+  app.context.cancelHistoryCloudPermission(true);
+  complete(Response.json({ok:true,session:{id:'cloud-one'}}));await pending;
+  assert.equal(app.context.getHistory()[0].cloudSynced,undefined);
+  assert.equal(JSON.parse(app.storage.get('occulert-cloud-outbox')).length,0);
 });

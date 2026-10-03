@@ -308,15 +308,6 @@
       ]
     },
     {
-      "source": "/(.*)\\.v63\\.(js|css)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
       "source": "/(.*)\\.v64\\.(js|css)",
       "headers": [
         {
@@ -399,6 +390,24 @@
     },
     {
       "source": "/local-history.v1.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v76\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v63\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",
