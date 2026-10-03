@@ -109,5 +109,13 @@
   "driver-app.v68.css": "7e10f3a15eed448154996bbaf45134fabd0506d6040d04ba51547989dfbcdd4f",
   "driver-app.v69.js": "f19725d3577e4ec202a9bce70ae31749a64cf7b14b54a7102f0dd1bba96280de",
   "driver-app.v70.js": "ec82d2a78ac126beb7dc8527a623ec2a9057e756fd3dfe13ef4a66785e6d91c9",
-  "occulert-backend.v69.js": "7b27a73861cefd326c6e243ab8035f8589ab60d9a118bfc0694958bb42a84437"
+  "occulert-backend.v69.js": "7b27a73861cefd326c6e243ab8035f8589ab60d9a118bfc0694958bb42a84437",
+  "driver-app.v74.js": "c574416ac9b4fa036720e153d3c0a9b7a8a3965eff4f5181bafb95422c7a50b4",
+  "occulert-backend.v74.js": "6154f00731000ffab0c9659907f3cd17f450523368cc7f004d31cc296395aecc",
+  "login-page-1.v61.js": "c25e6979b6c341700b3b4b02d90b6b1b83c40633c37f5e51ac81dcdc6a133d50",
+  "driver-profiles-page-2.v61.js": "c3397faeb7bd09fe5dbc2decbbc79e6c5a4c278518ff8d50a8926c51f2d14ec4",
+  "fleet-dashboard.v1.js": "93852d0f1330ad25328d9130f1124757dd8f604902b3e8a6b17d8f807efdde57",
+  "homepage-bootstrap.v1.js": "5448e67551715d642fdc692edf39a447b98411f3e598bfc6ceaa6a55d1899c3d",
+  "page-actions.v1.js": "906d366520aa95e10e24ec6294806c1af568ac8ff6d7fbf92c7ada53daea481e",
+  "fleet-onboarding-page-1.v69.js": "1bed7ad9d76fe87be228377807acfbbdc86941815787064f0a2c87c42f687e8a"
 }

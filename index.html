@@ -28,20 +28,11 @@
 <link rel="icon" href="/favicon.ico" sizes="48x48" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" />
 <meta name="theme-color" content="#07101f" />
-<script>
-(function(){
-  try{
-    var hash=window.location.hash||'';
-    var params=new URLSearchParams(hash.slice(1));
-    if(params.get('type')==='recovery'){
-      window.location.replace('/account.html?recovery=1'+hash);
-    }
-  }catch(error){}
-})();
-</script>
+<script src="/homepage-bootstrap.v1.js"></script>
+<script src="/page-actions.v1.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" data-page-action="font-ready" />
 <link rel="preload" as="image" href="/homepage-journey-cinematic-v1.avif" type="image/avif" media="(min-width: 721px)" fetchpriority="high" />
 <link rel="preload" as="image" href="/homepage-journey-cinematic-v1-640.avif" type="image/avif" media="(max-width: 720px)" fetchpriority="high" />
 <link rel="stylesheet" href="/homepage.v51.css" />

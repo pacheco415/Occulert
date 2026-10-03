@@ -83,6 +83,14 @@ if (refresh) {
   sw = sw.replace(cache[0], `const CACHE = '${cache[2]}${nextCacheVersion}'`);
   changes.set('sw.js', sw);
   const config = parse('vercel.json');
+  const appMarkup = existsSync(join(root, 'app.html')) ? read('app.html') : '';
+  const beforeGuard = appMarkup.match(/<script id="driver-startup-guard">([\s\S]*?)<\/script>/)?.[1];
+  const afterGuard = (changes.get('app.html') || appMarkup).match(/<script id="driver-startup-guard">([\s\S]*?)<\/script>/)?.[1];
+  if(beforeGuard !== afterGuard && beforeGuard && afterGuard){
+    const pin = source => "'sha256-" + createHash('sha256').update(source).digest('base64') + "'";
+    for(const rule of config.headers)for(const header of rule.headers)if(header.key==='Content-Security-Policy')header.value=header.value.replaceAll(pin(beforeGuard),pin(afterGuard));
+  }
+
   const versions = new Set([...replacements.values()].map(next => next.match(/\.v(\d+)\./)[1]));
   for (const version of versions) {
     const source = `/(.*)\\.v${version}\\.(js|css)`;

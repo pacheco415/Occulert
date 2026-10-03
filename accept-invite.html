@@ -8,9 +8,10 @@
   <meta name="theme-color" content="#0a0e1a">
   <link rel="canonical" href="https://www.occulert.com/accept-invite.html">
   <script src="/accept-invite-page-1.v47.js"></script>
-  <script src="/occulert-backend.v69.js"></script>
+  <script src="/occulert-backend.v74.js"></script>
   <link rel="stylesheet" href="/accept-invite-page-1.v47.css" />
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
+<script src="/page-actions.v1.js"></script>
 </head>
 <body>
   <header class="top"><div class="brand">Occulert Driver Invite</div><a class="btn" href="/">Home</a></header>
@@ -19,15 +20,15 @@
       <h1>Join your fleet</h1>
       <p class="muted">Use the exact email your manager invited. Occulert verifies the signed-in email before adding your driver profile.</p>
       <div class="notice" id="userState">Checking your invitation…</div>
-      <form class="form" id="acceptForm" onsubmit="signInAndAccept(event,'signin')">
+      <form class="form" id="acceptForm" data-page-action="signInAndAccept-event-signin">
         <div class="field"><label for="name">Driver name</label><input id="name" required maxlength="160" autocomplete="name" placeholder="Your name"></div>
         <div class="field"><label for="vehicle">Vehicle or route</label><input id="vehicle" maxlength="120" placeholder="Van 12"></div>
         <div class="field" id="emailField"><label for="email">Invited email</label><input id="email" type="email" required maxlength="240" autocomplete="email" placeholder="driver@example.com"></div>
         <div class="field" id="passwordField"><label for="password">Password</label><input id="password" type="password" required minlength="6" autocomplete="current-password"></div>
-        <div class="split" id="signedOutActions"><button class="btn primary" id="signInBtn" type="submit">Sign In and Accept</button><button class="btn good" id="createAccountBtn" type="button" onclick="signInAndAccept(event,'signup')">Create Account</button></div>
+        <div class="split" id="signedOutActions"><button class="btn primary" id="signInBtn" type="submit">Sign In and Accept</button><button class="btn good" id="createAccountBtn" type="button" data-page-action="signInAndAccept-event-signup">Create Account</button></div>
         <p class="help" id="accountHelp">First visit? Select Create Account once, confirm the email message, then return to this invitation and sign in.</p>
-        <div class="actions" id="accountRecoveryActions"><button class="btn hidden" id="resendConfirmationBtn" type="button" onclick="resendConfirmation()">Resend Confirmation</button><a class="btn" href="/login.html?mode=reset">Forgot Password?</a></div>
-        <div class="split hidden" id="signedInActions"><button class="btn primary" type="button" onclick="acceptForCurrentUser()">Accept Invitation</button><button class="btn" type="button" onclick="useDifferentAccount()">Use Different Account</button></div>
+        <div class="actions" id="accountRecoveryActions"><button class="btn hidden" id="resendConfirmationBtn" type="button" data-page-action="resendConfirmation">Resend Confirmation</button><a class="btn" href="/login.html?mode=reset">Forgot Password?</a></div>
+        <div class="split hidden" id="signedInActions"><button class="btn primary" type="button" data-page-action="acceptForCurrentUser">Accept Invitation</button><button class="btn" type="button" data-page-action="useDifferentAccount">Use Different Account</button></div>
       </form>
       <div class="notice hidden" id="result" role="status"></div>
       <div class="actions hidden" id="successActions"><a class="btn primary" href="/app.html">Open Driver App</a><a class="btn" href="/account.html">View Account</a></div>

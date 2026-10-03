@@ -1,3 +1,4 @@
+import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { createRequire } from "node:module";

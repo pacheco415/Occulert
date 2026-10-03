@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
 import "./audit-assets.mjs";
 import "./audit-mediapipe.mjs";
@@ -30,7 +31,8 @@ function read(path) {
 function assertionSource(path) {
   const source = read(path);
   if (!path.endsWith(".html")) return source;
-  const assets = [...source.matchAll(/(?:href|src)="\/([^"?#]+-page-[^"?#]+\.(?:js|css))"/g)];
+  const ownedAssets = new Set(Object.values(JSON.parse(read("asset-versions.json"))));
+  const assets = [...source.matchAll(/(?:href|src)="\/([^"?#]+\.(?:js|css))"/g)].filter(match => ownedAssets.has(match[1]) && (/-page-/.test(match[1]) || /^(?:fleet-dashboard|homepage-bootstrap)\.v/.test(match[1])));
   return source + assets.map(match => read(match[1])).join("\n");
 }
 
@@ -78,8 +80,10 @@ for (const retiredDuplicate of [
 
 for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
+  if(/\bon[a-z]+\s*=\s*["']/i.test(html))fail(`${file}: inline event handlers are forbidden`);
   const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
   for (const [index, match] of inlineScripts.entries()) {
+    if(!file.endsWith("/app.html") || !match[0].startsWith('<script id="driver-startup-guard">'))fail(`${file}: unapproved inline script`);
     try { new Function(match[1]); }
     catch (error) { fail(`${file}: inline script ${index + 1} does not parse (${error.message})`); }
   }
@@ -104,7 +108,8 @@ assertNotIncludes("index.html", "class=\"car-shell\"", "homepage must not render
 assertIncludes("index.html", `<script src=\"/${assetByStem('homepage.js')}\" defer></script>`, "homepage must load its external behavior script");
 assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
 const homepageInlineScripts = [...read("index.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
-if (homepageInlineScripts !== 1) fail(`homepage must contain only the early password-recovery handoff script (found ${homepageInlineScripts})`);
+if (homepageInlineScripts !== 0) fail(`homepage must contain no inline scripts (found ${homepageInlineScripts})`);
+if(!read("index.html").includes(`src="/${assetByStem("homepage-bootstrap.js")}"`))fail("homepage must load its early external password-recovery handoff");
 assertIncludes("index.html", "params.get('type')==='recovery'", "homepage must detect recovery links that fall back to the site root");
 assertIncludes("index.html", "'/account.html?recovery=1'+hash", "homepage must preserve recovery tokens while handing off to Account Setup");
 assertIncludes("index.html", "id=\"safetyJourney\"", "homepage must include the illustrated safety journey");
@@ -502,7 +507,7 @@ assertIncludes("fleet-dashboard.html", "function copyDriver(id)", "fleet dashboa
 assertIncludes("fleet-dashboard.html", "getFleetSummary({includeEvents})", "signed-in fleet dashboards must use the owner-scoped backend summary");
 assertIncludes("fleet-dashboard.html", "!fleetMode&&local", "protected fleet dashboards must not fall back to unrelated local driver data");
 assertIncludes("fleet-dashboard.html", "id=\"sessionHistory\"", "fleet dashboard must render protected session history");
-assertIncludes("fleet-dashboard.html", "ontoggle=\"handleHistoryToggle(event)\"", "protected session history must render only after the manager opens it");
+assertIncludes("fleet-dashboard.html", 'data-page-action="handleHistoryToggle-event"', "protected session history must render only after the manager opens it");
 assertNotIncludes("fleet-dashboard.html", "class=\"panel-details history-details\" open", "protected session history must start collapsed");
 assertIncludes("fleet-dashboard.html", "function refreshDashboardIfNeeded()", "fleet dashboard polling must skip unchanged full-page renders");
 assertIncludes("fleet-dashboard.html", "setInterval(refreshDashboardIfNeeded,DASHBOARD_CLOCK_INTERVAL_MS)", "fleet dashboard must use the focus-stable low-frequency clock refresh path");
@@ -635,6 +640,19 @@ assertNotIncludes("how-it-works.html", "runs silently in the background", "publi
 assertIncludes("how-it-works.html", "open in the foreground", "public copy must disclose that monitoring requires the foreground");
 assertIncludes(`${assetByStem('driver-app.js')}`, "async function handleVisibilityChange", "web monitoring must handle foreground loss explicitly");
 assertIncludes(`${assetByStem('driver-app.js')}`, "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
+
+
+const startupGuard=read('app.html').match(/<script id="driver-startup-guard">([\s\S]*?)<\/script>/)[1];
+const guardHash="'sha256-"+createHash('sha256').update(startupGuard).digest('base64')+"'";
+for(const rule of JSON.parse(read('vercel.json')).headers)for(const header of rule.headers){
+ if(header.key==='Content-Security-Policy'){
+  const scriptPolicy=header.value.match(/(?:^|;)\s*script-src ([^;]*)/)[1];
+  if(scriptPolicy.includes("'unsafe-inline'")||scriptPolicy.includes("'unsafe-eval'"))throw Error('Script policy must forbid inline handlers and JavaScript eval');
+  if(!scriptPolicy.includes(guardHash))throw Error('Driver startup guard CSP hash is stale');
+ }
+ if(header.key.toLowerCase()==='x-xss-protection')throw Error('Deprecated X-XSS-Protection header must remain absent');
+}
+for(const filename of Object.values(JSON.parse(read('asset-versions.json'))).filter(name=>name.endsWith('.js')))if(/\bon[a-z]+\s*=\s*["']/.test(read(filename)))throw Error('Generated inline event handler in '+filename);
 
 if (failures.length) {
   console.error("Occulert site audit failed:");

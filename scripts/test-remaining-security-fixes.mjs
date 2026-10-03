@@ -1,3 +1,4 @@
+import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -26,7 +27,7 @@ test('spreadsheet exports neutralize formula cells', () => {
     assert.equal(csvCell(`  ${prefix}SUM(1,1)`), `  '${prefix}SUM(1,1)`);
   }
   assert.equal(csvCell('Driver One'), 'Driver One');
-  assert.match(read('fleet-dashboard.html'), /OcculertSecurity\.csvCell/);
+  assert.match(fleetDashboardContract(), /OcculertSecurity\.csvCell/);
   assert.match(read(`${assetByStem('driver-app.js')}`), /OcculertSecurity\.csvCell/);
 });
 
@@ -421,7 +422,7 @@ test('web critical alerts cannot be snoozed and Watch delivery is conditional', 
 
 test('fleet telemetry is explicitly labeled client-reported and unverified', () => {
   assert.match(read('api/events.js'), /telemetry_trust: "unverified_client_report"/);
-  assert.match(read('fleet-dashboard.html'), /client-reported and not independently verified/i);
+  assert.match(fleetDashboardContract(), /client-reported and not independently verified/i);
 });
 
 test('pilot contacts are server-only and disclosed accurately', () => {
