@@ -67,6 +67,7 @@ const sessions = loadHandler("../api/sessions.js", async (table, options = {}) =
     insertedSession = options.body;
     return [{ id: "session-1", ...options.body }];
   }
+  if (table === "sessions" && !options.method) return allowSessionUpdate ? [{ id: "session-1", started_at: "2026-07-19T00:00:00.000Z", ended_at: null }] : [];
   if (table === "sessions" && options.method === "PATCH") {
     sessionPatchParams = options.params;
     patchedSession = options.body;
@@ -101,7 +102,7 @@ assert.equal(insertedSession.app_version, null, "app labels are limited to safe 
 const patchBody = { session_id: "session-1", average_fatigue: 30, max_fatigue: 60, safety_score: 80 };
 const deniedPatch = await invoke(sessions, request("PATCH", patchBody));
 assert.equal(deniedPatch.status, 404, "a session not owned by the authenticated driver must stay hidden");
-assert.deepEqual(sessionPatchParams, { id: "eq.session-1", driver_id: "eq.driver-1" });
+assert.equal(sessionPatchParams, undefined, "hidden sessions must never be patched");
 
 allowSessionUpdate = true;
 const allowedPatch = await invoke(sessions, request("PATCH", patchBody));
@@ -154,6 +155,38 @@ assert.equal(eventWithoutLocation.status, 200);
 assert.equal(insertedEvent.latitude, null, "explicitly absent latitude must not become 0");
 assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must not become 0");
 
+// Finalization is immutable and accepts delayed client finish timestamps.
+for (const finish of ['2026-07-19T00:05:00.000Z', '2026-07-18T00:00:00.000Z', '2999-01-01T00:00:00.000Z', 'invalid']) {
+  let row = { id: "session-1", started_at: "2026-07-19T00:00:00.000Z", ended_at: null };
+  let patches = 0;
+  const finalizing = loadHandler("../api/sessions.js", async (table, options = {}) => {
+    if (table === "drivers") return [{ id: "driver-1" }];
+    assert.equal(options.params.driver_id, "eq.driver-1");
+    if (!options.method) return [row];
+    assert.equal(options.params.ended_at, "is.null");
+    patches++;
+    row = { ...row, ...options.body };
+    return [row];
+  });
+  const before = Date.now();
+  const first = await invoke(finalizing, request("PATCH", { session_id: "session-1", ended_at: finish, safety_score: 80 }));
+  assert.equal(first.status, 200);
+  if (finish === '2026-07-19T00:05:00.000Z') assert.equal(row.ended_at, finish);
+  else assert.ok(Date.parse(row.ended_at) >= before && Date.parse(row.ended_at) <= Date.now());
+  const again = await invoke(finalizing, request("PATCH", { session_id: "session-1", safety_score: 0 }));
+  assert.deepEqual(again.body.session, first.body.session);
+  assert.equal(patches, 1);
+}
+let raceRead = 0;
+const concurrentClose = loadHandler("../api/sessions.js", async (table, options = {}) => {
+  if (table === "drivers") return [{ id: "driver-1" }];
+  if (options.method === "PATCH") return [];
+  return [{ id: "session-1", started_at: "2026-07-19T00:00:00.000Z", ended_at: ++raceRead > 1 ? "2026-07-19T00:05:00.000Z" : null, safety_score: 77 }];
+});
+const raceClose = await invoke(concurrentClose, request("PATCH", { session_id: "session-1", safety_score: 1 }));
+assert.equal(raceClose.status, 200);
+assert.equal(raceClose.body.session.safety_score, 77);
+
 let insertedProfile;
 const profile = loadHandler("../api/profile.js", async (table, options = {}) => {
   assert.equal(table, "drivers");
@@ -174,6 +207,39 @@ assert.equal(savedProfile.status, 200);
 assert.equal(insertedProfile.user_id, "user-1");
 assert.equal(insertedProfile.fleet_id, null, "drivers must not self-assign fleet membership");
 assert.equal(Object.hasOwn(insertedProfile, "role"), false, "privileged roles must not be accepted from the browser");
+
+// Native onboarding sends {} repeatedly, including during a concurrent insert.
+for (const race of [false, true]) {
+  let row = { id: "driver-1", user_id: "user-1", name: "John Smith", email: "old@example.com", vehicle_id: "TRK-7", fleet_id: "fleet-1", active: false };
+  let raced = false;
+  const updatingProfile = loadHandler("../api/profile.js", async (_table, options = {}) => {
+    if (!options.method) return race && !raced ? [] : [row];
+    if (options.method === "POST") { raced = true; throw { details: { code: "23505" } }; }
+    assert.equal(options.method, "PATCH");
+    assert.equal(options.params.user_id, "eq.user-1");
+    row = { ...row, ...options.body };
+    return [row];
+  });
+  const refreshed = await invoke(updatingProfile, request("POST", { fleet_id: "attacker", active: true }));
+  assert.equal(refreshed.status, 200);
+  assert.equal(row.name, "John Smith");
+  assert.equal(row.vehicle_id, "TRK-7");
+  assert.equal(row.active, false);
+  assert.equal(row.fleet_id, "fleet-1");
+  assert.equal(row.email, verifiedUser.email);
+  await invoke(updatingProfile, request("POST", { name: "New" }));
+  assert.equal(row.name, "New");
+  assert.equal(row.vehicle_id, "TRK-7");
+  await invoke(updatingProfile, request("POST", { vehicle: "" }));
+  assert.equal(row.vehicle_id, null);
+}
+const defaultProfile = await invoke(profile, request("POST", {}));
+assert.equal(defaultProfile.status, 200);
+assert.equal(insertedProfile.name, "manager");
+assert.equal(insertedProfile.active, true);
+for (const body of [null, true, "text", 3, []]) {
+  assert.equal((await invoke(profile, request("POST", body))).status, 415);
+}
 
 let insertedFleet;
 const fleets = loadHandler("../api/fleets.js", async (table, options = {}) => {
