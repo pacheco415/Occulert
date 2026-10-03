@@ -31,3 +31,5 @@ rule only if no retained asset needs it. Bump `CACHE` again.
 
 For releases with database migrations, apply the migrations in timestamp order
 before deploying routes or clients that use the new schema or functions.
+
+Use `npm run asset:bump -- <logical-name> --dry-run` to review an asset release plan, then run without `--dry-run` to copy the asset and any active versioned importers, rewrite page references, update manifests and cache lists, and add immutable headers. Edit the new file, then use `npm run asset:bump -- <logical-name> --refresh` before committing to refresh its integrity digest. Refresh rejects assets already active in HEAD. Review the plan and run all release verification before committing or publishing.

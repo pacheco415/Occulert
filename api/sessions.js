@@ -10,6 +10,7 @@ const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const MAX_BODY_LENGTH = 4096;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PIPELINES = new Set(["web_mediapipe_ear", "ios_mlkit_eye_probability", "android_mlkit_eye_probability"]);
 
 function json(response, status, body) {
@@ -25,6 +26,11 @@ if (typeof value === "string" && !value.trim()) return null;
 const n = Number(value);
 if (!Number.isFinite(n)) return null;
 return Math.max(min, Math.min(max, n));
+}
+
+function integerOrNull(value) {
+const count = numberOrNull(value, 0, 10000);
+return count === null ? null : Math.round(count);
 }
 
 function provenanceText(value, maxLength) {
@@ -94,6 +100,7 @@ const body = typeof request.body === "object" && request.body ? request.body : {
 if (!body.session_id) {
 return json(response, 400, { ok: false, error: "missing_session_id" });
 }
+if (typeof body.session_id !== "string" || !UUID.test(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
 const ownedParams = { id: "eq." + body.session_id, driver_id: "eq." + driver.id };
 const existing = await pgFetch("sessions", { params: { ...ownedParams, select: "*", limit: "1" } });
 if (!existing.length) return json(response, 404, { ok: false, error: "session_not_found" });
@@ -111,8 +118,8 @@ ended_at: endedAt,
 average_fatigue: numberOrNull(body.average_fatigue, 0, 100),
 max_fatigue: numberOrNull(body.max_fatigue, 0, 100),
 safety_score: numberOrNull(body.safety_score, 0, 100),
-alert_count: numberOrNull(body.alert_count, 0, 10000),
-head_nod_count: numberOrNull(body.head_nod_count, 0, 10000),
+alert_count: integerOrNull(body.alert_count),
+head_nod_count: integerOrNull(body.head_nod_count),
 },
 });
 if (!updated.length) {
