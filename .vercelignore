@@ -13,3 +13,5 @@ brand/
 playwright.config.mjs
 test-results/
 playwright-report/
+
+asset-size-budgets.json
