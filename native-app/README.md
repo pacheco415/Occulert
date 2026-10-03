@@ -323,3 +323,9 @@ in `app.json`.
 
 Each alert sends: `{ type: 'occulert-alert', level, perclos, at }` where
 `level` is one of `none | watch | alert | critical`.
+
+### Android camera compatibility
+
+The installed face detector requires Android API 26 (Android 8.0) or later.
+`expo-build-properties` sets that minimum during managed prebuild. Older Android
+versions are unsupported; do not override the detector's manifest requirement.
