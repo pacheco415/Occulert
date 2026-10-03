@@ -157,7 +157,7 @@ export function createAppHarness({ startAt = 1_700_000_000_000, initialStorage =
       run(`running = true; sessionStart = Date.now();
         localSessionId = createLocalDriverId();
         fatigue = 0; confidence = 0; alerts = 0; headNods = 0; microsleeps = 0;
-        maxFatigue = 0; fatigueSamples = []; noseYHistory = []; earHistory = [];
+        maxFatigue = 0; fatigueSampleSum = 0; fatigueSampleCount = 0; noseYHistory = []; earHistory = [];
         perclosWindow = []; eyesClosedSince = 0; turnedSince = 0; totalDistractionMs = 0;
         escalationLevel = 0; lastEscalation = 0; lastAlert = 0; lastRender = 0;
         noFaceSince = 0; lastFaceSeen = 0; distanceMeters = 0; routePoints = [];
@@ -216,7 +216,7 @@ export function createAppHarness({ startAt = 1_700_000_000_000, initialStorage =
         perclos: Number(document.getElementById('perclos').textContent.replace('%','')) || 0,
         earHistoryLength: earHistory.length,
         noseYHistoryLength: noseYHistory.length,
-        fatigueSamplesLength: fatigueSamples.length,
+        fatigueSampleCount, fatigueSampleSum,
         risk: riskText()[0],
         noFaceSince, eyesClosedSince, lastAlert,
       })`);
