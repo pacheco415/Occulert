@@ -6,6 +6,39 @@ import test from 'node:test';
 import { patchQueryDecoder } from './patch-query-decoder.mjs';
 
 const require = createRequire(new URL('../package.json', import.meta.url));
+for (const [consumer, intermediates] of [
+  ['@bacons/apple-targets', ['glob', 'minimatch']],
+  ['@expo/fingerprint', ['minimatch']],
+]) {
+  test(`${consumer} brace expansion preserves globs and bounds hostile patterns`, async () => {
+    let consumerRequire = createRequire(require.resolve(consumer));
+    for (const dependency of intermediates) {
+      consumerRequire = createRequire(consumerRequire.resolve(dependency));
+    }
+    const entry = consumerRequire.resolve('brace-expansion');
+    const worker = new Worker(`
+      const { parentPort } = require('node:worker_threads');
+      const module = require(${JSON.stringify(entry)});
+      const expand = module.expand || module.default || module;
+      const normal = expand('src/{app,lib}/*.{ts,tsx}');
+      for (const pattern of [
+        '{a,'.repeat(4000) + 'z' + '}'.repeat(4000),
+        '{'.repeat(3200) + 'a,b' + '}'.repeat(3200),
+        '{a}' + '}'.repeat(64000) + ',z}',
+      ]) expand(pattern);
+      parentPort.postMessage(normal);
+    `, { eval: true });
+    try {
+      const result = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(Error('Brace expansion stalled')), 3000);
+        worker.once('message', value => { clearTimeout(timer); resolve(value); });
+        worker.once('error', error => { clearTimeout(timer); reject(error); });
+      });
+      assert.deepEqual(result, ['src/app/*.ts', 'src/app/*.tsx', 'src/lib/*.ts', 'src/lib/*.tsx']);
+    } finally { await worker.terminate(); }
+  });
+}
+
 test('query-string keeps named parse/stringify and route options with the patched decoder', () => {
   const query = require('query-string');
   assert.deepEqual({ ...query.parse('name=Caf%C3%A9+driver&name=Second&key=a%26b', { arrayFormat: 'none' }) }, { name: ['Café driver', 'Second'], key: 'a&b' });

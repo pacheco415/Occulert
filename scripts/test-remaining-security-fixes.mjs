@@ -63,7 +63,7 @@ test('native brand assets keep store-safe square dimensions', () => {
   assert.deepEqual(pngSize('native-app/assets/icon.png'), { width: 1024, height: 1024 });
   assert.deepEqual(pngSize('native-app/assets/adaptive-icon.png'), { width: 1024, height: 1024 });
   assert.deepEqual(pngSize('native-app/assets/splash.png'), { width: 2048, height: 2048 });
-  assert.deepEqual(pngSize('occulert-logo-alt.png'), { width: 1024, height: 1024 });
+  assert.deepEqual(pngSize('brand/occulert-logo-alt.png'), { width: 1024, height: 1024 });
   const appConfig = JSON.parse(read('native-app/app.json'));
   assert.equal(appConfig.expo.ios.icon, './assets/icon.png');
 });

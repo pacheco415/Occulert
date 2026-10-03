@@ -47,6 +47,12 @@ function assertSingleH1(path) {
   if (count !== 1) fail(`${path} must contain exactly one h1 (found ${count})`);
 }
 
+// Keep deployment source exclusions explicit and reviewable.
+const deploymentExclusions = new Set(read('.vercelignore').split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')));
+for (const path of ['tests/', 'docs/', 'native-app/', 'supabase/', 'db/', 'scripts/', 'benchmark/', 'brand/', '.github/', '*.md', 'playwright.config.mjs']) {
+  if (!deploymentExclusions.has(path)) fail(`.vercelignore must exclude ${path}`);
+}
+
 walk(root);
 
 for (const scriptPath of [`${assetByStem('driver-app.js')}`, `${assetByStem('homepage.js')}`, `${assetByStem('lang.js')}`, `${assetByStem('passkey-auth.js')}`, `${assetByStem('supabase-loader.js')}`]) {
@@ -612,10 +618,13 @@ assertIncludes("api/pilot-leads.js", "unsupported_media_type", "pilot lead API m
 assertIncludes("api/pilot-leads.js", "url.protocol === \"https:\"", "pilot lead API must only forward to HTTPS webhooks");
 if (read(".nvmrc").trim() !== "24") fail(".nvmrc must select Node 24");
 for (const workflow of [".github/workflows/browser-smoke.yml", ".github/workflows/native-app-typecheck.yml", ".github/workflows/site-audit.yml"]) {
-  assertIncludes(workflow, "actions/checkout@v6", `${workflow} must use the Node 24 checkout action`);
-  assertIncludes(workflow, "actions/setup-node@v6", `${workflow} must use the Node 24 setup action`);
+  for (const action of ['checkout', 'setup-node']) {
+    if (!new RegExp(`uses: actions/${action}@[a-f0-9]{40} # v6`).test(read(workflow))) fail(`${workflow} must pin the verified Node 24 ${action} action`);
+  }
+  assertIncludes(workflow, 'contents: read', `${workflow} must declare read-only contents permissions`);
+  assertIncludes(workflow, 'timeout-minutes:', `${workflow} must bound job execution`);
   const source = read(workflow);
-  const setups = [...source.matchAll(/^[ \t]*- uses: actions\/setup-node@v6[ \t]*$/gm)].length;
+  const setups = [...source.matchAll(/^[ \t]*- uses: actions\/setup-node@[a-f0-9]{40}[ \t]+# v6[ \t]*$/gm)].length;
   const versionFiles = [...source.matchAll(/^[ \t]*node-version-file: \.nvmrc[ \t]*$/gm)].length;
   if (setups !== versionFiles || /^[ \t]*node-version:/m.test(source)) {
     fail(`${workflow} must use .nvmrc for every Node setup`);
