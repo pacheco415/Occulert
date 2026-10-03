@@ -12,7 +12,7 @@
 <!-- Run before any stylesheet or dependency can hold up the driver page. -->
 <script id="driver-startup-guard">
 (() => {
-  const corePath = '/driver-app.v70.js';
+  const corePath = '/driver-app.v75.js';
   let state = 'loading';
   const byId = id => document.getElementById(id);
   const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
@@ -82,6 +82,7 @@
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
 <script src="/static-page.v60.js" defer></script>
+<script src="/local-history.v1.js"></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -264,9 +265,9 @@
     </fieldset>
 </aside>
 </main>
-<script src="/occulert-backend.v69.js"></script>
+<script src="/occulert-backend.v75.js"></script>
 <script src="/security-utils.v47.js"></script>
-<script src="/driver-app.v70.js"></script>
+<script src="/driver-app.v75.js"></script>
 <script src="/lang.v47.js" defer></script>
 
 <!-- iOS Add to Home Screen Modal -->

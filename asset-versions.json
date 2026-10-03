@@ -4,9 +4,9 @@
   "liquid-glass.css": "liquid-glass.v47.css",
   "accessibility.css": "accessibility.v52.css",
   "portal.css": "portal.v47.css",
-  "driver-app.js": "driver-app.v70.js",
+  "driver-app.js": "driver-app.v75.js",
   "auth-helper.js": "auth-helper.v60.js",
-  "occulert-backend.js": "occulert-backend.v69.js",
+  "occulert-backend.js": "occulert-backend.v75.js",
   "passkey-auth.js": "passkey-auth.v60.js",
   "security-utils.js": "security-utils.v47.js",
   "supabase-loader.js": "supabase-loader.v47.js",
@@ -31,7 +31,7 @@
   "fleet-onboarding-page-1.js": "fleet-onboarding-page-1.v68.js",
   "account-page-1.css": "account-page-1.v47.css",
   "privacy-page-1.js": "static-page.v60.js",
-  "session-history-page-2.js": "session-history-page-2.v60.js",
+  "session-history-page-2.js": "session-history-page-2.v61.js",
   "how-it-works-page-1.css": "how-it-works-page-1.v47.css",
   "faq-page-1.js": "public-page.v67.js",
   "accept-invite-page-1.css": "accept-invite-page-1.v47.css",
@@ -62,5 +62,6 @@
   "fleet-history-page.js": "fleet-history-page.v68.js",
   "fleet-history-page.css": "fleet-history-page.v67.css",
   "public-guidance.css": "public-guidance.v67.css",
-  "fleet-followups.css": "fleet-followups.v67.css"
+  "fleet-followups.css": "fleet-followups.v67.css",
+  "local-history.js": "local-history.v1.js"
 }
