@@ -35,3 +35,16 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Save source and environment verification evidence
+        if: ${{ !cancelled() }}
+        run: node scripts/write-verification-receipt.mjs browser '${{ job.status }}'
+      - name: Preserve verification receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verification-browser-${{ github.sha }}
+          path: .verification-receipts/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
