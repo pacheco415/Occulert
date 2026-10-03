@@ -44,7 +44,7 @@
     "react-native-nitro-modules": "0.36.5",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-vision-camera": "^4.7.3",
+    "react-native-vision-camera": "^5.2.3",
     "react-native-vision-camera-face-detector": "^1.10.2",
     "react-native-watch-connectivity": "^2.0.0",
     "react-native-web": "~0.21.0",
