@@ -37,7 +37,8 @@ test('native cloud writes recheck current consent', () => {
   assert.match(alertWrite, /const syncContext = await currentSyncContext\(\)/);
   assert.match(alertWrite, /if \(!syncContext\) return false/);
   assert.match(finishWrite, /const syncContext = await currentSyncContext\(\)/);
-  assert.match(finishWrite, /if \(!syncContext\) return false/);
+  assert.match(finishWrite, /if \(!syncContext \|\| sessionScope.ownerId !== syncContext.ownerId/);
+  assert.match(finishWrite, /sessionScope.consentVersion !== syncContext.consentVersion/);
   assert.match(cloud, /createCachedBooleanPreference/);
   assert.match(cloud, /if \(consentRuntimeOverride !== null\) return consentRuntimeOverride/);
   assert.match(cloud, /if \(!enabled\) consentRuntimeOverride = false/);
@@ -293,6 +294,18 @@ test('single-session deletion removes only the confirmed matching local record',
     removeMatchingSessionRecord(duplicatedIdentity, duplicatedIdentity[0], 0),
     [duplicatedIdentity[1]],
   );
+});
+
+test('history edits reject duplicate legacy timestamps without changing saved records', () => {
+  const sessions = [{ savedAt: '2026-08-15T00:00:00.000Z', note: 'first' }, { savedAt: '2026-08-15T00:00:00.000Z', note: 'second' }];
+  const before = JSON.stringify(sessions);
+  assert.throws(() => updateMatchingSessionRecord(sessions, sessions[1], 1, item => ({ ...item, note: 'changed' })), /ambiguous/);
+  assert.throws(() => removeMatchingSessionRecord(sessions, sessions[1], 1), /ambiguous/);
+  assert.equal(JSON.stringify(sessions), before);
+  const distinct = sessions.map((item, index) => ({ ...item, sessionId: 'same-id', savedAt: `2026-08-${15 + index}T00:00:00.000Z` }));
+  const changed = updateMatchingSessionRecord(distinct, distinct[1], 1, item => ({ ...item, note: 'changed' }));
+  assert.equal(changed[0].note, 'first');
+  assert.equal(changed[1].note, 'changed');
 });
 
 test('native session exports include review summaries and exclude private identifiers and diagnostics', () => {
