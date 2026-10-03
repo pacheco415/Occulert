@@ -238,8 +238,9 @@ module.exports = async function handler(request, response) {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  let timeout;
   try {
+    timeout = setTimeout(() => controller.abort(), require("./_lib/provider-budget").remainingProviderMs(5000));
     const webhookResponse = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -258,3 +259,5 @@ module.exports = async function handler(request, response) {
     clearTimeout(timeout);
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

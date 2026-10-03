@@ -65,6 +65,7 @@ try {
   const bothRead = new Promise(resolve => { releaseReads = resolve; });
   const require = createRequire(import.meta.url);
   const context = { module: { exports: {} }, process: { env: { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-role' } }, require(name) {
+    if (name === './_lib/provider-budget') return require('../api/_lib/provider-budget.js');
     if (name !== './_lib/supabase') return require(name);
     return { verifyAccessToken: async () => ({ id: concurrentUser, email: 'concurrent@example.com' }), bearerToken: () => 'fixture-token', async pgFetch(table, options) {
       assert.equal(table, 'drivers');

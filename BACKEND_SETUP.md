@@ -174,3 +174,9 @@ for the existing project before enabling fleet onboarding.
 - [x] Manager-scoped session and event history excludes GPS, personal media, and raw motion
 - [ ] Protected session-history deployment and signed-in manager verification
 - [ ] Optional custom SMTP configured only if pilot volume outgrows Supabase's built-in sender
+
+### Shared provider time allowance and diagnostics
+
+Every API entry point creates one monotonic 12-second provider allowance, isolated per request. Nested consolidated routes reuse that allowance. Supabase authentication, REST/admin operations, Stripe test requests and the pilot-lead fallback webhook use the smaller of their existing per-call timeout and the remaining allowance. A later provider mutation is not sent after exhaustion. Supabase and Stripe deadlines cover response bodies and ignore late completion; mutations are never retried automatically. This bounds provider waiting, not arbitrary application CPU work or the complete Vercel invocation. Existing response shapes remain unchanged.
+
+Responses include a generated `X-Occulert-Request-ID`. Failed server responses and unhandled exceptions emit a small JSON diagnostic with that ID, bounded status, elapsed milliseconds and an unhandled flag. Diagnostics omit request URLs, headers, bodies, identity, provider response details and exception messages. Use the response ID to locate a failure without collecting driver information. A timeout may follow a committed provider mutation; use the existing idempotent finalization behavior before retrying.

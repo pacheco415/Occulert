@@ -54,3 +54,5 @@ module.exports = function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
   response.end(JSON.stringify({ error: "not_found" }));
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

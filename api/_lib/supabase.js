@@ -1,3 +1,4 @@
+const { remainingProviderMs } = require('./provider-budget');
 // Shared Supabase REST helpers for Occulert backend endpoints.
 //
 // This project intentionally avoids the @supabase/supabase-js SDK to keep
@@ -37,6 +38,7 @@ Authorization: "Bearer " + key,
 // a transport timeout does not prove that a server transaction was rolled back.
 function fetchTextWithDeadline(url, options) {
 return new Promise((resolve, reject) => {
+const timeoutMs = remainingProviderMs(8000);
 let settled = false;
 const controller = new AbortController();
 const timer = setTimeout(() => {
@@ -44,7 +46,7 @@ const error = new Error("supabase_unavailable");
 error.status = 504;
 finish(error);
 controller.abort();
-}, 8000);
+}, timeoutMs);
 function finish(error, value) {
 if (settled) return;
 settled = true;

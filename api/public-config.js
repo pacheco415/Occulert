@@ -35,3 +35,5 @@ module.exports = function handler(request, response) {
     supabase: configured ? { configured: true, url, anonKey } : { configured: false },
   });
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

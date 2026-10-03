@@ -124,3 +124,5 @@ includes_raw_motion: false,
 return json(response, 502, { ok: false, error: "supabase_error" });
 }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);
