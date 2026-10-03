@@ -11,6 +11,8 @@ const script = join(root, 'scripts/bump-asset.mjs');
 const sha = source => createHash('sha256').update(source).digest('hex');
 const run = (cwd, ...args) => execFileSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
 const read = (cwd, name) => readFileSync(join(cwd, name), 'utf8');
+// Fixture repositories must not launch background maintenance or inherit hooks.
+const fixtureGit = (cwd, args) => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd });
 
 test('asset release copies importers, preserves published bytes and supports guarded refresh', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-asset-'));
@@ -22,9 +24,9 @@ test('asset release copies importers, preserves published bytes and supports gua
     writeFileSync(join(cwd, 'index.html'), '<script src="/main.v1.js"></script>');
     writeFileSync(join(cwd, 'sw.js'), "const CACHE = 'occulert-v1'; const files = ['/main.v1.js', '/leaf.v1.js'];");
     writeFileSync(join(cwd, 'vercel.json'), JSON.stringify({ headers: [{ source: '/(.*)\\.v2\\.(js|css)', headers: [] }, { source: '/(.*)\\.(js|css)', headers: [] }] }));
-    execFileSync('git', ['init', '-q'], { cwd });
-    execFileSync('git', ['add', '.'], { cwd });
-    execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'Fixture'], { cwd });
+    fixtureGit(cwd, ['init', '-q']);
+    fixtureGit(cwd, ['add', '.']);
+    fixtureGit(cwd, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'Fixture']);
     assert.throws(() => run(cwd, 'leaf.js', '--refresh'));
     const before = read(cwd, 'asset-versions.json');
     run(cwd, 'leaf.js', '--dry-run');
@@ -43,7 +45,7 @@ test('asset release copies importers, preserves published bytes and supports gua
     writeFileSync(join(cwd, 'leaf.v2.js'), 'const sample = 2;\n');
     run(cwd, 'leaf.js', '--refresh');
     assert.equal(JSON.parse(read(cwd, 'asset-integrity.json'))['leaf.v2.js'], sha(read(cwd, 'leaf.v2.js')));
-  } finally { rmSync(cwd, { recursive: true, force: true }); }
+  } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
 
 test('the complete site audits pass after a sample asset release', () => {
@@ -56,11 +58,11 @@ test('the complete site audits pass after a sample asset release', () => {
       cpSync(join(root, name), destination);
     }
     symlinkSync(join(root, 'node_modules'), join(cwd, 'node_modules'), 'dir');
-    execFileSync('git', ['init', '-q'], { cwd });
-    execFileSync('git', ['add', '.'], { cwd });
-    execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'Fixture source'], { cwd });
+    fixtureGit(cwd, ['init', '-q']);
+    fixtureGit(cwd, ['add', '.']);
+    fixtureGit(cwd, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'Fixture source']);
     run(cwd, 'driver-app.js');
     const output = execFileSync(process.execPath, ['scripts/audit-site.mjs'], { cwd, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
     assert.match(output, /passed/i);
-  } finally { rmSync(cwd, { recursive: true, force: true }); }
+  } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
