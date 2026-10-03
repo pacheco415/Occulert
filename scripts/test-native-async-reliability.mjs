@@ -544,12 +544,12 @@ test('current unexpected parked bridge failure releases busy state for retry', a
 
 test('history mutation refuses malformed members without writing away existing bytes', async () => {
   const source = read('native-app/lib/sessionHistory.ts');
-  const { parseSessionHistory } = await import('../native-app/lib/sessionHistoryData.ts');
+  const { parseSessionHistory, assignMissingSessionIds } = await import('../native-app/lib/sessionHistoryData.ts');
   const stored = '[{"sessionId":"recoverable"},null]';
   const writes = [];
   const api = load(source, ['loadSessionHistory', 'updateSessionHistory'], {
     AsyncStorage: { getItem: async () => stored, setItem: async (_key, value) => writes.push(value) },
-    parseSessionHistory,
+    parseSessionHistory, assignMissingSessionIds,
   });
   await assert.rejects(api.loadSessionHistory(), /Saved session history/);
   await assert.rejects(api.updateSessionHistory(() => []), /Saved session history/);
@@ -604,4 +604,30 @@ test('an old cloud session cannot be finalized under a replacement account', asy
   assert.equal(await f.api.setCloudSyncEnabled(true), true);
   assert.equal(await f.api.finishCloudSession('session', { averageFatigue: 12, maxFatigue: 40, safetyScore: 72, alertCount: 1 }), false);
   assert.equal(f.requests.filter(row => row.init.method === 'PATCH').length, 0);
+});
+
+test('legacy history migration commits before exposing IDs and survives subsequent reads', async () => {
+  const {parseSessionHistory,assignMissingSessionIds}=await import('../native-app/lib/sessionHistoryData.ts');
+  let stored='[{"savedAt":"same"},{"savedAt":"same"}]', release;
+  const writes=[];const committed=new Promise(resolve=>{release=resolve});
+  const api=load(read('native-app/lib/sessionHistory.ts'),['loadSessionHistory','updateSessionHistory'],{
+    parseSessionHistory,assignMissingSessionIds,
+    AsyncStorage:{getItem:async()=>stored,setItem:async(_key,value)=>{writes.push(value);await committed;stored=value}},
+  });
+  let exposed=false;const first=api.loadSessionHistory().then(value=>{exposed=true;return value});
+  const second=api.loadSessionHistory();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(exposed,false);assert.equal(writes.length,1);release();
+  const a=await first,b=await second;assert.deepEqual(a,b);assert.notEqual(a[0].sessionId,a[1].sessionId);assert.equal(writes.length,1);
+  await api.updateSessionHistory(rows=>rows.slice(1));assert.equal((await api.loadSessionHistory())[0].sessionId,a[1].sessionId);
+});
+
+test('failed identity migration exposes no unstable rows and preserves stored history', async () => {
+  const {parseSessionHistory,assignMissingSessionIds}=await import('../native-app/lib/sessionHistoryData.ts');
+  const original='[{"savedAt":"legacy","unknown":42}]';let fail=true,stored=original;
+  const api=load(read('native-app/lib/sessionHistory.ts'),['loadSessionHistory'],{
+    parseSessionHistory,assignMissingSessionIds,
+    AsyncStorage:{getItem:async()=>stored,setItem:async(_key,value)=>{if(fail)throw Error('disk unavailable');stored=value}},
+  });
+  await assert.rejects(api.loadSessionHistory(),/disk unavailable/);assert.equal(stored,original);
+  fail=false;const rows=await api.loadSessionHistory();assert.ok(rows[0].sessionId);assert.equal(rows[0].unknown,42);
 });
