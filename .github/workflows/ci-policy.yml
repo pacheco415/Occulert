@@ -18,7 +18,7 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const skipToken = /\[(?:skip ci|ci skip)\]/i;
+            const skipToken = /\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]|(?:^|\n)skip-checks:\s*true\s*(?:\n|$)/i;
             const pull = context.payload.pull_request;
             const commits = await github.paginate(github.rest.pulls.listCommits, {
               ...context.repo,
