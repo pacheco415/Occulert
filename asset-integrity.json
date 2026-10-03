@@ -109,5 +109,7 @@
   "driver-app.v68.css": "7e10f3a15eed448154996bbaf45134fabd0506d6040d04ba51547989dfbcdd4f",
   "driver-app.v69.js": "f19725d3577e4ec202a9bce70ae31749a64cf7b14b54a7102f0dd1bba96280de",
   "driver-app.v70.js": "ec82d2a78ac126beb7dc8527a623ec2a9057e756fd3dfe13ef4a66785e6d91c9",
-  "occulert-backend.v69.js": "7b27a73861cefd326c6e243ab8035f8589ab60d9a118bfc0694958bb42a84437"
+  "occulert-backend.v69.js": "7b27a73861cefd326c6e243ab8035f8589ab60d9a118bfc0694958bb42a84437",
+  "occulert-backend.v70.js": "252c163972fc91dba776cb2dacbd9bc8c84325dcd98a3cd601683e0820b451b2",
+  "fleet-offboarding.v1.js": "4fef243598f4c42877745ff7d6f55905d9a2cfda851c14675a10f9e1e22c6504"
 }
