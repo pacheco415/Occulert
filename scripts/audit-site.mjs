@@ -300,7 +300,7 @@ assertIncludes("pilot-signup.html", "<form class=\"card\"", "pilot signup contro
 assertIncludes(`${assetByStem('driver-app.js')}`, "trigger=_patched", "enhanced alert behavior must replace the active trigger function");
 assertIncludes(`${assetByStem('driver-app.js')}`, "if(alerts===previousAlerts)return", "enhanced alert behavior must respect alert cooldowns");
 assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
-assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.endSession", "driver app must finish protected cloud sessions when opted in");
+assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.createCloudSummaryOutbox", "driver app must finish protected cloud sessions through the durable outbox when opted in");
 assertIncludes(`${assetByStem('driver-app.js')}`, "queueBackendEvent", "driver app must queue protected alert events when opted in");
 assertIncludes(`${assetByStem('driver-app.js')}`, "function cameraRecoveryGuidance", "driver app must keep camera failure recovery guidance available");
 assertIncludes("app.html", "id=\"cameraSourceSelect\"", "desktop driver setup must provide an explicit camera picker");
