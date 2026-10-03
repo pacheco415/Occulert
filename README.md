@@ -68,7 +68,7 @@ Occulert is an assistive prototype. It cannot guarantee crash prevention, driver
 occulert/
 ├── index.html              # Landing page
 ├── app.html                # Driver monitoring app
-├── driver-app.v68.js       # Versioned browser monitoring and alerts
+├── driver-app.v*.js        # Browser monitoring; active version in asset-versions.json
 ├── fleet-dashboard.html    # Protected manager workflow + separate demo
 ├── fleet-display.html      # Protected read-only TV aggregate view
 ├── pilot-guide.html        # Released manager-and-driver quick start
@@ -83,7 +83,7 @@ occulert/
 ├── accept-invite.html      # Invitation acceptance
 ├── manifest.json           # PWA manifest
 ├── sw.js                   # Service worker
-├── occulert-backend.v68.js  # Browser client for Supabase Auth + /api routes
+├── occulert-backend.v*.js   # Auth/API client; active version in asset-versions.json
 ├── api/                    # Vercel serverless endpoints
 ├── db/schema.sql           # Initial schema and RLS policies
 ├── supabase/migrations/    # Subsequent protected schema/function changes
