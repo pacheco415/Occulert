@@ -295,6 +295,18 @@ test('single-session deletion removes only the confirmed matching local record',
   );
 });
 
+test('history edits reject duplicate legacy timestamps without changing saved records', () => {
+  const sessions = [{ savedAt: '2026-08-15T00:00:00.000Z', note: 'first' }, { savedAt: '2026-08-15T00:00:00.000Z', note: 'second' }];
+  const before = JSON.stringify(sessions);
+  assert.throws(() => updateMatchingSessionRecord(sessions, sessions[1], 1, item => ({ ...item, note: 'changed' })), /ambiguous/);
+  assert.throws(() => removeMatchingSessionRecord(sessions, sessions[1], 1), /ambiguous/);
+  assert.equal(JSON.stringify(sessions), before);
+  const distinct = sessions.map((item, index) => ({ ...item, sessionId: 'same-id', savedAt: `2026-08-${15 + index}T00:00:00.000Z` }));
+  const changed = updateMatchingSessionRecord(distinct, distinct[1], 1, item => ({ ...item, note: 'changed' }));
+  assert.equal(changed[0].note, 'first');
+  assert.equal(changed[1].note, 'changed');
+});
+
 test('native session exports include review summaries and exclude private identifiers and diagnostics', () => {
   const exported = buildSessionHistoryExport([{
     savedAt: '2026-08-15T00:00:00.000Z',
