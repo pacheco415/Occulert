@@ -40,13 +40,17 @@ if (refresh) {
       }
     }
   }
+  // A URL already used on another prepared branch must never be reused with
+  // different immutable bytes. Include deleted assets retained in known history.
+  if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: root, encoding: 'utf8' }).trim() !== 'false') throw new Error('Fetch full Git history before choosing new immutable asset URLs');
+  const historicalAssets = new Set(execFileSync('git', ['log', '--all', '--format=', '--name-only', '--', ':(top,glob)*.v*.js', ':(top,glob)*.v*.css'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 }).split(/\r?\n/).map(name => name.trim()).filter(Boolean));
   const replacements = new Map();
   for (const name of selected) {
     if (digest(sources.get(name)) !== integrity[name]) throw new Error(`Published asset integrity mismatch: ${name}`);
     const match = name.match(/^(.+)\.v(\d+)\.(js|css)$/);
     if (!match) throw new Error(`Asset is not versioned: ${name}`);
     let version = Number(match[2]) + 1, next;
-    do { next = `${match[1]}.v${version++}.${match[3]}`; } while (existsSync(join(root, next)) || [...replacements.values()].includes(next));
+    do { next = `${match[1]}.v${version++}.${match[3]}`; } while (existsSync(join(root, next)) || historicalAssets.has(next) || [...replacements.values()].includes(next));
     replacements.set(name, next);
   }
   const escaped = [...replacements.keys()].map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
@@ -73,7 +77,10 @@ if (refresh) {
   let sw = replace(read('sw.js'));
   const cache = sw.match(/const CACHE\s*=\s*(['"])(occulert-v)(\d+)\1/);
   if (!cache) throw new Error('Cannot find versioned service worker cache');
-  sw = sw.replace(cache[0], `const CACHE = '${cache[2]}${Number(cache[3]) + 1}'`);
+  const cacheHistory = execFileSync('git', ['log', '--all', '--format=', '-p', '--unified=0', '--', 'sw.js'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 });
+  const recordedCacheVersions = [...cacheHistory.matchAll(/^\+const CACHE\s*=\s*['"]occulert-v(\d+)['"]/gm)].map(match => Number(match[1]));
+  const nextCacheVersion = Math.max(Number(cache[3]), ...recordedCacheVersions) + 1;
+  sw = sw.replace(cache[0], `const CACHE = '${cache[2]}${nextCacheVersion}'`);
   changes.set('sw.js', sw);
   const config = parse('vercel.json');
   const versions = new Set([...replacements.values()].map(next => next.match(/\.v(\d+)\./)[1]));
@@ -85,7 +92,7 @@ if (refresh) {
     rule.headers.push({ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' });
     config.headers.push(rule);
   }
-  console.log(JSON.stringify({ copies: Object.fromEntries(replacements), rewrites: [...changes.keys()], cache: `${cache[2]}${Number(cache[3]) + 1}`, dryRun: dry }, null, 2));
+  console.log(JSON.stringify({ copies: Object.fromEntries(replacements), rewrites: [...changes.keys()], cache: `${cache[2]}${nextCacheVersion}`, dryRun: dry }, null, 2));
   if (!dry) {
     for (const [name, source] of changes) writeFileSync(join(root, name), source);
     writeJSON('asset-versions.json', manifest);
