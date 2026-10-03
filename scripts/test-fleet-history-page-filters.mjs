@@ -23,7 +23,7 @@ class Element {
   click() {}
   remove() {}
 }
-function harness(sessions = []) {
+function harness(sessions = [], options = {}) {
   const ids = ['historyStatus', 'historyAccess', 'recordsTitle', 'historyScope', 'historyList', 'historyBoundary',
     'historyRefresh', 'historyOlder', 'historyFilters', 'historyDriver', 'historyPeriod', 'historyCompletion',
     'historyFrom', 'historyTo', 'historyCustomDates', 'historyDateStatus', 'historySort', 'historyClearFilters',
@@ -33,9 +33,9 @@ function harness(sessions = []) {
   elements.get('historyCompletion').value = 'all';
   elements.get('historySort').value = 'newest';
   const requests = [], downloads = [], windowEvents = new Map(), documentEvents = new Map();
-  const auth = { access_token: 'private-token', refresh_token: 'refresh-token', user: { id: OWNER } };
+  const auth = { access_token: 'private-token', refresh_token: 'refresh-token', user: { id: options.owner || OWNER } };
   const backend = { currentUser: () => auth.user, getSession: async () => auth,
-    captureAuthContext: () => ({ auth }), requireAuthContext: () => {}, isAuthContextCurrent: () => true,
+    captureAuthContext: () => ({ auth }), requireAuthContext: () => { if (options.stale) throw Object.assign(Error('Account changed'), {code:'auth_session_changed'}); }, isAuthContextCurrent: () => !options.stale,
     fetchWithDeadline: async path => {
       requests.push(path);
       const params = new URL(path, 'https://www.occulert.com').searchParams;
@@ -48,7 +48,8 @@ function harness(sessions = []) {
   const document = { hidden: false, getElementById: id => elements.get(id), createElement: () => new Element(),
     createDocumentFragment: () => new Element(), addEventListener: (name, fn) => documentEvents.set(name, fn),
     body: { appendChild() {} } };
-  const window = { OcculertBackend: backend, OcculertSecurity: { csvCell: value => String(value ?? '') },
+  const storage = options.storage || new Map();
+  const window = { localStorage: { getItem: key => { if (options.storageDenied) throw Error('Denied'); return storage.get(key) ?? null; }, setItem: (key,value) => { if (options.storageDenied) throw Error('Denied'); storage.set(key,value); }, removeItem: key => storage.delete(key) }, OcculertBackend: backend, OcculertSecurity: { csvCell: value => String(value ?? '') },
     addEventListener: (name, fn) => windowEvents.set(name, fn), print() {} };
   class TestURL extends URL {
     static createObjectURL(blob) { downloads.push(blob.parts.join('')); return 'blob:history'; }
@@ -57,7 +58,7 @@ function harness(sessions = []) {
   class TestBlob { constructor(parts) { this.parts = parts; } }
   vm.runInNewContext(source, { window, document, AbortController,
     setTimeout: () => 0, clearTimeout: () => {}, Date, Intl, URL: TestURL, Blob: TestBlob });
-  return { elements, requests, downloads };
+  return { elements, requests, downloads, storage, windowEvents };
 }
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
@@ -97,4 +98,55 @@ test('history keeps safe detector provenance in its shown records and CSV', asyn
   assert.match(app.downloads[0], /"ios_mlkit_eye_probability","ios-eye-1\.2","2\.0\.1","client_declared"/);
   assert.match(app.downloads[0], /"","","","not_recorded"/);
   assert.doesNotMatch(app.downloads[0], /HYPERLINK|3\.0\/unsafe|<script>/);
+});
+
+const preferenceKey = 'occulert-history-view-v1:' + OWNER + ':' + FLEET;
+const preferences = (overrides = {}) => JSON.stringify({version:1,period:'all',completion:'all',sort:'newest',from:'',to:'',...overrides});
+
+test('History restores a saved range only after access and requests that range from the server', async () => {
+  const storage = new Map([[preferenceKey, preferences({period:'7',completion:'completed',sort:'alerts'})]]);
+  const app = harness([], {storage}); await settle(); await settle();
+  assert.equal(app.requests.length, 2);
+  assert.equal(app.requests[0], '/api/fleet-session-history');
+  assert.ok(new URL(app.requests[1], 'https://www.occulert.com').searchParams.get('from'));
+  assert.equal(app.elements.get('historyCompletion').value, 'completed');
+  assert.equal(app.elements.get('historySort').value, 'alerts');
+  assert.equal(app.elements.get('historyDriver').value, '');
+});
+
+test('History persists only validated date, sort and end-status choices; clear removes saved values', async () => {
+  const app = harness(); await settle();
+  app.elements.get('historyDriver').value = DRIVER;
+  app.elements.get('historySort').value = 'duration'; app.elements.get('historySort').trigger('change');
+  const saved = JSON.parse(app.storage.get(preferenceKey));
+  assert.deepEqual(Object.keys(saved).sort(), ['completion','from','period','sort','to','version']);
+  assert.equal(saved.sort, 'duration'); assert.doesNotMatch(JSON.stringify(saved), new RegExp(DRIVER));
+  app.elements.get('historyClearFilters').trigger('click'); await settle();
+  assert.equal(app.storage.has(preferenceKey), false);
+  assert.equal(app.elements.get('historySort').value, 'newest');
+});
+
+test('History ignores other-owner, future-version and invalid-calendar preferences', async () => {
+  for (const [key, value] of [
+    [preferenceKey.replace(OWNER, DRIVER), preferences({period:'30'})],
+    [preferenceKey, preferences({version:2,period:'30'})],
+    [preferenceKey, preferences({period:'custom',from:'2026-02-30'})],
+    [preferenceKey, preferences({period:'custom',from:'2026-10-03',to:'2026-10-01'})],
+    [preferenceKey, '{broken'],
+  ]) {
+    const app = harness([], {storage:new Map([[key,value]])}); await settle();
+    assert.equal(app.requests.length, 1); assert.equal(app.elements.get('historyPeriod').value, 'all');
+  }
+});
+
+test('History storage denial preserves browsing and an account change clears active preferences', async () => {
+  const denied = harness([], {storageDenied:true}); await settle();
+  denied.elements.get('historySort').value = 'alerts'; denied.elements.get('historySort').trigger('change');
+  assert.equal(denied.elements.get('historySort').value, 'alerts');
+  const app = harness(); await settle();
+  app.elements.get('historySort').value = 'alerts'; app.elements.get('historySort').trigger('change');
+  app.windowEvents.get('storage')({key:'occulert-auth'});
+  assert.equal(app.storage.has(preferenceKey), false);
+  assert.equal(app.elements.get('historySort').value, 'newest');
+  assert.equal(app.elements.get('historyList').children.length, 0);
 });
