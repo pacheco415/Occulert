@@ -837,6 +837,6 @@ html[data-theme="light"] .account-page .field textarea {
 
 /* Preserve readable native select text in WebKit and usable link targets. */
 .dashboard-page select,.dashboard-page select option{color:var(--portal-text);-webkit-text-fill-color:var(--portal-text);background-color:var(--portal-surface-strong)}
-.dashboard-page .select{min-height:44px}
+.dashboard-page .select{appearance:none;-webkit-appearance:none;min-height:44px;padding-right:36px;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 12px) 50%;background-size:6px 6px;background-repeat:no-repeat}
 .portal-page .back-link,.hub-page .back-link{display:inline-flex;align-items:center;min-height:44px}
 .hub-page details>summary{min-height:44px;box-sizing:border-box;padding-block:12px;line-height:20px}
