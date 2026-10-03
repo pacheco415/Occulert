@@ -37,24 +37,49 @@ export class ActiveSessionCheckpointUnreadableError extends Error {
   }
 }
 
+function finiteNonnegative(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function validTimestamp(value: unknown): value is number {
+  return finiteNonnegative(value) && Number.isFinite(new Date(value).getTime());
+}
+
+// Older checkpoints omit newer counters. Validate every supplied metric without
+// deleting an unreadable checkpoint or inventing missing historical evidence.
+function validMetricObject(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.entries(value).every(([key, item]) => {
+    if (typeof item === 'number') return finiteNonnegative(item);
+    if (item !== null && typeof item === 'object') return validMetricObject(item);
+    return (item === null && key === 'timeToFirstSampleMs')
+      || (typeof item === 'string' && ['mode', 'status'].includes(key))
+      || (typeof item === 'boolean' && ['checked', 'moduleAvailable', 'paired', 'appInstalled', 'reachable'].includes(key));
+  });
+}
+
 export function isActiveSessionCheckpoint(value: unknown): value is ActiveSessionCheckpoint {
   if (!value || typeof value !== 'object') return false;
   const checkpoint = value as Partial<ActiveSessionCheckpoint>;
   return typeof checkpoint.sessionId === 'string'
     && checkpoint.sessionId.length > 0
-    && typeof checkpoint.startedAt === 'number'
-    && Number.isFinite(checkpoint.startedAt)
-    && typeof checkpoint.checkpointedAt === 'number'
-    && Number.isFinite(checkpoint.checkpointedAt)
-    && typeof checkpoint.durationSec === 'number'
-    && checkpoint.durationSec >= 0
-    && typeof checkpoint.alertCount === 'number'
-    && checkpoint.alertCount >= 0
+    && validTimestamp(checkpoint.startedAt)
+    && validTimestamp(checkpoint.checkpointedAt)
+    && checkpoint.checkpointedAt >= checkpoint.startedAt
+    && finiteNonnegative(checkpoint.durationSec)
+    && finiteNonnegative(checkpoint.alertCount)
+    && Number.isSafeInteger(checkpoint.alertCount)
+    && finiteNonnegative(checkpoint.avgFatigue) && checkpoint.avgFatigue <= 100
+    && finiteNonnegative(checkpoint.maxFatigue) && checkpoint.maxFatigue <= 100
+    && ['headNodObservations', 'cameraHeadNodObservations', 'headphoneHeadNodObservations', 'headphoneMotionSamples'].every(key => {
+      const value = (checkpoint as unknown as Record<string, unknown>)[key];
+      return value === undefined || (finiteNonnegative(value) && Number.isSafeInteger(value));
+    })
     && (checkpoint.sensitivity === 'low'
       || checkpoint.sensitivity === 'medium'
       || checkpoint.sensitivity === 'high')
-    && Boolean(checkpoint.monitorPerformance)
-    && typeof checkpoint.monitorPerformance === 'object';
+    && validMetricObject(checkpoint.monitorPerformance)
+    && (checkpoint.sensorFusion === undefined || validMetricObject(checkpoint.sensorFusion));
 }
 
 /** Only a missing key means no checkpoint; malformed stored data must be preserved. */
