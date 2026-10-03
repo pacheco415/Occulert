@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
+import { createSessionSummaryOutbox } from '../native-app/lib/sessionSummaryOutbox.ts';
 import { createAsyncMutationQueue } from '../native-app/lib/asyncMutationQueue.ts';
 import { createCachedBooleanPreference } from '../native-app/lib/cachedBooleanPreference.ts';
 import { createHealthReadinessSnapshot, isHealthReadinessSnapshot } from '../native-app/lib/healthReadiness.ts';
@@ -51,15 +52,17 @@ function cloudFixture(initial, { consent = false } = {}) {
     deleteItemAsync: async key => { secure.delete(key); },
   };
   fixture.asyncStorage = {
+    removeItem: async key => { storage.delete(key); },
     getItem: async key => storage.get(key) ?? null,
     setItem: async (key, value) => { storage.set(key, value); },
   };
   fixture.api = load(read('native-app/lib/cloudSync.ts'), [
     'getCloudState', 'signInToCloud', 'signOutOfCloud', 'setCloudSyncEnabled',
-    'beginCloudSession', 'logCloudAlert', 'finishCloudSession',
+    'beginCloudSession', 'logCloudAlert', 'finishCloudSession', 'cloudSessionScopes', 'retryPendingCloudSessions',
   ], {
     SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage,
-    Platform: { OS: 'ios', Version: '26' }, createAsyncMutationQueue, createCachedBooleanPreference,
+    updateSessionHistory: async update => { fixture.history = update(fixture.history || []); },
+    createSessionSummaryOutbox, Platform: { OS: 'ios', Version: '26' }, createAsyncMutationQueue, createCachedBooleanPreference,
     currentAppBuildInfo: () => ({ appVersion: '1.0.0', appBuildNumber: 'test' }),
     formatAppBuildLabel: ({ appVersion, appBuildNumber }) => `v${appVersion} (${appBuildNumber})`,
     setTimeout: (fn, delay) => { timers.set(++nextTimer, { fn, delay }); return nextTimer; },
@@ -73,6 +76,7 @@ function cloudFixture(initial, { consent = false } = {}) {
       return fixture.transport(url, init);
     },
   });
+  if (initial) fixture.api.cloudSessionScopes.set('session', { ownerId: initial.user.id, consentVersion: 0 });
   fixture.expire = async () => {
     const pending = [...timers.values()];
     assert.ok(pending.length, 'the request must retain a finite deadline');
@@ -573,4 +577,31 @@ test('failed consent opt-out prevents successful password tokens from being save
   assert.equal(f.secure.has(AUTH_KEY), false);
   assert.equal((await f.api.getCloudState()).syncEnabled, false);
   assert.equal(f.requests.some(request => request.url.endsWith('/api/profile')), false);
+});
+
+test('failed native finalization retries its original finish time and updates local history', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  f.history = [{ sessionId: 'local-one', cloudSynced: false }];
+  const payloads = [];
+  let available = false;
+  f.transport = (_url, options) => { payloads.push(JSON.parse(options.body)); return response(available ? 200 : 503, {}); };
+  const endedAt = '2026-10-03T12:00:00.000Z';
+  assert.equal(await f.api.finishCloudSession('session', { averageFatigue: 12, maxFatigue: 40, safetyScore: 72, alertCount: 1 }, endedAt, 'local-one'), false);
+  available = true;
+  await f.api.retryPendingCloudSessions();
+  assert.equal(payloads.length, 2);
+  assert.equal(payloads[0].ended_at, endedAt);
+  assert.deepEqual(payloads[1], payloads[0]);
+  assert.equal(Object.hasOwn(payloads[1], 'local_session_id'), false);
+  assert.equal(f.history[0].cloudSynced, true);
+  assert.equal(f.history[0].cloudOwnerId, 'old');
+});
+
+test('an old cloud session cannot be finalized under a replacement account', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  assert.equal(await f.api.beginCloudSession(), 'session');
+  assert.equal((await f.api.signInToCloud('new@example.com', 'password')).ok, true);
+  assert.equal(await f.api.setCloudSyncEnabled(true), true);
+  assert.equal(await f.api.finishCloudSession('session', { averageFatigue: 12, maxFatigue: 40, safetyScore: 72, alertCount: 1 }), false);
+  assert.equal(f.requests.filter(row => row.init.method === 'PATCH').length, 0);
 });

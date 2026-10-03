@@ -4,6 +4,8 @@ import { Platform } from 'react-native';
 import { createAsyncMutationQueue } from './asyncMutationQueue';
 import { createCachedBooleanPreference } from './cachedBooleanPreference';
 import { currentAppBuildInfo, formatAppBuildLabel } from './appBuildInfo';
+import { updateSessionHistory } from './sessionHistory';
+import { createSessionSummaryOutbox, type PendingSessionSummary, type SummaryScope } from './sessionSummaryOutbox';
 
 const API_BASE = 'https://www.occulert.com';
 const AUTH_KEY = 'occulert.cloud.auth.v1';
@@ -79,6 +81,16 @@ let authLoadPromise: Promise<StoredAuth | null> | null = null;
 let authRefreshPromise: Promise<StoredAuth | null> | null = null;
 let authMutationVersion = 0;
 const authStorageQueue = createAsyncMutationQueue();
+const cloudSessionScopes = new Map<string, SummaryScope>();
+const sessionOutbox = createSessionSummaryOutbox(AsyncStorage, scope =>
+  authCache?.user.id === scope.ownerId && consentRuntimeOverride !== false
+  && consentMutationVersion === scope.consentVersion, async (scope, entry) => {
+    if (!entry.local_session_id) return;
+    await updateSessionHistory<Record<string, unknown>>(records => records.map(record =>
+      record.sessionId === entry.local_session_id
+        ? { ...record, cloudSynced: true, cloudSessionId: entry.session_id, cloudOwnerId: scope.ownerId }
+        : record));
+  });
 const cloudSyncPreference = createCachedBooleanPreference(
   AsyncStorage,
   CONSENT_KEY,
@@ -251,6 +263,7 @@ async function clearAuth(): Promise<void> {
   await Promise.allSettled([
     authStorageQueue.run(() => SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS)),
     cloudSyncPreference.set(false),
+    sessionOutbox.clear(),
   ]);
 }
 
@@ -468,6 +481,7 @@ export async function signInToCloud(email: string, password: string): Promise<Cl
     consentMutationVersion += 1;
     try {
       await cloudSyncPreference.set(false);
+      await sessionOutbox.clear();
     } catch {
       return { ok: false, message: 'Cloud sharing could not be switched off. Sign-in was not saved. Please try again.' };
     }
@@ -515,10 +529,12 @@ export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
   if (enabled && !auth) return false;
   const consentVersion = authMutationVersion;
   try {
+    if (!enabled || !await consentEnabled()) await sessionOutbox.clear();
     await cloudSyncPreference.set(enabled);
     if (consentRevision !== consentMutationVersion) return false;
     if (enabled && (!auth || !authIsCurrent(auth, consentVersion))) return false;
     consentRuntimeOverride = enabled;
+    if (enabled) void retryPendingCloudSessions();
     return true;
   } catch {
     if (enabled && consentRevision === consentMutationVersion) consentRuntimeOverride = false;
@@ -527,6 +543,7 @@ export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
 }
 
 export async function beginCloudSession(): Promise<string | null> {
+  void retryPendingCloudSessions();
   const syncContext = await currentSyncContext();
   if (!syncContext || !await ensureDriverProfile(syncContext)) return null;
   const platform = Platform.OS;
@@ -540,7 +557,9 @@ export async function beginCloudSession(): Promise<string | null> {
     detector_version: 'mlkit-probability-perclos-1',
     app_version: formatAppBuildLabel(currentAppBuildInfo()),
   }, true, syncContext);
-  return result.ok ? result.body.session?.id || null : null;
+  const sessionId = result.ok ? result.body.session?.id || null : null;
+  if (sessionId) cloudSessionScopes.set(sessionId, syncContext);
+  return sessionId;
 }
 
 export async function logCloudAlert(sessionId: string, fatigueScore: number): Promise<boolean> {
@@ -554,20 +573,49 @@ export async function logCloudAlert(sessionId: string, fatigueScore: number): Pr
   return result.ok;
 }
 
+function sendPendingSummary(scope: SummaryScope, entry: PendingSessionSummary) {
+  return backendApi('PATCH', '/api/sessions', {
+    session_id: entry.session_id, ended_at: entry.ended_at,
+    average_fatigue: entry.average_fatigue, max_fatigue: entry.max_fatigue,
+    safety_score: entry.safety_score, alert_count: entry.alert_count,
+    head_nod_count: entry.head_nod_count,
+  }, true, scope);
+}
+
+export async function retryPendingCloudSessions(): Promise<void> {
+  try {
+    const scope = await currentSyncContext();
+    if (!scope) return;
+    await sessionOutbox.flush(scope, entry => sendPendingSummary(scope, entry));
+  }
+  catch { /* Preserve unreadable or unavailable storage for local recovery. */ }
+}
+
 export async function finishCloudSession(
   sessionId: string,
   stats: CloudSessionStats,
+  endedAt = new Date().toISOString(),
+  localSessionId?: string,
 ): Promise<boolean> {
+  const sessionScope = cloudSessionScopes.get(sessionId);
+  if (!sessionScope) return false;
   const syncContext = await currentSyncContext();
-  if (!syncContext) return false;
-  const result = await backendApi('PATCH', '/api/sessions', {
-    session_id: sessionId,
-    average_fatigue: stats.averageFatigue,
-    max_fatigue: stats.maxFatigue,
-    safety_score: stats.safetyScore,
-    alert_count: stats.alertCount,
+  if (!syncContext || sessionScope.ownerId !== syncContext.ownerId
+    || sessionScope.consentVersion !== syncContext.consentVersion) {
+    cloudSessionScopes.delete(sessionId);
+    return false;
+  }
+  const metric = (value: number, max = 100) => Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : null;
+  const entry: PendingSessionSummary = {
+    session_id: sessionId, ended_at: endedAt, local_session_id: localSessionId,
+    average_fatigue: metric(stats.averageFatigue), max_fatigue: metric(stats.maxFatigue),
+    safety_score: metric(stats.safetyScore), alert_count: metric(stats.alertCount, 10000),
     // Candidate head-nod observations remain local until device validation.
     head_nod_count: 0,
-  }, true, syncContext);
-  return result.ok;
+  };
+  try {
+    if (!await sessionOutbox.enqueue(syncContext, entry)) return false;
+    return (await sessionOutbox.flush(syncContext, item => sendPendingSummary(syncContext, item))).has(sessionId);
+  } catch { return false; }
+  finally { cloudSessionScopes.delete(sessionId); }
 }
