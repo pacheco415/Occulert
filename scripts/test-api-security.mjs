@@ -208,6 +208,39 @@ assert.equal(insertedProfile.user_id, "user-1");
 assert.equal(insertedProfile.fleet_id, null, "drivers must not self-assign fleet membership");
 assert.equal(Object.hasOwn(insertedProfile, "role"), false, "privileged roles must not be accepted from the browser");
 
+// Native onboarding sends {} repeatedly, including during a concurrent insert.
+for (const race of [false, true]) {
+  let row = { id: "driver-1", user_id: "user-1", name: "John Smith", email: "old@example.com", vehicle_id: "TRK-7", fleet_id: "fleet-1", active: false };
+  let raced = false;
+  const updatingProfile = loadHandler("../api/profile.js", async (_table, options = {}) => {
+    if (!options.method) return race && !raced ? [] : [row];
+    if (options.method === "POST") { raced = true; throw { details: { code: "23505" } }; }
+    assert.equal(options.method, "PATCH");
+    assert.equal(options.params.user_id, "eq.user-1");
+    row = { ...row, ...options.body };
+    return [row];
+  });
+  const refreshed = await invoke(updatingProfile, request("POST", { fleet_id: "attacker", active: true }));
+  assert.equal(refreshed.status, 200);
+  assert.equal(row.name, "John Smith");
+  assert.equal(row.vehicle_id, "TRK-7");
+  assert.equal(row.active, false);
+  assert.equal(row.fleet_id, "fleet-1");
+  assert.equal(row.email, verifiedUser.email);
+  await invoke(updatingProfile, request("POST", { name: "New" }));
+  assert.equal(row.name, "New");
+  assert.equal(row.vehicle_id, "TRK-7");
+  await invoke(updatingProfile, request("POST", { vehicle: "" }));
+  assert.equal(row.vehicle_id, null);
+}
+const defaultProfile = await invoke(profile, request("POST", {}));
+assert.equal(defaultProfile.status, 200);
+assert.equal(insertedProfile.name, "manager");
+assert.equal(insertedProfile.active, true);
+for (const body of [null, true, "text", 3, []]) {
+  assert.equal((await invoke(profile, request("POST", body))).status, 415);
+}
+
 let insertedFleet;
 const fleets = loadHandler("../api/fleets.js", async (table, options = {}) => {
   assert.equal(table, "fleets");
