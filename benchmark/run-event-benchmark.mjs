@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseTable } from './csv.mjs';
 import { contentSha256, sourceSnapshot } from './provenance.mjs';
@@ -213,6 +214,16 @@ export function scoreByDetector(input) {
   }));
 }
 
+export function comparePipelines(primary, comparison) {
+  validateInput(primary);validateInput(comparison);
+  const identity=input=>input.sessions.map(row=>[row.session_id,row.participant,row.platform,row.duration_ms,row.split||'']).sort((a,b)=>a[0].localeCompare(b[0]));
+  const labels=input=>input.episodes.map(row=>[row.session_id,row.start_ms,row.end_ms,row.label]).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  if(JSON.stringify(identity(primary))!==JSON.stringify(identity(comparison))||JSON.stringify(labels(primary))!==JSON.stringify(labels(comparison)))throw new Error('Comparison must use identical sessions, participants, durations, splits and ground-truth episodes');
+  const versions=new Map(primary.sessions.map(row=>[row.session_id,row.detector_version]));
+  if(comparison.sessions.some(row=>row.detector_version===versions.get(row.session_id)))throw new Error('Comparison must identify a distinct detector version');
+  return {primary:scoreByDetector(primary),comparison:scoreByDetector(comparison),combinedAccuracy:null};
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const arg = name => {
     const index = process.argv.indexOf(name);
@@ -220,7 +231,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   };
   const paths = Object.fromEntries(Object.keys(REQUIRED).map(kind => [kind, arg(`--${kind}`)]));
   if (Object.values(paths).some(value => !value)) {
-    console.error('Usage: node benchmark/run-event-benchmark.mjs --sessions sessions.csv --tracking tracking.csv --episodes episodes.csv --alerts alerts.csv [--split test] [--slice-by lighting] [--dataset name@version] [--json results.json]');
+    console.error('Usage: node benchmark/run-event-benchmark.mjs --sessions sessions.csv --tracking tracking.csv --episodes episodes.csv --alerts alerts.csv [--split test] [--slice-by lighting] [--dataset name@version] [--comparison-dir tasks-export] [--json results.json]');
     process.exit(2);
   }
   const bytes = Object.fromEntries(await Promise.all(Object.entries(paths).map(async ([kind, path]) => [kind, await readFile(path)])));
@@ -229,17 +240,28 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const selected = selectSessions(parsed, split);
   if (!selected.sessions.length) throw new Error('No sessions selected');
   const detectors = scoreByDetector(selected);
+  let comparison=null,comparisonInputs=null;
+  if(arg('--comparison-dir')) {
+    const comparisonPaths=Object.fromEntries(Object.keys(REQUIRED).map(kind=>[kind,join(arg('--comparison-dir'),kind+'.csv')]));
+    const comparisonBytes=Object.fromEntries(await Promise.all(Object.entries(comparisonPaths).map(async([kind,path])=>[kind,await readFile(path)])));
+    const comparisonParsed=Object.fromEntries(Object.entries(comparisonBytes).map(([kind,value])=>[kind,parseFile(value.toString('utf8'),kind)]));
+    comparePipelines(parsed,comparisonParsed);
+    comparison=comparePipelines(selected,selectSessions(comparisonParsed,split));
+    comparisonInputs=Object.fromEntries(Object.entries(comparisonBytes).map(([kind,value])=>[kind,{path:comparisonPaths[kind],sha256:contentSha256(value)}]));
+  }
   const result = {
     provenance: {
       ...sourceSnapshot(['run-event-benchmark.mjs']),
       dataset: arg('--dataset') ?? null,
       split: split ?? 'all',
       inputs: Object.fromEntries(Object.entries(bytes).map(([kind, value]) => [kind, { path: paths[kind], sha256: contentSha256(value) }])),
+      comparisonInputs,
       ranAt: new Date().toISOString(),
     },
     // Distinct platforms or detector versions must not share one accuracy number.
     overall: Object.keys(detectors).length === 1 ? scoreEvents(selected) : null,
     detectors,
+    comparison,
     slices: arg('--slice-by') ? scoreBySlice(selected, arg('--slice-by')) : null,
   };
   console.log(JSON.stringify(result, null, 2));

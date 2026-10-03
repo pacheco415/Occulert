@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseFile, scoreByDetector, scoreBySlice, scoreEvents, selectSessions, validateInput } from './run-event-benchmark.mjs';
+import { comparePipelines, parseFile, scoreByDetector, scoreBySlice, scoreEvents, selectSessions, validateInput } from './run-event-benchmark.mjs';
 
 const fixture = () => ({
   sessions: parseFile('session_id,participant,platform,detector_version,duration_ms,split,lighting\ns1,p1,web,web-1,10000,test,day\ns2,p2,ios,ios-1,10000,test,night\n', 'sessions'),
@@ -97,4 +97,30 @@ test('CSV input rejects missing fields, malformed values and invalid labels', ()
   assert.throws(() => parseFile('session_id,start_ms,end_ms,label\ns1,0,10,awake\n', 'episodes'), /Invalid episode label/);
   assert.throws(() => parseFile('session_id,start_ms,end_ms\ns1,10,5\n', 'tracking'), /end_ms must be after/);
   assert.throws(() => parseFile('session_id,participant,platform,detector_version,duration_ms\ns1,p1,unknown,v1,10\n', 'sessions'), /Invalid platform/);
+});
+
+
+test('parallel pipeline scoring keeps independent tracking and never combines accuracy',()=>{
+ const primary=fixture(),comparison=fixture();comparison.sessions.forEach(row=>row.detector_version='tasks-experiment');comparison.alerts=[];comparison.tracking=[];
+ const result=comparePipelines(primary,comparison);assert.equal(result.combinedAccuracy,null);assert.equal(result.primary['web / web-1'].eventRecall,1);assert.equal(result.comparison['web / tasks-experiment'].eventRecall,null);
+ for(const change of [value=>value.sessions[0].participant='different',value=>value.sessions[0].duration_ms=9000,value=>value.episodes[0].start_ms=2100]){
+  const other=fixture();other.sessions.forEach(row=>row.detector_version='tasks-experiment');change(other);assert.throws(()=>comparePipelines(primary,other));
+ }
+ assert.throws(()=>comparePipelines(primary,fixture()),/distinct detector/);
+});
+
+test('comparison CLI keeps independent tracking coverage and hashes both exports', async () => {
+  const {mkdtemp,writeFile,mkdir,rm}=await import('node:fs/promises');
+  const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+  const {execFileSync}=await import('node:child_process');
+  const dir=await mkdtemp(join(tmpdir(),'occulert-event-comparison-'));
+  try{
+    const candidate=join(dir,'candidate');await mkdir(candidate);
+    const files={sessions:'session_id,participant,platform,detector_version,duration_ms,split\ns1,p1,web,legacy,10000,test\n',tracking:'session_id,start_ms,end_ms\ns1,0,10000\n',episodes:'session_id,start_ms,end_ms,label\ns1,2000,4000,drowsy\n',alerts:'session_id,at_ms\ns1,3000\n'};
+    for(const [name,bytes]of Object.entries(files)){await writeFile(join(dir,name+'.csv'),bytes);await writeFile(join(candidate,name+'.csv'),name==='sessions'?bytes.replace(',legacy,',',tasks,'):name==='tracking'?'session_id,start_ms,end_ms\n':name==='alerts'?'session_id,at_ms\n':bytes)}
+    const args=Object.keys(files).flatMap(name=>['--'+name,join(dir,name+'.csv')]);
+    const report=JSON.parse(execFileSync(process.execPath,['benchmark/run-event-benchmark.mjs',...args,'--comparison-dir',candidate,'--split','test'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}));
+    assert.equal(report.comparison.primary['web / legacy'].eventRecall,1);assert.equal(report.comparison.comparison['web / tasks'].eventRecall,null);assert.equal(report.comparison.combinedAccuracy,null);
+    for(const kind of Object.keys(files)){assert.match(report.provenance.inputs[kind].sha256,/^[a-f0-9]{64}$/);assert.match(report.provenance.comparisonInputs[kind].sha256,/^[a-f0-9]{64}$/)}
+  }finally{await rm(dir,{recursive:true,force:true})}
 });

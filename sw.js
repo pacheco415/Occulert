@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v60';
+const CACHE = 'occulert-v71';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -38,6 +38,33 @@ const RUNTIME_ASSETS = [
     "integrity": "sha256-VFIvolxQW/CUJC+Wm05JGRJesNrcy1aPKvFxu9ZYZfk="
   }
 ];
+const TASKS_RUNTIME_ASSETS = [
+  {
+    "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/vision_bundle.js",
+    "integrity": "sha256-pCfCa2tALe6263Th9sdo0m7AzBWWlYyenj1RibfL9ao="
+  },
+  {
+    "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.js",
+    "integrity": "sha256-4XDuZ91OFsGm/NiECiBmh+WlmyLCDkqQK8RFsJVFTXM="
+  },
+  {
+    "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.wasm",
+    "integrity": "sha256-jaJ3pzOSbqzQR0uHBLNnQtbsMjHFeoYMW4id/48d+IY="
+  },
+  {
+    "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.js",
+    "integrity": "sha256-6B1xWj1CzDNzYC6y96/3ldFkk022gOMklrZdq1N/llg="
+  },
+  {
+    "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.wasm",
+    "integrity": "sha256-ooSDzULnToVb9evba0DZtmpbSeNelQILyXZp5oIqMZI="
+  },
+  {
+    "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/face_landmarker.task",
+    "integrity": "sha256-ZBhOIpsmMQe8K4BMZiXbE0H/K7cxh0sLzC/mVE4Lyf8="
+  }
+];
+const TASKS_RUNTIME_INTEGRITY = new Map(TASKS_RUNTIME_ASSETS.map(asset=>[asset.url,asset.integrity]));
 const RUNTIME_INTEGRITY = new Map(RUNTIME_ASSETS.map(asset => [asset.url, asset.integrity]));
 function selectedRuntimeAssets() {
   let simd = false;
@@ -64,7 +91,8 @@ const STATIC_ASSETS = [
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v68.css',
-  '/driver-app.v70.js',
+  '/driver-app.v73.js',
+  '/tasks-comparison.v1.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
@@ -86,7 +114,7 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v47.js',
   '/occulert-backend.v58.js',
   '/occulert-backend.v60.js',
-  '/occulert-backend.v69.js',
+  '/occulert-backend.v73.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
   '/supabase-loader.v47.js',
@@ -95,14 +123,14 @@ const NETWORK_ONLY_ASSETS = new Set([
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
   '/driver-app.v60.js',
-  '/driver-app.v70.js',
+  '/driver-app.v73.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
   '/base.v47.css',
   '/app.html',
   '/driver-app.v68.css',
-  '/driver-app.v70.js',
+  '/driver-app.v73.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;
@@ -215,6 +243,12 @@ self.addEventListener('notificationclick', event => {
   );
 });
 
+self.addEventListener('message', event => {
+  if(event.data?.type==='occulert.tasks.runtime'&&event.ports?.[0])event.ports[0].postMessage({type:'occulert.tasks.runtime',pins:TASKS_RUNTIME_ASSETS});
+});
+async function verifyTasksCachedResponse(response,integrity){
+  try{const hash=await crypto.subtle.digest('SHA-256',await response.clone().arrayBuffer());return 'sha256-'+btoa(String.fromCharCode(...new Uint8Array(hash)))===integrity}catch{return false}
+}
 self.addEventListener('fetch', event => {
   const req = event.request;
 
@@ -250,6 +284,18 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  const taskIntegrity=url.origin===self.location.origin&&TASKS_RUNTIME_INTEGRITY.get(url.pathname);
+  if(taskIntegrity){
+    const update=(async()=>{
+      const cache=await caches.open(CACHE),cached=await cache.match(req);
+      if(cached&&await verifyTasksCachedResponse(cached,taskIntegrity))return cached;
+      const response=await fetchWithDeadline(new Request(req,{integrity:taskIntegrity}),15000,undefined,completeNetworkResponse);
+      if(!response)return Response.error();
+      if(response.ok)await cacheResponseBestEffort(req,response);
+      return response;
+    })().catch(()=>Response.error());
+    event.respondWith(update);event.waitUntil(update.then(()=>{}));return;
+  }
   if (req.mode === 'navigate' || req.url.endsWith('.html')) {
     const networkAttempt = fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
     const cacheUpdate = networkAttempt
@@ -259,7 +305,9 @@ self.addEventListener('fetch', event => {
     event.respondWith((async () => {
       const networkResponse = await networkAttempt;
       if (networkResponse && networkResponse.ok) return networkResponse;
-      const cachedResponse = await caches.match(req) || await caches.match('/index.html');
+      const cachedResponse = await caches.match(req)
+        || (url.origin === self.location.origin && url.pathname === '/app.html' ? await caches.match('/app.html') : null)
+        || await caches.match('/index.html');
       return cachedResponse || networkResponse || Response.error();
     })());
     return;
