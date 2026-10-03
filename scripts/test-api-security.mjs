@@ -527,6 +527,28 @@ assert.equal(stored.body.stored, true);
 assert.equal(storedLead.email, "driver@example.com");
 assert.equal(storedLead.use_case, null);
 assert.equal(storedLead.source, "pilot-signup-page", "browser callers must not choose arbitrary lead sources");
+const originalNotifyFetch = globalThis.fetch;
+try {
+  process.env.LEAD_NOTIFY_WEBHOOK_URL = 'https://notify.example.invalid/hook';
+  let notice;
+  globalThis.fetch = async (_url, options) => { notice = JSON.parse(options.body); return { ok: true }; };
+  const notified = await invoke(pilotLeads, request("POST", validLead, "203.0.113.35"));
+  assert.equal(notified.status, 200);
+  assert.deepEqual(Object.keys(notice).sort(), ['lead_id', 'received_at', 'source', 'type']);
+  assert.equal(notice.type, 'occulert.pilot_lead.created');
+  assert.equal(notice.lead_id, 'lead-1');
+  assert.equal(notice.source, 'pilot-signup-page');
+  assert.ok(!JSON.stringify(notice).includes(validLead.email));
+  globalThis.fetch = async () => { throw new Error('notification unavailable'); };
+  assert.equal((await invoke(pilotLeads, request("POST", validLead, "203.0.113.36"))).status, 200);
+  process.env.LEAD_NOTIFY_WEBHOOK_URL = 'http://notify.example.invalid/hook';
+  globalThis.fetch = async () => { assert.fail('insecure notification destination must not be called'); };
+  assert.equal((await invoke(pilotLeads, request("POST", validLead, "203.0.113.37"))).status, 200);
+} finally {
+  delete process.env.LEAD_NOTIFY_WEBHOOK_URL;
+  globalThis.fetch = originalNotifyFetch;
+}
+
 const paidRollout = await invoke(pilotLeads, request("POST", {
   ...validLead,
   interest: "paid_rollout",
