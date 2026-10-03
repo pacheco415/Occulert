@@ -209,8 +209,22 @@ test('a 30-minute session keeps every rolling buffer bounded', () => {
   assert.ok(s.alerts > 0, 'repeated drowsy episodes must keep alerting');
   const logChildren = h.run("document.getElementById('log').children.length");
   assert.ok(logChildren <= 15, 'event log bounded');
-  // Known growth: fatigueSamples accumulates one entry per processed frame
-  // for the session report. ~13k entries per 30 min is small but unbounded;
-  // documented here so a future cap is a conscious choice.
-  assert.equal(typeof s.fatigueSamplesLength, 'number');
+  assert.ok(s.fatigueSampleCount > 10000, 'long drive records every valid sample');
+  assert.ok(Number.isFinite(s.fatigueSampleSum));
+  assert.equal(h.run('fleetPayload().avgFatigue'), Math.round(s.fatigueSampleSum / s.fatigueSampleCount));
+
+});
+
+test('running fatigue summary preserves the average of the same processed samples', () => {
+  const h = createAppHarness();
+  h.startSession();
+  h.feed({ ear: OPEN }, 4_000);
+  const baselineSum = h.get('fatigueSampleSum'), baselineCount = h.get('fatigueSampleCount');
+  const samples = [];
+  for (let i = 0; i < 100; i++) {
+    h.frame({ ear: i % 3 === 0 ? CLOSED : OPEN });
+    samples.push(h.state().fatigue);
+  }
+  assert.equal(h.get('fatigueSampleSum'), baselineSum + samples.reduce((sum, value) => sum + value, 0));
+  assert.equal(h.get('fatigueSampleCount'), baselineCount + samples.length);
 });
