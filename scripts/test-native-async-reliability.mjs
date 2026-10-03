@@ -58,7 +58,7 @@ function cloudFixture(initial, { consent = false } = {}) {
   };
   fixture.api = load(read('native-app/lib/cloudSync.ts'), [
     'getCloudState', 'signInToCloud', 'signOutOfCloud', 'setCloudSyncEnabled',
-    'beginCloudSession', 'logCloudAlert', 'finishCloudSession', 'cloudSessionScopes', 'retryPendingCloudSessions',
+    'beginCloudSession', 'logCloudAlert', 'finishCloudSession', 'cloudSessionScopes', 'retryPendingCloudSessions', 'getPendingCloudSummaryState', 'pendingCloudSummaryStateIsCurrent',
   ], {
     SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage,
     updateSessionHistory: async update => { fixture.history = update(fixture.history || []); },
@@ -630,4 +630,24 @@ test('failed identity migration exposes no unstable rows and preserves stored hi
   });
   await assert.rejects(api.loadSessionHistory(),/disk unavailable/);assert.equal(stored,original);
   fail=false;const rows=await api.loadSessionHistory();assert.ok(rows[0].sessionId);assert.equal(rows[0].unknown,42);
+});
+
+
+test('native pending-summary state is local, owner-scoped and hidden after consent revocation',async()=>{
+ const f=cloudFixture(auth('old',4000000000),{consent:true});
+ f.history=[{sessionId:'local-one'}];f.transport=()=>response(503,{});
+ await f.api.finishCloudSession('session',{averageFatigue:10,maxFatigue:20,safetyScore:70,alertCount:1},'2026-10-03T12:00:00.000Z','local-one');
+ const before=f.requests.length,state=await f.api.getPendingCloudSummaryState();
+ assert.equal(state.count,1);assert.deepEqual(Array.from(state.localIds),['local-one']);assert.equal(f.requests.length,before,'a queue snapshot must not send a provider request');
+ assert.equal(f.api.pendingCloudSummaryStateIsCurrent(state),true);
+ await f.api.setCloudSyncEnabled(false);assert.equal(f.api.pendingCloudSummaryStateIsCurrent(state),false);assert.equal((await f.api.getPendingCloudSummaryState()).count,0);
+});
+
+test('a deliberate native retry cannot switch to another owner or consent revision',async()=>{
+ const f=cloudFixture(auth('old',4000000000),{consent:true});
+ f.transport=()=>response(503,{});await f.api.finishCloudSession('session',{averageFatigue:10,maxFatigue:20,safetyScore:70,alertCount:1},'2026-10-03T12:00:00.000Z','local-one');
+ const state=await f.api.getPendingCloudSummaryState(),before=f.requests.length;
+ await f.api.retryPendingCloudSessions({...state.scope,ownerId:'another'});
+ await f.api.retryPendingCloudSessions({...state.scope,consentVersion:state.scope.consentVersion+1});
+ assert.equal(f.requests.length,before);
 });

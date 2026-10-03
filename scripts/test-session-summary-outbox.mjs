@@ -78,3 +78,10 @@ test('a failed local history acknowledgement retains the retry-safe summary', as
   await f.outbox.flush(scope, async () => ({ ok: true, status: 200 }));
   assert.equal(JSON.parse(f.values.get(KEY))[scope.ownerId].length, 0);
 });
+
+test('pending snapshots are owner-scoped, copied and invalidated by account changes',async()=>{
+ const f=fixture();await f.outbox.enqueue(scope,{...entry('one'),local_session_id:'local-one'});
+ const pending=await f.outbox.pendingEntries(scope);assert.equal(pending[0].local_session_id,'local-one');pending[0].session_id='changed';
+ assert.equal((await f.outbox.pendingEntries(scope))[0].session_id,'one');
+ f.switch({ownerId:'owner-b',consentVersion:1});assert.deepEqual(await f.outbox.pendingEntries(scope),[]);
+});
