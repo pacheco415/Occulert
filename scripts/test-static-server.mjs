@@ -13,6 +13,10 @@ test('static server rejects encoded parent paths and symlinks outside its root',
   await mkdir(root);
   await writeFile(join(root, 'vercel.json'), '{}');
   await writeFile(join(root, 'index.html'), 'public fixture');
+  await mkdir(join(root, '.git'));
+  await writeFile(join(root, '.git', 'HEAD'), 'private fixture marker');
+  await writeFile(join(root, '.env.local'), 'private fixture marker');
+  await symlink(join(root, '.env.local'), join(root, 'env-alias.txt'));
   await writeFile(sibling, 'private fixture marker');
   await symlink(sibling, join(root, 'linked.txt'));
   const reservation = createServer();
@@ -30,7 +34,7 @@ test('static server rejects encoded parent paths and symlinks outside its root',
     });
     const base = `http://127.0.0.1:${port}`;
     assert.equal(await (await fetch(base + '/')).text(), 'public fixture');
-    for (const path of ['/%2e%2e%2fsite-private.txt', '/linked.txt', '/%00', '/%ZZ']) {
+    for (const path of ['/%2e%2e%2fsite-private.txt', '/linked.txt', '/.env.local', '/%2eenv.local', '/.git/HEAD', '/env-alias.txt', '/%00', '/%ZZ']) {
       const response = await fetch(base + path);
       assert.equal(response.status, 404, `must reject ${path}`);
       assert.doesNotMatch(await response.text(), /private fixture marker/);
