@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import { formatSessionAlertCount } from '../native-app/lib/sessionAlertCount.ts';
 import { formatSessionFatigue } from '../native-app/lib/sessionSummaryValues.ts';
 import { buildSessionHistoryExport } from '../native-app/lib/sessionHistoryExport.ts';
-import { parseSessionHistory, assignMissingSessionIds } from '../native-app/lib/sessionHistoryData.ts';
+import { parseSessionHistory, assignMissingSessionIds, serializeSessionHistory, sessionHistoryNeedsMigration } from '../native-app/lib/sessionHistoryData.ts';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 function executeNativeModule(path, names, bindings) {
@@ -69,7 +69,7 @@ test('migrating and presenting mixed legacy history preserves saved fields and s
     + '{"alertCount":"invalid","avgFatigue":5}, {"alertCount":7,"avgFatigue":10} ]';
   let stored = bytes, writes = 0;
   const { loadSessionHistory } = executeNativeModule('native-app/lib/sessionHistory.ts', ['loadSessionHistory'], {
-    parseSessionHistory, assignMissingSessionIds,
+    parseSessionHistory, assignMissingSessionIds, serializeSessionHistory, sessionHistoryNeedsMigration,
     AsyncStorage: {
       getItem: async () => stored,
       setItem: async (_key, value) => { writes += 1; stored = value; },
@@ -84,7 +84,7 @@ test('migrating and presenting mixed legacy history preserves saved fields and s
   assert.equal((exported.match(/Alerts: Not recorded/g) || []).length, 2);
   assert.doesNotMatch(exported, /cloudSessionId|private|safetyScore/);
   assert.equal(JSON.stringify(records), before);
-  assert.deepEqual(JSON.parse(stored).map(({sessionId,...record})=>record),JSON.parse(bytes));
+  assert.deepEqual(JSON.parse(stored).sessions.map(({sessionId,...record})=>record),JSON.parse(bytes));
   assert.equal(writes, 1, 'only the identity migration writes');
   await loadSessionHistory();
   assert.equal(writes, 1, 'later reads do not rewrite migrated history');
