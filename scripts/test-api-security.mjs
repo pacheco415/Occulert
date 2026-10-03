@@ -687,4 +687,31 @@ const failedStart = loadHandler("../api/sessions.js", async (table, options = {}
 });
 assert.equal((await invoke(failedStart, request("POST", { session_id: retryStartId }))).status, 502);
 
+// Read-only start recovery cannot create sessions or expose another driver.
+for (const found of [true, false]) {
+ const lookup = loadHandler("../api/sessions.js", async (table, options = {}) => {
+  if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
+  assert.equal(table, "sessions");assert.equal(options.method, undefined);
+  assert.deepEqual(options.params, { id: "eq." + retryStartId, driver_id: "eq.driver-1", select: "*", limit: "1" });
+  return found ? [originalStart] : [];
+ });
+ const response = await invoke(lookup, { ...request("GET"), query: { session_id: retryStartId, driver_id: "attacker" } });
+ assert.equal(response.status, 200);assert.deepEqual(response.body.session, found ? originalStart : null);
+ assert.equal(response.body.session_lookup_protocol, "client_uuid_lookup_v1");assert.equal(response.headers["cache-control"], "no-store");
+}
+const invalidLookup = loadHandler("../api/sessions.js", async () => {assert.fail("invalid lookup must not reach database");});
+for (const session_id of [undefined, "", "bad", 42, [], {}]) assert.equal((await invoke(invalidLookup, { ...request("GET"), query: { session_id } })).status, 400);
+const deniedLookup = loadHandler("../api/sessions.js", async () => {assert.fail("unverified lookup must not reach database");}, null);
+assert.equal((await invoke(deniedLookup, { ...request("GET"), query: { session_id: retryStartId } })).status, 401);
+const recoveryConfig = require(publicConfigPath);
+const savedGate = process.env.SESSION_START_RECOVERY_ENABLED;
+try {
+ delete process.env.SESSION_START_RECOVERY_ENABLED;
+ assert.deepEqual((await invoke(recoveryConfig, request("GET"))).body.capabilities, {});
+ process.env.SESSION_START_RECOVERY_ENABLED = "true";
+ assert.deepEqual((await invoke(recoveryConfig, request("GET"))).body.capabilities, { session_start_protocol: "client_uuid_v1", session_lookup_protocol: "client_uuid_lookup_v1" });
+ const savedPublicKey = process.env.SUPABASE_ANON_KEY;
+ try {delete process.env.SUPABASE_ANON_KEY;assert.deepEqual((await invoke(recoveryConfig, request("GET"))).body.capabilities, {});} finally {process.env.SUPABASE_ANON_KEY=savedPublicKey;}
+} finally {if (savedGate===undefined) delete process.env.SESSION_START_RECOVERY_ENABLED;else process.env.SESSION_START_RECOVERY_ENABLED=savedGate;}
+
 console.log("Occulert API security tests passed.");

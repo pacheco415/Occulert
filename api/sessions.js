@@ -69,12 +69,21 @@ try {
   if ((request.method === "POST" || request.method === "PATCH") && !validBody(request)) {
   return json(response, 415, { ok: false, error: "invalid_json_body" });
   }
+if (request.method === "GET" && (typeof request.query?.session_id !== "string" || !UUID.test(request.query.session_id))) {
+return json(response, 400, { ok: false, error: "invalid_session_id" });
+}
 const drivers = await pgFetch("drivers", {
 params: { select: "id,fleet_id", user_id: "eq." + user.id, limit: "1" },
 });
 const driver = drivers[0];
 if (!driver) {
 return json(response, 403, { ok: false, error: "driver_profile_not_found" });
+}
+
+if (request.method === "GET") {
+// Recover an uncertain start by reading only. Never create a replacement.
+const stored = await pgFetch("sessions", { params: { id: "eq." + request.query.session_id, driver_id: "eq." + driver.id, select: "*", limit: "1" } });
+return json(response, 200, { ok: true, session: stored[0] || null, session_start_protocol: "client_uuid_v1", session_lookup_protocol: "client_uuid_lookup_v1" });
 }
 
 if (request.method === "POST") {
@@ -151,7 +160,7 @@ return json(response, 404, { ok: false, error: "session_not_found" });
 return json(response, 200, { ok: true, session: updated[0] });
 }
 
-response.setHeader("Allow", "POST, PATCH");
+response.setHeader("Allow", "GET, POST, PATCH");
 return json(response, 405, { ok: false, error: "method_not_allowed" });
 } catch (error) {
 return json(response, 502, { ok: false, error: "supabase_error" });
