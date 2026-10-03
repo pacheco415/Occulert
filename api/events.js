@@ -64,6 +64,26 @@ module.exports = async function handler(request, response) {
       return json(response, 400, { ok: false, error: "invalid_event" });
     }
     if (typeof body.session_id !== "string" || !UUID.test(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
+    // Deployment gate: the service-role-only transaction must exist first.
+    if (process.env.OCCULERT_EVENT_LIMITS_ENABLED === "true") {
+      let occurredAt = null;
+      if (Object.hasOwn(body, "occurred_at")) {
+        if (typeof body.occurred_at !== "string" || !Number.isFinite(Date.parse(body.occurred_at))) return json(response, 400, { ok: false, error: "invalid_occurred_at" });
+        occurredAt = new Date(body.occurred_at).toISOString();
+      }
+      const result = await pgFetch("rpc/record_limited_event", { method: "POST", body: {
+        p_user_id: user.id, p_session_id: body.session_id, p_type: type,
+        p_fatigue_score: numberOrNull(body.fatigue_score, 0, 100), p_confidence: numberOrNull(body.confidence, 0, 100),
+        p_latitude: numberOrNull(body.latitude, -90, 90), p_longitude: numberOrNull(body.longitude, -180, 180), p_occurred_at: occurredAt,
+      } });
+      const statuses = { invalid_event: 400, invalid_occurred_at: 400, session_not_found: 404, session_ended: 409, event_rate_limited: 429, session_event_limit: 429 };
+      if (result && Object.hasOwn(statuses, result.error)) {
+        if (result.error === "event_rate_limited") response.setHeader("Retry-After", String(Math.max(1, Math.min(60, Number(result.retry_after) || 60))));
+        return json(response, statuses[result.error], { ok: false, error: result.error });
+      }
+      if (!result || !result.event || result.event.session_id !== body.session_id) return json(response, 502, { ok: false, error: "event_not_saved" });
+      return json(response, 200, { ok: true, event: result.event, telemetry_trust: "unverified_client_report", message: "Client-reported telemetry is not independently measured or attested." });
+    }
     const drivers = await pgFetch("drivers", {
       params: { select: "id", user_id: "eq." + user.id, limit: "1" },
     });
