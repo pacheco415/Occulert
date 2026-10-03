@@ -10,7 +10,7 @@ test('browser History lists pending summaries and sends only after explicit perm
   await page.route('**/api/sessions',route=>{
     expect(route.request().method()).toBe('PATCH');expect(route.request().headers().authorization).toBe('Bearer owner-token');
     writes.push(route.request().postDataJSON());
-    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,session:{id:'cloud-one'}})});
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,session:{id:'cloud-one',ended_at:endTime}})});
   });
   await page.goto('/session-history.html');
   await expect(page.locator('#table')).toContainText('Cloud summary pending');
@@ -25,7 +25,7 @@ test('browser History lists pending summaries and sends only after explicit perm
 });
 test('browser History consent revocation cancels late local acknowledgement',async({page})=>{
   await seed(page);let release,requested;const held=new Promise(resolve=>{release=resolve}),started=new Promise(resolve=>{requested=resolve});
-  await page.route('**/api/sessions',async route=>{requested();await held;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,session:{id:'cloud-one'}})}).catch(()=>{});});
+  await page.route('**/api/sessions',async route=>{requested();await held;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,session:{id:'cloud-one',ended_at:endTime}})}).catch(()=>{});});
   await page.goto('/session-history.html');
   await page.locator('#historyCloudConsent').check();await page.locator('#historyCloudRetry').click();await started;
   await expect(page.locator('#historyCloudRetry')).toBeDisabled();
@@ -33,4 +33,16 @@ test('browser History consent revocation cancels late local acknowledgement',asy
   await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('occulert-cloud-outbox')).length)).toBe(0);
   await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('occulert-session-history'))[0].cloudSynced)).toBeUndefined();
   await expect(page.locator('#historyCloudRetry')).toBeDisabled();
+});
+
+
+test('browser History keeps a matching open-session response pending until an ended row is confirmed',async({page})=>{
+ await seed(page);let confirmed=false;const writes=[];
+ await page.route('**/api/sessions',route=>{writes.push(route.request().postDataJSON());return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,session:{id:'cloud-one',ended_at:confirmed?endTime:null}})});});
+ await page.goto('/session-history.html');await page.locator('#historyCloudConsent').check();await page.locator('#historyCloudRetry').click();
+ await expect(page.locator('#historyCloudStatus')).toContainText('1 pending cloud summaries');await expect(page.locator('#table')).toContainText('Cloud summary pending');
+ expect(JSON.parse(await page.evaluate(()=>localStorage.getItem('occulert-cloud-outbox')))).toHaveLength(1);
+ expect(JSON.parse(await page.evaluate(()=>localStorage.getItem('occulert-session-history')))[0].cloudSynced).toBeUndefined();
+ confirmed=true;await page.locator('#historyCloudRetry').click();await expect(page.locator('#table')).toContainText('Cloud summary confirmed');
+ expect(writes).toHaveLength(2);expect(writes[1]).toEqual(writes[0]);
 });

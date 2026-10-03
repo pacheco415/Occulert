@@ -7,3 +7,5 @@ Retry is deliberate. The page starts with retry permission off, and checking it 
 The queue snapshot is copied; unreadable bytes are preserved. Confirmed cloud writes can remove their retry entry even if their local record was explicitly deleted or its local confirmation cannot be saved. No unreadable history is overwritten to create a badge. This does not start sessions, infer a successful cloud start, automatically upload on opening History or send GPS, personal media or raw motion.
 
 This review depends on browser history migration #228 and truthful value formatting #234. Those parent runtime changes and this flow require live preview validation before release.
+
+A matching session ID is not enough to acknowledge completion: the response must confirm ok=true and include a valid stored end timestamp. Empty or open-session responses retain the original pending summary. PostgREST UTC offsets and microsecond precision are supported. This is reporting validation; it does not retry session creation.

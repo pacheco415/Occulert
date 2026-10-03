@@ -188,7 +188,7 @@ const cloudEntry={ownerId:'owner-a',sessionId:'cloud-one',localSessionId:'local-
 function cloudHistory(){return harness('session-history-page-2.js',{'occulert-auth':JSON.stringify(cloudAuth),'occulert-cloud-outbox':JSON.stringify([cloudEntry]),'occulert-session-history':JSON.stringify([{id:'local-one',localRecordId:'local-one',historyVersion:1,alerts:1,savedAt:'2026-10-03T12:00:00Z'}])})}
 test('History reads pending outcomes without sending and retries only after deliberate permission', async () => {
   const app=cloudHistory();let calls=0;
-  app.context.fetch=async(url)=>{calls++;if(url==='/api/public-config')return Response.json({ok:true,supabase:{configured:true,url:'https://example.supabase.co',anonKey:'public'}});return Response.json({ok:true,session:{id:'cloud-one'}})};
+  app.context.fetch=async(url)=>{calls++;if(url==='/api/public-config')return Response.json({ok:true,supabase:{configured:true,url:'https://example.supabase.co',anonKey:'public'}});return Response.json({ok:true,session:{id:'cloud-one',ended_at:cloudEntry.endedAt}})};
   assert.match(app.element('table').innerHTML,/Cloud summary pending/);
   await app.context.retryHistoryCloudSummaries();assert.equal(calls,0);
   app.element('historyCloudConsent').checked=true;
@@ -205,7 +205,7 @@ test('History consent revocation blocks late acknowledgement and removes only th
   const pending=app.context.retryHistoryCloudSummaries();await started;
   const duplicate=app.context.retryHistoryCloudSummaries();await duplicate;
   app.context.cancelHistoryCloudPermission(true);
-  complete(Response.json({ok:true,session:{id:'cloud-one'}}));await pending;
+  complete(Response.json({ok:true,session:{id:'cloud-one',ended_at:cloudEntry.endedAt}}));await pending;
   assert.equal(app.context.getHistory()[0].cloudSynced,undefined);
   assert.equal(JSON.parse(app.storage.get('occulert-cloud-outbox')).length,0);
 });
