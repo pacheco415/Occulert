@@ -81,7 +81,9 @@ try {
       }
       assert.equal(options.method, 'PATCH'); assert.deepEqual(JSON.parse(JSON.stringify(options.params)), { user_id: 'eq.' + concurrentUser });
       assert.equal(Object.hasOwn(b, 'fleet_id'), false); assert.equal(Object.hasOwn(b, 'user_id'), false); recovered++;
-      return (await db.query('update drivers set name=$1,email=$2,vehicle_id=$3,active=$4 where user_id=$5 returning *', [b.name,b.email,b.vehicle_id,b.active,concurrentUser])).rows;
+      assert.equal(Object.hasOwn(b, 'active'), false);
+      const fields = Object.keys(b); assert.ok(fields.every(field => ['name', 'email', 'vehicle_id'].includes(field)));
+      return (await db.query(`update drivers set ${fields.map((field, index) => `${field}=$${index + 1}`).join(',')} where user_id=$${fields.length + 1} returning *`, [...fields.map(field => b[field]), concurrentUser])).rows;
     } };
   } };
   vm.runInNewContext(readFileSync(new URL('../api/profile.js', import.meta.url), 'utf8'), context);
