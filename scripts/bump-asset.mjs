@@ -41,9 +41,10 @@ if (refresh) {
     }
   }
   // A URL already used on another prepared branch must never be reused with
-  // different immutable bytes. Include deleted assets retained in known history.
+  // different immutable bytes. Traverse full history and include merge diffs:
+  // a conflict resolution can introduce a URL absent from both parent commits.
   if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: root, encoding: 'utf8' }).trim() !== 'false') throw new Error('Fetch full Git history before choosing new immutable asset URLs');
-  const historicalAssets = new Set(execFileSync('git', ['log', '--all', '--format=', '--name-only', '--', ':(top,glob)*.v*.js', ':(top,glob)*.v*.css'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 }).split(/\r?\n/).map(name => name.trim()).filter(Boolean));
+  const historicalAssets = new Set(execFileSync('git', ['log', '--all', '--full-history', '--diff-merges=first-parent', '--format=', '--name-only', '--', ':(top,glob)*.v*.js', ':(top,glob)*.v*.css'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 }).split(/\r?\n/).map(name => name.trim()).filter(Boolean));
   const replacements = new Map();
   for (const name of selected) {
     if (digest(sources.get(name)) !== integrity[name]) throw new Error(`Published asset integrity mismatch: ${name}`);
@@ -77,7 +78,7 @@ if (refresh) {
   let sw = replace(read('sw.js'));
   const cache = sw.match(/const CACHE\s*=\s*(['"])(occulert-v)(\d+)\1/);
   if (!cache) throw new Error('Cannot find versioned service worker cache');
-  const cacheHistory = execFileSync('git', ['log', '--all', '--format=', '-p', '--unified=0', '--', 'sw.js'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 });
+  const cacheHistory = execFileSync('git', ['log', '--all', '--full-history', '--diff-merges=first-parent', '--format=', '-p', '--unified=0', '--', 'sw.js'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 });
   const recordedCacheVersions = [...cacheHistory.matchAll(/^\+const CACHE\s*=\s*['"]occulert-v(\d+)['"]/gm)].map(match => Number(match[1]));
   const nextCacheVersion = Math.max(Number(cache[3]), ...recordedCacheVersions) + 1;
   sw = sw.replace(cache[0], `const CACHE = '${cache[2]}${nextCacheVersion}'`);
