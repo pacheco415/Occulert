@@ -1,3 +1,4 @@
+const { isJsonMediaType, isJsonObject, jsonObjectWithinLimit } = require("./_lib/validation");
 const MAX_FIELD_LENGTH = 1200;
 const MAX_BODY_LENGTH = 4096;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
@@ -134,7 +135,7 @@ module.exports = async function handler(request, response) {
     return json(response, 403, { ok: false, error: "origin_not_allowed" });
   }
 
-  if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) {
+  if (!isJsonMediaType(request)) {
     return json(response, 415, { ok: false, error: "unsupported_media_type" });
   }
 
@@ -150,11 +151,11 @@ module.exports = async function handler(request, response) {
   }
 
   const body = typeof request.body === "object" && request.body ? request.body : {};
-  if (Array.isArray(body)) {
+  if (!isJsonObject(body)) {
     return json(response, 400, { ok: false, error: "invalid_body" });
   }
 
-  if (JSON.stringify(body).length > MAX_BODY_LENGTH) {
+  if (!jsonObjectWithinLimit(body, MAX_BODY_LENGTH)) {
     return json(response, 413, { ok: false, error: "payload_too_large" });
   }
 

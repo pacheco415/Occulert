@@ -6,6 +6,8 @@ test('UUID validation never coerces client values',()=>{
  assert.equal(isUuid('f89d1cf9-893f-4fb6-a924-6669b4568221'),true);assert.equal(isUuid('F89D1CF9-893F-4FB6-A924-6669B4568221'),true);
  for(const value of [null,undefined,{},[],1,'','not-a-uuid',' f89d1cf9-893f-4fb6-a924-6669b4568221'])assert.equal(isUuid(value),false);
  const uuid='f89d1cf9-893f-4fb6-a924-6669b4568221';
+ for(const value of ['018f9d48-b2d4-7abc-0123-456789abcdef','00000000-0000-0000-0000-000000000000'])assert.equal(isUuid(value),true);
+ assert.equal(require('../api/_lib/fleet-history-cursor.js').isUuid,isUuid);
  for(const value of [new String(uuid),[uuid],Symbol('uuid'),uuid+'\n',uuid+'\0',uuid+' ',uuid+'.extra'])assert.equal(isUuid(value),false);
 });
 test('finite metrics preserve zeros, clamp bounds and do not coerce missing values',()=>{
@@ -36,3 +38,6 @@ test('shared route responses retain status, existing method headers, JSON values
  assert.equal(headers['Content-Type'],'application/json; charset=utf-8');assert.equal(headers['Cache-Control'],'no-store');
  assert.deepEqual(JSON.parse(response.body),{ok:false,error:'conflict',recorded:0,missing:null,message:'Confirmed ✓'});
 });
+
+await import('./test-api-body-contracts.mjs');
+await import('./test-api-response-contracts.mjs');

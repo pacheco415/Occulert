@@ -8,6 +8,7 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
+const { validJsonBody } = require("./_lib/validation");
 const MAX_BODY_LENGTH = 2048;
 
 const { json } = require("./_lib/responses");
@@ -17,10 +18,7 @@ function clean(value, max) {
 }
 
 function validBody(request) {
-  if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = request.body;
-  if (!body || typeof body !== "object") return false;
-  return !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
+  return validJsonBody(request, MAX_BODY_LENGTH);
 }
 
 function emailVerified(user) {

@@ -6,7 +6,7 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const { isUuid } = require("./_lib/fleet-history-cursor");
+const { isUuid } = require("./_lib/validation");
 
 const { json } = require("./_lib/responses");
 
