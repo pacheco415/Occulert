@@ -72,7 +72,8 @@
     "audit:asset-sizes": "node scripts/audit-asset-sizes.mjs",
     "check:migrations": "node scripts/check-migration-readiness.mjs",
     "test:migration-readiness": "node --test scripts/test-migration-readiness.mjs",
-    "test:verify-runner": "node --test scripts/test-verify-runner.mjs scripts/test-verify-coverage.mjs"
+    "test:verify-runner": "node --test scripts/test-verify-runner.mjs scripts/test-verify-coverage.mjs",
+    "test:workflow-policy": "node --test scripts/test-workflow-policy.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
