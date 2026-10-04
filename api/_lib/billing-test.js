@@ -39,7 +39,7 @@ function parseJsonBody(request) {
 }
 
 async function ownerContext(request, requireVerifiedEmail) {
-  const user = await verifyAccessToken(bearerToken(request));
+  const user = await verifyAccessToken(bearerToken(request), { freshUser: true });
   if (!user) {
     const error = new Error("unauthorized");
     error.status = 401;

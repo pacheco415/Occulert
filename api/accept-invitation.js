@@ -39,7 +39,7 @@ module.exports = async function handler(request, response) {
 
   let user;
   try {
-    user = await verifyAccessToken(bearerToken(request));
+    user = await verifyAccessToken(bearerToken(request), { freshUser: true });
     if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
     if (!user.email || !(user.email_confirmed_at || user.confirmed_at)) {
       return json(response, 403, { ok: false, error: "email_not_verified" });

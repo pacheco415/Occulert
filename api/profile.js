@@ -26,7 +26,7 @@ module.exports = async function handler(request, response) {
 
   let user;
   try {
-    user = await verifyAccessToken(bearerToken(request));
+    user = await verifyAccessToken(bearerToken(request), { freshUser: true });
     if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
     if (!validJsonBody(request, 2048)) return json(response, 415, { ok: false, error: "invalid_json_body" });
 
