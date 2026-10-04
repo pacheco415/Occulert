@@ -39,7 +39,7 @@
     "test:event-benchmark": "node --test benchmark/test-event-benchmark.mjs",
     "test:detection": "node --test scripts/test-detection-pipeline.mjs",
     "test:browser": "playwright test",
-    "verify": "npm run audit:site && npm run test:vercel-function-budget && npm run test:mediapipe && npm run test:api && npm run test:client && npm run test:native-cloud && npm run test:session-history-data && npm run test:high-fixes && npm run test:remaining-fixes && npm run test:pilot-insights && npm run test:head-nod && npm run test:headphone-motion && npm run test:sensor-fusion && npm run test:fusion-validation && npm run test:health-readiness && npm run test:in-ear-alerts && npm run test:alert-preferences && npm run test:alert-sounds && npm run test:alert-delivery && npm run test:safe-stop && npm run test:monitor-lifecycle && npm run test:native-setup && npm run test:performance && npm run test:driver-startup && npm run test:native-perclos && npm run test:watch-status && npm run test:fleet-history && npm run test:fleet-display && npm run test:pilot-launch && npm run test:pilot-report && npm run test:login && npm run test:supabase-loader && npm run test:passkeys && npm run test:account && npm run test:account-delete && npm run test:benchmark && npm run test:event-benchmark && npm run test:billing-test-mode && npm run test:fleet-period-report && npm run test:fleet-history-filters && npm run test:driver-parked-check && npm run test:detection && npm run test:fleet-followups && npm run test:fleet-indexes && npm run test:local-pages && npm run test:static-server && npm run test:auth-races && npm run test:supabase-transport && npm run test:native-async-reliability && npm run test:fleet-invitations && npm run test:tenant-rls && npm run test:driver-observation-gaps && npm run test:dashboard-demo-storage && npm run test:account-ui-races && npm run test:theme-storage && npm run test:native-history-alert-count && npm run test:session-outbox && npm run test:web-outbox && npm run test:asset-bump && npm run test:native-eye-baseline && npm run test:native-session-completion && npm run test:cloud-summary-presentation && npm run audit:asset-sizes && npm run test:migration-readiness",
+    "verify": "node scripts/verify.mjs",
     "test:mediapipe": "node --test scripts/test-mediapipe-runtime.mjs",
     "test:fleet-followups": "node scripts/test-fleet-followups.mjs && node scripts/test-fleet-followups-db.mjs",
     "test:fleet-indexes": "node scripts/test-fleet-query-indexes.mjs",
@@ -71,7 +71,8 @@
     "test:cloud-summary-presentation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-cloud-summary-presentation.mjs",
     "audit:asset-sizes": "node scripts/audit-asset-sizes.mjs",
     "check:migrations": "node scripts/check-migration-readiness.mjs",
-    "test:migration-readiness": "node --test scripts/test-migration-readiness.mjs"
+    "test:migration-readiness": "node --test scripts/test-migration-readiness.mjs",
+    "test:verify-runner": "node --test scripts/test-verify-runner.mjs scripts/test-verify-coverage.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
