@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse, serialize } from 'parse5';
 
 const root = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
 const assets = JSON.parse(readFileSync(resolve(root, 'asset-versions.json'), 'utf8'));
@@ -214,9 +215,22 @@ test('a complete driver cannot activate if its early startup guard is absent', a
   await installPrivacyProbe(page);
   await page.route(/\/app\.html(?:\?.*)?$/, async route => {
     const html = readFileSync(resolve(root, 'app.html'), 'utf8');
-    const guard = /<script\b(?=[^>]*\bid="driver-startup-guard")[^>]*><\/script>/;
-    expect(html).toMatch(guard);
-    await route.fulfill({ status: 200, contentType: 'text/html', body: html.replace(guard, '') });
+    const document = parse(html);
+    let removed = 0;
+    function removeGuard(node) {
+      if (!node.childNodes) return;
+      node.childNodes = node.childNodes.filter(child => {
+        if (child.tagName === 'script' && child.attrs.some(attr => attr.name === 'id' && attr.value === 'driver-startup-guard')) {
+          removed++;
+          return false;
+        }
+        removeGuard(child);
+        return true;
+      });
+    }
+    removeGuard(document);
+    expect(removed).toBe(1);
+    await route.fulfill({ status: 200, contentType: 'text/html', body: serialize(document) });
   });
   const route = await driverRoute(page, 'full');
   await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
