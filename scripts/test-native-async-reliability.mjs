@@ -38,10 +38,12 @@ function cloudFixture(initial, { consent = false } = {}) {
   let nextTimer = 0;
   const fixture = {
     secure, storage, requests, timers,
-    transport: async (url) => {
+    transport: async (url, options) => {
       if (url.includes('grant_type=password')) return response(200, token('new'));
       if (url.includes('grant_type=refresh_token')) return response(200, token(initial.user.id));
-      if (url.endsWith('/api/sessions')) return response(200, { session: { id: 'session' } });
+      if (url.endsWith('/api/sessions')) return options.method === 'PATCH'
+        ? response(200,{ok:true,session:{id:'session',ended_at:JSON.parse(options.body).ended_at}})
+        : response(200, { session: { id: 'session' } });
       return response(200, {});
     },
   };
@@ -58,7 +60,7 @@ function cloudFixture(initial, { consent = false } = {}) {
   };
   fixture.api = load(read('native-app/lib/cloudSync.ts'), [
     'getCloudState', 'signInToCloud', 'signOutOfCloud', 'setCloudSyncEnabled',
-    'beginCloudSession', 'logCloudAlert', 'finishCloudSession', 'cloudSessionScopes', 'retryPendingCloudSessions',
+    'beginCloudSession', 'logCloudAlert', 'finishCloudSession', 'cloudSessionScopes', 'retryPendingCloudSessions', 'getPendingCloudSummaryState', 'pendingCloudSummaryStateIsCurrent',
   ], {
     SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage,
     updateSessionHistory: async update => { fixture.history = update(fixture.history || []); },
@@ -153,8 +155,9 @@ for (const stage of ['headers', 'body']) {
 
 test('concurrent expired-auth operations share one refresh and keep enabled consent', async () => {
   const f = cloudFixture(auth('old'), { consent: true }), started = deferred(), result = deferred();
-  f.transport = url => {
+  f.transport = (url, options) => {
     if (url.includes('grant_type=refresh_token')) { started.resolve(); return result.promise; }
+    if (url.endsWith('/api/sessions')) return response(200,{ok:true,session:{id:'session',ended_at:JSON.parse(options.body).ended_at}});
     return response(200, {});
   };
   const first = f.api.logCloudAlert('session', 40), second = f.api.finishCloudSession('session', {});
@@ -544,12 +547,12 @@ test('current unexpected parked bridge failure releases busy state for retry', a
 
 test('history mutation refuses malformed members without writing away existing bytes', async () => {
   const source = read('native-app/lib/sessionHistory.ts');
-  const { parseSessionHistory } = await import('../native-app/lib/sessionHistoryData.ts');
+  const { parseSessionHistory, assignMissingSessionIds, serializeSessionHistory, sessionHistoryNeedsMigration } = await import('../native-app/lib/sessionHistoryData.ts');
   const stored = '[{"sessionId":"recoverable"},null]';
   const writes = [];
   const api = load(source, ['loadSessionHistory', 'updateSessionHistory'], {
     AsyncStorage: { getItem: async () => stored, setItem: async (_key, value) => writes.push(value) },
-    parseSessionHistory,
+    parseSessionHistory, assignMissingSessionIds, serializeSessionHistory, sessionHistoryNeedsMigration,
   });
   await assert.rejects(api.loadSessionHistory(), /Saved session history/);
   await assert.rejects(api.updateSessionHistory(() => []), /Saved session history/);
@@ -584,7 +587,7 @@ test('failed native finalization retries its original finish time and updates lo
   f.history = [{ sessionId: 'local-one', cloudSynced: false }];
   const payloads = [];
   let available = false;
-  f.transport = (_url, options) => { payloads.push(JSON.parse(options.body)); return response(available ? 200 : 503, {}); };
+  f.transport = (_url, options) => { payloads.push(JSON.parse(options.body)); return response(available ? 200 : 503, {ok:true,session:{id:JSON.parse(options.body).session_id,ended_at:JSON.parse(options.body).ended_at}}); };
   const endedAt = '2026-10-03T12:00:00.000Z';
   assert.equal(await f.api.finishCloudSession('session', { averageFatigue: 12, maxFatigue: 40, safetyScore: 72, alertCount: 1 }, endedAt, 'local-one'), false);
   available = true;
@@ -604,4 +607,93 @@ test('an old cloud session cannot be finalized under a replacement account', asy
   assert.equal(await f.api.setCloudSyncEnabled(true), true);
   assert.equal(await f.api.finishCloudSession('session', { averageFatigue: 12, maxFatigue: 40, safetyScore: 72, alertCount: 1 }), false);
   assert.equal(f.requests.filter(row => row.init.method === 'PATCH').length, 0);
+});
+
+test('legacy history migration commits before exposing IDs and survives subsequent reads', async () => {
+  const {parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration}=await import('../native-app/lib/sessionHistoryData.ts');
+  let stored='[{"savedAt":"same"},{"savedAt":"same"}]', release;
+  const writes=[];const committed=new Promise(resolve=>{release=resolve});
+  const api=load(read('native-app/lib/sessionHistory.ts'),['loadSessionHistory','updateSessionHistory'],{
+    parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration,
+    AsyncStorage:{getItem:async()=>stored,setItem:async(_key,value)=>{writes.push(value);await committed;stored=value}},
+  });
+  let exposed=false;const first=api.loadSessionHistory().then(value=>{exposed=true;return value});
+  const second=api.loadSessionHistory();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(exposed,false);assert.equal(writes.length,1);release();
+  const a=await first,b=await second;assert.deepEqual(a,b);assert.notEqual(a[0].sessionId,a[1].sessionId);assert.equal(writes.length,1);
+  await api.updateSessionHistory(rows=>rows.slice(1));assert.equal((await api.loadSessionHistory())[0].sessionId,a[1].sessionId);
+});
+
+test('failed identity migration exposes no unstable rows and preserves stored history', async () => {
+  const {parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration}=await import('../native-app/lib/sessionHistoryData.ts');
+  const original='[{"savedAt":"legacy","unknown":42}]';let fail=true,stored=original;
+  const api=load(read('native-app/lib/sessionHistory.ts'),['loadSessionHistory'],{
+    parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration,
+    AsyncStorage:{getItem:async()=>stored,setItem:async(_key,value)=>{if(fail)throw Error('disk unavailable');stored=value}},
+  });
+  await assert.rejects(api.loadSessionHistory(),/disk unavailable/);assert.equal(stored,original);
+  fail=false;const rows=await api.loadSessionHistory();assert.ok(rows[0].sessionId);assert.equal(rows[0].unknown,42);
+});
+
+
+test('native pending-summary state is local, owner-scoped and hidden after consent revocation',async()=>{
+ const f=cloudFixture(auth('old',4000000000),{consent:true});
+ f.history=[{sessionId:'local-one'}];f.transport=()=>response(503,{});
+ await f.api.finishCloudSession('session',{averageFatigue:10,maxFatigue:20,safetyScore:70,alertCount:1},'2026-10-03T12:00:00.000Z','local-one');
+ const before=f.requests.length,state=await f.api.getPendingCloudSummaryState();
+ assert.equal(state.count,1);assert.deepEqual(Array.from(state.localIds),['local-one']);assert.equal(f.requests.length,before,'a queue snapshot must not send a provider request');
+ assert.equal(f.api.pendingCloudSummaryStateIsCurrent(state),true);
+ await f.api.setCloudSyncEnabled(false);assert.equal(f.api.pendingCloudSummaryStateIsCurrent(state),false);assert.equal((await f.api.getPendingCloudSummaryState()).count,0);
+});
+
+test('a deliberate native retry cannot switch to another owner or consent revision',async()=>{
+ const f=cloudFixture(auth('old',4000000000),{consent:true});
+ f.transport=()=>response(503,{});await f.api.finishCloudSession('session',{averageFatigue:10,maxFatigue:20,safetyScore:70,alertCount:1},'2026-10-03T12:00:00.000Z','local-one');
+ const state=await f.api.getPendingCloudSummaryState(),before=f.requests.length;
+ await f.api.retryPendingCloudSessions({...state.scope,ownerId:'another'});
+ await f.api.retryPendingCloudSessions({...state.scope,consentVersion:state.scope.consentVersion+1});
+ assert.equal(f.requests.length,before);
+});
+
+test('format migration is durable even when every legacy record already has an ID', async () => {
+ const {parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration}=await import('../native-app/lib/sessionHistoryData.ts');
+ const original='[{"sessionId":"known","unknown":{"keep":true}}]';let stored=original,fail=true,writes=0;
+ const api=load(read('native-app/lib/sessionHistory.ts'),['loadSessionHistory','updateSessionHistory'],{
+  parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration,
+  AsyncStorage:{getItem:async()=>stored,setItem:async(_key,value)=>{writes++;if(fail)throw Error('storage denied');stored=value}},
+ });
+ await assert.rejects(api.loadSessionHistory(),/storage denied/);assert.equal(stored,original);
+ fail=false;await api.loadSessionHistory();assert.equal(JSON.parse(stored).schemaVersion,1);
+ const committedWrites=writes;await api.loadSessionHistory();assert.equal(writes,committedWrites);
+ stored=JSON.stringify({...JSON.parse(stored),extension:{keep:'metadata'}});
+ await api.updateSessionHistory(rows=>rows.map(row=>({...row,cloudSynced:true})));
+ assert.deepEqual(JSON.parse(stored).extension,{keep:'metadata'});assert.deepEqual(JSON.parse(stored).sessions[0].unknown,{keep:true});
+ stored='{"schemaVersion":99,"sessions":[{"private":"preserve"}]}';const future=stored;
+ await assert.rejects(api.loadSessionHistory(),/unsupported format version/);
+ await assert.rejects(api.updateSessionHistory(()=>[]),/unsupported format version/);assert.equal(stored,future);
+});
+
+
+test('native cloud retries preserve unknown fatigue and unvalidated nod counts, including a recorded zero alert count',async()=>{
+ const f=cloudFixture(auth('old',4000000000),{consent:true});const payloads=[];let available=false;
+ f.transport=(_url,options)=>{payloads.push(JSON.parse(options.body));return response(available?200:503,{ok:true,session:{id:JSON.parse(options.body).session_id,ended_at:JSON.parse(options.body).ended_at}})};
+ const endedAt='2026-10-03T12:00:00.000Z';
+ assert.equal(await f.api.finishCloudSession('session',{averageFatigue:null,maxFatigue:null,safetyScore:null,alertCount:0},endedAt),false);
+ available=true;await f.api.retryPendingCloudSessions();assert.equal(payloads.length,2);
+ assert.deepEqual(payloads[0],{session_id:'session',ended_at:endedAt,average_fatigue:null,max_fatigue:null,safety_score:null,alert_count:0,head_nod_count:null});assert.deepEqual(payloads[1],payloads[0]);
+});
+
+
+test('native success requires the matching stored ended row before acknowledging or dropping a summary',async()=>{
+ const endedAt='2026-10-03T12:00:00.000Z';
+ const malformed=[{},null,[],true,'success',{ok:false,session:{id:'session',ended_at:endedAt}},{ok:true,session:{id:'other',ended_at:endedAt}},{ok:true,session:{id:'session',ended_at:null}},{ok:true,session:{id:'session',ended_at:'invalid'}},{ok:true,session:{id:'session',ended_at:'2026-02-31T12:00:00.000Z'}}];
+ for (const body of malformed) {
+  const f=cloudFixture(auth('old',4000000000),{consent:true});f.history=[{sessionId:'local-one',cloudSynced:false}];
+  f.transport=()=>response(200,body);
+  assert.equal(await f.api.finishCloudSession('session',{averageFatigue:0,maxFatigue:0,safetyScore:100,alertCount:0},endedAt,'local-one'),false);
+  assert.equal(f.history[0].cloudSynced,false);assert.equal((await f.api.getPendingCloudSummaryState()).count,1);
+  f.transport=()=>response(200,{ok:true,session:{id:'session',ended_at:'2026-10-03T12:00:00.000000+00:00'}});
+  await f.api.retryPendingCloudSessions();assert.equal(f.history[0].cloudSynced,true);assert.equal(f.history[0].cloudOwnerId,'old');
+  assert.equal((await f.api.getPendingCloudSummaryState()).count,0);
+ }
 });

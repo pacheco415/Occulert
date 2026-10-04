@@ -389,6 +389,33 @@
       ]
     },
     {
+      "source": "/(.*)\\.v76\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/audio/alert.v1.wav",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v77\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
       "source": "/(.*)\\.v1\\.(js|css)",
       "headers": [
         {
@@ -406,5 +433,11 @@
         }
       ]
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "dependabot/**": false
+    }
+  },
+  "ignoreCommand": "node -e \"try{let e=require('child_process').execFileSync;e(process.execPath,['--input-type=module'],{input:e('git',['show','HEAD:scripts/ignore-vercel-deployment.mjs']),stdio:['pipe','inherit','inherit']})}catch{process.exit(1)}\""
 }
