@@ -388,5 +388,11 @@
         }
       ]
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "dependabot/**": false
+    }
+  },
+  "ignoreCommand": "node -e \"try { const {execFileSync}=require('node:child_process'); execFileSync(process.execPath,['--input-type=module'],{input:execFileSync('git',['show','HEAD:scripts/ignore-vercel-deployment.mjs']),stdio:['pipe','inherit','inherit']}); } catch { process.exit(1); }\""
 }
