@@ -78,7 +78,9 @@
     "test:deployment-ignore": "node --test scripts/test-deployment-ignore.mjs",
     "sitemap:update": "node scripts/update-sitemap.mjs",
     "audit:sitemap": "node scripts/update-sitemap.mjs --check",
-    "test:sitemap": "node --test scripts/test-sitemap.mjs"
+    "test:sitemap": "node --test scripts/test-sitemap.mjs",
+    "test:provider-budget": "node --test scripts/test-provider-budget.mjs",
+    "test:api-validation": "node --test scripts/test-api-validation.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

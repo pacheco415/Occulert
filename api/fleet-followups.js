@@ -1,12 +1,7 @@
 const { pgFetch, verifyAccessToken, bearerToken } = require('./_lib/supabase');
-const { isUuid } = require('./_lib/fleet-history-cursor');
+const { isUuid, validJsonBody } = require('./_lib/validation');
 const STATUSES = new Set(['open', 'in_progress', 'reviewed']);
-function json(res, status, body) {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
-  res.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 module.exports = async function handler(req, res) {
   if (!['GET', 'POST'].includes(req.method)) {
     res.setHeader('Allow', 'GET, POST');
@@ -25,8 +20,7 @@ module.exports = async function handler(req, res) {
     if (!fleet) return json(res, 403, { ok: false, error: 'fleet_not_found' });
     if (req.method === 'POST') {
       const body = req.body;
-      if (!String(req.headers['content-type'] || '').toLowerCase().startsWith('application/json') ||
-          !body || typeof body !== 'object' || Array.isArray(body) || JSON.stringify(body).length > 1024) {
+      if (!validJsonBody(req, 1024)) {
         return json(res, 400, { ok: false, error: 'invalid_body' });
       }
       if (Object.keys(body).some(key => !['session_id', 'status', 'expected_version'].includes(key)) ||
@@ -66,3 +60,5 @@ module.exports = async function handler(req, res) {
     return json(res, 502, { ok: false, error: 'followups_unavailable' });
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

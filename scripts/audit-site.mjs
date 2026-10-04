@@ -291,7 +291,17 @@ assertIncludes("sw.js", "url.pathname.startsWith('/api/')", "service worker must
 assertIncludes("api/sessions.js", "driver_id: \"eq.\" + driver.id", "session updates must be scoped to the authenticated driver's own sessions");
 assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes must verify the session belongs to the authenticated driver");
 assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event GPS latitude must be range validated");
-assertIncludes("api/sessions.js", "MAX_BODY_LENGTH", "session API must reject oversized JSON bodies");
+assertIncludes("api/sessions.js", "validJsonBody(request)", "session API must use bounded shared JSON validation");
+assertIncludes("api/_lib/validation.js", "maxLength = 4096", "shared session JSON validation must retain the request size limit");
+assertIncludes("api/_lib/validation.js", "JSON.stringify(body).length <= maxLength", "shared JSON validation must enforce its limit");
+assertIncludes("api/profile.js", "validJsonBody(request, 2048)", "profile requests must retain their smaller size limit");
+for (const [route, limit] of [["fleets", 2048], ["fleet-invitations", 2048], ["accept-invitation", 1024]]) {
+  assertIncludes(`api/${route}.js`, `MAX_BODY_LENGTH = ${limit}`, `${route} must retain its request limit`);
+  assertIncludes(`api/${route}.js`, "validJsonBody(request, MAX_BODY_LENGTH)", `${route} must use shared bounded object validation`);
+}
+assertIncludes("api/account.js", "validJsonBody(request, 256)", "account confirmation must retain its request limit");
+assertIncludes("api/fleet-followups.js", "validJsonBody(req, 1024)", "followups must retain their request limit");
+assertIncludes("api/pilot-leads.js", "jsonObjectWithinLimit(body, MAX_BODY_LENGTH)", "pilot must retain its separately staged size check");
 assertIncludes("api/pilot-leads.js", "body.website", "pilot lead API must include honeypot spam filtering");
 assertIncludes(`${assetByStem('pilot-signup-page-2.js')}`, "startedAt: formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
 assertIncludes("api/pilot-leads.js", "rateLimitState(request)", "pilot lead API must use durable distributed rate limiting");
