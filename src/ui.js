@@ -20,6 +20,13 @@ export const experimentFlags = (() => {
         return Object.freeze({ any: false, primary: false, names: Object.freeze([]) });
     }
 })();
+// Parked legacy-calibration sample minimum; no detector/controller mode switch.
+export const calibrationMinimumSamples = (() => {
+    try {
+        const query = new URLSearchParams(window.location?.search || '');
+        return query.getAll('calibration-min').length === 1 && query.get('calibration-min') === '12' ? 12 : 1;
+    } catch (_) { return 1; }
+})();
 export let experimentController = /** @type {MountedExperimentController|null} */ (null), experimentGeneration = 0, experimentSessionSummary = null, experimentStopping = false;
 export function startupAllowsMonitoring() { return typeof window.OcculertStartup?.isReady === 'function' && window.OcculertStartup.isReady() === true; }
 export const INTENSITIES = ['dim', 'standard', 'bright'];
@@ -274,6 +281,8 @@ export function createLocalLifecycleOperations() {
             calibrationSamples = [];
             calibrationUntil = Date.now() + CALIBRATION_MS;
             baselineEAR = .28;
+            baseClosedThreshold = .18;
+            baseWatchThreshold = .22;
             eyeClosedThreshold = .18;
             eyeWatchThreshold = .22;
             alertsEl.textContent = '0';

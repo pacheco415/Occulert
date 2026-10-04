@@ -5,7 +5,7 @@ import "./metrics.js";
 import { escalationLevel, demoAlert, VOICE_MSGS, initializeVoicePreference, speak, toggleVoice, triggerBreakCheck, dismissBreak, registerAcceptedAlertHook, set_alerts, set_escalationLevel } from "./alerts.js";
 import { logEvent, exportCSV, browserHistoryStore } from "./storage-history.js";
 import { queueBackendEvent, getCloudSummaryOutbox, retryCloudSummaries, initCloud } from "./cloud-sync.js";
-import { experimentFlags, experimentController, startupAllowsMonitoring, demoBtn, calibrationEl, calibrationFill, alertsEl, alertScreen, logEl, reportEl, nodsEl, perclosEl, microsleepsEl, distractionEl, escalationEl, cloudConsent, cameraSourceSelect, cameraRefreshBtn, running, starting, fatigue, cloudConsentRevision, cloudSummaryClearPending, hiddenAt, CALIBRATION_MS, log, render, _sessionLog, initChart, updateChart, _isIOS, _isStandalone, triggerPWAInstall, loadExperimentController, publishDriverReadiness, initializeLocalLifecycle, handleVisibilityChange, startBtn, localSessionId, start, stop, set_unavailableCameraDeviceId, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_cloudConsentRevision, set_cloudSummaryClearPending, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_turnedSince, set_totalDistractionMs, set_calibrating, set_calibrated, set_calibrationUntil, set_calibrationSamples, set_hiddenAt } from "./ui.js";
+import { experimentFlags, experimentController, startupAllowsMonitoring, demoBtn, calibrationEl, calibrationFill, alertsEl, alertScreen, logEl, reportEl, nodsEl, perclosEl, microsleepsEl, distractionEl, escalationEl, cloudConsent, cameraSourceSelect, cameraRefreshBtn, running, starting, fatigue, cloudConsentRevision, cloudSummaryClearPending, hiddenAt, CALIBRATION_MS, log, render, _sessionLog, initChart, updateChart, _isIOS, _isStandalone, triggerPWAInstall, loadExperimentController, publishDriverReadiness, initializeLocalLifecycle, handleVisibilityChange, startBtn, localSessionId, start, stop, set_unavailableCameraDeviceId, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_cloudConsentRevision, set_cloudSummaryClearPending, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_turnedSince, set_totalDistractionMs, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold, set_calibrating, set_calibrated, set_calibrationUntil, set_calibrationSamples, set_hiddenAt } from "./ui.js";
 initializeLocalLifecycle();
 startBtn.onclick = () => running ? stop() : start();
 const recalBtn = document.getElementById('recalBtn');
@@ -13,6 +13,12 @@ if (recalBtn) {
     recalBtn.onclick = () => {
         if (!startupAllowsMonitoring() || !running)
             return;
+        set_baselineEAR(.28);
+        set_baseClosedThreshold(.18);
+        set_baseWatchThreshold(.22);
+        set_eyeClosedThreshold(.18);
+        set_eyeWatchThreshold(.22);
+        applySensitivity(localStorage.getItem('occulert-sensitivity') || 'medium');
         set_calibrating(true);
         set_calibrated(false);
         set_calibrationSamples([]);

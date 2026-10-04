@@ -61,3 +61,17 @@ The synthetic deque probe (`node benchmark/microbench-detection-window.mjs`) mea
 The attached software evidence also records actual Chromium/WebKit CPU/GPU startup and 20 measured blank-canvas inference calls after three warmups, including actual availability and no fallback. This blank 640×480 desktop workload has no usable faces and cannot establish paired face accuracy, pose direction or on-road timing. [Software evidence](evidence/parked-detection-software.json) preserves its workload, hashes and counts.
 
 Import traces using their matching source revision. The adapter checks the exact owned helper, runtime and model hashes, the detector/flag and geometry contract, and rejects usable legacy frames that also claim calibration or downward pitch. Unsupported time-PERCLOS, including calibration-only sessions, remains unavailable in local history and reports; measured zero remains 0%. These checks validate consistency, not the authenticity of user-edited JSON.
+
+## Parked calibration sample minimum
+
+`calibration-min=12` requires at least 12 accepted EAR samples before the legacy
+calibration can personalize its baseline. Fewer samples fall back to the same
+default thresholds and chosen sensitivity. The existing 3200 ms window and
+sample eligibility remain unchanged. A unique exact value is required; absent,
+duplicate or different values preserve the one-sample legacy rule. This flag
+does not switch to the experimental detector controller; pixel/pitch modes
+retain their existing stronger continuity and duration requirements. Keep this
+flag parked until labeled sessions support changing the default.
+
+Every new session and Recalibrate clears the preceding personal baseline and
+base thresholds, including when calibration later has no accepted samples.
