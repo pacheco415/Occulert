@@ -403,6 +403,11 @@ assertIncludes("sw.js", `'/${assetByStem('supabase-loader.js')}'`, "the service 
 const serviceWorker = read("sw.js");
 const staticAssets = serviceWorker.slice(serviceWorker.indexOf("const STATIC_ASSETS"), serviceWorker.indexOf("];", serviceWorker.indexOf("const STATIC_ASSETS")) + 2);
 const networkOnlyAssets = serviceWorker.slice(serviceWorker.indexOf("const NETWORK_ONLY_ASSETS"), serviceWorker.indexOf("]);", serviceWorker.indexOf("const NETWORK_ONLY_ASSETS")) + 3);
+// Older cached pages can still request retained credential-bearing clients.
+for (const name of readdirSync(root).filter(name => /^occulert-backend\.v\d+\.js$/.test(name))) {
+  if (!networkOnlyAssets.includes(`'/${name}'`)) fail(`retained backend client must remain network-only: ${name}`);
+  if (staticAssets.includes(`'/${name}'`)) fail(`retained backend client must not be in the offline static cache: ${name}`);
+}
 const staticAssetPaths = [...staticAssets.matchAll(/'([^']+)'/g)].map((match) => match[1]);
 const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
   const pathname = asset.split(/[?#]/, 1)[0];
