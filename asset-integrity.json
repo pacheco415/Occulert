@@ -120,5 +120,7 @@
   "account-page-2.v62.js": "68f91b05f8f6fc48e1196f3e3633898baf6767d75e7d087eeba06e9bb0f551a0",
   "account-page-2.v63.js": "76f37fb8f8d68f94d78e780d60fa15517281122b18de345723948c333fee7417",
   "supabase-loader.v48.js": "cefc5da2c38f5455b57a0949f3f38d57c35c0964e7c5d5499aa4911663ceebed",
-  "supabase-loader.v49.js": "cefc5da2c38f5455b57a0949f3f38d57c35c0964e7c5d5499aa4911663ceebed"
+  "supabase-loader.v49.js": "cefc5da2c38f5455b57a0949f3f38d57c35c0964e7c5d5499aa4911663ceebed",
+  "inter-fonts.v1.css": "2ffb1a4a8e66c3312942b1192aff330b07ce01e52acaae6b6b693f790b0e3cb7",
+  "inter-fonts.v2.css": "2ffb1a4a8e66c3312942b1192aff330b07ce01e52acaae6b6b693f790b0e3cb7"
 }

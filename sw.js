@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v99';
+const CACHE = 'occulert-v100';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -56,6 +56,7 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/base.v47.css',
+  '/inter-fonts.v2.css',
   '/app.html',
   '/manifest.json',
   '/favicon.ico',

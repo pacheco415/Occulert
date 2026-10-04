@@ -71,7 +71,8 @@
     "audit:sitemap",
     "test:sitemap",
     "test:provider-budget",
-    "test:api-validation"
+    "test:api-validation",
+    "test:owned-fonts"
   ],
   "additionalChecks": [
     "test:verify-runner"
