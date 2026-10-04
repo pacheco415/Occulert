@@ -235,7 +235,9 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(monitor, /setupPreviewActiveRef\.current && !isRunningRef\.current/);
   assert.match(monitor, /return;\s*}\s*\/\/ A frame already crossing/);
   assert.match(monitor, /SESSION_CHECKPOINT_INTERVAL_MS = 15_000/);
-  assert.match(monitor, /clearActiveSessionCheckpoint\(activeSessionId\)/);
+  assert.match(monitor, /clearCheckpoint: clearActiveSessionCheckpoint/);
+  const completion = readFileSync(new URL('../native-app/lib/sessionCompletion.ts', import.meta.url), 'utf8');
+  assert.match(completion, /services\.clearCheckpoint\(snapshot\.activeSessionId\)/);
   assert.match(monitor, /await saveActiveSessionCheckpoint\(\{/,
     'monitoring must reserve recovery storage before camera startup');
   assert.match(monitor, /ActiveSessionCheckpointConflictError/);
