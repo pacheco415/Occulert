@@ -95,6 +95,7 @@
     "asset:release": "node scripts/bump-asset.mjs --release",
     "audit:source-assets": "node scripts/audit-source-assets.mjs",
     "test:source-release": "node --test scripts/test-source-release.mjs",
+    "test:history-model": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-history-model.mjs",
     "build": "node scripts/build-driver.mjs",
     "lint:source": "eslint src",
     "typecheck:source": "tsc -p jsconfig.json",

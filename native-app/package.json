@@ -11,13 +11,14 @@
     "postinstall": "node ./scripts/patch-watch-connectivity.mjs && node ./scripts/patch-query-decoder.mjs",
     "check:dependencies": "expo install --check",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run check:dependencies && npm run typecheck && npm run test:dependencies && npm run test:audio-lifecycle",
+    "verify": "npm run check:dependencies && npm run typecheck && npm run test:dependencies && npm run test:audio-lifecycle && npm run test:history-interactions",
     "build:dev": "eas build --profile development --platform ios",
     "build:ios": "eas build --platform ios",
     "build:android": "eas build --platform android",
     "submit:ios": "eas submit -p ios",
     "test:dependencies": "node --test scripts/test-dependency-compatibility.mjs",
-    "test:audio-lifecycle": "node --test scripts/test-audio-lifecycle.mjs"
+    "test:audio-lifecycle": "node --test scripts/test-audio-lifecycle.mjs",
+    "test:history-interactions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-history-interactions.mjs"
   },
   "dependencies": {
     "@bacons/apple-targets": "5.0.0",
@@ -56,7 +57,8 @@
     "@babel/core": "^7.29.7",
     "@types/react": "~19.2.2",
     "react-test-renderer": "19.2.3",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "@babel/plugin-transform-react-jsx": "7.29.7"
   },
   "private": true,
   "overrides": {
