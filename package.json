@@ -74,6 +74,7 @@
     "test:migration-readiness": "node --test scripts/test-migration-readiness.mjs",
     "test:verify-runner": "node --test scripts/test-verify-runner.mjs scripts/test-verify-coverage.mjs",
     "test:asset-lineage": "node --test scripts/test-asset-lineage.mjs",
+    "test:workflow-policy": "node --test scripts/test-workflow-policy.mjs",
     "test:deployment-ignore": "node --test scripts/test-deployment-ignore.mjs"
   },
   "devDependencies": {

@@ -16,7 +16,7 @@ concurrency:
 jobs:
   skip-token-guard:
     name: Reject CI skip tokens
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check PR title and every commit message

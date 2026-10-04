@@ -65,6 +65,7 @@
     "audit:asset-sizes",
     "test:migration-readiness",
     "test:asset-lineage",
+    "test:workflow-policy",
     "test:deployment-ignore"
   ],
   "additionalChecks": [
