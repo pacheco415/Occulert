@@ -32,6 +32,7 @@
     "test:pilot-report",
     "test:login",
     "test:supabase-loader",
+    "test:vendor-supabase",
     "test:passkeys",
     "test:account",
     "test:account-delete",
