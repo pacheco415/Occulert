@@ -228,3 +228,76 @@ test('running fatigue summary preserves the average of the same processed sample
   assert.equal(h.get('fatigueSampleSum'), baselineSum + samples.reduce((sum, value) => sum + value, 0));
   assert.equal(h.get('fatigueSampleCount'), baselineCount + samples.length);
 });
+
+// Use the shipped lifecycle, stubbing only camera/model/cloud boundaries.
+async function startRealSession(h) {
+  h.run(`navigator.mediaDevices = { getUserMedia: async () => ({}) };
+    initModel = async () => {};
+    verifyFirstInference = async () => {};
+    openSelectedCamera = async () => ({getTracks:()=>[]});
+    attachCameraTrackGuards = () => {};
+    initCloud = async () => {};
+    startGPS = () => {};
+    initChart = () => {};
+    updateCameraSourceHint = () => {};
+    refreshCameraChoices = async () => [];
+    requestSessionWakeLock = async () => {};
+    startTimer = () => {};`);
+  await h.run('start()');
+  assert.equal(h.state().running, true);
+}
+
+test('real stop/start clears preceding driver personal base thresholds', async () => {
+ const h=createAppHarness();
+ await startRealSession(h);
+ h.feed({ear:.34},3400);
+ assert.equal(h.state().calibrated,true);
+ assert.ok(h.state().eyeClosedThreshold > .18);
+ await h.run('stop()');
+ await startRealSession(h);
+ h.feed({ear:.10},3400);
+ assert.equal(h.state().calibrated,false);
+ assert.equal(h.state().baselineEAR,.28);
+ assert.equal(h.state().eyeClosedThreshold,.18);
+ assert.equal(h.state().eyeWatchThreshold,.22);
+});
+
+test('Recalibrate clears personal thresholds before fallback', () => {
+ const h=calibrated();
+ h.el('recalBtn').onclick();
+ assert.equal(h.state().baselineEAR,.28);
+ assert.equal(h.state().eyeClosedThreshold,.18);
+ assert.equal(h.state().eyeWatchThreshold,.22);
+ h.feed({ear:.10},3400);
+ assert.equal(h.state().calibrated,false);
+ assert.equal(h.state().eyeClosedThreshold,.18);
+ assert.equal(h.state().eyeWatchThreshold,.22);
+});
+
+for (const [search, minimum] of [['',1],['?calibration-min=12',12],['?calibration-min=12&calibration-min=12',1],['?calibration-min=012',1]]) {
+ test(`parked calibration sample minimum ${search || 'default'}`, () => {
+  const h=createAppHarness({sandboxOverrides:{location:{search},URLSearchParams}});
+  h.startSession();
+  h.frame({ear:.30});
+  h.feed({ear:.10},3400);
+  assert.equal(h.state().calibrated,minimum===1);
+  if(minimum===12) {
+   assert.equal(h.state().eyeClosedThreshold,.18);
+   assert.equal(h.state().eyeWatchThreshold,.22);
+   h.el('recalBtn').onclick();
+   h.feed({ear:.30},3400);
+   assert.equal(h.state().calibrated,true);
+  }
+ });
+}
+
+test('parked sample minimum accepts twelve and rejects eleven samples', () => {
+ for (const accepted of [11,12]) {
+  const h=createAppHarness({sandboxOverrides:{location:{search:'?calibration-min=12'},URLSearchParams}});
+  h.startSession();
+  for(let n=0;n<accepted;n++) h.run('updateCalibration(.30)');
+  h.clock.advance(3400);
+  h.run('updateCalibration(.10)');
+  assert.equal(h.state().calibrated,accepted===12);
+ }
+});
