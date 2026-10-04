@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v89';
+const CACHE = 'occulert-v102';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -38,7 +38,8 @@ const RUNTIME_ASSETS = [
     "integrity": "sha256-VFIvolxQW/CUJC+Wm05JGRJesNrcy1aPKvFxu9ZYZfk="
   }
 ];
-const RUNTIME_INTEGRITY = new Map(RUNTIME_ASSETS.map(asset => [asset.url, asset.integrity]));
+const ALERT_AUDIO_ASSETS = [{ url: '/audio/alert.v1.wav', integrity: 'sha256-3fLbb34F09Mw3TsC1oy1Hkyg6pFnE5K5IbqP3YtPPCI=' }];
+const RUNTIME_INTEGRITY = new Map([...RUNTIME_ASSETS, ...ALERT_AUDIO_ASSETS].map(asset => [asset.url, asset.integrity]));
 function selectedRuntimeAssets() {
   let simd = false;
   try { simd = WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11])); } catch (_) {}
@@ -50,11 +51,15 @@ function selectedRuntimeAssets() {
 }
 const SELECTED_RUNTIME_ASSETS = selectedRuntimeAssets();
 const STATIC_ASSETS = [
-  '/local-history.v1.js',
+  '/homepage-bootstrap.v2.js',
+  '/page-actions.v2.js',
+
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
+  ...ALERT_AUDIO_ASSETS.map(asset => asset.url),
   '/',
   '/index.html',
   '/base.v47.css',
+  '/inter-fonts.v2.css',
   '/app.html',
   '/manifest.json',
   '/favicon.ico',
@@ -65,7 +70,7 @@ const STATIC_ASSETS = [
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v68.css',
-  '/driver-app.v75.js',
+  '/driver-app.v78.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
@@ -75,11 +80,15 @@ const NETWORK_ONLY_DOCUMENTS = new Set([
   '/fleet-history.html',
 ]);
 const NETWORK_ONLY_ASSETS = new Set([
+  '/occulert-backend.v69.js',
   '/fleet-history-page.v64.js',
   '/fleet-history-page.v65.js',
   '/fleet-history-page.v66.js',
   '/fleet-history-page.v67.js',
   '/fleet-history-page.v68.js',
+  '/fleet-history-page.v69.js',
+  '/fleet-history-page.v70.js',
+  '/fleet-history-page.v71.js',
   '/auth-helper.v47.js',
   '/passkey-auth.v47.js',
   '/auth-helper.v49.js',
@@ -87,24 +96,29 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v47.js',
   '/occulert-backend.v58.js',
   '/occulert-backend.v60.js',
-  '/occulert-backend.v77.js',
+  '/occulert-backend.v78.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
   '/supabase-loader.v47.js',
+  '/supabase-loader.v49.js',
+  '/supabase-loader.v48.js',
+  '/vendor/supabase-2.112.3.js',
   '/passwordless-auth.v49.js',
   '/passwordless-auth.v60.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
   '/driver-app.v60.js',
-  '/driver-app.v75.js',
+  '/driver-app.v78.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
-  '/local-history.v1.js',
+  '/page-actions.v2.js',
+
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
+  ...ALERT_AUDIO_ASSETS.map(asset => asset.url),
   '/base.v47.css',
   '/app.html',
   '/driver-app.v68.css',
-  '/driver-app.v75.js',
+  '/driver-app.v78.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;

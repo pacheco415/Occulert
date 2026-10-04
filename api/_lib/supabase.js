@@ -1,3 +1,4 @@
+const { remainingProviderMs } = require('./provider-budget');
 // Shared Supabase REST helpers for Occulert backend endpoints.
 //
 // This project intentionally avoids the @supabase/supabase-js SDK to keep
@@ -20,6 +21,12 @@ throw new Error("missing_env_" + name);
 return value;
 }
 
+// Public capability checks may learn only whether storage is configured,
+// never the server credential itself. This helper performs no network request.
+function serverStorageConfigured() {
+return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 function supabaseUrl() {
 return requireEnv("SUPABASE_URL").replace(/\/+$/, "");
 }
@@ -37,6 +44,7 @@ Authorization: "Bearer " + key,
 // a transport timeout does not prove that a server transaction was rolled back.
 function fetchTextWithDeadline(url, options) {
 return new Promise((resolve, reject) => {
+const timeoutMs = remainingProviderMs(8000);
 let settled = false;
 const controller = new AbortController();
 const timer = setTimeout(() => {
@@ -44,7 +52,7 @@ const error = new Error("supabase_unavailable");
 error.status = 504;
 finish(error);
 controller.abort();
-}, 8000);
+}, timeoutMs);
 function finish(error, value) {
 if (settled) return;
 settled = true;
@@ -133,4 +141,4 @@ const match = /^Bearer\s+(.+)$/i.exec(header);
 return match ? match[1] : null;
 }
 
-module.exports = { pgFetch: pgFetch, verifyAccessToken: verifyAccessToken, deleteAuthUser: deleteAuthUser, bearerToken: bearerToken };
+module.exports = { pgFetch: pgFetch, verifyAccessToken: verifyAccessToken, deleteAuthUser: deleteAuthUser, bearerToken: bearerToken, serverStorageConfigured: serverStorageConfigured };

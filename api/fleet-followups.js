@@ -1,12 +1,7 @@
 const { pgFetch, verifyAccessToken, bearerToken } = require('./_lib/supabase');
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { isUuid, validJsonBody } = require('./_lib/validation');
 const STATUSES = new Set(['open', 'in_progress', 'reviewed']);
-function json(res, status, body) {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
-  res.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 module.exports = async function handler(req, res) {
   if (!['GET', 'POST'].includes(req.method)) {
     res.setHeader('Allow', 'GET, POST');
@@ -25,12 +20,11 @@ module.exports = async function handler(req, res) {
     if (!fleet) return json(res, 403, { ok: false, error: 'fleet_not_found' });
     if (req.method === 'POST') {
       const body = req.body;
-      if (!String(req.headers['content-type'] || '').toLowerCase().startsWith('application/json') ||
-          !body || typeof body !== 'object' || Array.isArray(body) || JSON.stringify(body).length > 1024) {
+      if (!validJsonBody(req, 1024)) {
         return json(res, 400, { ok: false, error: 'invalid_body' });
       }
       if (Object.keys(body).some(key => !['session_id', 'status', 'expected_version'].includes(key)) ||
-          typeof body.session_id !== 'string' || !UUID.test(body.session_id) || !STATUSES.has(body.status) ||
+          !isUuid(body.session_id) || !STATUSES.has(body.status) ||
           !Number.isInteger(body.expected_version) || body.expected_version < 0 || body.expected_version > 2147483646) {
         return json(res, 400, { ok: false, error: 'invalid_followup' });
       }
@@ -46,7 +40,7 @@ module.exports = async function handler(req, res) {
       pgFetch('sessions', { params: { select: 'id,driver_id,started_at,ended_at,alert_count', fleet_id: 'eq.' + fleet.id, order: 'started_at.desc,id.desc', limit: '50' } }),
       pgFetch('drivers', { params: { select: 'id,name', fleet_id: 'eq.' + fleet.id } }),
     ]);
-    const ids = sessions.map(session => session.id).filter(id => UUID.test(String(id)));
+    const ids = sessions.map(session => session.id).filter(isUuid);
     const outcomes = ids.length ? await pgFetch('fleet_session_followups', {
       params: { select: 'session_id,status,version,updated_at', session_id: 'in.(' + ids.join(',') + ')' },
     }) : [];
@@ -66,3 +60,5 @@ module.exports = async function handler(req, res) {
     return json(res, 502, { ok: false, error: 'followups_unavailable' });
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

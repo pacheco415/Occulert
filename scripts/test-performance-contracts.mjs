@@ -1,3 +1,4 @@
+import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -178,7 +179,7 @@ test('web monitoring defers MediaPipe and prevents overlapping inference', async
   assert.match(driver, /async function verifyFirstInference\(timeoutMs=/);
   assert.match(driver, /function waitForDetectionResult\(/);
   assert.match(driver, /async function haltForDetectionFailure\(/);
-  assert.match(driver, /function primeAlertAudio\(\)/);
+  assert.match(driver, /function primeAlertAudio\(/);
   assert.doesNotMatch(driver, /Math\.floor\(Math\.random\(\)\*900\+100\)/);
   assert.equal((driver.match(/async function initModel\(/g) || []).length, 1);
   assert.equal((driver.match(/async function loop\(/g) || []).length, 1);
@@ -612,7 +613,7 @@ test('network-only account scripts time out without exposing cached auth and pre
     respondWith: promise => { responsePromise = promise; },
     waitUntil: () => { lifetimeUpdates++; },
   });
-  for (const path of ['/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', `/${assetByStem('occulert-backend.js')}`, `/${assetByStem('auth-helper.js')}`, `/${assetByStem('passkey-auth.js')}`, `/${assetByStem('passwordless-auth.js')}`, `/${assetByStem('supabase-loader.js')}`]) {
+  for (const path of ['/vendor/supabase-2.112.3.js', '/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', `/${assetByStem('occulert-backend.js')}`, `/${assetByStem('auth-helper.js')}`, `/${assetByStem('passkey-auth.js')}`, `/${assetByStem('passwordless-auth.js')}`, `/${assetByStem('supabase-loader.js')}`]) {
     const old = deferred();
     network = () => old.promise;
     dispatch(path);
@@ -823,7 +824,7 @@ for (const navigation of [false, true]) {
 
 test('fleet refreshes adapt to activity and throttle protected event queries', () => {
   const api = read('api/fleet-summary.js');
-  const dashboard = read('fleet-dashboard.html');
+  const dashboard = fleetDashboardContract();
   const policy = markedBlock(dashboard, 'fleet-refresh-policy');
   const context = {};
   runInNewContext(`${policy};globalThis.policyForTest={protectedRefreshDelay,shouldRefreshProtectedEvents}`, context);
@@ -847,7 +848,7 @@ test('fleet refreshes adapt to activity and throttle protected event queries', (
 });
 
 test('fleet dashboard restarts its relative-time clock after returning to a visible tab', async () => {
-  const dashboard = read('fleet-dashboard.html');
+  const dashboard = fleetDashboardContract();
   const scheduling = markedBlock(dashboard, 'fleet-refresh-scheduling');
   let intervalCalls = 0;
   const context = {
@@ -886,15 +887,15 @@ function deferred() {
   return { promise, resolve, reject };
 }
 const drainTasks = () => new Promise(done => setImmediate(done));
-function dashboardRefreshHarness({ empty = false } = {}) {
-  const source = read('fleet-dashboard.html'), timers = new Map(), elements = new Map(), requests = [], views = [];
+function dashboardRefreshHarness({ empty = false, storage = new Map(), storageDenied = false } = {}) {
+  const source = fleetDashboardContract(), timers = new Map(), elements = new Map(), requests = [], views = [];
   const now = Date.parse('2026-09-26T12:00:00Z');
   let user = { id: 'owner' }, timerId = 0, sessionImpl = async () => ({ user }), summaryImpl = async () => summary('Recovered fleet');
-  function summary(name) { return { ok: true, body: { fleet: { company_name: name }, drivers: [{ id: name, name, active: true }],
+  function summary(name) { return { ok: true, body: { fleet: { id: 'fleet', company_name: name }, drivers: [{ id: name, name, active: true }],
     sessions: [], events: [], events_included: true, telemetry_trust: 'unverified_client_report',
     privacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false } } }; }
   function element(id) {
-    if (!elements.has(id)) elements.set(id, { textContent: '', disabled: false, attributes: {}, hidden: false,
+    if (!elements.has(id)) elements.set(id, { textContent: '', value: id === 'riskFilter' ? 'all' : id === 'sortMode' ? 'risk' : '', disabled: false, attributes: {}, hidden: false,
       classList: { toggle(name, value) { elements.get(id).hidden = name === 'hidden' && value; } },
       setAttribute(name, value) { this.attributes[name] = value; } });
     return elements.get(id);
@@ -904,7 +905,10 @@ function dashboardRefreshHarness({ empty = false } = {}) {
   const window = { OcculertBackend: { currentUser: () => user, getSession: () => { requests.push('session'); return sessionImpl(); },
     getFleetSummary: options => { requests.push({ summary: options }); return summaryImpl(); }, signOut: () => { requests.push('signOut'); user = null; } },
     OcculertFollowups: { reset() {}, show() {} }, OcculertPilotReport: { reset() {}, update() {} } };
+  const storageReads = [];
   context = { Date: ClockDate, window, document: { hidden: false, getElementById: element }, navigator: { connection: {} },
+    localStorage: { getItem(key) { storageReads.push(key); if(storageDenied)throw Error('Blocked'); return storage.get(key) ?? null; },
+      setItem(key,value) { if(storageDenied)throw Error('Blocked'); storage.set(key,value); } },
     syncProtectedControls() {}, render: () => views.push(context.state().protectedFleetName),
     refreshDashboardIfNeeded: () => views.push(context.state().protectedFleetName), protectedHistoryOpen: () => false,
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
@@ -912,9 +916,10 @@ function dashboardRefreshHarness({ empty = false } = {}) {
   };
   const globals = source.slice(source.indexOf('let demoRows='), source.indexOf('function esc('));
   const auth = source.slice(source.indexOf('async function handleAuthStorageChange('), source.indexOf('async function boot('));
-  runInNewContext(globals + markedBlock(source, 'fleet-refresh-policy') + markedBlock(source, 'fleet-summary-projection') +
+  runInNewContext(globals + markedBlock(source, 'fleet-view-preferences') + markedBlock(source, 'fleet-refresh-policy') + markedBlock(source, 'fleet-summary-projection') +
     markedBlock(source, 'fleet-refresh-request') + markedBlock(source, 'fleet-refresh-scheduling') + auth + `
-      globalThis.state=()=>({fleetMode,protectedUserId,protectedFleetName,protectedDrivers,protectedSessions,protectedEvents,
+      globalThis.preferencesForTest={saveDashboardPreferences};
+      globalThis.state=()=>({fleetMode,protectedUserId,protectedFleetId,protectedFleetName,protectedDrivers,protectedSessions,protectedEvents,
         protectedLastSuccessfulAt,protectedRefreshFailures,protectedFleetLoading,protectedFleetGeneration,
         protectedTelemetryTrust,protectedReportPrivacy,protectedReportShape});
       globalThis.seed=input=>{({fleetMode,protectedUserId,protectedFleetName,protectedDrivers,protectedSessions,
@@ -924,12 +929,84 @@ function dashboardRefreshHarness({ empty = false } = {}) {
     protectedDrivers: [{ id: 'driver', name: 'Private Driver' }], protectedSessions: [{ id: 'private-session' }], protectedEvents: [{ id: 'private-event' }],
     protectedLastSuccessfulAt: now, protectedRefreshFailures: 0, protectedTelemetryTrust: 'unverified_client_report',
     protectedReportPrivacy: { includes_location: false, includes_personal_media: false, includes_raw_motion: false }, protectedReportShape: true }) });
-  return { context, timers, elements, requests, views, summary, state: context.state, user: value => { user = value; },
+  return { context, timers, elements, requests, views, summary, storage, storageReads, state: context.state, user: value => { user = value; },
     auth: fn => { sessionImpl = fn; }, fetch: fn => { summaryImpl = fn; },
     expire: delay => { const entry = Array.from(timers.entries()).find(([, timer]) => timer.delay === delay); assert.ok(entry, `timer ${delay} must exist`);
       timers.delete(entry[0]); entry[1].callback(); },
   };
 }
+
+const dashboardPreferenceKey = (owner='owner',fleet='fleet') => 'occulert-fleet-view-v1:' + JSON.stringify([owner,fleet]);
+const dashboardPreferences = JSON.stringify({version:1,risk:'watch',sort:'alerts'});
+
+test('dashboard restores only verified account/fleet preferences and never persists driver search', async () => {
+  const app = dashboardRefreshHarness({empty:true,storage:new Map([[dashboardPreferenceKey(),dashboardPreferences]])});
+  const account = deferred(); app.auth(()=>account.promise);
+  const load = app.context.refreshProtectedFleetNow(); await drainTasks();
+  assert.deepEqual(app.storageReads, [], 'pending account verification cannot restore preferences');
+  account.resolve({user:{id:'owner'}}); await load;
+  assert.deepEqual(app.storageReads, [dashboardPreferenceKey()]);
+  assert.equal(app.elements.get('riskFilter').value,'watch');
+  assert.equal(app.elements.get('sortMode').value,'alerts');
+  app.elements.get('driverSearch').value='Private driver';
+  app.elements.get('riskFilter').value='danger';
+  app.context.preferencesForTest.saveDashboardPreferences();
+  assert.deepEqual(JSON.parse(app.storage.get(dashboardPreferenceKey())),{version:1,risk:'danger',sort:'alerts'});
+  assert.doesNotMatch(app.storage.get(dashboardPreferenceKey()),/Private driver/);
+});
+
+test('dashboard resets choices and search when the verified fleet changes and keeps saved scopes separate', async () => {
+  const app = dashboardRefreshHarness({empty:true,storage:new Map([[dashboardPreferenceKey(),dashboardPreferences]])});
+  await app.context.refreshProtectedFleetNow();
+  app.elements.get('driverSearch').value='Private driver';
+  app.fetch(async()=>{const value=app.summary('New fleet');value.body.fleet.id='fleet-2';return value;});
+  await app.context.refreshProtectedFleetNow();
+  assert.equal(app.elements.get('riskFilter').value,'all');
+  assert.equal(app.elements.get('sortMode').value,'risk');
+  assert.equal(app.elements.get('driverSearch').value,'');
+  app.elements.get('sortMode').value='score';app.context.preferencesForTest.saveDashboardPreferences();
+  assert.equal(app.storage.get(dashboardPreferenceKey()),dashboardPreferences);
+  assert.deepEqual(JSON.parse(app.storage.get(dashboardPreferenceKey('owner','fleet-2'))),{version:1,risk:'all',sort:'score'});
+});
+
+test('dashboard account switch and sign-out clear controls and cannot write the previous scope', async () => {
+  const app = dashboardRefreshHarness({empty:true,storage:new Map([[dashboardPreferenceKey(),dashboardPreferences]])});
+  await app.context.refreshProtectedFleetNow();app.elements.get('driverSearch').value='Private driver';
+  app.user({id:'other-owner'});
+  await app.context.handleAuthStorageChange({key:'occulert-auth'});
+  assert.equal(app.elements.get('riskFilter').value,'all');
+  assert.equal(app.elements.get('driverSearch').value,'');
+  app.elements.get('sortMode').value='score';app.context.preferencesForTest.saveDashboardPreferences();
+  assert.equal(app.storage.get(dashboardPreferenceKey()),dashboardPreferences);
+  assert.deepEqual(JSON.parse(app.storage.get(dashboardPreferenceKey('other-owner'))),{version:1,risk:'all',sort:'score'});
+  app.user(null);await app.context.handleAuthStorageChange({key:'occulert-auth'});
+  assert.equal(app.elements.get('sortMode').value,'risk');
+  app.context.preferencesForTest.saveDashboardPreferences();
+  assert.equal(app.storage.size,2);
+});
+
+test('dashboard rejects malformed and oversized preferences while blocked storage keeps controls usable', async () => {
+  for (const value of ['{broken','[]',JSON.stringify({version:2,risk:'danger',sort:'alerts'}),
+    JSON.stringify({version:1,risk:'gps',sort:'<script>'}),JSON.stringify({version:1,risk:'danger',sort:'alerts',extra:'x'.repeat(512)})]) {
+    const app=dashboardRefreshHarness({empty:true,storage:new Map([[dashboardPreferenceKey(),value]])});
+    await app.context.refreshProtectedFleetNow();
+    assert.equal(app.elements.get('riskFilter').value,'all');assert.equal(app.elements.get('sortMode').value,'risk');
+  }
+  const app=dashboardRefreshHarness({empty:true,storageDenied:true});await app.context.refreshProtectedFleetNow();
+  app.elements.get('riskFilter').value='watch';app.context.preferencesForTest.saveDashboardPreferences();
+  assert.equal(app.elements.get('riskFilter').value,'watch');assert.equal(app.storage.size,0);
+  assert.equal(app.state().protectedFleetName,'Recovered fleet');
+});
+
+test('dashboard denied access and late old-account summaries cannot restore another scope', async () => {
+  const denied=dashboardRefreshHarness({empty:true,storage:new Map([[dashboardPreferenceKey(),dashboardPreferences]])});
+  denied.fetch(async()=>({ok:false,status:403,body:{error:'forbidden'}}));await denied.context.refreshProtectedFleetNow();
+  assert.deepEqual(denied.storageReads,[]);
+  const app=dashboardRefreshHarness({empty:true,storage:new Map([[dashboardPreferenceKey(),dashboardPreferences]])});
+  const old=deferred();app.fetch(()=>old.promise);
+  const load=app.context.refreshProtectedFleetNow();await drainTasks();app.user(null);old.resolve(app.summary('Old fleet'));await load;
+  assert.deepEqual(app.storageReads,[]);assert.equal(app.state().fleetMode,false);
+});
 
 test('hung dashboard account checks release controls, preserve same-owner stale data, and recover manually', async () => {
   const app = dashboardRefreshHarness(), old = deferred();

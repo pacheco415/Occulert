@@ -17,8 +17,8 @@
 <meta name="theme-color" content="#0a0e1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<script src="/supabase-loader.v47.js"></script>
-<script src="/occulert-backend.v77.js"></script>
+<script src="/supabase-loader.v49.js"></script>
+<script src="/occulert-backend.v78.js"></script>
 <script src="/passkey-auth.v60.js"></script>
 <script src="/auth-helper.v60.js"></script>
 <link rel="stylesheet" href="/account-page-1.v47.css" />
@@ -26,6 +26,7 @@
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/portal.v47.css" />
 <link rel="stylesheet" href="/form-controls.v63.css" />
+<script src="/page-actions.v2.js"></script>
 </head>
 <body class="portal-page account-page">
 <div class="top">
@@ -41,7 +42,7 @@
     <div id="profileBox"><div style="color:var(--text3);font-size:13px">Loading profile…</div></div>
     <div class="action-row">
       <a class="btn primary" id="continueBtn" href="/app.html">Continue to App</a>
-      <button class="btn red" onclick="signOut()">Sign Out</button>
+      <button class="btn red" data-page-action="signOut">Sign Out</button>
     </div>
   </div>
 </aside>
@@ -49,7 +50,7 @@
   <div class="card">
     <div class="section-label">Driver app settings</div>
     <p style="color:var(--text2);font-size:13px;margin:0 0 16px">These device-only driver app settings do not grant access to a protected fleet.</p>
-    <form class="form" onsubmit="saveProfile(event)">
+    <form class="form" data-page-action="saveProfile-event">
       <div class="split">
         <div class="field"><label for="name">Name</label><input id="name" placeholder="Your name" autocomplete="name"></div>
         <div class="field"><label for="role">Local app role</label><select id="role"><option value="driver">Driver</option><option value="fleet">Fleet Manager</option></select></div>
@@ -67,11 +68,11 @@
     <div class="section-label">Sign-in and security</div>
     <p style="color:var(--text2);font-size:13px;margin:0 0 16px" id="securityIntro">Sign in to change your email or password.</p>
     <div id="securityForms" class="hidden">
-      <form class="form" style="margin-bottom:14px" onsubmit="changeEmail(event)">
+      <form class="form" style="margin-bottom:14px" data-page-action="changeEmail-event">
         <div class="field"><label for="newEmail">New Email</label><input id="newEmail" type="email" required placeholder="new@email.com" autocomplete="email"></div>
         <button class="btn primary" id="emailBtn" type="submit">Change Email</button>
       </form>
-      <form class="form" onsubmit="changePassword(event)">
+      <form class="form" data-page-action="changePassword-event">
         <div class="field"><label for="newPassword">New Password</label><input id="newPassword" type="password" required minlength="6" placeholder="Minimum 6 characters" autocomplete="new-password"></div>
         <button class="btn primary" id="passwordBtn" type="submit">Change Password</button>
       </form>
@@ -82,11 +83,11 @@
             <h2 id="passkeyHeading">Passkeys <span class="badge">Beta</span></h2>
             <p>Use Touch ID, Face ID, a device PIN, password manager, or security key. Use an email sign-in link if your passkey is unavailable.</p>
           </div>
-          <button class="btn primary" id="registerPasskeyBtn" type="button" onclick="registerPasskey()">Add a passkey</button>
+          <button class="btn primary" id="registerPasskeyBtn" type="button" data-page-action="registerPasskey">Add a passkey</button>
         </div>
         <div class="passkey-list" id="passkeyList" aria-live="polite"><div class="passkey-empty">Loading passkeys…</div></div>
         <div class="status" id="passkeyStatus" role="status" aria-live="polite"></div>
-        <button class="btn hidden" id="passkeyRetryBtn" type="button" style="margin-top:10px" onclick="retryPasskeySetup()">Retry passkey setup</button>
+        <button class="btn hidden" id="passkeyRetryBtn" type="button" style="margin-top:10px" data-page-action="retryPasskeySetup">Retry passkey setup</button>
       </section>
     </div>
     <div class="note"><strong>Note:</strong> Changing your email sends a confirmation link to the new address, and depending on your account security settings your current address may receive one too. Your sign-in email stays the same until confirmation is complete. Occulert never stores your password.</div>
@@ -96,11 +97,21 @@
     <div class="section-label">Danger zone</div>
     <h2 id="deleteAccountHeading">Delete your account</h2>
     <p>This permanently deletes your Occulert sign-in, driver profile, sessions, alerts, invitations, and any fleet you own. Other fleet members keep their accounts and driving history, without fleet membership. This cannot be undone.</p>
-    <form class="form" onsubmit="deleteAccount(event)">
+    <form class="form" data-page-action="deleteAccount-event">
       <div class="field"><label for="deleteConfirmation">Type DELETE to confirm</label><input id="deleteConfirmation" autocomplete="off" spellcheck="false" placeholder="DELETE" required></div>
       <button class="btn red" id="deleteAccountBtn" type="submit">Delete account permanently</button>
     </form>
     <div class="status" id="deleteStatus" role="status" aria-live="polite"></div>
+    <section id="deleteReauthSection" hidden aria-labelledby="deleteReauthTitle">
+      <h3 id="deleteReauthTitle">Confirm your sign-in</h3>
+      <p>Sign in again to continue permanent account deletion. Your data remains until deletion is confirmed.</p>
+      <form id="deleteReauthForm">
+        <div class="field"><label for="deleteReauthPassword">Current password</label><input id="deleteReauthPassword" type="password" autocomplete="current-password" required></div>
+        <button class="btn" id="deleteReauthPasswordBtn" type="submit">Sign in and review deletion</button>
+      </form>
+      <button class="btn" id="deleteReauthPasskeyBtn" type="button">Use a passkey</button>
+      <p><a href="/login.html">Other sign-in options</a></p>
+    </section>
   </div>
 </div>
 <aside class="account-secondary">
@@ -123,7 +134,7 @@
 </aside>
 </section>
 </main>
-<script src="/account-page-2.v60.js"></script>
+<script src="/account-page-2.v63.js"></script>
 
 <footer style="text-align:center;padding:28px 16px 24px;border-top:1px solid #1e293b;color:#4a6070;font-size:12px;margin-top:40px"><a href="/" style="color:#60a5fa;text-decoration:none;font-weight:700">Occulert</a> &nbsp;·&nbsp; <a href="/privacy.html" style="color:#4a6070;text-decoration:none">Privacy</a> &nbsp;·&nbsp; <a href="/safety.html" style="color:#4a6070;text-decoration:none">Safety</a> &nbsp;·&nbsp; <a href="/app.html" style="color:#4a6070;text-decoration:none">Driver App</a><div style="margin-top:8px">© 2026 Occulert. Prototype — not a substitute for rest or safe driving.</div></footer>
 </body>

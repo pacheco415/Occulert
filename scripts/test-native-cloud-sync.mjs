@@ -175,8 +175,11 @@ assert.doesNotMatch(
 
 assert.match(monitor, /beginCloudSession\(\)/);
 assert.match(monitor, /logCloudAlert\(sessionId, result\.fatigueScore\)/);
-assert.match(monitor, /finishCloudSession\(cloudSessionId/);
-assert.match(monitor, /cloudSynced: true/);
+const completion = read('native-app/lib/sessionCompletion.ts');
+assert.match(monitor, /finalizeCompletedNativeSession/);
+assert.match(monitor, /finish: finishCloudSession/);
+assert.match(completion, /services\.finish\(cloudId/);
+assert.match(completion, /cloudSynced: true/);
 assert.match(
   monitor,
   /if \(!isRunningRef\.current \|\| stoppingRef\.current\) return;/,

@@ -16,11 +16,11 @@ concurrency:
 jobs:
   skip-token-guard:
     name: Reject CI skip tokens
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check PR title and every commit message
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const skipToken = /\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]|(?:^|\n)skip-checks:\s*true\s*(?:\n|$)/i;

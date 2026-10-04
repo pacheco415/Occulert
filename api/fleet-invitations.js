@@ -10,19 +10,13 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
+const { validJsonBody } = require("./_lib/validation");
 const MAX_BODY_LENGTH = 2048;
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function validBody(request) {
-  if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = typeof request.body === "object" && request.body ? request.body : {};
-  return !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
+  return validJsonBody(request, MAX_BODY_LENGTH);
 }
 
 function normalizedEmail(value) {
@@ -140,3 +134,5 @@ module.exports = async function handler(request, response) {
     return json(response, 502, { ok: false, error: "supabase_error" });
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

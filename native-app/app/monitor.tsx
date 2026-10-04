@@ -46,6 +46,7 @@ import {
   type SensitivityLevel,
 } from '../constants/thresholds';
 import { updateSessionHistory } from '../lib/sessionHistory';
+import { saveCompletedNativeSession, markCompletedNativeSessionSynced, finalizeCompletedNativeSession, completeNativeSessionStop } from '../lib/sessionCompletion';
 import {
   beginCloudSession,
   finishCloudSession,
@@ -559,45 +560,29 @@ export default function MonitorScreen() {
     endedAt: number,
   ): Promise<string | null> => {
     if (durationSec <= 0) return null;
-    const avgFatigue = fatigueSamplesRef.current
-      ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
-      : 0;
-    const record = {
-      sessionId,
-      savedAt: new Date().toISOString(),
-      durationSec,
-      alertCount: alerts,
-      avgFatigue,
+    return saveCompletedNativeSession({
+      sessionId, durationSec, alerts,
+      fatigueSum: fatigueSumRef.current,
+      fatigueSamples: fatigueSamplesRef.current,
       headNodObservations: headNodObservationsRef.current,
-      cameraHeadNodObservations: headNodObservationsRef.current,
       headphoneHeadNodObservations: headphoneHeadNodObservationsRef.current,
       headphoneMotionSamples: headphoneMotionSamplesRef.current,
       headphoneMotionStatus: headphoneMotionStatusRef.current,
       monitorPerformance,
       sensorFusion: sensorFusionTrackerRef.current.snapshot(endedAt),
       sensitivity: sessionSensitivityRef.current,
-      ...(EYE_BASELINE_EXPERIMENT ? {eyeBaselineExperiment:{version:1,baseline:sessionEyeBaselineRef.current}} : {}),
-      ...currentAppBuildInfo(),
-    };
-    await updateSessionHistory<Record<string, unknown>>((sessions) => [
-      record,
-      ...sessions.filter(item => item?.sessionId !== sessionId),
-    ].slice(0, 50));
-    return sessionId;
+      extra: {
+        ...(EYE_BASELINE_EXPERIMENT ? {eyeBaselineExperiment:{version:1,baseline:sessionEyeBaselineRef.current}} : {}),
+        ...currentAppBuildInfo(),
+      },
+    }, updateSessionHistory);
   }, []);
 
   const markSessionSynced = useCallback(async (
     localSessionId: string,
     cloudSessionId: string,
   ) => {
-    try {
-      await updateSessionHistory<Record<string, unknown>>((sessions) => sessions.map((item) =>
-        item?.sessionId === localSessionId
-          ? { ...item, cloudSynced: true, cloudSessionId }
-          : item));
-    } catch {
-      // Keep the local session intact if its cloud badge cannot update.
-    }
+    await markCompletedNativeSessionSynced(updateSessionHistory, localSessionId, cloudSessionId);
   }, []);
 
   const handleStop = useCallback(async (
@@ -618,10 +603,10 @@ export default function MonitorScreen() {
     const durationSec = elapsedSessionSeconds(sessionStartedAtRef.current, stoppedAt);
     const alerts = alertCountRef.current;
     const activeSessionId = activeSessionIdRef.current;
-    const averageFatigue = fatigueSamplesRef.current
+    const averageFatigue = fatigueSamplesRef.current > 0
       ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
-      : 0;
-    const maxFatigue = maxFatigueRef.current;
+      : null;
+    const maxFatigue = fatigueSamplesRef.current > 0 ? maxFatigueRef.current : null;
     const cloudSession = cloudSessionRef.current;
     const pendingEvents = cloudEventQueueRef.current;
     const monitorPerformance = performanceTrackerRef.current.snapshot(stoppedAt);
@@ -641,37 +626,19 @@ export default function MonitorScreen() {
     }
 
     const cloudEndedAt = new Date(stoppedAt).toISOString();
-    const finalizeCloud = async (localSessionId: string | null) => {
-      const cloudSessionId = cloudSession ? await cloudSession.catch(() => null) : null;
-      if (!cloudSessionId) return;
-      await pendingEvents.catch(() => {});
-      const safetyScore = Math.max(0, 100 - Math.round(maxFatigue * 0.65) - alerts * 8);
-      const synced = await finishCloudSession(cloudSessionId, {
-        averageFatigue,
-        maxFatigue,
-        safetyScore,
-        alertCount: alerts,
-      }, cloudEndedAt, localSessionId || undefined);
-      if (synced && localSessionId) {
-        await markSessionSynced(localSessionId, cloudSessionId);
-      }
-    };
+    const finalizeCloud = (localSessionId: string | null) => finalizeCompletedNativeSession({
+      cloudSession, pendingEvents, averageFatigue, maxFatigue, alerts, endedAt: cloudEndedAt,
+    }, localSessionId, { finish: finishCloudSession, markSynced: markSessionSynced });
 
     try {
-      if (!wasRunning) return;
-      const localSessionId = activeSessionId
-        ? await saveSession(activeSessionId, durationSec, alerts, monitorPerformance, stoppedAt)
-        : null;
-      if (activeSessionId) {
-        await clearActiveSessionCheckpoint(activeSessionId).catch(() => {});
-        if (activeSessionIdRef.current === activeSessionId) activeSessionIdRef.current = null;
-      }
-      if (options.deferCloudFinalization) {
-        // Optional cloud finalization never delays a safe-stop Maps handoff.
-        void finalizeCloud(localSessionId).catch(() => {});
-        return;
-      }
-      await finalizeCloud(localSessionId);
+      await completeNativeSessionStop({
+        wasRunning, activeSessionId, deferCloudFinalization: Boolean(options.deferCloudFinalization),
+      }, {
+        save: id => saveSession(id, durationSec, alerts, monitorPerformance, stoppedAt),
+        clearCheckpoint: clearActiveSessionCheckpoint,
+        releaseIdentity: id => { if (activeSessionIdRef.current === id) activeSessionIdRef.current = null; },
+        finalize: finalizeCloud,
+      });
     } finally {
       stoppingRef.current = false;
       setIsStopping(false);

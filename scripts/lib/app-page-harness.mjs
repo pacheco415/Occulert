@@ -142,7 +142,6 @@ export function createAppHarness({ startAt = 1_700_000_000_000, initialStorage =
   vm.createContext(sandbox);
 
   const code = readFileSync(DRIVER_APP, 'utf8');
-  vm.runInContext(readFileSync(new URL('../../' + assetByStem('local-history.js'), import.meta.url), 'utf8'), sandbox);
   vm.runInContext(code, sandbox, { filename: `${assetByStem('driver-app.js')}` });
 
   const run = (code) => vm.runInContext(code, sandbox, { filename: 'harness-eval' });

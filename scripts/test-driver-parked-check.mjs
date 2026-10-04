@@ -2,10 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
-import {createRequire} from 'node:module';
-const require=createRequire(import.meta.url);
-const manifest=JSON.parse(readFileSync(new URL('../asset-versions.json',import.meta.url),'utf8'));
-const historyData=require('../'+manifest['local-history.js']);
 
 const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
 const asset = html.match(/<script src="\/(driver-app\.v\d+\.js)"><\/script>/)?.[1];
@@ -36,6 +32,7 @@ test('active monitoring shows status and alerts while parked diagnostics are hid
 
 test('parked output check leaves session telemetry untouched and is disabled while monitoring', () => {
   const check = extract('function demoAlert(){', '\nfunction onResults');
+  const clearTest = extract('function clearParkedAlertTest(owner){', '\nfunction getAlertAudio');
   const output = { textContent: '' };
   const classes = new Set();
   const sound = [];
@@ -56,12 +53,15 @@ test('parked output check leaves session telemetry untouched and is disabled whi
     alertSub: { textContent: 'Pull over safely' },
     alertScreen: { style: {}, classList: { add: value => classes.add(value), remove: value => classes.delete(value) } },
     nightOpacity: { value: '72' },
-    primeAlertAudio: () => {},
+    beginAlertAudioScope: () => 1,
+    _alertAudioOwner: 1,
+    _alertTestOwner: 0,
+    releaseAlertAudioScope: () => {},
     tone: (...args) => sound.push(args),
     navigator: { vibrate: pattern => vibration.push(pattern) },
     setTimeout: callback => { timers.push(callback); },
   };
-  vm.runInNewContext(`${check}\ndemoAlert();`, context);
+  vm.runInNewContext(`${clearTest}\n${check}\ndemoAlert();`, context);
   assert.equal(context.sessionStart, 12345);
   assert.equal(context.localSessionId, 'saved-session');
   assert.equal(context.alerts, 2);
@@ -99,7 +99,6 @@ test('post-drive review writes only to matching local history', () => {
     Date,
     JSON,
   };
-  context.browserHistoryStore=()=>historyData.create(context.localStorage);
   vm.runInNewContext(registration, context);
   submit({ preventDefault() {} });
   const rows = JSON.parse(stored);

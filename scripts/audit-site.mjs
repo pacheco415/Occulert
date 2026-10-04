@@ -1,3 +1,6 @@
+import { scriptMarkupPolicy } from './lib/html-script-policy.mjs';
+import { auditWorkflowPolicy } from './lib/workflow-policy.mjs';
+import { createHash } from 'node:crypto';
 import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
 import "./audit-assets.mjs";
 import "./audit-mediapipe.mjs";
@@ -30,7 +33,8 @@ function read(path) {
 function assertionSource(path) {
   const source = read(path);
   if (!path.endsWith(".html")) return source;
-  const assets = [...source.matchAll(/(?:href|src)="\/([^"?#]+-page-[^"?#]+\.(?:js|css))"/g)];
+  const ownedAssets = new Set(Object.values(JSON.parse(read("asset-versions.json"))));
+  const assets = [...source.matchAll(/(?:href|src)="\/([^"?#]+\.(?:js|css))"/g)].filter(match => ownedAssets.has(match[1]) && (/-page-/.test(match[1]) || /^(?:fleet-dashboard|homepage-bootstrap)\.v/.test(match[1])));
   return source + assets.map(match => read(match[1])).join("\n");
 }
 
@@ -78,8 +82,10 @@ for (const retiredDuplicate of [
 
 for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
+  if(scriptMarkupPolicy(html).handlers.length)fail(`${file}: inline event handlers are forbidden`);
   const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
   for (const [index, match] of inlineScripts.entries()) {
+    if(!file.endsWith("/app.html") || !match[0].startsWith('<script id="driver-startup-guard">'))fail(`${file}: unapproved inline script`);
     try { new Function(match[1]); }
     catch (error) { fail(`${file}: inline script ${index + 1} does not parse (${error.message})`); }
   }
@@ -104,7 +110,8 @@ assertNotIncludes("index.html", "class=\"car-shell\"", "homepage must not render
 assertIncludes("index.html", `<script src=\"/${assetByStem('homepage.js')}\" defer></script>`, "homepage must load its external behavior script");
 assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
 const homepageInlineScripts = [...read("index.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
-if (homepageInlineScripts !== 1) fail(`homepage must contain only the early password-recovery handoff script (found ${homepageInlineScripts})`);
+if (homepageInlineScripts !== 0) fail(`homepage must contain no inline scripts (found ${homepageInlineScripts})`);
+if(!read("index.html").includes(`src="/${assetByStem("homepage-bootstrap.js")}"`))fail("homepage must load its early external password-recovery handoff");
 assertIncludes("index.html", "params.get('type')==='recovery'", "homepage must detect recovery links that fall back to the site root");
 assertIncludes("index.html", "'/account.html?recovery=1'+hash", "homepage must preserve recovery tokens while handing off to Account Setup");
 assertIncludes("index.html", "id=\"safetyJourney\"", "homepage must include the illustrated safety journey");
@@ -259,8 +266,8 @@ assertIncludes("sw.js", `'/${assetByStem('driver-app.css')}'`, "service worker m
 assertIncludes("sw.js", `'/${assetByStem('driver-app.js')}'`, "service worker must cache the external driver app behavior");
 assertIncludes("sw.js", "const NETWORK_FIRST_ASSETS", "service worker must refresh safety-critical driver logic before using its offline copy");
 assertIncludes("vercel.json", "\"key\": \"Content-Security-Policy\"", "vercel.json must enforce its tested CSP");
-assertIncludes("vercel.json", "https://fonts.googleapis.com", "vercel.json CSP must allow Google Fonts stylesheets used by marketing pages");
-assertIncludes("vercel.json", "font-src 'self' https://fonts.gstatic.com", "vercel.json CSP must allow Google Fonts font files");
+assertNotIncludes("vercel.json", "https://fonts.googleapis.com", "font stylesheets must be owned static assets");
+assertNotIncludes("vercel.json", "https://fonts.gstatic.com", "fonts must be served from owned static assets");
 assertIncludes("vercel.json", "https://*.supabase.co", "vercel.json CSP must allow configured Supabase Auth requests");
 assertIncludes("vercel.json", "'wasm-unsafe-eval'", "vercel.json CSP must permit MediaPipe WebAssembly compilation");
 assertIncludes("vercel.json", "webp|avif|gif", "optimized AVIF assets must receive immutable cache headers");
@@ -290,7 +297,17 @@ assertIncludes("sw.js", "url.pathname.startsWith('/api/')", "service worker must
 assertIncludes("api/sessions.js", "driver_id: \"eq.\" + driver.id", "session updates must be scoped to the authenticated driver's own sessions");
 assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes must verify the session belongs to the authenticated driver");
 assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event GPS latitude must be range validated");
-assertIncludes("api/sessions.js", "MAX_BODY_LENGTH", "session API must reject oversized JSON bodies");
+assertIncludes("api/sessions.js", "validJsonBody(request)", "session API must use bounded shared JSON validation");
+assertIncludes("api/_lib/validation.js", "maxLength = 4096", "shared session JSON validation must retain the request size limit");
+assertIncludes("api/_lib/validation.js", "JSON.stringify(body).length <= maxLength", "shared JSON validation must enforce its limit");
+assertIncludes("api/profile.js", "validJsonBody(request, 2048)", "profile requests must retain their smaller size limit");
+for (const [route, limit] of [["fleets", 2048], ["fleet-invitations", 2048], ["accept-invitation", 1024]]) {
+  assertIncludes(`api/${route}.js`, `MAX_BODY_LENGTH = ${limit}`, `${route} must retain its request limit`);
+  assertIncludes(`api/${route}.js`, "validJsonBody(request, MAX_BODY_LENGTH)", `${route} must use shared bounded object validation`);
+}
+assertIncludes("api/account.js", "validJsonBody(request, 256)", "account confirmation must retain its request limit");
+assertIncludes("api/fleet-followups.js", "validJsonBody(req, 1024)", "followups must retain their request limit");
+assertIncludes("api/pilot-leads.js", "jsonObjectWithinLimit(body, MAX_BODY_LENGTH)", "pilot must retain its separately staged size check");
 assertIncludes("api/pilot-leads.js", "body.website", "pilot lead API must include honeypot spam filtering");
 assertIncludes(`${assetByStem('pilot-signup-page-2.js')}`, "startedAt: formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
 assertIncludes("api/pilot-leads.js", "rateLimitState(request)", "pilot lead API must use durable distributed rate limiting");
@@ -335,9 +352,10 @@ assertIncludes(`${assetByStem('auth-helper.js')}`, "await window.OcculertBackend
 assertIncludes("login.html", `src=\"/${assetByStem('supabase-loader.js')}\"`, "login must use the resilient same-site Supabase loader");
 assertIncludes("account.html", `src=\"/${assetByStem('supabase-loader.js')}\"`, "account settings must use the same resilient Supabase loader");
 assertIncludes(`${assetByStem('supabase-loader.js')}`, "var VERSION = \"2.112.3\"", "the resilient loader must pin a passkey-capable Supabase SDK version");
-assertIncludes(`${assetByStem('supabase-loader.js')}`, "sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC", "every Supabase loader path must verify the pinned SDK integrity");
-assertIncludes(`${assetByStem('supabase-loader.js')}`, "/vendor/supabase-", "the Supabase loader must prefer the Occulert same-origin proxy");
-assertIncludes("vercel.json", "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js", "the same-origin proxy must target the pinned SDK artifact");
+assertIncludes(`${assetByStem('supabase-loader.js')}`, "sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg", "every Supabase loader path must verify the pinned SDK integrity");
+assertIncludes(`${assetByStem('supabase-loader.js')}`, "/vendor/supabase-", "the Supabase loader must use the owned pinned SDK");
+assertIncludes("vercel.json", "/vendor/supabase-2.112.3.js", "the owned pinned SDK must have an explicit cache policy");
+assertNotIncludes(assetByStem('supabase-loader.js'), "cdn.jsdelivr.net", "new SDK loaders must not request a runtime CDN fallback");
 assertIncludes("login.html", "id=\"passkeyRetryBtn\"", "login must offer recovery after a retryable Safari loader failure");
 assertIncludes("account.html", "id=\"passkeyRetryBtn\"", "account settings must offer recovery after a retryable passkey setup failure");
 assertIncludes(`${assetByStem('passkey-auth.js')}`, "sdk_load_failed", "passkey errors must distinguish an SDK delivery failure");
@@ -395,6 +413,8 @@ if (staticAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the exp
 if (!networkOnlyAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the passkey client must be listed as a network-only asset");
 if (staticAssets.includes(`'/${assetByStem('supabase-loader.js')}'`)) fail("the resilient Supabase loader must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes(`'/${assetByStem('supabase-loader.js')}'`)) fail("the resilient Supabase loader must be listed as a network-only asset");
+if (staticAssets.includes("'/vendor/supabase-2.112.3.js'")) fail("the owned Supabase SDK must not be stored in the offline static cache");
+if (!networkOnlyAssets.includes("'/vendor/supabase-2.112.3.js'")) fail("the owned Supabase SDK must be listed as a network-only asset");
 assertIncludes("privacy.html", "passkey private key stay with your device", "privacy terms must disclose that Occulert does not receive passkey private keys or biometrics");
 assertIncludes("privacy.html", 'aria-label="Privacy and data controls"', "privacy terms must expose a clear data-controls navigation landmark");
 assertIncludes("privacy.html", 'id="local-history"', "privacy terms must explain native local history and recovery data");
@@ -414,7 +434,7 @@ assertIncludes("native-app/app/history.tsx", "openFeedbackWithFallback(target", 
 assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, raw motion readings, or location are attached.", "native pilot feedback must state that sensitive media, raw motion, and location are not attached");
 assertIncludes("native-app/app/history.tsx", "false_alert", "native session history must capture structured false-alert feedback");
 assertIncludes("native-app/app/history.tsx", "missed_alert", "native session history must capture structured missed-alert feedback");
-assertIncludes("native-app/app/history.tsx", "Saved only on this iPhone", "native alert assessments must disclose their local-only storage");
+assertIncludes("native-app/app/history.tsx", "This alert rating stays only on this iPhone", "native alert assessments must disclose their local-only storage");
 assertIncludes("native-app/app/monitor.tsx", "sensitivity: sessionSensitivityRef.current", "native session history must preserve the sensitivity used for each session");
 assertIncludes("native-app/app/history.tsx", "CHECKPOINT_TARGET = 10", "native history must track progress toward the first 10-session accuracy checkpoint");
 assertIncludes("native-app/app/history.tsx", "item.sensitivity === 'medium'", "native accuracy checkpoint must count only reviewed Medium-sensitivity sessions");
@@ -502,7 +522,7 @@ assertIncludes("fleet-dashboard.html", "function copyDriver(id)", "fleet dashboa
 assertIncludes("fleet-dashboard.html", "getFleetSummary({includeEvents})", "signed-in fleet dashboards must use the owner-scoped backend summary");
 assertIncludes("fleet-dashboard.html", "!fleetMode&&local", "protected fleet dashboards must not fall back to unrelated local driver data");
 assertIncludes("fleet-dashboard.html", "id=\"sessionHistory\"", "fleet dashboard must render protected session history");
-assertIncludes("fleet-dashboard.html", "ontoggle=\"handleHistoryToggle(event)\"", "protected session history must render only after the manager opens it");
+assertIncludes("fleet-dashboard.html", 'data-page-action="handleHistoryToggle-event"', "protected session history must render only after the manager opens it");
 assertNotIncludes("fleet-dashboard.html", "class=\"panel-details history-details\" open", "protected session history must start collapsed");
 assertIncludes("fleet-dashboard.html", "function refreshDashboardIfNeeded()", "fleet dashboard polling must skip unchanged full-page renders");
 assertIncludes("fleet-dashboard.html", "setInterval(refreshDashboardIfNeeded,DASHBOARD_CLOCK_INTERVAL_MS)", "fleet dashboard must use the focus-stable low-frequency clock refresh path");
@@ -617,17 +637,20 @@ assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must 
 assertIncludes("api/pilot-leads.js", "unsupported_media_type", "pilot lead API must require JSON submissions");
 assertIncludes("api/pilot-leads.js", "url.protocol === \"https:\"", "pilot lead API must only forward to HTTPS webhooks");
 if (read(".nvmrc").trim() !== "24") fail(".nvmrc must select Node 24");
-for (const workflow of [".github/workflows/browser-smoke.yml", ".github/workflows/native-app-typecheck.yml", ".github/workflows/site-audit.yml"]) {
-  for (const action of ['checkout', 'setup-node']) {
-    if (!new RegExp(`uses: actions/${action}@[a-f0-9]{40} # v6`).test(read(workflow))) fail(`${workflow} must pin the verified Node 24 ${action} action`);
+const requiredNodeWorkflows = new Set(['browser-smoke.yml', 'native-app-typecheck.yml', 'site-audit.yml']);
+const workflowFiles = readdirSync(join(root, '.github/workflows')).filter(file => /\.ya?ml$/.test(file));
+for (const file of requiredNodeWorkflows) {
+  if (!workflowFiles.includes(file)) fail(`required verification workflow ${file} is missing`);
+}
+for (const file of workflowFiles) {
+  const workflow = `.github/workflows/${file}`;
+  for (const message of auditWorkflowPolicy(read(workflow), { requireNodeSetup: requiredNodeWorkflows.has(file) })) {
+    fail(`${workflow}: ${message}`);
   }
-  assertIncludes(workflow, 'contents: read', `${workflow} must declare read-only contents permissions`);
-  assertIncludes(workflow, 'timeout-minutes:', `${workflow} must bound job execution`);
-  const source = read(workflow);
-  const setups = [...source.matchAll(/^[ \t]*- uses: actions\/setup-node@[a-f0-9]{40}[ \t]+# v6[ \t]*$/gm)].length;
-  const versionFiles = [...source.matchAll(/^[ \t]*node-version-file: \.nvmrc[ \t]*$/gm)].length;
-  if (setups !== versionFiles || /^[ \t]*node-version:/m.test(source)) {
-    fail(`${workflow} must use .nvmrc for every Node setup`);
+  if (requiredNodeWorkflows.has(file)) {
+    assertIncludes(workflow, 'contents: read', `${workflow} must declare read-only contents permissions`);
+    assertIncludes(workflow, 'timeout-minutes:', `${workflow} must bound job execution`);
+    if (/^[ \t]*node-version:/m.test(read(workflow))) fail(`${workflow} must not override .nvmrc with node-version`);
   }
 }
 assertIncludes("package.json", "\"node\": \"24.x\"", "Vercel functions and local checks must use the verified Node 24 runtime");
@@ -635,6 +658,19 @@ assertNotIncludes("how-it-works.html", "runs silently in the background", "publi
 assertIncludes("how-it-works.html", "open in the foreground", "public copy must disclose that monitoring requires the foreground");
 assertIncludes(`${assetByStem('driver-app.js')}`, "async function handleVisibilityChange", "web monitoring must handle foreground loss explicitly");
 assertIncludes(`${assetByStem('driver-app.js')}`, "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
+
+
+const startupGuard=read('app.html').match(/<script id="driver-startup-guard">([\s\S]*?)<\/script>/)[1];
+const guardHash="'sha256-"+createHash('sha256').update(startupGuard).digest('base64')+"'";
+for(const rule of JSON.parse(read('vercel.json')).headers)for(const header of rule.headers){
+ if(header.key==='Content-Security-Policy'){
+  const scriptPolicy=header.value.match(/(?:^|;)\s*script-src ([^;]*)/)[1];
+  if(scriptPolicy.includes("'unsafe-inline'")||scriptPolicy.includes("'unsafe-eval'"))throw Error('Script policy must forbid inline handlers and JavaScript eval');
+  if(!scriptPolicy.includes(guardHash))throw Error('Driver startup guard CSP hash is stale');
+ }
+ if(header.key.toLowerCase()==='x-xss-protection')throw Error('Deprecated X-XSS-Protection header must remain absent');
+}
+for(const filename of Object.values(JSON.parse(read('asset-versions.json'))).filter(name=>name.endsWith('.js')))if(scriptMarkupPolicy(read(filename)).handlers.length)throw Error('Generated inline event handler in '+filename);
 
 if (failures.length) {
   console.error("Occulert site audit failed:");
