@@ -54,3 +54,5 @@ Thumbs.db
 # Generated dependency audit evidence.
 dependency-reports/
 .verification-receipts/
+.asset-release-*/
+build/

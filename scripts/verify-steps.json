@@ -78,7 +78,9 @@
     "test:browser-history-data",
     "test:status",
     "test:cached-jwks",
-    "test:db-baseline"
+    "test:db-baseline",
+    "audit:source-assets",
+    "test:source-release"
   ],
   "additionalChecks": [
     "test:verify-runner"

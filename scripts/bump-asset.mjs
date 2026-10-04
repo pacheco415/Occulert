@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { assertReleaseBaseline, commitAssetPlan, loadSourceAssets } from './lib/source-assets.mjs';
 
 const root = process.cwd();
 const read = name => readFileSync(join(root, name), 'utf8');
@@ -11,12 +12,39 @@ const writeJSON = (name, value) => writeFileSync(join(root, name), JSON.stringif
 const args = process.argv.slice(2);
 const dry = args.includes('--dry-run');
 const refresh = args.includes('--refresh');
+const release = args.includes('--release');
 const logical = args.find(arg => !arg.startsWith('--'));
 const manifest = parse('asset-versions.json');
 const integrity = parse('asset-integrity.json');
-if (!logical || !manifest[logical]) throw new Error('Choose a known logical asset: asset:bump -- driver-app.js [--dry-run | --refresh]');
+if (args.some(arg => arg.startsWith('--') && !['--dry-run', '--refresh', '--release'].includes(arg)) || args.filter(arg => !arg.startsWith('--')).length > 1 || (release && (refresh || logical))) throw new Error('Use asset:release [--dry-run] or asset:bump -- <logical-name> [--dry-run | --refresh]');
+if (!release && (!logical || !manifest[logical])) throw new Error('Choose a known logical asset: asset:bump -- driver-app.js [--dry-run | --refresh]');
 const active = [...new Set(Object.values(manifest))];
 const sources = new Map(active.map(name => [name, read(name)]));
+const sourceEntries = loadSourceAssets(root, manifest, { required: release });
+const releaseInputs = new Map();
+if (release) {
+  assertReleaseBaseline(root, manifest, integrity);
+  for (const entry of sourceEntries) {
+    if (entry.logical.endsWith('.js')) new Function(entry.bytes.toString('utf8'));
+    const prior = releaseInputs.get(entry.active);
+    if (prior && !prior.equals(entry.bytes)) throw new Error(`Conflicting source aliases: ${entry.active}`);
+    releaseInputs.set(entry.active, entry.bytes);
+  }
+  if (!sourceEntries.some(entry => entry.changed)) {
+    console.log(JSON.stringify({ mode: 'release', sources: sourceEntries.map(({ logical, source, active, sha256 }) => ({ logical, source, active, sha256 })), copies: {}, rewrites: [], noOp: true, dryRun: dry }, null, 2));
+    process.exit(0);
+  }
+} else if (sourceEntries.some(entry => entry.changed && (!refresh || entry.sha256 !== integrity[entry.active]))) {
+  throw new Error('Pending source edits: use asset:release before bumping or refreshing an importer');
+}
+
+function synchronizeRegisteredSources(changes) {
+  for (const entry of sourceEntries) {
+    const filename = manifest[entry.logical];
+    const bytes = changes.get(filename) ?? read(filename);
+    if (!entry.bytes.equals(Buffer.from(bytes))) changes.set(entry.source, bytes);
+  }
+}
 
 function synchronizeExperimentHelper(changes) {
   const name = manifest['detection-experiments.js'];
@@ -72,12 +100,13 @@ if (refresh) {
   const changes = new Map();
   synchronizeExperimentHelper(changes);
   synchronizeStartupGuard(changes);
+  synchronizeRegisteredSources(changes);
   if (!dry) {
     for (const [name, source] of changes) writeFileSync(join(root, name), source);
     writeJSON('asset-integrity.json', integrity);
   }
 } else {
-  const selected = new Set([manifest[logical]]);
+  const selected = new Set(release ? sourceEntries.filter(entry => entry.changed).map(entry => entry.active) : [manifest[logical]]);
   // Versioned importers must also be copied rather than rewritten in place.
   for (let changed = true; changed;) {
     changed = false;
@@ -106,13 +135,13 @@ if (refresh) {
   const replace = source => source.replace(pattern, name => replacements.get(name));
   const changes = new Map();
   for (const [old, next] of replacements) {
-    const bytes = replace(sources.get(old));
+    const bytes = replace(releaseInputs.get(old)?.toString('utf8') ?? sources.get(old));
     changes.set(next, bytes); integrity[next] = digest(bytes);
   }
   for (const key of Object.keys(manifest)) manifest[key] = replacements.get(manifest[key]) || manifest[key];
   const walkHTML = directory => {
     for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
-      if (entry.name.startsWith('.') || ['node_modules', 'native-app', 'scripts', 'tests', 'docs', 'benchmark', 'test-results', 'playwright-report'].includes(entry.name)) continue;
+      if (entry.name.startsWith('.') || ['node_modules', 'native-app', 'scripts', 'tests', 'docs', 'benchmark', 'src', 'build', 'test-results', 'playwright-report'].includes(entry.name)) continue;
       const name = join(directory, entry.name);
       if (entry.isDirectory()) walkHTML(name);
       else if (entry.name.endsWith('.html')) {
@@ -133,6 +162,7 @@ if (refresh) {
   const config = parse('vercel.json');
   synchronizeExperimentHelper(changes);
   synchronizeStartupGuard(changes);
+  synchronizeRegisteredSources(changes);
 
   const versions = new Set([...replacements.values()].map(next => next.match(/\.v(\d+)\./)[1]));
   for (const version of versions) {
@@ -143,11 +173,11 @@ if (refresh) {
     rule.headers.push({ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' });
     config.headers.push(rule);
   }
-  console.log(JSON.stringify({ copies: Object.fromEntries(replacements), rewrites: [...changes.keys()], cache: `${cache[2]}${nextCacheVersion}`, dryRun: dry }, null, 2));
+  console.log(JSON.stringify({ ...(release ? { mode: 'release', sources: sourceEntries.map(({ logical, source, active, sha256, changed }) => ({ logical, source, active, sha256, changed })) } : {}), copies: Object.fromEntries(replacements), rewrites: [...changes.keys()], cache: `${cache[2]}${nextCacheVersion}`, dryRun: dry }, null, 2));
   if (!dry) {
-    for (const [name, source] of changes) writeFileSync(join(root, name), source);
-    writeJSON('asset-versions.json', manifest);
-    writeJSON('asset-integrity.json', integrity);
-    writeJSON('vercel.json', config);
+    changes.set('asset-versions.json', JSON.stringify(manifest, null, 2) + '\n');
+    changes.set('asset-integrity.json', JSON.stringify(integrity, null, 2) + '\n');
+    changes.set('vercel.json', JSON.stringify(config, null, 2) + '\n');
+    commitAssetPlan(root, changes);
   }
 }

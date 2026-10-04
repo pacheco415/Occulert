@@ -91,7 +91,10 @@
     "test:detection-experiments": "node --test scripts/test-detection-experiment-models.mjs scripts/test-detection-experiment-controller.mjs scripts/test-detection-experiment-runtime.mjs scripts/test-detection-trace-benchmark.mjs",
     "test:cached-jwks": "node --test scripts/test-cached-jwks.mjs",
     "migration:status": "node scripts/migration-status.mjs",
-    "test:db-baseline": "node --test scripts/test-db-baseline.mjs scripts/test-migration-status.mjs"
+    "test:db-baseline": "node --test scripts/test-db-baseline.mjs scripts/test-migration-status.mjs",
+    "asset:release": "node scripts/bump-asset.mjs --release",
+    "audit:source-assets": "node scripts/audit-source-assets.mjs",
+    "test:source-release": "node --test scripts/test-source-release.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

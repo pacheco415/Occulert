@@ -20,3 +20,8 @@ dependency-reports/
 asset-size-budgets.json
 
 startup-performance-budgets.json
+
+# Editable source and build configuration stay outside the public deployment.
+src/
+build/
+source-assets.json
