@@ -88,3 +88,19 @@ test('actual builder rejects a linked contract in normal and override-staging mo
     assert.deepEqual(snapshot(cwd), before);
   }
 }));
+
+test('prebuilt Vercel deployments skip the excluded compiler while CI verifies committed output', () => {
+  const config = json(root, 'vercel.json');
+  assert.equal(config.buildCommand, '', 'An explicit empty deployment command must override the root package build script');
+  assert.equal(json(root, 'package.json').scripts.build, 'node scripts/build-driver.mjs');
+  assert.ok(json(root, 'scripts/verify-steps.json').steps.includes('build'), 'Root verification must still compile the actual source');
+  const exclusions = new Set(read(root, '.vercelignore').split(/\r?\n/).map(line => line.trim()));
+  for (const path of ['src/', 'build/', 'scripts/', 'source-assets.json', 'source-driver-contract.json', 'jsconfig.json', 'eslint.config.mjs'])
+    assert.ok(exclusions.has(path), 'Development input must stay excluded from deployment: ' + path);
+  const manifest = json(root, 'asset-versions.json'), pins = json(root, 'asset-integrity.json');
+  for (const logical of ['driver-app.js', 'driver-startup-guard.js']) {
+    const active = manifest[logical];
+    assert.ok(!exclusions.has(active), 'The committed runtime must remain a deployment asset');
+    assert.equal(hash(readFileSync(join(root, active))), pins[active], 'The prebuilt runtime must retain its committed integrity pin');
+  }
+});

@@ -1,4 +1,5 @@
 {
+  "buildCommand": "",
   "rewrites": [
     {
       "source": "/vendor/supabase-2.112.3.min.js",
