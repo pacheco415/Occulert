@@ -114,6 +114,23 @@ test('foreground loss has a packaged spoken warning and explicit visible limitat
   );
   assert.ok(pausedAudio.length > 10_000, 'the spoken monitoring-paused cue must be packaged');
   assert.match(monitor, /Screen kept on · Keep app in foreground/);
+  assert.match(monitor, /useAlertAudioPlayer\(MONITORING_PAUSED_SOUND\)/);
+  assert.match(monitor, /monitoringPausedPlayerIsCurrent/);
+  assert.doesNotMatch(monitor, /setIsAudioActiveAsync|keepAudioSessionActive: true/);
+});
+
+test('permission text covers both implemented camera paths without unused location or Health writes', () => {
+  const config = JSON.parse(readFileSync(new URL('../native-app/app.json', import.meta.url), 'utf8')).expo;
+  assert.match(config.ios.infoPlist.NSCameraUsageDescription, /front camera.*both cameras/i);
+  assert.equal(config.ios.infoPlist.NSLocationWhenInUseUsageDescription, undefined);
+  const health = config.plugins.find(plugin => Array.isArray(plugin) && plugin[0] === '@kingstinct/react-native-healthkit');
+  assert.equal(health[1].NSHealthUpdateUsageDescription, false);
+  const hook = readFileSync(new URL('../native-app/hooks/useAlertAudioPlayer.ts', import.meta.url), 'utf8');
+  assert.match(hook, /useLayoutEffect/);
+  assert.match(hook, /keepAudioSessionActive: false/);
+  const alertSystem = readFileSync(new URL('../native-app/components/AlertSystem.tsx', import.meta.url), 'utf8');
+  assert.match(alertSystem, /useLayoutEffect\(\(\) => cancelPendingCues/);
+  assert.doesNotMatch(alertSystem, /setIsAudioActiveAsync|keepAudioSessionActive: true/);
 });
 
 test('an immediate background stop uses the running ref before React state commits', () => {

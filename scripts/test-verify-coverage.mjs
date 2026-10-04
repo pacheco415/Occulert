@@ -11,7 +11,10 @@ test('every root test and audit has a verification entry or a documented exclusi
   assert.ok(plan.steps.length > 0);
   assert.ok(plan.additionalChecks.includes('test:verify-runner'));
   assert.equal(scripts.verify, 'node scripts/verify.mjs');
-  assert.deepEqual(manifest.excluded.map(entry => entry.script).sort(), ['test:browser', 'test:watch-notification']);
+  assert.deepEqual(manifest.excluded.map(entry => entry.script).sort(), ['test:accessibility', 'test:browser', 'test:watch-notification']);
+  assert.equal(scripts['test:browser'], 'playwright test', 'the full browser suite must collect the accessibility cases');
+  assert.match(scripts['test:accessibility'], /tests\/accessibility-baseline\.spec\.mjs/);
+  assert.match(scripts['test:accessibility'], /tests\/accessibility-controls\.spec\.mjs/);
   const browserWorkflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
   const nativeWorkflow = readFileSync(new URL('../.github/workflows/native-app-typecheck.yml', import.meta.url), 'utf8');
   assert.match(browserWorkflow, /npm run test:browser/);

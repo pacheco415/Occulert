@@ -6,10 +6,11 @@ import { resolve, extname } from 'node:path';
 
 test.use({ serviceWorkers: 'allow' });
 const currentCache = cacheName();
-const backendPath = `/${assetByStem('occulert-backend.js')}`;
+const currentBackendPath = `/${assetByStem('occulert-backend.js')}`;
 
-for (const partialBody of [false, true]) {
-test(`a network-only account script stalled ${partialBody ? 'mid-body' : 'before headers'} cannot block startup or use a cached account script`, async ({ page }) => {
+for (const backendPath of [currentBackendPath, '/occulert-backend.v68.js', '/occulert-backend.v75.js', '/occulert-backend.v76.js', '/occulert-backend.v77.js']) {
+for (const partialBody of backendPath === currentBackendPath ? [false, true] : [false]) {
+test(`a ${backendPath === currentBackendPath ? 'current' : 'retained'} network-only account script ${backendPath} stalled ${partialBody ? 'mid-body' : 'before headers'} cannot block startup or use a cached account script`, async ({ page }) => {
   test.setTimeout(60_000);
   const root = resolve('.');
   const state = { stall: false, requested: false, aborted: false };
@@ -29,7 +30,9 @@ test(`a network-only account script stalled ${partialBody ? 'mid-body' : 'before
     if (!file.startsWith(root + '/') || !existsSync(file)) { response.writeHead(404); response.end(); return; }
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('Content-Type', types[extname(file)] || 'application/octet-stream');
-    response.end(readFileSync(file));
+    const source=readFileSync(file);
+    // Model an older cached page still referencing a retained auth-client URL.
+    response.end(pathname==='/app.html'?source.toString().replace(currentBackendPath,backendPath):source);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -46,6 +49,8 @@ test(`a network-only account script stalled ${partialBody ? 'mid-body' : 'before
     }, { name: currentCache, path: backendPath });
     state.stall = true;
     await page.goto(origin + '/app.html', { waitUntil: 'domcontentloaded', timeout: 10_000 });
+    const outcome=await page.evaluate(()=>({detectorReady:typeof initModel,cachedAccountScriptUsed:window.cachedAccountScriptUsed===true,accountClientLoaded:Boolean(window.OcculertBackend)}));
+    await test.info().attach('account-script-outcome',{body:JSON.stringify({backendPath,partialBody,state,outcome},null,2),contentType:'application/json'});
     expect(state.requested).toBe(true);
     await expect.poll(() => state.aborted).toBe(true);
     expect(await page.evaluate(() => ({ detectorReady: typeof initModel, cachedAccountScriptUsed: window.cachedAccountScriptUsed === true, accountClientLoaded: Boolean(window.OcculertBackend) })))
@@ -58,4 +63,5 @@ test(`a network-only account script stalled ${partialBody ? 'mid-body' : 'before
     await new Promise(resolve => server.close(resolve));
   }
 });
+}
 }

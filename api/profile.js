@@ -6,24 +6,12 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const MAX_BODY_LENGTH = 2048;
+const { validJsonBody } = require("./_lib/validation");
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function clean(value, max) {
   return String(value || "").replace(/\0/g, "").trim().slice(0, max);
-}
-
-function validBody(request) {
-  if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = request.body;
-  if (!body || typeof body !== "object") return false;
-  return !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
 }
 
 module.exports = async function handler(request, response) {
@@ -40,7 +28,7 @@ module.exports = async function handler(request, response) {
   try {
     user = await verifyAccessToken(bearerToken(request));
     if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
-    if (!validBody(request)) return json(response, 415, { ok: false, error: "invalid_json_body" });
+    if (!validJsonBody(request, 2048)) return json(response, 415, { ok: false, error: "invalid_json_body" });
 
     const body = request.body || {};
     const email = clean(user.email, 240).toLowerCase();
@@ -87,3 +75,5 @@ module.exports = async function handler(request, response) {
     return json(response, 502, { ok: false, error: "supabase_error" });
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

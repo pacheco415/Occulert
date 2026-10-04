@@ -75,11 +75,24 @@
     "test:verify-runner": "node --test scripts/test-verify-runner.mjs scripts/test-verify-coverage.mjs",
     "test:asset-lineage": "node --test scripts/test-asset-lineage.mjs",
     "test:workflow-policy": "node --test scripts/test-workflow-policy.mjs",
-    "test:deployment-ignore": "node --test scripts/test-deployment-ignore.mjs"
+    "test:deployment-ignore": "node --test scripts/test-deployment-ignore.mjs",
+    "sitemap:update": "node scripts/update-sitemap.mjs",
+    "audit:sitemap": "node scripts/update-sitemap.mjs --check",
+    "test:sitemap": "node --test scripts/test-sitemap.mjs",
+    "test:api-validation": "node --test scripts/test-api-validation.mjs",
+    "test:provider-budget": "node --test scripts/test-provider-budget.mjs",
+    "test:vendor-supabase": "node --test scripts/test-vendor-supabase.mjs",
+    "test:owned-fonts": "node --test scripts/test-owned-fonts.mjs",
+    "test:accessibility": "playwright test tests/accessibility-baseline.spec.mjs tests/accessibility-controls.spec.mjs",
+    "test:page-actions": "node --test scripts/test-page-actions.mjs scripts/test-html-script-policy.mjs scripts/test-page-actions-offline.mjs",
+    "test:browser-history-data": "node --test scripts/test-browser-history-data.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
-    "@playwright/test": "^1.63.0"
+    "@playwright/test": "^1.63.0",
+    "@axe-core/playwright": "4.13.0",
+    "acorn": "8.18.0",
+    "parse5": "8.0.1"
   },
   "engines": {
     "node": "24.x"
