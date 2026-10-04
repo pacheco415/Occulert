@@ -103,10 +103,10 @@ for(const phase of ['headers','body'])test(`Stripe deadline bounds ${phase} even
 const settleTasks=async()=>{for(let i=0;i<5;i++)await new Promise(resolve=>setImmediate(resolve))};
 const fixtureEnv={SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'fixture-key',
  LEAD_NOTIFY_WEBHOOK_URL:'https://notify.example.invalid/hook'};
-function loadRoute(path,b,{supabase={},fetch=async()=>{throw Error('Unexpected fetch')},setTimeout:timer=setTimeout,clearTimeout:clear=clearTimeout}={}){
+function loadRoute(path,b,{supabase={},env=fixtureEnv,fetch=async()=>{throw Error('Unexpected fetch')},setTimeout:timer=setTimeout,clearTimeout:clear=clearTimeout}={}){
  const module={exports:{}},routeRequire=createRequire(new URL('../'+path,import.meta.url));
- const dependencies={supabase,fetch,setTimeout:timer,clearTimeout:clear};
- vm.runInNewContext(fs.readFileSync(new URL('../'+path,import.meta.url),'utf8'),{module,process:{env:fixtureEnv},URL,URLSearchParams,Buffer,AbortController,
+ const dependencies={supabase,env,fetch,setTimeout:timer,clearTimeout:clear};
+ vm.runInNewContext(fs.readFileSync(new URL('../'+path,import.meta.url),'utf8'),{module,process:{env},URL,URLSearchParams,Buffer,AbortController,
   setTimeout:timer,clearTimeout:clear,fetch,require(name){
    if(name.endsWith('/provider-budget'))return b.lib;
    if(name.endsWith('/supabase'))return supabase;
@@ -140,6 +140,50 @@ for(const[insertAt,expectedMs]of [[8000,3000],[11950,50],[12000,null],[12001,nul
   const payload=JSON.parse(notification.options.body);assert.deepEqual(Object.keys(payload).sort(),['lead_id','received_at','source','type']);assert.equal(payload.lead_id,'stored-lead');
   assert.doesNotMatch(notification.options.body,/Private|private@example|555-0100/);assert.equal(f.b.now(),insertAt+expectedMs)}
  f.late.resolve({ok:true});await settleTasks();assert.equal(f.writes(),1);assert.equal(f.notifications.length,expectedMs===null?0:1);assert.equal(f.providerCalls.length,2);assert.equal(f.timers.size,0);
+});
+
+function fallbackFixture(rateAt,transport){
+ const b=boot(),late=deferred(),timers=new Map(),calls=[];let next=0,writes=0;
+ const env={...fixtureEnv,PILOT_LEADS_WEBHOOK_URL:'https://hook.example.invalid/leads'};
+ const handler=loadRoute('api/pilot-leads.js',b,{env,
+  supabase:{async pgFetch(table){assert.equal(table,'rpc/check_pilot_lead_rate_limit');b.set(rateAt);
+   // Exercise the actual existing fallback after its real durable-rate guard.
+   // Normal initially missing storage is separately asserted to fail closed.
+   delete env.SUPABASE_URL;delete env.SUPABASE_SERVICE_ROLE_KEY;return[{allowed:true}]}},
+  fetch:async(url,options)=>{calls.push({url,options});return transport?transport():late.promise},
+  setTimeout(fn,ms){const id=++next;timers.set(id,{fn,ms});return id},clearTimeout:id=>timers.delete(id),
+ });
+ const response=b.response();response.end=value=>{writes++;response.body=JSON.parse(value)};
+ const request={method:'POST',headers:{origin:'https://www.occulert.com','content-type':'application/json'},body:{
+  name:'Fixture Driver',company:'Fixture Fleet',email:'fixture@example.invalid',startedAt:new Date(Date.now()-3000).toISOString(),website:''}};
+ return{b,late,timers,calls,response,request,handler,writes:()=>writes};
+}
+for(const[rateAt,expectedMs]of [[0,5000],[7000,5000],[11950,50],[12000,null],[12001,null]])test(`actual fallback settles with ${12000-rateAt}ms remaining despite an abort-ignoring fetch`,async()=>{
+ const f=fallbackFixture(rateAt);let settled=false;const pending=f.handler(f.request,f.response).then(()=>{settled=true});
+ await settleTasks();assert.deepEqual([...f.timers.values()].map(timer=>timer.ms),expectedMs===null?[]:[expectedMs]);
+ try{
+  for(const timer of [...f.timers.values()]){f.b.set(rateAt+timer.ms);timer.fn()}
+  await settleTasks();assert.equal(settled,true,'the response must settle at its hard deadline');
+  assert.equal(f.response.statusCode,502);assert.deepEqual(f.response.body,{ok:false,error:'webhook_unreachable'});
+  assert.equal(f.writes(),1);assert.equal(f.calls.length,expectedMs===null?0:1);assert.equal(f.response.headers['Cache-Control'],'no-store');
+  if(expectedMs!==null){assert.equal(f.calls[0].options.signal.aborted,true);assert.equal(f.calls[0].url,'https://hook.example.invalid/leads')}
+ }finally{f.late.resolve({ok:true});await pending;await settleTasks()}
+ assert.equal(f.writes(),1);assert.equal(f.response.statusCode,502,'late headers cannot overwrite a timeout');assert.equal(f.timers.size,0);
+ assert.equal(f.b.logs.length,1);assert.doesNotMatch(f.b.logs[0],/Fixture|fixture@example|hook\.example|fixture-key/);
+});
+test('fallback retains ordinary success/provider-failure shapes and the missing-storage rate guard',async()=>{
+ for(const[transport,status,body]of [
+  [async()=>({ok:true}),200,{ok:true,stored:true,storage:'webhook'}],
+  [async()=>({ok:false}),502,{ok:false,error:'webhook_failed'}],
+  [async()=>{throw Error('private provider error')},502,{ok:false,error:'webhook_unreachable'}],
+ ]){
+  const f=fallbackFixture(7000,transport);await f.handler(f.request,f.response);
+  assert.equal(f.response.statusCode,status);assert.deepEqual(f.response.body,body);assert.equal(f.calls.length,1);assert.equal(f.timers.size,0);assert.equal(f.writes(),1);
+ }
+ const b=boot(),handler=loadRoute('api/pilot-leads.js',b,{env:{PILOT_LEADS_WEBHOOK_URL:'https://hook.example.invalid/leads'},
+  supabase:{pgFetch:async()=>assert.fail('initially absent storage must stop before rate RPC')},fetch:async()=>assert.fail('initially absent storage must not reach fallback')});
+ const response=b.response();response.end=value=>{response.body=JSON.parse(value)};
+ await handler(fallbackFixture(0).request,response);assert.equal(response.statusCode,503);assert.deepEqual(response.body,{ok:false,error:'rate_limit_unavailable'});
 });
 
 const budgetedEntries=['account','accept-invitation','events','fleet-followups','fleet-invitations','fleet-summary','fleets','pilot-leads','profile','public-config','sessions','[endpoint]'].map(name=>'api/'+name+'.js');

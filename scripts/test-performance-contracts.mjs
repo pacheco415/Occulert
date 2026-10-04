@@ -1,3 +1,4 @@
+import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -612,7 +613,7 @@ test('network-only account scripts time out without exposing cached auth and pre
     respondWith: promise => { responsePromise = promise; },
     waitUntil: () => { lifetimeUpdates++; },
   });
-  for (const path of ['/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', `/${assetByStem('occulert-backend.js')}`, `/${assetByStem('auth-helper.js')}`, `/${assetByStem('passkey-auth.js')}`, `/${assetByStem('passwordless-auth.js')}`, `/${assetByStem('supabase-loader.js')}`]) {
+  for (const path of ['/vendor/supabase-2.112.3.js', '/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', `/${assetByStem('occulert-backend.js')}`, `/${assetByStem('auth-helper.js')}`, `/${assetByStem('passkey-auth.js')}`, `/${assetByStem('passwordless-auth.js')}`, `/${assetByStem('supabase-loader.js')}`]) {
     const old = deferred();
     network = () => old.promise;
     dispatch(path);
@@ -823,7 +824,7 @@ for (const navigation of [false, true]) {
 
 test('fleet refreshes adapt to activity and throttle protected event queries', () => {
   const api = read('api/fleet-summary.js');
-  const dashboard = read('fleet-dashboard.html');
+  const dashboard = fleetDashboardContract();
   const policy = markedBlock(dashboard, 'fleet-refresh-policy');
   const context = {};
   runInNewContext(`${policy};globalThis.policyForTest={protectedRefreshDelay,shouldRefreshProtectedEvents}`, context);
@@ -847,7 +848,7 @@ test('fleet refreshes adapt to activity and throttle protected event queries', (
 });
 
 test('fleet dashboard restarts its relative-time clock after returning to a visible tab', async () => {
-  const dashboard = read('fleet-dashboard.html');
+  const dashboard = fleetDashboardContract();
   const scheduling = markedBlock(dashboard, 'fleet-refresh-scheduling');
   let intervalCalls = 0;
   const context = {
@@ -887,7 +888,7 @@ function deferred() {
 }
 const drainTasks = () => new Promise(done => setImmediate(done));
 function dashboardRefreshHarness({ empty = false, storage = new Map(), storageDenied = false } = {}) {
-  const source = read('fleet-dashboard.html'), timers = new Map(), elements = new Map(), requests = [], views = [];
+  const source = fleetDashboardContract(), timers = new Map(), elements = new Map(), requests = [], views = [];
   const now = Date.parse('2026-09-26T12:00:00Z');
   let user = { id: 'owner' }, timerId = 0, sessionImpl = async () => ({ user }), summaryImpl = async () => summary('Recovered fleet');
   function summary(name) { return { ok: true, body: { fleet: { id: 'fleet', company_name: name }, drivers: [{ id: name, name, active: true }],
