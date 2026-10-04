@@ -51,9 +51,12 @@ cannot cancel another request's refresh. The JWKS body is capped at 64 KiB.
 ## Cache and revocation limits
 
 Each warm server process retains at most one configured issuer and 32 public
-keys for ten minutes. Cold/expired refreshes are coalesced; a missing key can
+keys for ten minutes measured by a monotonic clock, independently of the wall
+clock used for JWT claims. Cold/expired refreshes are coalesced; a missing key can
 trigger at most one additional refresh per 30 seconds. Discovery failures use
-a five-second retry backoff. There is no cache of users, tokens, accepted claims
+a five-second retry backoff. After a failed missing-key refresh, missing-key
+requests retain fresh Auth fallback through the cooldown until discovery
+succeeds; known unexpired keys remain usable. There is no cache of users, tokens, accepted claims
 or attacker-controlled missing key IDs. Expired keys are not used during an
 outage; fresh Auth must accept the original token for fallback to succeed.
 

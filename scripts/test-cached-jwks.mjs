@@ -31,10 +31,11 @@ function jwt(name = 'ec', { now = clockStart, header = {}, claims = {}, der = fa
   return parts.join('.') + '.' + signature.toString('base64url');
 }
 function fixture(initial = [jwk('ec'), jwk('rsa')]) {
-  let now = clockStart, discovery = { keys: initial }, count = 0;
-  const verify = createCachedJwtVerifier(() => now);
+  let now = clockStart, elapsed = 0, discovery = { keys: initial }, count = 0;
+  const verify = createCachedJwtVerifier(() => now, () => elapsed);
   const load = async () => { count++; if (discovery instanceof Error) throw discovery; return discovery; };
-  return { verify: (token, configuredIssuer = issuer) => verify(token, configuredIssuer, load), set: value => { discovery = value; }, advance: ms => { now += ms; }, now: () => now, count: () => count, verifier: verify, load };
+  return { verify: (token, configuredIssuer = issuer) => verify(token, configuredIssuer, load), set: value => { discovery = value; },
+    advance: ms => { now += ms; elapsed += ms; }, shiftWall: ms => { now += ms; }, now: () => now, count: () => count, verifier: verify, load };
 }
 const deferred = () => { let resolve; const promise = new Promise(yes => { resolve = yes; }); return { promise, resolve }; };
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -126,6 +127,32 @@ test('unavailable discovery/oversized key sets are fallback signals with bounded
   f.advance(5000); f.set({ keys: [] }); assert.equal(await f.verify(jwt()), null, 'a healthy missing key is denied');
 });
 
+test('monotonic cache TTL and miss/backoff timers survive backwards wall-clock changes', async () => {
+  const token = jwt('ec', { claims: { nbf: 0 } });
+  const missing = jwt('ec', { header: { kid: 'missing' }, claims: { nbf: 0 } });
+  const expired = fixture(); await expired.verify(token);
+  expired.advance(300000); expired.shiftWall(-600000); expired.set({ keys: [] }); expired.advance(360000);
+  assert.equal(await expired.verify(token), null); assert.equal(expired.count(), 2, 'revoked keys refresh after eleven elapsed minutes');
+  const miss = fixture(); await miss.verify(token); miss.shiftWall(-600000);
+  await miss.verify(missing); assert.equal(miss.count(), 2);
+  miss.advance(30000); await miss.verify(missing); assert.equal(miss.count(), 3);
+  const outage = fixture(); outage.set(new Error('outage')); await outage.verify(token); outage.shiftWall(-600000);
+  outage.advance(5000); await outage.verify(token); assert.equal(outage.count(), 2, 'discovery retries after five elapsed seconds');
+});
+
+test('failed rotated-key discovery preserves safe Auth fallback throughout the bounded miss cooldown', async () => {
+  const f = fixture([jwk('ec')]); await f.verify(jwt()); f.set(new Error('outage'));
+  const rotated = jwt('rotated');
+  assert.equal(await f.verify(rotated), undefined); assert.equal(f.count(), 2);
+  for (const delta of [4999, 1, 24999]) {
+    f.advance(delta); assert.equal(await f.verify(rotated), undefined);
+    assert.deepEqual(await f.verify(jwt()), { id: subject }, 'a known unexpired key remains usable');
+    assert.equal(f.count(), 2, 'misses cannot force repeated discovery during the cooldown');
+  }
+  f.set({ keys: [jwk('ec'), jwk('rotated')] }); f.advance(1);
+  assert.deepEqual(await f.verify(rotated), { id: subject }); assert.equal(f.count(), 3);
+});
+
 // Load actual route-relative helpers, with isolated module caches and a mocked
 // HTTP boundary. Cryptography, local-vs-network policy and the deadline stay real.
 function networkFixture(fetch, options = {}) {
@@ -141,7 +168,8 @@ function networkFixture(fetch, options = {}) {
     const module = { exports: {} }; modules.set(absolute, module);
     const moduleRequire = createRequire(absolute);
     vm.runInNewContext(readFileSync(absolute, 'utf8'), { ...contextExtras, module, exports: module.exports, process: { env: environment },
-      require: name => name.startsWith('.') ? load(new URL(moduleRequire.resolve(name), 'file:').pathname) : require(name) }, { filename: absolute });
+      require: name => name.startsWith('.') ? load(new URL(moduleRequire.resolve(name), 'file:').pathname)
+        : name === 'node:perf_hooks' && options.cacheClock ? { performance: { now: options.cacheClock } } : require(name) }, { filename: absolute });
     return module.exports;
   }
   return { lib: load('_lib/supabase.js'), load, calls, environment };
@@ -171,6 +199,28 @@ test('actual cached adapter denies invalid signatures/claims/unknown kids even i
     assert.equal(await f.lib.verifyAccessToken(token, { cachedIdentity: true }), null);
   }
   assert.ok(f.calls.every(call => call.url.endsWith('/jwks.json')));
+});
+
+test('actual rotated-token requests use Auth throughout a failed-discovery cooldown, then return to local verification', async () => {
+  let elapsed = 0, mode = 'original';
+  const f = networkFixture(async url => {
+    if (url.endsWith('/auth/v1/user')) return Response.json({ id: subject });
+    return mode === 'outage' ? new Response('outage', { status: 503 })
+      : Response.json({ keys: mode === 'original' ? [jwk('ec')] : [jwk('ec'), jwk('rotated')] });
+  }, { cacheClock: () => elapsed });
+  const original = liveJwt(), rotated = liveJwt('rotated');
+  assert.equal((await f.lib.verifyAccessToken(original, { cachedIdentity: true })).id, subject); mode = 'outage';
+  for (const delta of [0, 4999, 1, 24999]) {
+    elapsed += delta;
+    assert.equal((await f.lib.verifyAccessToken(rotated, { cachedIdentity: true })).id, subject);
+    assert.ok(f.calls.at(-1).url.endsWith('/auth/v1/user'));
+    const calls = f.calls.length;
+    assert.equal((await f.lib.verifyAccessToken(original, { cachedIdentity: true })).id, subject); assert.equal(f.calls.length, calls);
+  }
+  assert.equal(f.calls.filter(call => call.url.endsWith('/jwks.json')).length, 2);
+  mode = 'rotated'; elapsed += 1;
+  assert.equal((await f.lib.verifyAccessToken(rotated, { cachedIdentity: true })).id, subject);
+  assert.ok(f.calls.at(-1).url.endsWith('/jwks.json')); assert.equal(f.calls.length, 7);
 });
 
 test('default/explicit fresh Auth never downgrades after rejection or outage despite a warm cached key', async () => {
@@ -315,7 +365,7 @@ test('expired discovery keys are never used through an outage or a fresh Auth de
   const time = class extends Date { static now() { return now; } };
   const f = networkFixture(async url => url.endsWith('/jwks.json')
     ? healthy ? Response.json({ keys: [jwk('ec')] }) : new Response('outage', { status: 503 })
-    : new Response('{}', { status: 401 }), { Date: time });
+    : new Response('{}', { status: 401 }), { Date: time, cacheClock: () => now - clockStart });
   const token = jwt();
   assert.equal((await f.lib.verifyAccessToken(token, { cachedIdentity: true })).id, subject);
   now += 600000; healthy = false;

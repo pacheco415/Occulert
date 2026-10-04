@@ -1,6 +1,7 @@
 // Verify only project-issued asymmetric access tokens. A local identity is not
 // a current Auth user/profile, email-confirmation or session-revocation check.
 const { createPublicKey, verify, constants } = require('node:crypto');
+const { performance } = require('node:perf_hooks');
 const { isUuid, isJsonObject } = require('./validation');
 const { remainingProviderMs } = require('./provider-budget');
 const TTL_MS = 600000, MISS_REFRESH_MS = 30000, OUTAGE_BACKOFF_MS = 5000;
@@ -86,7 +87,7 @@ function waitWithinBudget(promise) {
     promise.then(resolve, reject).finally(() => clearTimeout(timer));
   });
 }
-function createCachedJwtVerifier(now = () => Date.now()) {
+function createCachedJwtVerifier(now = () => Date.now(), cacheNow = () => performance.now()) {
   // Only one trusted configured issuer and at most 32 keys. Never retain
   // attacker-controlled missing-kid lists or user/token/claim results.
   let state;
@@ -94,10 +95,10 @@ function createCachedJwtVerifier(now = () => Date.now()) {
     if (current.inflight) return current.inflight;
     const operation = Promise.resolve().then(load).then(value => {
       const keys = keySet(value);
-      current.keys = keys; current.expires = now() + TTL_MS; current.retryAfter = 0;
+      current.keys = keys; current.expires = cacheNow() + TTL_MS; current.retryAfter = 0; current.discoveryFailed = false;
       return true;
     }, () => false).catch(() => false).then(ok => {
-      if (!ok) current.retryAfter = now() + OUTAGE_BACKOFF_MS;
+      if (!ok) { current.retryAfter = cacheNow() + OUTAGE_BACKOFF_MS; current.discoveryFailed = true; }
       return ok;
     }).finally(() => { if (current.inflight === operation) current.inflight = null; });
     current.inflight = operation;
@@ -108,17 +109,20 @@ function createCachedJwtVerifier(now = () => Date.now()) {
     if (!parsed) return null;
     // Never handle shared secrets locally. The Auth server verifies HS256.
     if (parsed.header.alg === 'HS256') return undefined;
-    if (!state || state.issuer !== issuer) state = { issuer, keys: new Map(), expires: 0, missAfter: 0, retryAfter: 0, inflight: null };
-    const current = state, cold = current.expires <= now();
+    if (!state || state.issuer !== issuer) state = { issuer, keys: new Map(), expires: 0, missAfter: 0, retryAfter: 0, discoveryFailed: false, inflight: null };
+    const current = state, cold = current.expires <= cacheNow();
     let available = true;
     if (cold) {
       available = current.inflight ? await waitWithinBudget(current.inflight)
-        : current.retryAfter > now() ? false : await waitWithinBudget(refresh(current, load));
+        : current.retryAfter > cacheNow() ? false : await waitWithinBudget(refresh(current, load));
     } else if (!current.keys.has(parsed.header.kid)) {
+      // A failed miss refresh has not established that the new key is absent.
+      // Keep the Auth fallback through the cooldown until healthy discovery.
+      available = !current.discoveryFailed;
       if (current.inflight) available = await waitWithinBudget(current.inflight);
-      else if (current.retryAfter > now()) available = false;
-      else if (current.missAfter <= now()) {
-        current.missAfter = now() + MISS_REFRESH_MS;
+      else if (current.retryAfter > cacheNow()) available = false;
+      else if (current.missAfter <= cacheNow()) {
+        current.missAfter = cacheNow() + MISS_REFRESH_MS;
         available = await waitWithinBudget(refresh(current, load));
       }
     }
