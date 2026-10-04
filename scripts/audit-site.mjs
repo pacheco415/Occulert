@@ -473,7 +473,8 @@ assertIncludes("native-app/app/settings.tsx", "formatAppBuildLabel(currentAppBui
 assertNotIncludes("native-app/app/settings.tsx", "Occulert™ · v1.0.0", "native Settings must not hardcode the displayed app version");
 assertNotIncludes("native-app/lib/feedback.ts", "App version: 1.0.0", "native feedback must not hardcode an app version");
 assertIncludes("native-app/app/history.tsx", "router.push('/pre-drive')", "native history must route monitoring through the pre-drive safety gate");
-assertIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native iOS builds must explain optional location access to satisfy App Store validation");
+assertNotIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native Maps search links must not declare an unimplemented coordinate-access feature");
+assertIncludes("native-app/app.json", "both cameras", "native camera permission text must explain the optional parked dual-camera test");
 assertIncludes("native-app/constants/thresholds.ts", "EARLY_CLOSED_ALERT_MS = 600", "native monitoring must issue a prominent warning after a prolonged blink threshold");
 assertIncludes("native-app/constants/thresholds.ts", "CRITICAL_CLOSED_ALERT_MS = 1_200", "native monitoring must retain a stronger prolonged-closure stage");
 assertIncludes("native-app/app/monitor.tsx", "monitoring-paused.wav", "native monitoring must package an audible foreground-loss warning");
