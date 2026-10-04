@@ -53,6 +53,13 @@ that has exceeded its deadline. The asset tool copies versioned importers and
 refreshes guard pins when a driver release changes the referenced core path.
 Run strict policy/startup and normal browser cases after changing that contract.
 
+The optional parked detection helper is pinned by its versioned driver importer
+and optional worker entry. Bumping `detection-experiments.js` also copies the
+driver and startup guard; refreshing that unpublished helper synchronizes its
+SRI and importer digest. The tool rejects rewriting a published importer. Keep
+these optional bytes outside the default installation cache and run the helper
+release, strict offline, and trace adapter checks after a helper change.
+
 CSP connections use the exact project host declared in
 `scripts/lib/csp-policy.mjs`. If the backend project changes, update that constant
 and all Vercel connection policies together and verify `/api/public-config`.

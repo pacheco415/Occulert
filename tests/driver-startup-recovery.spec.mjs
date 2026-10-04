@@ -341,7 +341,8 @@ for (const resource of ['backend', 'stylesheet']) {
 
 test('busy core initialization cannot bypass the startup deadline before the timer runs', async ({page}) => {
  await installPrivacyProbe(page);
- const marker='// Final synchronous statement: partial scripts and hoisted functions cannot signal readiness.';
+ const marker='const startupCore=Object.freeze(';
+ // Inject before the actual capability creation, independently of comments.
  expect(driverSource).toContain(marker);
  const blocked=driverSource.replace(marker,'const busyUntil=performance.now()+8100;while(performance.now()<busyUntil){};\n'+marker);
  await page.route(driverPattern,route=>route.fulfill({status:200,contentType:'text/javascript',body:blocked}));

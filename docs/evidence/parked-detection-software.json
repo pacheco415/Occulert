@@ -1,0 +1,187 @@
+{
+  "scope": "Desktop software evidence only; no camera, driver, accuracy, mobile performance or physical pose validation",
+  "recordedAt": "2026-10-04T17:42:22.421Z",
+  "sourceBase": "0930ba0fdb40f7d2429aa7299abb316ac66e25c7",
+  "sourceSha256": {
+    "driver-app.v80.js": "c25751d829f871b5d86d8392a1fc4f16c8f1ba5745ff331497afc138b54895cf",
+    "driver-app.v81.js": "ba47a0291c6fd00f484921c8502355348093eeeb2fbe14bb8e2226ff0420d4db",
+    "detection-experiments.v1.js": "705280df65c8afa21656d8b08b89bc9579e901ad034e61309154e4f01b051363",
+    "driver-startup-guard.v2.js": "bd4f0cbd5389dff9b0ba21f8edda8c59ab2a15ba588c855a19e54de03d11a344",
+    "sw.js": "fa1d05f0fab0e629e528e33bcea3eaffe3050be7240404007a80b9247de6563c",
+    "benchmark/parked-detection-trace.mjs": "eb62b9204cadf77c1b39a3a061fb8dffc55cbd65c1ba65ff3537bc2bc2a44c87",
+    "benchmark/run-event-benchmark.mjs": "52d9e99f0d0b7a6ef9d34fff1a790d7f4333d28599b82b26c66d835fb200c4a5",
+    "benchmark/detection-comparison.mjs": "7f39ba25554f261a1605514f1df5b717e1153fe03f9ff0d9256593385faa86c1",
+    "benchmark/microbench-detection-window.mjs": "3d98504eee8eaafc82154841a17a4b25344e92ca28b60a923ca9025685128d69",
+    "vendor/mediapipe/tasks-vision-1.0.1-occulert.1/runtime-manifest.json": "805ca12bb8295c32dbbd2dbe1065936676c0e74088008ba2ef0a98eda692f662"
+  },
+  "browserTests": {
+    "passed": 10,
+    "failed": 0,
+    "flaky": 0,
+    "skipped": 0,
+    "workers": 1,
+    "retries": 0
+  },
+  "runtimeProbeConvention": "CPU is requested first (optional runtime cold); GPU is requested second (owned runtime cached). Blank frames contain no face; delegates are not compared for real-face accuracy or mobile performance.",
+  "runtimeProbes": [
+    {
+      "browser": "chromium",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "probes": [
+        {
+          "requestedDelegate": "CPU",
+          "usableDelegate": "CPU",
+          "startupMs": 189.39999999850988,
+          "status": "ready",
+          "finalStatus": "ready",
+          "samples": 20,
+          "medianMs": 2.1999999955296516,
+          "p95Ms": 2.600000001490116,
+          "usableFaceFrames": 0,
+          "fallback": false,
+          "workload": "desktop blank 640x480 canvas; 3 warmups + 20 measured inference calls; no camera or accuracy claim"
+        },
+        {
+          "requestedDelegate": "GPU",
+          "usableDelegate": "GPU",
+          "startupMs": 73.20000000298023,
+          "status": "ready",
+          "finalStatus": "ready",
+          "samples": 20,
+          "medianMs": 10.200000002980232,
+          "p95Ms": 10.600000001490116,
+          "usableFaceFrames": 0,
+          "fallback": false,
+          "workload": "desktop blank 640x480 canvas; 3 warmups + 20 measured inference calls; no camera or accuracy claim"
+        }
+      ]
+    },
+    {
+      "browser": "webkit",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15",
+      "probes": [
+        {
+          "requestedDelegate": "CPU",
+          "usableDelegate": "CPU",
+          "startupMs": 139,
+          "status": "ready",
+          "finalStatus": "ready",
+          "samples": 20,
+          "medianMs": 3,
+          "p95Ms": 4,
+          "usableFaceFrames": 0,
+          "fallback": false,
+          "workload": "desktop blank 640x480 canvas; 3 warmups + 20 measured inference calls; no camera or accuracy claim"
+        },
+        {
+          "requestedDelegate": "GPU",
+          "usableDelegate": "GPU",
+          "startupMs": 93,
+          "status": "ready",
+          "finalStatus": "ready",
+          "samples": 20,
+          "medianMs": 4,
+          "p95Ms": 4,
+          "usableFaceFrames": 0,
+          "fallback": false,
+          "workload": "desktop blank 640x480 canvas; 3 warmups + 20 measured inference calls; no camera or accuracy claim"
+        }
+      ]
+    }
+  ],
+  "ownedRuntimeManifest": {
+    "version": 1,
+    "package": "@mediapipe/tasks-vision",
+    "packageVersion": "1.0.1",
+    "packageIntegrity": "sha512-rvRE2FmAZ6ZxKSw7wq+e+jQDpN3t1B/tD2mJz9SmAzb1msoDkd4dMoE4wAh8Z30Um0PQwLiHr9QtomhmXk3aUQ==",
+    "modelUrl": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+    "modelCards": [
+      "https://storage.googleapis.com/mediapipe-assets/MediaPipe%20BlazeFace%20Model%20Card%20(Short%20Range).pdf",
+      "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Face%20Mesh%20V2.pdf",
+      "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20Blendshape%20V2.pdf"
+    ],
+    "files": [
+      {
+        "file": "vision_bundle.js",
+        "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/vision_bundle.js",
+        "bytes": 155110,
+        "sha256": "a427c26b6b402deeb6eb74e1f6c768d26ec0cc1596958c9e9e3d5189b7cbf5aa",
+        "integrity": "sha256-pCfCa2tALe6263Th9sdo0m7AzBWWlYyenj1RibfL9ao="
+      },
+      {
+        "file": "wasm/vision_wasm_internal.js",
+        "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.js",
+        "bytes": 323377,
+        "sha256": "e170ee67dd4e16c1a6fcd8840a206687e5a59b22c20e4a902bc445b095454d73",
+        "integrity": "sha256-4XDuZ91OFsGm/NiECiBmh+WlmyLCDkqQK8RFsJVFTXM="
+      },
+      {
+        "file": "wasm/vision_wasm_internal.wasm",
+        "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.wasm",
+        "bytes": 11756954,
+        "sha256": "8da277a733926eacd0474b8704b36742d6ec3231c57a860c5b889dff8f1df886",
+        "integrity": "sha256-jaJ3pzOSbqzQR0uHBLNnQtbsMjHFeoYMW4id/48d+IY="
+      },
+      {
+        "file": "wasm/vision_wasm_nosimd_internal.js",
+        "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.js",
+        "bytes": 323180,
+        "sha256": "e81d715a3d42cc3373602eb2f7aff795d164934db680e32496b65dab537f9658",
+        "integrity": "sha256-6B1xWj1CzDNzYC6y96/3ldFkk022gOMklrZdq1N/llg="
+      },
+      {
+        "file": "wasm/vision_wasm_nosimd_internal.wasm",
+        "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.wasm",
+        "bytes": 10960242,
+        "sha256": "a28483cd42e74e855bf5ebdb6b40d9b66a5b49e35e95020bc97669e6822a3192",
+        "integrity": "sha256-ooSDzULnToVb9evba0DZtmpbSeNelQILyXZp5oIqMZI="
+      },
+      {
+        "file": "face_landmarker.task",
+        "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/face_landmarker.task",
+        "bytes": 3758596,
+        "sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+        "integrity": "sha256-ZBhOIpsmMQe8K4BMZiXbE0H/K7cxh0sLzC/mVE4Lyf8="
+      }
+    ],
+    "runtimeVersion": "1.0.1-occulert.1",
+    "localPatch": {
+      "description": "Replace the upstream telemetry transport with a local success callback; no usage logs are sent.",
+      "upstreamBundleSha256": "98db72469ffb176f5e9f2687be0f70783893aca681f7789c34b872b0a764371a",
+      "transportSha256": "b6a4a689ae7669e44dd6da2e9d2563a8cf270663fdb4ab1831ed92dc71ddd440"
+    }
+  },
+  "windowMicrobenchmark": {
+    "workload": "synthetic alternating 135ms samples with every 17th frame unknown; no camera; no accuracy claim",
+    "node": "v24.19.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M5",
+    "helper": "detection-experiments.v1.js",
+    "helperSha256": "705280df65c8afa21656d8b08b89bc9579e901ad034e61309154e4f01b051363",
+    "deque": {
+      "updatesPerRun": 100000,
+      "runs": 5,
+      "medianTotalMs": 2.9059159999999977,
+      "medianUsPerUpdate": 0.02905915999999998,
+      "finalPerclos": 50.056625141562854,
+      "typedBackingBytes": 17408,
+      "droppedIntervals": 0
+    },
+    "rebuildingArray": {
+      "updatesPerRun": 100000,
+      "runs": 5,
+      "medianTotalMs": 118.81725,
+      "medianUsPerUpdate": 1.1881725,
+      "finalPerclos": 50.05662514156285,
+      "typedBackingBytes": null,
+      "droppedIntervals": null
+    }
+  },
+  "tasksEventMetrics": {
+    "eventRecall": null,
+    "falseAlertsPerTrackedHour": null,
+    "alertDelayMs": null,
+    "reason": "Measurement-only Tasks path has no frozen validated event replay and no Tasks alerts."
+  }
+}

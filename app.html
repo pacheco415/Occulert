@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
 <!-- Request the integrity-checked guard early; core loading must not block parsing. -->
-<script id="driver-startup-guard" src="/driver-startup-guard.v1.js" integrity="sha256-Gew0ZixKdONHn3FwuRMrltNbUtoWe600xCClmny0BP4=" crossorigin="anonymous" defer></script>
+<script id="driver-startup-guard" src="/driver-startup-guard.v2.js" integrity="sha256-vU8MvVOJ3/mwuiH47dqMWasqFbpYjIVaGeVN4D0Ro0Q=" crossorigin="anonymous" defer></script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 <!-- The supported cloud path uses authenticated Occulert API endpoints. -->
@@ -149,7 +149,7 @@
       <div class="card"><div class="label">Location</div><div class="value" id="location">--</div></div>
     </div>
     <details class="dev-tools"><summary>Parked diagnostics</summary><p class="small">Run the alert check while parked. It does not add an alert or change a saved session.</p><button class="btn demo" id="demoBtn" type="button">Test sound and vibration</button><p class="small" id="alertCheckResult" role="status" aria-live="polite"></p><button class="btn" id="resetBtn" type="button" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8;margin-top:8px;margin-bottom:0;font-size:12px;padding:10px">Clear on-screen diagnostics</button></details>
-    <div class="card"><div class="label">Session Report</div><div class="report" id="report"></div></div>
+    <div class="card"><div class="label">Session Report</div><p id="experimentStatus" role="status" hidden></p><button id="exportDetectionTrace" type="button" class="btn" hidden>Export parked detection comparison</button><div class="report" id="report"></div></div>
     <div class="card" id="feedbackCard" hidden>
       <div class="label">Post-drive alert feedback</div>
       <p class="small">Review this drive while parked. Your observation stays in this browser's local history unless you choose to share it.</p>
@@ -202,10 +202,10 @@
     </fieldset>
 </aside>
 </main>
-<script src="/occulert-backend.v80.js" defer></script>
+<script src="/occulert-backend.v81.js" defer></script>
 <script src="/security-utils.v47.js" defer></script>
 <script src="/local-history.v2.js" defer></script>
-<script src="/driver-app.v80.js" defer></script>
+<script src="/driver-app.v81.js" defer></script>
 <script src="/lang.v47.js" defer></script>
 
 <!-- iOS Add to Home Screen Modal -->

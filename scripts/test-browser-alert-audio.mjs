@@ -7,7 +7,7 @@ import { assetByStem } from './lib/current-assets.mjs';
 import { browserAlertBytes } from './generate-browser-alert.mjs';
 
 const driver = readFileSync(assetByStem('driver-app.js'), 'utf8');
-const audioCode = driver.slice(driver.indexOf('let _ac=null,'), driver.indexOf('function trigger(reason)'));
+const audioCode = driver.slice(driver.indexOf('let _ac=null,'), driver.indexOf('function trigger(reason'));
 assert.ok(audioCode.includes('function tone('), 'Test the active driver audio implementation');
 
 function harness({ state = 'running', noContext = false, runningAfterResume = false, rejectResume = false, neverResume = false, rejectPlay = false, rejectPrime = false, session = {} } = {}) {
@@ -32,6 +32,7 @@ function harness({ state = 'running', noContext = false, runningAfterResume = fa
   }
   const document = { hidden: false, addEventListener(name, callback) { listeners.set(name, callback); } };
   const context = vm.createContext({
+    experimentFlags: {any:false,noface:false}, experimentController: null,
     document, navigator: { audioSession: session }, window: { AudioContext: noContext ? undefined : Context },
     Audio: Media, Promise,
     setTimeout(callback, duration) { const id = ++timerId; timers.set(id, { callback, duration }); return id; },
@@ -197,7 +198,7 @@ test('a scheduled low pulse is discarded if the context interrupts before delive
     alertScreen: { style: {}, classList: { add() {}, remove() {} } }, nightOpacity: { value: '70' },
     log() {}, pushFleet() {},
   });
-  const trigger = driver.slice(driver.indexOf('function trigger(reason)'), driver.indexOf('function demoAlert()'));
+  const trigger = driver.slice(driver.indexOf('function trigger(reason'), driver.indexOf('function demoAlert()'));
   vm.runInContext(`${trigger}\nbeginAlertAudioScope();trigger('Fatigue');`, h.context);
   assert.equal(h.oscillators.length, 1, 'The main tone starts immediately while running');
   h.contexts[0].state = 'interrupted';
