@@ -82,11 +82,13 @@
     "test:provider-budget": "node --test scripts/test-provider-budget.mjs",
     "test:api-validation": "node --test scripts/test-api-validation.mjs",
     "test:vendor-supabase": "node --test scripts/test-vendor-supabase.mjs",
-    "test:owned-fonts": "node --test scripts/test-owned-fonts.mjs"
+    "test:owned-fonts": "node --test scripts/test-owned-fonts.mjs",
+    "test:accessibility": "playwright test tests/accessibility-baseline.spec.mjs tests/accessibility-controls.spec.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
-    "@playwright/test": "^1.63.0"
+    "@playwright/test": "^1.63.0",
+    "@axe-core/playwright": "4.13.0"
   },
   "engines": {
     "node": "24.x"

@@ -85,6 +85,10 @@
     {
       "script": "test:watch-notification",
       "reason": "The Swift callback harness runs separately in the Native App Typecheck workflow on macOS; the portable root verification does not require swiftc."
+    },
+    {
+      "script": "test:accessibility",
+      "reason": "This alias selects the axe and computed control integration cases included by test:browser in the Browser Smoke Tests workflow; it requires installed browser engines and the local static server."
     }
   ]
 }
