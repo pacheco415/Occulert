@@ -71,7 +71,8 @@
     "test:sitemap",
     "test:api-validation",
     "test:provider-budget",
-    "test:vendor-supabase"
+    "test:vendor-supabase",
+    "test:owned-fonts"
   ],
   "additionalChecks": [
     "test:verify-runner"

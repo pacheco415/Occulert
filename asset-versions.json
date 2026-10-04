@@ -62,5 +62,6 @@
   "fleet-history-page.js": "fleet-history-page.v71.js",
   "fleet-history-page.css": "fleet-history-page.v67.css",
   "public-guidance.css": "public-guidance.v67.css",
-  "fleet-followups.css": "fleet-followups.v67.css"
+  "fleet-followups.css": "fleet-followups.v67.css",
+  "inter-fonts.css": "inter-fonts.v2.css"
 }
