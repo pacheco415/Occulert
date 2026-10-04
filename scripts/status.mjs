@@ -136,7 +136,7 @@ export function renderStatus({ git, observations = { schemaVersion: 1 }, pullReq
   } else lines.push('- Production migrations: Unknown; Git files do not establish a deployed schema.');
   lines.push('', 'Next steps:', '',
     '1. Finish current-source checks for the remaining reviewed PRs and compose them against current main.',
-    '2. Prepare the next native release and checklist after selected native changes merge; do not start a build here.',
+    '2. Complete native release notes and the device checklist for the inspected source; do not start a build here.',
     '3. Record parked iPhone Silent-mode Safari/PWA alerts, Watch delivery and exact-build device checks.',
     '4. Read the production migration ledger and confirm definitions before enabling PRs #192 and #206.',
     '5. Review remaining security and consent changes, then benchmark parked detector flags before changing released alerts.', '',

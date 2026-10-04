@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-10-04T16:41:36Z",
+  "observedAt": "2026-10-04T16:51:58Z",
   "complete": true,
   "pullRequests": [
     {
@@ -15,11 +15,6 @@
     {
       "number": 245,
       "headRefName": "codex/current-status-docs",
-      "isDraft": false
-    },
-    {
-      "number": 244,
-      "headRefName": "codex/native-store-readiness",
       "isDraft": false
     },
     {

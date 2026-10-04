@@ -36,8 +36,8 @@ release receipts, build-52 device reports and testing deferrals.
 1. Finish current-source checks, then merge the remaining reviewed
    pull requests sequentially against current main. Preserve immutable asset
    bytes and compose overlapping browser changes from the active release.
-2. Prepare native release notes and a device checklist after the selected
-   native changes merge. Build and device acceptance are separate steps.
+2. Complete native release notes and the device checklist for the inspected
+   source. Build and device acceptance are separate steps.
 3. Verify the production migration ledger and deployed definitions before
    activating event quotas, fleet offboarding or schema consolidation.
 4. Review security and consent composition as the remaining branches merge.
