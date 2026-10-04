@@ -68,6 +68,11 @@ npm ci --include=dev
 npm run verify
 ```
 
+Verification includes dependency checks, TypeScript, audio lifecycle fixtures and
+mounted History interactions using the actual TSX components with React. The
+History fixtures substitute native storage, navigation and sharing bridges;
+they do not establish physical device or signed-binary acceptance.
+
 ### Run
 ```bash
 # iOS simulator
@@ -88,16 +93,19 @@ native-app/
 |   |-- index.tsx           # Landing / home screen
 |   |-- monitor.tsx         # Main monitoring screen (camera)
 |   |-- pre-drive.tsx       # Parked checks + optional local Health context
-|   |-- history.tsx         # Session history
+|   |-- history.tsx         # History state, storage and asynchronous actions
 |   `-- settings.tsx        # Sensitivity + preferences
 |-- components/
 |   |-- AlertSystem.tsx     # Alert triggering + haptics + audio
 |   |-- CloudSyncCard.tsx   # Optional protected account sync
+|   |-- history/           # Typed History filters, cards, reviews and diagnostics
 |   `-- SensitivitySlider.tsx # Low/Med/High sensitivity control
 |-- hooks/
 |   `-- useEyeTracking.ts   # Eye openness + PERCLOS scoring
 |-- lib/
 |   |-- headNodDetector.ts  # Experimental face-pitch observation state machine
+|   |-- history*Model.ts    # Pure review/filter models; original record indices retained
+|   |-- historyShareMessage.ts # Existing summary and aggregate export whitelists
 |   |-- sessionHistory.ts   # Serialized local session storage
 |   `-- watchBridge.ts      # iPhone-to-Watch alert delivery
 |-- constants/

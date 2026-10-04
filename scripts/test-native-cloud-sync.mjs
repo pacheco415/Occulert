@@ -1,3 +1,4 @@
+import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,7 +14,8 @@ const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 const cloud = read('native-app/lib/cloudSync.ts');
 const monitor = read('native-app/app/monitor.tsx');
 const settings = read('native-app/app/settings.tsx');
-const history = read('native-app/app/history.tsx');
+const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
 const appConfig = JSON.parse(read('native-app/app.json'));
 const nativePackage = JSON.parse(read('native-app/package.json'));
 const cloudCard = read('native-app/components/CloudSyncCard.tsx');
@@ -188,8 +190,8 @@ assert.match(
 assert.match(monitor, /headNodObservationsRef\.current \+= 1/);
 assert.match(cloud, /Candidate head-nod observations remain local until device validation/);
 assert.match(settings, /<CloudSyncCard \/>/);
-assert.match(history, /This alert rating stays only on this iPhone/);
-assert.match(history, /Does not trigger alerts/);
+assert.match(historyOwners.review, /This alert rating stays only on this iPhone/);
+assert.match(historyOwners.diagnostics, /Does not trigger alerts/);
 
 assert.match(cloudCard, /createSingleFlightActionRunner/);
 assert.match(cloudCard, /could not complete or confirm that change/);
