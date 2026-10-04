@@ -111,5 +111,6 @@
   "driver-app.v70.js": "ec82d2a78ac126beb7dc8527a623ec2a9057e756fd3dfe13ef4a66785e6d91c9",
   "occulert-backend.v69.js": "7b27a73861cefd326c6e243ab8035f8589ab60d9a118bfc0694958bb42a84437",
   "fleet-history-page.v69.js": "fad0c7ff61a43d539ce00402bb7564e39796d3adb24a5d51cf6bd1f62281013a",
-  "fleet-history-page.v70.js": "50200cd38e5539b939f8ff8bb026c3ef79beccd8983470507af02fc45345786e"
+  "fleet-history-page.v70.js": "50200cd38e5539b939f8ff8bb026c3ef79beccd8983470507af02fc45345786e",
+  "fleet-history-page.v71.js": "940cb7c320223568c3976a1a92a96353a52c6caa0c949c2dcafba85f71da8964"
 }
