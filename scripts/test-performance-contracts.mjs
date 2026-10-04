@@ -1,3 +1,4 @@
+import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
@@ -149,15 +150,16 @@ test('camera resilience reduces load and permits only one safe restart', () => {
 
 test('Build 30 pins its iOS toolchain and exposes local aggregate diagnostics', () => {
   const eas = JSON.parse(read('native-app/eas.json'));
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   assert.equal(eas.build.production.ios.image, 'macos-tahoe-26.5-xcode-26.6');
-  assert.match(history, /LOCAL PERFORMANCE DIAGNOSTICS/);
-  assert.match(history, /First camera sample/);
-  assert.match(history, /Inference p95/);
-  assert.match(history, /Phone software dispatch/);
-  assert.match(history, /Watch live acknowledgements/);
-  assert.match(history, /not haptic onset/);
-  assert.match(history, /No camera frames are saved/);
+  assert.match(historyOwners.diagnostics, /LOCAL PERFORMANCE DIAGNOSTICS/);
+  assert.match(historyOwners.diagnostics, /First camera sample/);
+  assert.match(historyOwners.diagnostics, /Inference p95/);
+  assert.match(historyOwners.diagnostics, /Phone software dispatch/);
+  assert.match(historyOwners.diagnostics, /Watch live acknowledgements/);
+  assert.match(historyOwners.diagnostics, /not haptic onset/);
+  assert.match(historyOwners.diagnostics, /No camera frames are saved/);
 });
 
 test('web monitoring defers MediaPipe and prevents overlapping inference', async () => {

@@ -1,3 +1,4 @@
+import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -95,7 +96,8 @@ test('native wiring keeps fusion diagnostics local and outside scoring and alert
   const cloudSync = read('native-app/lib/cloudSync.ts');
   const historyExport = read('native-app/lib/sessionHistoryExport.ts');
   const feedback = read('native-app/lib/feedback.ts');
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
 
   assert.match(monitor, /createSensorFusionObservationTracker/);
   assert.match(monitor, /sensorFusion: sensorFusionTrackerRef\.current\.snapshot/);
@@ -104,6 +106,6 @@ test('native wiring keeps fusion diagnostics local and outside scoring and alert
   assert.doesNotMatch(cloudSync, /sensorFusion/i);
   assert.doesNotMatch(historyExport, /sensorFusion/i);
   assert.doesNotMatch(feedback, /sensorFusion/i);
-  assert.match(history, /OBSERVATION-ONLY SENSOR FUSION/);
-  assert.match(history, /does not change fatigue scores or alerts/);
+  assert.match(historyOwners.diagnostics, /OBSERVATION-ONLY SENSOR FUSION/);
+  assert.match(historyOwners.diagnostics, /does not change fatigue scores or alerts/);
 });

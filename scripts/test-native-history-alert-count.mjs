@@ -1,3 +1,4 @@
+import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
@@ -25,8 +26,10 @@ const feedbackBody = item => new URL(feedbackUrl(item)).searchParams.get('body')
 
 // Execute the actual per-record render bindings and the Alerts Text expression.
 // JSX layout and native bridges are excluded so root Node CI needs no Expo install.
-const historySource = read('native-app/app/history.tsx');
-const renderBindings = historySource.match(/group\.sessions\.map\(\(\{ item, index: i \}\) => \{([\s\S]*?)return \(/)?.[1];
+const historyOwners = readHistorySourceOwners(read);
+const historySource = historyOwners.card;
+const renderBindings = historySource.match(/(const sessionKey = [\s\S]*?)\n  return \(/)?.[1];
+assert.match(historyOwners.screen, /<HistorySessionCard[^>]*item=\{item\} index=\{i\}/);
 const alertsExpression = historySource.match(/<Text[^>]*>\{([^{}]*)\}<\/Text>\s*<Text style=\{s\.statLbl\}>Alerts<\/Text>/)?.[1];
 assert.ok(renderBindings && alertsExpression, 'the production history Alerts render must be located');
 function displayedAlerts(item) {

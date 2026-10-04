@@ -1,3 +1,4 @@
+import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
@@ -359,7 +360,8 @@ test('a failed session review edit leaves confirmed UI state intact and permits 
 });
 
 test('History commits after persistence and ignores loads started before a newer edit', () => {
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   const storage = read('native-app/lib/sessionHistory.ts');
   assert.match(history, /loadSessionHistory<SessionRecord>\(\)/, 'history loads must wait for queued local writes');
   assert.doesNotMatch(history, /AsyncStorage\.getItem\(HISTORY_KEY\)/);
@@ -373,44 +375,47 @@ test('History commits after persistence and ignores loads started before a newer
 });
 
 test('History deletion captures the confirmed record before the alert can become stale', () => {
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   const deletion = history.slice(
     history.indexOf('const deleteSession'),
-    history.indexOf('const evidenceSessions'),
+    history.indexOf('const model = deriveHistoryView'),
   );
   assert.match(deletion, /confirmDeleteSession = \(target: SessionRecord, index: number\)/);
   assert.match(deletion, /deleteSession\(target, index\)/);
-  assert.match(history, /confirmDeleteSession\(item, i\)/);
+  assert.match(historyOwners.card, /confirmDeleteSession\(item, i\)/);
   assert.doesNotMatch(deletion, /const target = sessions\[index\]/);
 });
 
 test('History load failures stay visible without pretending saved sessions are empty', () => {
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   const loadStart = history.indexOf('const load = useCallback');
   const load = history.slice(loadStart, history.indexOf('useFocusEffect', loadStart));
   assert.match(load, /historyLoadAttemptRef\.current === loadAttempt/, 'only the latest history read may update the screen');
   assert.match(history, /return \(\) => \{\s*focusedRef\.current = false;\s*historyLoadAttemptRef\.current \+= 1;/, 'leaving History must invalidate its pending read');
   assert.match(load, /setHistoryLoadError\(true\)/);
   assert.doesNotMatch(load, /catch \{[\s\S]*setSessions\(\[\]\)/);
-  assert.match(history, /Checking local session history/);
-  assert.match(history, /Couldn’t load local history/);
-  assert.match(history, /Your saved sessions were not deleted/);
-  assert.match(history, /accessibilityLabel=\{historyLoadBusy \? 'Retrying local session history'/);
+  assert.match(historyOwners.load, /Checking local session history/);
+  assert.match(historyOwners.load, /Couldn’t load local history/);
+  assert.match(historyOwners.load, /Your saved sessions were not deleted/);
+  assert.match(historyOwners.load, /accessibilityLabel=\{historyLoadBusy \? 'Retrying local session history'/);
   assert.match(history, /!historyLoadError && sessions\.length === 0/);
 });
 
 test('History serializes each session operation and announces pending saves', () => {
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   assert.match(history, /new Map<string, ReturnType<typeof createSingleFlightActionRunner>>\(\)/);
   assert.match(history, /runSessionOperation\([\s\S]*sessionRecordKey\(target, index\),[\s\S]*'saving'/);
   assert.match(history, /sessionRecordKey\(target, index\),[\s\S]*'deleting'/);
-  assert.match(history, /accessibilityLiveRegion="polite"/);
-  assert.match(history, /Saving changes…/);
-  assert.match(history, /Deleting session…/);
-  assert.match(history, /accessibilityState=\{\{ selected, disabled: sessionBusy, busy: sessionBusy \}\}/);
-  assert.match(history, /Wait for session changes before sharing summaries/);
-  assert.match(history, /accessibilityState=\{\{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy \}\}/);
-  assert.match(history, /disabled=\{sessionBusy\}/);
+  assert.match(historyOwners.card, /accessibilityLiveRegion="polite"/);
+  assert.match(historyOwners.card, /Saving changes…/);
+  assert.match(historyOwners.card, /Deleting session…/);
+  assert.match(historyOwners.review, /accessibilityState=\{\{ selected, disabled: sessionBusy, busy: sessionBusy \}\}/);
+  assert.match(historyOwners.filters, /Wait for session changes before sharing summaries/);
+  assert.match(historyOwners.filters, /accessibilityState=\{\{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy \}\}/);
+  assert.match(historyOwners.card, /disabled=\{sessionBusy\}/);
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
