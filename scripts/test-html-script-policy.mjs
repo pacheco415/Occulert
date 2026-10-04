@@ -18,6 +18,11 @@ test('script attributes are case-insensitive and quoted greater-than characters 
   assert.equal(result.inlineScripts[0].attributes.id, 'guard>name');
   assert.equal(result.inlineScripts[0].body, 'run();');
 });
+test('quoted data containing src= cannot disguise an inline script as external', () => {
+  const result = scriptMarkupPolicy('<script data-note="src=not-an-attribute">window.auditInlineBypass=true</script><script src = "/owned.js"></script>');
+  assert.equal(result.inlineScripts.length, 1);
+  assert.equal(result.inlineScripts[0].body, 'window.auditInlineBypass=true');
+});
 test('active generated markup is checked without matching quoted data text', () => {
   const source = 'function render(){return `<button data-label=" onclick=ignore()" onClick=save()>Save</button>`}';
   assert.deepEqual(scriptMarkupPolicy(source).handlers.map(value => value.attribute), ['onclick']);

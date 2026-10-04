@@ -82,11 +82,11 @@ for (const retiredDuplicate of [
 
 for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
-  if(scriptMarkupPolicy(html).handlers.length)fail(`${file}: inline event handlers are forbidden`);
-  const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
-  for (const [index, match] of inlineScripts.entries()) {
-    if(!file.endsWith("/app.html") || !match[0].startsWith('<script id="driver-startup-guard">'))fail(`${file}: unapproved inline script`);
-    try { new Function(match[1]); }
+  const markupPolicy = scriptMarkupPolicy(html);
+  if(markupPolicy.handlers.length)fail(`${file}: inline event handlers are forbidden`);
+  for (const [index, script] of markupPolicy.inlineScripts.entries()) {
+    if(!file.endsWith("/app.html") || script.attributes.id !== 'driver-startup-guard' || Object.keys(script.attributes).length !== 1)fail(`${file}: unapproved inline script`);
+    try { new Function(script.body); }
     catch (error) { fail(`${file}: inline script ${index + 1} does not parse (${error.message})`); }
   }
   const refs = [...html.matchAll(/\b(?:href|src)=["']([^"'#?]+)[^"']*["']/g)].map((match) => match[1]);
@@ -109,7 +109,7 @@ assertIncludes("index.html", "class=\"journey-frame journey-frame-enter\"", "hom
 assertNotIncludes("index.html", "class=\"car-shell\"", "homepage must not render the retired flat CSS car");
 assertIncludes("index.html", `<script src=\"/${assetByStem('homepage.js')}\" defer></script>`, "homepage must load its external behavior script");
 assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
-const homepageInlineScripts = [...read("index.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
+const homepageInlineScripts = scriptMarkupPolicy(read("index.html")).inlineScripts.length;
 if (homepageInlineScripts !== 0) fail(`homepage must contain no inline scripts (found ${homepageInlineScripts})`);
 if(!read("index.html").includes(`src="/${assetByStem("homepage-bootstrap.js")}"`))fail("homepage must load its early external password-recovery handoff");
 assertIncludes("index.html", "params.get('type')==='recovery'", "homepage must detect recovery links that fall back to the site root");
@@ -247,9 +247,10 @@ assertIncludes("app.html", '<h1 style="font-size:18px;line-height:1.2;color:var(
 assertIncludes("app.html", '<h2 id="overlayTitle"', "camera guidance must remain a subordinate heading");
 assertIncludes("app.html", '<h2 id="alertTitle"', "driver alert overlay must not replace the page's main heading");
 assertIncludes("app.html", '<label for="nightOpacity">', "driver app must label the night alert brightness slider");
-const driverAppInlineScripts = [...read("app.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
-if (driverAppInlineScripts !== 1 || !read("app.html").includes('<script id="driver-startup-guard">')) fail("driver page must keep only its early startup guard inline");
-if (read("app.html").indexOf('<script id="driver-startup-guard">') > read("app.html").indexOf('<link rel="stylesheet"')) fail("startup recovery must initialize before blocking styles or scripts");
+const driverAppInlineScripts = scriptMarkupPolicy(read("app.html")).inlineScripts;
+const driverStartupGuard = driverAppInlineScripts.find(script => script.attributes.id === 'driver-startup-guard');
+if (driverAppInlineScripts.length !== 1 || !driverStartupGuard) fail("driver page must keep only its early startup guard inline");
+if (driverStartupGuard?.offset > read("app.html").indexOf('<link rel="stylesheet"')) fail("startup recovery must initialize before blocking styles or scripts");
 const driverAppPage = read("app.html");
 const driverAppDependencies = [`/${assetByStem('occulert-backend.js')}`, `/${assetByStem('security-utils.js')}`, `/${assetByStem('driver-app.js')}`].map((path) => driverAppPage.indexOf(`src=\"${path}\"`));
 if (driverAppDependencies.some((index) => index < 0) || driverAppDependencies.some((index, position) => position > 0 && index <= driverAppDependencies[position - 1])) {
@@ -660,7 +661,8 @@ assertIncludes(`${assetByStem('driver-app.js')}`, "async function handleVisibili
 assertIncludes(`${assetByStem('driver-app.js')}`, "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
 
 
-const startupGuard=read('app.html').match(/<script id="driver-startup-guard">([\s\S]*?)<\/script>/)[1];
+const startupGuard=driverStartupGuard?.body;
+if(typeof startupGuard !== 'string')throw Error('Driver startup guard is missing');
 const guardHash="'sha256-"+createHash('sha256').update(startupGuard).digest('base64')+"'";
 for(const rule of JSON.parse(read('vercel.json')).headers)for(const header of rule.headers){
  if(header.key==='Content-Security-Policy'){
