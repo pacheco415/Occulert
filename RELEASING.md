@@ -37,3 +37,10 @@ Use `npm run asset:bump -- <logical-name> --dry-run` to review an asset release 
 ### Prepared branch asset names
 
 Before choosing a new asset URL, fetch the current main and relevant remote branches into a full-history checkout. The release tool reserves filenames found anywhere in known Git history, including other local/remote-tracking branches and deleted files. It also advances the service-worker cache beyond every recorded cache version in known history, so two prepared releases cannot share a cache identity. It does not contact GitHub automatically or know branches that have never been fetched. Never reuse an immutable URL from another prepared release, even after its file is deleted.
+
+The PR Site Audit checks the actual PR head against the base revision with
+`scripts/audit-asset-lineage.mjs`. A stale logical release or an immutable filename
+collision blocks the PR. Rebase onto current main, copy its current active asset
+to a fresh version, and apply only the intended feature diff. Review the composed
+source; the lineage check cannot prove that all earlier behavior was preserved.
+Never resolve release manifests or service-worker lists by selecting one side.
