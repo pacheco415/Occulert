@@ -3,6 +3,8 @@ import test from 'node:test';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {AsyncLocalStorage} from 'node:async_hooks';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
 const source=fs.readFileSync('api/_lib/provider-budget.js','utf8');
 function boot(){let time=0,id=0;const logs=[],module={exports:{}};
  vm.runInNewContext(source,{module,require:name=>name==='node:async_hooks'?{AsyncLocalStorage}:name==='node:perf_hooks'?{performance:{now:()=>time}}:name==='node:crypto'?{randomUUID:()=>`fixture-request-${++id}`}:(()=>{throw Error('Unexpected import')})(),console:{error:value=>logs.push(value)}});
@@ -19,10 +21,45 @@ test('concurrent requests retain separate deadlines and correlation IDs',async()
  b.set(9000);a.resolve();c.resolve();assert.equal(await first,3000);assert.equal(await second,8000);assert.notEqual(ra.headers['X-Occulert-Request-ID'],rc.headers['X-Occulert-Request-ID']);
 });
 test('router nesting preserves the outer deadline and exported helpers',async()=>{
- const b=boot(),response=b.response();const child=Object.assign(async()=>b.lib.remainingProviderMs(8000),{validReport:()=>true});
+ const b=boot(),response=b.response();const child=Object.assign(async()=>b.lib.remainingProviderMs(8000),{validReport:()=>true,config:{api:{bodyParser:false}}});
  const inner=b.lib.withProviderBudget(child);assert.equal(inner.validReport(),true);
+ assert.equal(inner.config,child.config);
  const outer=b.lib.withProviderBudget(async(request,response)=>{b.set(11000);return inner(request,response)});
  assert.equal(await outer({},response),1000);assert.equal(response.headers['X-Occulert-Request-ID'],'fixture-request-1');
+});
+
+test('actual session route stops before a mutation after earlier provider work exhausts its budget',async()=>{
+ const b=boot(),calls=[],supabase={exports:{}};
+ const env={SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'fixture-key'};
+ vm.runInNewContext(fs.readFileSync('api/_lib/supabase.js','utf8'),{
+  module:supabase,require:name=>name==='./provider-budget'?b.lib:require(name),process:{env},URL,AbortController,setTimeout,clearTimeout,
+  fetch:async(url,options)=>{
+   calls.push({url:String(url),options});
+   if(calls.length===1){assert.match(String(url),/auth\/v1\/user$/);b.set(7000);return Response.json({id:'verified-user'});}
+   const parsed=new URL(url);assert.equal(parsed.pathname,'/rest/v1/drivers');assert.equal(parsed.searchParams.get('user_id'),'eq.verified-user');
+   b.set(13000);return Response.json([{id:'verified-driver',fleet_id:'verified-fleet'}]);
+  },
+ });
+ const route={exports:{}};
+ vm.runInNewContext(fs.readFileSync('api/sessions.js','utf8'),{
+  module:route,process:{env},require:name=>name==='./_lib/supabase'?supabase.exports:name==='./_lib/provider-budget'?b.lib:require(name.startsWith('./_lib/')?'../api/'+name.slice(2):name),
+ });
+ const response=b.response();response.end=value=>{response.body=JSON.parse(value)};
+ await route.exports({method:'POST',headers:{authorization:'Bearer fixture-token','content-type':'application/json'},body:{driver_id:'attacker-driver',fleet_id:'attacker-fleet'}},response);
+ assert.equal(response.statusCode,502);assert.deepEqual(response.body,{ok:false,error:'supabase_error'});
+ assert.equal(response.headers['Cache-Control'],'no-store');assert.equal(response.headers['X-Occulert-Request-ID'],'fixture-request-1');
+ assert.equal(calls.length,2);assert.ok(calls.every(call=>call.options.method===undefined||call.options.method==='GET'));
+ assert.equal(b.logs.length,1);assert.equal(JSON.parse(b.logs[0]).requestId,response.headers['X-Occulert-Request-ID']);
+ assert.doesNotMatch(b.logs[0],/attacker|verified-user|fixture-key|Bearer|fixture-token/);
+});
+
+test('a failed request does not leave its expired allowance in the next request',async()=>{
+ const b=boot();
+ await assert.rejects(b.lib.withProviderBudget(async()=>{b.set(13000);b.lib.remainingProviderMs(8000)})({},b.response()),error=>error.status===504);
+ const response=b.response();
+ assert.equal(await b.lib.withProviderBudget(async()=>b.lib.remainingProviderMs(8000))({},response),8000);
+ assert.equal(response.headers['X-Occulert-Request-ID'],'fixture-request-2');
+ assert.equal(b.logs.length,1);
 });
 test('failure diagnostics contain only fixed fields and generated IDs',async()=>{
  const b=boot(),response=b.response(503);await b.lib.withProviderBudget(async()=>{b.set(123)})({url:'/api/profile?email=private@example.test',body:{name:'Private Name'},headers:{authorization:'Bearer secret'}},response);

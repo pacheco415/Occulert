@@ -14,8 +14,7 @@ const rpc = async (email, hash, replace = null, actor = owner, target = fleet) =
 const count = async () => Number((await db.query('select count(*) as n from fleet_invitations')).rows[0].n);
 const reset = () => db.exec('reset role; truncate fleet_invitations; set role service_role');
 const routeContext = { module: { exports: {} }, process: { env: { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-role' } }, require(name) {
-  if (name === './_lib/provider-budget') return require('../api/_lib/provider-budget.js');
-    if (name !== './_lib/supabase') return require(name);
+  if (name !== './_lib/supabase') return require(name.startsWith('./_lib/') ? '../api/' + name.slice(2) : name);
   return { bearerToken: () => 'fixture-token', verifyAccessToken: async () => ({ id: owner, email: 'owner@example.com', email_confirmed_at: '2026-01-01' }), async pgFetch(table, options) {
     if (table === 'fleets') return (await db.query('select id,company_name,plan from fleets where owner_user_id=$1', [owner])).rows;
     assert.equal(table, 'rpc/create_fleet_invitation'); assert.equal(options.method, 'POST');
