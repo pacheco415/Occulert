@@ -1,8 +1,65 @@
-# Occulert Native App Upgrade — Real Eye Tracking + EAS Build
+# Native source setup and upgrades
 
-This package upgrades `native-app/` from simulated detection to **real on-device
-eye tracking**, adds the missing **EAS build config**, and includes the
-**app icon / splash assets** the build needs.
+Work from a reviewed repository revision. Keep current tracked files and the
+committed lockfile; copying an older source package can discard later history,
+consent and audio fixes. The [native README](README.md) describes the current
+architecture, and the [October 4 release intent](../docs/RELEASE_2026-10-04.md)
+records source, distribution receipts and the remaining device checks.
+
+## Reproducible setup
+
+Select Node 24 from the root `.nvmrc`, then run:
+
+```bash
+cd native-app
+npm ci --include=dev
+npm run verify
+```
+
+Verification checks Expo dependency compatibility and TypeScript, then runs the
+installed dependency regressions and React/Expo short-cue lifecycle cases.
+Record the exact source and result; these checks do not measure physical audio,
+camera accuracy or Watch perception. The separate `eas-install` job in
+[Native App Typecheck](../.github/workflows/native-app-typecheck.yml) uses the same
+Node 24 source and npm 10.9.8 for a clean install and full native verification.
+Use that exact package manager for the additional release compatibility check.
+
+Run an already provisioned development client with `npx expo start --dev-client`.
+VisionCamera, ML Kit, HealthKit and the Watch target require a custom native
+build; Expo Go cannot supply them. Installed versions are defined by
+`package.json` and `package-lock.json`, not this guide. Android requires API 26
+or later. A private Android preview of the build-56 source finished; this
+new candidate has no Android build or device acceptance yet.
+
+## Current behavior
+
+Foreground VisionCamera frames feed ML Kit eye-open probabilities. Native
+scales those probabilities to a 0–0.3 signal; browser geometric EAR is a separate
+pipeline. Sensitivity presets do not establish equal accuracy across the two.
+The optional parked eye-baseline flag is experimental and local; keep it off
+for an ordinary release unless a separate experiment is explicitly selected.
+
+Alert tones, directional variants, the monitoring-paused warning and Settings
+sound test are bundled WAV assets. Short-cue players automatically release the
+shared audio session while silent; owned layout cleanup precedes Expo disposal.
+A playing warning may finish as monitoring stops on foreground loss. Silent
+mode, Bluetooth routing and restoration of external music still need the
+exact-build device checks. Headphone motion is foreground observation only.
+
+## Existing release identities
+
+`app.json` already contains the EAS project and iOS bundle/team identities.
+`eas.json` already contains production build/submission profiles and the App
+Store app ID. Preserve them when preparing a release; do not create a duplicate
+project or App Store record.
+
+`cli.appVersionSource` is `remote`, and production `autoIncrement` is `true`.
+The configured app version is 1.0.0; `ios.buildNumber` is intentionally absent.
+EAS assigns the next remote build number at the separately authorized build
+step. A local number does not reserve it, and preparation does not reset or
+synchronize a remote counter. Record the returned exact source, build and
+submission receipts before updating distribution status.
+[Expo app version management](https://docs.expo.dev/build-reference/app-versions/)
 
 ## Upgrading Expo SDK
 
@@ -25,76 +82,7 @@ compatibility failures before continuing. Dependabot holds those packages and
 native major updates for this coordinated process. Continue reviewing dependency
 audit reports while an SDK upgrade is pending.
 
-Run the root verification and the release guide's EAS package-manager check, then
-follow [RELEASING.md](../RELEASING.md) and the
+Run root verification and the npm 10.9.8 `eas-install` compatibility job linked
+above. Follow [RELEASING.md](../RELEASING.md) and the
 [device checklist](../docs/DEVICE_ACCEPTANCE.md) for the resulting native build.
 See the [official Expo upgrade guide](https://docs.expo.dev/workflow/upgrading-expo-sdk-walkthrough/).
-
-## What changed
-
-| File | Change |
-|---|---|
-| `app/monitor.tsx` | Simulation loop removed. Real camera pipeline: vision-camera frame processor → ML Kit face detection → eye-open probabilities → PERCLOS scoring (~10 Hz). |
-| `hooks/useEyeTracking.ts` | New `processEyeOpenness()` (ML Kit path) + `processNoFace()`. `processLandmarks()` kept for web parity. Same PERCLOS/fatigue math, same sensitivity presets. |
-| `package.json` | Removed `expo-camera` + `@mediapipe/face_mesh` (web-only, couldn't run natively). Added `react-native-vision-camera`, `react-native-vision-camera-face-detector`, `react-native-worklets-core`. |
-| `app.json` | `expo-camera` plugin → `react-native-vision-camera` plugin (same privacy copy). |
-| `babel.config.js` | NEW — worklets plugin required for frame processors. |
-| `eas.json` | NEW — development / preview / production build profiles. |
-| `tsconfig.json` | NEW — was referenced in README but missing from repo. |
-| `assets/` | NEW — `icon.png` (1024²), `splash.png` (2048²), `adaptive-icon.png`. On-brand placeholders; swap for final designs anytime. |
-
-## How to apply
-
-1. Copy every file in this folder into `native-app/` in your repo (keep the
-   same paths). `eas.json` can live in `native-app/` since that's the project root.
-2. ```bash
-   cd native-app
-   rm -rf node_modules
-   npm install
-   ```
-3. Link EAS (one-time):
-   ```bash
-   npm install -g eas-cli
-   eas login                # your expo.dev account
-   eas init                 # writes the real projectId into app.json
-   ```
-4. Build a development client (~15 min in Expo's cloud, no Mac needed):
-   ```bash
-   eas build --profile development --platform ios
-   ```
-   EAS will offer to register your iPhone (ad-hoc provisioning) — say yes and
-   follow the QR code on your phone. Install the build when it finishes.
-5. Run it:
-   ```bash
-   npx expo start --dev-client
-   ```
-   Open the dev build on your phone, start monitoring, and your real eyes now
-   drive the EAR/PERCLOS metrics.
-
-## ⚠️ Important changes to your workflow
-
-- **Expo Go no longer works** for the monitor screen. vision-camera is native
-  code, so you must use the development build from step 4. Everything else
-  about your `expo start` workflow stays the same.
-- The **EYE metric** shown on the monitor screen is now eye-open probability
-  mapped onto the EAR scale (1.0 open ≈ 0.30), so your existing Low/Med/High
-  sensitivity thresholds behave the same as the web app.
-- `AlertSystem` still streams `alert.mp3` from occulert.com — consider bundling
-  it in `assets/` later so alerts work offline (cell dead zones).
-
-## Path to TestFlight (after the dev build works)
-
-```bash
-eas build --platform ios          # production build
-eas submit -p ios                 # uploads to App Store Connect
-```
-Before `eas submit`: create the app record in App Store Connect (name
-"Occulert", bundle ID `com.occulert.app`) and put its Apple ID into
-`eas.json` → `submit.production.ios.ascAppId`.
-
-## Verified
-
-- All JSON files parse cleanly; `babel.config.js` and `useEyeTracking.ts`
-  syntax-checked; `monitor.tsx` structure-checked (balanced braces/parens).
-- Full type-check will run on your machine via `npx tsc --noEmit` after
-  `npm install`.
