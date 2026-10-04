@@ -265,13 +265,20 @@ module.exports = async function handler(request, response) {
   const controller = new AbortController();
   let timeout;
   try {
-    timeout = setTimeout(() => controller.abort(), require("./_lib/provider-budget").remainingProviderMs(5000));
-    const webhookResponse = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "occulert.pilot_lead", lead }),
-      signal: controller.signal,
-    });
+    const timeoutMs = remainingProviderMs(5000);
+    // Settle even if a transport ignores abort. The provider may still have
+    // received the lead, so do not retry or overwrite this response later.
+    const webhookResponse = await Promise.race([
+      fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "occulert.pilot_lead", lead }),
+        signal: controller.signal,
+      }),
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => { reject(new Error("webhook_timeout")); controller.abort(); }, timeoutMs);
+      }),
+    ]);
 
     if (!webhookResponse.ok) {
       return json(response, 502, { ok: false, error: "webhook_failed" });
