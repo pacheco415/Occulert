@@ -13,7 +13,7 @@ export function checkCoverage(ledger, inventory = migrationInventory()) {
   const recorded = new Set(ledger.map(row => row.version));
   const required = inventory.filter(row => row.version);
   const missing = required.filter(row => !recorded.has(row.version));
-  return { status: missing.length ? 'missing_required_versions' : 'required_versions_recorded', missing, recorded_required_count: required.length - missing.length, baseline_files_not_covered_by_ledger: inventory.filter(row => !row.version), limitations: ['Ledger presence does not prove deployed SQL matches these source hashes.', 'Verify legacy baseline definitions, RLS and service-role grants separately before schema consolidation or feature activation.'] };
+  return { status: missing.length ? 'missing_required_versions' : 'required_versions_recorded', missing, recorded_required_count: required.length - missing.length, baseline_files_not_covered_by_ledger: inventory.filter(row => !row.version), limitations: ['Ledger presence does not prove deployed SQL matches these source hashes.', 'Verify archived baseline definitions, RLS and service-role grants before baseline adoption or feature activation; missing ledger entries do not authorize SQL replay.'] };
 }
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   const inventory = migrationInventory();

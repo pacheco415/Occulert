@@ -14,7 +14,9 @@ driver data.
 ## 1. Create a Supabase project
 
 1. Go to supabase.com and create a free account and project yourself.
-2. In the SQL editor, run the contents of `db/schema.sql` from this repo.
+2. For a new empty project, apply `supabase/migrations/*.sql` in filename
+   order, starting with `20260701000000_baseline.sql`. Do not also replay
+   `db/schema.sql` or `db/migrations`; those are archived inside the baseline.
 3. Under Authentication, enable email/password (or magic link) sign-in for
 drivers and fleet managers.
 4. Under Authentication -> URL Configuration, set the Site URL to
@@ -26,10 +28,12 @@ small number of confirmation messages. Keep volume low because it can
 rate-limit confirmation messages across the project. A custom SMTP provider
 is optional if pilot volume later grows.
 
-For an existing Occulert project that already has the core tables, review and
-run only `db/migrations/20260719_secure_fleet_invitations.sql`. It adds the
-one-fleet-per-owner constraint, protected invitation table, and atomic
-service-role-only acceptance function without recreating existing policies.
+For an existing Occulert project, first inspect its ledger and deployed
+definitions using [migration readiness guidance](docs/MIGRATION_READINESS.md).
+Do not replay the new baseline: archived SQL may already be present without
+ledger entries. [db/README.md](db/README.md) explains fresh installation and
+separately authorized baseline adoption. Put future SQL only in the canonical
+Supabase migration directory.
 
 ### Passkey authentication (experimental)
 
@@ -96,8 +100,9 @@ Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the API reports
 `stored: false`; the request form tells the visitor it could not confirm
 delivery and asks them to retry. It does not claim an offline submission.
 
-For this unreleased source batch, apply these migrations to an existing
-project **in order** before deploying the updated client and fleet routes:
+Review coverage of these migrations before activating the dependent features.
+Apply only migrations demonstrated to be missing, **in order**, after the
+existing-project adoption check above:
 
 1. `supabase/migrations/20260926200000_session_detector_provenance.sql` adds
    self-reported detector and app version fields to protected sessions.
@@ -107,6 +112,13 @@ project **in order** before deploying the updated client and fleet routes:
 3. `supabase/migrations/20260927030000_stripe_test_billing.sql` is only for
    the separate Stripe **test-mode** dry run described in
    `docs/BILLING_INTEGRATION.md`; it does not enable paid access.
+4. `supabase/migrations/20260929010000_billing_ignored_webhook_events.sql`
+   records ignored test webhook events for safe repeated acknowledgment.
+
+The complete canonical chain also includes atomic account deletion, fleet
+follow-ups, query indexes and atomic invitation creation. Production database
+authentication failed during the October 3 read-only check; their current
+production ledger coverage remains unknown. Local replay does not verify it.
 
 The new period route reports `period_report_not_enabled` when its SQL function
 is absent. Do not present a bounded recent-session snapshot as a complete
@@ -156,17 +168,17 @@ owned by the access-token user.
 `api/profile.js` safely creates a driver row for the authenticated user with
 no fleet membership. It does not accept a caller-provided fleet ID. Only the
 atomic invitation acceptance function can assign that row to a fleet. Run the
-full current `db/schema.sql` for a new project or the dated migration above
-for the existing project before enabling fleet onboarding.
+canonical migration chain for a new project; follow the adoption and coverage
+guidance for an existing project before enabling fleet onboarding.
 
 ## Status
 
-- [x] Schema drafted (`db/schema.sql`)
+- [x] Canonical schema drafted and locally verified (`supabase/migrations`)
 - [x] API scaffolding drafted (`api/sessions.js`, `api/events.js`,
 `api/fleet-summary.js`, `api/_lib/supabase.js`)
 - [x] Pilot-lead storage path, spam checks, and per-instance rate limiting
 - [x] Supabase project and protected pilot-lead table created
-- [x] Full fleet/driver/session/event schema applied and verified
+- [ ] Current production schema and migration ledger independently verified
 - [x] `SUPABASE_ANON_KEY` environment variable set in Vercel and deployment verified
 - [x] Frontend wired with authenticated API calls and local fallback
 - [x] Passkey sign-in, enrollment, rename, and revocation implemented with a pinned Supabase SDK
@@ -174,11 +186,16 @@ for the existing project before enabling fleet onboarding.
 - [ ] First production-domain enrollment and sign-in verified on a physical Apple device
 - [x] Row Level Security and service-role invitation boundaries independently verified
 - [x] Trusted fleet invitation/administration flow implemented in code
-- [x] Secure fleet invitation migration applied and independently verified
+- [ ] Current production invitation migration coverage independently verified
 - [x] No-cost invitation sharing through the manager's mail app and copy-link fallback
 - [x] Manager-scoped session and event history excludes GPS, personal media, and raw motion
 - [ ] Protected session-history deployment and signed-in manager verification
 - [ ] Optional custom SMTP configured only if pilot volume outgrows Supabase's built-in sender
+
+Earlier setup notes reported the core schema and secure invitation migration
+as applied and verified. That historical report is retained here; it does not
+resolve the October 3 database authentication failure or confirm the current
+canonical ledger. See `docs/MIGRATION_READINESS.md` for the present evidence.
 
 ### Shared provider time allowance and diagnostics
 
