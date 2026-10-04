@@ -7,6 +7,10 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const sitemap = resolve(root, 'sitemap.xml');
 const original = readFileSync(sitemap, 'utf8');
 const records = [...original.matchAll(/<url>([\s\S]*?)<\/url>/g)].map(match => ({ body: match[1], url: new URL(match[1].match(/<loc>(.*?)<\/loc>/)[1]) }));
+if (!records.length) throw Error('Sitemap must contain at least one canonical page');
+for (const record of records) {
+  if (record.url.origin !== 'https://www.occulert.com' || record.url.username || record.url.password) throw Error('Sitemap URLs must use the canonical site origin without credentials');
+}
 if (process.argv.includes('--check')) {
   const seen = new Set();
   for (const record of records) {

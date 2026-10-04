@@ -67,7 +67,8 @@
     "test:asset-lineage",
     "test:workflow-policy",
     "test:deployment-ignore",
-    "audit:sitemap"
+    "audit:sitemap",
+    "test:sitemap"
   ],
   "additionalChecks": [
     "test:verify-runner"
