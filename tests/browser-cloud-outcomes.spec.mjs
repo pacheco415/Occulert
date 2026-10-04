@@ -48,17 +48,17 @@ test('browser History keeps a matching open-session response pending until an en
 });
 
 
-test('a different account cannot confirm or remove an in-flight owner summary',async({page})=>{
+test('a late owner response cannot confirm its old local copy or remove the newer account queue',async({page})=>{
   await seed(page);let release,requested;const held=new Promise(resolve=>{release=resolve}),started=new Promise(resolve=>{requested=resolve});const writes=[];
   await page.route('**/api/sessions',async route=>{writes.push(route.request().headers().authorization);requested();await held;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,session:{id:'cloud-one',ended_at:endTime}})}).catch(()=>{});});
   await page.goto('/session-history.html');await page.locator('#historyCloudConsent').check();await page.locator('#historyCloudRetry').click();await started;
-  await page.evaluate(()=>{window.OcculertBackend.adoptSession({access_token:'other-token',refresh_token:'other-refresh',expires_at:9999999999,user:{id:'owner-b'}});window.dispatchEvent(new StorageEvent('storage',{key:'occulert-auth'}));});
+  await page.evaluate(()=>{window.OcculertBackend.adoptSession({access_token:'other-token',refresh_token:'other-refresh',expires_at:9999999999,user:{id:'owner-b'}});window.OcculertBackend.createCloudSummaryOutbox(()=>true).enqueue({ownerId:'owner-b',revision:0},{sessionId:'new-cloud',localSessionId:'new-local',endedAt:'2026-10-03T12:00:00.000Z',stats:{average_fatigue:0,max_fatigue:0,safety_score:0,alert_count:0,head_nod_count:0}});window.dispatchEvent(new StorageEvent('storage',{key:'occulert-auth'}));});
   await expect(page.locator('#historyCloudConsent')).not.toBeChecked();release();
   await expect.poll(()=>page.evaluate(()=>cloudFlight===null)).toBe(true);
   expect(writes).toEqual(['Bearer owner-token']);
-  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('occulert-cloud-outbox')).map(row=>row.ownerId))).toEqual(['owner-a']);
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('occulert-cloud-outbox')).map(row=>({ownerId:row.ownerId,sessionId:row.sessionId})))).toEqual([{ownerId:'owner-b',sessionId:'new-cloud'}]);
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('occulert-session-history'))[0].cloudSynced)).toBeUndefined();
-  await expect(page.locator('#historyCloudStatus')).toContainText('0 pending cloud summaries');await expect(page.locator('#historyCloudRetry')).toBeDisabled();
+  await expect(page.locator('#historyCloudStatus')).toContainText('1 pending cloud summaries');await expect(page.locator('#historyCloudRetry')).toBeDisabled();
 });
 
 test('leaving History prevents a late summary response from changing its local copy',async({page})=>{
