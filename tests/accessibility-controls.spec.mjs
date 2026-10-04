@@ -76,7 +76,7 @@ for (const preference of ['dark', 'light']) {
       await page.goto('/account.html', { waitUntil: 'load' });
       await settle(page);
       await expect(page.locator('html')).toHaveAttribute('data-theme', preference);
-      const toggle = page.getByRole('button', { name: 'Toggle theme' });
+      const toggle = page.getByRole('button', { name: 'Toggle light/dark mode' });
       const footer = page.locator('footer');
       const initialColor = await footer.evaluate(element => getComputedStyle(element).color);
       await keyboardFocus(page, toggle);
