@@ -25,6 +25,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Verify asset lineage against the actual PR head
+        if: github.event_name == 'pull_request'
+        env:
+          ASSET_LINEAGE_HEAD: ${{ github.event.pull_request.head.sha }}
+          ASSET_LINEAGE_BASE: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/audit-asset-lineage.mjs
       - name: Audit every site change
         run: npm run audit:site
       - run: npm run verify
