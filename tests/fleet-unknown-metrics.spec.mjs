@@ -14,6 +14,7 @@ async function bootLocal(page, metrics) {
     Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>window.fixtureClipboard.push(text)}});
   }, metrics);
   await page.goto('/fleet-dashboard.html');
+  await expect(page.locator('#cloudStatus')).toContainText('Not signed in. Showing same-browser local data only');
   await expect(page.locator('.driver-metrics')).toBeVisible();
 }
 
