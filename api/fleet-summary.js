@@ -6,7 +6,7 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { isUuid } = require("./_lib/fleet-history-cursor");
 
 function json(response, status, body) {
 response.statusCode = status;
@@ -73,8 +73,8 @@ const rosterLookupMs = Date.now() - rosterStartedAt;
 
 const includeEvents = shouldIncludeEvents(request);
 const sessionIds = sessions
-.map(function (session) { return String(session.id || ""); })
-.filter(function (id) { return UUID_PATTERN.test(id); });
+.map(function (session) { return session.id; })
+.filter(isUuid);
 let events = [];
 const eventsStartedAt = Date.now();
 if (includeEvents && sessionIds.length) {

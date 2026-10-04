@@ -21,6 +21,12 @@ throw new Error("missing_env_" + name);
 return value;
 }
 
+// Public capability checks may learn only whether storage is configured,
+// never the server credential itself. This helper performs no network request.
+function serverStorageConfigured() {
+return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 function supabaseUrl() {
 return requireEnv("SUPABASE_URL").replace(/\/+$/, "");
 }
@@ -135,4 +141,4 @@ const match = /^Bearer\s+(.+)$/i.exec(header);
 return match ? match[1] : null;
 }
 
-module.exports = { pgFetch: pgFetch, verifyAccessToken: verifyAccessToken, deleteAuthUser: deleteAuthUser, bearerToken: bearerToken };
+module.exports = { pgFetch: pgFetch, verifyAccessToken: verifyAccessToken, deleteAuthUser: deleteAuthUser, bearerToken: bearerToken, serverStorageConfigured: serverStorageConfigured };
