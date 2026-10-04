@@ -12,7 +12,7 @@
 <!-- Run before any stylesheet or dependency can hold up the driver page. -->
 <script id="driver-startup-guard">
 (() => {
-  const corePath = '/driver-app.v77.js';
+  const corePath = '/driver-app.v79.js';
   let state = 'loading';
   const byId = id => document.getElementById(id);
   const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
@@ -79,9 +79,10 @@
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 <!-- The supported cloud path uses authenticated Occulert API endpoints. -->
 <link rel="stylesheet" href="/driver-app.v68.css" />
-<link rel="stylesheet" href="/liquid-glass.v47.css" />
+<link rel="stylesheet" href="/liquid-glass.v49.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
 <script src="/static-page.v60.js" defer></script>
+<script src="/page-actions.v2.js"></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -250,29 +251,30 @@
     <div class="card" style="padding:12px 14px;margin-bottom:10px">
       <div class="label" style="margin-bottom:10px">Controls</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-        <button id="voiceToggleBtn" onclick="typeof toggleVoice==='function'&&toggleVoice()" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">🔇 Voice OFF</button>
+        <button id="voiceToggleBtn" data-page-action="toggleVoice" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">🔇 Voice OFF</button>
         <span style="font-size:11px;color:#94a3b8">Safety alerts cannot be snoozed while monitoring.</span>
       </div>
     </div>
 
     <!-- Export + Install row -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <button onclick="typeof exportCSV==='function'&&exportCSV()" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
-      <button id="pwaInstallBtn" onclick="typeof triggerPWAInstall==='function'&&triggerPWAInstall()" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
+      <button data-page-action="exportCSV" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
+      <button id="pwaInstallBtn" data-page-action="triggerPWAInstall" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
     </div>
     </section>
     </fieldset>
 </aside>
 </main>
-<script src="/occulert-backend.v69.js"></script>
+<script src="/occulert-backend.v79.js"></script>
 <script src="/security-utils.v47.js"></script>
-<script src="/driver-app.v77.js"></script>
+<script src="/local-history.v2.js"></script>
+<script src="/driver-app.v79.js"></script>
 <script src="/lang.v47.js" defer></script>
 
 <!-- iOS Add to Home Screen Modal -->
 <div id="iosInstallModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom)">
   <div style="background:#0f1e2e;border:1px solid #1a3a4a;border-radius:20px 20px 0 0;padding:28px 24px 32px;width:100%;max-width:480px;position:relative">
-    <button onclick="closeIOSInstallModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1">✕</button>
+    <button data-page-action="closeIOSInstallModal" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1">✕</button>
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
       <img src="/occulert-logo-main-192.png" width="52" height="52" loading="lazy" decoding="async" style="width:52px;height:52px;border-radius:12px" alt="Occulert">
       <div>
