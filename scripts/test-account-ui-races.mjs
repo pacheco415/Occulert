@@ -324,3 +324,42 @@ test('late password reauthentication cannot retry deletion or clear a replacemen
     assert.equal(b.el('deleteReauthSection').hidden,true);
   }finally{b.cleanup()}
 });
+
+test('replacement account can reauthenticate after the previous account attempt finishes',async()=>{
+  const b=await boot();try{
+    b.backend.deleteAccount=async()=>({ok:false,status:401,body:{error:'reauth_required'}});
+    b.el('deleteConfirmation').value='DELETE';await b.context.deleteAccount({preventDefault});
+    const pending=deferred();b.hooks.fetch=call=>call.url.includes('/auth/v1/token')?pending.promise:null;
+    b.el('deleteReauthPassword').value='A-private-password';
+    const old=b.context.reauthenticateForDeletion({preventDefault});await tick();
+    assert.equal(b.el('deleteReauthPasswordBtn').disabled,true);
+    b.switchTo('B');await tick();await tick();
+    pending.resolve(Response.json({...session('A'),expires_in:3600}));await old;
+    b.el('deleteConfirmation').value='DELETE';await b.context.deleteAccount({preventDefault});
+    assert.equal(b.backend.currentUser().id,'B');assert.equal(b.el('deleteReauthSection').hidden,false);
+    assert.equal(b.el('deleteReauthPasswordBtn').disabled,false);assert.equal(b.el('deleteReauthPasskeyBtn').disabled,false);
+    b.hooks.fetch=call=>call.url.includes('/auth/v1/token')?Response.json({...session('B'),expires_in:3600}):null;
+    b.backend.deleteAccount=async()=>({ok:false,status:502,body:{error:'account_deletion_failed'}});
+    b.el('deleteReauthPassword').value='B-private-password';await b.context.reauthenticateForDeletion({preventDefault});
+    assert.match(b.el('deleteStatus').textContent,/Deletion was not confirmed/);
+    assert.equal(b.el('deleteReauthSection').hidden,true);assert.equal(b.backend.currentUser().id,'B');
+  }finally{b.cleanup()}
+});
+
+test('late previous-account finally cannot release a newer pending password reauthentication',async()=>{
+  const b=await boot();try{
+    b.backend.deleteAccount=async()=>({ok:false,status:401,body:{error:'reauth_required'}});
+    b.el('deleteConfirmation').value='DELETE';await b.context.deleteAccount({preventDefault});
+    const oldResponse=deferred(),newResponse=deferred();let requests=0;
+    b.hooks.fetch=call=>call.url.includes('/auth/v1/token')?(++requests===1?oldResponse:newResponse).promise:null;
+    b.el('deleteReauthPassword').value='A-private-password';const old=b.context.reauthenticateForDeletion({preventDefault});await tick();
+    b.switchTo('B');await tick();await tick();b.el('deleteConfirmation').value='DELETE';await b.context.deleteAccount({preventDefault});
+    b.el('deleteReauthPassword').value='B-private-password';const fresh=b.context.reauthenticateForDeletion({preventDefault});await tick();
+    oldResponse.resolve(Response.json({...session('A'),expires_in:3600}));await old;
+    assert.equal(vm.runInContext('deletionReauthBusy',b.context),true);
+    assert.equal(b.el('deleteReauthPasswordBtn').disabled,true);assert.equal(b.el('deleteReauthPasskeyBtn').disabled,true);
+    assert.equal(b.backend.currentUser().id,'B');assert.equal(b.el('deleteReauthSection').hidden,false);
+    newResponse.resolve(Response.json({error:'invalid_credentials'},{status:400}));await fresh;
+    assert.equal(vm.runInContext('deletionReauthBusy',b.context),false);assert.equal(b.el('deleteReauthPasswordBtn').disabled,false);
+  }finally{b.cleanup()}
+});

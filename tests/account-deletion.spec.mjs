@@ -68,3 +68,62 @@ test('recent sign-in is requested before a confirmed deletion and preserves data
   expect(attempts).toBe(2);
   expect(await page.evaluate(() => localStorage.getItem('occulert-sessions'))).toBeNull();
 });
+
+test('switching accounts during password confirmation leaves the replacement account usable', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (location.pathname !== '/account.html') return;
+    localStorage.setItem('occulert-auth', JSON.stringify({ access_token: 'access-A', refresh_token: 'refresh-A', expires_at: Math.floor(Date.now()/1000)+3600, user: { id: 'A', email: 'A@example.invalid' } }));
+    localStorage.setItem('occulert-sessions', 'saved-local-history');
+  });
+  await page.route('**/api/public-config', route => route.fulfill({ json: { ok: true, supabase: { configured: true, url: 'https://example.supabase.co', anonKey: 'public-fixture' } } }));
+  await page.route('**/api/fleets', route => route.fulfill({ json: { ok: true, fleet: null } }));
+  let releaseOld;
+  const oldResponse = new Promise(resolve => { releaseOld = resolve; });
+  await page.route('**/auth/v1/token?grant_type=password', async route => {
+    const body = route.request().postDataJSON();
+    const owner = body.email.startsWith('A@') ? 'A' : 'B';
+    expect(body.password).toBe(owner + '-password');
+    if (owner === 'A') await oldResponse;
+    await route.fulfill({ json: { access_token: 'recent-' + owner, refresh_token: 'recent-refresh-' + owner, expires_in: 3600, user: { id: owner, email: owner + '@example.invalid' } } });
+  });
+  const deletions = [];
+  await page.route('**/api/account', async route => {
+    const token = route.request().headers().authorization;
+    deletions.push(token);
+    const recent = token === 'Bearer recent-B';
+    await route.fulfill({ status: recent ? 200 : 401, json: recent ? { ok: true, deleted: true } : { ok: false, error: 'reauth_required' } });
+  });
+  await page.goto('/account.html');
+  page.on('dialog', dialog => dialog.accept());
+  // Keep the actual event-handler promise available so the delayed response can
+  // settle deterministically before the next account uses the same controls.
+  await page.evaluate(() => {
+    const original = reauthenticateForDeletion;
+    reauthenticateForDeletion = (...args) => (window.fixtureReauth = original(...args));
+  });
+  await page.locator('#deleteConfirmation').fill('DELETE');
+  await page.locator('#deleteAccountBtn').click();
+  await page.locator('#deleteReauthPassword').fill('A-password');
+  await page.locator('#deleteReauthPasswordBtn').click();
+  await expect(page.locator('#deleteReauthPasswordBtn')).toBeDisabled();
+  await page.evaluate(() => {
+    const oldValue = localStorage.getItem('occulert-auth');
+    const newValue = JSON.stringify({ access_token: 'access-B', refresh_token: 'refresh-B', expires_at: Math.floor(Date.now()/1000)+3600, user: { id: 'B', email: 'B@example.invalid' } });
+    localStorage.setItem('occulert-auth', newValue);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'occulert-auth', oldValue, newValue }));
+  });
+  await expect(page.locator('#securityIntro')).toContainText('B@example.invalid');
+  releaseOld();
+  await page.evaluate(() => window.fixtureReauth);
+  expect(await page.evaluate(() => OcculertBackend.currentUser().id)).toBe('B');
+  await page.locator('#deleteConfirmation').fill('DELETE');
+  await page.locator('#deleteAccountBtn').click();
+  await expect(page.locator('#deleteReauthSection')).toBeVisible();
+  await expect(page.locator('#deleteReauthPasswordBtn')).toBeEnabled();
+  expect(await page.evaluate(() => localStorage.getItem('occulert-sessions'))).toBe('saved-local-history');
+  await page.locator('#deleteReauthPassword').fill('B-password');
+  await page.locator('#deleteReauthPasswordBtn').click();
+  await expect(page).toHaveURL(/\/login.html$/);
+  expect(deletions).toEqual(['Bearer access-A', 'Bearer access-B', 'Bearer recent-B']);
+  expect(await page.evaluate(() => localStorage.getItem('occulert-sessions'))).toBeNull();
+});

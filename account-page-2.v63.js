@@ -21,6 +21,7 @@ function accountRequireView(context){if(accountViewCurrent(context))return true;
 function accountProfile(user){let p=getProfile()||{};return p.uid&&(!user||p.uid!==user.id)?{}:p}
 function clearAccountView(){
   deletionReauthOwner=null;deletionReauthBusy=false;const reauthSection=document.getElementById("deleteReauthSection");if(reauthSection)reauthSection.hidden=true;
+  ['deleteReauthPasswordBtn','deleteReauthPasskeyBtn'].forEach(id=>{const button=document.getElementById(id);if(button)button.disabled=id==='deleteReauthPasskeyBtn'&&!passkeySupported()});
   accountContext=null;accountAccessRenderVersion++;passkeyLoadId++;passkeysById={};verifiedAccountAccess={status:'local'};recoveryVerified=false;
   ['name','company','fleetId','vehicle','bio','newEmail','newPassword','deleteConfirmation','deleteReauthPassword'].forEach(id=>{let el=document.getElementById(id);if(el)el.value=''});
   ['status','deleteStatus','passkeyStatus'].forEach(id=>{let el=document.getElementById(id);if(el){el.textContent='';el.className='status'}});
@@ -117,8 +118,10 @@ async function reauthenticateForDeletion(event,method='password'){
   }catch(error){
     if(generation===accountGeneration&&signedInUser()?.id===owner){accountContext=backend.captureAuthContext();showDelete(method==='passkey'?window.OcculertPasskeys.message(error,'signin'):'Sign-in was not confirmed. Check your password and try again.','bad')}
   }finally{
-    deletionReauthBusy=false;
-    if(generation===accountGeneration&&signedInUser()?.id===owner)['deleteReauthPasswordBtn','deleteReauthPasskeyBtn'].forEach(id=>{const button=document.getElementById(id);if(button)button.disabled=id==='deleteReauthPasskeyBtn'&&!passkeySupported()});
+    if(generation===accountGeneration&&signedInUser()?.id===owner){
+      deletionReauthBusy=false;
+      ['deleteReauthPasswordBtn','deleteReauthPasskeyBtn'].forEach(id=>{const button=document.getElementById(id);if(button)button.disabled=id==='deleteReauthPasskeyBtn'&&!passkeySupported()});
+    }
   }
 }
 document.getElementById('deleteReauthForm')?.addEventListener('submit',event=>{void reauthenticateForDeletion(event)});
