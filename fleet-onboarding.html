@@ -7,11 +7,12 @@
   <meta name="description" content="Create an Occulert fleet and securely invite drivers with expiring one-time links.">
   <meta name="theme-color" content="#0a0e1a">
   <link rel="canonical" href="https://www.occulert.com/fleet-onboarding.html">
-  <script src="/occulert-backend.v69.js"></script>
+  <script src="/occulert-backend.v78.js"></script>
 <link rel="stylesheet" href="/liquid-glass.v47.css" />
 <link rel="stylesheet" href="/portal.v47.css" />
   <link rel="stylesheet" href="/accessibility.v52.css">
   <link rel="stylesheet" href="/fleet-onboarding-page-1.v68.css">
+<script src="/page-actions.v2.js"></script>
 </head>
 <body class="portal-page fleet-setup-page">
   <a class="skip-link" href="#main-content">Skip to fleet setup</a>
@@ -36,7 +37,7 @@
       <p class="step-label">Step 1 of 2</p>
       <h2>Create your fleet</h2>
       <p class="muted">The signed-in account becomes the server-verified owner. A typed role or fleet ID cannot grant access.</p>
-      <form class="form" onsubmit="createFleet(event)">
+      <form class="form" data-page-action="createFleet-event">
         <div class="field"><label for="companyName">Company or fleet name</label><input id="companyName" required minlength="2" maxlength="160" autocomplete="organization" placeholder="Pacheco Safety Fleet"></div>
         <button class="btn primary" type="submit">Create Fleet</button>
       </form>
@@ -46,11 +47,11 @@
       <p class="step-label">Step 2 of 2</p>
       <h2 id="fleetName">Invite drivers</h2>
       <p class="muted">Enter the exact email the driver will use for their Occulert account. Create invitation makes a one-time link; it does not email the driver. Email link opens a draft in your mail app for you to review and send. Copy link lets you deliver it through your chosen channel.</p>
-      <form class="form" onsubmit="createInvite(event)">
+      <form class="form" data-page-action="createInvite-event">
         <div class="field"><label for="driverEmail">Driver email</label><input id="driverEmail" type="email" required maxlength="240" autocomplete="email" placeholder="driver@example.com"></div>
         <button class="btn primary" id="createInviteBtn" type="submit">Create invitation</button>
       </form>
-      <div class="invite-link hidden" id="inviteLinkBox"><input id="inviteLink" readonly aria-label="New driver invitation link"><div class="invite-actions"><a class="btn" id="emailInvite" href="#">Email link</a><button class="btn" type="button" onclick="copyInvite()">Copy link</button></div><p class="muted invite-delivery">This usable link is shown once. Copy it or prepare your email before leaving. Occulert cannot confirm that the email was sent or delivered.</p></div>
+      <div class="invite-link hidden" id="inviteLinkBox"><input id="inviteLink" readonly aria-label="New driver invitation link"><div class="invite-actions"><a class="btn" id="emailInvite" href="#">Email link</a><button class="btn" type="button" data-page-action="copyInvite">Copy link</button></div><p class="muted invite-delivery">This usable link is shown once. Copy it or prepare your email before leaving. Occulert cannot confirm that the email was sent or delivered.</p></div>
       <div class="notice hidden" id="inviteStatus" role="status"></div>
     </section>
 
@@ -67,6 +68,6 @@
     </section>
   </main>
   <footer class="footer">Occulert prototype — fleet access is enforced by authenticated server-side ownership.</footer>
-<script src="/fleet-onboarding-page-1.v68.js"></script>
+<script src="/fleet-onboarding-page-1.v70.js"></script>
 </body>
 </html>

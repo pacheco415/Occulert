@@ -1,12 +1,10 @@
+import { fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const html = readFileSync(new URL('../fleet-dashboard.html', import.meta.url), 'utf8');
-const script = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
-  .map(match => match[1]).find(source => source.includes('/* fleet-refresh-policy:start */'));
-assert.ok(script);
+const script = fleetDashboardRuntime();
 const historyKey = 'occulert-session-history', liveKey = 'occulert-live-session';
 const live = { id: 'real-session', driverId: 'real-driver', name: 'Real driver', safetyScore: 82 };
 function boot(values = {}) {
