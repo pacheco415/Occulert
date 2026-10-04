@@ -17,8 +17,8 @@ test('owned font files retain reviewed upstream bytes, notices and bounded Latin
 });
 
 test('public documents and their font policy cannot reintroduce Google font requests',()=>{
- for(const html of readdirSync('.').filter(name=>name.endsWith('.html')))assert.doesNotMatch(read(html),/fonts\.(?:googleapis|gstatic)\.com/,html);
+ for(const asset of readdirSync('.').filter(name=>/\.(?:html|css|js)$/.test(name)))assert.doesNotMatch(read(asset),/fonts\.(?:googleapis|gstatic)\.com/,asset);
  assert.doesNotMatch(read('vercel.json'),/fonts\.(?:googleapis|gstatic)\.com/);
  assert.match(read('sw.js'),/\/inter-fonts\.v1\.css/);
- assert.doesNotMatch(read('sw.js'),/\/vendor\/inter-5\.3\.0\/inter-latin-wght-normal\.woff2/,'fonts must load on demand within the existing install budget');
+ assert.doesNotMatch(read('sw.js'),/\/vendor\/inter-5\.3\.0\/[^'"\s]+\.woff2/,'font subsets must load on demand within the existing install budget');
 });

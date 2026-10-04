@@ -6,7 +6,9 @@ test('the owned Inter font renders English and Spanish without Google requests',
  const external=[];
  await page.route('https://fonts.googleapis.com/**',route=>{external.push(route.request().url());return route.abort();});
  await page.route('https://fonts.gstatic.com/**',route=>{external.push(route.request().url());return route.abort();});
- await page.goto('/');
+ const response=await page.goto('/');
+ expect(response.headers()['content-security-policy']).toContain("font-src 'self'");
+ expect(response.headers()['content-security-policy']).not.toMatch(/fonts\.(?:googleapis|gstatic)\.com/);
  await expect.poll(()=>page.evaluate(async()=>{
    const faces=await document.fonts.load('600 16px Inter','Eyes open · Conducción segura');
    return faces.length>0&&faces.every(face=>face.status==='loaded');
@@ -21,8 +23,8 @@ test.describe('owned fonts with the service worker',()=>{
  test.use({serviceWorkers:'allow'});
  test('a font cached after activation remains usable offline',async({page})=>{
   const root=resolve('.'),state={offline:false};
-  const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2','.wasm':'application/wasm'};
-  const publicExtension=/\.(?:html|js|css|json|woff2|wasm|binarypb|data|svg|png|webp|avif|ico)$/;
+  const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2','.wasm':'application/wasm','.wav':'audio/wav'};
+  const publicExtension=/\.(?:html|js|css|json|woff2|wasm|binarypb|data|svg|png|webp|avif|ico|wav)$/;
   const server=createServer((request,response)=>{
     if(state.offline){response.destroy();return;}
     const path=new URL(request.url,'http://localhost').pathname;
