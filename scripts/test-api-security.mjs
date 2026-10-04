@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 
 const require = createRequire(import.meta.url);
 const libPath = require.resolve("../api/_lib/supabase.js");
+const { serverStorageConfigured } = require(libPath);
 
 process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
@@ -27,6 +28,7 @@ function loadHandler(path, pgFetch, user = verifiedUser) {
       pgFetch,
       verifyAccessToken: async () => user,
       bearerToken: () => "valid-token",
+      serverStorageConfigured,
     },
   };
   return require(path);
@@ -734,7 +736,13 @@ try {
   assert.deepEqual((await invoke(recoveryConfig, request("GET"))).body.capabilities, {});
  }
  process.env.SESSION_START_RECOVERY_ENABLED = "true";
- assert.deepEqual((await invoke(recoveryConfig, request("GET"))).body.capabilities, { session_start_protocol: "client_uuid_v1", session_lookup_protocol: "client_uuid_lookup_v1" });
+ const enabledConfig = await invoke(recoveryConfig, request("GET"));
+ assert.deepEqual(enabledConfig.body, {
+  ok: true,
+  capabilities: { session_start_protocol: "client_uuid_v1", session_lookup_protocol: "client_uuid_lookup_v1" },
+  supabase: { configured: true, url: "https://example.supabase.co", anonKey: "test-public-anon-key" },
+ });
+ assert.equal(JSON.stringify(enabledConfig.body).includes(process.env.SUPABASE_SERVICE_ROLE_KEY), false, "checking server storage presence must never publish its credential");
  const savedPublicKey = process.env.SUPABASE_ANON_KEY;
  try {delete process.env.SUPABASE_ANON_KEY;assert.deepEqual((await invoke(recoveryConfig, request("GET"))).body.capabilities, {});} finally {process.env.SUPABASE_ANON_KEY=savedPublicKey;}
  const savedServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
