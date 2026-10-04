@@ -8,17 +8,11 @@ const verifyAccessToken = supabaseLib.verifyAccessToken;
 const deleteAuthUser = supabaseLib.deleteAuthUser;
 const bearerToken = supabaseLib.bearerToken;
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { validJsonBody } = require("./_lib/validation");
+const { json } = require("./_lib/responses");
 
 function validBody(request) {
-  if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = request.body && typeof request.body === "object" && !Array.isArray(request.body) ? request.body : {};
-  return JSON.stringify(body).length <= 256 && body.confirm === "DELETE";
+  return validJsonBody(request, 256) && request.body.confirm === "DELETE";
 }
 
 module.exports = async function handler(request, response) {

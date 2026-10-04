@@ -68,7 +68,8 @@
     "test:workflow-policy",
     "test:deployment-ignore",
     "audit:sitemap",
-    "test:sitemap"
+    "test:sitemap",
+    "test:api-validation"
   ],
   "additionalChecks": [
     "test:verify-runner"

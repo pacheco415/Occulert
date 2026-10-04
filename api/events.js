@@ -8,31 +8,11 @@ const { validTimestamp, compareTimestamps } = require("./_lib/fleet-history-curs
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const MAX_BODY_LENGTH = 4096;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const { isUuid, numberOrNull, validJsonBody } = require("./_lib/validation");
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 const ALLOWED_TYPES = ["drowsy", "distracted", "head_nod", "yawn", "phone_use", "ok_check_in", "emergency"];
-
-function numberOrNull(value, min, max) {
-  if (value === null || value === undefined || typeof value === "boolean" || typeof value === "object") return null;
-  if (typeof value === "string" && !value.trim()) return null;
-  const n = Number(value);
-  if (!Number.isFinite(n)) return null;
-  return Math.max(min, Math.min(max, n));
-}
-
-function validJsonBody(request) {
-  if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = request.body;
-  return body !== null && typeof body === "object" && !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
-}
 
 module.exports = async function handler(request, response) {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -64,7 +44,7 @@ module.exports = async function handler(request, response) {
     if (!body.session_id || ALLOWED_TYPES.indexOf(type) === -1) {
       return json(response, 400, { ok: false, error: "invalid_event" });
     }
-    if (typeof body.session_id !== "string" || !UUID.test(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
+    if (!isUuid(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
     const drivers = await pgFetch("drivers", {
       params: { select: "id", user_id: "eq." + user.id, limit: "1" },
     });
