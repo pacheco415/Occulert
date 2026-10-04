@@ -13,16 +13,15 @@ const keys = {
   ec: generateKeyPairSync('ec', { namedCurve: 'prime256v1' }),
   rotated: generateKeyPairSync('ec', { namedCurve: 'prime256v1' }),
   rsa: generateKeyPairSync('rsa', { modulusLength: 2048 }),
-  weak: generateKeyPairSync('rsa', { modulusLength: 1024 }),
   wrongCurve: generateKeyPairSync('ec', { namedCurve: 'secp384r1' }),
 };
 const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
 const clockStart = Date.UTC(2026, 9, 4);
 function jwk(name, overrides = {}) {
-  return { ...keys[name].publicKey.export({ format: 'jwk' }), kid: name, alg: name === 'rsa' || name === 'weak' ? 'RS256' : 'ES256', use: 'sig', key_ops: ['verify'], ...overrides };
+  return { ...keys[name].publicKey.export({ format: 'jwk' }), kid: name, alg: name === 'rsa' ? 'RS256' : 'ES256', use: 'sig', key_ops: ['verify'], ...overrides };
 }
 function jwt(name = 'ec', { now = clockStart, header = {}, claims = {}, der = false } = {}) {
-  const algorithm = name === 'rsa' || name === 'weak' ? 'RS256' : 'ES256';
+  const algorithm = name === 'rsa' ? 'RS256' : 'ES256';
   const parts = [encode({ alg: algorithm, typ: 'JWT', kid: name, ...header }), encode({ iss: issuer, aud: 'authenticated', role: 'authenticated', sub: subject,
     exp: Math.floor(now / 1000) + 3600, nbf: Math.floor(now / 1000) - 60,
     email: 'stale@example.com', user_metadata: { email_verified: true }, ...claims })];
@@ -89,7 +88,11 @@ test('known-key bad signatures/alg confusion/DER encoding never use an Auth fall
 test('matching JWKs enforce public-only algorithm/type/curve/key-size/use/operation guards', async () => {
   const bad = [jwk('ec', { use: 'enc' }), jwk('ec', { key_ops: ['sign'] }), jwk('ec', { key_ops: [] }), jwk('ec', { key_ops: ['verify', 'sign'] }),
     jwk('ec', { d: '' }), jwk('ec', { alg: 'ES384' }), jwk('ec', { kty: 'RSA' }), jwk('wrongCurve', { kid: 'ec' }),
-    jwk('ec', { x: jwk('ec').x + '=' }), jwk('weak', { kid: 'rsa' }), jwk('rsa', { p: '' }), jwk('rsa', { e: 'Ag' }),
+    jwk('ec', { x: jwk('ec').x + '=' }),
+    // Deliberately short public-key data exercises the size guard without
+    // generating or using an insecure private signing key.
+    jwk('rsa', { n: Buffer.from(jwk('rsa').n, 'base64url').subarray(0, 128).toString('base64url') }),
+    jwk('rsa', { p: '' }), jwk('rsa', { e: 'Ag' }),
     jwk('rsa', { n: 'A'.repeat(685) }), jwk('rsa', { n: Buffer.concat([Buffer.from([0]), Buffer.from(jwk('rsa').n, 'base64url')]).toString('base64url') })];
   for (const key of bad) {
     const f = fixture([key]); assert.equal(await f.verify(jwt(key.kid === 'rsa' ? 'rsa' : 'ec')), null); assert.equal(f.count(), 1);
