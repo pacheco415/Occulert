@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert, Linking, AppState, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAudioPlayer } from 'expo-audio';
+import { useAlertAudioPlayer } from '../hooks/useAlertAudioPlayer';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SensitivitySlider, loadSavedSensitivity } from '../components/SensitivitySlider';
@@ -148,7 +148,7 @@ export default function SettingsScreen() {
   const [feedbackBusy, setFeedbackBusy] = useState(false);
   // This parked-only test must release the shared iOS audio session when the
   // tone ends so music and navigation audio can return to their normal level.
-  const audioTestPlayer = useAudioPlayer(ALERT_SOUND);
+  const { player: audioTestPlayer } = useAlertAudioPlayer(ALERT_SOUND);
   const audioTestRunnerRef = useRef(createSingleFlightActionRunner());
   const watchTestRunnerRef = useRef(createSingleFlightActionRunner());
   const deviceRefreshRunnerRef = useRef(createSingleFlightActionRunner());
