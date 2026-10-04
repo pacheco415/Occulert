@@ -342,6 +342,9 @@ function hookFixture() {
       const changed = !previous || deps.some((dep, i) => dep !== previous.deps[i]);
       if (changed) effects[slot] = { deps, callback, cleanup: previous?.cleanup, changed: true };
     },
+    // This harness exercises Watch bridge races; real React effect-phase
+    // ordering is exercised separately by the native audio lifecycle suite.
+    useLayoutEffect(callback, deps) { React.useEffect(callback, deps); },
   };
   return { React, updates, render(callback) {
     index = 0;
@@ -363,7 +366,7 @@ function alertFixture() {
     ...h.React, React: h.React, require: () => 'sound',
     Animated: { Value: class { stopAnimation() {} setValue() {} } },
     useAccessibilityPreferences: () => ({ reduceMotion: true }),
-    useAudioPlayer: () => ({ pause() {} }),
+    useAlertAudioPlayer: () => ({ player: { pause() {} } }),
     loadAlertPreferences: async () => {}, configureAlertAudioMode: async () => {},
     currentAlertPreferences: () => ({ audioEnabled: false, hapticEnabled: false }),
     getWatchAlertsEnabled: () => preference.promise,
