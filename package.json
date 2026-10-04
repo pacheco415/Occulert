@@ -73,7 +73,9 @@
     "check:migrations": "node scripts/check-migration-readiness.mjs",
     "test:migration-readiness": "node --test scripts/test-migration-readiness.mjs",
     "test:verify-runner": "node --test scripts/test-verify-runner.mjs scripts/test-verify-coverage.mjs",
-    "test:asset-lineage": "node --test scripts/test-asset-lineage.mjs"
+    "test:asset-lineage": "node --test scripts/test-asset-lineage.mjs",
+    "status": "node scripts/status.mjs",
+    "test:status": "node --test scripts/test-status.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

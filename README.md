@@ -6,11 +6,12 @@ Occulert is a prototype real-time AI drowsiness detection platform that uses you
 
 🌐 **Live at [occulert.com](https://www.occulert.com)**
 
-Development and release status is maintained in the
-[authoritative roadmap](docs/APP_ROADMAP.md).
+Current source, deployment and native build facts are in
+[Status](docs/STATUS.md). Product scope and evidence requirements are in the
+[app roadmap](docs/APP_ROADMAP.md).
 
-- **Current status:** see the [app roadmap](docs/APP_ROADMAP.md) for source,
-  website, installed native build and device-validation evidence.
+- **Current status:** see [Status](docs/STATUS.md) for the dated website,
+  TestFlight, source, pull request and migration snapshots.
 - **Verification:** pull requests require site, browser, native compatibility and
   Watch checks. Follow [RELEASING.md](RELEASING.md) for local verification and release.
 - **Native delivery:** merged source and website updates require a new native binary
@@ -18,7 +19,8 @@ Development and release status is maintained in the
 - **Detection and later projects:** threshold tuning, fusion, paid entitlements and
   additional platforms retain the roadmap's decision and evidence requirements.
 
-Keep dated release receipts and device evidence in the roadmap.
+Keep exact release receipts and device results in dated documents;
+[archived roadmap records](docs/archive/APP_ROADMAP_2026-09-28.md) preserve earlier evidence.
 
 ---
 
@@ -88,7 +90,8 @@ occulert/
 ├── db/schema.sql           # Initial schema and RLS policies
 ├── supabase/migrations/    # Subsequent protected schema/function changes
 ├── native-app/             # Private iPhone/Watch source
-├── docs/APP_ROADMAP.md      # Authoritative release/source/evidence status
+├── docs/STATUS.md           # Dated deployment, source and build facts
+├── docs/APP_ROADMAP.md      # Product scope, backlog and evidence requirements
 ├── docs/PILOT_OVERVIEW.md   # One-page voluntary 30-day pilot overview
 ├── docs/PILOT_OUTREACH.md   # Qualification and unsent outreach drafts
 └── BACKEND_SETUP.md        # Backend configuration guide

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "production": {
+    "sourceCommit": "0d11ad22b66baab61ea9db6456bfaed837871537",
+    "deploymentId": "dpl_DJCCTk2wdrBiEFxPF8WSWdjQCZGN",
+    "state": "READY",
+    "createdAt": "2026-10-03T23:20:35.697Z",
+    "observedAt": "2026-10-04"
+  },
+  "testFlight": {
+    "sourceCommit": "0d11ad22b66baab61ea9db6456bfaed837871537",
+    "version": "1.0.0",
+    "buildNumber": "56",
+    "completedAt": "2026-10-03T23:44:38.728Z",
+    "observedAt": "2026-10-03T23:49:49.617533+00:00",
+    "processingState": "VALID",
+    "internalState": "IN_BETA_TESTING",
+    "physicalAcceptance": "not_recorded"
+  },
+  "migrations": {
+    "state": "unknown",
+    "observedAt": "2026-10-04",
+    "summary": "Read-only production ledger lookup failed PostgreSQL authentication (28P01); PRs #192 and #206 remain gated."
+  }
+}
