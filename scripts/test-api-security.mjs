@@ -643,10 +643,64 @@ assert.ok(Number(rateLimited.headers["retry-after"]) > 0);
 
 
 for(const mediaType of ['application/jsonp','not-application/json','text/plain']){
- for(const handler of [sessions,events]){
+ for(const handler of [sessions,events,profile]){
   const req=request('POST',{});req.headers['content-type']=mediaType;
   assert.equal((await invoke(handler,req)).status,415);
  }
+}
+
+// Shared numeric validation must keep measured zero separate from absence.
+const zeroMetrics = { average_fatigue: 0, max_fatigue: 0, safety_score: 0, alert_count: 0, head_nod_count: 0 };
+assert.equal((await invoke(sessions, request("PATCH", { session_id: patchBody.session_id, ...zeroMetrics }))).status, 200);
+for (const field of Object.keys(zeroMetrics)) assert.equal(patchedSession[field], 0);
+assert.equal((await invoke(events, request("POST", { ...eventBody, fatigue_score: 0, confidence: 0, latitude: 0, longitude: 0 }))).status, 200);
+for (const field of ["fatigue_score", "confidence", "latitude", "longitude"]) assert.equal(insertedEvent[field], 0);
+
+// The profile retains its 2 KB limit and sessions/events their 4 KB limit.
+// Test the exact serialized boundary through each actual route before storage.
+for (const [route, limit, fields] of [
+ ["../api/profile.js", 2048, {}],
+ ["../api/sessions.js", 4096, {}],
+ ["../api/events.js", 4096, { session_id: patchBody.session_id, type: "drowsy" }],
+]) {
+ const calls = [];
+ const bounded = loadHandler(route, async (table, options = {}) => {
+  calls.push({ table, options });
+  if (table === "drivers" && !options.method) {
+   assert.equal(options.params.user_id, "eq.user-1");
+   return [{ id: "driver-1", fleet_id: "fleet-1", name: "Existing Driver", vehicle_id: "TRK-7" }];
+  }
+  if (table === "sessions" && !options.method) {
+   assert.equal(options.params.driver_id, "eq.driver-1");
+   return [{ id: patchBody.session_id, started_at: new Date(Date.now() - 60000).toISOString(), ended_at: null }];
+  }
+  assert.ok(["POST", "PATCH"].includes(options.method));
+  return [{ id: table === "sessions" ? patchBody.session_id : "record-1", ...options.body }];
+ });
+ const body = { ...fields, padding: "" };
+ body.padding = "x".repeat(limit - JSON.stringify(body).length);
+ assert.equal(JSON.stringify(body).length, limit);
+ const accepted = await invoke(bounded, request("POST", body));
+ assert.equal(accepted.status, 200, `${route} must accept its exact body-size limit`);
+ assert.equal(accepted.body.ok, true);
+ assert.equal(accepted.headers["cache-control"], "no-store");
+ assert.equal(accepted.headers["content-type"], "application/json; charset=utf-8");
+ assert.equal(calls.filter(call => call.options.method).length, 1);
+ calls.length = 0;
+ const oversized = await invoke(bounded, request("POST", { ...body, padding: body.padding + "x" }));
+ assert.equal(oversized.status, 415);
+ assert.deepEqual(oversized.body, { ok: false, error: "invalid_json_body" });
+ assert.equal(oversized.headers["cache-control"], "no-store");
+ assert.equal(calls.length, 0, `${route} must reject oversized bodies before any storage call`);
+ const wrongMedia = request("POST", fields);
+ wrongMedia.headers["content-type"] = "application/jsonp; charset=utf-8";
+ assert.equal((await invoke(bounded, wrongMedia)).status, 415);
+ assert.equal(calls.length, 0);
+ const method = await invoke(bounded, request("PUT", fields));
+ assert.equal(method.status, 405);
+ assert.deepEqual(method.body, { ok: false, error: "method_not_allowed" });
+ assert.ok(method.headers.allow.includes("POST"));
+ assert.equal(method.headers["cache-control"], "no-store");
 }
 
 console.log("Occulert API security tests passed.");
