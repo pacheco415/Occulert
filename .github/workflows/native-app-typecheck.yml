@@ -34,7 +34,7 @@ jobs:
         run: node ../scripts/write-verification-receipt.mjs native '${{ job.status }}'
       - name: Preserve verification receipt
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: verification-native-${{ github.sha }}
           path: .verification-receipts/
@@ -65,7 +65,7 @@ jobs:
         run: node ../scripts/write-verification-receipt.mjs eas-install '${{ job.status }}'
       - name: Preserve verification receipt
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: verification-eas-install-${{ github.sha }}
           path: .verification-receipts/
@@ -89,7 +89,7 @@ jobs:
         run: node scripts/write-verification-receipt.mjs watch-notification '${{ job.status }}'
       - name: Preserve verification receipt
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: verification-watch-notification-${{ github.sha }}
           path: .verification-receipts/
