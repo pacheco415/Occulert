@@ -72,7 +72,8 @@
     "test:api-validation",
     "test:provider-budget",
     "test:vendor-supabase",
-    "test:owned-fonts"
+    "test:owned-fonts",
+    "test:page-actions"
   ],
   "additionalChecks": [
     "test:verify-runner"

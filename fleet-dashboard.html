@@ -16,7 +16,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/occulert-logo-main-192.png">
   <script defer src="/lang.v47.js"></script>
-  <script src="/occulert-backend.v69.js"></script>
+  <script src="/occulert-backend.v78.js"></script>
   <script src="/security-utils.v47.js"></script>
   <script src="/fleet-followups.v67.js" defer></script>
   <script src="/fleet-pilot-report.v68.js" defer></script>
@@ -86,6 +86,7 @@
   @media(max-width:560px){.dashboard-page .value-header,.dashboard-page .launch-header{display:grid}.dashboard-page .value-range{width:100%}.dashboard-page .value-grid,.dashboard-page .launch-grid{grid-template-columns:1fr}.dashboard-page .value-metric strong{font-size:22px}.dashboard-page .status-row{grid-template-columns:1fr}.dashboard-page .launch-badge{width:max-content}}
   @media(max-width:720px){.dashboard-page .top{position:relative}.dashboard-page .actions{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-page .section-title{align-items:stretch;flex-direction:column}.dashboard-page .driver-actions{display:grid}.dashboard-page .driver-actions .btn{width:100%}}
 </style>
+<script src="/page-actions.v2.js"></script>
 </head>
 <body class="portal-page dashboard-page">
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -102,14 +103,14 @@
       </div>
       <details class="panel-details dashboard-tools">
         <summary>Dashboard tools</summary>
-        <div class="hero-actions"><a class="btn" href="/pilot-guide.html">Pilot quick start</a><a class="btn good" href="/fleet-display.html">Open TV display</a><button class="btn" onclick="exportFleetCSV()" title="Export loaded dashboard rows; driver filters are not applied">Export CSV</button><button class="btn warn" onclick="seedDemoData()">Load Demo Data</button><button class="btn ghost" onclick="clearDemoData()">Clear Demo</button></div>
+        <div class="hero-actions"><a class="btn" href="/pilot-guide.html">Pilot quick start</a><a class="btn good" href="/fleet-display.html">Open TV display</a><button class="btn" data-page-action="exportFleetCSV" title="Export loaded dashboard rows; driver filters are not applied">Export CSV</button><button class="btn warn" data-page-action="seedDemoData">Load Demo Data</button><button class="btn ghost" data-page-action="clearDemoData">Clear Demo</button></div>
       </details>
     </section>
     <details class="privacy-details privacy-note">
       <summary>Privacy and data boundaries</summary>
       <div class="details-body"><div>Protected fleet summaries exclude GPS coordinates by design. When signed out, this page can show opt-in GPS only from same-browser local sessions or demo data.</div><div>Protected fleet data is limited to the authenticated server-verified fleet owner. Safety scores and event telemetry are client-reported and not independently verified; do not use them as sole evidence for discipline, compliance, or emergency decisions.</div></div>
     </details>
-    <div class="status-row"><div class="notice" id="cloudStatus" role="status" aria-live="polite">Checking protected fleet access...</div><button class="btn hidden" id="refreshNow" type="button" onclick="refreshProtectedFleetNow()">Refresh now</button></div>
+    <div class="status-row"><div class="notice" id="cloudStatus" role="status" aria-live="polite">Checking protected fleet access...</div><button class="btn hidden" id="refreshNow" type="button" data-page-action="refreshProtectedFleetNow">Refresh now</button></div>
     <div class="empty-actions signed-out-recovery hidden" id="signedOutActions" aria-label="Signed-out fleet actions"><a class="btn primary" href="/login.html">Sign In</a><a class="btn" href="/">Back home</a></div>
     <section class="card launch-panel" aria-labelledby="pilotLaunchTitle">
       <div class="launch-header">
@@ -127,7 +128,7 @@
     <section class="card value-panel" aria-labelledby="pilotValueTitle">
       <div class="value-header">
         <div class="value-heading"><span class="plan-badge" id="fleetPlanBadge">Evaluation workspace</span><h2 id="pilotValueTitle">Recorded activity snapshot</h2><div class="sub" id="pilotWindowLabel">Last 30 days · recent protected history</div></div>
-        <div class="value-range"><label for="pilotRange">Reporting window</label><select class="select" id="pilotRange" onchange="renderPilotValue()"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></div>
+        <div class="value-range"><label for="pilotRange">Reporting window</label><select class="select" id="pilotRange" data-page-action="renderPilotValue"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></div>
       </div>
       <div class="value-grid" aria-label="Trial outcome metrics">
         <div class="value-metric"><div class="label">Sessions recorded</div><strong id="valueSessions">0</strong><div class="sub" id="valueSessionsSub">in this window</div></div>
@@ -137,7 +138,7 @@
       </div>
       <div class="value-story">
         <p id="pilotValueStory" aria-live="polite">Record protected sessions to build a manager-ready activity summary.</p>
-        <div class="value-actions"><a class="btn" href="#pilotQualityTitle">Print pilot report</a><button class="btn" type="button" onclick="exportPilotReport()">Download protected session CSV</button><a class="btn" href="/fleet-pricing.html">View affordable plans</a><a class="btn primary" href="/pilot-signup.html?interest=free-trial&amp;plan=free-trial">Request free trial</a></div>
+        <div class="value-actions"><a class="btn" href="#pilotQualityTitle">Print pilot report</a><button class="btn" type="button" data-page-action="exportPilotReport">Download protected session CSV</button><a class="btn" href="/fleet-pricing.html">View affordable plans</a><a class="btn primary" href="/pilot-signup.html?interest=free-trial&amp;plan=free-trial">Request free trial</a></div>
       </div>
       <p class="value-footnote">Decision-support snapshot of up to 50 recent protected sessions. Scores are client-reported and unverified; web and phone detectors use different measurements, so their scores are not directly comparable. GPS, personal media, and raw motion are excluded from protected reports.</p>
     </section>
@@ -156,7 +157,7 @@
       <details id="pilotReportPreview" class="pilot-report-preview"><summary>Preview manager report</summary><article id="pilotPrintableReport" aria-label="Printable aggregate pilot report"><h2>Occulert pilot report</h2><p>Protected report unavailable. Sign in and refresh protected data before printing.</p></article></details>
     </section>
     <section class="ops ops-primary" aria-label="Fleet priorities">
-      <div class="card"><div class="section-title"><h2>Needs attention</h2><button class="btn" onclick="copyOpsSummary()">Copy</button></div><div class="ops-list" id="actionQueue"></div></div>
+      <div class="card"><div class="section-title"><h2>Needs attention</h2><button class="btn" data-page-action="copyOpsSummary">Copy</button></div><div class="ops-list" id="actionQueue"></div></div>
       <div class="card"><div class="section-title"><h2>Driver roster</h2><a class="btn" href="/driver-profiles.html">Manage drivers</a></div><div class="ops-list" id="rosterSummary"></div></div>
     </section>
     <div class="dashboard-content">
@@ -165,9 +166,9 @@
         <div class="section-title">
           <h2>Driver status</h2>
           <div class="toolbar">
-            <input class="input" id="driverSearch" aria-label="Search drivers" placeholder="Search driver, route, vehicle" oninput="queueDriverListRender()">
-            <select class="select" id="riskFilter" aria-label="Filter drivers" onchange="queueDriverListRender()"><option value="all">All drivers</option><option value="danger">High risk</option><option value="watch">Watch</option><option value="stale">Stale</option><option value="gps">Local GPS shared</option><option value="nogps">No local GPS</option></select>
-            <select class="select" id="sortMode" aria-label="Sort drivers" onchange="queueDriverListRender()"><option value="risk">Sort by risk</option><option value="updated">Newest first</option><option value="score">Lowest score</option><option value="alerts">Most alerts</option></select>
+            <input class="input" id="driverSearch" aria-label="Search drivers" placeholder="Search driver, route, vehicle" data-page-action="queueDriverListRender-input">
+            <select class="select" id="riskFilter" aria-label="Filter drivers" data-page-action="queueDriverListRender"><option value="all">All drivers</option><option value="danger">High risk</option><option value="watch">Watch</option><option value="stale">Stale</option><option value="gps">Local GPS shared</option><option value="nogps">No local GPS</option></select>
+            <select class="select" id="sortMode" aria-label="Sort drivers" data-page-action="queueDriverListRender"><option value="risk">Sort by risk</option><option value="updated">Newest first</option><option value="score">Lowest score</option><option value="alerts">Most alerts</option></select>
             <span class="sub" id="updated">waiting for data</span>
           </div>
         </div>
@@ -186,7 +187,7 @@
         <details class="panel-details secondary-panel">
           <summary>Recent events</summary>
           <div class="card">
-          <div class="section-title"><h2>Recent events</h2><button class="btn" onclick="render()">Refresh</button></div>
+          <div class="section-title"><h2>Recent events</h2><button class="btn" data-page-action="render">Refresh</button></div>
           <div id="events"></div>
           </div>
         </details>
@@ -214,12 +215,12 @@
         <div id="followupList"></div>
       </div>
     </details>
-    <details class="panel-details history-details" ontoggle="handleHistoryToggle(event)">
+    <details class="panel-details history-details" data-page-action="handleHistoryToggle-event">
       <summary>Protected session history</summary>
     <section class="card history-section" aria-labelledby="sessionHistoryTitle">
       <div class="section-title">
         <div><h2 id="sessionHistoryTitle">Protected Session History</h2><div class="sub">Recent sessions and events for the signed-in manager's server-verified fleet.</div></div>
-        <div class="toolbar"><a class="btn" href="/fleet-history.html">Browse older sessions</a><button class="btn" onclick="exportSessionHistoryCSV()">Export Session CSV</button><span class="sub">Up to 50 recent sessions; older History and complete-period reports are separate.</span></div>
+        <div class="toolbar"><a class="btn" href="/fleet-history.html">Browse older sessions</a><button class="btn" data-page-action="exportSessionHistoryCSV">Export Session CSV</button><span class="sub">Up to 50 recent sessions; older History and complete-period reports are separate.</span></div>
       </div>
       <div class="notice privacy-note"><strong>Client-reported and unverified:</strong> Session scores and events are operational observations, not independently measured evidence. This history excludes GPS coordinates, camera media, audio, and raw motion.</div>
       <div class="history-list" id="sessionHistory" role="list"></div>
@@ -229,261 +230,6 @@
   </main>
   <div class="toast" id="toast"></div>
   <footer class="footer"><a href="/">Occulert</a> &nbsp;·&nbsp; <a href="/app.html">Driver App</a> &nbsp;·&nbsp; <a href="/privacy.html">Privacy</a><div style="margin-top:8px">© 2026 Occulert. Prototype only — not a certified safety, medical, emergency, or compliance device.</div></footer>
-<script>
-/* fleet-refresh-policy:start */
-const DASHBOARD_CLOCK_INTERVAL_MS=15000,PROTECTED_ACTIVE_REFRESH_MS=30000,PROTECTED_IDLE_REFRESH_MS=90000,PROTECTED_SAVE_DATA_REFRESH_MS=120000,PROTECTED_EVENTS_REFRESH_MS=120000,PROTECTED_MAX_BACKOFF_MS=300000,PROTECTED_REQUEST_TIMEOUT_MS=8000;
-function protectedRefreshDelay({hasActiveSession=false,failureCount=0,saveData=false}={}){let base=hasActiveSession?PROTECTED_ACTIVE_REFRESH_MS:saveData?PROTECTED_SAVE_DATA_REFRESH_MS:PROTECTED_IDLE_REFRESH_MS,multiplier=2**Math.min(Math.max(0,failureCount),3);return Math.min(PROTECTED_MAX_BACKOFF_MS,base*multiplier)}
-function shouldRefreshProtectedEvents({historyOpen=false,lastLoadedAt=0,now=Date.now(),force=false}={}){return historyOpen&&(force||!lastLoadedAt||now-lastLoadedAt>=PROTECTED_EVENTS_REFRESH_MS)}
-/* fleet-refresh-policy:end */
-let demoRows=[],cloudRows=[],lastOpsSummary='',lastRows=[],fleetMode=false,protectedUserId='',protectedFleetId='',protectedFleetName='',protectedFleetPlan='',protectedSessions=[],protectedEvents=[],protectedDrivers=[],lastDashboardSnapshot='',sessionHistoryDirty=true,driverListFrame=0,protectedFleetLoading=false,protectedFleetGeneration=0,protectedFleetCancel=null,protectedEventsRefreshPending=false,protectedAccountRefreshPending=false,dashboardRefreshTimer=0,protectedRefreshTimer=0,protectedEventsLoadedAt=0,protectedLastSuccessfulAt=0,protectedRefreshFailures=0,protectedTelemetryTrust='',protectedReportPrivacy=null,protectedReportShape=false;
-function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function jsArg(v){return encodeURIComponent(String(v??''))}
-function fromArg(v){try{return decodeURIComponent(String(v??''))}catch(e){return String(v??'')}}
-function clamp(v,min,max,fallback=0){let n=Number(v);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback}
-function cls(s){return s==='ALERT'||s==='DANGER'||s==='HIGH'||s==='CRITICAL'?'danger':s==='WATCH'?'watch':s==='NO DATA'||s==='INACTIVE'?'neutral':'safe'}
-function riskRank(d){return cls(d.status)==='danger'?4:cls(d.status)==='watch'?3:d.active!==false&&d.hasSession&&d.stale?2:d.location?1:0}
-function initials(n){return(n||'Driver').split(' ').filter(Boolean).map(x=>x[0]).join('').slice(0,2).toUpperCase()||'DR'}
-function validLoc(l){if(!l)return null;let lat=clamp(l.lat,-90,90,NaN),lng=clamp(l.lng,-180,180,NaN);return Number.isFinite(lat)&&Number.isFinite(lng)?{lat,lng}:null}
-function getJSON(k,f){try{let value=JSON.parse(localStorage.getItem(k)||JSON.stringify(f));return Array.isArray(f)?Array.isArray(value)?value.filter(row=>row&&typeof row==='object'&&!Array.isArray(row)):f:value}catch(e){return f}}
-function saveJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-/* fleet-view-preferences:start */
-// Persist only nonpersonal view choices after the owner and fleet are confirmed.
-let dashboardPreferenceScope='';
-function resetDashboardPreferences(){dashboardPreferenceScope='';for(const[id,value]of[['riskFilter','all'],['sortMode','risk'],['driverSearch','']]){let control=document.getElementById(id);if(control)control.value=value}}
-function dashboardPreferenceKey(){return fleetMode&&protectedUserId&&protectedFleetId&&currentProtectedOwner()===protectedUserId?'occulert-fleet-view-v1:'+JSON.stringify([protectedUserId,protectedFleetId]):''}
-function restoreDashboardPreferences(){let key=dashboardPreferenceKey();if(!key||key===dashboardPreferenceScope)return;resetDashboardPreferences();dashboardPreferenceScope=key;let value;try{let raw=localStorage.getItem(key);if(raw&&raw.length<=512)value=JSON.parse(raw)}catch{}if(!value||typeof value!=='object'||Array.isArray(value)||value.version!==1)return;for(const[id,allowed,field]of[['riskFilter',['all','danger','watch','stale'],'risk'],['sortMode',['risk','updated','score','alerts'],'sort']]){if(allowed.includes(value[field]))document.getElementById(id).value=value[field]}}
-function saveDashboardPreferences(){let key=dashboardPreferenceKey();if(!key||key!==dashboardPreferenceScope)return;let risk=document.getElementById('riskFilter').value,sort=document.getElementById('sortMode').value;if(!['all','danger','watch','stale'].includes(risk)||!['risk','updated','score','alerts'].includes(sort))return;try{localStorage.setItem(key,JSON.stringify({version:1,risk,sort}))}catch{}}
-/* fleet-view-preferences:end */
-function getLocal(){return getJSON('occulert-live-session',null)}
-function getDrivers(){return getJSON('occulert-drivers',[])}
-function getLeads(){return[]}
-function timestamp(x){let raw=x.lastUpdate||x.updatedAt||x.cloudUpdatedAt||x.savedAt||x.createdAt,t=raw?Date.parse(raw):NaN;return Number.isFinite(t)?t:0}
-function fresh(x){let t=timestamp(x);return !!t&&Date.now()-t<5*60*1000}
-function ageLabel(x){let t=timestamp(x);if(!t)return 'unknown';let s=Math.max(0,Math.floor((Date.now()-t)/1000));if(s<60)return s+'s ago';let m=Math.floor(s/60);if(m<60)return m+'m ago';return Math.floor(m/60)+'h ago'}
-function recordedPercent(value){if(value===null||value===undefined||typeof value==='boolean'||typeof value==='object'||(typeof value==='string'&&!value.trim()))return null;let n=Number(value);return Number.isFinite(n)&&n>=0&&n<=100?n:null}
-function normalize(x){let loc=validLoc(x.location)||validLoc(x),rawScore=recordedPercent(x.safetyScore),hasSafetyScore=rawScore!==null&&(x.hasSafetyScore===undefined||!!x.hasSafetyScore),score=hasSafetyScore?rawScore:0,fatigue=recordedPercent(x.fatigue),status=x.status||'NO DATA',lastUpdate=x.lastUpdate||x.updatedAt||x.cloudUpdatedAt||x.savedAt||x.createdAt,hasSession=x.hasSession===undefined?!!lastUpdate:!!x.hasSession;return{initials:initials(x.name),name:String(x.name||'Local Driver').slice(0,80),route:String(x.route||x.vehicle||x.driverId||'Browser / Driver App').slice(0,100),status,safetyScore:score,hasSafetyScore,detectorPipeline:detectorPipeline(x.detectorPipeline??x.detector_pipeline),hasSession,active:x.active!==false,sessionActive:x.sessionActive===undefined?hasSession:!!x.sessionActive,alerts:clamp(x.alerts,0,9999,0),headNods:clamp(x.headNods,0,9999,0),microsleeps:clamp(x.microsleeps,0,9999,0),perclos:recordedPercent(x.perclos),distractionSeconds:clamp(x.distractionSeconds,0,86400,0),escalationLevel:clamp(x.escalationLevel,0,10,0),fatigue,confidence:recordedPercent(x.confidence),lastUpdate,location:loc,distanceMiles:clamp(x.distanceMiles,0,999999,0),speedMph:clamp(x.speedMph,0,300,0),gpsEnabled:!!loc,stale:!fresh(x),cloudConsent:!!x.cloudConsent,cloudSynced:!!x.cloudSynced,driverId:String(x.driverId||x.id||x.name||'driver').slice(0,80)}}
-function rowHtml(label,value,kind=''){return `<div class="ops-row"><span>${esc(label)}</span><strong class="${kind}">${esc(value)}</strong></div>`}
-function actionRowHtml(label,value,kind='',driverId=''){let action=driverId?`<button class="btn action-open" type="button" onclick="focusDriver('${jsArg(driverId)}')" data-focus-key="action-driver-${esc(jsArg(driverId))}">Open driver</button>`:'';return `<div class="ops-row"><span>${esc(label)}</span><strong class="${kind}">${esc(value)}</strong>${action}</div>`}
-function emptyState(){return `<div class="notice"><strong>No live sessions.</strong><div class="empty-actions"><a class="btn primary" href="/fleet-onboarding.html" data-focus-key="empty-invite">Invite Drivers</a><a class="btn" href="/app.html" data-focus-key="empty-driver-app">Launch Driver App</a>${fleetMode?'':'<button class="btn warn" onclick="seedDemoData()" data-focus-key="empty-demo">Load Demo Data</button>'}</div></div>`}
-function pinXY(lat,lng,allLocs){if(!allLocs||allLocs.length<2)return{x:50,y:50};const lats=allLocs.map(l=>l.lat),lngs=allLocs.map(l=>l.lng),minLat=Math.min(...lats)-0.05,maxLat=Math.max(...lats)+0.05,minLng=Math.min(...lngs)-0.05,maxLng=Math.max(...lngs)+0.05,latRange=maxLat-minLat||0.1,lngRange=maxLng-minLng||0.1;return{x:Math.max(5,Math.min(92,((lng-minLng)/lngRange)*82+5)),y:Math.max(8,Math.min(90,((maxLat-lat)/latRange)*74+8))}}
-function renderMap(rows){let gps=rows.filter(d=>d.location),map=document.getElementById('map');document.getElementById('gpsDrivers').textContent=gps.length;document.getElementById('milesTracked').textContent=rows.reduce((a,d)=>a+d.distanceMiles,0).toFixed(2);document.getElementById('maxEscalation').textContent=rows.reduce((a,d)=>Math.max(a,d.escalationLevel),0);if(fleetMode){document.getElementById('gpsCount').textContent='excluded from protected view';map.innerHTML='<div><strong>GPS is not included</strong><p class="sub">The protected fleet summary excludes driver coordinates by design.</p></div>';return}document.getElementById('gpsCount').textContent=gps.length?gps.length+' local GPS active':'waiting for local GPS';if(!gps.length){map.innerHTML='<div><strong>No local GPS data</strong><p class="sub">Same-browser drivers must opt in before location appears.</p></div>';return}map.innerHTML='<div style="position:absolute;left:16px;top:14px;text-align:left"><strong>Same-browser GPS locations</strong><p class="sub">Opt-in local session or demo pins.</p></div>'+gps.map(d=>{let p=pinXY(d.location.lat,d.location.lng,gps.map(g=>g.location)),c=d.stale?'stale':cls(d.status),score=d.hasSafetyScore?d.safetyScore:'--';return `<div class="pin ${c}" style="left:${p.x}%;top:${p.y}%"><div class="tip"><strong>${esc(d.name)}</strong><br>${esc(d.status)} · score ${esc(score)}<br><span class="coords">${d.location.lat.toFixed(4)}, ${d.location.lng.toFixed(4)}</span><br>${d.speedMph} mph · ${d.distanceMiles.toFixed(2)} mi</div></div>`}).join('')}
-function filterRows(rows){let f=document.getElementById('riskFilter')?.value||'all',q=(document.getElementById('driverSearch')?.value||'').trim().toLowerCase();return rows.filter(d=>(f==='all'||(f==='danger'&&cls(d.status)==='danger')||(f==='watch'&&cls(d.status)==='watch')||(f==='stale'&&d.active!==false&&d.hasSession&&d.stale)||(f==='gps'&&!fleetMode&&d.location)||(f==='nogps'&&!fleetMode&&d.active!==false&&!d.location))&&(!q||[d.name,d.route,d.status,d.driverId].join(' ').toLowerCase().includes(q)))}
-function syncProtectedControls(){let select=document.getElementById('riskFilter');if(!select)return;Array.from(select.options).forEach(option=>{if(option.value==='gps'||option.value==='nogps')option.disabled=fleetMode});if(fleetMode&&(select.value==='gps'||select.value==='nogps'))select.value='all'}
-function sortRows(rows){let mode=document.getElementById('sortMode')?.value||'risk';return rows.slice().sort((a,b)=>mode==='updated'?timestamp(b)-timestamp(a):mode==='score'?(a.hasSafetyScore?a.safetyScore:Infinity)-(b.hasSafetyScore?b.safetyScore:Infinity):mode==='alerts'?b.alerts-a.alerts:riskRank(b)-riskRank(a)||Number(b.hasSafetyScore)-Number(a.hasSafetyScore)||a.safetyScore-b.safetyScore)}
-function renderOps(rows){
-  let drivers=fleetMode?protectedDrivers:getDrivers(),activeRows=rows.filter(d=>d.active!==false),leads=getLeads(),active=drivers.filter(d=>d.active!==false).length,live=activeRows.filter(d=>d.sessionActive&&!d.stale).length,newLeads=leads.filter(l=>!l.status||l.status==='New'||l.status==='new'||!l.cloudSynced).length,gps=activeRows.filter(r=>r.location).length,high=activeRows.filter(r=>cls(r.status)==='danger').length,watch=activeRows.filter(r=>cls(r.status)==='watch').length,stale=activeRows.filter(r=>r.hasSession&&r.stale).length,noGps=fleetMode?0:activeRows.filter(r=>!r.location).length,coverage=active?Math.min(100,Math.round((live/active)*100)):0;
-  let rosterSummary=fleetMode
-    ? rowHtml('Protected drivers',drivers.length)+rowHtml('Active / training',active)+rowHtml('Live coverage',coverage+'%')+`<div class="sub">Server-scoped to ${esc(protectedFleetName)}.</div>`
-    : rowHtml('Saved driver profiles',drivers.length)+rowHtml('Local sessions',activeRows.length)+rowHtml('Fresh now',live)+`<div class="sub">Same-browser local data.</div>`;
-  document.getElementById('rosterSummary').innerHTML=rosterSummary;
-  document.getElementById('leadSummary').innerHTML=rowHtml('Local leads',leads.length)+rowHtml('Needs follow-up',newLeads,newLeads?'yellow':'')+rowHtml('Newest',leads.length?new Date(leads[0].createdAt||Date.now()).toLocaleDateString():'--')+`<div class="sub">Fleet leads are separate from driver invitations.</div>`;
-  document.getElementById('coverageSummary').innerHTML=fleetMode?rowHtml('GPS data','Excluded')+rowHtml('Live sessions',live+'/'+active)+rowHtml('Cloud synced',rows.filter(r=>r.cloudSynced).length+'/'+rows.length):rowHtml('Local GPS shared',gps+'/'+activeRows.length)+rowHtml('No local GPS',noGps,noGps?'yellow':'')+rowHtml('Cloud synced',rows.filter(r=>r.cloudSynced).length+'/'+rows.length);
-  let actions=[];
-  if(fleetMode){
-    sortRows(activeRows).filter(row=>cls(row.status)==='danger'||cls(row.status)==='watch'||(row.hasSession&&row.stale)).slice(0,4).forEach(row=>{let state=cls(row.status)==='danger'?'High-priority review':cls(row.status)==='watch'?'Watch follow-up':'Session check-in',detail=row.hasSafetyScore?`${row.status} · score ${row.safetyScore} · ${row.alerts} alert${row.alerts===1?'':'s'}`:`${row.status} · no recorded score`;actions.push({label:`${state}: ${row.name}`,value:detail,kind:cls(row.status)==='danger'?'red':cls(row.status)==='watch'?'yellow':'',driverId:row.driverId})});
-    let notReporting=Math.max(0,active-activeRows.filter(row=>row.hasSession).length);
-    if(notReporting&&actions.length<4)actions.push({label:'Reporting coverage',value:`${notReporting} active driver${notReporting===1?' has':'s have'} no recorded session`,kind:'yellow'});
-  }else{
-    if(high)actions.push({label:'Action 1',value:`${high} high-risk driver${high===1?'':'s'} need immediate review.`,kind:'red'});
-    if(watch)actions.push({label:`Action ${actions.length+1}`,value:`${watch} driver${watch===1?' is':'s are'} in watch state.`,kind:'yellow'});
-    if(stale)actions.push({label:`Action ${actions.length+1}`,value:`${stale} stale session${stale===1?'':'s'} need check-in.`});
-    if(noGps&&activeRows.length)actions.push({label:`Action ${actions.length+1}`,value:`${noGps} active session${noGps===1?' has':'s have'} no local GPS consent.`});
-    if(newLeads)actions.push({label:`Action ${actions.length+1}`,value:`${newLeads} fleet lead${newLeads===1?'':'s'} need follow-up.`});
-  }
-  if(!drivers.length)actions.push({label:fleetMode?'Build the roster':`Action ${actions.length+1}`,value:fleetMode?'Invite drivers to start protected reporting.':'Add driver profiles before fleet demos.'});
-  if(!actions.length)actions.push({label:'Queue clear',value:'No urgent fleet actions.'});
-  lastOpsSummary=actions.map(action=>`${action.label}: ${action.value}`).join('\n');
-  document.getElementById('actionQueue').innerHTML=actions.map(action=>actionRowHtml(action.label,action.value,action.kind,action.driverId)).join('')
-}
-function relativeAgeHtml(value){return `<span data-age-at="${esc(value)}">${esc(ageLabel({lastUpdate:value}))}</span>`}
-function refreshRelativeTimes(){document.querySelectorAll('[data-age-at]').forEach(element=>{element.textContent=ageLabel({lastUpdate:element.dataset.ageAt})})}
-function driverRow(d){let c=cls(d.status),rowClass=c==='danger'?'priority':c==='watch'?'watchrow':d.stale&&d.hasSession?'stale':'',age=d.hasSession?relativeAgeHtml(d.lastUpdate):'not recorded',score=d.hasSafetyScore?d.safetyScore:'--',metrics=d.hasSession?`Fatigue ${metricValue(d.fatigue,'/100')}<br>Confidence ${metricValue(d.confidence,'%')}<br>PERCLOS ${metricValue(d.perclos,'%')}`:'No recorded session metrics',key=esc(jsArg(d.driverId));return `<article class="driver ${rowClass}" tabindex="-1" data-driver-key="${key}" aria-label="${esc(d.name)} ${esc(d.status)}"><div class="avatar">${esc(d.initials)}</div><div class="driver-identity"><div class="name">${esc(d.name)}</div><div class="sub">${esc(d.route)}<br>${fleetMode?'GPS excluded from protected view':d.location?`GPS <span class="coords">${d.location.lat.toFixed(4)}, ${d.location.lng.toFixed(4)}</span> · ${d.speedMph} mph · ${d.distanceMiles.toFixed(2)} mi`:'GPS not shared'}<br>Updated ${age}</div></div><div class="driver-state"><span class="pill ${c}">${esc(d.status)}</span>${d.stale&&d.hasSession?'<br><span class="pill stale-pill" style="margin-top:6px">STALE</span>':''}</div><div class="driver-score"><div class="label">Score</div><strong>${esc(score)}</strong>${d.hasSafetyScore?`<div class="sub score-source">${esc(detectorLabel(d.detectorPipeline))}</div>`:''}<div class="score"><span style="width:${d.hasSafetyScore?d.safetyScore:0}%"></span></div></div><div class="sub driver-metrics">${metrics}</div><div class="driver-actions"><button class="btn" onclick="copyDriver('${jsArg(d.driverId)}')" data-focus-key="driver-copy-${key}">Copy</button><a class="btn" href="/session-history.html" data-focus-key="driver-history-${key}">History</a></div></article>`}
-function eventRows(rows){let events=rows.filter(d=>d.hasSession);if(!events.length)return '<div class="notice">No recorded session events yet.</div>';return events.slice(0,10).map(d=>`<div class="event"><div class="dot" style="background:${cls(d.status)==='danger'?'#ef4444':cls(d.status)==='watch'?'#f59e0b':'#10b981'}"></div><div><div>${esc(d.name)}: ${esc(d.status)} · score ${esc(d.hasSafetyScore?d.safetyScore:'--')} · alerts ${d.alerts} · esc ${d.escalationLevel}</div><div class="sub">${!fleetMode&&d.location?`GPS ${d.location.lat.toFixed(4)}, ${d.location.lng.toFixed(4)} · `:''}${relativeAgeHtml(d.lastUpdate)}</div></div></div>`).join('')}
-/* protected-session-history:start */
-function safeDate(value){let t=value?Date.parse(value):NaN;return Number.isFinite(t)?new Date(t):null}
-function dateLabel(value){let d=safeDate(value);return d?d.toLocaleString():'Not recorded'}
-function sessionCompletionState(session,now=Date.now()){if(!session.endedAt)return'No recorded end time';let start=safeDate(session.startedAt),end=safeDate(session.endedAt);return start&&end&&end>=start&&end.getTime()<=now?'Completed':'Invalid recorded dates'}
-function durationLabel(start,end){let a=safeDate(start),b=safeDate(end);if(!a||!b||b<a||b.getTime()>Date.now())return'Not recorded';let minutes=Math.round((b-a)/60000);return minutes<60?minutes+' min':Math.floor(minutes/60)+'h '+(minutes%60)+'m'}
-function metricValue(value,suffix=''){if(value===null||value===undefined||typeof value==='boolean'||typeof value==='object'||(typeof value==='string'&&!value.trim()))return'--';let n=Number(value);return Number.isFinite(n)?Math.round(n)+suffix:'--'}
-const DETECTOR_LABELS={web_mediapipe_ear:'Web camera (MediaPipe EAR)',ios_mlkit_eye_probability:'iPhone (ML Kit eye probability)',android_mlkit_eye_probability:'Android (ML Kit eye probability)'};
-function detectorPipeline(value){return typeof value==='string'&&Object.prototype.hasOwnProperty.call(DETECTOR_LABELS,value)?value:null}
-function detectorVersion(value){return typeof value==='string'&&/^[a-zA-Z0-9._() -]{1,80}$/.test(value)?value:null}
-function detectorLabel(value){return value?DETECTOR_LABELS[value]:'Not recorded'}
-function detectorProvenanceTrust(session){return session.detectorPipeline||session.detectorVersion||session.appVersion?'client_declared':'not_recorded'}
-function sessionView(raw){raw=raw||{};return{id:String(raw.id||raw.sessionId||raw.session_id||''),driverId:String(raw.driver_id||raw.driverId||''),driverName:String(raw.driverName||raw.name||'Local Driver').slice(0,80),startedAt:raw.started_at||raw.startedAt||raw.startTime||raw.savedAt||raw.createdAt||raw.lastUpdate,endedAt:raw.ended_at||raw.endedAt||raw.endTime||raw.savedAt,averageFatigue:raw.average_fatigue??raw.averageFatigue??raw.avgFatigue??raw.fatigue,maxFatigue:raw.max_fatigue??raw.maxFatigue,safetyScore:raw.safety_score??raw.safetyScore,alertCount:raw.alert_count??raw.alertCount??raw.alerts,headNodCount:raw.head_nod_count??raw.headNodCount??raw.headNods,device:String(raw.device||raw.browser||'Not recorded').slice(0,120),detectorPipeline:detectorPipeline(raw.detector_pipeline??raw.detectorPipeline),detectorVersion:detectorVersion(raw.detector_version??raw.detectorVersion),appVersion:detectorVersion(raw.app_version??raw.appVersion),events:Array.isArray(raw.events)?raw.events:[]}}
-function sessionHistoryRows(){if(fleetMode){let names=new Map(protectedDrivers.map(d=>[String(d.id),String(d.name||'Driver')]));return protectedSessions.map(s=>sessionView({...s,driverName:names.get(String(s.driver_id))||'Driver'}))}if(demoRows.length)return demoRows.map(sessionView);return getJSON('occulert-session-history',[]).slice(0,50).map(sessionView)}
-function eventsForSession(session){let rows=fleetMode?protectedEvents:session.events;return rows.filter(e=>String(e.session_id||e.sessionId||session.id)===session.id).slice(0,20)}
-function getProtectedPilotSnapshot(){return{fleetMode,userId:protectedUserId,fleetId:protectedFleetId,fleetName:protectedFleetName,days:pilotWindowDays(),drivers:protectedDrivers,sessions:protectedSessions,telemetryTrust:protectedTelemetryTrust,privacy:protectedReportPrivacy,summaryValid:protectedReportShape,lastSuccessfulAt:protectedLastSuccessfulAt,refreshFailures:protectedRefreshFailures}}
-function allowProtectedShare(){let reason=window.OcculertPilotReport?.sourceAccess({...getProtectedPilotSnapshot(),currentUserId:window.OcculertBackend?.currentUser()?.id||''},Date.now());if(reason==='')return true;toast('Refresh protected fleet data before sharing or exporting');return false}
-function allowDashboardShare(){return!fleetMode&&!protectedUserId||allowProtectedShare()}
-function pilotWindowDays(){let days=Number(document.getElementById('pilotRange')?.value||30);return days===7?7:30}
-function pilotWindowSessions(days=pilotWindowDays()){let now=Date.now(),cutoff=now-days*86400000;return sessionHistoryRows().slice(0,50).filter(session=>{let started=safeDate(session.startedAt);return started&&started.getTime()>=cutoff&&started.getTime()<=now})}
-/* pilot-launch-checklist:start */
-function pilotLaunchState(input={}){
-  let now=Number.isFinite(Number(input.now))?Number(input.now):Date.now();
-  let drivers=Array.isArray(input.drivers)?input.drivers:[];
-  let sessions=(Array.isArray(input.sessions)?input.sessions:[]).slice(0,50);
-  let activeDrivers=drivers.filter(driver=>driver&&driver.active!==false).length;
-  let sessionTimes=sessions.map(session=>Date.parse(session&&(session.started_at||session.startedAt)||''))
-    .filter(time=>Number.isFinite(time)&&time<=now).sort((a,b)=>a-b);
-  let firstSessionReady=sessionTimes.length>0;
-  let recordedAgeDays=firstSessionReady?Math.floor((now-sessionTimes[0])/86400000):0;
-  return{fleetReady:input.fleetReady===true,activeDrivers,driverTarget:Math.min(5,activeDrivers),
-    overPilotTarget:activeDrivers>5,firstSessionReady,sessionCount:sessionTimes.length,
-    displayReady:input.fleetReady===true,sevenDayDataReady:recordedAgeDays>=7,
-    thirtyDayDataReady:recordedAgeDays>=30,recordedAgeDays,historyLimited:sessions.length===50};
-}
-function setLaunchStep(id,state,status){let step=document.getElementById(id);if(step)step.dataset.state=state;let label=document.getElementById(id.replace('Step','Status'));if(label)label.textContent=status}
-function renderPilotLaunchChecklist(){
-  let state=pilotLaunchState({fleetReady:fleetMode&&!!protectedFleetName,
-    drivers:fleetMode?protectedDrivers:[],sessions:fleetMode?protectedSessions:[],now:Date.now()});
-  let age=state.recordedAgeDays;
-  let badge=state.firstSessionReady
-    ?`Earliest loaded session: ${age===0?'today':`${age} day${age===1?'':'s'} ago`}${state.historyLimited?' · latest 50':''}`
-    :state.fleetReady?'Ready to set up':'Pre-launch';
-  let driverStatus=state.overPilotTarget?`${state.activeDrivers} active · choose up to 5 for the pilot`:`${state.driverTarget} of 5 active drivers`;
-  let reviewStatus=state.thirtyDayDataReady?'Oldest loaded session is at least 30 days old · use agreed review dates'
-    :state.sevenDayDataReady?'Oldest loaded session is at least 7 days old · use agreed review dates'
-    :state.firstSessionReady?'Recorded sessions available · use agreed review dates'
-    :'No recorded sessions · trial dates confirmed separately';
-  document.getElementById('pilotLaunchBadge').textContent=badge;
-  setLaunchStep('launchFleetStep',state.fleetReady?'complete':'pending',state.fleetReady?'Protected fleet ready':'Sign in and create a fleet');
-  setLaunchStep('launchDriversStep',state.overPilotTarget?'available':state.activeDrivers?'complete':state.fleetReady?'available':'pending',driverStatus);
-  setLaunchStep('launchSessionStep',state.firstSessionReady?'complete':state.activeDrivers?'available':'pending',
-    state.firstSessionReady?`${state.sessionCount}${state.historyLimited?' recent':''} protected session${state.sessionCount===1?'':'s'} recorded${state.historyLimited?' · 50-record limit':''}`:'Waiting for first protected session');
-  setLaunchStep('launchDisplayStep',state.displayReady?'available':'pending',state.displayReady?'Privacy-safe display available':'Available after fleet setup');
-  setLaunchStep('launchReviewStep',state.firstSessionReady?'available':'pending',reviewStatus);
-}
-/* pilot-launch-checklist:end */
-function pilotMetrics(){let days=pilotWindowDays(),sessions=pilotWindowSessions(days),activeDrivers=fleetMode?protectedDrivers.filter(driver=>driver.active!==false):getDrivers().filter(driver=>driver.active!==false),sessionDrivers=new Set(sessions.map(session=>session.driverId||session.driverName).filter(Boolean)),activeDriverIds=new Set(activeDrivers.map(driver=>String(driver.id||driver.driverId||driver.name||''))),coveredDrivers=fleetMode?new Set(Array.from(sessionDrivers).filter(driverId=>activeDriverIds.has(String(driverId)))):sessionDrivers,rosterCount=fleetMode?activeDrivers.length:Math.max(activeDrivers.length,coveredDrivers.size),coverage=rosterCount?Math.min(100,Math.round(coveredDrivers.size/rosterCount*100)):0,scored=sessions.filter(session=>metricValue(session.safetyScore)!=='--'),average=scored.length?Math.round(scored.reduce((sum,session)=>sum+Number(session.safetyScore),0)/scored.length):null,review=sessions.filter(session=>Number(session.alertCount||0)>0||(metricValue(session.safetyScore)!=='--'&&Number(session.safetyScore)<70)),completed=sessions.filter(session=>sessionCompletionState(session)==='Completed').length,alerts=sessions.reduce((sum,session)=>sum+Math.max(0,Number(session.alertCount)||0),0);return{days,sessions,sessionDrivers,coveredDrivers,rosterCount,coverage,scored,average,review,completed,alerts}}
-function renderPilotValue(){let metrics=pilotMetrics(),plan=protectedFleetPlan?protectedFleetPlan.replace(/[_-]+/g,' '):fleetMode?'fleet':'evaluation';document.getElementById('fleetPlanBadge').textContent=plan+' workspace';document.getElementById('pilotWindowLabel').textContent=`Last ${metrics.days} days · ${metrics.sessions.length} of up to 50 recent sessions`;document.getElementById('valueSessions').textContent=metrics.sessions.length;document.getElementById('valueSessionsSub').textContent=metrics.completed+' completed';document.getElementById('valueCoverage').textContent=metrics.coverage+'%';document.getElementById('valueCoverageSub').textContent=metrics.rosterCount?`${metrics.coveredDrivers.size} of ${metrics.rosterCount} active drivers reporting`:'no participating drivers';document.getElementById('valueReview').textContent=metrics.review.length;document.getElementById('valueReviewSub').textContent=metrics.alerts?metrics.alerts+' client-reported alerts':'no reported alerts';document.getElementById('valueScore').textContent=metrics.average??'--';document.getElementById('valueScoreSub').textContent=metrics.scored.length?metrics.scored.length+' sessions with scores':'no recorded scores';document.getElementById('pilotValueStory').textContent=metrics.sessions.length?`${metrics.sessions.length} sessions across ${metrics.sessionDrivers.size} drivers created ${metrics.review.length} manager review candidate${metrics.review.length===1?'':'s'} in this window.`:'Record protected sessions to build a manager-ready activity summary.';window.OcculertPilotReport?.update()}
-const dashboardDownloadUrls=new Map();
-function clearDashboardDownloads(){
-  for(const [url,timer] of dashboardDownloadUrls){clearTimeout(timer);URL.revokeObjectURL(url)}
-  dashboardDownloadUrls.clear();
-}
-window.addEventListener('pagehide',clearDashboardDownloads);
-function requestDashboardCSVDownload(csv,filename,protectedOnly=false){
-  const owner=currentProtectedOwner(),generation=protectedFleetGeneration,mode=fleetMode;
-  if(protectedOnly?!allowProtectedShare():!allowDashboardShare())return;
-  let url='',anchor=null;
-  try{
-    url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-    anchor=document.createElement('a');anchor.href=url;anchor.download=filename;
-    document.body.appendChild(anchor);
-    if(owner!==currentProtectedOwner()||generation!==protectedFleetGeneration||mode!==fleetMode||(protectedOnly?!allowProtectedShare():!allowDashboardShare()))return;
-    anchor.click();
-    const downloadUrl=url;
-    dashboardDownloadUrls.set(downloadUrl,setTimeout(()=>{URL.revokeObjectURL(downloadUrl);dashboardDownloadUrls.delete(downloadUrl)},15000));
-    url='';
-    toast('Download requested — check your browser downloads');
-  }catch(error){toast('Download unavailable — refresh and try again')}
-  finally{anchor?.remove();if(url)URL.revokeObjectURL(url)}
-}
-function exportPilotReport(){
-  if(!allowProtectedShare())return;
-  const metrics=pilotMetrics();if(!metrics.sessions.length){toast('No sessions in this reporting window');return}
-  const header=['fleet','window_days','driver','started','ended','duration','safety_score','alert_count','head_nod_count','detector_pipeline','detector_version','app_version','detector_provenance_trust','telemetry_trust','report_scope','exported_record_count'];
-  const rows=metrics.sessions.map(session=>[protectedFleetName||'Local trial',metrics.days,session.driverName,session.startedAt||'',session.endedAt||'',durationLabel(session.startedAt,session.endedAt),session.safetyScore??'',session.alertCount??'',session.headNodCount??'',session.detectorPipeline||'',session.detectorVersion||'',session.appVersion||'',detectorProvenanceTrust(session),'unverified_client_report','selected_window_within_latest_50_sessions_incomplete_period',metrics.sessions.length]);
-  const csv=[header,...rows].map(row=>row.map(value=>`"${OcculertSecurity.csvCell(value).replace(/"/g,'""')}"`).join(',')).join('\n');
-  requestDashboardCSVDownload(csv,`occulert-trial-report-${metrics.days}d.csv`,true);
-}
-function eventHistoryHtml(event){let type=String(event.type||'event').replace(/_/g,' ').slice(0,40),fatigue=metricValue(event.fatigue_score??event.fatigueScore,'/100'),confidence=metricValue(event.confidence,'%');return `<div class="history-event"><span class="history-event-type">${esc(type)}</span><span>${esc(dateLabel(event.created_at||event.createdAt))}</span><span class="sub">Fatigue ${esc(fatigue)} · confidence ${esc(confidence)}</span></div>`}
-function renderSessionHistory(){let root=document.getElementById('sessionHistory'),panel=document.querySelector('.history-details');if(!root)return;if(panel&&!panel.open){sessionHistoryDirty=true;return}let sessions=sessionHistoryRows();if(!sessions.length){root.innerHTML=`<div class="notice history-empty">${fleetMode?'No protected sessions have been recorded for this fleet yet.':'Sign in as a verified fleet owner to view protected history. Local-only session history will remain available on this browser.'}</div>`;sessionHistoryDirty=false;return}root.innerHTML=sessions.map(session=>{let events=eventsForSession(session),status=sessionCompletionState(session);return `<article class="history-item" role="listitem"><div class="history-head"><div><div class="name">${esc(session.driverName)}</div><div class="sub">Started ${esc(dateLabel(session.startedAt))} · ${esc(durationLabel(session.startedAt,session.endedAt))}</div></div><span class="pill ${status==='Completed'?'safe':'watch'}">${esc(status)}</span></div><div class="history-metrics"><div class="history-metric"><div class="label">Safety</div><strong>${esc(metricValue(session.safetyScore))}</strong></div><div class="history-metric"><div class="label">Avg fatigue</div><strong>${esc(metricValue(session.averageFatigue))}</strong></div><div class="history-metric"><div class="label">Max fatigue</div><strong>${esc(metricValue(session.maxFatigue))}</strong></div><div class="history-metric"><div class="label">Alerts</div><strong>${esc(metricValue(session.alertCount))}</strong></div><div class="history-metric"><div class="label">Head nods</div><strong>${esc(metricValue(session.headNodCount))}</strong></div><div class="history-metric"><div class="label">Device</div><strong>${esc(session.device)}</strong></div></div><div class="trust-note">Detector provenance: ${esc(detectorLabel(session.detectorPipeline))} · detector version ${esc(session.detectorVersion||'Not recorded')} · app version ${esc(session.appVersion||'Not recorded')}. Metadata are client declared when present.</div><div class="history-events">${events.length?events.map(eventHistoryHtml).join(''):'<div class="trust-note">No alert events in the available sample. Events may not be loaded or may be omitted.</div>'}</div><div class="trust-note">Client-reported telemetry · GPS and personal media excluded · ${fleetMode?'Events show up to 20 per session from up to 200 recent fleet events.':'Local events show up to 20 per session.'}</div></article>`}).join('');sessionHistoryDirty=false}
-function protectedHistoryOpen(){return document.querySelector('.history-details')?.open===true}
-function handleHistoryToggle(event){if(!event.currentTarget.open)return;if(sessionHistoryDirty)renderSessionHistory();if(fleetMode&&shouldRefreshProtectedEvents({historyOpen:true,lastLoadedAt:protectedEventsLoadedAt}))void refreshProtectedFleetNow({forceEvents:true})}
-function exportSessionHistoryCSV(){
-  if(!allowDashboardShare())return;
-  const sessions=sessionHistoryRows();if(!sessions.length){toast('No session history to export');return}
-  const header=['driver','started','ended','duration','safety_score','average_fatigue','max_fatigue','alert_count','head_nod_count','device','available_event_count','detector_pipeline','detector_version','app_version','detector_provenance_trust','telemetry_trust','report_scope','exported_record_count'];
-  const scope=fleetMode?'latest_up_to_50_protected_sessions_incomplete_period':demoRows.length?'loaded_local_demo_rows':'latest_up_to_50_local_sessions';
-  const rows=sessions.map(session=>[session.driverName,session.startedAt||'',session.endedAt||'',durationLabel(session.startedAt,session.endedAt),session.safetyScore??'',session.averageFatigue??'',session.maxFatigue??'',session.alertCount??'',session.headNodCount??'',session.device,eventsForSession(session).length,session.detectorPipeline||'',session.detectorVersion||'',session.appVersion||'',detectorProvenanceTrust(session),'unverified_client_report',scope,sessions.length]);
-  const csv=[header,...rows].map(row=>row.map(value=>`"${OcculertSecurity.csvCell(value).replace(/"/g,'""')}"`).join(',')).join('\n');
-  requestDashboardCSVDownload(csv,fleetMode?'occulert-protected-session-history.csv':'occulert-local-demo-session-history.csv');
-}
-/* protected-session-history:end */
-function dashboardDataSnapshot(){let local=fleetMode?null:getLocal(),rawRows=cloudRows.length||fleetMode?cloudRows:local?[local]:[];return JSON.stringify({fleetMode,protectedFleetName,protectedFleetPlan,cloudRows,protectedDrivers,protectedSessions,protectedEvents,local,localDrivers:fleetMode?null:getDrivers(),localHistory:fleetMode?null:getJSON('occulert-session-history',[]),freshness:rawRows.map(row=>[String(row.driverId||row.id||row.name||''),timestamp(row),fresh(row)])})}
-function captureDashboardFocus(){let active=document.activeElement,key=active&&active.getAttribute&&active.getAttribute('data-focus-key');return key?{key}:null}
-function restoreDashboardFocus(state){if(!state)return;let target=Array.from(document.querySelectorAll('[data-focus-key]')).find(element=>element.getAttribute('data-focus-key')===state.key);if(target){try{target.focus({preventScroll:true})}catch(error){target.focus()}}}
-function renderDriverList(){lastRows=sortRows(lastRows);let visible=filterRows(lastRows);document.getElementById('drivers').innerHTML=visible.length?visible.map(driverRow).join(''):lastRows.length?'<div class="notice"><strong>No drivers match this filter.</strong></div>':emptyState()}
-function queueDriverListRender(){if(driverListFrame)cancelAnimationFrame(driverListFrame);driverListFrame=requestAnimationFrame(()=>{driverListFrame=0;renderDriverList()})}
-function focusDriver(id){id=fromArg(id);let driver=lastRows.find(row=>row.driverId===id);if(!driver)return;let search=document.getElementById('driverSearch'),filter=document.getElementById('riskFilter');search.value=driver.name;if(filter)filter.value='all';renderDriverList();requestAnimationFrame(()=>{let target=document.querySelector(`[data-driver-key="${CSS.escape(jsArg(id))}"]`);if(target){target.scrollIntoView({behavior:'smooth',block:'center'});target.focus({preventScroll:true})}})}
-function render(){let focused=captureDashboardFocus(),rows=cloudRows.map(normalize),local=getLocal();if(!rows.length&&!fleetMode&&local)rows=[normalize(local)];rows=sortRows(rows);lastRows=rows;let activeRows=rows.filter(d=>d.active!==false),liveRows=activeRows.filter(d=>d.sessionActive&&!d.stale),scoreRows=activeRows.filter(d=>d.hasSafetyScore),alertCount=activeRows.reduce((a,d)=>a+d.alerts,0),avg=scoreRows.length?Math.round(scoreRows.reduce((a,d)=>a+d.safetyScore,0)/scoreRows.length):'--',risk=activeRows.filter(d=>cls(d.status)==='danger').length,stale=activeRows.filter(d=>d.hasSession&&d.stale).length,latest=activeRows.reduce((best,d)=>timestamp(d)>timestamp(best||{})?d:best,null);document.getElementById('kpiDrivers').textContent=activeRows.length;document.getElementById('kpiDriversSub').textContent=liveRows.length+' live';document.getElementById('kpiScore').textContent=avg;document.getElementById('kpiScoreSub').textContent=scoreRows.length?scoreRows.filter(d=>d.safetyScore<70).length+' below 70':'no recorded scores';document.getElementById('kpiAlerts').textContent=alertCount;document.getElementById('kpiAlertsSub').textContent=activeRows.reduce((a,d)=>a+d.microsleeps,0)+' microsleeps';document.getElementById('kpiRisk').textContent=risk;document.getElementById('kpiRiskSub').textContent=activeRows.filter(d=>cls(d.status)==='watch').length+' watch';document.getElementById('kpiStale').textContent=stale;document.getElementById('updated').innerHTML=latest?'updated '+relativeAgeHtml(latest.lastUpdate):'waiting for data';renderOps(rows);renderPilotLaunchChecklist();renderPilotValue();renderDriverList();document.getElementById('events').innerHTML=eventRows(rows);renderMap(rows);renderSessionHistory();lastDashboardSnapshot=dashboardDataSnapshot();restoreDashboardFocus(focused)}
-function refreshDashboardIfNeeded(){window.OcculertPilotReport?.update();let snapshot=dashboardDataSnapshot();if(snapshot!==lastDashboardSnapshot){render();return}refreshRelativeTimes()}
-function toast(msg){let el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800)}
-/* dashboard-sharing:start */
-function copyOpsSummary(){if(!allowDashboardShare()||!lastOpsSummary)return;try{navigator.clipboard.writeText(lastOpsSummary);toast('Action summary copied')}catch(e){alert(lastOpsSummary)}}
-function copyDriver(id){if(!allowDashboardShare())return;id=fromArg(id);let d=lastRows.find(x=>x.driverId===id);if(!d)return;let score=d.hasSafetyScore?d.safetyScore+'/100':'not recorded',metrics=d.hasSession?`, fatigue ${metricValue(d.fatigue,'/100')}, alerts ${d.alerts}`:', no recorded session metrics',text=`${d.name}: ${d.status}\nScore ${score}${metrics}\nUpdated ${d.hasSession?ageLabel(d):'not recorded'}${!fleetMode&&d.location?`\nGPS ${d.location.lat.toFixed(4)}, ${d.location.lng.toFixed(4)}`:''}`;try{navigator.clipboard.writeText(text);toast('Driver summary copied')}catch(e){alert(text)}}
-function exportFleetCSV(){
-  if(!allowDashboardShare())return;
-  const rows=lastRows.length?lastRows:[];if(!rows.length){toast('No dashboard rows to export');return}
-  const header=['name','status','safetyScore','fatigue','confidence','alerts','perclos','escalation','gps','lat','lng','updated','report_scope','exported_record_count'];
-  const scope=fleetMode?'loaded_protected_dashboard_rows_driver_filters_not_applied':'loaded_local_demo_dashboard_rows_driver_filters_not_applied';
-  const values=rows.map(d=>[d.name,d.status,d.hasSafetyScore?d.safetyScore:'',d.hasSession?d.fatigue:'',d.hasSession?d.confidence:'',d.hasSession?d.alerts:'',d.hasSession?d.perclos:'',d.hasSession?d.escalationLevel:'',!fleetMode&&!!d.location,!fleetMode&&d.location?d.location.lat:'',!fleetMode&&d.location?d.location.lng:'',d.lastUpdate||'',scope,rows.length]);
-  const csv=[header,...values].map(row=>row.map(value=>`"${OcculertSecurity.csvCell(value).replace(/"/g,'""')}"`).join(',')).join('\n');
-  requestDashboardCSVDownload(csv,fleetMode?'occulert-protected-fleet-dashboard.csv':'occulert-local-demo-fleet-dashboard.csv');
-}
-/* dashboard-sharing:end */
-function seedDemoData(){if(fleetMode||currentProtectedOwner()){toast('Sign out before loading local demo data');return}let now=Date.now(),rows=[{name:'Avery R.',driverId:'demo-avery',route:'Route 12 / Van 4',status:'ALERT',safetyScore:48,fatigue:86,confidence:91,alerts:3,perclos:42,escalationLevel:3,microsleeps:1,headNods:2,location:{lat:37.7749,lng:-122.4194},speedMph:21,distanceMiles:14.2,lastUpdate:new Date(now-42000).toISOString(),cloudConsent:true},{name:'Mina S.',driverId:'demo-mina',route:'Airport shuttle',status:'WATCH',safetyScore:72,fatigue:58,confidence:88,alerts:1,perclos:22,escalationLevel:1,location:{lat:37.6213,lng:-122.3790},speedMph:34,distanceMiles:22.8,lastUpdate:new Date(now-120000).toISOString(),cloudConsent:true},{name:'Jordan K.',driverId:'demo-jordan',route:'Warehouse return',status:'SAFE',safetyScore:93,fatigue:12,confidence:94,alerts:0,perclos:4,escalationLevel:0,lastUpdate:new Date(now-8*60000).toISOString(),cloudConsent:false}];demoRows=rows;cloudRows=demoRows;sessionHistoryDirty=true;render();toast('Demo data loaded — saved local sessions are unchanged')}
-function clearDemoData(){demoRows=[];if(!fleetMode){cloudRows=[];sessionHistoryDirty=true;render()}toast('Demo data cleared — saved local sessions are unchanged')}
-/* fleet-summary-projection:start */
-function rowsFromFleet(summary){let sessions=Array.isArray(summary.sessions)?summary.sessions:[],latest=new Map();sessions.forEach(s=>{if(!latest.has(s.driver_id))latest.set(s.driver_id,s)});return (summary.drivers||[]).map(d=>{let s=latest.get(d.id),active=d.active!==false,hasSafetyScore=!!s&&s.safety_score!==null&&s.safety_score!==undefined&&s.safety_score!==''&&Number.isFinite(Number(s.safety_score)),score=hasSafetyScore?Number(s.safety_score):null,status=!active?'INACTIVE':!s||!hasSafetyScore?'NO DATA':score<50?'ALERT':score<75?'WATCH':'SAFE';return{name:d.name,driverId:d.id,route:d.vehicle_id||'Unassigned vehicle',status,safetyScore:score,hasSafetyScore,hasSession:!!s,active,sessionActive:!!s&&!s.ended_at,fatigue:s&&s.max_fatigue,alerts:s&&s.alert_count,lastUpdate:s&&(s.ended_at||s.started_at),cloudConsent:true,cloudSynced:true,detectorPipeline:s&&s.detector_pipeline}})}
-/* fleet-summary-projection:end */
-/* fleet-refresh-request:start */
-function setProtectedFleetBusy(value){protectedFleetLoading=value;let button=document.getElementById('refreshNow');if(button){button.disabled=value;button.textContent=value?'Refreshing…':'Refresh now'}document.getElementById('cloudStatus')?.setAttribute('aria-busy',String(value))}
-function cancelProtectedFleetRefresh(){protectedFleetGeneration+=1;protectedFleetCancel?.()}
-async function boundedProtectedFleetRequest(work,cancelled){let timer;try{return await Promise.race([Promise.resolve().then(work),cancelled,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Protected request timed out')),PROTECTED_REQUEST_TIMEOUT_MS)})])}finally{clearTimeout(timer)}}
-function currentProtectedOwner(){let user=window.OcculertBackend?.currentUser?.();return typeof user?.id==='string'?user.id:''}
-function showSignedOutActions(show){document.getElementById('signedOutActions')?.classList.toggle('hidden',!show);document.getElementById('driverAppNav')?.classList.toggle('hidden',!show);document.getElementById('accountNav')?.classList.toggle('hidden',show);document.getElementById('refreshNow')?.classList.toggle('hidden',show);let primary=document.getElementById('fleetPrimaryNav');if(primary){primary.href=show?'/login.html':'/fleet-onboarding.html';primary.textContent=show?'Sign In':'Fleet setup'}}
-function clearProtectedFleetCache(){resetDashboardPreferences();window.OcculertFollowups?.reset();window.OcculertPilotReport?.reset();protectedTelemetryTrust='';protectedReportPrivacy=null;protectedReportShape=false;cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedEventsRefreshPending=false;protectedFleetId='';protectedFleetName='';protectedFleetPlan='';protectedEventsLoadedAt=0;protectedLastSuccessfulAt=0;protectedRefreshFailures=0;sessionHistoryDirty=true;lastDashboardSnapshot=''}
-function resetProtectedFleet(){cancelProtectedFleetRefresh();let localDemoRows=demoRows;fleetMode=false;protectedUserId='';protectedAccountRefreshPending=false;clearProtectedFleetCache();cloudRows=localDemoRows;showSignedOutActions(true);syncProtectedControls();document.getElementById('cloudStatus').textContent='Not signed in. Showing same-browser local data only; protected fleet data remains unavailable.';render()}
-function reconcileProtectedOwner(expectedUserId){let currentUserId=currentProtectedOwner();if(currentUserId===expectedUserId)return false;if(!currentUserId){resetProtectedFleet();return true}cancelProtectedFleetRefresh();clearProtectedFleetCache();protectedUserId=currentUserId;fleetMode=true;protectedAccountRefreshPending=true;showSignedOutActions(false);syncProtectedControls();document.getElementById('cloudStatus').textContent='Signed-in account changed. Loading the new account’s protected fleet data.';render();return true}
-function recordProtectedRefreshFailure(stage){protectedRefreshFailures=Math.min(4,protectedRefreshFailures+1);let last=protectedLastSuccessfulAt?new Date(protectedLastSuccessfulAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';document.getElementById('cloudStatus').textContent=stage==='account'?'Account check unavailable or timed out. Sign-out was not confirmed. '+(last?'Showing the protected data last updated at '+last+'. ':'Protected fleet data is unavailable. '):last?'Connection interrupted or timed out. Showing the protected data last updated at '+last+'. ':'Protected fleet data is temporarily unavailable or the request timed out. ';document.getElementById('cloudStatus').textContent+='Use Refresh now to retry; automatic retries will slow down to reduce data use.';refreshDashboardIfNeeded();window.OcculertPilotReport?.update()}
-async function loadProtectedFleet(options={}){
-  let includeEvents=options.includeEvents===true;
-  if(protectedFleetLoading){if(includeEvents)protectedEventsRefreshPending=true;return false}
-  setProtectedFleetBusy(true);
-  let version=++protectedFleetGeneration,cancel,stage='account',backend=window.OcculertBackend,expectedUserId='';
-  let cancelled=new Promise((_,reject)=>{cancel=()=>reject(new Error('Protected request superseded'))});cancelled.catch(()=>{});protectedFleetCancel=cancel;
-  try{
-    if(!backend?.currentUser)throw new Error('Protected backend unavailable');
-    expectedUserId=currentProtectedOwner();
-    if(!expectedUserId){resetProtectedFleet();return false}
-    if(protectedUserId!==expectedUserId){clearProtectedFleetCache();protectedUserId=expectedUserId;fleetMode=true;render()}
-    showSignedOutActions(false);fleetMode=true;syncProtectedControls();
-    if(!backend.getSession||!backend.getFleetSummary)throw new Error('Protected backend unavailable');
-    let session=await boundedProtectedFleetRequest(()=>backend.getSession(),cancelled);
-    if(version!==protectedFleetGeneration)return false;
-    if(reconcileProtectedOwner(expectedUserId))return false;
-    if(session?.user?.id!==expectedUserId)throw new Error('Protected account could not be confirmed');
-    stage='summary';
-    let result=await boundedProtectedFleetRequest(()=>backend.getFleetSummary({includeEvents}),cancelled);
-    if(version!==protectedFleetGeneration)return false;
-    if(reconcileProtectedOwner(expectedUserId))return false;
-    if(!result.ok&&result.status===401){backend.signOut();resetProtectedFleet();return false}
-    if(result.ok){protectedReportShape=Array.isArray(result.body.sessions)&&Array.isArray(result.body.drivers);protectedTelemetryTrust=String(result.body.telemetry_trust||'');protectedReportPrivacy=result.body.privacy||null;window.OcculertFollowups?.show();protectedFleetId=String(result.body.fleet.id||'');restoreDashboardPreferences();protectedFleetName=result.body.fleet.company_name||'your fleet';protectedFleetPlan=String(result.body.fleet.plan||'fleet').slice(0,40);protectedDrivers=Array.isArray(result.body.drivers)?result.body.drivers:[];protectedSessions=Array.isArray(result.body.sessions)?result.body.sessions:[];if(result.body.events_included!==false){protectedEvents=Array.isArray(result.body.events)?result.body.events:[];protectedEventsLoadedAt=Date.now()}cloudRows=rowsFromFleet(result.body);protectedLastSuccessfulAt=Date.now();protectedRefreshFailures=0;sessionHistoryDirty=true;document.getElementById('cloudStatus').textContent='Protected connection active for '+protectedFleetName+'. Active sessions refresh every 30 seconds; otherwise the dashboard uses a lower-cost 90-second refresh.'}
-    else if(result.body&&result.body.error==='fleet_not_found'){clearProtectedFleetCache();document.getElementById('cloudStatus').textContent='No owned fleet found. Use Fleet setup to create one and invite drivers.'}
-    else{recordProtectedRefreshFailure(stage);return false}
-    refreshDashboardIfNeeded();window.OcculertPilotReport?.update();return result.ok
-  }catch(error){if(version!==protectedFleetGeneration)return false;if(backend?.currentUser&&reconcileProtectedOwner(expectedUserId))return false;recordProtectedRefreshFailure(stage);return false}
-  finally{let refreshEvents=protectedEventsRefreshPending,refreshAccount=protectedAccountRefreshPending;protectedEventsRefreshPending=false;protectedAccountRefreshPending=false;if(protectedFleetCancel===cancel)protectedFleetCancel=null;setProtectedFleetBusy(false);if((refreshAccount||refreshEvents&&protectedRefreshFailures===0)&&fleetMode&&!document.hidden)void refreshProtectedFleetNow({forceEvents:refreshEvents})}
-}
-/* fleet-refresh-request:end */
-/* fleet-refresh-scheduling:start */
-function stopRefreshTimers(){clearInterval(dashboardRefreshTimer);clearTimeout(protectedRefreshTimer);dashboardRefreshTimer=0;protectedRefreshTimer=0}
-function startDashboardClock(){clearInterval(dashboardRefreshTimer);dashboardRefreshTimer=0;if(!document.hidden)dashboardRefreshTimer=setInterval(refreshDashboardIfNeeded,DASHBOARD_CLOCK_INTERVAL_MS)}
-function scheduleProtectedRefresh(){clearTimeout(protectedRefreshTimer);protectedRefreshTimer=0;if(document.hidden||!fleetMode)return;let hasActiveSession=cloudRows.some(row=>row.sessionActive),saveData=!hasActiveSession&&navigator.connection?.saveData===true,delay=protectedRefreshDelay({hasActiveSession,failureCount:protectedRefreshFailures,saveData});protectedRefreshTimer=setTimeout(()=>{void pollProtectedFleet()},delay)}
-async function pollProtectedFleet(){if(document.hidden||!fleetMode)return;let includeEvents=shouldRefreshProtectedEvents({historyOpen:protectedHistoryOpen(),lastLoadedAt:protectedEventsLoadedAt});await loadProtectedFleet({includeEvents});scheduleProtectedRefresh()}
-function startRefreshTimers(){stopRefreshTimers();if(document.hidden)return;startDashboardClock();scheduleProtectedRefresh()}
-async function refreshProtectedFleetNow(options={}){clearTimeout(protectedRefreshTimer);protectedRefreshTimer=0;let includeEvents=shouldRefreshProtectedEvents({historyOpen:protectedHistoryOpen(),lastLoadedAt:protectedEventsLoadedAt,force:options.forceEvents===true});await loadProtectedFleet({includeEvents});scheduleProtectedRefresh()}
-async function handleVisibilityChange(){if(document.hidden){stopRefreshTimers();return}startDashboardClock();refreshDashboardIfNeeded();if(fleetMode)await refreshProtectedFleetNow();else scheduleProtectedRefresh()}
-/* fleet-refresh-scheduling:end */
-async function handleAuthStorageChange(event){if(event.key!==null&&event.key!=='occulert-auth')return;let backend=window.OcculertBackend,currentUser=backend&&backend.currentUser?backend.currentUser():null,currentUserId=typeof currentUser?.id==='string'?currentUser.id:'';if(currentUserId===protectedUserId){if(!currentUserId)return;cancelProtectedFleetRefresh();if(protectedFleetLoading){protectedAccountRefreshPending=true;return}await refreshProtectedFleetNow();return}if(!currentUserId){resetProtectedFleet();startRefreshTimers();return}cancelProtectedFleetRefresh();clearProtectedFleetCache();protectedUserId=currentUserId;fleetMode=true;showSignedOutActions(false);syncProtectedControls();document.getElementById('cloudStatus').textContent='Signed-in account changed. Loading the new account’s protected fleet data.';render();if(protectedFleetLoading){protectedAccountRefreshPending=true;return}await refreshProtectedFleetNow()}
-async function boot(){render();await new Promise(resolve=>setTimeout(resolve,100));await loadProtectedFleet();startRefreshTimers()}
-document.addEventListener('visibilitychange',()=>{void handleVisibilityChange()});
-window.addEventListener('storage',event=>{void handleAuthStorageChange(event)});
-for(const id of ['riskFilter','sortMode'])document.getElementById(id)?.addEventListener('change',saveDashboardPreferences);
-void boot();
-</script>
+<script src="/fleet-dashboard.v2.js"></script>
 </body>
 </html>
