@@ -4,6 +4,28 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX = 5;
 const crypto = require("node:crypto");
 const { pgFetch } = require("./_lib/supabase");
+// Optional notification metadata excludes contact fields; the ID remains linkable.
+async function notifyStoredLead(lead, leadId) {
+  let url;
+  try { url = new URL(process.env.LEAD_NOTIFY_WEBHOOK_URL || ''); } catch { return; }
+  if (url.protocol !== 'https:' || url.username || url.password || !leadId) return;
+  const controller = new AbortController();
+  let timer;
+  try {
+    await Promise.race([
+      fetch(url.toString(), {
+        method: 'POST', redirect: 'error',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'occulert.pilot_lead.created', source: lead.source, received_at: lead.receivedAt, lead_id: leadId }),
+        signal: controller.signal,
+      }),
+      new Promise(resolve => { timer = setTimeout(() => { controller.abort(); resolve(null); }, 3000); }),
+    ]);
+  } catch {
+    // A failed notification must never undo or fail a successfully stored lead.
+  } finally { clearTimeout(timer); }
+}
+
 const DEFAULT_ALLOWED_ORIGINS = new Set([
   "https://www.occulert.com",
   "https://occulert.com",
@@ -199,6 +221,7 @@ module.exports = async function handler(request, response) {
   }
 
   let stored = false;
+  let storedLeadId = null;
   let storageError = false;
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     try {
@@ -218,6 +241,7 @@ module.exports = async function handler(request, response) {
         },
       });
       stored = Array.isArray(created) && created.length > 0;
+      if (stored) storedLeadId = created[0].id;
     } catch {
       storageError = true;
     }
@@ -225,7 +249,10 @@ module.exports = async function handler(request, response) {
 
   // Use exactly one configured destination for contact PII. Supabase is the
   // primary store; the webhook is a fallback only when Supabase is absent.
-  if (stored) return json(response, 200, { ok: true, stored: true, storage: "supabase" });
+  if (stored) {
+    await notifyStoredLead(lead, storedLeadId);
+    return json(response, 200, { ok: true, stored: true, storage: "supabase" });
+  }
 
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return json(response, 502, { ok: false, error: "storage_unavailable" });

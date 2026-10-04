@@ -23,7 +23,8 @@ function clean(value, max) {
 
 function validBody(request) {
   if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = typeof request.body === "object" && request.body ? request.body : {};
+  const body = request.body;
+  if (!body || typeof body !== "object") return false;
   return !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
 }
 
