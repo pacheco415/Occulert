@@ -66,6 +66,7 @@
     "test:migration-readiness",
     "test:asset-lineage",
     "test:workflow-policy",
+    "test:deployment-ignore",
     "test:api-validation"
   ],
   "additionalChecks": [

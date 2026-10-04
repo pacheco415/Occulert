@@ -75,11 +75,12 @@
     "test:verify-runner": "node --test scripts/test-verify-runner.mjs scripts/test-verify-coverage.mjs",
     "test:asset-lineage": "node --test scripts/test-asset-lineage.mjs",
     "test:workflow-policy": "node --test scripts/test-workflow-policy.mjs",
+    "test:deployment-ignore": "node --test scripts/test-deployment-ignore.mjs",
     "test:api-validation": "node --test scripts/test-api-validation.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
-    "@playwright/test": "^1.54.1"
+    "@playwright/test": "^1.63.0"
   },
   "engines": {
     "node": "24.x"

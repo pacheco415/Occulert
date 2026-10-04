@@ -32,6 +32,7 @@ test('active monitoring shows status and alerts while parked diagnostics are hid
 
 test('parked output check leaves session telemetry untouched and is disabled while monitoring', () => {
   const check = extract('function demoAlert(){', '\nfunction onResults');
+  const clearTest = extract('function clearParkedAlertTest(owner){', '\nfunction getAlertAudio');
   const output = { textContent: '' };
   const classes = new Set();
   const sound = [];
@@ -52,12 +53,15 @@ test('parked output check leaves session telemetry untouched and is disabled whi
     alertSub: { textContent: 'Pull over safely' },
     alertScreen: { style: {}, classList: { add: value => classes.add(value), remove: value => classes.delete(value) } },
     nightOpacity: { value: '72' },
-    primeAlertAudio: () => {},
+    beginAlertAudioScope: () => 1,
+    _alertAudioOwner: 1,
+    _alertTestOwner: 0,
+    releaseAlertAudioScope: () => {},
     tone: (...args) => sound.push(args),
     navigator: { vibrate: pattern => vibration.push(pattern) },
     setTimeout: callback => { timers.push(callback); },
   };
-  vm.runInNewContext(`${check}\ndemoAlert();`, context);
+  vm.runInNewContext(`${clearTest}\n${check}\ndemoAlert();`, context);
   assert.equal(context.sessionStart, 12345);
   assert.equal(context.localSessionId, 'saved-session');
   assert.equal(context.alerts, 2);
