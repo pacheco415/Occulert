@@ -1,7 +1,7 @@
 # Native camera compatibility plan
 
-Prepared October 3, 2026 against `main` at
-`1138e5d6b0f714a10d06e1a7e0430fcac1d2a19f`. This is a plan, with no
+Reviewed October 4, 2026 against `main` at
+`7b61530065b925cd0d58c60d7772f975b72bc5da`. This is a plan, with no
 dependency, runtime, build, or release change. No candidate binary or physical
 camera result has been validated. Perform this migration in one coordinated
 branch, following [AGENTS.md](../AGENTS.md) and [RELEASING.md](../RELEASING.md).
