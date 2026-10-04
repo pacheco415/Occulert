@@ -2,8 +2,8 @@
 
 These are dated snapshots. Source, deployment, build availability and device tests are separate.
 
-- Inspected source (origin/main): `1138e5d6b0f714a10d06e1a7e0430fcac1d2a19f`.
-- Source commit date: 2026-10-03T22:03:44-07:00.
+- Inspected source (origin/main): `913ed8d486f67c282b3cbb5666aa1a09710b4547`.
+- Source commit date: 2026-10-03T23:48:08-07:00.
 
 - Production website: `1138e5d6b0f714a10d06e1a7e0430fcac1d2a19f`.
 - Deployment: dpl_Hxh9W4wAJPpbZqy9v1SMso5By2mU, READY; created 2026-10-04T05:03:47.573Z.
