@@ -2,6 +2,7 @@
 // The service-role key is used only on the server after the bearer token has
 // been verified. The browser must send { confirm: "DELETE" } deliberately.
 
+const { hasRecentAuthentication } = require("./_lib/recent-auth");
 const supabaseLib = require("./_lib/supabase");
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const deleteAuthUser = supabaseLib.deleteAuthUser;
@@ -26,8 +27,10 @@ module.exports = async function handler(request, response) {
   if (!validBody(request)) return json(response, 400, { ok: false, error: "confirmation_required" });
 
   try {
-    const user = await verifyAccessToken(bearerToken(request));
+    const accessToken = bearerToken(request);
+    const user = await verifyAccessToken(accessToken);
     if (!user || !user.id) return json(response, 401, { ok: false, error: "unauthorized" });
+    if (!hasRecentAuthentication(accessToken, user)) return json(response, 401, { ok: false, error: "reauth_required" });
     // Database foreign keys perform cleanup in the Auth deletion transaction.
     // Never pre-delete rows: any constraint/storage failure must roll back all data.
     await deleteAuthUser(user.id);
