@@ -69,7 +69,8 @@
     "test:deployment-ignore",
     "audit:sitemap",
     "test:sitemap",
-    "test:api-validation"
+    "test:api-validation",
+    "test:provider-budget"
   ],
   "additionalChecks": [
     "test:verify-runner"

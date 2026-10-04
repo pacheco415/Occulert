@@ -39,3 +39,5 @@ module.exports = async function handler(request, response) {
     return json(response, 502, { ok: false, error: "account_deletion_failed" });
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

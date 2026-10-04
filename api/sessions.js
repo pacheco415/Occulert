@@ -136,3 +136,5 @@ return json(response, 405, { ok: false, error: "method_not_allowed" });
 return json(response, 502, { ok: false, error: "supabase_error" });
 }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

@@ -5,6 +5,7 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX = 5;
 const crypto = require("node:crypto");
 const { pgFetch } = require("./_lib/supabase");
+const { remainingProviderMs } = require("./_lib/provider-budget");
 // Optional notification metadata excludes contact fields; the ID remains linkable.
 async function notifyStoredLead(lead, leadId) {
   let url;
@@ -13,6 +14,7 @@ async function notifyStoredLead(lead, leadId) {
   const controller = new AbortController();
   let timer;
   try {
+    const timeoutMs = remainingProviderMs(3000);
     await Promise.race([
       fetch(url.toString(), {
         method: 'POST', redirect: 'error',
@@ -20,7 +22,7 @@ async function notifyStoredLead(lead, leadId) {
         body: JSON.stringify({ type: 'occulert.pilot_lead.created', source: lead.source, received_at: lead.receivedAt, lead_id: leadId }),
         signal: controller.signal,
       }),
-      new Promise(resolve => { timer = setTimeout(() => { controller.abort(); resolve(null); }, 3000); }),
+      new Promise(resolve => { timer = setTimeout(() => { controller.abort(); resolve(null); }, timeoutMs); }),
     ]);
   } catch {
     // A failed notification must never undo or fail a successfully stored lead.
@@ -261,14 +263,22 @@ module.exports = async function handler(request, response) {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  let timeout;
   try {
-    const webhookResponse = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "occulert.pilot_lead", lead }),
-      signal: controller.signal,
-    });
+    const timeoutMs = remainingProviderMs(5000);
+    // Settle even if a transport ignores abort. The provider may still have
+    // received the lead, so do not retry or overwrite this response later.
+    const webhookResponse = await Promise.race([
+      fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "occulert.pilot_lead", lead }),
+        signal: controller.signal,
+      }),
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => { reject(new Error("webhook_timeout")); controller.abort(); }, timeoutMs);
+      }),
+    ]);
 
     if (!webhookResponse.ok) {
       return json(response, 502, { ok: false, error: "webhook_failed" });
@@ -281,3 +291,5 @@ module.exports = async function handler(request, response) {
     clearTimeout(timeout);
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

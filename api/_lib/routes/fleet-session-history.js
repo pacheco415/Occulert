@@ -205,3 +205,5 @@ module.exports = async function handler(request, response) {
         ? 'fleet_history_invalid_response' : 'fleet_history_unavailable' });
   }
 };
+
+module.exports = require("../provider-budget").withProviderBudget(module.exports);

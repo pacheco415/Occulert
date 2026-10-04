@@ -60,3 +60,5 @@ module.exports = async function handler(req, res) {
     return json(res, 502, { ok: false, error: 'followups_unavailable' });
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

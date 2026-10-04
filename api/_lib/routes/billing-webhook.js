@@ -125,3 +125,5 @@ module.exports = async function handler(request, response) {
     return billing.replyError(response, error);
   }
 };
+
+module.exports = require("../provider-budget").withProviderBudget(module.exports);

@@ -49,3 +49,5 @@ module.exports = function handler(request, response) {
   }
   return json(response, 404, { error: "not_found" });
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

@@ -110,3 +110,5 @@ module.exports = async function handler(request, response) {
     return json(response, 502, { ok: false, error: "supabase_error" });
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

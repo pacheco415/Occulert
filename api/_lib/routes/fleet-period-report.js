@@ -93,3 +93,5 @@ module.exports = async function handler(request, response) {
 };
 
 module.exports.validReport = validReport;
+
+module.exports = require("../provider-budget").withProviderBudget(module.exports);

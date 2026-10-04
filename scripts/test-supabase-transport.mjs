@@ -12,7 +12,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
 function deferred() { let resolve; const promise = new Promise(yes => { resolve = yes; }); return { promise, resolve }; }
 function boot(fetch) {
   const timers = new Map(), calls = []; let next = 0;
-  const context = { module: { exports: {} }, process: { env: { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-role' } }, URL, AbortController,
+  const context = { require: name => { if(name==='./provider-budget')return require('../api/_lib/provider-budget.js');throw Error('Unexpected import'); }, module: { exports: {} }, process: { env: { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-role' } }, URL, AbortController,
     setTimeout(fn, ms) { const id = ++next; timers.set(id, { fn, ms }); return id; }, clearTimeout: id => timers.delete(id),
     fetch(url, options) { calls.push({ url: String(url), options }); return fetch(url, options); },
   };
