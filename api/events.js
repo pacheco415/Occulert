@@ -60,7 +60,7 @@ module.exports = async function handler(request, response) {
     }
 
     const body = typeof request.body === "object" && request.body ? request.body : {};
-    const type = String(body.type || "");
+    const type = typeof body.type === "string" ? body.type : "";
     if (!body.session_id || ALLOWED_TYPES.indexOf(type) === -1) {
       return json(response, 400, { ok: false, error: "invalid_event" });
     }

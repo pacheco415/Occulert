@@ -155,6 +155,21 @@ assert.equal(eventWithoutLocation.status, 200);
 assert.equal(insertedEvent.latitude, null, "explicitly absent latitude must not become 0");
 assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must not become 0");
 
+// JSON values must not acquire an allowed event type through string coercion.
+{
+  let storageCalls = 0;
+  const invalidTypeEvents = loadHandler("../api/events.js", async () => {
+    storageCalls++;
+    throw new Error("invalid event types must be rejected before storage");
+  });
+  for (const type of [["drowsy"], { toString: "drowsy" }, { type: "drowsy" }, true, 7, null]) {
+    const result = await invoke(invalidTypeEvents, request("POST", { ...eventBody, type }));
+    assert.equal(result.status, 400, `reject malformed event type ${JSON.stringify(type)}`);
+    assert.equal(result.body.error, "invalid_event");
+  }
+  assert.equal(storageCalls, 0, "malformed event types must never query or mutate storage");
+}
+
 // Client event time must stay inside the owned session; finished sessions have a short delivery grace.
 {
   const now = Date.now();
