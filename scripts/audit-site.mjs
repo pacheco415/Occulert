@@ -54,7 +54,7 @@ function assertSingleH1(path) {
 
 // Keep deployment source exclusions explicit and reviewable.
 const deploymentExclusions = new Set(read('.vercelignore').split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')));
-for (const path of ['tests/', 'docs/', 'native-app/', 'supabase/', 'db/', 'scripts/', 'benchmark/', 'brand/', '.github/', '*.md', 'playwright.config.mjs']) {
+for (const path of ['tests/', 'docs/', 'native-app/', 'supabase/', 'db/', 'scripts/', 'benchmark/', 'brand/', '.github/', '*.md', 'playwright.config.mjs', 'src/', 'build/', 'source-assets.json']) {
   if (!deploymentExclusions.has(path)) fail(`.vercelignore must exclude ${path}`);
 }
 

@@ -89,7 +89,10 @@
     "status": "node scripts/status.mjs",
     "test:status": "node --test scripts/test-status.mjs",
     "test:detection-experiments": "node --test scripts/test-detection-experiment-models.mjs scripts/test-detection-experiment-controller.mjs scripts/test-detection-experiment-runtime.mjs scripts/test-detection-trace-benchmark.mjs",
-    "test:cached-jwks": "node --test scripts/test-cached-jwks.mjs"
+    "test:cached-jwks": "node --test scripts/test-cached-jwks.mjs",
+    "asset:release": "node scripts/bump-asset.mjs --release",
+    "audit:source-assets": "node scripts/audit-source-assets.mjs",
+    "test:source-release": "node --test scripts/test-source-release.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
