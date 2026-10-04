@@ -1,3 +1,4 @@
+import { auditWorkflowPolicy } from './lib/workflow-policy.mjs';
 import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
 import "./audit-assets.mjs";
 import "./audit-mediapipe.mjs";
@@ -417,7 +418,7 @@ assertIncludes("native-app/app/history.tsx", "openFeedbackWithFallback(target", 
 assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, raw motion readings, or location are attached.", "native pilot feedback must state that sensitive media, raw motion, and location are not attached");
 assertIncludes("native-app/app/history.tsx", "false_alert", "native session history must capture structured false-alert feedback");
 assertIncludes("native-app/app/history.tsx", "missed_alert", "native session history must capture structured missed-alert feedback");
-assertIncludes("native-app/app/history.tsx", "Saved only on this iPhone", "native alert assessments must disclose their local-only storage");
+assertIncludes("native-app/app/history.tsx", "This alert rating stays only on this iPhone", "native alert assessments must disclose their local-only storage");
 assertIncludes("native-app/app/monitor.tsx", "sensitivity: sessionSensitivityRef.current", "native session history must preserve the sensitivity used for each session");
 assertIncludes("native-app/app/history.tsx", "CHECKPOINT_TARGET = 10", "native history must track progress toward the first 10-session accuracy checkpoint");
 assertIncludes("native-app/app/history.tsx", "item.sensitivity === 'medium'", "native accuracy checkpoint must count only reviewed Medium-sensitivity sessions");
@@ -620,17 +621,20 @@ assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must 
 assertIncludes("api/pilot-leads.js", "unsupported_media_type", "pilot lead API must require JSON submissions");
 assertIncludes("api/pilot-leads.js", "url.protocol === \"https:\"", "pilot lead API must only forward to HTTPS webhooks");
 if (read(".nvmrc").trim() !== "24") fail(".nvmrc must select Node 24");
-for (const workflow of [".github/workflows/browser-smoke.yml", ".github/workflows/native-app-typecheck.yml", ".github/workflows/site-audit.yml"]) {
-  for (const action of ['checkout', 'setup-node']) {
-    if (!new RegExp(`uses: actions/${action}@[a-f0-9]{40} # v6`).test(read(workflow))) fail(`${workflow} must pin the verified Node 24 ${action} action`);
+const requiredNodeWorkflows = new Set(['browser-smoke.yml', 'native-app-typecheck.yml', 'site-audit.yml']);
+const workflowFiles = readdirSync(join(root, '.github/workflows')).filter(file => /\.ya?ml$/.test(file));
+for (const file of requiredNodeWorkflows) {
+  if (!workflowFiles.includes(file)) fail(`required verification workflow ${file} is missing`);
+}
+for (const file of workflowFiles) {
+  const workflow = `.github/workflows/${file}`;
+  for (const message of auditWorkflowPolicy(read(workflow), { requireNodeSetup: requiredNodeWorkflows.has(file) })) {
+    fail(`${workflow}: ${message}`);
   }
-  assertIncludes(workflow, 'contents: read', `${workflow} must declare read-only contents permissions`);
-  assertIncludes(workflow, 'timeout-minutes:', `${workflow} must bound job execution`);
-  const source = read(workflow);
-  const setups = [...source.matchAll(/^[ \t]*- uses: actions\/setup-node@[a-f0-9]{40}[ \t]+# v6[ \t]*$/gm)].length;
-  const versionFiles = [...source.matchAll(/^[ \t]*node-version-file: \.nvmrc[ \t]*$/gm)].length;
-  if (setups !== versionFiles || /^[ \t]*node-version:/m.test(source)) {
-    fail(`${workflow} must use .nvmrc for every Node setup`);
+  if (requiredNodeWorkflows.has(file)) {
+    assertIncludes(workflow, 'contents: read', `${workflow} must declare read-only contents permissions`);
+    assertIncludes(workflow, 'timeout-minutes:', `${workflow} must bound job execution`);
+    if (/^[ \t]*node-version:/m.test(read(workflow))) fail(`${workflow} must not override .nvmrc with node-version`);
   }
 }
 assertIncludes("package.json", "\"node\": \"24.x\"", "Vercel functions and local checks must use the verified Node 24 runtime");
