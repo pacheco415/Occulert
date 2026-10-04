@@ -83,7 +83,8 @@
     "test:api-validation": "node --test scripts/test-api-validation.mjs",
     "test:vendor-supabase": "node --test scripts/test-vendor-supabase.mjs",
     "test:owned-fonts": "node --test scripts/test-owned-fonts.mjs",
-    "test:page-actions": "node --test scripts/test-page-actions.mjs scripts/test-html-script-policy.mjs scripts/test-page-actions-offline.mjs"
+    "test:page-actions": "node --test scripts/test-page-actions.mjs scripts/test-html-script-policy.mjs scripts/test-page-actions-offline.mjs",
+    "test:browser-history-data": "node --test scripts/test-browser-history-data.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

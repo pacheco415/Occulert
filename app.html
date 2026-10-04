@@ -12,7 +12,7 @@
 <!-- Run before any stylesheet or dependency can hold up the driver page. -->
 <script id="driver-startup-guard">
 (() => {
-  const corePath = '/driver-app.v78.js';
+  const corePath = '/driver-app.v79.js';
   let state = 'loading';
   const byId = id => document.getElementById(id);
   const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
@@ -265,9 +265,10 @@
     </fieldset>
 </aside>
 </main>
-<script src="/occulert-backend.v78.js"></script>
+<script src="/occulert-backend.v79.js"></script>
 <script src="/security-utils.v47.js"></script>
-<script src="/driver-app.v78.js"></script>
+<script src="/local-history.v2.js"></script>
+<script src="/driver-app.v79.js"></script>
 <script src="/lang.v47.js" defer></script>
 
 <!-- iOS Add to Home Screen Modal -->

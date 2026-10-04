@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v102';
+const CACHE = 'occulert-v103';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -51,6 +51,7 @@ function selectedRuntimeAssets() {
 }
 const SELECTED_RUNTIME_ASSETS = selectedRuntimeAssets();
 const STATIC_ASSETS = [
+  '/local-history.v2.js',
   '/homepage-bootstrap.v2.js',
   '/page-actions.v2.js',
 
@@ -70,7 +71,7 @@ const STATIC_ASSETS = [
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v68.css',
-  '/driver-app.v78.js',
+  '/driver-app.v79.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
@@ -97,6 +98,7 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v58.js',
   '/occulert-backend.v60.js',
   '/occulert-backend.v78.js',
+  '/occulert-backend.v79.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
   '/supabase-loader.v47.js',
@@ -108,9 +110,10 @@ const NETWORK_ONLY_ASSETS = new Set([
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
   '/driver-app.v60.js',
-  '/driver-app.v78.js',
+  '/driver-app.v79.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
+  '/local-history.v2.js',
   '/page-actions.v2.js',
 
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
@@ -118,7 +121,7 @@ const CRITICAL_OFFLINE_ASSETS = [
   '/base.v47.css',
   '/app.html',
   '/driver-app.v68.css',
-  '/driver-app.v78.js',
+  '/driver-app.v79.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;

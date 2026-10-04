@@ -73,7 +73,8 @@
     "test:provider-budget",
     "test:api-validation",
     "test:owned-fonts",
-    "test:page-actions"
+    "test:page-actions",
+    "test:browser-history-data"
   ],
   "additionalChecks": [
     "test:verify-runner"
