@@ -34,6 +34,11 @@ test('real bundled output and both release no-op modes preserve every file', () 
   const before = snapshot(cwd);
   for (const args of [['--release'], ['--release', '--dry-run']]) { assert.equal(JSON.parse(run(cwd, ...args)).noOp, true); assert.deepEqual(snapshot(cwd), before); }
   assert.equal(auditSourceAssets(cwd)[0].mode, 'bundle');
+  writeFileSync(join(cwd, 'src/driver-app.js'), read(cwd, 'src/driver-app.js') + '\n// Comment-only source edit.\n');
+  const commentOnly = snapshot(cwd);
+  assert.equal(JSON.parse(run(cwd, '--release')).noOp, true);
+  assert.deepEqual(snapshot(cwd), commentOnly);
+  assert.equal(auditSourceAssets(cwd).length, 1);
 }));
 
 test('a real module edit releases compiled output and guard while pending work blocks dependency bumps', () => fixture(cwd => {
