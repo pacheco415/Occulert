@@ -12,8 +12,11 @@ async function settle(page) {
 }
 
 async function keyboardFocus(page, target) {
+  // macOS WebKit's default Tab navigation reaches form fields only. Its
+  // alternate gesture reaches buttons and links without changing the page.
+  const key = page.context().browser().browserType().name() === 'webkit' ? 'Alt+Tab' : 'Tab';
   for (let step = 0; step < 40; step++) {
-    await page.keyboard.press('Tab');
+    await page.keyboard.press(key);
     if (await target.evaluate(element => element === document.activeElement)) return;
   }
   throw new Error('Control was not reachable through the page tab order');
@@ -56,6 +59,10 @@ for (const preference of ['dark', 'light']) {
       // preference case as evidence for a rendered light dashboard.
       await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
       const select = page.getByLabel('Reporting window');
+      await keyboardFocus(page, select);
+      await expectFocusRing(select);
+      // WebKit exposes native default computed values before this control
+      // receives real interaction. Measure its actual focused rendered state.
       const style = await select.evaluate(element => {
         const computed = getComputedStyle(element);
         return { color: computed.color, textFill: computed.webkitTextFillColor,
@@ -64,8 +71,6 @@ for (const preference of ['dark', 'light']) {
       expect(style.textFill).toBe(style.color);
       expect(contrast(style.color, style.background)).toBeGreaterThanOrEqual(4.5);
       expect(style.height).toBeGreaterThanOrEqual(44);
-      await keyboardFocus(page, select);
-      await expectFocusRing(select);
       await select.selectOption('7');
       await expect(page.locator('#pilotWindowLabel')).toContainText('Last 7 days');
       await select.selectOption('30');
