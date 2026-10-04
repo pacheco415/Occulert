@@ -64,7 +64,7 @@ module.exports = async function handler(request, response) {
   const days = requestedDays(request);
   if (!days) return json(response, 400, { ok: false, error: 'invalid_period' });
   try {
-    const user = await verifyAccessToken(bearerToken(request));
+    const user = await verifyAccessToken(bearerToken(request), { cachedIdentity: true });
     if (!user) return json(response, 401, { ok: false, error: 'unauthorized' });
     if (!isUuid(user.id)) throw new Error('invalid_user');
     const fleets = await pgFetch('fleets', {

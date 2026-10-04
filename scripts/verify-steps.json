@@ -75,7 +75,8 @@
     "test:owned-fonts",
     "test:page-actions",
     "test:browser-history-data",
-    "test:status"
+    "test:status",
+    "test:cached-jwks"
   ],
   "additionalChecks": [
     "test:verify-runner"

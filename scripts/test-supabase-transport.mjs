@@ -3,16 +3,22 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 import vm from 'node:vm';
+import { createHmac } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
 const source = readFileSync(new URL('../api/_lib/supabase.js', import.meta.url), 'utf8');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const user = { id: '11111111-1111-4111-8111-111111111111', email: 'fixture@example.com', email_confirmed_at: '2026-01-01' };
+function legacyToken() {
+  const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const input = encode({alg:'HS256',typ:'JWT'})+'.'+encode({sub:user.id,iss:'https://example.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600});
+  return input+'.'+createHmac('sha256','fixture-only-secret').update(input).digest('base64url');
+}
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status });
 function deferred() { let resolve; const promise = new Promise(yes => { resolve = yes; }); return { promise, resolve }; }
 function boot(fetch) {
   const timers = new Map(), calls = []; let next = 0;
-  const context = { require: name => { if(name==='./provider-budget')return require('../api/_lib/provider-budget.js');throw Error('Unexpected import'); }, module: { exports: {} }, process: { env: { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-role' } }, URL, AbortController,
+  const context = { Buffer, require: createRequire(new URL('../api/_lib/supabase.js', import.meta.url)), module: { exports: {} }, process: { env: { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-role' } }, URL, AbortController,
     setTimeout(fn, ms) { const id = ++next; timers.set(id, { fn, ms }); return id; }, clearTimeout: id => timers.delete(id),
     fetch(url, options) { calls.push({ url: String(url), options }); return fetch(url, options); },
   };
@@ -71,7 +77,7 @@ for (const filename of ['account', 'accept-invitation', 'events', 'fleet-followu
   const routeRequire = createRequire(new URL(`../api/${filename}.js`, import.meta.url));
   const routeContext = { ...b.context, module: { exports: {} }, require: name => name === './_lib/supabase' ? b.lib : routeRequire(name) };
   vm.runInNewContext(route, routeContext);
-  const request = { method: filename === 'account' ? 'DELETE' : ['profile', 'events', 'sessions', 'accept-invitation'].includes(filename) ? 'POST' : 'GET', headers: { authorization: 'Bearer fixture-token', 'content-type': 'application/json' }, body: { confirm: 'DELETE' }, query: {} };
+  const request = { method: filename === 'account' ? 'DELETE' : ['profile', 'events', 'sessions', 'accept-invitation'].includes(filename) ? 'POST' : 'GET', headers: { authorization: 'Bearer ' + legacyToken(), 'content-type': 'application/json' }, body: { confirm: 'DELETE' }, query: {} };
   const response = { headers: {}, setHeader(key, value) { this.headers[key] = value; }, end(value) { this.body = JSON.parse(value); } };
   await routeContext.module.exports(request, response);
   assert.equal(response.statusCode, 502); assert.equal(response.body.ok, false); assert.equal(response.headers['Cache-Control'], 'no-store'); assert.equal(b.calls.length, 1);

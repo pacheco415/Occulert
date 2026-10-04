@@ -37,7 +37,7 @@ return json(response, 405, { ok: false, error: "method_not_allowed" });
 
 let user;
 try {
-  user = await verifyAccessToken(bearerToken(request));
+  user = await verifyAccessToken(bearerToken(request), { cachedIdentity: true });
   if (!user) {
   return json(response, 401, { ok: false, error: "unauthorized" });
   }
