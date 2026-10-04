@@ -4,6 +4,32 @@ This package upgrades `native-app/` from simulated detection to **real on-device
 eye tracking**, adds the missing **EAS build config**, and includes the
 **app icon / splash assets** the build needs.
 
+## Upgrading Expo SDK
+
+Use one planned `codex/` branch for each SDK upgrade. Review the target SDK's
+release notes and the camera, face detector, worklets and custom Watch module
+compatibility before changing dependencies. Move one SDK version at a time.
+
+With Node 24 selected from the repository's `.nvmrc`, install the reviewed Expo
+version in `native-app/`, then run:
+
+```bash
+npx expo install --fix
+npx expo-doctor
+npm ci --include=dev && npm run verify
+```
+
+Review and commit the manifest and lockfile together. Keep React, React Native,
+Babel, React types and TypeScript on the versions selected for that SDK; resolve
+compatibility failures before continuing. Dependabot holds those packages and
+native major updates for this coordinated process. Continue reviewing dependency
+audit reports while an SDK upgrade is pending.
+
+Run the root verification and the release guide's EAS package-manager check, then
+follow [RELEASING.md](../RELEASING.md) and the
+[device checklist](../docs/DEVICE_ACCEPTANCE.md) for the resulting native build.
+See the [official Expo upgrade guide](https://docs.expo.dev/workflow/upgrading-expo-sdk-walkthrough/).
+
 ## What changed
 
 | File | Change |
