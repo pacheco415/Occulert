@@ -1,3 +1,4 @@
+import { auditDriverHooks } from './lib/driver-hook-policy.mjs';
 import { readHistorySourceOwners, HISTORY_SOURCE_PATHS } from './lib/history-source-owners.mjs';
 import { auditCspPolicy, SUPABASE_HOST } from './lib/csp-policy.mjs';
 import { scriptMarkupPolicy, generatedScriptMarkupPolicy } from './lib/html-script-policy.mjs';
@@ -331,8 +332,8 @@ assertIncludes("api/pilot-leads.js", "rateLimitState(request)", "pilot lead API 
 assertIncludes("api/pilot-leads.js", "pgFetch(\"pilot_leads\"", "pilot lead API must support durable Supabase storage");
 assertIncludes("db/schema.sql", "create table if not exists pilot_leads", "database schema must include pilot lead storage");
 assertIncludes("pilot-signup.html", "<form class=\"card\"", "pilot signup controls must use a semantic form");
-assertIncludes(`${assetByStem('driver-app.js')}`, "trigger=_patched", "enhanced alert behavior must replace the active trigger function");
-assertIncludes(`${assetByStem('driver-app.js')}`, "if(alerts===previousAlerts)return", "enhanced alert behavior must respect alert cooldowns");
+try { auditDriverHooks(readFileSync(assetByStem('driver-app.js'), 'utf8')); }
+catch (error) { failures.push('Driver hooks: ' + error.message); }
 assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
 assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.createCloudSummaryOutbox", "driver app must finish protected cloud sessions through the durable outbox when opted in");
 assertIncludes(`${assetByStem('driver-app.js')}`, "queueBackendEvent", "driver app must queue protected alert events when opted in");

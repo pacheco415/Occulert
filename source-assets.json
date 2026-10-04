@@ -3,7 +3,7 @@
   "assets": {
     "driver-app.js": {
       "source": "src/driver-app.js",
-      "mode": "copy"
+      "mode": "bundle"
     }
   }
 }

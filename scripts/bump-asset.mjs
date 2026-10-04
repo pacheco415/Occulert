@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { assertReleaseBaseline, commitAssetPlan, loadSourceAssets } from './lib/source-assets.mjs';
+import { assertReleaseBaseline, commitAssetPlan, loadSourceAssets, synchronizeSourceEntry } from './lib/source-assets.mjs';
 
 const root = process.cwd();
 const read = name => readFileSync(join(root, name), 'utf8');
@@ -16,6 +16,7 @@ const release = args.includes('--release');
 const logical = args.find(arg => !arg.startsWith('--'));
 const manifest = parse('asset-versions.json');
 const integrity = parse('asset-integrity.json');
+const beforeManifest = { ...manifest };
 if (args.some(arg => arg.startsWith('--') && !['--dry-run', '--refresh', '--release'].includes(arg)) || args.filter(arg => !arg.startsWith('--')).length > 1 || (release && (refresh || logical))) throw new Error('Use asset:release [--dry-run] or asset:bump -- <logical-name> [--dry-run | --refresh]');
 if (!release && (!logical || !manifest[logical])) throw new Error('Choose a known logical asset: asset:bump -- driver-app.js [--dry-run | --refresh]');
 const active = [...new Set(Object.values(manifest))];
@@ -42,7 +43,7 @@ function synchronizeRegisteredSources(changes) {
   for (const entry of sourceEntries) {
     const filename = manifest[entry.logical];
     const bytes = changes.get(filename) ?? read(filename);
-    if (!entry.bytes.equals(Buffer.from(bytes))) changes.set(entry.source, bytes);
+    for (const [name, source] of synchronizeSourceEntry(root, entry, bytes, beforeManifest, manifest)) changes.set(name, source);
   }
 }
 

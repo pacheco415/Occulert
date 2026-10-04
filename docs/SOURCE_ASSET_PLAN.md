@@ -43,3 +43,13 @@ The subsequent driver module migration is separate. It must compile its actual
 source graph, preserve initialization/effect order and existing behavioral
 test/harness contracts, and replace lifecycle reassignment with explicit hooks.
 The pilot neither installs a compiler nor changes runtime source structure.
+
+## Current bundled driver
+
+The completed pilot is now followed by the separate module migration in
+[DRIVER_MODULES.md](DRIVER_MODULES.md). The driver registration uses `bundle`;
+its entry is a composition file, so its bytes do not equal the published bundle.
+The source audit recompiles the actual tracked graph and requires exact output
+bytes and integrity. The `copy` mode and its byte-equality checks remain available
+for other assets. Bundle importer synchronization updates owned module resource
+references, compiles a staged graph and proves output equality before writes.

@@ -81,7 +81,11 @@
     "test:db-baseline",
     "audit:source-assets",
     "test:source-release",
-    "test:history-model"
+    "test:history-model",
+    "build",
+    "lint:source",
+    "typecheck:source",
+    "test:driver-build"
   ],
   "additionalChecks": [
     "test:verify-runner"

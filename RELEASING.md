@@ -36,24 +36,31 @@ Use `npm run asset:bump -- <logical-name> --dry-run` to review an asset release 
 
 ### Editable source pilot
 
-`source-assets.json` currently registers only `driver-app.js`, copied from
-`src/driver-app.js`. Edit that source, then review `npm run asset:release --
---dry-run` and run `npm run asset:release`. Release processes every changed
-registered source in one plan, copies its versioned importers, synchronizes
+`source-assets.json` currently registers `driver-app.js` in bundle mode, built
+from `src/driver-app.js` and its eight domain modules. Edit the actual source,
+then review `npm run asset:release -- --dry-run` and run `npm run asset:release`.
+Release processes every changed registered source in one plan, copies its
+versioned importers, synchronizes
 guard/helper pins, and advances the aggregate cache once. An unchanged source
 is an exact no-op; it does not reserve another URL or cache name. Fetch and
 integrate `origin/main` first. Finish or discard an existing unpublished release
 before starting another source release.
 
-`npm run audit:source-assets` checks each registered source against its active
-immutable output. Existing bumps of an unregistered dependency also synchronize
-the source of a copied registered importer. Pending source edits block those
-bumps, so the tool cannot discard them. The copy pilot accepts classic UTF-8 JS
-or CSS; it does not bundle modules or generate maps. Other logical assets still
-use the existing bump workflow. The migration plan and coverage boundary are in
-[docs/SOURCE_ASSET_PLAN.md](docs/SOURCE_ASSET_PLAN.md).
+`npm run audit:source-assets` compares each registered source with its active
+immutable output. Driver bundle mode compiles the actual graph with pinned
+esbuild and checks source, binding and effect identity before release. Existing
+bumps of an unregistered dependency synchronize URL and integrity references in
+the real registered source and recompile before writing. Pending source edits
+block those bumps, so the tool cannot discard them. Copy mode remains supported
+for classic UTF-8 JS or CSS; neither mode emits source maps. Other logical assets
+still use the existing bump workflow. The migration plan and coverage boundary
+are in [docs/SOURCE_ASSET_PLAN.md](docs/SOURCE_ASSET_PLAN.md) and
+[docs/DRIVER_MODULES.md](docs/DRIVER_MODULES.md).
 
-Source, registry and internal build output are excluded from deployment and
+Local and CI verification runs `npm run build` and checks the compiled driver
+against its committed runtime. Vercel uses the Other preset with an explicit empty `buildCommand` in `vercel.json` to serve
+prebuilt assets; it must not auto-run the excluded compiler. Keep source,
+scripts, configuration and internal build output excluded from deployment and
 offline caching. Validation and output staging happen before replacements; a
 failed replacement restores prior files. Keep the checkout idle while releasing,
 review the generated diff, and run all verification before committing.
@@ -89,3 +96,8 @@ CSP connections use the exact project host declared in
 and all Vercel connection policies together and verify `/api/public-config`.
 Retained old SDK loaders require their documented CDN compatibility grant during
 the existing 14-day retention window; remove it after the reference audit passes.
+
+The driver now uses the bundled source mode described in
+[docs/DRIVER_MODULES.md](docs/DRIVER_MODULES.md). Edit its eight modules and entry,
+then release through `asset:release`; do not copy compiled output into the entry.
+Other logical assets retain the existing manual immutable release process.

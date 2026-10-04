@@ -4,7 +4,7 @@
   "liquid-glass.css": "liquid-glass.v49.css",
   "accessibility.css": "accessibility.v52.css",
   "portal.css": "portal.v49.css",
-  "driver-app.js": "driver-app.v81.js",
+  "driver-app.js": "driver-app.v83.js",
   "auth-helper.js": "auth-helper.v60.js",
   "occulert-backend.js": "occulert-backend.v81.js",
   "passkey-auth.js": "passkey-auth.v60.js",
@@ -68,7 +68,7 @@
   "homepage-bootstrap.js": "homepage-bootstrap.v2.js",
   "page-actions.js": "page-actions.v2.js",
   "local-history.js": "local-history.v2.js",
-  "driver-startup-guard.js": "driver-startup-guard.v2.js",
+  "driver-startup-guard.js": "driver-startup-guard.v4.js",
   "detection-experiments.js": "detection-experiments.v1.js",
   "public-page.css": "public-page.v1.css"
 }
