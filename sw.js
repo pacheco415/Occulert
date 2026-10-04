@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v99';
+const CACHE = 'occulert-v103';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -51,22 +51,27 @@ function selectedRuntimeAssets() {
 }
 const SELECTED_RUNTIME_ASSETS = selectedRuntimeAssets();
 const STATIC_ASSETS = [
+  '/local-history.v2.js',
+  '/homepage-bootstrap.v2.js',
+  '/page-actions.v2.js',
+
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
   ...ALERT_AUDIO_ASSETS.map(asset => asset.url),
   '/',
   '/index.html',
   '/base.v47.css',
+  '/inter-fonts.v2.css',
   '/app.html',
   '/manifest.json',
   '/favicon.ico',
   '/homepage.v51.css',
-  '/liquid-glass.v47.css',
+  '/liquid-glass.v49.css',
   '/accessibility.v52.css',
-  '/portal.v47.css',
+  '/portal.v49.css',
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v68.css',
-  '/driver-app.v77.js',
+  '/driver-app.v79.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
@@ -76,6 +81,11 @@ const NETWORK_ONLY_DOCUMENTS = new Set([
   '/fleet-history.html',
 ]);
 const NETWORK_ONLY_ASSETS = new Set([
+  '/occulert-backend.v68.js',
+  '/occulert-backend.v75.js',
+  '/occulert-backend.v76.js',
+  '/occulert-backend.v77.js',
+  '/occulert-backend.v69.js',
   '/fleet-history-page.v64.js',
   '/fleet-history-page.v65.js',
   '/fleet-history-page.v66.js',
@@ -91,7 +101,8 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v47.js',
   '/occulert-backend.v58.js',
   '/occulert-backend.v60.js',
-  '/occulert-backend.v69.js',
+  '/occulert-backend.v78.js',
+  '/occulert-backend.v79.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
   '/supabase-loader.v47.js',
@@ -103,15 +114,18 @@ const NETWORK_ONLY_ASSETS = new Set([
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
   '/driver-app.v60.js',
-  '/driver-app.v77.js',
+  '/driver-app.v79.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
+  '/local-history.v2.js',
+  '/page-actions.v2.js',
+
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
   ...ALERT_AUDIO_ASSETS.map(asset => asset.url),
   '/base.v47.css',
   '/app.html',
   '/driver-app.v68.css',
-  '/driver-app.v77.js',
+  '/driver-app.v79.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;

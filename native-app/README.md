@@ -1,7 +1,8 @@
 # Occulert Native App
 
 This directory contains the React Native (Expo) iPhone and Apple Watch source.
-Android configuration remains source; no released Android app is claimed.
+A saved private Android preview exists; no public Android release or physical
+Android acceptance is recorded.
 
 Latest saved distribution receipt is private TestFlight **1.0.0 (56)** from
 `0d11ad22b66baab61ea9db6456bfaed837871537`. EAS build and submission finished
@@ -57,7 +58,8 @@ alert delivery remain separate checks.
 - Node 24 from `.nvmrc`; native CI also clean-installs with npm 10.9.8 on Node 24
 - Use the project's Expo CLI through `npx expo`; native features need a custom development or TestFlight build
 - iOS: SDK 57-compatible Xcode/toolchain; the production EAS profile pins Xcode 26.6
-- Android source requires API 26 or later; native build and device acceptance remain open
+- Android source requires API 26 or later; the earlier private preview finished,
+  while this candidate still needs its own build and physical acceptance
 
 ### Install
 ```bash

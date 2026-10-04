@@ -28,7 +28,8 @@ Run an already provisioned development client with `npx expo start --dev-client`
 VisionCamera, ML Kit, HealthKit and the Watch target require a custom native
 build; Expo Go cannot supply them. Installed versions are defined by
 `package.json` and `package-lock.json`, not this guide. Android requires API 26
-or later; an Android build/device pass remains unrecorded.
+or later. A private Android preview of the build-56 source finished; this
+new candidate has no Android build or device acceptance yet.
 
 ## Current behavior
 
