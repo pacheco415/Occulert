@@ -1,7 +1,7 @@
 import React, { useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useAudioPlayer } from 'expo-audio';
+import { useAlertAudioPlayer } from '../hooks/useAlertAudioPlayer';
 import { sendAlertToWatch, sendMonitoringStatusToWatch } from '../lib/watchBridge';
 import { configureAlertAudioMode } from '../lib/audioSession';
 import { getWatchAlertsEnabled } from '../lib/watchPreferences';
@@ -110,7 +110,7 @@ export function AlertSystem({
     pendingCueTimers.current.push(timer);
   }, []);
 
-  React.useEffect(() => cancelPendingCues, [cancelPendingCues]);
+  React.useLayoutEffect(() => cancelPendingCues, [cancelPendingCues]);
 
   // Preload output preferences before Start. handleStart also awaits this same
   // deduplicated read so an alert never waits for the native storage bridge.
@@ -207,9 +207,9 @@ export function AlertSystem({
     };
   }, [isRunning]);
   const pulse = useRef(new Animated.Value(1)).current;
-  const balancedPlayer = useAudioPlayer(ALERT_SOUND, { keepAudioSessionActive: true });
-  const leftPlayer = useAudioPlayer(ALERT_SOUND_LEFT, { keepAudioSessionActive: true });
-  const rightPlayer = useAudioPlayer(ALERT_SOUND_RIGHT, { keepAudioSessionActive: true });
+  const { player: balancedPlayer } = useAlertAudioPlayer(ALERT_SOUND);
+  const { player: leftPlayer } = useAlertAudioPlayer(ALERT_SOUND_LEFT);
+  const { player: rightPlayer } = useAlertAudioPlayer(ALERT_SOUND_RIGHT);
 
   // PERCLOS is a rolling history. Never keep a red alert on screen after
   // the driver's eyes are visibly open again. Sustained tracking loss is a

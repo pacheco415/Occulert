@@ -26,13 +26,14 @@ import {
 } from 'react-native-vision-camera-face-detector';
 import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
 import { useKeepAwake } from 'expo-keep-awake';
-import { useAudioPlayer } from 'expo-audio';
+import { useAlertAudioPlayer } from '../hooks/useAlertAudioPlayer';
 import * as Haptics from 'expo-haptics';
 import * as Battery from 'expo-battery';
 import { Ionicons } from '@expo/vector-icons';
 import { EYE_BASELINE_EXPERIMENT, ParkedEyeBaseline } from '../lib/eyeBaselineModel';
 import { loadDeviceEyeBaseline, saveDeviceEyeBaseline } from '../lib/eyeBaselineStorage';
 import { useEyeTracking } from '../hooks/useEyeTracking';
+import { deliverCueIfCurrent } from '../lib/alertDelivery';
 import { AlertSystem, type AlertTimingEvent } from '../components/AlertSystem';
 import { CameraSetupGuide } from '../components/CameraSetupGuide';
 import { LiveMetrics } from '../components/LiveMetrics';
@@ -233,9 +234,10 @@ export default function MonitorScreen() {
     state: 'noFace',
   });
 
-  const monitoringPausedPlayer = useAudioPlayer(MONITORING_PAUSED_SOUND, {
-    keepAudioSessionActive: true,
-  });
+  const {
+    player: monitoringPausedPlayer,
+    isCurrent: monitoringPausedPlayerIsCurrent,
+  } = useAlertAudioPlayer(MONITORING_PAUSED_SOUND);
 
   const { processEyeOpenness, processNoFace, reset } = useEyeTracking(sensitivity, EYE_BASELINE_EXPERIMENT ? eyeBaseline : null);
   const { detectFaces } = useFaceDetector(FACE_DETECTOR_OPTIONS);
@@ -245,15 +247,19 @@ export default function MonitorScreen() {
     if (preferences.hapticEnabled) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     }
-    if (!preferences.audioEnabled) return;
+    if (!preferences.audioEnabled || !monitoringPausedPlayerIsCurrent()) return;
     try {
       monitoringPausedPlayer.pause();
-      void monitoringPausedPlayer.seekTo(0).then(() => {
-        monitoringPausedPlayer.volume = 1;
-        monitoringPausedPlayer.play();
-      }).catch(() => {});
+      void deliverCueIfCurrent(
+        () => monitoringPausedPlayer.seekTo(0),
+        monitoringPausedPlayerIsCurrent,
+        () => {
+          monitoringPausedPlayer.volume = 1;
+          monitoringPausedPlayer.play();
+        },
+      ).catch(() => {});
     } catch {}
-  }, [monitoringPausedPlayer]);
+  }, [monitoringPausedPlayer, monitoringPausedPlayerIsCurrent]);
 
   const recordAlertTiming = useCallback((event: AlertTimingEvent) => {
     if (event.kind === 'decision') {
