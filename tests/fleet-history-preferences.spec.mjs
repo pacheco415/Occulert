@@ -6,15 +6,15 @@ async function fixture(page, period='30') {
     if (!localStorage.getItem('occulert-auth')) localStorage.setItem('occulert-auth',JSON.stringify({access_token:'test-manager',refresh_token:'test-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:OWNER}}));
     if (!localStorage.getItem(KEY)) localStorage.setItem(KEY,JSON.stringify({version:1,period,completion:'completed',sort:'alerts',from:'',to:''}));
   },{OWNER,KEY,period});
-  const requests=[];
+  const requests=[];let fleet=FLEET;
   await page.route('**/api/fleet-session-history*',route=>{
     const params=new URL(route.request().url()).searchParams; requests.push(route.request().url());
-    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,fleet:{id:FLEET,company_name:'Test fleet'},sessions:[],drivers:[],driver_filter_complete:true,filters:{driver_id:params.get('driver_id'),from:params.get('from'),to:params.get('to')},has_more:false,next_cursor:null,telemetry_trust:'unverified_client_report',privacy:{includes_location:false,includes_personal_media:false,includes_raw_motion:false}})});
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,fleet:{id:fleet,company_name:'Test fleet'},sessions:[],drivers:[],driver_filter_complete:true,filters:{driver_id:params.get('driver_id'),from:params.get('from'),to:params.get('to')},has_more:false,next_cursor:null,telemetry_trust:'unverified_client_report',privacy:{includes_location:false,includes_personal_media:false,includes_raw_motion:false}})});
   });
-  return requests;
+  return {requests,changeFleet:value=>{fleet=value;}};
 }
 test('fleet History restores owner preferences, re-queries dates and clears deliberately',async({page})=>{
-  const requests=await fixture(page);
+  const {requests}=await fixture(page);
   await page.goto('/fleet-history.html');
   await expect(page.locator('#historyFilters')).toBeEnabled();
   await expect.poll(()=>requests.length).toBe(2);
@@ -58,4 +58,18 @@ test('fleet History invalid ranges remain editable and recover without a page re
  await page.locator('#historyFrom').fill('2026-01-01');await page.locator('#historyFrom').dispatchEvent('change');
  await expect(page.locator('#historyFilters')).toBeEnabled();
  await expect(page.locator('#historyDateStatus')).not.toContainText('today or earlier');
+});
+
+test('fleet History changes to a newly verified fleet without inheriting the previous range',async({page})=>{
+ const {requests,changeFleet}=await fixture(page);
+ await page.goto('/fleet-history.html');await expect.poll(()=>requests.length).toBe(2);
+ await expect(page.locator('#historyFilters')).toBeEnabled();
+ changeFleet('66666666-6666-4666-8666-666666666666');
+ await page.locator('#historyRefresh').click();await expect.poll(()=>requests.length).toBe(4);
+ await expect(page.locator('#historyFilters')).toBeEnabled();
+ await expect(page.locator('#historyPeriod')).toHaveValue('all');
+ await expect(page.locator('#historyCompletion')).toHaveValue('all');
+ await expect(page.locator('#historySort')).toHaveValue('newest');
+ expect(new URL(requests.at(-1)).searchParams.get('from')).toBeNull();
+ expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).period,KEY)).toBe('30');
 });
