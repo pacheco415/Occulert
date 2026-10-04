@@ -109,8 +109,10 @@ test("public information pages share accessible mobile navigation", async ({ pag
     const sharedStyle = page.locator(`link[rel="stylesheet"][href="${assetPath('public-page.css')}"]`);
     await expect(sharedStyle).toHaveCount(1);
     await expect.poll(() => sharedStyle.evaluate(link => link.sheet?.cssRules.length ?? 0)).toBeGreaterThan(0);
-    await expect(page.locator('#siteNav')).toHaveCSS('position', 'fixed');
-    await expect(page.locator('#siteNav')).toHaveCSS('height', '72px');
+    const navigation = page.getByRole('navigation');
+    await expect(navigation).toHaveCount(1);
+    await expect(navigation).toHaveCSS('position', 'fixed');
+    await expect(navigation).toHaveCSS('height', '72px');
     await expect(page.locator(`script[src="/${assetByStem('public-page.js')}"]`)).toHaveCount(1);
     const skipLink = page.getByRole("link", { name: "Skip to main content" });
     await skipLink.focus();
