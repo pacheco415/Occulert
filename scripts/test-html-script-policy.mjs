@@ -22,3 +22,9 @@ test('active generated markup is checked without matching quoted data text', () 
   const source = 'function render(){return `<button data-label=" onclick=ignore()" onClick=save()>Save</button>`}';
   assert.deepEqual(scriptMarkupPolicy(source).handlers.map(value => value.attribute), ['onclick']);
 });
+for (const quote of ['"', "'"]) {
+  test(`a literal ${quote} in an unquoted value cannot hide the next event attribute`, () => {
+    const result = scriptMarkupPolicy(`<button data-note=a${quote} OnClIcK=window.auditBypass=true>Click</button>`);
+    assert.deepEqual(result.handlers.map(value => value.attribute), ['onclick']);
+  });
+}

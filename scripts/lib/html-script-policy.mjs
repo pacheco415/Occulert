@@ -13,20 +13,12 @@ export function scriptMarkupPolicy(source) {
     }
     const name = /^<([a-z][a-z0-9:-]*)\b/i.exec(source.slice(start));
     if (!name) { offset = start + 1; continue; }
-    let end = start + name[0].length, quote = '';
-    for (; end < source.length; end += 1) {
-      const char = source[end];
-      if (quote) { if (char === quote) quote = ''; }
-      else if (char === '"' || char === "'") quote = char;
-      else if (char === '>') break;
-    }
-    if (end === source.length) break;
     const attributes = Object.create(null);
     let index = start + name[0].length;
-    while (index < end) {
+    while (index < source.length) {
       while (/[\s/]/.test(source[index] || '')) index += 1;
-      if (index >= end) break;
-      const attribute = /^[^\s=/>]+/.exec(source.slice(index, end));
+      if (index >= source.length || source[index] === '>') break;
+      const attribute = /^[^\s=/>]+/.exec(source.slice(index));
       if (!attribute) { index += 1; continue; }
       const key = attribute[0].toLowerCase(); index += attribute[0].length;
       while (/\s/.test(source[index] || '')) index += 1;
@@ -36,18 +28,21 @@ export function scriptMarkupPolicy(source) {
         const delimiter = source[index];
         if (delimiter === '"' || delimiter === "'") {
           const from = ++index;
-          while (index < end && source[index] !== delimiter) index += 1;
+          while (index < source.length && source[index] !== delimiter) index += 1;
           value = source.slice(from, index); index += 1;
         } else {
           const from = index;
-          while (index < end && !/\s/.test(source[index])) index += 1;
+          // Quotes within an unquoted HTML value are literal parse-error
+          // characters; they do not hide subsequent event attributes.
+          while (index < source.length && !/[\s>]/.test(source[index])) index += 1;
           value = source.slice(from, index);
         }
       }
       attributes[key] = value;
       if (/^on[a-z]+$/.test(key)) handlers.push({ tag: name[1].toLowerCase(), attribute: key, offset: start });
     }
-    offset = end + 1;
+    if (index >= source.length) break;
+    offset = index + 1;
     if (name[1].toLowerCase() === 'script') {
       const closing = /<\/script\s*>/gi; closing.lastIndex = offset;
       const match = closing.exec(source);
