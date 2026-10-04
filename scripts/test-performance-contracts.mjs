@@ -283,11 +283,13 @@ test('detector failure recovery is not blocked by cloud finalization', async () 
   harness.run(`
     cloudConsent.checked=true;cloudReady=true;
     backendSessionId='old-session';backendSessionPromise=Promise.resolve('old-session');backendEventQueue=Promise.resolve();
-    window.OcculertBackend={endSession:()=>new Promise(()=>{})};
+    backendSessionScope={ownerId:'owner-a',revision:cloudConsentRevision};
+    window.OcculertBackend={currentUser:()=>({id:'owner-a'}),createCloudSummaryOutbox:()=>({enqueue:()=>true,flush:()=>{window.cloudFinishStarted=true;return new Promise(()=>{})}})};
     faceMesh={close:async()=>{}};
   `);
   await harness.run("haltForDetectionFailure(detectionRuntimeError('detector failed'))");
   assert.equal(harness.get('detectorFailureStopping'), false);
+  assert.equal(harness.get('window.cloudFinishStarted'), true);
   assert.equal(harness.get('startBtn.disabled'), false);
   assert.equal(harness.get('backendSessionId'), null);
   assert.equal(harness.get('backendSessionPromise'), null);

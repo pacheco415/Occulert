@@ -5,6 +5,8 @@ import { useAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SensitivitySlider, loadSavedSensitivity } from '../components/SensitivitySlider';
+import { EYE_BASELINE_EXPERIMENT } from '../lib/eyeBaselineModel';
+import { clearDeviceEyeBaseline } from '../lib/eyeBaselineStorage';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { openFeedbackWithFallback } from '../lib/feedback';
 import { getWatchStatus, sendAlertToWatch, type WatchStatus } from '../lib/watchBridge';
@@ -122,6 +124,8 @@ const labelHeadphoneMotion = (status: HeadphoneMotionStatus): string => {
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const [baselineResetBusy, setBaselineResetBusy] = useState(false);
+  const baselineResetBusyRef = useRef(false);
   const [sens, setSens] = useState<SensitivityLevel>('medium');
   const [haptic, setHaptic] = useState(true);
   const [audio, setAudio] = useState(true);
@@ -545,6 +549,20 @@ export default function SettingsScreen() {
           </View>
         </View>
         <SensitivitySlider value={sens} onChange={setSens} />
+        {EYE_BASELINE_EXPERIMENT && <View style={s.card}>
+          <Text style={s.cardTitle}>PARKED BASELINE EXPERIMENT</Text>
+          <Text style={s.sub}>Local sessions only. While parked, look forward with eyes open during the three-second Setup check. Insufficient samples use current presets.</Text>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Recalibrate parked eye baseline" disabled={baselineResetBusy} onPress={() => {
+            if(baselineResetBusyRef.current)return;
+            baselineResetBusyRef.current=true;setBaselineResetBusy(true);
+            const revision=settingsViewRevisionRef.current;
+            void clearDeviceEyeBaseline().then(()=>{
+              if(settingsMountedRef.current&&settingsFocusedRef.current&&revision===settingsViewRevisionRef.current)router.push('/monitor');
+            }).catch(()=>{if(settingsMountedRef.current&&revision===settingsViewRevisionRef.current)Alert.alert('Could not reset baseline','The saved baseline remains unchanged. Try again.');}).finally(()=>{
+              baselineResetBusyRef.current=false;if(settingsMountedRef.current)setBaselineResetBusy(false);
+            });
+          }}><Text style={s.label}>{baselineResetBusy?'Resetting…':'Recalibrate while parked'}</Text></TouchableOpacity>
+        </View>}
         <View style={s.card}>
           <Text style={s.cardTitle}>ALERTS</Text>
           <View style={s.row}>
