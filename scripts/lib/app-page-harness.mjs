@@ -72,7 +72,7 @@ function makeElement(id) {
   return el;
 }
 
-export function createAppHarness({ startAt = 1_700_000_000_000, initialStorage = {}, sandboxOverrides = {} } = {}) {
+export function createAppHarness({ startAt = 1_700_000_000_000, initialStorage = {}, sandboxOverrides = {}, preloadSources = [], sourceOverride = null } = {}) {
   const clock = {
     now: startAt,
     advance(ms) { this.now += ms; },
@@ -141,7 +141,8 @@ export function createAppHarness({ startAt = 1_700_000_000_000, initialStorage =
   Object.assign(sandbox, sandboxOverrides);
   vm.createContext(sandbox);
 
-  const code = readFileSync(DRIVER_APP, 'utf8');
+  const code = sourceOverride ?? readFileSync(DRIVER_APP, 'utf8');
+  for(const source of preloadSources)vm.runInContext(source,sandbox);
   vm.runInContext(readFileSync(new URL('../../' + assetByStem('local-history.js'), import.meta.url), 'utf8'), sandbox);
   vm.runInContext(code, sandbox, { filename: `${assetByStem('driver-app.js')}` });
 

@@ -50,7 +50,7 @@ module.exports = async function handler(request, response) {
   }
 
   try {
-    const user = await verifyAccessToken(bearerToken(request));
+    const user = await verifyAccessToken(bearerToken(request), { freshUser: true });
     if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
     if (!emailVerified(user)) return json(response, 403, { ok: false, error: "email_not_verified" });
     if (request.method !== "GET" && !validBody(request)) {

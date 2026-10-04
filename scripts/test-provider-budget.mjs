@@ -4,7 +4,11 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {createRequire} from 'node:module';
+import {createHmac} from 'node:crypto';
 const require=createRequire(import.meta.url);
+const supabaseRequire=createRequire(new URL('../api/_lib/supabase.js',import.meta.url));
+const fixtureId='11111111-1111-4111-8111-111111111111';
+function legacyToken(){const enc=value=>Buffer.from(JSON.stringify(value)).toString('base64url');const input=enc({alg:'HS256',typ:'JWT'})+'.'+enc({sub:fixtureId,iss:'https://fixture.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600});return input+'.'+createHmac('sha256','fixture-only-secret').update(input).digest('base64url');}
 const source=fs.readFileSync('api/_lib/provider-budget.js','utf8');
 function boot(){let time=0,id=0;const logs=[],module={exports:{}};
  vm.runInNewContext(source,{module,require:name=>name==='node:async_hooks'?{AsyncLocalStorage}:name==='node:perf_hooks'?{performance:{now:()=>time}}:name==='node:crypto'?{randomUUID:()=>`fixture-request-${++id}`}:(()=>{throw Error('Unexpected import')})(),console:{error:value=>logs.push(value)}});
@@ -32,11 +36,11 @@ test('actual session route stops before a mutation after earlier provider work e
  const b=boot(),calls=[],supabase={exports:{}};
  const env={SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'fixture-key'};
  vm.runInNewContext(fs.readFileSync('api/_lib/supabase.js','utf8'),{
-  module:supabase,require:name=>name==='./provider-budget'?b.lib:require(name),process:{env},URL,AbortController,setTimeout,clearTimeout,
+  module:supabase,Buffer,require:name=>name==='./provider-budget'?b.lib:supabaseRequire(name),process:{env},URL,AbortController,setTimeout,clearTimeout,
   fetch:async(url,options)=>{
    calls.push({url:String(url),options});
-   if(calls.length===1){assert.match(String(url),/auth\/v1\/user$/);b.set(7000);return Response.json({id:'verified-user'});}
-   const parsed=new URL(url);assert.equal(parsed.pathname,'/rest/v1/drivers');assert.equal(parsed.searchParams.get('user_id'),'eq.verified-user');
+   if(calls.length===1){assert.match(String(url),/auth\/v1\/user$/);b.set(7000);return Response.json({id:fixtureId});}
+   const parsed=new URL(url);assert.equal(parsed.pathname,'/rest/v1/drivers');assert.equal(parsed.searchParams.get('user_id'),'eq.'+fixtureId);
    b.set(13000);return Response.json([{id:'verified-driver',fleet_id:'verified-fleet'}]);
   },
  });
@@ -45,7 +49,7 @@ test('actual session route stops before a mutation after earlier provider work e
   module:route,process:{env},require:name=>name==='./_lib/supabase'?supabase.exports:name==='./_lib/provider-budget'?b.lib:require(name.startsWith('./_lib/')?'../api/'+name.slice(2):name),
  });
  const response=b.response();response.end=value=>{response.body=JSON.parse(value)};
- await route.exports({method:'POST',headers:{authorization:'Bearer fixture-token','content-type':'application/json'},body:{driver_id:'attacker-driver',fleet_id:'attacker-fleet'}},response);
+ await route.exports({method:'POST',headers:{authorization:'Bearer '+legacyToken(),'content-type':'application/json'},body:{driver_id:'attacker-driver',fleet_id:'attacker-fleet'}},response);
  assert.equal(response.statusCode,502);assert.deepEqual(response.body,{ok:false,error:'supabase_error'});
  assert.equal(response.headers['Cache-Control'],'no-store');assert.equal(response.headers['X-Occulert-Request-ID'],'fixture-request-1');
  assert.equal(calls.length,2);assert.ok(calls.every(call=>call.options.method===undefined||call.options.method==='GET'));
@@ -68,14 +72,14 @@ test('failure diagnostics contain only fixed fields and generated IDs',async()=>
 });
 test('exhausted budget prevents a later Supabase mutation from being sent',async()=>{
  const b=boot(),calls=[],module={exports:{}};
- vm.runInNewContext(fs.readFileSync('api/_lib/supabase.js','utf8'),{module,require:()=>b.lib,process:{env:{SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'fixture-key'}},URL,AbortController,setTimeout,clearTimeout,fetch:async(url)=>{calls.push(url);b.set(13000);return new Response(JSON.stringify({id:'fixture-user'}))}});
+ vm.runInNewContext(fs.readFileSync('api/_lib/supabase.js','utf8'),{module,Buffer,require:name=>name==='./provider-budget'?b.lib:supabaseRequire(name),process:{env:{SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'fixture-key'}},URL,AbortController,setTimeout,clearTimeout,fetch:async(url)=>{calls.push(url);b.set(13000);return new Response(JSON.stringify({id:'fixture-user'}))}});
  await b.lib.withProviderBudget(async()=>{await module.exports.verifyAccessToken('fixture-token');await assert.rejects(module.exports.pgFetch('sessions',{method:'POST',body:{driver_id:'fixture-user'}}),error=>error.status===504)})({},b.response());
  assert.equal(calls.length,1);assert.match(calls[0],/auth\/v1\/user$/);
 });
 
 test('Supabase header/body deadlines shrink after earlier provider work and ignore late commits',async()=>{
  const b=boot(),timers=new Map(),calls=[],late=deferred(),module={exports:{}};let next=0;
- vm.runInNewContext(fs.readFileSync('api/_lib/supabase.js','utf8'),{module,require:()=>b.lib,process:{env:{SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'fixture-key'}},URL,AbortController,
+ vm.runInNewContext(fs.readFileSync('api/_lib/supabase.js','utf8'),{module,Buffer,require:name=>name==='./provider-budget'?b.lib:supabaseRequire(name),process:{env:{SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'fixture-key'}},URL,AbortController,
  setTimeout(fn,ms){const id=++next;timers.set(id,{fn,ms});return id},clearTimeout:id=>timers.delete(id),
  fetch:async(url,options)=>{calls.push({url,options});if(calls.length===1){b.set(7000);return new Response(JSON.stringify({id:'fixture-user'}))}return late.promise}});
  const pending=b.lib.withProviderBudget(async()=>{await module.exports.verifyAccessToken('fixture-token');await assert.rejects(module.exports.pgFetch('sessions',{method:'POST',body:{driver_id:'fixture-user'}}),error=>error.status===504)})({},b.response());

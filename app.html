@@ -9,72 +9,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
-<!-- Run before any stylesheet or dependency can hold up the driver page. -->
-<script id="driver-startup-guard">
-(() => {
-  const corePath = '/driver-app.v79.js';
-  let state = 'loading';
-  const byId = id => document.getElementById(id);
-  const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
-  // HTML may still be streaming when the deadline expires. Paint once all
-  // recovery controls exist, even if a later dependency still blocks parsing.
-  const failureNodes = ['startupNotice', 'startupReload', 'driverControls', 'startBtn', 'driveState', 'calibration', 'risk', 'riskDetail', 'status', 'overlay'];
-  const observer = new MutationObserver(() => {
-    if (state === 'failed' && failureNodes.every(id => byId(id))) { observer.disconnect(); refresh(); }
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  function refresh() {
-    const failed = state === 'failed', ready = state === 'ready';
-    const controls = byId('driverControls'), startButton = byId('startBtn');
-    if (controls) controls.disabled = !ready;
-    if (startButton) { startButton.disabled = !ready; startButton.textContent = ready ? 'START MONITORING' : failed ? 'APP UNAVAILABLE' : 'Loading app…'; }
-    const notice = byId('startupNotice');
-    if (notice) { notice.hidden = ready; notice.setAttribute('role', failed ? 'alert' : 'status'); notice.setAttribute('aria-live', failed ? 'assertive' : 'polite'); }
-    setText('startupTitle', failed ? 'App could not load' : 'Loading app…');
-    setText('startupMessage', failed ? 'No monitoring is active. Reload the app when safely parked.' : 'Monitoring controls will be available when the app finishes loading.');
-    const reload = byId('startupReload');
-    if (reload) { reload.hidden = !failed; reload.onclick = () => location.reload(); }
-    setText('driveState', 'NOT MONITORING');
-    setText('driveHint', ready ? 'Press Start Monitoring only when safely parked.' : 'Monitoring has not started.');
-    setText('calibration', 'NOT STARTED');
-    setText('risk', '--'); setText('riskDetail', '--');
-    setText('status', ready ? 'OFFLINE' : failed ? 'APP UNAVAILABLE' : 'LOADING');
-    const card = byId('stateCard'); if (card) card.className = 'card state-card';
-    const status = byId('status'); if (status) status.className = 'status off';
-    if (failed) {
-      setText('overlayTitle', 'Monitoring unavailable');
-      setText('overlayText', 'The app did not finish loading. No camera monitoring is active.');
-      setText('overlayHint', 'Reload the app only when safely parked.');
-      const overlay = byId('overlay'); if (overlay) overlay.classList.remove('hide');
-    }
-  }
-  function fail() {
-    if (state !== 'loading') return;
-    state = 'failed'; clearTimeout(deadline);
-    if (failureNodes.every(id => byId(id))) observer.disconnect();
-    refresh();
-  }
-  const deadline = setTimeout(fail, 8000);
-  function isCore(value) {
-    try { return new URL(value, location.href).pathname === corePath; } catch (_) { return false; }
-  }
-  window.addEventListener('error', event => {
-    if (isCore(event.filename || '') || (event.target?.tagName === 'SCRIPT' && isCore(event.target.src))) fail();
-  }, true);
-  document.addEventListener('DOMContentLoaded', () => { if (state !== 'ready') refresh(); }, { once: true });
-  window.OcculertStartup = Object.freeze({
-    isReady: () => state === 'ready',
-    refresh: () => { if (state !== 'ready') refresh(); },
-    ready: core => {
-      if (state !== 'loading') { if (state === 'failed') refresh(); return false; }
-      if (!core || core.version !== 'v68' || !Object.isFrozen(core) ||
-          !['start', 'stop', 'findCameraChoices', 'initModel'].every(key => typeof core[key] === 'function') ||
-          typeof byId('startBtn')?.onclick !== 'function') { fail(); return false; }
-      state = 'ready'; clearTimeout(deadline); observer.disconnect(); refresh(); return true;
-    }
-  });
-})();
-</script>
+<!-- Request the integrity-checked guard early; core loading must not block parsing. -->
+<script id="driver-startup-guard" src="/driver-startup-guard.v2.js" integrity="sha256-vU8MvVOJ3/mwuiH47dqMWasqFbpYjIVaGeVN4D0Ro0Q=" crossorigin="anonymous" defer></script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 <!-- The supported cloud path uses authenticated Occulert API endpoints. -->
@@ -82,7 +18,7 @@
 <link rel="stylesheet" href="/liquid-glass.v49.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
 <script src="/static-page.v60.js" defer></script>
-<script src="/page-actions.v2.js"></script>
+<script src="/page-actions.v2.js" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -133,6 +69,7 @@
       <h2 id="startupTitle" style="font-size:18px;margin:0 0 8px">Loading app…</h2>
       <p class="small" id="startupMessage">Monitoring controls will be available when the app finishes loading.</p>
       <button class="btn primary" type="button" id="startupReload" hidden>Reload app</button>
+      <a class="btn" id="startupRetryLink" href="/app.html">Reload when safely parked</a>
     </div>
     <fieldset id="driverControls" disabled aria-label="Monitoring controls" style="border:0;padding:0;margin:0;min-width:0">
 
@@ -212,7 +149,7 @@
       <div class="card"><div class="label">Location</div><div class="value" id="location">--</div></div>
     </div>
     <details class="dev-tools"><summary>Parked diagnostics</summary><p class="small">Run the alert check while parked. It does not add an alert or change a saved session.</p><button class="btn demo" id="demoBtn" type="button">Test sound and vibration</button><p class="small" id="alertCheckResult" role="status" aria-live="polite"></p><button class="btn" id="resetBtn" type="button" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8;margin-top:8px;margin-bottom:0;font-size:12px;padding:10px">Clear on-screen diagnostics</button></details>
-    <div class="card"><div class="label">Session Report</div><div class="report" id="report"></div></div>
+    <div class="card"><div class="label">Session Report</div><p id="experimentStatus" role="status" hidden></p><button id="exportDetectionTrace" type="button" class="btn" hidden>Export parked detection comparison</button><div class="report" id="report"></div></div>
     <div class="card" id="feedbackCard" hidden>
       <div class="label">Post-drive alert feedback</div>
       <p class="small">Review this drive while parked. Your observation stays in this browser's local history unless you choose to share it.</p>
@@ -265,10 +202,10 @@
     </fieldset>
 </aside>
 </main>
-<script src="/occulert-backend.v79.js"></script>
-<script src="/security-utils.v47.js"></script>
-<script src="/local-history.v2.js"></script>
-<script src="/driver-app.v79.js"></script>
+<script src="/occulert-backend.v81.js" defer></script>
+<script src="/security-utils.v47.js" defer></script>
+<script src="/local-history.v2.js" defer></script>
+<script src="/driver-app.v81.js" defer></script>
 <script src="/lang.v47.js" defer></script>
 
 <!-- iOS Add to Home Screen Modal -->

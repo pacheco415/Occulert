@@ -18,6 +18,47 @@ if (!logical || !manifest[logical]) throw new Error('Choose a known logical asse
 const active = [...new Set(Object.values(manifest))];
 const sources = new Map(active.map(name => [name, read(name)]));
 
+function synchronizeExperimentHelper(changes) {
+  const name = manifest['detection-experiments.js'];
+  if (!name) return;
+  const coreName = manifest['driver-app.js'];
+  if (!coreName) throw new Error('The experimental helper needs its owned driver importer');
+  const source = changes.get(name) ?? sources.get(name) ?? read(name);
+  const pin = 'sha256-' + createHash('sha256').update(source).digest('base64');
+  const core = changes.get(coreName) ?? sources.get(coreName) ?? read(coreName);
+  if (!core.includes(name) || !/const EXPERIMENT_HELPER_INTEGRITY='[^']+';/.test(core)) throw new Error('The driver must own the selected experimental helper URL and pin');
+  let atHead;
+  try { atHead = JSON.parse(execFileSync('git', ['show', 'HEAD:asset-versions.json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); }
+  catch { throw new Error('Helper pin synchronization requires Git history'); }
+  if (Object.values(atHead).includes(name) && digest(source) !== integrity[name]) throw new Error('Cannot synchronize edited published helper bytes; bump it first');
+  const updated = core.replace(/const EXPERIMENT_HELPER_INTEGRITY='[^']+';/, `const EXPERIMENT_HELPER_INTEGRITY='${pin}';`);
+  if (updated !== core && Object.values(atHead).includes(coreName)) throw new Error('Cannot rewrite the published helper importer; bump the helper with its importer first');
+  if (updated !== core) changes.set(coreName, updated);
+  integrity[name] = digest(source);
+  integrity[coreName] = digest(updated);
+  const sw = changes.get('sw.js') ?? read('sw.js');
+  if (!/const EXPERIMENT_HELPER_ASSETS = \[[\s\S]*?\];/.test(sw)) throw new Error('The helper must have its optional pinned worker entry');
+  const worker = sw.replace(/const EXPERIMENT_HELPER_ASSETS = \[[\s\S]*?\];/, `const EXPERIMENT_HELPER_ASSETS = ${JSON.stringify([{url:'/'+name,integrity:pin}])};`);
+  if (worker !== sw) changes.set('sw.js', worker);
+}
+
+function synchronizeStartupGuard(changes) {
+  const name = manifest['driver-startup-guard.js'];
+  if (!name) return;
+  const source = changes.get(name) ?? sources.get(name) ?? read(name);
+  const pin = 'sha256-' + createHash('sha256').update(source).digest('base64');
+  const app = changes.get('app.html') ?? read('app.html');
+  const tag = app.match(/<script\b(?=[^>]*\bid="driver-startup-guard")[^>]*><\/script>/)?.[0];
+  if (!tag?.includes(`src="/${name}"`) || !/\bintegrity="[^"]+"/.test(tag)) throw new Error('External startup guard must have its owned URL and integrity attribute');
+  const updated = app.replace(tag, tag.replace(/\bintegrity="[^"]+"/, `integrity="${pin}"`));
+  if (updated !== app) changes.set('app.html', updated);
+  const sw = changes.get('sw.js') ?? read('sw.js');
+  const entry = `const STARTUP_GUARD_ASSETS = ${JSON.stringify([{ url: '/' + name, integrity: pin }])};`;
+  if (!/const STARTUP_GUARD_ASSETS = \[[\s\S]*?\];/.test(sw)) throw new Error('Startup guard must be part of the pinned worker assets');
+  const worker = sw.replace(/const STARTUP_GUARD_ASSETS = \[[\s\S]*?\];/, entry);
+  if (worker !== sw) changes.set('sw.js', worker);
+}
+
 if (refresh) {
   const filename = manifest[logical];
   // A committed active asset is published for this tool's purposes. Refresh
@@ -28,7 +69,13 @@ if (refresh) {
   if (Object.values(atHead).includes(filename)) throw new Error('Cannot refresh a published active asset; bump it first');
   integrity[filename] = digest(sources.get(filename));
   console.log(`Refresh integrity: ${filename}`);
-  if (!dry) writeJSON('asset-integrity.json', integrity);
+  const changes = new Map();
+  synchronizeExperimentHelper(changes);
+  synchronizeStartupGuard(changes);
+  if (!dry) {
+    for (const [name, source] of changes) writeFileSync(join(root, name), source);
+    writeJSON('asset-integrity.json', integrity);
+  }
 } else {
   const selected = new Set([manifest[logical]]);
   // Versioned importers must also be copied rather than rewritten in place.
@@ -84,13 +131,8 @@ if (refresh) {
   sw = sw.replace(cache[0], `const CACHE = '${cache[2]}${nextCacheVersion}'`);
   changes.set('sw.js', sw);
   const config = parse('vercel.json');
-  const appMarkup = existsSync(join(root, 'app.html')) ? read('app.html') : '';
-  const beforeGuard = appMarkup.match(/<script id="driver-startup-guard">([\s\S]*?)<\/script>/)?.[1];
-  const afterGuard = (changes.get('app.html') || appMarkup).match(/<script id="driver-startup-guard">([\s\S]*?)<\/script>/)?.[1];
-  if(beforeGuard !== afterGuard && beforeGuard && afterGuard){
-    const pin = source => "'sha256-" + createHash('sha256').update(source).digest('base64') + "'";
-    for(const rule of config.headers)for(const header of rule.headers)if(header.key==='Content-Security-Policy')header.value=header.value.replaceAll(pin(beforeGuard),pin(afterGuard));
-  }
+  synchronizeExperimentHelper(changes);
+  synchronizeStartupGuard(changes);
 
   const versions = new Set([...replacements.values()].map(next => next.match(/\.v(\d+)\./)[1]));
   for (const version of versions) {

@@ -42,6 +42,7 @@
     "test:fleet-history-filters",
     "test:driver-parked-check",
     "test:detection",
+    "test:detection-experiments",
     "test:fleet-followups",
     "test:fleet-indexes",
     "test:local-pages",
@@ -75,7 +76,9 @@
     "test:vendor-supabase",
     "test:owned-fonts",
     "test:page-actions",
-    "test:browser-history-data"
+    "test:browser-history-data",
+    "test:status",
+    "test:cached-jwks"
   ],
   "additionalChecks": [
     "test:verify-runner"

@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "package": "@mediapipe/tasks-vision",
+  "packageVersion": "1.0.1",
+  "packageIntegrity": "sha512-rvRE2FmAZ6ZxKSw7wq+e+jQDpN3t1B/tD2mJz9SmAzb1msoDkd4dMoE4wAh8Z30Um0PQwLiHr9QtomhmXk3aUQ==",
+  "modelUrl": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+  "modelCards": [
+    "https://storage.googleapis.com/mediapipe-assets/MediaPipe%20BlazeFace%20Model%20Card%20(Short%20Range).pdf",
+    "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Face%20Mesh%20V2.pdf",
+    "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20Blendshape%20V2.pdf"
+  ],
+  "files": [
+    {
+      "file": "vision_bundle.js",
+      "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/vision_bundle.js",
+      "bytes": 155110,
+      "sha256": "a427c26b6b402deeb6eb74e1f6c768d26ec0cc1596958c9e9e3d5189b7cbf5aa",
+      "integrity": "sha256-pCfCa2tALe6263Th9sdo0m7AzBWWlYyenj1RibfL9ao="
+    },
+    {
+      "file": "wasm/vision_wasm_internal.js",
+      "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.js",
+      "bytes": 323377,
+      "sha256": "e170ee67dd4e16c1a6fcd8840a206687e5a59b22c20e4a902bc445b095454d73",
+      "integrity": "sha256-4XDuZ91OFsGm/NiECiBmh+WlmyLCDkqQK8RFsJVFTXM="
+    },
+    {
+      "file": "wasm/vision_wasm_internal.wasm",
+      "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.wasm",
+      "bytes": 11756954,
+      "sha256": "8da277a733926eacd0474b8704b36742d6ec3231c57a860c5b889dff8f1df886",
+      "integrity": "sha256-jaJ3pzOSbqzQR0uHBLNnQtbsMjHFeoYMW4id/48d+IY="
+    },
+    {
+      "file": "wasm/vision_wasm_nosimd_internal.js",
+      "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.js",
+      "bytes": 323180,
+      "sha256": "e81d715a3d42cc3373602eb2f7aff795d164934db680e32496b65dab537f9658",
+      "integrity": "sha256-6B1xWj1CzDNzYC6y96/3ldFkk022gOMklrZdq1N/llg="
+    },
+    {
+      "file": "wasm/vision_wasm_nosimd_internal.wasm",
+      "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.wasm",
+      "bytes": 10960242,
+      "sha256": "a28483cd42e74e855bf5ebdb6b40d9b66a5b49e35e95020bc97669e6822a3192",
+      "integrity": "sha256-ooSDzULnToVb9evba0DZtmpbSeNelQILyXZp5oIqMZI="
+    },
+    {
+      "file": "face_landmarker.task",
+      "url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/face_landmarker.task",
+      "bytes": 3758596,
+      "sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+      "integrity": "sha256-ZBhOIpsmMQe8K4BMZiXbE0H/K7cxh0sLzC/mVE4Lyf8="
+    }
+  ],
+  "runtimeVersion": "1.0.1-occulert.1",
+  "localPatch": {
+    "description": "Replace the upstream telemetry transport with a local success callback; no usage logs are sent.",
+    "upstreamBundleSha256": "98db72469ffb176f5e9f2687be0f70783893aca681f7789c34b872b0a764371a",
+    "transportSha256": "b6a4a689ae7669e44dd6da2e9d2563a8cf270663fdb4ab1831ed92dc71ddd440"
+  }
+}

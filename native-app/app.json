@@ -16,9 +16,8 @@
       "bundleIdentifier": "com.occulert.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Occulert uses your front camera to detect eye fatigue while driving. No video is stored or uploaded.",
+        "NSCameraUsageDescription": "Occulert uses your front camera for on-device fatigue monitoring. Optional parked setup tests briefly check both cameras. No photos or video are saved or uploaded.",
         "NSMotionUsageDescription": "Occulert reads motion from compatible connected headphones during foreground monitoring to record optional local-only head-movement observations. These observations do not change fatigue scores or alerts.",
-        "NSLocationWhenInUseUsageDescription": "Occulert uses your location only when you choose to enable optional trip location features. Core fatigue monitoring works without location.",
         "UIBackgroundModes": [
           "audio"
         ]
@@ -51,7 +50,7 @@
         "@kingstinct/react-native-healthkit",
         {
           "NSHealthShareUsageDescription": "Occulert reads recent sleep and heart rate variability data to show optional pre-drive context. This data stays on this iPhone and does not change alerts.",
-          "NSHealthUpdateUsageDescription": "Occulert does not add or change data in Apple Health. This message is included only because the HealthKit framework is used for read-only sleep and HRV access.",
+          "NSHealthUpdateUsageDescription": false,
           "background": false
         }
       ],

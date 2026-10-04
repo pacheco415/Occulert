@@ -132,8 +132,13 @@ the user's driver, sessions, events, invitations, and owned fleet in the same
 transaction. Other fleet members and their history survive with no fleet assigned.
 A database constraint or Storage ownership failure rolls everything back; never
 pre-delete data to work around such failures. No Storage uploads are currently used.
-Protected APIs verify the user through Auth, so a deleted user's unexpired JWT is
-rejected. Successful deletion clears local app state and signs out the browser SDK.
+Account deletion verifies the current user through Auth and requires recent
+authentication in the same verified token. Profile/email and sensitive fleet
+operations also use current Auth details. Selected identity-only routes can
+verify asymmetric JWTs with cached public keys; these do not check current Auth
+account or session status. They still require current owned database rows, which
+account deletion removes. See [cached verification and its revocation limits](docs/CACHED_JWKS_VERIFICATION.md).
+Successful deletion clears local app state and signs out the browser SDK.
 Keep the service-role key on the server; it is never sent to the browser.
 
 Invitation creation returns the one-time link only to the verified manager.
