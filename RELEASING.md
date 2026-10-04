@@ -101,3 +101,20 @@ The driver now uses the bundled source mode described in
 [docs/DRIVER_MODULES.md](docs/DRIVER_MODULES.md). Edit its eight modules and entry,
 then release through `asset:release`; do not copy compiled output into the entry.
 Other logical assets retain the existing manual immutable release process.
+
+### Weekly retired asset cleanup
+
+Run `npm run asset:retire` in a full-history checkout to review eligible files,
+then `npm run asset:retire -- --write` on a dedicated branch. The tool shares
+the audit's retirement dates and protects HTML, service-worker, manifest and
+active asset roots, plus every dependency of a retained runtime file. It never
+rewrites a runtime reference to make a file eligible. An asset in `sw.js` remains
+protected; review and release any obsolete runtime references separately first.
+
+Removal starts at 14 days after retirement. The audit warns from day 14 through
+day 20 and fails at day 21. Run cleanup weekly so the warning window does not
+expire. Write mode drops integrity entries, unused immutable Vercel version
+rules and unreferenced exact-name asset fixtures, and advances CACHE once beyond
+all recorded cache versions. Review tests that use fixtures with other names
+(the tool preserves these), run full verification, and follow the normal PR
+checks before merge. An empty cleanup does not change files or CACHE.
