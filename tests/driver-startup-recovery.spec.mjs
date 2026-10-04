@@ -214,7 +214,7 @@ test('a complete driver cannot activate if its early startup guard is absent', a
   await installPrivacyProbe(page);
   await page.route(/\/app\.html(?:\?.*)?$/, async route => {
     const html = readFileSync(resolve(root, 'app.html'), 'utf8');
-    const guard = /<script id="driver-startup-guard">[\s\S]*?<\/script>/;
+    const guard = /<script\b(?=[^>]*\bid="driver-startup-guard")[^>]*><\/script>/;
     expect(html).toMatch(guard);
     await route.fulfill({ status: 200, contentType: 'text/html', body: html.replace(guard, '') });
   });
@@ -233,9 +233,147 @@ test('a complete driver cannot activate if its early startup guard is absent', a
   expect(route.count).toBe(1);
 });
 
+const guardPattern = /\/driver-startup-guard\.v\d+\.js(?:\?.*)?$/;
+const guardSource = readFileSync(resolve(root, assets['driver-startup-guard.js']), 'utf8');
+
+for (const order of ['guard-first', 'guard-delayed']) {
+  test(`external startup handshake tolerates ${order} without permissioned work`, async ({ page }) => {
+    await installPrivacyProbe(page);
+    let release;
+    const held = new Promise(resolve => { release = resolve; });
+    if (order === 'guard-delayed') await page.route(guardPattern, async route => {
+      await held; await route.fulfill({ status: 200, contentType: 'text/javascript', body: guardSource });
+    });
+    const driver = await driverRoute(page, order === 'guard-first' ? 'held' : 'full');
+    try {
+      if (order === 'guard-first') {
+        await page.goto('/app.html', { waitUntil: 'commit' });
+        await expect.poll(() => page.evaluate(() => typeof window.OcculertStartup)).toBe('object');
+        expect(await page.evaluate(() => window.OcculertStartup.isReady())).toBe(false);
+        driver.release(); await page.waitForLoadState('domcontentloaded');
+      } else {
+        await page.goto('/app.html', { waitUntil: 'commit' });
+        await expect(page.locator('#startupRetryLink')).toBeVisible();
+        expect(await page.evaluate(() => ({ core: typeof window.OcculertDriverCore, guard: typeof window.OcculertStartup }))).toEqual({ core: 'undefined', guard: 'undefined' });
+        await expect(page.locator('#startBtn')).toBeDisabled();
+        await expect(page.locator('#startupRetryLink')).toBeVisible();
+        release();
+      }
+      await expect.poll(() => page.evaluate(() => window.OcculertStartup?.isReady())).toBe(true);
+      await expect(page.locator('#startBtn')).toBeEnabled();
+      await expectNoPermissionedWork(page);
+    } finally { release?.(); driver.release(); }
+  });
+}
+for (const failure of ['missing', 'tampered']) {
+  test(`a ${failure} external guard leaves complete core disabled with plain recovery`, async ({ page }) => {
+    await installPrivacyProbe(page);
+    await page.route(guardPattern, route => failure === 'missing' ? route.abort('failed') : route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.__tamperedGuardExecuted=true;' }));
+    const driver = await driverRoute(page, 'full');
+    try {
+      await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
+      expect(await page.evaluate(() => ({ core: Object.isFrozen(window.OcculertDriverCore), guard: typeof window.OcculertStartup, tampered: window.__tamperedGuardExecuted }))).toEqual({ core: true, guard: 'undefined', tampered: undefined });
+      await expect(page.locator('#startupRetryLink')).toBeVisible();
+      await expectCoreGuards(page);
+    } finally { driver.release(); }
+  });
+}
+test('a hung guard cannot activate a complete driver when released after the deadline', async ({ page }) => {
+  await installPrivacyProbe(page);
+  let release;
+  const held = new Promise(resolve => { release = resolve; });
+  await page.route(guardPattern, async route => { await held; await route.fulfill({ status: 200, contentType: 'text/javascript', body: guardSource }); });
+  const driver = await driverRoute(page, 'full');
+  try {
+    await page.goto('/app.html', { waitUntil: 'commit' });
+    await expect(page.locator('#startBtn')).toBeDisabled();
+    await expect(page.locator('#startupRetryLink')).toBeVisible();
+    expect(await page.evaluate(() => typeof window.OcculertDriverCore)).toBe('undefined');
+    await expectNoPermissionedWork(page);
+    await page.waitForTimeout(8100);
+    release();
+    await page.waitForLoadState('domcontentloaded');
+    await expectFailure(page);
+    await expectCoreGuards(page);
+    expect(await page.evaluate(() => window.OcculertStartup.isReady())).toBe(false);
+  } finally { release(); driver.release(); }
+});
+
+for (const resource of ['backend', 'stylesheet']) {
+ test(`a stalled ${resource} keeps controls disabled and late completion cannot activate monitoring`, async ({page}) => {
+  await installPrivacyProbe(page);
+  let release;const held=new Promise(resolve=>{release=resolve});
+  const logical=resource==='backend'?'occulert-backend.js':'driver-app.css';
+  const filename=assets[logical];
+  await page.route('**/'+filename,async route=>{await held;await route.fulfill({status:200,contentType:resource==='backend'?'text/javascript':'text/css',body:readFileSync(resolve(root,filename),'utf8')})});
+  try {
+   await page.goto('/app.html',{waitUntil:'commit'});
+   // WebKit defers first paint behind a pending stylesheet. Verify the HTML
+   // protection directly until that style response returns, without extending
+   // the document deadline or enabling an uninitialized driver.
+   await expect(page.locator('#startupRetryLink')).toHaveAttribute('href','/app.html');
+   if(resource==='backend') await expect(page.locator('#startupRetryLink')).toBeVisible();
+   await expect(page.locator('#startBtn')).toBeDisabled();
+   await expectNoPermissionedWork(page);
+   if(resource==='backend') await expectFailure(page);
+   else await page.waitForTimeout(8100);
+   release();await page.waitForLoadState('domcontentloaded');
+   await expectFailure(page);await expectCoreGuards(page);
+   expect(await page.evaluate(()=>window.OcculertStartup.isReady())).toBe(false);
+  } finally {release()}
+ });
+}
+
+test('busy core initialization cannot bypass the startup deadline before the timer runs', async ({page}) => {
+ await installPrivacyProbe(page);
+ const marker='// Final synchronous statement: partial scripts and hoisted functions cannot signal readiness.';
+ expect(driverSource).toContain(marker);
+ const blocked=driverSource.replace(marker,'const busyUntil=performance.now()+8100;while(performance.now()<busyUntil){};\n'+marker);
+ await page.route(driverPattern,route=>route.fulfill({status:200,contentType:'text/javascript',body:blocked}));
+ await page.goto('/app.html',{waitUntil:'domcontentloaded'});
+ await expectFailure(page);await expectCoreGuards(page);
+ expect(await page.evaluate(()=>window.OcculertStartup.isReady())).toBe(false);
+});
+
 test.describe('cached complete driver startup', () => {
   test.use({ serviceWorkers: 'allow' });
   test('the verified offline shell still initializes without camera or cloud access', async ({ page }) => {
+    test.setTimeout(45_000);
+    await installPrivacyProbe(page);
+    const state = { offline: false, guardTampered: false };
+    const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json' };
+    const server = createServer((request, response) => {
+      if (state.offline) { response.destroy(); return; }
+      const path = new URL(request.url, 'http://localhost').pathname;
+      const file = resolve(root, path === '/' ? 'index.html' : path.slice(1));
+      if (!file.startsWith(root + '/') || !existsSync(file)) { response.writeHead(404); response.end(); return; }
+      response.setHeader('Cache-Control', 'no-store');
+      response.setHeader('Content-Type', types[extname(file)] || 'application/octet-stream');
+      response.end(state.guardTampered && path === '/'+assets['driver-startup-guard.js'] ? 'window.__tamperedNetworkGuardExecuted=true;' : readFileSync(file));
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const origin = `http://127.0.0.1:${server.address().port}`;
+    try {
+      await page.goto(origin + '/app.html');
+      await page.evaluate(async () => { await navigator.serviceWorker.register('/sw.js'); await navigator.serviceWorker.ready; });
+      await expect.poll(() => page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration();
+        return Boolean(registration?.active && navigator.serviceWorker.controller === registration.active);
+      })).toBe(true);
+      state.guardTampered = true;
+      await page.goto(origin + '/app.html', {waitUntil:'domcontentloaded'});
+      await expect(page.locator('#startBtn')).toBeEnabled();
+      expect(await page.evaluate(()=>window.__tamperedNetworkGuardExecuted)).toBeUndefined();
+      expect(await page.evaluate(async path=>(await caches.match(path)).text(),'/'+assets['driver-startup-guard.js'])).toBe(guardSource);
+      state.offline = true;
+      await page.goto(origin + '/app.html', { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('#startBtn')).toBeEnabled();
+      await expect(page.locator('#startBtn')).toHaveText(/START MONITORING/i);
+      expect(await page.evaluate(() => typeof initModel)).toBe('function');
+      await expectNoPermissionedWork(page);
+    } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  });
+  test('a corrupted offline guard cannot enable the cached complete driver', async ({ page }) => {
     test.setTimeout(45_000);
     await installPrivacyProbe(page);
     const state = { offline: false };
@@ -258,11 +396,16 @@ test.describe('cached complete driver startup', () => {
         const registration = await navigator.serviceWorker.getRegistration();
         return Boolean(registration?.active && navigator.serviceWorker.controller === registration.active);
       })).toBe(true);
+      await page.evaluate(async guardPath=>{
+        const cacheName=(await caches.keys()).find(name=>name.startsWith('occulert-v'));
+        const cache=await caches.open(cacheName);
+        await cache.put(guardPath,new Response('window.__corruptedGuardExecuted=true;',{headers:{'Content-Type':'text/javascript'}}));
+      },'/'+assets['driver-startup-guard.js']);
       state.offline = true;
       await page.goto(origin + '/app.html', { waitUntil: 'domcontentloaded' });
-      await expect(page.locator('#startBtn')).toBeEnabled();
-      await expect(page.locator('#startBtn')).toHaveText(/START MONITORING/i);
-      expect(await page.evaluate(() => typeof initModel)).toBe('function');
+      await expect(page.locator('#startupRetryLink')).toBeVisible();
+      await expectCoreGuards(page);
+      expect(await page.evaluate(()=>({guard:typeof window.OcculertStartup,corrupted:window.__corruptedGuardExecuted,core:Object.isFrozen(window.OcculertDriverCore)}))).toEqual({guard:'undefined',corrupted:undefined,core:true});
       await expectNoPermissionedWork(page);
     } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
   });

@@ -1,3 +1,4 @@
+import { auditCspPolicy, SUPABASE_HOST } from './lib/csp-policy.mjs';
 import { scriptMarkupPolicy, generatedScriptMarkupPolicy } from './lib/html-script-policy.mjs';
 import { auditWorkflowPolicy } from './lib/workflow-policy.mjs';
 import { createHash } from 'node:crypto';
@@ -85,7 +86,7 @@ for (const file of htmlFiles) {
   const markupPolicy = scriptMarkupPolicy(html);
   if(markupPolicy.handlers.length)fail(`${file}: inline event handlers are forbidden`);
   for (const [index, script] of markupPolicy.inlineScripts.entries()) {
-    if(!file.endsWith("/app.html") || script.attributes.id !== 'driver-startup-guard' || Object.keys(script.attributes).length !== 1)fail(`${file}: unapproved inline script`);
+    fail(`${file}: inline script bodies are forbidden`);
     try { new Function(script.body); }
     catch (error) { fail(`${file}: inline script ${index + 1} does not parse (${error.message})`); }
   }
@@ -237,7 +238,7 @@ for (const accessibilityBoundary of [
 }
 assertIncludes("app.html", `<link rel=\"stylesheet\" href=\"/${assetByStem('driver-app.css')}\" />`, "driver app must load its external stylesheet");
 assertNotIncludes("app.html", "<style>", "driver app must keep its styles out of the HTML document");
-assertIncludes("app.html", `<script src=\"/${assetByStem('driver-app.js')}\"></script>`, "driver app must load its external behavior script");
+assertIncludes("app.html", `<script src=\"/${assetByStem('driver-app.js')}\" defer></script>`, "driver app must load its external behavior script");
 for (const path of ["app.html", "session-history.html"]) {
   assertIncludes(path, 'class="skip-link" href="#main-content"', `${path} must let keyboard users skip repeated navigation`);
   assertIncludes(path, 'id="main-content" tabindex="-1"', `${path} must expose a focusable main destination`);
@@ -247,11 +248,17 @@ assertIncludes("app.html", '<h1 style="font-size:18px;line-height:1.2;color:var(
 assertIncludes("app.html", '<h2 id="overlayTitle"', "camera guidance must remain a subordinate heading");
 assertIncludes("app.html", '<h2 id="alertTitle"', "driver alert overlay must not replace the page's main heading");
 assertIncludes("app.html", '<label for="nightOpacity">', "driver app must label the night alert brightness slider");
-const driverAppInlineScripts = scriptMarkupPolicy(read("app.html")).inlineScripts;
-const driverStartupGuard = driverAppInlineScripts.find(script => script.attributes.id === 'driver-startup-guard');
-if (driverAppInlineScripts.length !== 1 || !driverStartupGuard) fail("driver page must keep only its early startup guard inline");
-if (driverStartupGuard?.offset > read("app.html").indexOf('<link rel="stylesheet"')) fail("startup recovery must initialize before blocking styles or scripts");
+const driverGuardName = assetByStem('driver-startup-guard.js');
+const driverGuardMarkup = read('app.html').match(/<script\b(?=[^>]*\bid="driver-startup-guard")[^>]*><\/script>/)?.[0];
+const driverGuardSource = read(driverGuardName);
+const driverGuardIntegrity = 'sha256-' + createHash('sha256').update(driverGuardSource).digest('base64');
+if (!driverGuardMarkup?.includes(`src="/${driverGuardName}"`) || !driverGuardMarkup.includes(`integrity="${driverGuardIntegrity}"`) || (!/\bdefer\b/.test(driverGuardMarkup) || /\basync\b/.test(driverGuardMarkup))) fail('driver startup guard must be external, ordered and integrity-pinned');
+if (read('app.html').indexOf(driverGuardMarkup) > read('app.html').indexOf('<link rel="stylesheet"')) fail('startup guard must be requested before blocking styles');
+assertIncludes('app.html', 'id="startupRetryLink" href="/app.html"', 'parked startup recovery must remain available without a guard script');
+assertIncludes('sw.js', 'const STARTUP_GUARD_ASSETS =', 'the owned startup guard must join integrity-verified offline installation');
+assertIncludes('sw.js', driverGuardIntegrity, 'the offline startup guard integrity must match its current bytes');
 const driverAppPage = read("app.html");
+if (/<script\b(?=[^>]*\bsrc=)[^>]*>/.test(driverAppPage) && [...driverAppPage.matchAll(/<script\b(?=[^>]*\bsrc=)[^>]*>/g)].some(([tag])=> !/\bdefer\b/.test(tag) || /\basync\b/.test(tag))) fail('driver scripts must preserve ordered, nonblocking startup');
 const driverAppDependencies = [`/${assetByStem('occulert-backend.js')}`, `/${assetByStem('security-utils.js')}`, `/${assetByStem('driver-app.js')}`].map((path) => driverAppPage.indexOf(`src=\"${path}\"`));
 if (driverAppDependencies.some((index) => index < 0) || driverAppDependencies.some((index, position) => position > 0 && index <= driverAppDependencies[position - 1])) {
   fail("driver app dependencies must load before the external monitoring behavior in their original order");
@@ -269,7 +276,7 @@ assertIncludes("sw.js", "const NETWORK_FIRST_ASSETS", "service worker must refre
 assertIncludes("vercel.json", "\"key\": \"Content-Security-Policy\"", "vercel.json must enforce its tested CSP");
 assertNotIncludes("vercel.json", "https://fonts.googleapis.com", "font stylesheets must be owned static assets");
 assertNotIncludes("vercel.json", "https://fonts.gstatic.com", "fonts must be served from owned static assets");
-assertIncludes("vercel.json", "https://*.supabase.co", "vercel.json CSP must allow configured Supabase Auth requests");
+assertIncludes("vercel.json", `https://${SUPABASE_HOST}`, "vercel.json CSP must allow only the configured Supabase Auth project");
 assertIncludes("vercel.json", "'wasm-unsafe-eval'", "vercel.json CSP must permit MediaPipe WebAssembly compilation");
 assertIncludes("vercel.json", "webp|avif|gif", "optimized AVIF assets must receive immutable cache headers");
 assertIncludes("vercel.json", "publickey-credentials-create=(self)", "the production permissions policy must allow same-origin passkey enrollment");
@@ -666,17 +673,11 @@ assertIncludes(`${assetByStem('driver-app.js')}`, "async function handleVisibili
 assertIncludes(`${assetByStem('driver-app.js')}`, "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
 
 
-const startupGuard=driverStartupGuard?.body;
-if(typeof startupGuard !== 'string')throw Error('Driver startup guard is missing');
-const guardHash="'sha256-"+createHash('sha256').update(startupGuard).digest('base64')+"'";
-for(const rule of JSON.parse(read('vercel.json')).headers)for(const header of rule.headers){
- if(header.key==='Content-Security-Policy'){
-  const scriptPolicy=header.value.match(/(?:^|;)\s*script-src ([^;]*)/)[1];
-  if(scriptPolicy.includes("'unsafe-inline'")||scriptPolicy.includes("'unsafe-eval'"))throw Error('Script policy must forbid inline handlers and JavaScript eval');
-  if(!scriptPolicy.includes(guardHash))throw Error('Driver startup guard CSP hash is stale');
- }
- if(header.key.toLowerCase()==='x-xss-protection')throw Error('Deprecated X-XSS-Protection header must remain absent');
+for (const rule of JSON.parse(read('vercel.json')).headers) for (const header of rule.headers) {
+ if (header.key === 'Content-Security-Policy') for (const message of auditCspPolicy(header.value)) fail(message);
+ if (header.key.toLowerCase() === 'x-xss-protection') fail('Deprecated X-XSS-Protection header must remain absent');
 }
+if (process.env.SUPABASE_URL && new URL(process.env.SUPABASE_URL).hostname !== SUPABASE_HOST) fail('Configured Supabase URL differs from the audited CSP project host');
 for(const filename of Object.values(JSON.parse(read('asset-versions.json'))).filter(name=>name.endsWith('.js'))){
  const policy=generatedScriptMarkupPolicy(read(filename));
  if(policy.handlers.length || policy.inlineScripts.length)throw Error('Generated inline script or event handler in '+filename);

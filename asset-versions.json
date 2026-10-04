@@ -4,9 +4,9 @@
   "liquid-glass.css": "liquid-glass.v49.css",
   "accessibility.css": "accessibility.v52.css",
   "portal.css": "portal.v49.css",
-  "driver-app.js": "driver-app.v79.js",
+  "driver-app.js": "driver-app.v80.js",
   "auth-helper.js": "auth-helper.v60.js",
-  "occulert-backend.js": "occulert-backend.v79.js",
+  "occulert-backend.js": "occulert-backend.v80.js",
   "passkey-auth.js": "passkey-auth.v60.js",
   "security-utils.js": "security-utils.v47.js",
   "supabase-loader.js": "supabase-loader.v49.js",
@@ -67,5 +67,6 @@
   "fleet-dashboard.js": "fleet-dashboard.v2.js",
   "homepage-bootstrap.js": "homepage-bootstrap.v2.js",
   "page-actions.js": "page-actions.v2.js",
-  "local-history.js": "local-history.v2.js"
+  "local-history.js": "local-history.v2.js",
+  "driver-startup-guard.js": "driver-startup-guard.v1.js"
 }
