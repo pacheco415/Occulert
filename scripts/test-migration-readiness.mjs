@@ -10,6 +10,7 @@ test('missing production ledger is not represented as an applied schema', () => 
   assert.ok(result.missing.some(row => row.version === '20260927010000'));
   assert.ok(result.missing.some(row => row.version === '20260927030000'));
   assert.ok(result.missing.some(row => row.version === '20260929010000'));
+  assert.ok(result.missing.some(row => row.version === '20260701000000'));
 });
 test('complete ledger coverage still distinguishes legacy/schema equivalence', () => {
   const files = migrationInventory();
