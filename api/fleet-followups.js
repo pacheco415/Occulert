@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
     return json(res, 501, { ok: false, error: 'backend_not_configured' });
   }
   try {
-    const user = await verifyAccessToken(bearerToken(req));
+    const user = await verifyAccessToken(bearerToken(req), { freshUser: true });
     if (!user) return json(res, 401, { ok: false, error: 'unauthorized' });
     if (!user.email || !(user.email_confirmed_at || user.confirmed_at)) {
       return json(res, 403, { ok: false, error: 'email_not_verified' });

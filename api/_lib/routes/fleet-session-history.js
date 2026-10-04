@@ -71,7 +71,7 @@ module.exports = async function handler(request, response) {
     return json(response, 501, { ok: false, error: 'backend_not_configured' });
   }
   try {
-    const user = await verifyAccessToken(bearerToken(request));
+    const user = await verifyAccessToken(bearerToken(request), { cachedIdentity: true });
     if (!user) return json(response, 401, { ok: false, error: 'unauthorized' });
     if (!isUuid(user.id)) throw invalidResponse();
     const query = requestHistoryQuery(request), cursor = query.cursor, filters = query.filters;

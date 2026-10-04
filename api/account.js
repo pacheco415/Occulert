@@ -28,7 +28,7 @@ module.exports = async function handler(request, response) {
 
   try {
     const accessToken = bearerToken(request);
-    const user = await verifyAccessToken(accessToken);
+    const user = await verifyAccessToken(accessToken, { freshUser: true });
     if (!user || !user.id) return json(response, 401, { ok: false, error: "unauthorized" });
     if (!hasRecentAuthentication(accessToken, user)) return json(response, 401, { ok: false, error: "reauth_required" });
     // Database foreign keys perform cleanup in the Auth deletion transaction.
