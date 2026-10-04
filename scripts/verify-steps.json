@@ -85,7 +85,8 @@
     "build",
     "lint:source",
     "typecheck:source",
-    "test:driver-build"
+    "test:driver-build",
+    "test:asset-retirement"
   ],
   "additionalChecks": [
     "test:verify-runner"
