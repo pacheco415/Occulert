@@ -12,7 +12,7 @@
   "supabase-loader.js": "supabase-loader.v47.js",
   "lang.js": "lang.v47.js",
   "base.css": "base.v47.css",
-  "account-page-2.js": "account-page-2.v60.js",
+  "account-page-2.js": "account-page-2.v63.js",
   "login-page-1.css": "login-page-1.v47.css",
   "install-page-1.js": "public-page.v67.js",
   "login-page-1.js": "login-page-1.v60.js",
@@ -59,7 +59,7 @@
   "fleet-pilot-report.css": "fleet-pilot-report.v56.css",
   "homepage.js": "homepage.v67.js",
   "form-controls.css": "form-controls.v63.css",
-  "fleet-history-page.js": "fleet-history-page.v68.js",
+  "fleet-history-page.js": "fleet-history-page.v71.js",
   "fleet-history-page.css": "fleet-history-page.v67.css",
   "public-guidance.css": "public-guidance.v67.css",
   "fleet-followups.css": "fleet-followups.v67.css"

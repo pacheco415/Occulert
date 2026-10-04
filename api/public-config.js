@@ -2,6 +2,8 @@
 // The Supabase URL and publishable/anon key are intentionally public values.
 // Never add the service-role key or any other server secret here.
 
+const { serverStorageConfigured } = require("./_lib/supabase");
+
 function json(response, status, body) {
   response.statusCode = status;
   response.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -32,6 +34,8 @@ module.exports = function handler(request, response) {
 
   return json(response, 200, {
     ok: true,
+    capabilities: configured && serverStorageConfigured() && process.env.SESSION_START_RECOVERY_ENABLED === "true"
+      ? { session_start_protocol: "client_uuid_v1", session_lookup_protocol: "client_uuid_lookup_v1" } : {},
     supabase: configured ? { configured: true, url, anonKey } : { configured: false },
   });
 };

@@ -20,6 +20,19 @@ function boot(fetch) {
   return { lib: context.module.exports, context, timers, calls, expire() { for (const [id, timer] of [...timers]) { timers.delete(id); timer.fn(); } } };
 }
 
+test('storage configuration exposes only a Boolean and never makes a network request', () => {
+  const b = boot(() => assert.fail('a presence check must not contact Auth or PostgREST'));
+  assert.equal(b.lib.serverStorageConfigured(), true);
+  delete b.context.process.env.SUPABASE_SERVICE_ROLE_KEY;
+  assert.equal(b.lib.serverStorageConfigured(), false);
+  b.context.process.env.SUPABASE_SERVICE_ROLE_KEY = '';
+  assert.equal(b.lib.serverStorageConfigured(), false);
+  b.context.process.env.SUPABASE_SERVICE_ROLE_KEY = 'fixture-service-role';
+  delete b.context.process.env.SUPABASE_URL;
+  assert.equal(b.lib.serverStorageConfigured(), false);
+  assert.equal(b.calls.length, 0);
+});
+
 for (const status of [400, 401, 403, 429, 500, 503]) test(`token verification distinguishes status ${status} from confirmed invalid credentials`, async () => {
   const b = boot(() => json({ error: 'fixture-upstream' }, status));
   if ([400, 401, 403].includes(status)) assert.equal(await b.lib.verifyAccessToken('fixture-token'), null);
@@ -55,7 +68,8 @@ test('PostgREST preserves database error details for explicit route mappings and
 for (const filename of ['account', 'accept-invitation', 'events', 'fleet-followups', 'fleet-invitations', 'fleet-summary', 'fleets', 'profile', 'sessions']) test(`${filename} returns a finite JSON upstream failure instead of 401 or an unhandled rejection`, async () => {
   const b = boot(() => json({ error: 'fixture-outage' }, 503));
   const route = readFileSync(new URL(`../api/${filename}.js`, import.meta.url), 'utf8');
-  const routeContext = { ...b.context, module: { exports: {} }, require: name => name === './_lib/supabase' ? b.lib : require(name) };
+  const routeRequire = createRequire(new URL(`../api/${filename}.js`, import.meta.url));
+  const routeContext = { ...b.context, module: { exports: {} }, require: name => name === './_lib/supabase' ? b.lib : routeRequire(name) };
   vm.runInNewContext(route, routeContext);
   const request = { method: filename === 'account' ? 'DELETE' : ['profile', 'events', 'sessions', 'accept-invitation'].includes(filename) ? 'POST' : 'GET', headers: { authorization: 'Bearer fixture-token', 'content-type': 'application/json' }, body: { confirm: 'DELETE' }, query: {} };
   const response = { headers: {}, setHeader(key, value) { this.headers[key] = value; }, end(value) { this.body = JSON.parse(value); } };
