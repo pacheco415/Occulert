@@ -1,8 +1,8 @@
-import type React from 'react';
 import type { Ionicons } from '@expo/vector-icons';
+import type React from 'react';
 import type { AlertAssessment } from './feedback';
-import type { SessionRecord, TestConditionGroup, DeviceImpactGroup, HistoryRecordedFilterKey } from './historyRecord';
-import { hasHistoryAlertAssessment, type HistoryFilter, type HistoryPeriod, type HistorySort, type HistoryAssessmentFilter, type HistoryViewPreferences } from './historyPreferences.ts';
+import { hasHistoryAlertAssessment, type HistoryAssessmentFilter, type HistoryFilter, type HistoryPeriod, type HistorySort, type HistoryViewPreferences } from './historyPreferences.ts';
+import type { DeviceImpactGroup, HistoryRecordedFilterKey, SessionRecord, TestConditionGroup } from './historyRecord';
 import { hasCompleteSessionReview, incompleteSessionReviewQueue } from './sessionReviewProgress.ts';
 
 export const CHECKPOINT_TARGET = 10;
@@ -181,4 +181,3 @@ export function historyScopeLabel(
 export function sessionRecordKey(item: SessionRecord, index: number): string {
   return item.sessionId || `${item.savedAt || item.updatedAt || 'session'}-${index}`;
 }
-

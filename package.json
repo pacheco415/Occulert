@@ -89,7 +89,8 @@
     "status": "node scripts/status.mjs",
     "test:status": "node --test scripts/test-status.mjs",
     "test:detection-experiments": "node --test scripts/test-detection-experiment-models.mjs scripts/test-detection-experiment-controller.mjs scripts/test-detection-experiment-runtime.mjs scripts/test-detection-trace-benchmark.mjs",
-    "test:cached-jwks": "node --test scripts/test-cached-jwks.mjs"
+    "test:cached-jwks": "node --test scripts/test-cached-jwks.mjs",
+    "test:history-model": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-history-model.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

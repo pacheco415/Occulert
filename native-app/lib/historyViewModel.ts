@@ -1,8 +1,8 @@
-import type { SessionRecord, SessionOperation } from './historyRecord';
-import { filterIndexedSessionsByPeriod, filterIndexedSessionsByRecordedConditions, filterIndexedSessionsByAssessment, sortIndexedSessions, type HistoryFilter, type HistoryPeriod, type HistoryAssessmentFilter, type HistoryViewPreferences } from './historyPreferences.ts';
+import { planNextFusionValidationSession, summarizeFusionValidation } from './fusionValidationSummary.ts';
+import { filterIndexedSessionsByAssessment, filterIndexedSessionsByPeriod, filterIndexedSessionsByRecordedConditions, sortIndexedSessions, type HistoryAssessmentFilter, type HistoryFilter, type HistoryPeriod, type HistoryViewPreferences } from './historyPreferences.ts';
+import type { SessionOperation, SessionRecord } from './historyRecord';
+import { CHECKPOINT_TARGET, hasCompleteHistoryReview, HISTORY_ASSESSMENTS, HISTORY_SORTS, historyReviewInput, historyReviewQueue, historyScopeLabel, matchesHistoryReviewFilter } from './historyReviewModel.ts';
 import { summarizePilotCoverage, summarizePilotIssues } from './pilotInsights.ts';
-import { summarizeFusionValidation, planNextFusionValidationSession } from './fusionValidationSummary.ts';
-import { CHECKPOINT_TARGET, HISTORY_ASSESSMENTS, HISTORY_SORTS, historyReviewInput, hasCompleteHistoryReview, matchesHistoryReviewFilter, historyScopeLabel, historyReviewQueue } from './historyReviewModel.ts';
 
 export interface HistoryViewInput {
   sessions: SessionRecord[];
@@ -15,7 +15,7 @@ export interface HistoryViewInput {
 }
 
 /** Derive display copies while retaining each original record and storage index. */
-export function deriveHistoryView({ sessions, historyFilter, historyPeriod, historyAssessment, historyView, sessionOperations, now = Date.now() }: HistoryViewInput) {
+export function deriveHistoryView({ sessions, historyFilter, historyPeriod, historyAssessment, historyView, sessionOperations, now }: HistoryViewInput) {
   const evidenceSessions = sessions.filter(item => !item.recoveredFromInterruption);
   const reviewedMedium = evidenceSessions.filter(
     item => item.sensitivity === 'medium' && hasCompleteHistoryReview(item),
@@ -42,7 +42,7 @@ export function deriveHistoryView({ sessions, historyFilter, historyPeriod, hist
   const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteHistoryReview(item)).length;
   const recoveredCount = sessions.filter(item => item.recoveredFromInterruption).length;
   const sortedSessions = sortIndexedSessions(sessions, historyView.sort);
-  const periodSessions = filterIndexedSessionsByPeriod(sortedSessions, historyPeriod, now, historyView.range);
+  const periodSessions = filterIndexedSessionsByPeriod(sortedSessions, historyPeriod, now ?? Date.now(), historyView.range);
   const recordedSessions = filterIndexedSessionsByRecordedConditions(periodSessions, historyView);
   const assessmentSessions = filterIndexedSessionsByAssessment(recordedSessions, historyAssessment);
   const filterCounts: Record<HistoryFilter, number> = {

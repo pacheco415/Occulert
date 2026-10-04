@@ -1,3 +1,4 @@
+import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -94,17 +95,18 @@ test('fusion validation names missing optional coverage without inventing eviden
 });
 
 test('fusion validation dashboard remains local, aggregate, and observation-only', () => {
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   const cloudSync = read('native-app/lib/cloudSync.ts');
   const historyExport = read('native-app/lib/sessionHistoryExport.ts');
   const pilotExport = read('native-app/lib/pilotProgressExport.ts');
   const feedback = read('native-app/lib/feedback.ts');
 
-  assert.match(history, /LOCAL FUSION VALIDATION/);
-  assert.match(history, /NEXT VALIDATION SESSION/);
-  assert.match(history, /Optional accessories are never required/);
-  assert.match(history, /No accuracy rate or safety score is produced/);
-  assert.match(history, /excluded from sync, exports, and feedback/);
+  assert.match(historyOwners.fusion, /LOCAL FUSION VALIDATION/);
+  assert.match(historyOwners.fusion, /NEXT VALIDATION SESSION/);
+  assert.match(historyOwners.fusion, /Optional accessories are never required/);
+  assert.match(historyOwners.fusion, /No accuracy rate or safety score is produced/);
+  assert.match(historyOwners.fusion, /excluded from sync, exports, and feedback/);
   assert.doesNotMatch(cloudSync, /summarizeFusionValidation/);
   assert.doesNotMatch(historyExport, /summarizeFusionValidation/);
   assert.doesNotMatch(pilotExport, /summarizeFusionValidation/);

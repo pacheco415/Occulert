@@ -1,9 +1,9 @@
-import type { SessionRecord } from './historyRecord';
-import type { HistoryFilter, HistoryPeriod, HistoryAssessmentFilter, HistoryViewPreferences } from './historyPreferences';
-import { CHECKPOINT_TARGET, historyScopeLabel, historyReviewInput } from './historyReviewModel.ts';
+import type { HistoryAssessmentFilter, HistoryFilter, HistoryPeriod, HistoryViewPreferences } from './historyPreferences';
 import { sessionHistoryDate } from './historyPresentation.ts';
-import { buildSessionHistoryExport } from './sessionHistoryExport.ts';
+import type { SessionRecord } from './historyRecord';
+import { CHECKPOINT_TARGET, historyReviewInput, historyScopeLabel } from './historyReviewModel.ts';
 import { buildPilotProgressExport } from './pilotProgressExport.ts';
+import { buildSessionHistoryExport } from './sessionHistoryExport.ts';
 
 export function buildHistoryShareMessage(items: SessionRecord[], historyPeriod: HistoryPeriod, historyFilter: HistoryFilter, historyAssessment: HistoryAssessmentFilter, historyView: HistoryViewPreferences): string {
     const selectedScope = historyScopeLabel(historyPeriod, historyFilter, historyAssessment, historyView);

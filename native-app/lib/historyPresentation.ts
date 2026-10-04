@@ -37,4 +37,3 @@ export function headphoneMotionLabel(value?: string): string {
   if (value === 'stopped') return 'Headphone motion was stopped';
   return 'Headphone motion status was not recorded';
 }
-
