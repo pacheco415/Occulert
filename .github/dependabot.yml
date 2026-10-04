@@ -10,6 +10,18 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Native major versions and Expo's shared runtime move in a planned SDK PR.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: react
+      - dependency-name: react-dom
+      - dependency-name: react-native
+      - dependency-name: react-native-*
+      - dependency-name: '@react-native-*/*'
+      - dependency-name: '@babel/core'
+      - dependency-name: '@types/react'
+      - dependency-name: typescript
     groups:
       expo:
         patterns:
@@ -20,4 +32,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 1
+    groups:
+      weekly-actions:
+        applies-to: version-updates
+        patterns:
+          - '*'
