@@ -8,7 +8,7 @@ const manifest=JSON.parse(readFileSync(new URL('../asset-versions.json',import.m
 const historyData=require('../'+manifest['local-history.js']);
 
 const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
-const asset = html.match(/<script src="\/(driver-app\.v\d+\.js)"><\/script>/)?.[1];
+const asset = html.match(/<script src="\/(driver-app\.v\d+\.js)" defer><\/script>/)?.[1];
 assert.ok(asset, 'The driver page must load a versioned driver app');
 const driver = readFileSync(new URL(`../${asset}`, import.meta.url), 'utf8');
 
