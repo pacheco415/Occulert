@@ -12,7 +12,7 @@ const sha = source => createHash('sha256').update(source).digest('hex');
 const run = (cwd, ...args) => execFileSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
 const read = (cwd, name) => readFileSync(join(cwd, name), 'utf8');
 // Fixture repositories must not launch background maintenance or inherit hooks.
-const fixtureGit = (cwd, args) => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd });
+const fixtureGit = (cwd, args) => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
 
 test('asset release copies importers, preserves published bytes and supports guarded refresh', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-asset-'));
@@ -90,4 +90,59 @@ test('a prepared branch and its deleted URLs reserve immutable asset versions',(
   run(cwd,'leaf.js');assert.equal(JSON.parse(read(cwd,'asset-versions.json'))['leaf.js'],'leaf.v4.js');
   assert.equal(read(cwd,'leaf.v1.js'),source);assert.equal(read(cwd,'leaf.v4.js'),source);assert.match(read(cwd,'sw.js'),/occulert-v4/);
  }finally{rmSync(cwd,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
+});
+
+test('merge-resolution-only filenames and caches stay reserved after removal', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'occulert-merge-reserved-'));
+  const commit = message => {
+    fixtureGit(cwd, ['add', '.']);
+    fixtureGit(cwd, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', message]);
+  };
+  try {
+    const source = 'const sample = 1;\n';
+    const initialWorker = "const CACHE = 'occulert-v1'; const files=['/leaf.v1.js'];\n";
+    writeFileSync(join(cwd, 'leaf.v1.js'), source);
+    writeFileSync(join(cwd, 'asset-versions.json'), JSON.stringify({ 'leaf.js': 'leaf.v1.js' }));
+    writeFileSync(join(cwd, 'asset-integrity.json'), JSON.stringify({ 'leaf.v1.js': sha(source) }));
+    writeFileSync(join(cwd, 'index.html'), '<script src="/leaf.v1.js"></script>');
+    writeFileSync(join(cwd, 'sw.js'), initialWorker);
+    writeFileSync(join(cwd, 'vercel.json'), JSON.stringify({ headers: [{ source: '/(.*)\\.(js|css)', headers: [] }] }));
+    fixtureGit(cwd, ['init', '-q']); commit('Initial release');
+    const initial = fixtureGit(cwd, ['rev-parse', 'HEAD']).toString().trim();
+    fixtureGit(cwd, ['checkout', '-qb', 'side-release']);
+    writeFileSync(join(cwd, 'sw.js'), initialWorker.replace('occulert-v1', 'occulert-v2')); commit('Side cache');
+    fixtureGit(cwd, ['checkout', '-qb', 'merge-release', initial]);
+    writeFileSync(join(cwd, 'sw.js'), initialWorker.replace('occulert-v1', 'occulert-v3')); commit('Main cache');
+    assert.throws(() => fixtureGit(cwd, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'merge', '--no-commit', '--no-ff', 'side-release']));
+    assert.match(read(cwd, 'sw.js'), /<<<<<<< HEAD/);
+    writeFileSync(join(cwd, 'sw.js'), initialWorker.replace('occulert-v1', 'occulert-v93'));
+    writeFileSync(join(cwd, 'leaf.v2.js'), 'const mergedBytes = 2;\n'); commit('Resolve with fresh file and cache');
+    const merge = fixtureGit(cwd, ['rev-parse', 'HEAD']).toString().trim();
+    assert.equal(fixtureGit(cwd, ['show', '-s', '--format=%P', merge]).toString().trim().split(' ').length, 2);
+    for (const parent of [`${merge}^1`, `${merge}^2`]) {
+      assert.throws(() => fixtureGit(cwd, ['cat-file', '-e', `${parent}:leaf.v2.js`]));
+      assert.doesNotMatch(fixtureGit(cwd, ['show', `${parent}:sw.js`]).toString(), /occulert-v93/);
+    }
+    fixtureGit(cwd, ['checkout', '-qb', 'next-release', initial]);
+    const before = read(cwd, 'asset-versions.json');
+    const assertReservations = () => {
+      const plan = JSON.parse(run(cwd, 'leaf.js', '--dry-run'));
+      assert.equal(plan.copies['leaf.v1.js'], 'leaf.v3.js');
+      assert.equal(plan.cache, 'occulert-v94');
+      assert.equal(read(cwd, 'asset-versions.json'), before);
+      assert.equal(read(cwd, 'sw.js'), initialWorker);
+    };
+    assertReservations();
+    fixtureGit(cwd, ['checkout', '-q', 'merge-release']);
+    fixtureGit(cwd, ['rm', 'leaf.v2.js']);
+    writeFileSync(join(cwd, 'sw.js'), initialWorker); commit('Retire merged release');
+    fixtureGit(cwd, ['branch', '-D', 'side-release']);
+    fixtureGit(cwd, ['checkout', '-q', 'next-release']);
+    assertReservations();
+    run(cwd, 'leaf.js');
+    assert.equal(JSON.parse(read(cwd, 'asset-versions.json'))['leaf.js'], 'leaf.v3.js');
+    assert.equal(read(cwd, 'leaf.v1.js'), source);
+    assert.equal(read(cwd, 'leaf.v3.js'), source);
+    assert.match(read(cwd, 'sw.js'), /occulert-v94/);
+  } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
