@@ -300,7 +300,7 @@ assertIncludes("pilot-signup.html", "<form class=\"card\"", "pilot signup contro
 assertIncludes(`${assetByStem('driver-app.js')}`, "trigger=_patched", "enhanced alert behavior must replace the active trigger function");
 assertIncludes(`${assetByStem('driver-app.js')}`, "if(alerts===previousAlerts)return", "enhanced alert behavior must respect alert cooldowns");
 assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
-assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.endSession", "driver app must finish protected cloud sessions when opted in");
+assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.createCloudSummaryOutbox", "driver app must finish protected cloud sessions through the durable outbox when opted in");
 assertIncludes(`${assetByStem('driver-app.js')}`, "queueBackendEvent", "driver app must queue protected alert events when opted in");
 assertIncludes(`${assetByStem('driver-app.js')}`, "function cameraRecoveryGuidance", "driver app must keep camera failure recovery guidance available");
 assertIncludes("app.html", "id=\"cameraSourceSelect\"", "desktop driver setup must provide an explicit camera picker");
@@ -414,7 +414,7 @@ assertIncludes("native-app/app/history.tsx", "openFeedbackWithFallback(target", 
 assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, raw motion readings, or location are attached.", "native pilot feedback must state that sensitive media, raw motion, and location are not attached");
 assertIncludes("native-app/app/history.tsx", "false_alert", "native session history must capture structured false-alert feedback");
 assertIncludes("native-app/app/history.tsx", "missed_alert", "native session history must capture structured missed-alert feedback");
-assertIncludes("native-app/app/history.tsx", "Saved only on this iPhone", "native alert assessments must disclose their local-only storage");
+assertIncludes("native-app/app/history.tsx", "This alert rating stays only on this iPhone", "native alert assessments must disclose their local-only storage");
 assertIncludes("native-app/app/monitor.tsx", "sensitivity: sessionSensitivityRef.current", "native session history must preserve the sensitivity used for each session");
 assertIncludes("native-app/app/history.tsx", "CHECKPOINT_TARGET = 10", "native history must track progress toward the first 10-session accuracy checkpoint");
 assertIncludes("native-app/app/history.tsx", "item.sensitivity === 'medium'", "native accuracy checkpoint must count only reviewed Medium-sensitivity sessions");

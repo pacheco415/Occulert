@@ -235,3 +235,30 @@ Only replace `TBD` with reproducible results from an authorized dataset. After
 that, update `README.md`, `safety.html`, and the related GitHub roadmap issue
 with the exact dataset, split, metric definitions, and limitations — and never
 publish a single headline percentage without them.
+
+### Optional native parked baseline (prepared, default off)
+
+`EXPO_PUBLIC_EYE_BASELINE_EXPERIMENT=1` builds an internal, local-session-only
+prototype. Normal builds retain the existing ML Kit probability mapping and
+presets. While parked, use Setup check and look forward with eyes open for
+three seconds. Both eye probabilities and the existing camera readiness checks
+must remain valid; a gap over 500 ms, backward clock or missing setup resets the
+collection. The last at most 64 samples are trimmed by 20% at each end; at least
+eight samples and a mean of at least 0.5 are required. Otherwise current presets
+apply. This is not a guarantee that the person's eyes were open.
+
+The personal baseline multiplies existing preset thresholds on the scaled
+probability axis, with closed/watch bounds and separation. It is not geometric
+EAR or an assertion of equivalence to web calibration. Only the aggregate
+baseline, sample count and format version are saved on this device; no raw eye
+samples, face images or identifiers are persisted. Settings offers Recalibrate
+while parked. Saves cannot change thresholds in an already-running session.
+Uncertain saved storage falls back without overwriting it automatically.
+Completed local records label the experiment and frozen session baseline;
+interrupted checkpoint recovery currently retains build/sensitivity evidence,
+not a baseline tag. Experimental sessions do not start a cloud session.
+
+Synthetic tests cover three-second timelines at 3/7/15 fps, trim/fallback math,
+bounded samples, reset conditions, device storage and a late save after preview
+cancellation. Licensed face/lighting/glasses data and physical native validation
+remain required before changing default alerts or enabling this in normal builds.
