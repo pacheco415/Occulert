@@ -64,6 +64,7 @@
     "test:cloud-summary-presentation",
     "audit:asset-sizes",
     "test:migration-readiness",
+    "test:asset-lineage",
     "test:deployment-ignore"
   ],
   "additionalChecks": [
