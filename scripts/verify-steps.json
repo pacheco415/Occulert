@@ -78,6 +78,7 @@
     "test:browser-history-data",
     "test:status",
     "test:cached-jwks",
+    "test:db-baseline",
     "audit:source-assets",
     "test:source-release"
   ],
