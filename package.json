@@ -90,6 +90,8 @@
     "test:status": "node --test scripts/test-status.mjs",
     "test:detection-experiments": "node --test scripts/test-detection-experiment-models.mjs scripts/test-detection-experiment-controller.mjs scripts/test-detection-experiment-runtime.mjs scripts/test-detection-trace-benchmark.mjs",
     "test:cached-jwks": "node --test scripts/test-cached-jwks.mjs",
+    "migration:status": "node scripts/migration-status.mjs",
+    "test:db-baseline": "node --test scripts/test-db-baseline.mjs scripts/test-migration-status.mjs",
     "test:history-model": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-history-model.mjs"
   },
   "devDependencies": {
