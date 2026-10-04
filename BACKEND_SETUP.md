@@ -174,3 +174,7 @@ for the existing project before enabling fleet onboarding.
 - [x] Manager-scoped session and event history excludes GPS, personal media, and raw motion
 - [ ] Protected session-history deployment and signed-in manager verification
 - [ ] Optional custom SMTP configured only if pilot volume outgrows Supabase's built-in sender
+
+## Optional stored-lead notification
+
+Leave `LEAD_NOTIFY_WEBHOOK_URL` unset to keep notifications disabled. Configure it only with an authorized HTTPS email, Slack or Zapier webhook destination. After a successful Supabase insert the server sends only the event type, server-derived source, received timestamp and lead ID. It never forwards name, email, phone, company or message to this optional destination. The lead ID remains linkable metadata and should be treated as private. Redirects and URL credentials are rejected. Delivery is best effort, bounded to three seconds, and failure does not fail the stored lead submission. This is separate from the existing contact-data storage fallback webhook.

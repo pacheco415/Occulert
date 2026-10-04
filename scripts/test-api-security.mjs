@@ -742,6 +742,60 @@ assert.equal(stored.body.stored, true);
 assert.equal(storedLead.email, "driver@example.com");
 assert.equal(storedLead.use_case, null);
 assert.equal(storedLead.source, "pilot-signup-page", "browser callers must not choose arbitrary lead sources");
+const originalNotifyFetch = globalThis.fetch;
+try {
+  process.env.LEAD_NOTIFY_WEBHOOK_URL = 'https://notify.example.invalid/hook';
+  let notice;
+  let notifyCalls = 0;
+  globalThis.fetch = async (url, options) => {
+    notifyCalls++;
+    assert.equal(url, process.env.LEAD_NOTIFY_WEBHOOK_URL);
+    assert.equal(options.method, 'POST');
+    assert.equal(options.redirect, 'error', 'metadata must not follow redirects to another destination');
+    assert.deepEqual(options.headers, { 'Content-Type': 'application/json' });
+    assert.ok(options.signal instanceof AbortSignal);
+    notice = JSON.parse(options.body);
+    return { ok: true };
+  };
+  const notified = await invoke(pilotLeads, request("POST", validLead, "203.0.113.35"));
+  assert.equal(notified.status, 200);
+  assert.deepEqual(Object.keys(notice).sort(), ['lead_id', 'received_at', 'source', 'type']);
+  assert.equal(notice.type, 'occulert.pilot_lead.created');
+  assert.equal(notice.lead_id, 'lead-1');
+  assert.equal(notice.source, 'pilot-signup-page');
+  assert.ok(Number.isFinite(Date.parse(notice.received_at)));
+  assert.ok(!JSON.stringify(notice).includes(validLead.email));
+  assert.ok(!JSON.stringify(notice).includes(validLead.name));
+  assert.ok(!JSON.stringify(notice).includes(validLead.company));
+  assert.equal(notifyCalls, 1);
+  globalThis.fetch = async () => { throw new Error('notification unavailable'); };
+  assert.equal((await invoke(pilotLeads, request("POST", validLead, "203.0.113.36"))).status, 200);
+  // Assert outside the handler: notification deliberately catches fetch errors.
+  notifyCalls = 0;
+  globalThis.fetch = async () => { notifyCalls++; return { ok: true }; };
+  for (const [index, destination] of ['', 'not a URL', 'http://notify.example.invalid/hook', 'https://user:password@notify.example.invalid/hook'].entries()) {
+    process.env.LEAD_NOTIFY_WEBHOOK_URL = destination;
+    assert.equal((await invoke(pilotLeads, request("POST", validLead, `203.0.113.${70 + index}`))).status, 200);
+  }
+  assert.equal(notifyCalls, 0, 'unset, invalid, insecure and credential-bearing destinations must not be called');
+  process.env.LEAD_NOTIFY_WEBHOOK_URL = 'https://notify.example.invalid/hook';
+  const noLeadId = loadHandler('../api/pilot-leads.js', async (table, options = {}) => {
+    if (table === 'rpc/check_pilot_lead_rate_limit') return [{ allowed: true }];
+    assert.equal(table, 'pilot_leads');
+    return [{ ...options.body }];
+  });
+  assert.equal((await invoke(noLeadId, request('POST', validLead, '203.0.113.74'))).status, 200);
+  assert.equal(notifyCalls, 0, 'missing stored lead identity must not send a notification');
+  let timeoutSignal;
+  globalThis.fetch = async (_url, options) => { timeoutSignal = options.signal; return new Promise(() => {}); };
+  const timedOutNotice = await invoke(pilotLeads, request('POST', validLead, '203.0.113.75'));
+  assert.equal(timedOutNotice.status, 200, 'a stalled notification must not fail stored lead delivery');
+  assert.equal(timeoutSignal.aborted, true, 'the three-second deadline must abort the pending notification');
+} finally {
+  delete process.env.LEAD_NOTIFY_WEBHOOK_URL;
+  globalThis.fetch = originalNotifyFetch;
+}
+
 const paidRollout = await invoke(pilotLeads, request("POST", {
   ...validLead,
   interest: "paid_rollout",
