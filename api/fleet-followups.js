@@ -1,12 +1,7 @@
 const { pgFetch, verifyAccessToken, bearerToken } = require('./_lib/supabase');
 const { isUuid } = require('./_lib/fleet-history-cursor');
 const STATUSES = new Set(['open', 'in_progress', 'reviewed']);
-function json(res, status, body) {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
-  res.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 module.exports = async function handler(req, res) {
   if (!['GET', 'POST'].includes(req.method)) {
     res.setHeader('Allow', 'GET, POST');

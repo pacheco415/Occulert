@@ -4,12 +4,7 @@
 
 const { serverStorageConfigured } = require("./_lib/supabase");
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function validSupabaseUrl(value) {
   try {

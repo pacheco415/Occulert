@@ -12,12 +12,7 @@ const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const MAX_BODY_LENGTH = 2048;
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function validBody(request) {
   if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;

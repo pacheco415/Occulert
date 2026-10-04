@@ -62,12 +62,7 @@ function allowlistedLabel(value, labels) {
   return Object.hasOwn(labels, key) ? labels[key] : "";
 }
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
