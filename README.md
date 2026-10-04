@@ -48,7 +48,7 @@ Occulert is an assistive prototype. It cannot guarantee crash prevention, driver
 |---|---|
 | iPhone Safari | ✅ Supported, keep screen unlocked |
 | Android Chrome | ✅ Supported |
-| Phone vibration | Device/browser dependent |
+| Phone vibration | Device/browser dependent; iOS Safari does not support vibration |
 | Wearables / earbuds | May work through paired-device behavior, not guaranteed |
 | GPS / fleet dashboard | Optional and consent-based |
 

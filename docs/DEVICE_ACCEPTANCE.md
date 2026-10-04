@@ -48,6 +48,7 @@ Record both whether a signal was **sent** and whether a person actually
 |---|---|---|---|
 | Phone speaker and vibration | ____ | ____ | ____ |
 | Phone muted or low volume | ____ | ____ | ____ |
+| iPhone Safari + Home Screen PWA, Silent switch ON: alert audible (pass/fail) | Not tested | Not tested | Physical iPhone acceptance required |
 | Car audio connected | ____ | ____ | ____ |
 | Headphones connected | ____ | ____ | ____ |
 | Focus or notification restrictions | ____ | ____ | ____ |
