@@ -9,28 +9,16 @@ Occulert is a prototype real-time AI drowsiness detection platform that uses you
 Development and release status is maintained in the
 [authoritative roadmap](docs/APP_ROADMAP.md).
 
-- **Current source package:** [PR #153](https://github.com/pacheco415/Occulert/pull/153)
-  implements the approved app and website improvements. See that PR's release
-  receipt for the final source and website deployment status. The previous
-  production receipt is PR #152, `26d2fb4`, deployment READY. Source publication
-  does not establish runtime acceptance.
-- **Installed private native app:** TestFlight **1.0.0 (52)** from `969849b`.
-  The user reported general iPhone functionality and foreground/background Watch
-  urgent display/vibration. Exact-device coverage and sustained performance remain open.
-- **Approved development:** [21 app and website upgrades](docs/APPROVED_UPGRADES_2026_09_26.md)
-  cover account access, History, fleet workflows, public guidance and release records.
-  All tests and type/browser/device checks remain skipped at the user's request.
-  Native changes require a later binary; source merges and website updates do not
-  update the installed iPhone or Watch app.
-- **Native capacity:** the recorded allowance is 15/15 used, renewing September 30
-  at 5 p.m. Pacific. Recheck before building. No paid upgrade, build, submission
-  or OTA update is queued.
-- **Later projects:** detection tuning, fusion, complete-period fleet reports,
-  realtime updates, paid entitlements and additional platforms retain the decisions
-  and evidence requirements in the roadmap. Existing pilot and App Store materials
-  do not establish participants, device acceptance, accuracy or public store availability.
+- **Current status:** see the [app roadmap](docs/APP_ROADMAP.md) for source,
+  website, installed native build and device-validation evidence.
+- **Verification:** pull requests require site, browser, native compatibility and
+  Watch checks. Follow [RELEASING.md](RELEASING.md) for local verification and release.
+- **Native delivery:** merged source and website updates require a new native binary
+  to reach installed iPhone and Watch apps. Recheck build capacity before building.
+- **Detection and later projects:** threshold tuning, fusion, paid entitlements and
+  additional platforms retain the roadmap's decision and evidence requirements.
 
-Dated PR #138–#153 evidence remains in the roadmap and linked release records.
+Keep dated release receipts and device evidence in the roadmap.
 
 ---
 
@@ -58,7 +46,7 @@ Occulert is an assistive prototype. It cannot guarantee crash prevention, driver
 |---|---|
 | iPhone Safari | ✅ Supported, keep screen unlocked |
 | Android Chrome | ✅ Supported |
-| Phone vibration | Device/browser dependent |
+| Phone vibration | Device/browser dependent; iOS Safari does not support vibration |
 | Wearables / earbuds | May work through paired-device behavior, not guaranteed |
 | GPS / fleet dashboard | Optional and consent-based |
 
@@ -80,7 +68,7 @@ Occulert is an assistive prototype. It cannot guarantee crash prevention, driver
 occulert/
 ├── index.html              # Landing page
 ├── app.html                # Driver monitoring app
-├── driver-app.v60.js       # Versioned browser monitoring and alerts
+├── driver-app.v*.js        # Browser monitoring; active version in asset-versions.json
 ├── fleet-dashboard.html    # Protected manager workflow + separate demo
 ├── fleet-display.html      # Protected read-only TV aggregate view
 ├── pilot-guide.html        # Released manager-and-driver quick start
@@ -95,7 +83,7 @@ occulert/
 ├── accept-invite.html      # Invitation acceptance
 ├── manifest.json           # PWA manifest
 ├── sw.js                   # Service worker
-├── occulert-backend.v60.js  # Browser client for Supabase Auth + /api routes
+├── occulert-backend.v*.js   # Auth/API client; active version in asset-versions.json
 ├── api/                    # Vercel serverless endpoints
 ├── db/schema.sql           # Initial schema and RLS policies
 ├── supabase/migrations/    # Subsequent protected schema/function changes
