@@ -1,7 +1,6 @@
 // A cursor is a bounded pagination boundary, never an authorization token.
 // Keep database timestamps verbatim; ISO round-tripping would drop microseconds.
-// PostgreSQL UUID columns accept this canonical syntax without version/variant restrictions.
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const { isUuid } = require('./validation');
 const TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/;
 const MAX_CURSOR_LENGTH = 1024;
 
@@ -15,10 +14,6 @@ function exactKeys(value, expected) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     && Object.keys(value).length === expected.length
     && expected.every(key => Object.hasOwn(value, key));
-}
-
-function isUuid(value) {
-  return typeof value === 'string' && value.length === 36 && UUID_PATTERN.test(value);
 }
 
 function validTimestamp(value) {

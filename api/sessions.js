@@ -9,45 +9,15 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const MAX_BODY_LENGTH = 4096;
-const { isUuid } = require("./_lib/fleet-history-cursor");
+const { isUuid, numberOrNull, integerOrNull, validJsonBody } = require("./_lib/validation");
 const PIPELINES = new Set(["web_mediapipe_ear", "ios_mlkit_eye_probability", "android_mlkit_eye_probability"]);
 
-function json(response, status, body) {
-response.statusCode = status;
-response.setHeader("Content-Type", "application/json; charset=utf-8");
-response.setHeader("Cache-Control", "no-store");
-response.end(JSON.stringify(body));
-}
-
-function numberOrNull(value, min, max) {
-if (value === null || value === undefined || typeof value === "boolean" || typeof value === "object") return null;
-if (typeof value === "string" && !value.trim()) return null;
-const n = Number(value);
-if (!Number.isFinite(n)) return null;
-return Math.max(min, Math.min(max, n));
-}
-
-function integerOrNull(value) {
-const count = numberOrNull(value, 0, 10000);
-return count === null ? null : Math.round(count);
-}
+const { json } = require("./_lib/responses");
 
 function provenanceText(value, maxLength) {
 if (typeof value !== "string") return null;
 const text = value.trim();
 return text && text.length <= maxLength && /^[a-zA-Z0-9._() -]+$/.test(text) ? text : null;
-}
-
-function isJsonRequest(request) {
-return String(request.headers["content-type"] || "").toLowerCase().includes("application/json");
-}
-
-function validBody(request) {
-if (request.method === "GET") return true;
-if (!isJsonRequest(request)) return false;
-const body = request.body;
-return body !== null && typeof body === "object" && !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
 }
 
 module.exports = async function handler(request, response) {
@@ -66,7 +36,7 @@ try {
   return json(response, 401, { ok: false, error: "unauthorized" });
   }
 
-  if ((request.method === "POST" || request.method === "PATCH") && !validBody(request)) {
+  if ((request.method === "POST" || request.method === "PATCH") && !validJsonBody(request)) {
   return json(response, 415, { ok: false, error: "invalid_json_body" });
   }
 if (request.method === "GET" && !isUuid(request.query?.session_id)) {
@@ -166,3 +136,5 @@ return json(response, 405, { ok: false, error: "method_not_allowed" });
 return json(response, 502, { ok: false, error: "supabase_error" });
 }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);
