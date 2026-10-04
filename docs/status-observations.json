@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "production": {
-    "sourceCommit": "1138e5d6b0f714a10d06e1a7e0430fcac1d2a19f",
-    "deploymentId": "dpl_Hxh9W4wAJPpbZqy9v1SMso5By2mU",
+    "sourceCommit": "7b61530065b925cd0d58c60d7772f975b72bc5da",
+    "deploymentId": "dpl_FJteCFD9JBeQ3pJeDFRCuUeuEk3N",
     "state": "READY",
-    "createdAt": "2026-10-04T05:03:47.573Z",
-    "observedAt": "2026-10-04T05:09:16Z"
+    "createdAt": "2026-10-04T16:37:18.513Z",
+    "observedAt": "2026-10-04T16:41:36Z"
   },
   "testFlight": {
     "sourceCommit": "0d11ad22b66baab61ea9db6456bfaed837871537",

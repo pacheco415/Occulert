@@ -28,19 +28,20 @@ release receipts, build-52 device reports and testing deferrals.
 | Fleet TV and launch checklist | Shipped web | Read-only aggregate TV view excludes names, vehicles, locations, individual scores and raw events. Record-derived milestones do not certify offline tasks or fitness to drive. |
 | Managed early access and billing | Published qualification pages; billing prepared in test mode | Proposed prices do not activate subscriptions, automatic renewals or entitlement enforcement. Commercial terms and legal review precede paid activation. |
 | iPhone and Apple Watch | Private native releases, identified in Status | Native uses ML Kit; browser uses MediaPipe. Validate camera, Watch delivery, audio routes, History migration and recovery on the exact binary. Earlier device results stay with their tested build. |
-| Local History identity and privacy | Released source | Migration persists missing IDs before exposing them; duplicate IDs fail closed. Valid zero stays distinct from missing values. Local deletion does not delete cloud records. Local IDs confer no cloud authority. |
+| Local History identity and privacy | Released source | Validate the entire stored array before rewriting it; persist missing IDs before exposing them. Ambiguous keyed edits fail closed. Valid zero stays distinct from missing values. Local deletion does not delete cloud records. Local IDs confer no cloud authority. |
 | Sensor-fusion observations | Local observation only | Candidate camera/headphone counts and optional Watch coverage do not affect cloud telemetry, feedback exports, scores or alerts. Accessories are optional. |
 
 ## Current backlog
 
-1. Finish pipeline hardening, then merge the reviewed API, fleet and browser
+1. Finish current-source checks, then merge the remaining reviewed
    pull requests sequentially against current main. Preserve immutable asset
    bytes and compose overlapping browser changes from the active release.
 2. Prepare native release notes and a device checklist after the selected
    native changes merge. Build and device acceptance are separate steps.
 3. Verify the production migration ledger and deployed definitions before
    activating event quotas, fleet offboarding or schema consolidation.
-4. Finish CSP and authentication hardening. Keep fresh server identity checks
+4. Review security and consent composition as the remaining branches merge.
+   Keep the external-script CSP policy and fresh server identity checks
    for sensitive account and fleet changes and preserve consent boundaries.
 5. Benchmark detector experiments under safe parked conditions with flags
    off by default. Do not change released alerts without supporting evidence.

@@ -135,11 +135,11 @@ export function renderStatus({ git, observations = { schemaVersion: 1 }, pullReq
     if (m.state === 'pending') lines.push(`- Recorded pending versions: ${m.pendingVersions.join(', ')}.`);
   } else lines.push('- Production migrations: Unknown; Git files do not establish a deployed schema.');
   lines.push('', 'Next steps:', '',
-    '1. Finish pipeline checks and merge the reviewed API, fleet and browser PRs against current main.',
+    '1. Finish current-source checks for the remaining reviewed PRs and compose them against current main.',
     '2. Prepare the next native release and checklist after selected native changes merge; do not start a build here.',
     '3. Record parked iPhone Silent-mode Safari/PWA alerts, Watch delivery and exact-build device checks.',
     '4. Read the production migration ledger and confirm definitions before enabling PRs #192 and #206.',
-    '5. Complete security hardening, then benchmark parked detector flags before changing released alerts.', '',
+    '5. Review remaining security and consent changes, then benchmark parked detector flags before changing released alerts.', '',
     'Refresh the Git facts with `npm run status -- --write` in a current full-history checkout.',
     'Supply dated service receipts in `docs/status-observations.json` and a complete PR snapshot in',
     '`docs/status-pull-requests.json`; optional `--observations FILE`, `--pull-requests FILE` and `--ref REF` override them.',
