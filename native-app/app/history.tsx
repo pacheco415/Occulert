@@ -1,3 +1,8 @@
+import type { SessionRecord, SessionOperation, TestConditionKey, TestConditionValue, DeviceImpactKey, DeviceImpactValue, HistoryRecordedFilterKey } from '../lib/historyRecord';
+import { CHECKPOINT_TARGET, ASSESSMENT_OPTIONS, TEST_CONDITION_GROUPS, DEVICE_IMPACT_GROUPS, HISTORY_FILTERS, HISTORY_PERIODS, HISTORY_RECORDED_FILTERS, HISTORY_SORTS, HISTORY_ASSESSMENTS, historyReviewInput, hasCompleteHistoryReview, matchesHistoryReviewFilter, historyReviewQueue, historyScopeLabel, sessionRecordKey } from '../lib/historyReviewModel';
+import { fmtDate, fmtDuration, sessionHistoryDate, sensitivityLabel, headphoneMotionLabel } from '../lib/historyPresentation';
+import { deriveHistoryView } from '../lib/historyViewModel';
+import { buildHistoryShareMessage, buildHistoryPilotProgressMessage } from '../lib/historyShareMessage';
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share, ActivityIndicator, TextInput,
@@ -65,254 +70,6 @@ const HISTORY_FILTER_KEY = 'occulert-session-history-filter';
 const HISTORY_PERIOD_KEY = 'occulert-session-history-period';
 const HISTORY_ASSESSMENT_KEY = 'occulert-session-history-assessment';
 const HISTORY_VIEW_KEY = 'occulert-session-history-recorded-view';
-const CHECKPOINT_TARGET = 10;
-
-interface SessionRecord extends FeedbackSession {
-  driverId?: string;
-  cloudSynced?: boolean;
-  cloudSessionId?: string;
-  assessmentUpdatedAt?: string;
-  conditionsUpdatedAt?: string;
-  deviceImpactUpdatedAt?: string;
-  monitorPerformance?: MonitorPerformanceSnapshot;
-  sensorFusion?: SensorFusionObservationSnapshot;
-  recoveredFromInterruption?: boolean;
-  recoveryNote?: string;
-}
-
-type TestConditionKey = keyof SessionTestConditions;
-type TestConditionValue = NonNullable<SessionTestConditions[TestConditionKey]>;
-
-interface TestConditionGroup {
-  key: TestConditionKey;
-  label: string;
-  options: Array<{ value: TestConditionValue; label: string }>;
-}
-
-type DeviceImpactKey = keyof SessionDeviceImpact;
-type DeviceImpactValue = NonNullable<SessionDeviceImpact[DeviceImpactKey]>;
-
-interface DeviceImpactGroup {
-  key: DeviceImpactKey;
-  label: string;
-  options: Array<{ value: DeviceImpactValue; label: string }>;
-}
-
-const ASSESSMENT_OPTIONS: Array<{
-  value: AlertAssessment;
-  label: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-}> = [
-  { value: 'accurate', label: 'Felt right', icon: 'checkmark-circle-outline' },
-  { value: 'false_alert', label: 'Unnecessary', icon: 'alert-circle-outline' },
-  { value: 'missed_alert', label: 'Missed alert', icon: 'eye-off-outline' },
-  { value: 'late_alert', label: 'Too late', icon: 'time-outline' },
-];
-
-const TEST_CONDITION_GROUPS: TestConditionGroup[] = [
-  {
-    key: 'lighting',
-    label: 'Lighting',
-    options: [
-      { value: 'daylight', label: 'Daylight' },
-      { value: 'low_light', label: 'Low light' },
-    ],
-  },
-  {
-    key: 'eyewear',
-    label: 'Eyewear',
-    options: [
-      { value: 'none', label: 'None' },
-      { value: 'glasses', label: 'Glasses' },
-      { value: 'sunglasses', label: 'Sunglasses' },
-    ],
-  },
-  {
-    key: 'phonePosition',
-    label: 'Phone position',
-    options: [
-      { value: 'high', label: 'High' },
-      { value: 'center', label: 'Center' },
-      { value: 'low', label: 'Low' },
-    ],
-  },
-];
-
-const DEVICE_IMPACT_GROUPS: DeviceImpactGroup[] = [
-  {
-    key: 'batteryImpact',
-    label: 'Battery use',
-    options: [
-      { value: 'low', label: 'Low' },
-      { value: 'noticeable', label: 'Noticeable' },
-      { value: 'high', label: 'High' },
-    ],
-  },
-  {
-    key: 'phoneHeat',
-    label: 'Phone heat',
-    options: [
-      { value: 'cool', label: 'Cool' },
-      { value: 'warm', label: 'Warm' },
-      { value: 'hot', label: 'Hot' },
-    ],
-  },
-];
-
-const HISTORY_FILTERS: Array<{ value: HistoryFilter; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'needs-review', label: 'Needs review' },
-  { value: 'reviewed', label: 'Reviewed' },
-  { value: 'recovered', label: 'Recovered' },
-];
-
-const HISTORY_PERIODS: Array<{ value: HistoryPeriod; label: string }> = [
-  { value: 'all', label: 'All time' },
-  { value: '7-days', label: 'Last 7 days' },
-  { value: '30-days', label: 'Last 30 days' },
-  { value: 'custom', label: 'Custom dates' },
-];
-
-type HistoryRecordedFilterKey = 'sensitivity' | 'lighting' | 'eyewear';
-
-const HISTORY_RECORDED_FILTERS: Array<{
-  key: HistoryRecordedFilterKey;
-  label: string;
-  options: Array<{ value: string; label: string }>;
-}> = [
-  { key: 'sensitivity', label: 'Saved sensitivity', options: [
-    { value: 'all', label: 'All' }, { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' },
-    { value: 'unknown', label: 'Not recorded' },
-  ] },
-  { key: 'lighting', label: 'Saved lighting', options: [
-    { value: 'all', label: 'All' }, { value: 'daylight', label: 'Daylight' },
-    { value: 'low_light', label: 'Low light' }, { value: 'unknown', label: 'Not recorded' },
-  ] },
-  { key: 'eyewear', label: 'Saved eyewear', options: [
-    { value: 'all', label: 'All' }, { value: 'none', label: 'None' },
-    { value: 'glasses', label: 'Glasses' }, { value: 'sunglasses', label: 'Sunglasses' },
-    { value: 'unknown', label: 'Not recorded' },
-  ] },
-];
-
-const HISTORY_SORTS: Array<{ value: HistorySort; label: string }> = [
-  { value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' },
-  { value: 'duration', label: 'Longest first' }, { value: 'alerts', label: 'Most alerts first' },
-];
-
-const HISTORY_ASSESSMENTS: Array<{ value: HistoryAssessmentFilter; label: string }> = [
-  { value: 'all', label: 'All feedback' },
-  { value: 'accurate', label: 'Felt right' },
-  { value: 'false_alert', label: 'Unnecessary alert' },
-  { value: 'missed_alert', label: 'Missed alert' },
-  { value: 'late_alert', label: 'Too late' },
-  { value: 'not-assessed', label: 'Not assessed' },
-];
-
-function historyReviewInput(item: SessionRecord): SessionRecord {
-  const testConditions = { ...item.testConditions };
-  const deviceImpact = { ...item.deviceImpact };
-  TEST_CONDITION_GROUPS.forEach(group => {
-    if (!group.options.some(option => option.value === testConditions[group.key])) delete testConditions[group.key];
-  });
-  DEVICE_IMPACT_GROUPS.forEach(group => {
-    if (!group.options.some(option => option.value === deviceImpact[group.key])) delete deviceImpact[group.key];
-  });
-  return {
-    ...item,
-    alertAssessment: hasHistoryAlertAssessment(item.alertAssessment) ? item.alertAssessment : undefined,
-    sensitivity: item.sensitivity === 'low' || item.sensitivity === 'medium' || item.sensitivity === 'high'
-      ? item.sensitivity : undefined,
-    testConditions,
-    deviceImpact,
-  };
-}
-
-function hasCompleteHistoryReview(item: SessionRecord): boolean {
-  return hasCompleteSessionReview(historyReviewInput(item));
-}
-
-function matchesHistoryReviewFilter(item: SessionRecord, filter: HistoryFilter): boolean {
-  if (filter === 'recovered') return Boolean(item.recoveredFromInterruption);
-  if (filter === 'reviewed') return !item.recoveredFromInterruption && hasCompleteHistoryReview(item);
-  if (filter === 'needs-review') return !item.recoveredFromInterruption && !hasCompleteHistoryReview(item);
-  return true;
-}
-
-function historyReviewQueue(
-  sessions: Array<{ item: SessionRecord; index: number }>,
-  excludedIndex?: number,
-): Array<{ item: SessionRecord; index: number }> {
-  const unfinished = incompleteSessionReviewQueue(
-    sessions.map(({ item, index }) => ({ item: historyReviewInput(item), index })),
-    excludedIndex,
-  );
-  const indices = new Set(unfinished.map(({ index }) => index));
-  // Return the original records and storage indices, rather than normalized copies.
-  return sessions.filter(({ index }) => indices.has(index));
-}
-
-function historyScopeLabel(
-  period: HistoryPeriod,
-  filter: HistoryFilter,
-  assessment: HistoryAssessmentFilter,
-  view: HistoryViewPreferences,
-): string {
-  const periodLabel = period === 'custom' && view.range
-    ? `${view.range.start} through ${view.range.end}`
-    : HISTORY_PERIODS.find(option => option.value === period)?.label || 'All time';
-  const filterLabel = HISTORY_FILTERS.find(option => option.value === filter)?.label || 'All';
-  const assessmentLabel = HISTORY_ASSESSMENTS.find(option => option.value === assessment)?.label || 'All feedback';
-  const recordedLabels = HISTORY_RECORDED_FILTERS.map(group => (
-    `${group.label}: ${group.options.find(option => option.value === view[group.key])?.label || 'All'}`
-  ));
-  const sortLabel = HISTORY_SORTS.find(option => option.value === view.sort)?.label || 'Newest first';
-  return [periodLabel, filterLabel, assessmentLabel, ...recordedLabels, sortLabel].join(' · ');
-}
-
-function fmtDuration(sec?: number): string {
-  if (!sec || sec < 0) return '0:00';
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return m + ':' + String(s).padStart(2, '0');
-}
-
-function fmtDate(iso?: string): string {
-  if (!iso) return 'Unknown date';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return 'Unknown date';
-  return d.toLocaleDateString() + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function sessionHistoryDate(item: SessionRecord): string | undefined {
-  return sessionSavedAt(item.savedAt, item.updatedAt) || undefined;
-}
-
-function sensitivityLabel(value?: SensitivityLevel): string {
-  if (value === 'low') return 'Low';
-  if (value === 'medium') return 'Medium';
-  if (value === 'high') return 'High';
-  return 'Not recorded';
-}
-
-function headphoneMotionLabel(value?: string): string {
-  if (value === 'active') return 'Compatible headphones provided motion';
-  if (value === 'starting') return 'No motion sample arrived before the session ended';
-  if (value === 'unavailable') return 'No compatible headphone motion was available';
-  if (value === 'denied') return 'Motion access was not allowed';
-  if (value === 'error') return 'Headphone motion stopped with an error';
-  if (value === 'not-built') return 'This build does not include headphone motion';
-  if (value === 'stopped') return 'Headphone motion was stopped';
-  return 'Headphone motion status was not recorded';
-}
-
-function sessionRecordKey(item: SessionRecord, index: number): string {
-  return item.sessionId || `${item.savedAt || item.updatedAt || 'session'}-${index}`;
-}
-
-type SessionOperation = 'saving' | 'deleting' | 'feedback';
-
 export default function HistoryScreen() {
   const router = useRouter();
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
@@ -717,16 +474,11 @@ export default function HistoryScreen() {
 
   const shareSessions = async (items: SessionRecord[]) => {
     if (items.length === 0) return;
-    const selectedScope = historyScopeLabel(historyPeriod, historyFilter, historyAssessment, historyView);
-    const dateScope = historyPeriod === 'all'
-      ? 'All saved dates are included.'
-      : historyPeriod === 'custom'
-        ? 'The applied From and To dates are inclusive local calendar dates on this iPhone; unrecorded and future dates are excluded.'
-        : 'This period includes today and the preceding local calendar days; unrecorded and future dates are excluded.';
+
     try {
       await Share.share({
         title: 'Occulert session summaries',
-        message: `Shown view: ${selectedScope}\n${dateScope}\nAlert feedback is a saved user observation, not a detection accuracy measure. Recovered sessions are partial summaries.\n\n${buildSessionHistoryExport(items.map(item => ({ ...historyReviewInput(item), savedAt: sessionHistoryDate(item) })))}`,
+        message: buildHistoryShareMessage(items, historyPeriod, historyFilter, historyAssessment, historyView),
       });
     } catch {
       Alert.alert('Could not share summaries', 'Please try exporting the session summaries again.');
@@ -737,7 +489,7 @@ export default function HistoryScreen() {
     try {
       await Share.share({
         title: 'Occulert pilot progress',
-        message: buildPilotProgressExport(sessions.map(historyReviewInput), CHECKPOINT_TARGET),
+        message: buildHistoryPilotProgressMessage(sessions),
       });
     } catch {
       Alert.alert('Could not share pilot progress', 'Please try exporting the aggregate pilot report again.');
@@ -790,58 +542,7 @@ export default function HistoryScreen() {
     );
   };
 
-  const evidenceSessions = sessions.filter(item => !item.recoveredFromInterruption);
-  const reviewedMedium = evidenceSessions.filter(
-    item => item.sensitivity === 'medium' && hasCompleteHistoryReview(item),
-  );
-  const checkpointProgress = Math.min(reviewedMedium.length, CHECKPOINT_TARGET);
-  const accurateCount = reviewedMedium.filter(item => item.alertAssessment === 'accurate').length;
-  const falseAlertCount = reviewedMedium.filter(item => item.alertAssessment === 'false_alert').length;
-  const missedAlertCount = reviewedMedium.filter(item => item.alertAssessment === 'missed_alert').length;
-  const lateAlertCount = reviewedMedium.filter(item => item.alertAssessment === 'late_alert').length;
-  const completeConditionCount = reviewedMedium.filter(item => (
-    Boolean(item.testConditions?.lighting)
-    && Boolean(item.testConditions?.eyewear)
-    && Boolean(item.testConditions?.phonePosition)
-  )).length;
-  const completeDeviceImpactCount = reviewedMedium.filter(item => (
-    Boolean(item.deviceImpact?.batteryImpact) && Boolean(item.deviceImpact?.phoneHeat)
-  )).length;
-  const pilotCoverage = summarizePilotCoverage(reviewedMedium);
-  const issueInsights = summarizePilotIssues(evidenceSessions.map(historyReviewInput));
-  const issueSessionCount = issueInsights.reduce((total, insight) => total + insight.total, 0);
-  const fusionValidation = summarizeFusionValidation(sessions);
-  const fusionSessionPlan = planNextFusionValidationSession(sessions);
-  const reviewedCount = sessions.filter(item => !item.recoveredFromInterruption && hasCompleteHistoryReview(item)).length;
-  const needsReviewCount = sessions.filter(item => !item.recoveredFromInterruption && !hasCompleteHistoryReview(item)).length;
-  const recoveredCount = sessions.filter(item => item.recoveredFromInterruption).length;
-  const sortedSessions = sortIndexedSessions(sessions, historyView.sort);
-  const periodSessions = filterIndexedSessionsByPeriod(sortedSessions, historyPeriod, Date.now(), historyView.range);
-  const recordedSessions = filterIndexedSessionsByRecordedConditions(periodSessions, historyView);
-  const assessmentSessions = filterIndexedSessionsByAssessment(recordedSessions, historyAssessment);
-  const filterCounts: Record<HistoryFilter, number> = {
-    all: assessmentSessions.length,
-    'needs-review': assessmentSessions.filter(({ item }) => matchesHistoryReviewFilter(item, 'needs-review')).length,
-    reviewed: assessmentSessions.filter(({ item }) => matchesHistoryReviewFilter(item, 'reviewed')).length,
-    recovered: assessmentSessions.filter(({ item }) => matchesHistoryReviewFilter(item, 'recovered')).length,
-  };
-  const reviewStatusSessions = recordedSessions.filter(({ item }) => matchesHistoryReviewFilter(item, historyFilter));
-  const assessmentCounts = Object.fromEntries(HISTORY_ASSESSMENTS.map(assessment => [
-    assessment.value,
-    filterIndexedSessionsByAssessment(reviewStatusSessions, assessment.value).length,
-  ])) as Record<HistoryAssessmentFilter, number>;
-  const filteredSessions = filterIndexedSessionsByAssessment(reviewStatusSessions, historyAssessment);
-  const selectedScope = historyScopeLabel(historyPeriod, historyFilter, historyAssessment, historyView);
-  const visibleReviewQueue = historyReviewQueue(filteredSessions);
-  const nextReviewSession = visibleReviewQueue[0];
-  const shownRecoveredCount = filteredSessions.filter(({ item }) => item.recoveredFromInterruption).length;
-  // A single shown group keeps metric and oldest sorting intact instead of regrouping by date.
-  const groupedFilteredSessions = filteredSessions.length > 0 ? [{
-    key: 'shown',
-    label: HISTORY_SORTS.find(option => option.value === historyView.sort)?.label || 'Newest first',
-    sessions: filteredSessions,
-  }] : [];
-  const sessionOperationsBusy = Object.keys(sessionOperations).length > 0;
+  const { evidenceSessions, reviewedMedium, checkpointProgress, accurateCount, falseAlertCount, missedAlertCount, lateAlertCount, completeConditionCount, completeDeviceImpactCount, pilotCoverage, issueInsights, issueSessionCount, fusionValidation, fusionSessionPlan, reviewedCount, needsReviewCount, recoveredCount, sortedSessions, periodSessions, recordedSessions, assessmentSessions, filterCounts, reviewStatusSessions, assessmentCounts, filteredSessions, selectedScope, visibleReviewQueue, nextReviewSession, shownRecoveredCount, groupedFilteredSessions, sessionOperationsBusy } = deriveHistoryView({ sessions, historyFilter, historyPeriod, historyAssessment, historyView, sessionOperations });
 
   const continueReviewing = () => {
     if (!nextReviewSession || sessionOperationsBusy) return;
