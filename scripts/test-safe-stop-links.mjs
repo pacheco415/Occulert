@@ -43,8 +43,10 @@ test('the monitor stops and saves before handing off to Maps', () => {
   assert.match(monitor, /alertCount > 0/);
   assert.match(monitor, /Only use this after you are safely parked/);
   assert.match(monitor, /await handleStop\(\{ deferCloudFinalization: true \}\)/);
-  assert.match(monitor, /Optional cloud finalization never delays a safe-stop Maps handoff/);
-  assert.match(monitor, /void finalizeCloud\(localSessionId\)\.catch\(\(\) => \{\}\)/);
+  const completion = readFileSync(new URL('../native-app/lib/sessionCompletion.ts', import.meta.url), 'utf8');
+  assert.match(monitor, /await completeNativeSessionStop/);
+  assert.match(monitor, /deferCloudFinalization: Boolean\(options\.deferCloudFinalization\)/);
+  assert.match(completion, /void services\.finalize\(localId\)\.catch\(\(\) => \{\}\)/);
   assert.match(monitor, /buildSafeStopSearchUrls\(Platform\.OS, kind\)/);
   assert.match(monitor, /Linking\.openURL\(url\)/);
   assert.match(monitor, /does not read, store, or upload your location/i);
