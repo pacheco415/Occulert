@@ -366,7 +366,10 @@ for (const body of [null, true, "text", 3, []]) {
 let insertedFleet;
 const fleets = loadHandler("../api/fleets.js", async (table, options = {}) => {
   assert.equal(table, "fleets");
-  if (!options.method) return [];
+  if (!options.method) {
+    assert.equal(options.params.owner_user_id, "eq.user-1");
+    return [];
+  }
   if (options.method === "POST") {
     insertedFleet = options.body;
     return [{ id: "fleet-1", created_at: new Date().toISOString(), ...options.body }];
@@ -391,19 +394,73 @@ const unverifiedFleetResult = await invoke(unverifiedFleet, request("POST", { co
 assert.equal(unverifiedFleetResult.status, 403);
 assert.equal(unverifiedFleetResult.body.error, "email_not_verified");
 
+const malformedFleetBodies = [undefined, null, false, true, 0, 3, "text", "{", "[]", []];
+for (const route of ["../api/fleets.js", "../api/fleet-invitations.js", "../api/accept-invitation.js"]) {
+  let mutations = 0;
+  const malformed = loadHandler(route, async (table, options = {}) => {
+    // Fleet creation may read the authenticated owner's existing fleet before
+    // validating a body; invitation handlers reject the body before any read.
+    if (route === "../api/fleets.js" && table === "fleets" && !options.method) {
+      assert.equal(options.params.owner_user_id, "eq.user-1");
+      return [];
+    }
+    mutations += 1;
+    throw new Error("invalid bodies must not reach invitation storage or write data");
+  });
+  for (const body of [...malformedFleetBodies, { padding: "x".repeat(4096) }]) {
+    const result = await invoke(malformed, request("POST", body));
+    assert.equal(result.status, 415, `${route} must reject non-object or oversized bodies`);
+    assert.equal(result.body.error, "invalid_json_body");
+  }
+  for (const contentType of [undefined, "text/plain"]) {
+    const req = request("POST", { company_name: "Fleet", email: "driver@example.com", token: "a".repeat(43) });
+    if (contentType === undefined) delete req.headers["content-type"];
+    else req.headers["content-type"] = contentType;
+    assert.equal((await invoke(malformed, req)).status, 415, `${route} must require JSON media`);
+  }
+  assert.equal(mutations, 0, `${route} malformed requests must never reach a write`);
+
+  for (const [user, status, error] of [
+    [null, 401, "unauthorized"],
+    [{ id: "unverified-user", email: "unverified@example.com" }, 403, "email_not_verified"],
+  ]) {
+    let calls = 0;
+    const unauthenticated = loadHandler(route, async () => { calls += 1; return []; }, user);
+    const result = await invoke(unauthenticated, request("POST", {
+      company_name: "Fleet", email: verifiedUser.email, email_confirmed_at: verifiedUser.email_confirmed_at,
+      confirmed_at: verifiedUser.email_confirmed_at, owner_user_id: verifiedUser.id,
+      fleet_id: "fleet-1", role: "admin", token: "a".repeat(43),
+    }));
+    assert.equal(result.status, status, `${route} must reject browser-supplied authentication claims`);
+    assert.equal(result.body.error, error);
+    assert.equal(calls, 0, `${route} must authenticate and verify email before storage`);
+  }
+}
+
 let invitationRpcBody;
 const invitations = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
-  if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
+  if (table === "fleets") {
+    assert.equal(options.params.owner_user_id, "eq.user-1");
+    return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
+  }
   assert.equal(table, "rpc/create_fleet_invitation");
   assert.equal(options.method, "POST");
   invitationRpcBody = options.body;
   return { id: "11111111-1111-4111-8111-111111111111", email: "driver@example.com", expires_at: new Date(Date.now() + 60000).toISOString() };
 });
-const createdInvitation = await invoke(invitations, request("POST", { email: "Driver@Example.com", fleet_id: "attacker-fleet", invited_by: "attacker" }));
+const createdInvitation = await invoke(invitations, request("POST", {
+  email: "Driver@Example.com", fleet_id: "attacker-fleet", invited_by: "attacker",
+  owner_user_id: "attacker", owner_email: "attacker@example.com", role: "admin",
+}));
 assert.equal(createdInvitation.status, 201);
 assert.equal(invitationRpcBody.p_fleet_id, "fleet-1");
 assert.equal(invitationRpcBody.p_owner_user_id, "user-1");
+assert.equal(invitationRpcBody.p_owner_email, verifiedUser.email);
 assert.equal(invitationRpcBody.p_email, "driver@example.com");
+assert.equal(invitationRpcBody.p_replace_invitation_id, null);
+assert.deepEqual(Object.keys(invitationRpcBody).sort(), [
+  "p_email", "p_fleet_id", "p_owner_email", "p_owner_user_id", "p_replace_invitation_id", "p_token_hash",
+]);
 assert.match(invitationRpcBody.p_token_hash, /^[0-9a-f]{64}$/);
 const originalHash = invitationRpcBody.p_token_hash;
 const rawInviteToken = createdInvitation.body.invitation.accept_path.split("#token=")[1];
@@ -443,24 +500,60 @@ assert.equal(invitationList.status, 200);
 assert.equal(invitationListSelect.includes("token_hash"), false, "invitation listings must never select token hashes");
 
 
-const nonOwnerInvitations = loadHandler("../api/fleet-invitations.js", async (table) => {
-  if (table === "fleets") return [];
+const nonOwnerInvitations = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
+  if (table === "fleets") {
+    assert.equal(options.params.owner_user_id, "eq.user-1");
+    return [];
+  }
   throw new Error("a non-owner must not reach invitation data");
 });
-const nonOwnerInviteResult = await invoke(nonOwnerInvitations, request("POST", { email: "driver@example.com" }));
+const nonOwnerInviteResult = await invoke(nonOwnerInvitations, request("POST", {
+  email: "driver@example.com", fleet_id: "attacker-fleet", owner_user_id: "attacker", role: "admin",
+}));
 assert.equal(nonOwnerInviteResult.status, 403, "only a server-verified fleet owner may invite drivers");
+
+let revocationCall;
+let revocable = true;
+const revokeInvitation = loadHandler("../api/fleet-invitations.js", async (table, options = {}) => {
+  if (table === "fleets") {
+    assert.equal(options.params.owner_user_id, "eq.user-1");
+    return [{ id: "fleet-1" }];
+  }
+  assert.equal(table, "fleet_invitations");
+  revocationCall = options;
+  return revocable ? [{ id: replacementId, revoked_at: options.body.revoked_at }] : [];
+});
+const revokedInvitation = await invoke(revokeInvitation, request("DELETE", {
+  invitation_id: replacementId, fleet_id: "attacker-fleet", owner_user_id: "attacker", accepted_at: null,
+}));
+assert.equal(revokedInvitation.status, 200);
+assert.equal(revocationCall.method, "PATCH");
+assert.deepEqual(revocationCall.params, {
+  id: `eq.${replacementId}`, fleet_id: "eq.fleet-1", accepted_at: "is.null", revoked_at: "is.null",
+});
+assert.deepEqual(Object.keys(revocationCall.body), ["revoked_at"]);
+assert.ok(Number.isFinite(Date.parse(revocationCall.body.revoked_at)));
+revocable = false;
+const unavailableRevocation = await invoke(revokeInvitation, request("DELETE", { invitation_id: replacementId }));
+assert.equal(unavailableRevocation.status, 404, "foreign, accepted or already revoked invitations cannot be changed");
+assert.equal(unavailableRevocation.body.error, "invitation_not_found");
 
 let acceptanceCall;
 const acceptInvitation = loadHandler("../api/accept-invitation.js", async (table, options = {}) => {
   acceptanceCall = { table, options };
   return [{ fleet_id: "fleet-1", company_name: "Safe Transit", driver_id: "driver-1" }];
 }, { id: "driver-user", email: "driver@example.com", email_confirmed_at: "2026-07-19T00:00:00.000Z" });
-const acceptedInvitation = await invoke(acceptInvitation, request("POST", { token: rawInviteToken }));
+const acceptedInvitation = await invoke(acceptInvitation, request("POST", {
+  token: rawInviteToken, user_id: "attacker-user", driver_id: "attacker-driver", fleet_id: "attacker-fleet",
+  email: "attacker@example.com", role: "admin", email_confirmed_at: "2099-01-01T00:00:00Z",
+}));
 assert.equal(acceptedInvitation.status, 200);
 assert.equal(acceptanceCall.table, "rpc/accept_fleet_invitation");
+assert.equal(acceptanceCall.options.method, "POST");
 assert.equal(acceptanceCall.options.body.p_user_id, "driver-user");
 assert.equal(acceptanceCall.options.body.p_user_email, "driver@example.com");
 assert.match(acceptanceCall.options.body.p_token_hash, /^[0-9a-f]{64}$/);
+assert.deepEqual(Object.keys(acceptanceCall.options.body).sort(), ["p_token_hash", "p_user_email", "p_user_id"]);
 assert.equal(JSON.stringify(acceptanceCall).includes(rawInviteToken), false, "the raw token must be hashed before the database call");
 
 const mismatchedInvitation = loadHandler("../api/accept-invitation.js", async () => {
