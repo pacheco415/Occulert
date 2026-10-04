@@ -74,7 +74,8 @@
     "test:vendor-supabase",
     "test:owned-fonts",
     "test:page-actions",
-    "test:browser-history-data"
+    "test:browser-history-data",
+    "test:status"
   ],
   "additionalChecks": [
     "test:verify-runner"
