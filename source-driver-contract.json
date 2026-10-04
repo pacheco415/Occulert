@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "modules": [
+    "camera.js",
+    "detector.js",
+    "calibration.js",
+    "metrics.js",
+    "alerts.js",
+    "storage-history.js",
+    "cloud-sync.js",
+    "ui.js",
+    "driver-app.js"
+  ],
+  "entry": "driver-app.js",
+  "partialCutoffBinding": "recalBtn",
+  "partialPrefixFunctions": [
+    "isMobileCaptureDevice",
+    "buildCameraConstraints",
+    "cameraSelectionError",
+    "cameraOptionLabel",
+    "savedCameraDeviceId",
+    "rememberCameraDeviceId",
+    "setCameraControlsDisabled",
+    "updateCameraSourceHint",
+    "refreshCameraChoices",
+    "findCameraChoices",
+    "openSelectedCamera",
+    "clearCameraTrackGuards",
+    "handleCameraTrackEnded",
+    "handleCameraTrackMuted",
+    "handleCameraTrackUnmuted",
+    "attachCameraTrackGuards",
+    "cameraRecoveryGuidance",
+    "haltForCameraFailure",
+    "recordFramePerformance",
+    "resetFramePerformance",
+    "framePerformanceSnapshot",
+    "detectionRuntimeError",
+    "withDetectionTimeout",
+    "fetchDetectionAsset",
+    "verifyDetectionRuntime",
+    "loadFaceMeshScript",
+    "sendFaceMeshFrame",
+    "signalDetectionResult",
+    "waitForDetectionResult",
+    "discardFaceMesh",
+    "initModel",
+    "verifyFirstInference",
+    "haltForDetectionFailure",
+    "loop",
+    "finishCalibration",
+    "updateCalibration",
+    "createLocalDriverId",
+    "normalizeLocalDriverId",
+    "browserHistoryStore",
+    "rewriteStoredDriverId",
+    "migrateLocalDriverIdentity",
+    "saveLocalSessionHistory",
+    "setMonitoringUi"
+  ],
+  "adjacentDeclarations": {
+    "after": "demoAlert",
+    "move": "onResults"
+  },
+  "newlineBeforeBindingFollower": {
+    "binding": "feedbackForm",
+    "follower": "IfStatement"
+  },
+  "lifecycle": {
+    "factory": "createLocalLifecycleOperations",
+    "locals": [
+      {
+        "name": "start",
+        "capture": "startLocalSession"
+      },
+      {
+        "name": "stop",
+        "capture": "stopLocalSession"
+      }
+    ],
+    "aliases": {
+      "start": "startMonitoring",
+      "stop": "stopMonitoring"
+    }
+  },
+  "requiredLiterals": [
+    "let _ac=null,",
+    "async function start(){",
+    "async function stop(",
+    "const startLocalSession=start;",
+    "function demoAlert(){",
+    "\nfunction onResults",
+    "const feedbackForm=document.getElementById('feedbackForm');\nif(feedbackForm)feedbackForm.addEventListener",
+    "const recalBtn=",
+    "const startupCore=Object.freeze"
+  ],
+  "provenance": "Declarations are derived from these real module files. Prefix names encode reviewed partial-startup prerequisites; short literal markers encode unchanged runnable excerpt contracts. No published driver implementation is an adapter input.",
+  "markerRules": [
+    {
+      "role": "alert-state",
+      "kind": "variable",
+      "name": "_ac",
+      "literal": "let _ac=null,"
+    },
+    {
+      "role": "local-start",
+      "kind": "local-function",
+      "name": "start",
+      "literal": "async function start(){"
+    },
+    {
+      "role": "local-stop",
+      "kind": "local-function",
+      "name": "stop",
+      "literal": "async function stop("
+    },
+    {
+      "role": "local-capture",
+      "kind": "capture",
+      "name": "startLocalSession",
+      "literal": "const startLocalSession=start;"
+    },
+    {
+      "role": "demo-function",
+      "kind": "function",
+      "name": "demoAlert",
+      "literal": "function demoAlert(){"
+    },
+    {
+      "role": "results-boundary",
+      "kind": "function",
+      "name": "onResults",
+      "literal": "\nfunction onResults",
+      "leadingNewline": true
+    },
+    {
+      "role": "feedback-registration",
+      "kind": "variable",
+      "name": "feedbackForm",
+      "literal": "const feedbackForm=document.getElementById('feedbackForm');\nif(feedbackForm)feedbackForm.addEventListener"
+    },
+    {
+      "role": "partial-startup",
+      "kind": "variable",
+      "name": "recalBtn",
+      "literal": "const recalBtn="
+    },
+    {
+      "role": "core-capability",
+      "kind": "variable",
+      "name": "startupCore",
+      "literal": "const startupCore=Object.freeze"
+    }
+  ]
+}

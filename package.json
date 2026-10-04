@@ -94,14 +94,22 @@
     "test:db-baseline": "node --test scripts/test-db-baseline.mjs scripts/test-migration-status.mjs",
     "asset:release": "node scripts/bump-asset.mjs --release",
     "audit:source-assets": "node scripts/audit-source-assets.mjs",
-    "test:source-release": "node --test scripts/test-source-release.mjs"
+    "test:source-release": "node --test scripts/test-source-release.mjs",
+    "build": "node scripts/build-driver.mjs",
+    "lint:source": "eslint src",
+    "typecheck:source": "tsc -p jsconfig.json",
+    "test:driver-build": "node --test scripts/test-driver-build.mjs scripts/test-driver-hook-policy.mjs scripts/test-bundled-source-release.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "^1.63.0",
-    "@axe-core/playwright": "4.13.0",
     "acorn": "8.18.0",
-    "parse5": "8.0.1"
+    "esbuild": "0.28.2",
+    "eslint": "10.12.0",
+    "eslint-scope": "9.1.2",
+    "parse5": "8.0.1",
+    "typescript": "6.0.3"
   },
   "engines": {
     "node": "24.x"

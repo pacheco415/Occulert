@@ -168,5 +168,7 @@
   "driver-app.v81.js": "ba47a0291c6fd00f484921c8502355348093eeeb2fbe14bb8e2226ff0420d4db",
   "driver-startup-guard.v2.js": "bd4f0cbd5389dff9b0ba21f8edda8c59ab2a15ba588c855a19e54de03d11a344",
   "occulert-backend.v81.js": "b197eaf47693b74f1413772f8ebbb26e1538106e543f6cc78a5325ac114a6c98",
-  "detection-experiments.v1.js": "705280df65c8afa21656d8b08b89bc9579e901ad034e61309154e4f01b051363"
+  "detection-experiments.v1.js": "705280df65c8afa21656d8b08b89bc9579e901ad034e61309154e4f01b051363",
+  "driver-app.v82.js": "733995d39cf8bff16670c61c0954cfe7f9b51a521d44210a57579722383ab01e",
+  "driver-startup-guard.v3.js": "db7185c9b86175743d08f811848f56d7dd1c6df0b64edb51894b5769c7bb82bb"
 }

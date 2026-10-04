@@ -25,3 +25,6 @@ startup-performance-budgets.json
 src/
 build/
 source-assets.json
+source-driver-contract.json
+jsconfig.json
+eslint.config.mjs

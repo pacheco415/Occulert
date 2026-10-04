@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { parse } from 'acorn';
 
 export const SOURCE_REGISTRY = 'source-assets.json';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -30,12 +31,13 @@ export function loadSourceAssets(root, manifest, { required = false } = {}) {
   const usedSources = new Set();
   const entries = Object.entries(registry.assets).map(([logical, entry]) => {
     if (!/^[\w-]+\.(js|css)$/.test(logical) || !Object.hasOwn(manifest, logical)) throw new Error(`Unknown source-managed logical asset: ${logical}`);
-    if (!entry || entry.mode !== 'copy' || Object.keys(entry).some(key => !['source', 'mode'].includes(key)) || typeof entry.source !== 'string' || !/^src\/(?:[\w-]+\/)*[\w.-]+\.(js|css)$/.test(entry.source) || !entry.source.endsWith(logical.slice(logical.lastIndexOf('.')))) throw new Error(`Unsupported source entry: ${logical}`);
+    if (!entry || !['copy', 'bundle'].includes(entry.mode) || Object.keys(entry).some(key => !['source', 'mode'].includes(key)) || typeof entry.source !== 'string' || !/^src\/(?:[\w-]+\/)*[\w.-]+\.(js|css)$/.test(entry.source) || !entry.source.endsWith(logical.slice(logical.lastIndexOf('.')))) throw new Error(`Unsupported source entry: ${logical}`);
     if (usedSources.has(entry.source)) throw new Error(`Source registered twice: ${entry.source}`);
     usedSources.add(entry.source);
     const active = manifest[logical];
     if (typeof active !== 'string' || !/^[\w-]+\.v\d+\.(js|css)$/.test(active)) throw new Error(`Invalid active source asset: ${logical}`);
-    const bytes = readFileSync(ownedFile(root, entry.source));
+    if (entry.mode === 'bundle' && (logical !== 'driver-app.js' || entry.source !== 'src/driver-app.js')) throw new Error(`Unsupported bundled source entry: ${logical}`);
+    const bytes = entry.mode === 'bundle' ? renderDriverBundle(root) : readFileSync(ownedFile(root, entry.source));
     if (!Buffer.from(bytes.toString('utf8')).equals(bytes)) throw new Error(`Source must be UTF-8: ${entry.source}`);
     const published = readFileSync(ownedFile(root, active));
     return { logical, ...entry, active, bytes, changed: !bytes.equals(published), sha256: sha(bytes) };
@@ -73,10 +75,10 @@ export function auditSourceAssets(root = process.cwd()) {
     if (integrity[entry.active] !== entry.sha256) throw new Error(`Source output integrity mismatch: ${entry.active}`);
   }
   const exclusions = new Set(readFileSync(join(root, '.vercelignore'), 'utf8').split(/\r?\n/).map(line => line.trim()));
-  for (const name of ['src/', 'build/', SOURCE_REGISTRY]) if (!exclusions.has(name)) throw new Error(`.vercelignore must exclude ${name}`);
+  for (const name of ['src/', 'build/', SOURCE_REGISTRY, ...(entries.some(entry => entry.mode === 'bundle') ? ['source-driver-contract.json', 'jsconfig.json', 'eslint.config.mjs'] : [])]) if (!exclusions.has(name)) throw new Error(`.vercelignore must exclude ${name}`);
   const worker = readFileSync(join(root, 'sw.js'), 'utf8');
-  if (/["'`]\/?(?:src\/|build\/|source-assets\.json)/.test(worker)) throw new Error('Development source must not enter the offline cache');
-  return entries.map(({ logical, source, active, sha256 }) => ({ logical, source, active, sha256 }));
+  if (/["'`]\/?(?:src\/|build\/|source-assets\.json|source-driver-contract\.json|jsconfig\.json|eslint\.config\.mjs)/.test(worker)) throw new Error('Development source must not enter the offline cache');
+  return entries.map(({ logical, source, mode, active, sha256 }) => ({ logical, source, mode, active, sha256 }));
 }
 
 // Validate and stage every byte before replacing any checkout path. Restore the
@@ -115,4 +117,38 @@ export function commitAssetPlan(root, changes, { rename = renameSync } = {}) {
     }
     throw error;
   } finally { rmSync(directory, { recursive: true, force: true }); }
+}
+
+// The compiler is a fixed repository build step, never a registry-supplied
+// executable. --stdout compiles without creating persistent build output.
+function renderDriverBundle(root, overrides) {
+  ownedFile(root, 'src/driver-app.js');
+  const args = [ownedFile(root, 'scripts/build-driver.mjs'), '--stdout'];
+  if (overrides) args.push('--overrides');
+  return execFileSync(process.execPath, args, { cwd: root, input: overrides ? JSON.stringify(overrides) : undefined, timeout: 30000, maxBuffer: 2 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] });
+}
+
+export function synchronizeSourceEntry(root, entry, expected, beforeManifest, afterManifest) {
+  const bytes = Buffer.from(expected);
+  if (entry.bytes.equals(bytes)) return new Map();
+  if (entry.mode === 'copy') return new Map([[entry.source, bytes]]);
+  const contract = json(root, 'source-driver-contract.json');
+  const replacements = new Map(Object.keys(beforeManifest).filter(key => beforeManifest[key] !== afterManifest[key]).map(key => [beforeManifest[key], afterManifest[key]]));
+  const escaped = [...replacements.keys()].map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = escaped.length ? new RegExp(escaped.join('|'), 'g') : null;
+  const output = parse(bytes.toString('utf8'), { ecmaVersion: 2022, sourceType: 'script' });
+  const pin = output.body.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === 'EXPERIMENT_HELPER_INTEGRITY')?.init;
+  const changes = new Map(), overrides = {};
+  for (const name of contract.modules) {
+    const path = 'src/' + name, original = readFileSync(ownedFile(root, path), 'utf8');
+    let updated = pattern ? original.replace(pattern, value => replacements.get(value)) : original;
+    if (pin?.type === 'Literal' && typeof pin.value === 'string') {
+      const ast = parse(updated, { ecmaVersion: 2022, sourceType: 'module' });
+      const owned = ast.body.map(node => node.type === 'ExportNamedDeclaration' ? node.declaration : node).filter(node => node?.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === 'EXPERIMENT_HELPER_INTEGRITY');
+      if (owned) updated = updated.slice(0, owned.init.start) + JSON.stringify(pin.value) + updated.slice(owned.init.end);
+    }
+    if (updated !== original) { overrides[name] = updated; changes.set(path, updated); }
+  }
+  if (!renderDriverBundle(root, overrides).equals(bytes)) throw new Error('Bundled importer changes must originate in actual source modules; update source and use asset:release');
+  return changes;
 }

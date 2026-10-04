@@ -1,0 +1,4 @@
+const browserNames = ['document','window','navigator','localStorage','performance','fetch','setTimeout','clearTimeout','setInterval','clearInterval','requestAnimationFrame','cancelAnimationFrame','Audio','SpeechSynthesisUtterance','speechSynthesis','URL','URLSearchParams','Blob','WebAssembly','crypto','atob','btoa','confirm','alert','matchMedia','console','Notification','AbortController'];
+// These are the actual already-loaded legacy detector and safety helper globals.
+const ownedRuntimeNames = ['FaceMesh','OcculertSecurity'];
+export default [{files:['**/*.js'],languageOptions:{ecmaVersion:2022,sourceType:'module',globals:Object.fromEntries([...browserNames,...ownedRuntimeNames].map(name=>[name,'readonly']))},rules:{'no-undef':'error','no-func-assign':'error','no-global-assign':'error','no-redeclare':'error','no-sequences':'error','no-import-assign':'error'}}];

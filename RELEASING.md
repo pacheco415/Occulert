@@ -89,3 +89,8 @@ CSP connections use the exact project host declared in
 and all Vercel connection policies together and verify `/api/public-config`.
 Retained old SDK loaders require their documented CDN compatibility grant during
 the existing 14-day retention window; remove it after the reference audit passes.
+
+The driver now uses the bundled source mode described in
+[docs/DRIVER_MODULES.md](docs/DRIVER_MODULES.md). Edit its eight modules and entry,
+then release through `asset:release`; do not copy compiled output into the entry.
+Other logical assets retain the existing manual immutable release process.
