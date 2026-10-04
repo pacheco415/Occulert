@@ -123,7 +123,7 @@ let allowEventSession = false;
 let insertedEvent;
 const events = loadHandler("../api/events.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1" }];
-  if (table === "sessions") return allowEventSession ? [{ id: "00000000-0000-4000-8000-000000000001" }] : [];
+  if (table === "sessions") return allowEventSession ? [{ id: "00000000-0000-4000-8000-000000000001", started_at: "2026-07-19T00:00:00.000Z", ended_at: null }] : [];
   if (table === "events") {
     insertedEvent = options.body;
     return [{ id: "event-1", ...options.body }];
@@ -154,6 +154,127 @@ const eventWithoutLocation = await invoke(events, request("POST", {
 assert.equal(eventWithoutLocation.status, 200);
 assert.equal(insertedEvent.latitude, null, "explicitly absent latitude must not become 0");
 assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must not become 0");
+
+// JSON values must not acquire an allowed event type through string coercion.
+{
+  let storageCalls = 0;
+  const invalidTypeEvents = loadHandler("../api/events.js", async () => {
+    storageCalls++;
+    throw new Error("invalid event types must be rejected before storage");
+  });
+  for (const type of [["drowsy"], { toString: "drowsy" }, { type: "drowsy" }, true, 7, null]) {
+    const result = await invoke(invalidTypeEvents, request("POST", { ...eventBody, type }));
+    assert.equal(result.status, 400, `reject malformed event type ${JSON.stringify(type)}`);
+    assert.equal(result.body.error, "invalid_event");
+  }
+  assert.equal(storageCalls, 0, "malformed event types must never query or mutate storage");
+}
+
+// Client event time must stay inside the owned session; finished sessions have a short delivery grace.
+{
+  const now = Date.now();
+  const start = new Date(now - 600000).toISOString();
+  const finish = new Date(now - 30000).toISOString();
+  let row = { id: "session-1", started_at: start, ended_at: finish };
+  let writes = 0;
+  let saved;
+  const timedEvents = loadHandler("../api/events.js", async (table, options = {}) => {
+    if (table === "drivers") return [{ id: "driver-1" }];
+    if (table === "sessions") {
+      assert.equal(options.params.driver_id, "eq.driver-1");
+      assert.equal(options.params.select, "id,started_at,ended_at");
+      return [row];
+    }
+    assert.equal(table, "events");
+    writes++;
+    saved = options.body;
+    return [{ id: "event-1", ...saved }];
+  });
+  for (const occurred_at of [start, finish]) {
+    assert.equal((await invoke(timedEvents, request("POST", { ...eventBody, occurred_at }))).status, 200);
+    assert.equal(saved.created_at, occurred_at);
+  }
+  assert.equal((await invoke(timedEvents, request("POST", eventBody))).status, 200);
+  assert.equal(saved.created_at, finish, "legacy event delivery during grace must not be stamped after session end");
+  const previousWrites = writes;
+  for (const occurred_at of [new Date(now - 600001).toISOString(), new Date(now).toISOString(), "invalid", null, 42]) {
+    const result = await invoke(timedEvents, request("POST", { ...eventBody, occurred_at }));
+    assert.equal(result.status, 400);
+    assert.equal(result.body.error, "invalid_occurred_at");
+  }
+  assert.equal(writes, previousWrites, "invalid event time must not write data");
+  row.ended_at = new Date(now - 180000).toISOString();
+  const stale = await invoke(timedEvents, request("POST", eventBody));
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.error, "session_ended");
+  assert.equal(writes, previousWrites);
+  row.ended_at = null;
+  assert.equal((await invoke(timedEvents, request("POST", { ...eventBody, occurred_at: finish }))).status, 200);
+}
+
+// Use the actual API with a fixed clock to catch calendar normalization,
+// timezone ambiguity, sub-millisecond bounds, and the exact delivery grace.
+{
+  const originalNow = Date.now;
+  const now = Date.parse("2026-03-03T13:00:00.000Z");
+  Date.now = () => now;
+  let row = { id: eventBody.session_id, started_at: "2026-03-01T00:00:00.000Z", ended_at: "2026-03-03T12:59:30.000000Z" };
+  let writes = 0;
+  let saved;
+  const strictEvents = loadHandler("../api/events.js", async (table, options = {}) => {
+    if (table === "drivers") return [{ id: "driver-1" }];
+    if (table === "sessions") {
+      assert.equal(options.params.driver_id, "eq.driver-1");
+      assert.equal(options.params.id, "eq." + eventBody.session_id);
+      return [row];
+    }
+    assert.equal(table, "events");
+    writes++;
+    saved = options.body;
+    return [{ id: "event-1", ...saved }];
+  });
+  try {
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 200);
+    assert.equal(saved.created_at, row.ended_at);
+    const beforeInvalid = writes;
+    for (const occurred_at of [
+      "2026-02-31T12:00:00Z", "2026-02-29T12:00:00Z",
+      "2026-03-02T12:00:00", "2026-03-02", "2026-03-02T24:00:00Z",
+      "2026-03-02T12:00:00+14:01", "2026-03-02T12:00:00Z\n",
+      "2026-03-03T12:59:30.000001Z", "2026-02-28T23:59:59.999999Z",
+    ]) {
+      const result = await invoke(strictEvents, request("POST", { ...eventBody, occurred_at }));
+      assert.equal(result.status, 400, occurred_at);
+      assert.equal(result.body.error, "invalid_occurred_at");
+    }
+    assert.equal(writes, beforeInvalid, "invalid ISO timestamps or precise bounds must not reach the insert");
+    for (const occurred_at of ["2026-03-03T12:00:00.123456Z", "2026-03-03T13:00:00.123456+01:00", "2026-03-03T07:00:00.123456-05:00"]) {
+      assert.equal((await invoke(strictEvents, request("POST", { ...eventBody, occurred_at }))).status, 200);
+      assert.equal(saved.created_at, occurred_at, "accepted timestamps must preserve timezone and microsecond precision for storage");
+    }
+    row.ended_at = "2026-03-03T12:58:00.000000Z";
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 200, "exactly two minutes remains inside the delivery grace");
+    assert.equal(saved.created_at, row.ended_at);
+    row.ended_at = "2026-03-03T12:57:59.999999Z";
+    const beforeStale = writes;
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 409);
+    assert.equal(writes, beforeStale);
+    row.ended_at = null;
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 200);
+    assert.equal(saved.created_at, new Date(now).toISOString(), "open sessions keep the server arrival timestamp");
+    row.started_at = "2024-02-28T00:00:00Z";
+    assert.equal((await invoke(strictEvents, request("POST", { ...eventBody, occurred_at: "2024-02-29T12:00:00Z" }))).status, 200, "a real leap day remains valid");
+    row.started_at = "2026-03-04T00:00:00Z";
+    const beforeInvalidSession = writes;
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 502);
+    row.started_at = "invalid";
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 502);
+    row.started_at = "2026-03-01T00:00:00Z";
+    row.ended_at = "invalid";
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 502);
+    assert.equal(writes, beforeInvalidSession, "invalid stored intervals must fail without inventing event times");
+  } finally { Date.now = originalNow; }
+}
 
 // Finalization is immutable and accepts delayed client finish timestamps.
 for (const finish of ['2026-07-19T00:05:00.000Z', '2026-07-18T00:00:00.000Z', '2999-01-01T00:00:00.000Z', 'invalid']) {
@@ -636,6 +757,60 @@ assert.equal(stored.body.stored, true);
 assert.equal(storedLead.email, "driver@example.com");
 assert.equal(storedLead.use_case, null);
 assert.equal(storedLead.source, "pilot-signup-page", "browser callers must not choose arbitrary lead sources");
+const originalNotifyFetch = globalThis.fetch;
+try {
+  process.env.LEAD_NOTIFY_WEBHOOK_URL = 'https://notify.example.invalid/hook';
+  let notice;
+  let notifyCalls = 0;
+  globalThis.fetch = async (url, options) => {
+    notifyCalls++;
+    assert.equal(url, process.env.LEAD_NOTIFY_WEBHOOK_URL);
+    assert.equal(options.method, 'POST');
+    assert.equal(options.redirect, 'error', 'metadata must not follow redirects to another destination');
+    assert.deepEqual(options.headers, { 'Content-Type': 'application/json' });
+    assert.ok(options.signal instanceof AbortSignal);
+    notice = JSON.parse(options.body);
+    return { ok: true };
+  };
+  const notified = await invoke(pilotLeads, request("POST", validLead, "203.0.113.35"));
+  assert.equal(notified.status, 200);
+  assert.deepEqual(Object.keys(notice).sort(), ['lead_id', 'received_at', 'source', 'type']);
+  assert.equal(notice.type, 'occulert.pilot_lead.created');
+  assert.equal(notice.lead_id, 'lead-1');
+  assert.equal(notice.source, 'pilot-signup-page');
+  assert.ok(Number.isFinite(Date.parse(notice.received_at)));
+  assert.ok(!JSON.stringify(notice).includes(validLead.email));
+  assert.ok(!JSON.stringify(notice).includes(validLead.name));
+  assert.ok(!JSON.stringify(notice).includes(validLead.company));
+  assert.equal(notifyCalls, 1);
+  globalThis.fetch = async () => { throw new Error('notification unavailable'); };
+  assert.equal((await invoke(pilotLeads, request("POST", validLead, "203.0.113.36"))).status, 200);
+  // Assert outside the handler: notification deliberately catches fetch errors.
+  notifyCalls = 0;
+  globalThis.fetch = async () => { notifyCalls++; return { ok: true }; };
+  for (const [index, destination] of ['', 'not a URL', 'http://notify.example.invalid/hook', 'https://user:password@notify.example.invalid/hook'].entries()) {
+    process.env.LEAD_NOTIFY_WEBHOOK_URL = destination;
+    assert.equal((await invoke(pilotLeads, request("POST", validLead, `203.0.113.${70 + index}`))).status, 200);
+  }
+  assert.equal(notifyCalls, 0, 'unset, invalid, insecure and credential-bearing destinations must not be called');
+  process.env.LEAD_NOTIFY_WEBHOOK_URL = 'https://notify.example.invalid/hook';
+  const noLeadId = loadHandler('../api/pilot-leads.js', async (table, options = {}) => {
+    if (table === 'rpc/check_pilot_lead_rate_limit') return [{ allowed: true }];
+    assert.equal(table, 'pilot_leads');
+    return [{ ...options.body }];
+  });
+  assert.equal((await invoke(noLeadId, request('POST', validLead, '203.0.113.74'))).status, 200);
+  assert.equal(notifyCalls, 0, 'missing stored lead identity must not send a notification');
+  let timeoutSignal;
+  globalThis.fetch = async (_url, options) => { timeoutSignal = options.signal; return new Promise(() => {}); };
+  const timedOutNotice = await invoke(pilotLeads, request('POST', validLead, '203.0.113.75'));
+  assert.equal(timedOutNotice.status, 200, 'a stalled notification must not fail stored lead delivery');
+  assert.equal(timeoutSignal.aborted, true, 'the three-second deadline must abort the pending notification');
+} finally {
+  delete process.env.LEAD_NOTIFY_WEBHOOK_URL;
+  globalThis.fetch = originalNotifyFetch;
+}
+
 const paidRollout = await invoke(pilotLeads, request("POST", {
   ...validLead,
   interest: "paid_rollout",
