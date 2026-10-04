@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { resolve, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const SDK = '/vendor/supabase-2.112.3.js';
 const sdkBytes = readFileSync(new URL('../vendor/supabase-2.112.3.js', import.meta.url), 'utf8');
@@ -24,11 +27,12 @@ test('owned SDK initializes both account pages under their CSP without a CDN', a
     const response = await page.goto(path);
     expect(response.headers()['content-security-policy']).toContain("script-src 'self'");
     await expect.poll(() => page.evaluate(() => window.OcculertSupabaseLoader?.state().ready)).toBe(true);
-    const capabilities = await page.evaluate(() => {
+    const capabilities = await page.evaluate(async () => {
       const script = document.querySelector('script[data-occulert-supabase-sdk]');
       const client = window.supabase.createClient('https://fixture.supabase.co', 'fixture-public-key', {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, experimental: { passkey: true } },
       });
+      await client.auth.initialize();
       return { source: new URL(script.src).pathname, integrity: script.integrity,
         auth: typeof client.auth.signInWithPasskey, register: typeof client.auth.registerPasskey,
         remove: typeof client.auth.passkey.delete };
@@ -40,7 +44,7 @@ test('owned SDK initializes both account pages under their CSP without a CDN', a
   expect(external.filter(url => url.includes('jsdelivr') || url.includes('unpkg') || url.includes('fixture.supabase.co'))).toEqual([]);
 });
 
-test('tampered owned SDK bytes are rejected by browser SRI and ordinary sign-in stays usable', async ({ page, baseURL }) => {
+test('tampered owned SDK bytes are rejected by browser SRI and sign-in fields stay enabled', async ({ page, baseURL }) => {
   const external = await blockExternal(page, baseURL);
   await page.route('**' + SDK, route => route.fulfill({ contentType: 'text/javascript',
     body: 'window.__tamperedSDKExecuted = true;\n' + sdkBytes }));
@@ -64,7 +68,28 @@ test('owned SDK delivery failure retries only its pinned source', async ({ page,
   expect(external.filter(url => url.includes('jsdelivr') || url.includes('unpkg'))).toEqual([]);
 });
 
-test('offline driver startup works while the owned SDK never falls back to a cached copy', async ({ browser, baseURL }) => {
+test('offline driver startup works while the owned SDK never falls back to a cached copy', async ({ browser }) => {
+  const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
+  const config = JSON.parse(readFileSync(resolve(root, 'vercel.json'), 'utf8'));
+  const state = { offline: false };
+  const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json' };
+  const server = createServer((request, response) => {
+    if (state.offline) { response.destroy(); return; }
+    const path = new URL(request.url, 'http://localhost').pathname;
+    const file = resolve(root, path === '/' ? 'index.html' : path.slice(1));
+    if (!file.startsWith(root + '/') || !existsSync(file)) { response.writeHead(404); response.end(); return; }
+    for (const rule of config.headers) {
+      if (new RegExp(`^${rule.source}$`).test(path)) {
+        for (const { key, value } of rule.headers) response.setHeader(key, value);
+      }
+    }
+    // Bypass HTTP cache: offline success must come from the real service worker.
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('Content-Type', types[extname(file)] || 'application/octet-stream');
+    response.end(readFileSync(file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const baseURL = `http://127.0.0.1:${server.address().port}`;
   const context = await browser.newContext({ baseURL, serviceWorkers: 'allow' });
   try {
     const page = await context.newPage();
@@ -76,14 +101,19 @@ test('offline driver startup works while the owned SDK never falls back to a cac
       } });
     });
     await page.goto('/app.html');
-    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+    });
     await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
     await page.evaluate(async source => {
       const cache = await caches.open('cached-sdk-fixture');
       await cache.put(source, new Response('window.__cachedSDKExecuted = true;', { headers: { 'Content-Type': 'text/javascript' } }));
     }, SDK);
-    await context.setOffline(true);
-    await page.reload();
+    // WebKit's offline emulation rejects requests before its worker can handle
+    // them. Cut the origin connection instead, for the same behavior in both engines.
+    state.offline = true;
+    await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
     await expect.poll(() => page.evaluate(() => window.OcculertStartup?.isReady())).toBe(true);
     const unavailable = await page.evaluate(async source => {
       try { await fetch(source); return false; } catch { return true; }
@@ -91,5 +121,9 @@ test('offline driver startup works while the owned SDK never falls back to a cac
     expect(unavailable).toBe(true);
     expect(await page.evaluate(() => window.__cameraCalls)).toBe(0);
     expect(await page.evaluate(() => Boolean(window.__cachedSDKExecuted))).toBe(false);
-  } finally { await context.close(); }
+  } finally {
+    await context.close();
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
 });
