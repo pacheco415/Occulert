@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v90';
+const CACHE = 'occulert-v91';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -66,7 +66,7 @@ const STATIC_ASSETS = [
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v68.css',
-  '/driver-app.v76.js',
+  '/driver-app.v77.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
@@ -97,7 +97,7 @@ const NETWORK_ONLY_ASSETS = new Set([
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
   '/driver-app.v60.js',
-  '/driver-app.v76.js',
+  '/driver-app.v77.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
@@ -105,7 +105,7 @@ const CRITICAL_OFFLINE_ASSETS = [
   '/base.v47.css',
   '/app.html',
   '/driver-app.v68.css',
-  '/driver-app.v76.js',
+  '/driver-app.v77.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;

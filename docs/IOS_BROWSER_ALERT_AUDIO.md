@@ -16,7 +16,11 @@ physical iPhone result is available. iOS Safari does not support vibration.
 
 Suspended and interrupted contexts receive a bounded, single-flight resume
 attempt. Returning to a visible page and the next pointer gesture retry audio
-preparation. These actions never queue or replay an alert. A context that is
+preparation only while monitoring is starting/active or the deliberate parked
+test is active. Stop, failed Start, and test completion restore the prior
+AudioSession setting and cancel fallback playback. An ownership generation
+prevents an older test timeout from releasing a newer monitoring session.
+These actions never queue or replay an alert. A context that is
 still unavailable or not running uses one same-origin HTML audio element for
 an actual tone request. It plays the original 880 Hz `audio/alert.v1.wav`,
 limited to the requested duration and at most 900 ms, with no loop or remote

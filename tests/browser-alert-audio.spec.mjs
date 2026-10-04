@@ -53,6 +53,11 @@ for (const unavailable of [true, false]) {
     await expect.poll(() => page.evaluate(() => _alertAudio.paused && _alertAudio.currentTime === 0)).toBe(true);
     await page.locator('#demoBtn').click();
     expect(await page.evaluate(() => window.browserAudioDelivery.elements)).toBe(1);
+    await expect.poll(() => page.evaluate(() => _alertAudioRequested)).toBe(false);
+    expect(await page.evaluate(() => window.browserAudioDelivery.policy.type)).toBe('auto');
+    const stoppedPlayCount = await page.evaluate(() => window.browserAudioDelivery.plays.length);
+    await page.getByText('Parked diagnostics', { exact: true }).click();
+    expect(await page.evaluate(() => window.browserAudioDelivery.plays.length)).toBe(stoppedPlayCount);
     expect(errors).toEqual([]);
   });
 }

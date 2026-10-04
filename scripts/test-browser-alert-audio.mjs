@@ -66,7 +66,7 @@ test('the Start gesture requests playback before asynchronous camera/model work'
 test('interrupted and suspended contexts resume without producing a priming alert', async () => {
   for (const state of ['interrupted', 'suspended']) {
     const h = harness({ state });
-    h.run('primeAlertAudio(true);');
+    h.run('beginAlertAudioScope();');
     assert.equal(h.contexts[0].resumeCalls, 1);
     assert.equal(h.session.type, 'playback');
     assert.equal(h.media[0].loop, false);
@@ -81,7 +81,7 @@ test('interrupted and suspended contexts resume without producing a priming aler
 
 test('a resumed running context keeps the existing oscillator frequency, gain and duration', async () => {
   const h = harness({ state: 'interrupted', runningAfterResume: true });
-  h.run('primeAlertAudio(true);tone(1100,900,.35);');
+  h.run('beginAlertAudioScope();tone(1100,900,.35);');
   assert.equal(h.oscillators.length, 1);
   assert.equal(h.oscillators[0].frequency.value, 1100);
   assert.equal(h.oscillators[0].started, true);
@@ -94,7 +94,7 @@ test('a resumed running context keeps the existing oscillator frequency, gain an
 test('unavailable or still interrupted Web Audio uses one bounded fallback for actual tones', async () => {
   for (const options of [{ noContext: true }, { state: 'interrupted' }, { state: 'suspended', rejectResume: true }]) {
     const h = harness(options);
-    h.run('primeAlertAudio(true);tone(880,450,.2);');
+    h.run('beginAlertAudioScope();tone(880,450,.2);');
     assert.equal(h.media.length, 1);
     assert.equal(h.media[0].calls.at(-1).muted, false);
     assert.equal(h.media[0].volume, .2);
@@ -115,7 +115,7 @@ test('returning visible and the next tap recover audio without replaying an aler
   h.event('visibilitychange');
   h.event('pointerdown');
   assert.equal(h.contexts.length, 0, 'Do not request audio before a deliberate Start/test gesture');
-  h.run('primeAlertAudio(true);tone(880,450,.2);');
+  h.run('beginAlertAudioScope();tone(880,450,.2);');
   h.document.hidden = true; h.event('visibilitychange');
   assert.equal(h.media[0].paused, true);
   await settle();
@@ -133,7 +133,7 @@ test('returning visible and the next tap recover audio without replaying an aler
 
 test('a stuck resume remains single-flight until its bounded preparation timeout', () => {
   const h = harness({ state: 'interrupted', neverResume: true });
-  h.run('primeAlertAudio(true);primeAlertAudio(true);');
+  h.run('beginAlertAudioScope();beginAlertAudioScope();');
   assert.equal(h.contexts[0].resumeCalls, 1);
   h.expire(1000); h.expire(150);
   h.event('pointerdown');
@@ -143,16 +143,16 @@ test('a stuck resume remains single-flight until its bounded preparation timeout
 test('missing or denied AudioSession/media APIs and playback rejection stay contained', async () => {
   const session = {}; Object.defineProperty(session, 'type', { set() { throw Error('Unsupported'); } });
   const h = harness({ noContext: true, rejectPlay: true, session });
-  assert.doesNotThrow(() => h.run('primeAlertAudio(true);tone(880,450,.25);'));
+  assert.doesNotThrow(() => h.run('beginAlertAudioScope();tone(880,450,.25);'));
   await settle();
   assert.equal(h.media[0].paused, true);
   assert.equal(h.timers.size, 0);
   const missing = harness({ noContext: true, session: null });
-  assert.doesNotThrow(() => missing.run('primeAlertAudio(true);'));
+  assert.doesNotThrow(() => missing.run('beginAlertAudioScope();'));
   missing.document.hidden = true;
   missing.event('visibilitychange');
   const count = missing.media[0].calls.length;
-  missing.run('tone(880,450,.2);primeAlertAudio(true);');
+  missing.run('tone(880,450,.2);beginAlertAudioScope();');
   assert.equal(missing.media[0].calls.length, count);
 });
 
@@ -180,7 +180,7 @@ async function offlineInstall(failAudio = false) {
 
 test('a rejected muted preparation cannot cancel a newer actual fallback alert', async () => {
   const h = harness({ noContext: true, rejectPrime: true });
-  h.run('primeAlertAudio(true);tone(880,450,.2);');
+  h.run('beginAlertAudioScope();tone(880,450,.2);');
   await settle();
   assert.equal(h.media[0].paused, false);
   assert.equal(h.media[0].calls.at(-1).muted, false);
@@ -198,11 +198,105 @@ test('a scheduled low pulse is discarded if the context interrupts before delive
     log() {}, pushFleet() {},
   });
   const trigger = driver.slice(driver.indexOf('function trigger(reason)'), driver.indexOf('function demoAlert()'));
-  vm.runInContext(`${trigger}\nprimeAlertAudio(true);trigger('Fatigue');`, h.context);
+  vm.runInContext(`${trigger}\nbeginAlertAudioScope();trigger('Fatigue');`, h.context);
   assert.equal(h.oscillators.length, 1, 'The main tone starts immediately while running');
   h.contexts[0].state = 'interrupted';
   h.expire(0); h.expire(300);
   assert.equal(h.oscillators.length, 1, 'Do not queue low pulses for much later recovery');
+});
+
+function attachDriverLifecycle(h) {
+  const output = {}, screenClasses = new Set();
+  h.document.getElementById = id => id === 'alertCheckResult' ? output : null;
+  Object.assign(h.context, {
+    startupAllowsMonitoring: () => true, starting: false, running: false,
+    detectorFailureStopping: false, cameraFailureStopping: false, startCancelled: false,
+    startBtn: {}, setMonitoringUi() {}, setCameraControlsDisabled() {}, setOverlay() {},
+    initModel: async () => { throw Error('Model not ready'); },
+    cameraRecoveryGuidance: () => ({ title: 'Unavailable', text: 'Try again', hint: 'Park first' }),
+    stream: null, video: {}, render() {}, log() {},
+    stopTimer() {}, clearCameraTrackGuards() {}, wakeLock: null, raf: null, stopGPS() {},
+    ctx: { clearRect() {} }, canvas: { width: 1, height: 1 }, refreshCameraChoices: async () => [],
+    fleetPayload: () => ({ status: 'WATCH', safetyScore: 0, perclos: 0, distractionSeconds: 0, avgFatigue: 0, maxFatigue: 0, gpsEnabled: false, distanceMiles: 0 }),
+    saveLocalSessionHistory: payload => payload, sessionStart: 0, pushFleet() {}, reportEl: { style: {} },
+    calibrated: false, baselineEAR: .28, eyeClosedThreshold: .18,
+    alerts: 0, headNods: 0, microsleeps: 0, escalationLevel: 0,
+    cloudConsent: { checked: false }, cloudReady: false, Date,
+    alertTitle: {}, alertSub: {}, nightOpacity: { value: '70' },
+    alertScreen: { style: {}, classList: { add: value => screenClasses.add(value), remove: value => screenClasses.delete(value) } },
+  });
+  h.context.navigator.mediaDevices = { getUserMedia() {} };
+  const start = driver.slice(driver.indexOf('async function start(){'), driver.indexOf('async function stop('));
+  const stop = driver.slice(driver.indexOf('async function stop('), driver.indexOf('const startLocalSession=start;'));
+  const demo = driver.slice(driver.indexOf('function demoAlert(){'), driver.indexOf('\nfunction onResults'));
+  vm.runInContext(`${start}\n${stop}\n${demo}`, h.context);
+  return { screenClasses };
+}
+
+test('actual Stop restores prior routing, cancels fallback and disables all later tap recovery', async () => {
+  const h = harness({ noContext: true, session: { type: 'ambient' } });
+  attachDriverLifecycle(h);
+  h.run('running=true;beginAlertAudioScope();tone(880,450,.2);');
+  assert.equal(h.session.type, 'playback');
+  await h.run('stop();');
+  assert.equal(h.session.type, 'ambient');
+  assert.equal(h.run('_alertAudioRequested'), false);
+  assert.equal(h.media[0].paused, true);
+  const plays = h.media[0].calls.length;
+  h.event('pointerdown'); h.event('visibilitychange'); h.run('tone(880,450,.2);');
+  assert.equal(h.media[0].calls.length, plays);
+  assert.equal(h.session.type, 'ambient');
+});
+
+test('actual failed Start and parked-test completion restore routing and release ownership', async () => {
+  const failed = harness({ noContext: true, session: { type: 'auto' } });
+  attachDriverLifecycle(failed);
+  await failed.run('start();');
+  assert.equal(failed.session.type, 'auto');
+  assert.equal(failed.run('_alertAudioRequested'), false);
+  assert.equal(failed.media[0].paused, true);
+  const demo = harness({ noContext: true, session: { type: 'transient' } });
+  attachDriverLifecycle(demo);
+  demo.run('demoAlert();');
+  assert.equal(demo.session.type, 'playback');
+  demo.expire(1800);
+  assert.equal(demo.session.type, 'transient');
+  assert.equal(demo.run('_alertAudioRequested'), false);
+  const plays = demo.media[0].calls.length;
+  demo.event('pointerdown');
+  assert.equal(demo.media[0].calls.length, plays);
+});
+
+test('an old demo timeout cannot release audio owned by a newer actual monitoring Start', () => {
+  const h = harness({ noContext: true, session: { type: 'auto' } });
+  const lifecycle = attachDriverLifecycle(h);
+  h.run('demoAlert();');
+  assert.equal(lifecycle.screenClasses.has('show'), true);
+  h.context.initModel = () => new Promise(() => {});
+  h.run('void start();');
+  assert.equal(lifecycle.screenClasses.has('show'), false, 'Start dismisses only the old parked-test overlay');
+  h.context.alertTitle.textContent = 'NEWER ALERT';
+  lifecycle.screenClasses.add('show');
+  const owner = h.run('_alertAudioOwner');
+  h.expire(1800);
+  assert.equal(h.run('_alertAudioOwner'), owner);
+  assert.equal(lifecycle.screenClasses.has('show'), true, 'Old test timeout preserves newer alert UI');
+  assert.equal(h.context.alertTitle.textContent, 'NEWER ALERT');
+  assert.equal(h.run('_alertAudioRequested'), true);
+  assert.equal(h.session.type, 'playback');
+  h.expire(450);
+  h.event('pointerdown');
+  assert.equal(h.media[0].calls.at(-1).muted, true, 'Active Start retains silent gesture recovery');
+  h.run('releaseAlertAudioScope();');
+  assert.equal(h.session.type, 'auto');
+});
+
+test('release does not overwrite a routing setting changed outside the owned playback scope', () => {
+  const h = harness({ noContext: true, session: { type: 'ambient' } });
+  h.run('beginAlertAudioScope();');
+  h.session.type = 'transient';
+  h.run('releaseAlertAudioScope();');
+  assert.equal(h.session.type, 'transient');
 });
 
 test('the original short alert is integrity-pinned, immutable and required for offline install', async () => {
