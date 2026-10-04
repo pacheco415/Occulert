@@ -67,7 +67,8 @@
     "test:asset-lineage",
     "test:workflow-policy",
     "test:deployment-ignore",
-    "test:provider-budget"
+    "test:provider-budget",
+    "test:api-validation"
   ],
   "additionalChecks": [
     "test:verify-runner"

@@ -76,7 +76,8 @@
     "test:asset-lineage": "node --test scripts/test-asset-lineage.mjs",
     "test:workflow-policy": "node --test scripts/test-workflow-policy.mjs",
     "test:deployment-ignore": "node --test scripts/test-deployment-ignore.mjs",
-    "test:provider-budget": "node --test scripts/test-provider-budget.mjs"
+    "test:provider-budget": "node --test scripts/test-provider-budget.mjs",
+    "test:api-validation": "node --test scripts/test-api-validation.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

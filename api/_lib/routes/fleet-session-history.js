@@ -11,12 +11,10 @@ function safeVersion(value) {
   return typeof value === 'string' && value.length <= 80 && /^[a-zA-Z0-9._() -]+$/.test(value) ? value : null;
 }
 
+const { json: sendJson } = require("../responses");
 function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader('Content-Type', 'application/json; charset=utf-8');
-  response.setHeader('Cache-Control', 'no-store');
-  response.setHeader('Vary', 'Authorization');
-  response.end(JSON.stringify(body));
+  response.setHeader("Vary", "Authorization");
+  return sendJson(response, status, body);
 }
 
 function invalidResponse() {

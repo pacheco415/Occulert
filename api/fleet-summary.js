@@ -6,14 +6,9 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const { isUuid } = require("./_lib/fleet-history-cursor");
+const { isUuid } = require("./_lib/validation");
 
-function json(response, status, body) {
-response.statusCode = status;
-response.setHeader("Content-Type", "application/json; charset=utf-8");
-response.setHeader("Cache-Control", "no-store");
-response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function shouldIncludeEvents(request) {
 let value = request.query && request.query.include_events;
