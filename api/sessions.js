@@ -10,7 +10,7 @@ const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const MAX_BODY_LENGTH = 4096;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const { isUuid } = require("./_lib/fleet-history-cursor");
 const PIPELINES = new Set(["web_mediapipe_ear", "ios_mlkit_eye_probability", "android_mlkit_eye_probability"]);
 
 function json(response, status, body) {
@@ -69,7 +69,7 @@ try {
   if ((request.method === "POST" || request.method === "PATCH") && !validBody(request)) {
   return json(response, 415, { ok: false, error: "invalid_json_body" });
   }
-if (request.method === "GET" && (typeof request.query?.session_id !== "string" || !UUID.test(request.query.session_id))) {
+if (request.method === "GET" && !isUuid(request.query?.session_id)) {
 return json(response, 400, { ok: false, error: "invalid_session_id" });
 }
 const drivers = await pgFetch("drivers", {
@@ -89,7 +89,7 @@ return json(response, 200, { ok: true, session: stored[0] || null, session_start
 if (request.method === "POST") {
 const body = typeof request.body === "object" && request.body ? request.body : {};
 const hasClientId = Object.prototype.hasOwnProperty.call(body, "session_id");
-if (hasClientId && (typeof body.session_id !== "string" || !UUID.test(body.session_id))) {
+if (hasClientId && !isUuid(body.session_id)) {
 return json(response, 400, { ok: false, error: "invalid_session_id" });
 }
 const ownedStartParams = hasClientId ? { id: "eq." + body.session_id, driver_id: "eq." + driver.id, select: "*", limit: "1" } : null;
@@ -129,7 +129,7 @@ const body = typeof request.body === "object" && request.body ? request.body : {
 if (!body.session_id) {
 return json(response, 400, { ok: false, error: "missing_session_id" });
 }
-if (typeof body.session_id !== "string" || !UUID.test(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
+if (!isUuid(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
 const ownedParams = { id: "eq." + body.session_id, driver_id: "eq." + driver.id };
 const existing = await pgFetch("sessions", { params: { ...ownedParams, select: "*", limit: "1" } });
 if (!existing.length) return json(response, 404, { ok: false, error: "session_not_found" });

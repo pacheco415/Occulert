@@ -1106,4 +1106,6 @@ try {
  assert.equal((await startDb.query("select count(*)::integer as count from sessions")).rows[0].count, 2);
 } finally { await startDb.close(); }
 
+await import("./test-session-uuid-interoperability.mjs");
+
 console.log("Occulert API security tests passed.");
