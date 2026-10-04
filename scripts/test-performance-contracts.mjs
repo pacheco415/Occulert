@@ -178,7 +178,7 @@ test('web monitoring defers MediaPipe and prevents overlapping inference', async
   assert.match(driver, /async function verifyFirstInference\(timeoutMs=/);
   assert.match(driver, /function waitForDetectionResult\(/);
   assert.match(driver, /async function haltForDetectionFailure\(/);
-  assert.match(driver, /function primeAlertAudio\(\)/);
+  assert.match(driver, /function primeAlertAudio\(/);
   assert.doesNotMatch(driver, /Math\.floor\(Math\.random\(\)\*900\+100\)/);
   assert.equal((driver.match(/async function initModel\(/g) || []).length, 1);
   assert.equal((driver.match(/async function loop\(/g) || []).length, 1);
