@@ -6,6 +6,13 @@ import { createRequire } from 'node:module';
 
 const uuid = 'f89d1cf9-893f-4fb6-a924-6669b4568221';
 const verifiedUser = { id: uuid, email: 'owner@example.com', email_confirmed_at: '2026-01-01' };
+// Retain a valid same-user authentication proof when the recent-auth gate lands.
+// The fixture still mocks the network verifier, not any route authorization gate.
+function fixtureToken() {
+  const claims = { sub: uuid, role: 'authenticated', session_id: uuid,
+    amr: [{ method: 'password', timestamp: Math.floor(Date.now() / 1000) }] };
+  return ['fixture', Buffer.from(JSON.stringify(claims)).toString('base64url'), 'fixture'].join('.');
+}
 const cases = [
   { route: 'sessions', method: 'POST', body: {}, limit: 4096, status: 200 },
   { route: 'sessions', method: 'PATCH', body: { session_id: uuid }, limit: 4096, status: 200 },
@@ -27,7 +34,7 @@ function harness(entry, options = {}) {
   const routeUrl = new URL(`../api/${entry.route}.js`, import.meta.url);
   const routeRequire = createRequire(routeUrl);
   const storage = {
-    bearerToken: req => req.headers.authorization,
+    bearerToken: req => req.headers.authorization.replace(/^Bearer /, ''),
     verifyAccessToken: async token => { auth.push(token); return Object.hasOwn(options, 'user') ? options.user : verifiedUser; },
     deleteAuthUser: async id => { mutations.push({ table: 'auth.users', id }); },
     pgFetch: async (table, opts = {}) => {
@@ -52,7 +59,7 @@ function harness(entry, options = {}) {
   async function invoke(body = entry.body, media = 'application/json') {
     const headers = {};
     const response = { setHeader(name, value) { headers[name.toLowerCase()] = String(value); }, end(value) { this.body = JSON.parse(value); } };
-    await context.module.exports({ method: entry.method, body, query: {}, headers: { authorization: 'Bearer verified', 'content-type': media,
+    await context.module.exports({ method: entry.method, body, query: {}, headers: { authorization: 'Bearer ' + fixtureToken(), 'content-type': media,
       origin: 'https://www.occulert.com', host: 'www.occulert.com', 'x-vercel-forwarded-for': '203.0.113.10' } }, response);
     assert.equal(headers['content-type'], 'application/json; charset=utf-8');
     assert.equal(headers['cache-control'], 'no-store');
