@@ -4,7 +4,7 @@ import { auditCspPolicy, SUPABASE_HOST } from './lib/csp-policy.mjs';
 import { scriptMarkupPolicy, generatedScriptMarkupPolicy } from './lib/html-script-policy.mjs';
 import { auditWorkflowPolicy } from './lib/workflow-policy.mjs';
 import { createHash } from 'node:crypto';
-import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
+import { asset, assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
 import "./audit-assets.mjs";
 import "./audit-mediapipe.mjs";
 import "./audit-retired-assets.mjs";
@@ -38,7 +38,8 @@ function assertionSource(path) {
   const source = read(path);
   if (!path.endsWith(".html")) return source;
   const ownedAssets = new Set(Object.values(JSON.parse(read("asset-versions.json"))));
-  const assets = [...source.matchAll(/(?:href|src)="\/([^"?#]+\.(?:js|css))"/g)].filter(match => ownedAssets.has(match[1]) && (/-page-/.test(match[1]) || /^(?:fleet-dashboard|homepage-bootstrap)\.v/.test(match[1])));
+  const sharedPublicStyle = asset('public-page.css');
+  const assets = [...source.matchAll(/(?:href|src)="\/([^"?#]+\.(?:js|css))"/g)].filter(match => ownedAssets.has(match[1]) && (match[1] === sharedPublicStyle || /-page-/.test(match[1]) || /^(?:fleet-dashboard|homepage-bootstrap)\.v/.test(match[1])));
   return source + assets.map(match => read(match[1])).join("\n");
 }
 

@@ -41,6 +41,7 @@ for (const upgrade of [false, true]) {
       }
       const file = state.old && path === '/sw.js' ? resolve('tests/fixtures/sw-v48.js')
         : state.old && path === '/app.html' ? resolve('tests/fixtures/app-v48.html')
+        : state.old && path === '/homepage.js' ? resolve('tests/fixtures/homepage-baseline.js')
         : resolve(root, path === '/' ? 'index.html' : path.slice(1));
       if (!file.startsWith(root + '/') || !existsSync(file)) { response.statusCode = 404; response.end(); return; }
       response.setHeader('Content-Type', types[extname(file)] || 'application/octet-stream');

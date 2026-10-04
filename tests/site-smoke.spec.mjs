@@ -1,5 +1,5 @@
 import { SUPABASE_HOST } from '../scripts/lib/csp-policy.mjs';
-import { assetByStem } from '../scripts/lib/current-assets.mjs';
+import { assetByStem, assetPath } from '../scripts/lib/current-assets.mjs';
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
@@ -106,6 +106,15 @@ test("public information pages share accessible mobile navigation", async ({ pag
   await page.setViewportSize({ width: 390, height: 844 });
   for (const path of ["/about.html", "/faq.html", "/features.html", "/how-it-works.html", "/install.html"]) {
     await page.goto(path, { waitUntil: "domcontentloaded" });
+    const sharedStyle = page.locator(`link[rel="stylesheet"][href="${assetPath('public-page.css')}"]`);
+    await expect(sharedStyle).toHaveCount(1);
+    await expect.poll(() => sharedStyle.evaluate(link => link.sheet?.cssRules.length ?? 0)).toBeGreaterThan(0);
+    const navigation = page.getByRole('navigation');
+    await expect(navigation).toHaveCount(1);
+    await expect(navigation).toHaveCSS('position', 'fixed');
+    // The retained mobile glass style sizes the nav around a 44px control,
+    // 8px vertical padding and 1px borders, overriding the base 72px rule.
+    await expect(navigation).toHaveCSS('height', '62px');
     await expect(page.locator(`script[src="/${assetByStem('public-page.js')}"]`)).toHaveCount(1);
     const skipLink = page.getByRole("link", { name: "Skip to main content" });
     await skipLink.focus();
