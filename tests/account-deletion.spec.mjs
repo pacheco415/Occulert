@@ -1,3 +1,4 @@
+import { SUPABASE_HOST } from '../scripts/lib/csp-policy.mjs';
 import { test, expect } from '@playwright/test';
 
 test('account deletion confirms, preserves data on failure, and clears it on success', async ({ page }) => {
@@ -44,7 +45,7 @@ test('recent sign-in is requested before a confirmed deletion and preserves data
     localStorage.setItem('occulert-auth', JSON.stringify({ access_token: 'old-token', refresh_token: 'old-refresh', expires_at: Math.floor(Date.now()/1000)+3600, user: { id: 'fixture-user', email: 'fixture@example.invalid' } }));
     localStorage.setItem('occulert-sessions', 'saved-local-history');
   });
-  await page.route('**/api/public-config', route => route.fulfill({ json: { ok: true, supabase: { configured: true, url: 'https://example.supabase.co', anonKey: 'public-fixture' } } }));
+  await page.route('**/api/public-config', route => route.fulfill({ json: { ok: true, supabase: { configured: true, url: `https://${SUPABASE_HOST}`, anonKey: 'public-fixture' } } }));
   await page.route('**/api/fleets', route => route.fulfill({ json: { ok: true, fleet: null } }));
   await page.route('**/auth/v1/token?grant_type=password', async route => {
     expect(route.request().postDataJSON()).toEqual({ email: 'fixture@example.invalid', password: 'fixture-password' });
@@ -75,7 +76,7 @@ test('switching accounts during password confirmation leaves the replacement acc
     localStorage.setItem('occulert-auth', JSON.stringify({ access_token: 'access-A', refresh_token: 'refresh-A', expires_at: Math.floor(Date.now()/1000)+3600, user: { id: 'A', email: 'A@example.invalid' } }));
     localStorage.setItem('occulert-sessions', 'saved-local-history');
   });
-  await page.route('**/api/public-config', route => route.fulfill({ json: { ok: true, supabase: { configured: true, url: 'https://example.supabase.co', anonKey: 'public-fixture' } } }));
+  await page.route('**/api/public-config', route => route.fulfill({ json: { ok: true, supabase: { configured: true, url: `https://${SUPABASE_HOST}`, anonKey: 'public-fixture' } } }));
   await page.route('**/api/fleets', route => route.fulfill({ json: { ok: true, fleet: null } }));
   let releaseOld;
   const oldResponse = new Promise(resolve => { releaseOld = resolve; });

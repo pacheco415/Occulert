@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-10-04T17:07:15Z",
+  "complete": true,
+  "pullRequests": [
+    {
+      "number": 246,
+      "headRefName": "codex/vision-camera-compatibility-plan",
+      "isDraft": false
+    },
+    {
+      "number": 245,
+      "headRefName": "codex/current-status-docs",
+      "isDraft": false
+    },
+    {
+      "number": 220,
+      "headRefName": "codex/tasks-vision-comparison",
+      "isDraft": false
+    },
+    {
+      "number": 213,
+      "headRefName": "codex/pixel-ear-experiment",
+      "isDraft": false
+    },
+    {
+      "number": 212,
+      "headRefName": "codex/elapsed-fatigue-experiment",
+      "isDraft": false
+    },
+    {
+      "number": 206,
+      "headRefName": "codex/fleet-offboarding",
+      "isDraft": true
+    },
+    {
+      "number": 192,
+      "headRefName": "codex/atomic-event-quotas",
+      "isDraft": false
+    }
+  ]
+}

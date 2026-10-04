@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v103';
+const CACHE = 'occulert-v105';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -39,7 +39,8 @@ const RUNTIME_ASSETS = [
   }
 ];
 const ALERT_AUDIO_ASSETS = [{ url: '/audio/alert.v1.wav', integrity: 'sha256-3fLbb34F09Mw3TsC1oy1Hkyg6pFnE5K5IbqP3YtPPCI=' }];
-const RUNTIME_INTEGRITY = new Map([...RUNTIME_ASSETS, ...ALERT_AUDIO_ASSETS].map(asset => [asset.url, asset.integrity]));
+const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v1.js","integrity":"sha256-Gew0ZixKdONHn3FwuRMrltNbUtoWe600xCClmny0BP4="}];
+const RUNTIME_INTEGRITY = new Map([...RUNTIME_ASSETS, ...ALERT_AUDIO_ASSETS, ...STARTUP_GUARD_ASSETS].map(asset => [asset.url, asset.integrity]));
 function selectedRuntimeAssets() {
   let simd = false;
   try { simd = WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11])); } catch (_) {}
@@ -51,6 +52,7 @@ function selectedRuntimeAssets() {
 }
 const SELECTED_RUNTIME_ASSETS = selectedRuntimeAssets();
 const STATIC_ASSETS = [
+  ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
   '/local-history.v2.js',
   '/homepage-bootstrap.v2.js',
   '/page-actions.v2.js',
@@ -71,7 +73,7 @@ const STATIC_ASSETS = [
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v68.css',
-  '/driver-app.v79.js',
+  '/driver-app.v80.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
@@ -81,6 +83,7 @@ const NETWORK_ONLY_DOCUMENTS = new Set([
   '/fleet-history.html',
 ]);
 const NETWORK_ONLY_ASSETS = new Set([
+  '/occulert-backend.v79.js',
   '/occulert-backend.v68.js',
   '/occulert-backend.v75.js',
   '/occulert-backend.v76.js',
@@ -102,7 +105,7 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v58.js',
   '/occulert-backend.v60.js',
   '/occulert-backend.v78.js',
-  '/occulert-backend.v79.js',
+  '/occulert-backend.v80.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
   '/supabase-loader.v47.js',
@@ -113,10 +116,12 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passwordless-auth.v60.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
+  '/driver-startup-guard.v1.js',
   '/driver-app.v60.js',
-  '/driver-app.v79.js',
+  '/driver-app.v80.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
+  ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
   '/local-history.v2.js',
   '/page-actions.v2.js',
 
@@ -125,7 +130,7 @@ const CRITICAL_OFFLINE_ASSETS = [
   '/base.v47.css',
   '/app.html',
   '/driver-app.v68.css',
-  '/driver-app.v79.js',
+  '/driver-app.v80.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;
@@ -258,7 +263,9 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (url.origin === self.location.origin && NETWORK_FIRST_ASSETS.has(url.pathname)) {
-    const networkAttempt = fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
+    const integrity = RUNTIME_INTEGRITY.get(url.pathname);
+    const verifiedRequest = integrity ? new Request(req, { integrity }) : req;
+    const networkAttempt = fetchWithDeadline(verifiedRequest, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
     const cacheUpdate = networkAttempt
       .then(response => response && response.ok ? cacheResponseBestEffort(req, response) : null)
       .catch(() => null);

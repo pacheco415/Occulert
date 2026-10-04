@@ -146,3 +146,31 @@ test('merge-resolution-only filenames and caches stay reserved after removal', (
     assert.match(read(cwd, 'sw.js'), /occulert-v94/);
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
+
+
+test('a driver release copies its startup guard and synchronizes both integrity consumers', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'occulert-guard-release-'));
+  const sri = source => 'sha256-' + createHash('sha256').update(source).digest('base64');
+  try {
+    const original = { 'driver.v1.js': 'window.completeDriver=true;\n', 'driver-startup-guard.v1.js': 'const corePath="/driver.v1.js";\n' };
+    for (const [name, source] of Object.entries(original)) writeFileSync(join(cwd, name), source);
+    writeFileSync(join(cwd, 'asset-versions.json'), JSON.stringify({'driver.js':'driver.v1.js','driver-startup-guard.js':'driver-startup-guard.v1.js'}));
+    writeFileSync(join(cwd, 'asset-integrity.json'), JSON.stringify(Object.fromEntries(Object.entries(original).map(([name,source])=>[name,sha(source)]))));
+    writeFileSync(join(cwd, 'app.html'), `<script id="driver-startup-guard" src="/driver-startup-guard.v1.js" integrity="${sri(original['driver-startup-guard.v1.js'])}" defer></script><script src="/driver.v1.js" defer></script>`);
+    writeFileSync(join(cwd, 'sw.js'), `const CACHE = 'occulert-v1'; const STARTUP_GUARD_ASSETS = ${JSON.stringify([{url:'/driver-startup-guard.v1.js',integrity:sri(original['driver-startup-guard.v1.js'])}])}; const files=['/driver.v1.js'];`);
+    writeFileSync(join(cwd, 'vercel.json'), JSON.stringify({headers:[{source:'/(.*)\\.(js|css)',headers:[]}]}));
+    fixtureGit(cwd,['init','-q']);fixtureGit(cwd,['add','.']);fixtureGit(cwd,['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','Published guard']);
+    run(cwd,'driver.js');
+    const guard='driver-startup-guard.v2.js';
+    assert.match(read(cwd,guard),/driver\.v2\.js/);
+    const assertPins=()=>{
+      const pin=sri(read(cwd,guard));
+      assert.ok(read(cwd,'app.html').includes(`src="/${guard}" integrity="${pin}"`));
+      assert.ok(read(cwd,'sw.js').includes(JSON.stringify({url:'/'+guard,integrity:pin})));
+      assert.equal(JSON.parse(read(cwd,'asset-integrity.json'))[guard],sha(read(cwd,guard)));
+    };
+    assertPins();writeFileSync(join(cwd,guard),read(cwd,guard)+'// Unpublished revision.\n');
+    run(cwd,'driver-startup-guard.js','--refresh');assertPins();
+    for(const [name,source] of Object.entries(original))assert.equal(read(cwd,name),source);
+  } finally { rmSync(cwd,{recursive:true,force:true,maxRetries:5,retryDelay:100}); }
+});

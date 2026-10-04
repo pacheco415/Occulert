@@ -1,3 +1,4 @@
+import { SUPABASE_HOST } from '../scripts/lib/csp-policy.mjs';
 import { assetByStem } from '../scripts/lib/current-assets.mjs';
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
@@ -514,8 +515,8 @@ test("driver app external assets preserve layout and monitoring behavior", async
 
   expect(await page.locator(`link[href="/${assetByStem('driver-app.css')}"]`).count()).toBe(1);
   expect(await page.locator(`script[src="/${assetByStem('driver-app.js')}"]`).count()).toBe(1);
-  expect(await page.locator('script#driver-startup-guard:not([src])').count()).toBe(1);
-  expect(await page.locator('script:not([src]):not(#driver-startup-guard)').count()).toBe(0);
+  expect(await page.locator(`script#driver-startup-guard[src="/${assetByStem('driver-startup-guard.js')}"]`).count()).toBe(1);
+  expect(await page.locator('script:not([src])').count()).toBe(0);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator(".top")).toHaveCSS("min-height", "74px");
   await expect(page.locator(".app")).toHaveCSS("display", "grid");
@@ -647,7 +648,7 @@ test("opted-in driver sessions use authenticated cloud APIs without sending GPS 
   await page.route("**/api/public-config", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
-    body: JSON.stringify({ ok: true, supabase: { configured: true, url: "https://example.supabase.co", anonKey: "public-test-key" } }),
+    body: JSON.stringify({ ok: true, supabase: { configured: true, url: `https://${SUPABASE_HOST}`, anonKey: "public-test-key" } }),
   }));
   await page.route("**/api/sessions", async (route) => {
     const request = route.request();
@@ -815,7 +816,7 @@ test("driver invitations can resend a missing signup confirmation", async ({ pag
   await page.route("**/api/public-config", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
-    body: JSON.stringify({ ok: true, supabase: { configured: true, url: "https://example.supabase.co", anonKey: "public-key" } }),
+    body: JSON.stringify({ ok: true, supabase: { configured: true, url: `https://${SUPABASE_HOST}`, anonKey: "public-key" } }),
   }));
   await page.route("**/auth/v1/signup**", (route) => route.fulfill({
     status: 200,
@@ -849,7 +850,7 @@ test("returning unconfirmed drivers can recover from invitation sign-in", async 
   await page.route("**/api/public-config", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
-    body: JSON.stringify({ ok: true, supabase: { configured: true, url: "https://example.supabase.co", anonKey: "public-key" } }),
+    body: JSON.stringify({ ok: true, supabase: { configured: true, url: `https://${SUPABASE_HOST}`, anonKey: "public-key" } }),
   }));
   await page.route("**/auth/v1/token**", (route) => route.fulfill({
     status: 400,
