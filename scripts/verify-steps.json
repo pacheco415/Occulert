@@ -70,7 +70,8 @@
     "audit:sitemap",
     "test:sitemap",
     "test:api-validation",
-    "test:provider-budget"
+    "test:provider-budget",
+    "test:vendor-supabase"
   ],
   "additionalChecks": [
     "test:verify-runner"
