@@ -32,7 +32,6 @@
     "test:pilot-report",
     "test:login",
     "test:supabase-loader",
-    "test:vendor-supabase",
     "test:passkeys",
     "test:account",
     "test:account-delete",
@@ -70,8 +69,9 @@
     "test:deployment-ignore",
     "audit:sitemap",
     "test:sitemap",
+    "test:api-validation",
     "test:provider-budget",
-    "test:api-validation"
+    "test:vendor-supabase"
   ],
   "additionalChecks": [
     "test:verify-runner"
