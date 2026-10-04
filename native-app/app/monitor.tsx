@@ -30,6 +30,8 @@ import { useAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import * as Battery from 'expo-battery';
 import { Ionicons } from '@expo/vector-icons';
+import { EYE_BASELINE_EXPERIMENT, ParkedEyeBaseline } from '../lib/eyeBaselineModel';
+import { loadDeviceEyeBaseline, saveDeviceEyeBaseline } from '../lib/eyeBaselineStorage';
 import { useEyeTracking } from '../hooks/useEyeTracking';
 import { AlertSystem, type AlertTimingEvent } from '../components/AlertSystem';
 import { CameraSetupGuide } from '../components/CameraSetupGuide';
@@ -44,6 +46,7 @@ import {
   type SensitivityLevel,
 } from '../constants/thresholds';
 import { updateSessionHistory } from '../lib/sessionHistory';
+import { saveCompletedNativeSession, markCompletedNativeSessionSynced, finalizeCompletedNativeSession, completeNativeSessionStop } from '../lib/sessionCompletion';
 import {
   beginCloudSession,
   finishCloudSession,
@@ -152,6 +155,17 @@ export default function MonitorScreen() {
   const [isStopping, setIsStopping] = useState(false);
   const [sensitivity, setSensitivity] = useState<SensitivityLevel>('medium');
   const [sensitivityLoaded, setSensitivityLoaded] = useState(false);
+  const [eyeBaseline, setEyeBaseline] = useState<number | null>(null);
+  const [baselineLoaded, setBaselineLoaded] = useState(!EYE_BASELINE_EXPERIMENT);
+  const [baselineBusy, setBaselineBusy] = useState(false);
+  const [baselineMessage, setBaselineMessage] = useState('Parked eye-baseline experiment · local sessions only.');
+  const baselineCollectorRef = useRef(new ParkedEyeBaseline());
+  const baselineGenerationRef = useRef(0);
+  const baselineFinishedRef = useRef(false);
+  const baselineCanSaveRef = useRef(false);
+  const baselineBusyRef = useRef(false);
+  const baselineMountedRef = useRef(true);
+  const sessionEyeBaselineRef = useRef<number | null>(null);
   const [sensorFault, setSensorFault] = useState<string | null>(null);
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [sessionEndedAt, setSessionEndedAt] = useState<number | null>(null);
@@ -223,7 +237,7 @@ export default function MonitorScreen() {
     keepAudioSessionActive: true,
   });
 
-  const { processEyeOpenness, processNoFace, reset } = useEyeTracking(sensitivity);
+  const { processEyeOpenness, processNoFace, reset } = useEyeTracking(sensitivity, EYE_BASELINE_EXPERIMENT ? eyeBaseline : null);
   const { detectFaces } = useFaceDetector(FACE_DETECTOR_OPTIONS);
 
   const deliverMonitoringPausedCue = useCallback(() => {
@@ -249,6 +263,20 @@ export default function MonitorScreen() {
     } else {
       performanceTrackerRef.current.recordWatchDelivery(event.decisionAt, event);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!EYE_BASELINE_EXPERIMENT) return;
+    let active = true;baselineMountedRef.current=true;
+    void loadDeviceEyeBaseline().then(value => {
+      if (!active) return;
+      baselineCanSaveRef.current = true;
+      setEyeBaseline(value);
+      setBaselineMessage(value === null ? 'While parked, open Setup check and look forward with eyes open for three seconds.' : 'Saved parked eye baseline · experimental local sessions only.');
+    }).catch(() => {
+      if (active) setBaselineMessage('Saved baseline unavailable. Current presets apply; use Recalibrate in Settings to reset it.');
+    }).finally(() => { if (active) setBaselineLoaded(true); });
+    return () => { active = false; baselineMountedRef.current=false;baselineGenerationRef.current += 1; };
   }, []);
 
   useEffect(() => {
@@ -349,9 +377,12 @@ export default function MonitorScreen() {
   }, [checkpointActiveSession, isRunning]);
 
   const toggleSetupPreview = useCallback(() => {
-    if (isRunningRef.current || startingRef.current || stoppingRef.current) return;
+    if (isRunningRef.current || startingRef.current || stoppingRef.current || baselineBusyRef.current) return;
     const next = !setupPreviewActiveRef.current;
     setupPreviewActiveRef.current = next;
+    baselineGenerationRef.current += 1;
+    baselineCollectorRef.current.reset();
+    baselineFinishedRef.current = false;
     lastCameraSetupUiAtRef.current = 0;
     setSetupPreviewActive(next);
     setCameraSetup(initialCameraSetupAssessment());
@@ -359,7 +390,7 @@ export default function MonitorScreen() {
   }, []);
 
   const handleStart = async () => {
-    if (startingRef.current || isStopping || !sensitivityLoaded) return;
+    if (startingRef.current || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusyRef.current) return;
     const startAttempt = startAttemptRef.current + 1;
     let reservedSessionId: string | null = null;
     let monitoringStarted = false;
@@ -435,6 +466,9 @@ export default function MonitorScreen() {
       }
 
       reset();
+      sessionEyeBaselineRef.current = eyeBaseline;
+      if(EYE_BASELINE_EXPERIMENT)setBaselineMessage(eyeBaseline===null?'Experimental local session uses current presets; no personal baseline was saved.':'Experimental local session uses the saved parked baseline.');
+      baselineGenerationRef.current += 1;
       setupPreviewActiveRef.current = false;
       setSetupPreviewActive(false);
       prevAlertingRef.current = false;
@@ -465,7 +499,7 @@ export default function MonitorScreen() {
       // delaying core camera monitoring, and discard any late result after the
       // session is cancelled or replaced.
       const headphoneStart = startHeadphoneMotion();
-      cloudSessionRef.current = beginCloudSession();
+      cloudSessionRef.current = EYE_BASELINE_EXPERIMENT ? Promise.resolve(null) : beginCloudSession();
       setAlertCount(0);
       alertCountRef.current = 0;
       hasCameraSampleRef.current = false;
@@ -526,44 +560,29 @@ export default function MonitorScreen() {
     endedAt: number,
   ): Promise<string | null> => {
     if (durationSec <= 0) return null;
-    const avgFatigue = fatigueSamplesRef.current
-      ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
-      : 0;
-    const record = {
-      sessionId,
-      savedAt: new Date().toISOString(),
-      durationSec,
-      alertCount: alerts,
-      avgFatigue,
+    return saveCompletedNativeSession({
+      sessionId, durationSec, alerts,
+      fatigueSum: fatigueSumRef.current,
+      fatigueSamples: fatigueSamplesRef.current,
       headNodObservations: headNodObservationsRef.current,
-      cameraHeadNodObservations: headNodObservationsRef.current,
       headphoneHeadNodObservations: headphoneHeadNodObservationsRef.current,
       headphoneMotionSamples: headphoneMotionSamplesRef.current,
       headphoneMotionStatus: headphoneMotionStatusRef.current,
       monitorPerformance,
       sensorFusion: sensorFusionTrackerRef.current.snapshot(endedAt),
       sensitivity: sessionSensitivityRef.current,
-      ...currentAppBuildInfo(),
-    };
-    await updateSessionHistory<Record<string, unknown>>((sessions) => [
-      record,
-      ...sessions.filter(item => item?.sessionId !== sessionId),
-    ].slice(0, 50));
-    return sessionId;
+      extra: {
+        ...(EYE_BASELINE_EXPERIMENT ? {eyeBaselineExperiment:{version:1,baseline:sessionEyeBaselineRef.current}} : {}),
+        ...currentAppBuildInfo(),
+      },
+    }, updateSessionHistory);
   }, []);
 
   const markSessionSynced = useCallback(async (
     localSessionId: string,
     cloudSessionId: string,
   ) => {
-    try {
-      await updateSessionHistory<Record<string, unknown>>((sessions) => sessions.map((item) =>
-        item?.sessionId === localSessionId
-          ? { ...item, cloudSynced: true, cloudSessionId }
-          : item));
-    } catch {
-      // Keep the local session intact if its cloud badge cannot update.
-    }
+    await markCompletedNativeSessionSynced(updateSessionHistory, localSessionId, cloudSessionId);
   }, []);
 
   const handleStop = useCallback(async (
@@ -584,10 +603,10 @@ export default function MonitorScreen() {
     const durationSec = elapsedSessionSeconds(sessionStartedAtRef.current, stoppedAt);
     const alerts = alertCountRef.current;
     const activeSessionId = activeSessionIdRef.current;
-    const averageFatigue = fatigueSamplesRef.current
+    const averageFatigue = fatigueSamplesRef.current > 0
       ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
-      : 0;
-    const maxFatigue = maxFatigueRef.current;
+      : null;
+    const maxFatigue = fatigueSamplesRef.current > 0 ? maxFatigueRef.current : null;
     const cloudSession = cloudSessionRef.current;
     const pendingEvents = cloudEventQueueRef.current;
     const monitorPerformance = performanceTrackerRef.current.snapshot(stoppedAt);
@@ -607,37 +626,19 @@ export default function MonitorScreen() {
     }
 
     const cloudEndedAt = new Date(stoppedAt).toISOString();
-    const finalizeCloud = async (localSessionId: string | null) => {
-      const cloudSessionId = cloudSession ? await cloudSession.catch(() => null) : null;
-      if (!cloudSessionId) return;
-      await pendingEvents.catch(() => {});
-      const safetyScore = Math.max(0, 100 - Math.round(maxFatigue * 0.65) - alerts * 8);
-      const synced = await finishCloudSession(cloudSessionId, {
-        averageFatigue,
-        maxFatigue,
-        safetyScore,
-        alertCount: alerts,
-      }, cloudEndedAt, localSessionId || undefined);
-      if (synced && localSessionId) {
-        await markSessionSynced(localSessionId, cloudSessionId);
-      }
-    };
+    const finalizeCloud = (localSessionId: string | null) => finalizeCompletedNativeSession({
+      cloudSession, pendingEvents, averageFatigue, maxFatigue, alerts, endedAt: cloudEndedAt,
+    }, localSessionId, { finish: finishCloudSession, markSynced: markSessionSynced });
 
     try {
-      if (!wasRunning) return;
-      const localSessionId = activeSessionId
-        ? await saveSession(activeSessionId, durationSec, alerts, monitorPerformance, stoppedAt)
-        : null;
-      if (activeSessionId) {
-        await clearActiveSessionCheckpoint(activeSessionId).catch(() => {});
-        if (activeSessionIdRef.current === activeSessionId) activeSessionIdRef.current = null;
-      }
-      if (options.deferCloudFinalization) {
-        // Optional cloud finalization never delays a safe-stop Maps handoff.
-        void finalizeCloud(localSessionId).catch(() => {});
-        return;
-      }
-      await finalizeCloud(localSessionId);
+      await completeNativeSessionStop({
+        wasRunning, activeSessionId, deferCloudFinalization: Boolean(options.deferCloudFinalization),
+      }, {
+        save: id => saveSession(id, durationSec, alerts, monitorPerformance, stoppedAt),
+        clearCheckpoint: clearActiveSessionCheckpoint,
+        releaseIdentity: id => { if (activeSessionIdRef.current === id) activeSessionIdRef.current = null; },
+        finalize: finalizeCloud,
+      });
     } finally {
       stoppingRef.current = false;
       setIsStopping(false);
@@ -714,6 +715,7 @@ export default function MonitorScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active' && setupPreviewActiveRef.current) {
+        baselineGenerationRef.current += 1;baselineCollectorRef.current.reset();
         setupPreviewActiveRef.current = false;
         setSetupPreviewActive(false);
         setCameraSetup(initialCameraSetupAssessment());
@@ -776,6 +778,7 @@ export default function MonitorScreen() {
   const handleCameraError = useCallback((error: CameraRuntimeError, epoch: number) => {
     if (epoch !== cameraEpochRef.current) return;
     if (setupPreviewActiveRef.current && !isRunningRef.current) {
+      baselineGenerationRef.current += 1;baselineCollectorRef.current.reset();
       setupPreviewActiveRef.current = false;
       setSetupPreviewActive(false);
       setSensorFault('Camera preview could not start. Close other camera apps and try the setup check again.');
@@ -820,6 +823,27 @@ export default function MonitorScreen() {
   ) => {
     const now = Date.now();
     if (setupPreviewActiveRef.current && !isRunningRef.current) {
+      if (EYE_BASELINE_EXPERIMENT && baselineLoaded && eyeBaseline === null && baselineCanSaveRef.current && !baselineFinishedRef.current) {
+        const assessment = assessCameraSetup({faceFound,faceX,faceY,faceWidth,faceHeight,frameWidth,frameHeight,leftEyeOpenProbability:leftProb,rightEyeOpenProbability:rightProb,pitchAngle,yawAngle,rollAngle});
+        const clock = typeof performance !== 'undefined' ? performance.now() : now;
+        const result = baselineCollectorRef.current.add(clock,leftProb,rightProb,assessment.ready);
+        setBaselineMessage(`Parked eyes-open baseline: ${Math.round(result.progress*100)}% · keep looking forward.`);
+        if (result.done) {
+          baselineFinishedRef.current = true;
+          if (result.baseline === null) setBaselineMessage('Too few reliable eyes-open samples. Current presets apply; retry the parked Setup check.');
+          else {
+            const generation = baselineGenerationRef.current, value = result.baseline;
+            baselineBusyRef.current = true;setBaselineBusy(true);
+            void saveDeviceEyeBaseline(value,result.samples).then(() => {
+              if (generation === baselineGenerationRef.current && setupPreviewActiveRef.current && !isRunningRef.current) {
+                setEyeBaseline(value);setBaselineMessage('Parked baseline saved on this device · experimental local sessions only.');
+              }
+            }).catch(() => {
+              if (generation === baselineGenerationRef.current) setBaselineMessage('Baseline was not saved. Current presets apply; retry the parked Setup check.');
+            }).finally(() => { baselineBusyRef.current = false; if (baselineMountedRef.current) setBaselineBusy(false); });
+          }
+        }
+      }
       if (now - lastCameraSetupUiAtRef.current >= CAMERA_SETUP_UI_INTERVAL_MS) {
         lastCameraSetupUiAtRef.current = now;
         const nextSetup = assessCameraSetup({
@@ -946,7 +970,7 @@ export default function MonitorScreen() {
       }
     }
     prevAlertingRef.current = alerting;
-  }, [processEyeOpenness, processNoFace]);
+  }, [processEyeOpenness, processNoFace, baselineLoaded, eyeBaseline]);
 
   // These native worklet values must outlive ordinary React renders so the
   // frame-processor bridge stays stable throughout a drive.
@@ -1231,11 +1255,12 @@ export default function MonitorScreen() {
         />
 
         <View style={s.ctrl}>
+          {EYE_BASELINE_EXPERIMENT && <Text accessibilityLiveRegion="polite" style={{color:'#22d3ee',padding:12}}>{baselineMessage}</Text>}
           {!isRunning && (
             <CameraSetupGuide
               active={setupPreviewActive}
               assessment={cameraSetup}
-              disabled={isStarting || isStopping}
+              disabled={isStarting || isStopping || baselineBusy}
               onTogglePreview={toggleSetupPreview}
             />
           )}
@@ -1272,11 +1297,11 @@ export default function MonitorScreen() {
               accessibilityRole="button"
               accessibilityLabel="Start fatigue monitoring"
               accessibilityHint="Starts on-device camera monitoring using the current setup"
-              accessibilityState={{ disabled: isStarting || isStopping || !sensitivityLoaded }}
-              disabled={isStarting || isStopping || !sensitivityLoaded}
+              accessibilityState={{ disabled: isStarting || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusy }}
+              disabled={isStarting || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusy}
               style={[
                 s.startBtn,
-                (isStarting || isStopping || !sensitivityLoaded) && s.disabledBtn,
+                (isStarting || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusy) && s.disabledBtn,
               ]}
               onPress={handleStart}
             >

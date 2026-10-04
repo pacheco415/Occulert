@@ -25,6 +25,25 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Verify asset lineage against the actual PR head
+        if: github.event_name == 'pull_request'
+        env:
+          ASSET_LINEAGE_HEAD: ${{ github.event.pull_request.head.sha }}
+          ASSET_LINEAGE_BASE: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/audit-asset-lineage.mjs
       - name: Audit every site change
         run: npm run audit:site
       - run: npm run verify
+
+      - name: Save source and environment verification evidence
+        if: ${{ !cancelled() }}
+        run: node scripts/write-verification-receipt.mjs site '${{ job.status }}'
+      - name: Preserve verification receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verification-site-${{ github.sha }}
+          path: .verification-receipts/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14

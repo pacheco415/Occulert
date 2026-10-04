@@ -62,9 +62,9 @@ export interface CloudState {
 }
 
 export interface CloudSessionStats {
-  averageFatigue: number;
-  maxFatigue: number;
-  safetyScore: number;
+  averageFatigue: number | null;
+  maxFatigue: number | null;
+  safetyScore: number | null;
   alertCount: number;
 }
 
@@ -573,19 +573,53 @@ export async function logCloudAlert(sessionId: string, fatigueScore: number): Pr
   return result.ok;
 }
 
-function sendPendingSummary(scope: SummaryScope, entry: PendingSessionSummary) {
-  return backendApi('PATCH', '/api/sessions', {
+async function sendPendingSummary(scope: SummaryScope, entry: PendingSessionSummary) {
+  const result = await backendApi<{ ok?: boolean; session?: { id?: unknown; ended_at?: unknown } }>('PATCH', '/api/sessions', {
     session_id: entry.session_id, ended_at: entry.ended_at,
     average_fatigue: entry.average_fatigue, max_fatigue: entry.max_fatigue,
     safety_score: entry.safety_score, alert_count: entry.alert_count,
     head_nod_count: entry.head_nod_count,
   }, true, scope);
+  const stored = result.body?.session;
+  const end = stored?.ended_at;
+  // PostgREST may return Z or a numeric offset and microsecond precision.
+  const ended = typeof end === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(end)
+    && Number.isFinite(Date.parse(end))
+    && new Date(end.slice(0, 10) + 'T00:00:00.000Z').toISOString().slice(0, 10) === end.slice(0, 10);
+  // An HTTP success alone does not acknowledge an immutable stored completion.
+  return { status: result.status, ok: result.ok && result.body?.ok === true
+    && stored?.id === entry.session_id && ended };
 }
 
-export async function retryPendingCloudSessions(): Promise<void> {
+export interface PendingCloudSummaryState {
+  scope: SummaryScope | null;
+  count: number;
+  localIds: string[];
+}
+
+export function pendingCloudSummaryStateIsCurrent(state: PendingCloudSummaryState): boolean {
+  return Boolean(state.scope && authCache?.user.id === state.scope.ownerId
+    && consentRuntimeOverride !== false && consentMutationVersion === state.scope.consentVersion);
+}
+
+export async function getPendingCloudSummaryState(): Promise<PendingCloudSummaryState> {
+  const unavailable = (): PendingCloudSummaryState => ({scope:null,count:0,localIds:[]});
+  try {
+    return await withCloudReadDeadline(async () => {
+      const scope = await currentSyncContext();
+      if (!scope) return unavailable();
+      const entries = await sessionOutbox.pendingEntries(scope);
+      const result = {scope,count:entries.length,localIds:entries.flatMap(entry=>entry.local_session_id?[entry.local_session_id]:[])};
+      return pendingCloudSummaryStateIsCurrent(result) ? result : unavailable();
+    });
+  } catch { return unavailable(); }
+}
+
+export async function retryPendingCloudSessions(expectedScope?: SummaryScope): Promise<void> {
   try {
     const scope = await currentSyncContext();
-    if (!scope) return;
+    if (!scope || expectedScope && (scope.ownerId !== expectedScope.ownerId || scope.consentVersion !== expectedScope.consentVersion)) return;
     await sessionOutbox.flush(scope, entry => sendPendingSummary(scope, entry));
   }
   catch { /* Preserve unreadable or unavailable storage for local recovery. */ }
@@ -605,13 +639,13 @@ export async function finishCloudSession(
     cloudSessionScopes.delete(sessionId);
     return false;
   }
-  const metric = (value: number, max = 100) => Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : null;
+  const metric = (value: number | null, max = 100) => typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : null;
   const entry: PendingSessionSummary = {
     session_id: sessionId, ended_at: endedAt, local_session_id: localSessionId,
     average_fatigue: metric(stats.averageFatigue), max_fatigue: metric(stats.maxFatigue),
     safety_score: metric(stats.safetyScore), alert_count: metric(stats.alertCount, 10000),
     // Candidate head-nod observations remain local until device validation.
-    head_nod_count: 0,
+    head_nod_count: null,
   };
   try {
     if (!await sessionOutbox.enqueue(syncContext, entry)) return false;
