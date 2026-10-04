@@ -81,6 +81,10 @@ const NETWORK_ONLY_DOCUMENTS = new Set([
   '/fleet-history.html',
 ]);
 const NETWORK_ONLY_ASSETS = new Set([
+  '/occulert-backend.v68.js',
+  '/occulert-backend.v75.js',
+  '/occulert-backend.v76.js',
+  '/occulert-backend.v77.js',
   '/occulert-backend.v69.js',
   '/fleet-history-page.v64.js',
   '/fleet-history-page.v65.js',
