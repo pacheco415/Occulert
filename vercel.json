@@ -394,5 +394,5 @@
       "dependabot/**": false
     }
   },
-  "ignoreCommand": "node -e \"try { const {execFileSync}=require('node:child_process'); execFileSync(process.execPath,['--input-type=module'],{input:execFileSync('git',['show','HEAD:scripts/ignore-vercel-deployment.mjs']),stdio:['pipe','inherit','inherit']}); } catch { process.exit(1); }\""
+  "ignoreCommand": "node -e \"try{let e=require('child_process').execFileSync;e(process.execPath,['--input-type=module'],{input:e('git',['show','HEAD:scripts/ignore-vercel-deployment.mjs']),stdio:['pipe','inherit','inherit']})}catch{process.exit(1)}\""
 }

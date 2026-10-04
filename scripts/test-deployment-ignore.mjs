@@ -8,6 +8,12 @@ import test from 'node:test';
 import { deploymentDecision } from './ignore-vercel-deployment.mjs';
 
 const script = fileURLToPath(new URL('./ignore-vercel-deployment.mjs', import.meta.url));
+test('ignored build command stays within the Vercel configuration schema limit', () => {
+  const config = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url)));
+  assert.equal(typeof config.ignoreCommand, 'string');
+  assert.ok(config.ignoreCommand.length <= 256, 'Vercel limits ignoreCommand to 256 characters');
+  assert.deepEqual(config.git.deploymentEnabled, { 'dependabot/**': false });
+});
 function fixture(run) {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-deploy-ignore-'));
   const git = (...args) => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd, encoding: 'utf8' }).trim();
