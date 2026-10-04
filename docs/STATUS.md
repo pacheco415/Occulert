@@ -2,12 +2,12 @@
 
 These are dated snapshots. Source, deployment, build availability and device tests are separate.
 
-- Inspected source (origin/main): `e00e2834eb6ea5e118f9334a57c237f0f6cf7e21`.
-- Source commit date: 2026-10-03T17:56:08-07:00.
+- Inspected source (origin/main): `1138e5d6b0f714a10d06e1a7e0430fcac1d2a19f`.
+- Source commit date: 2026-10-03T22:03:44-07:00.
 
-- Production website: `0d11ad22b66baab61ea9db6456bfaed837871537`.
-- Deployment: dpl_DJCCTk2wdrBiEFxPF8WSWdjQCZGN, READY; created 2026-10-03T23:20:35.697Z.
-- Production observation: 2026-10-04.
+- Production website: `1138e5d6b0f714a10d06e1a7e0430fcac1d2a19f`.
+- Deployment: dpl_Hxh9W4wAJPpbZqy9v1SMso5By2mU, READY; created 2026-10-04T05:03:47.573Z.
+- Production observation: 2026-10-04T05:09:16Z.
 
 - TestFlight: 1.0.0 (56); Apple VALID, internal beta available.
 - TestFlight source: `0d11ad22b66baab61ea9db6456bfaed837871537`.
@@ -15,7 +15,7 @@ These are dated snapshots. Source, deployment, build availability and device tes
 - Physical acceptance for build 56: Not recorded.
 - Native changes waiting for a build: None in the inspected source; pending PRs are separate.
 
-- Open PRs (2026-10-04T00:56:41Z): 32 total; 27 Codex, 5 Dependabot, 0 other; 1 draft.
+- Open PRs (2026-10-04T05:09:16Z): 31 total; 26 Codex, 5 Dependabot, 0 other; 1 draft.
 - Production migrations (2026-10-04): unknown. Read-only production ledger lookup failed PostgreSQL authentication (28P01); PRs #192 and #206 remain gated.
 
 Next steps:

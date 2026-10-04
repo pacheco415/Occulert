@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-10-04T00:56:41Z",
+  "observedAt": "2026-10-04T05:09:16Z",
   "complete": true,
   "pullRequests": [
     {
@@ -11,11 +11,6 @@
       "headRefName": "codex/recover-ios-alert-audio",
       "isDraft": false,
       "number": 242
-    },
-    {
-      "headRefName": "codex/skip-development-deployments",
-      "isDraft": false,
-      "number": 240
     },
     {
       "headRefName": "codex/browser-cloud-outcomes",
