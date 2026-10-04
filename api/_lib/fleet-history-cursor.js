@@ -1,6 +1,7 @@
 // A cursor is a bounded pagination boundary, never an authorization token.
 // Keep database timestamps verbatim; ISO round-tripping would drop microseconds.
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// PostgreSQL UUID columns accept this canonical syntax without version/variant restrictions.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/;
 const MAX_CURSOR_LENGTH = 1024;
 

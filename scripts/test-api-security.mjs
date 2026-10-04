@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 
 const require = createRequire(import.meta.url);
 const libPath = require.resolve("../api/_lib/supabase.js");
+const { serverStorageConfigured } = require(libPath);
 
 process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
@@ -27,6 +28,7 @@ function loadHandler(path, pgFetch, user = verifiedUser) {
       pgFetch,
       verifyAccessToken: async () => user,
       bearerToken: () => "valid-token",
+      serverStorageConfigured,
     },
   };
   return require(path);
@@ -123,7 +125,7 @@ let allowEventSession = false;
 let insertedEvent;
 const events = loadHandler("../api/events.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1" }];
-  if (table === "sessions") return allowEventSession ? [{ id: "00000000-0000-4000-8000-000000000001" }] : [];
+  if (table === "sessions") return allowEventSession ? [{ id: "00000000-0000-4000-8000-000000000001", started_at: "2026-07-19T00:00:00.000Z", ended_at: null }] : [];
   if (table === "events") {
     insertedEvent = options.body;
     return [{ id: "event-1", ...options.body }];
@@ -154,6 +156,127 @@ const eventWithoutLocation = await invoke(events, request("POST", {
 assert.equal(eventWithoutLocation.status, 200);
 assert.equal(insertedEvent.latitude, null, "explicitly absent latitude must not become 0");
 assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must not become 0");
+
+// JSON values must not acquire an allowed event type through string coercion.
+{
+  let storageCalls = 0;
+  const invalidTypeEvents = loadHandler("../api/events.js", async () => {
+    storageCalls++;
+    throw new Error("invalid event types must be rejected before storage");
+  });
+  for (const type of [["drowsy"], { toString: "drowsy" }, { type: "drowsy" }, true, 7, null]) {
+    const result = await invoke(invalidTypeEvents, request("POST", { ...eventBody, type }));
+    assert.equal(result.status, 400, `reject malformed event type ${JSON.stringify(type)}`);
+    assert.equal(result.body.error, "invalid_event");
+  }
+  assert.equal(storageCalls, 0, "malformed event types must never query or mutate storage");
+}
+
+// Client event time must stay inside the owned session; finished sessions have a short delivery grace.
+{
+  const now = Date.now();
+  const start = new Date(now - 600000).toISOString();
+  const finish = new Date(now - 30000).toISOString();
+  let row = { id: "session-1", started_at: start, ended_at: finish };
+  let writes = 0;
+  let saved;
+  const timedEvents = loadHandler("../api/events.js", async (table, options = {}) => {
+    if (table === "drivers") return [{ id: "driver-1" }];
+    if (table === "sessions") {
+      assert.equal(options.params.driver_id, "eq.driver-1");
+      assert.equal(options.params.select, "id,started_at,ended_at");
+      return [row];
+    }
+    assert.equal(table, "events");
+    writes++;
+    saved = options.body;
+    return [{ id: "event-1", ...saved }];
+  });
+  for (const occurred_at of [start, finish]) {
+    assert.equal((await invoke(timedEvents, request("POST", { ...eventBody, occurred_at }))).status, 200);
+    assert.equal(saved.created_at, occurred_at);
+  }
+  assert.equal((await invoke(timedEvents, request("POST", eventBody))).status, 200);
+  assert.equal(saved.created_at, finish, "legacy event delivery during grace must not be stamped after session end");
+  const previousWrites = writes;
+  for (const occurred_at of [new Date(now - 600001).toISOString(), new Date(now).toISOString(), "invalid", null, 42]) {
+    const result = await invoke(timedEvents, request("POST", { ...eventBody, occurred_at }));
+    assert.equal(result.status, 400);
+    assert.equal(result.body.error, "invalid_occurred_at");
+  }
+  assert.equal(writes, previousWrites, "invalid event time must not write data");
+  row.ended_at = new Date(now - 180000).toISOString();
+  const stale = await invoke(timedEvents, request("POST", eventBody));
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.error, "session_ended");
+  assert.equal(writes, previousWrites);
+  row.ended_at = null;
+  assert.equal((await invoke(timedEvents, request("POST", { ...eventBody, occurred_at: finish }))).status, 200);
+}
+
+// Use the actual API with a fixed clock to catch calendar normalization,
+// timezone ambiguity, sub-millisecond bounds, and the exact delivery grace.
+{
+  const originalNow = Date.now;
+  const now = Date.parse("2026-03-03T13:00:00.000Z");
+  Date.now = () => now;
+  let row = { id: eventBody.session_id, started_at: "2026-03-01T00:00:00.000Z", ended_at: "2026-03-03T12:59:30.000000Z" };
+  let writes = 0;
+  let saved;
+  const strictEvents = loadHandler("../api/events.js", async (table, options = {}) => {
+    if (table === "drivers") return [{ id: "driver-1" }];
+    if (table === "sessions") {
+      assert.equal(options.params.driver_id, "eq.driver-1");
+      assert.equal(options.params.id, "eq." + eventBody.session_id);
+      return [row];
+    }
+    assert.equal(table, "events");
+    writes++;
+    saved = options.body;
+    return [{ id: "event-1", ...saved }];
+  });
+  try {
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 200);
+    assert.equal(saved.created_at, row.ended_at);
+    const beforeInvalid = writes;
+    for (const occurred_at of [
+      "2026-02-31T12:00:00Z", "2026-02-29T12:00:00Z",
+      "2026-03-02T12:00:00", "2026-03-02", "2026-03-02T24:00:00Z",
+      "2026-03-02T12:00:00+14:01", "2026-03-02T12:00:00Z\n",
+      "2026-03-03T12:59:30.000001Z", "2026-02-28T23:59:59.999999Z",
+    ]) {
+      const result = await invoke(strictEvents, request("POST", { ...eventBody, occurred_at }));
+      assert.equal(result.status, 400, occurred_at);
+      assert.equal(result.body.error, "invalid_occurred_at");
+    }
+    assert.equal(writes, beforeInvalid, "invalid ISO timestamps or precise bounds must not reach the insert");
+    for (const occurred_at of ["2026-03-03T12:00:00.123456Z", "2026-03-03T13:00:00.123456+01:00", "2026-03-03T07:00:00.123456-05:00"]) {
+      assert.equal((await invoke(strictEvents, request("POST", { ...eventBody, occurred_at }))).status, 200);
+      assert.equal(saved.created_at, occurred_at, "accepted timestamps must preserve timezone and microsecond precision for storage");
+    }
+    row.ended_at = "2026-03-03T12:58:00.000000Z";
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 200, "exactly two minutes remains inside the delivery grace");
+    assert.equal(saved.created_at, row.ended_at);
+    row.ended_at = "2026-03-03T12:57:59.999999Z";
+    const beforeStale = writes;
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 409);
+    assert.equal(writes, beforeStale);
+    row.ended_at = null;
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 200);
+    assert.equal(saved.created_at, new Date(now).toISOString(), "open sessions keep the server arrival timestamp");
+    row.started_at = "2024-02-28T00:00:00Z";
+    assert.equal((await invoke(strictEvents, request("POST", { ...eventBody, occurred_at: "2024-02-29T12:00:00Z" }))).status, 200, "a real leap day remains valid");
+    row.started_at = "2026-03-04T00:00:00Z";
+    const beforeInvalidSession = writes;
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 502);
+    row.started_at = "invalid";
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 502);
+    row.started_at = "2026-03-01T00:00:00Z";
+    row.ended_at = "invalid";
+    assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 502);
+    assert.equal(writes, beforeInvalidSession, "invalid stored intervals must fail without inventing event times");
+  } finally { Date.now = originalNow; }
+}
 
 // Finalization is immutable and accepts delayed client finish timestamps.
 for (const finish of ['2026-07-19T00:05:00.000Z', '2026-07-18T00:00:00.000Z', '2999-01-01T00:00:00.000Z', 'invalid']) {
@@ -636,6 +759,60 @@ assert.equal(stored.body.stored, true);
 assert.equal(storedLead.email, "driver@example.com");
 assert.equal(storedLead.use_case, null);
 assert.equal(storedLead.source, "pilot-signup-page", "browser callers must not choose arbitrary lead sources");
+const originalNotifyFetch = globalThis.fetch;
+try {
+  process.env.LEAD_NOTIFY_WEBHOOK_URL = 'https://notify.example.invalid/hook';
+  let notice;
+  let notifyCalls = 0;
+  globalThis.fetch = async (url, options) => {
+    notifyCalls++;
+    assert.equal(url, process.env.LEAD_NOTIFY_WEBHOOK_URL);
+    assert.equal(options.method, 'POST');
+    assert.equal(options.redirect, 'error', 'metadata must not follow redirects to another destination');
+    assert.deepEqual(options.headers, { 'Content-Type': 'application/json' });
+    assert.ok(options.signal instanceof AbortSignal);
+    notice = JSON.parse(options.body);
+    return { ok: true };
+  };
+  const notified = await invoke(pilotLeads, request("POST", validLead, "203.0.113.35"));
+  assert.equal(notified.status, 200);
+  assert.deepEqual(Object.keys(notice).sort(), ['lead_id', 'received_at', 'source', 'type']);
+  assert.equal(notice.type, 'occulert.pilot_lead.created');
+  assert.equal(notice.lead_id, 'lead-1');
+  assert.equal(notice.source, 'pilot-signup-page');
+  assert.ok(Number.isFinite(Date.parse(notice.received_at)));
+  assert.ok(!JSON.stringify(notice).includes(validLead.email));
+  assert.ok(!JSON.stringify(notice).includes(validLead.name));
+  assert.ok(!JSON.stringify(notice).includes(validLead.company));
+  assert.equal(notifyCalls, 1);
+  globalThis.fetch = async () => { throw new Error('notification unavailable'); };
+  assert.equal((await invoke(pilotLeads, request("POST", validLead, "203.0.113.36"))).status, 200);
+  // Assert outside the handler: notification deliberately catches fetch errors.
+  notifyCalls = 0;
+  globalThis.fetch = async () => { notifyCalls++; return { ok: true }; };
+  for (const [index, destination] of ['', 'not a URL', 'http://notify.example.invalid/hook', 'https://user:password@notify.example.invalid/hook'].entries()) {
+    process.env.LEAD_NOTIFY_WEBHOOK_URL = destination;
+    assert.equal((await invoke(pilotLeads, request("POST", validLead, `203.0.113.${70 + index}`))).status, 200);
+  }
+  assert.equal(notifyCalls, 0, 'unset, invalid, insecure and credential-bearing destinations must not be called');
+  process.env.LEAD_NOTIFY_WEBHOOK_URL = 'https://notify.example.invalid/hook';
+  const noLeadId = loadHandler('../api/pilot-leads.js', async (table, options = {}) => {
+    if (table === 'rpc/check_pilot_lead_rate_limit') return [{ allowed: true }];
+    assert.equal(table, 'pilot_leads');
+    return [{ ...options.body }];
+  });
+  assert.equal((await invoke(noLeadId, request('POST', validLead, '203.0.113.74'))).status, 200);
+  assert.equal(notifyCalls, 0, 'missing stored lead identity must not send a notification');
+  let timeoutSignal;
+  globalThis.fetch = async (_url, options) => { timeoutSignal = options.signal; return new Promise(() => {}); };
+  const timedOutNotice = await invoke(pilotLeads, request('POST', validLead, '203.0.113.75'));
+  assert.equal(timedOutNotice.status, 200, 'a stalled notification must not fail stored lead delivery');
+  assert.equal(timeoutSignal.aborted, true, 'the three-second deadline must abort the pending notification');
+} finally {
+  delete process.env.LEAD_NOTIFY_WEBHOOK_URL;
+  globalThis.fetch = originalNotifyFetch;
+}
+
 const paidRollout = await invoke(pilotLeads, request("POST", {
   ...validLead,
   interest: "paid_rollout",
@@ -733,5 +910,202 @@ for (let i = 0; i < 6; i += 1) {
 }
 assert.equal(rateLimited.status, 429, "submission bursts must be rate limited");
 assert.ok(Number(rateLimited.headers["retry-after"]) > 0);
+
+
+
+// Repeat-safe starts use the existing UUID primary key, without a new schema.
+const retryStartId = "f89d1cf9-893f-4fb6-a924-6669b4568221";
+const originalStart = {
+ id: retryStartId, driver_id: "driver-1", fleet_id: "old-fleet", started_at: "2026-10-03T10:00:00.000Z",
+ device: "Original device", detector_pipeline: "web_mediapipe_ear", detector_version: "original-detector",
+ app_version: "original-app", ended_at: null,
+};
+for (const ended of [false, true]) for (const race of [false, true]) {
+ const storedStart = ended ? { ...originalStart, ended_at: "2026-10-03T10:15:00.000Z", safety_score: 77, alert_count: 2 } : originalStart;
+ let reads = 0, inserts = 0;
+ const handler = loadHandler("../api/sessions.js", async (table, options = {}) => {
+  if (table === "drivers") {
+   assert.equal(options.params.user_id, "eq.user-1");
+   return [{ id: "driver-1", fleet_id: "new-fleet" }];
+  }
+  assert.equal(table, "sessions");
+  if (!options.method) {
+   assert.deepEqual(options.params, { id: "eq." + retryStartId, driver_id: "eq.driver-1", select: "*", limit: "1" });
+   reads++;
+   return race && reads === 1 ? [] : [storedStart];
+  }
+  assert.equal(options.method, "POST");inserts++;
+  assert.equal(options.body.id, retryStartId);
+  assert.equal(options.body.driver_id, "driver-1");
+  assert.equal(options.body.fleet_id, "new-fleet");
+  throw { details: { code: "23505" } };
+ });
+ const replay = await invoke(handler, request("POST", {
+  session_id: retryStartId, driver_id: "attacker-driver", fleet_id: "attacker-fleet", device: "Changed device",
+  detector_pipeline: "ios_mlkit_eye_probability", detector_version: "changed-detector", app_version: "changed-app",
+  started_at: "2099-01-01T00:00:00Z", ended_at: null, safety_score: 0, alert_count: 99,
+ }));
+ assert.equal(replay.status, 200);assert.deepEqual(replay.body.session, storedStart);
+ assert.equal(replay.headers["cache-control"], "no-store");
+ assert.equal(replay.body.session_start_protocol, "client_uuid_v1");assert.equal(inserts, race ? 1 : 0);
+}
+let firstStart;
+const freshStart = loadHandler("../api/sessions.js", async (table, options = {}) => {
+ if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
+ if (!options.method) return [];
+ firstStart = options.body;return [{ ...options.body }];
+});
+assert.equal((await invoke(freshStart, request("POST", { session_id: retryStartId, driver_id: "attacker", fleet_id: "attacker" }))).status, 200);
+assert.equal(firstStart.id, retryStartId);assert.equal(firstStart.driver_id, "driver-1");assert.equal(firstStart.fleet_id, "fleet-1");
+for (const session_id of [null, "", "bad", 42, {}, []]) assert.equal((await invoke(freshStart, request("POST", { session_id }))).status, 400);
+const foreignStart = loadHandler("../api/sessions.js", async (table, options = {}) => {
+ if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
+ if (!options.method) { assert.equal(options.params.driver_id, "eq.driver-1");return []; }
+ throw { details: { code: "23505" } };
+});
+const conflict = await invoke(foreignStart, request("POST", { session_id: retryStartId }));
+assert.equal(conflict.status, 409);assert.deepEqual(conflict.body, { ok: false, error: "session_id_conflict" });
+const failedStart = loadHandler("../api/sessions.js", async (table, options = {}) => {
+ if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
+ if (!options.method) return [];
+ throw { details: { code: "23503" } };
+});
+assert.equal((await invoke(failedStart, request("POST", { session_id: retryStartId }))).status, 502);
+
+// Read-only start recovery cannot create sessions or expose another driver.
+for (const found of [true, false]) {
+ const lookup = loadHandler("../api/sessions.js", async (table, options = {}) => {
+  if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
+  assert.equal(table, "sessions");assert.equal(options.method, undefined);
+  assert.deepEqual(options.params, { id: "eq." + retryStartId, driver_id: "eq.driver-1", select: "*", limit: "1" });
+  return found ? [originalStart] : [];
+ });
+ const response = await invoke(lookup, { ...request("GET"), query: { session_id: retryStartId, driver_id: "attacker" } });
+ assert.equal(response.status, 200);assert.deepEqual(response.body.session, found ? originalStart : null);
+ assert.equal(response.body.session_lookup_protocol, "client_uuid_lookup_v1");assert.equal(response.headers["cache-control"], "no-store");
+}
+const invalidLookup = loadHandler("../api/sessions.js", async () => {assert.fail("invalid lookup must not reach database");});
+for (const session_id of [undefined, null, "", "bad", `${retryStartId}\n`, 42, [], {}, [retryStartId, retryStartId]]) assert.equal((await invoke(invalidLookup, { ...request("GET"), query: { session_id } })).status, 400);
+assert.equal((await invoke(invalidLookup, request("GET"))).status, 400);
+const deniedLookup = loadHandler("../api/sessions.js", async () => {assert.fail("unverified lookup must not reach database");}, null);
+assert.equal((await invoke(deniedLookup, { ...request("GET"), query: { session_id: retryStartId } })).status, 401);
+assert.equal((await invoke(deniedLookup, request("POST", { session_id: retryStartId, driver_id: "driver-1" }))).status, 401);
+const missingProfileLookup = loadHandler("../api/sessions.js", async (table, options) => {
+ assert.equal(table, "drivers");assert.equal(options.params.user_id, "eq.user-1");return [];
+});
+assert.equal((await invoke(missingProfileLookup, { ...request("GET"), query: { session_id: retryStartId, driver_id: "driver-1" } })).status, 403);
+const recoveryConfig = require(publicConfigPath);
+const savedGate = process.env.SESSION_START_RECOVERY_ENABLED;
+try {
+ delete process.env.SESSION_START_RECOVERY_ENABLED;
+ assert.deepEqual((await invoke(recoveryConfig, request("GET"))).body.capabilities, {});
+ for (const gate of ["false", "1", "TRUE", " true "]) {
+  process.env.SESSION_START_RECOVERY_ENABLED = gate;
+  assert.deepEqual((await invoke(recoveryConfig, request("GET"))).body.capabilities, {});
+ }
+ process.env.SESSION_START_RECOVERY_ENABLED = "true";
+ const enabledConfig = await invoke(recoveryConfig, request("GET"));
+ assert.deepEqual(enabledConfig.body, {
+  ok: true,
+  capabilities: { session_start_protocol: "client_uuid_v1", session_lookup_protocol: "client_uuid_lookup_v1" },
+  supabase: { configured: true, url: "https://example.supabase.co", anonKey: "test-public-anon-key" },
+ });
+ assert.equal(JSON.stringify(enabledConfig.body).includes(process.env.SUPABASE_SERVICE_ROLE_KEY), false, "checking server storage presence must never publish its credential");
+ const savedPublicKey = process.env.SUPABASE_ANON_KEY;
+ try {delete process.env.SUPABASE_ANON_KEY;assert.deepEqual((await invoke(recoveryConfig, request("GET"))).body.capabilities, {});} finally {process.env.SUPABASE_ANON_KEY=savedPublicKey;}
+ const savedServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+ try {
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const noStorage = loadHandler("../api/sessions.js", async () => assert.fail("unconfigured storage must not be queried"));
+  assert.equal((await invoke(noStorage, request("POST", { session_id: retryStartId }))).status, 501);
+  assert.deepEqual((await invoke(recoveryConfig, request("GET"))).body.capabilities, {}, "capabilities require configured session storage as well as public auth");
+ } finally {process.env.SUPABASE_SERVICE_ROLE_KEY=savedServiceKey;}
+} finally {if (savedGate===undefined) delete process.env.SESSION_START_RECOVERY_ENABLED;else process.env.SESSION_START_RECOVERY_ENABLED=savedGate;}
+
+// Exercise the actual handler against a real UUID primary key. The barrier
+// makes both first reads finish before either insert, forcing the 23505 path.
+const startDb = new PGlite();
+try {
+ await startDb.exec(`
+  create table drivers (id uuid primary key, user_id text unique not null, fleet_id text);
+  create table sessions (
+   id uuid primary key default gen_random_uuid(), driver_id uuid references drivers(id), fleet_id text,
+   started_at timestamptz, ended_at timestamptz, device text, browser text,
+   detector_pipeline text, detector_version text, app_version text,
+   safety_score numeric, alert_count integer
+  );
+  insert into drivers values
+   ('11111111-1111-4111-8111-111111111111', 'user-1', 'fleet-1'),
+   ('22222222-2222-4222-8222-222222222222', 'foreign-user', 'foreign-fleet');
+ `);
+ let firstReads = 0, writes = 0, lostReply = false;
+ let releaseReads;
+ const simultaneousReads = new Promise(resolve => { releaseReads = resolve; });
+ const sessionStore = async (table, options = {}) => {
+  if (table === "drivers") return (await startDb.query("select id,fleet_id from drivers where user_id=$1 limit 1", [options.params.user_id.slice(3)])).rows;
+  assert.equal(table, "sessions");
+  if (!options.method) {
+   const rows = (await startDb.query("select * from sessions where id=$1 and driver_id=$2 limit 1", [options.params.id.slice(3), options.params.driver_id.slice(3)])).rows;
+   if (options.params.id === `eq.${retryStartId}` && firstReads < 2) {
+    if (++firstReads === 2) releaseReads();
+    await simultaneousReads;
+   }
+   return rows;
+  }
+  assert.equal(options.method, "POST", "start recovery never patches or upserts a session");
+  writes += 1;
+  const fields = Object.keys(options.body);
+  assert.ok(fields.every(field => ["id", "driver_id", "fleet_id", "started_at", "device", "browser", "detector_pipeline", "detector_version", "app_version"].includes(field)));
+  let rows;
+  try {
+   rows = (await startDb.query(`insert into sessions (${fields.join(",")}) values (${fields.map((_, index) => `$${index + 1}`).join(",")}) returning *`, Object.values(options.body))).rows;
+  } catch (error) {
+   throw { details: { code: error.code } };
+  }
+  if (lostReply) { lostReply = false; throw { status: 504 }; }
+  return rows;
+ };
+ const persistedStarts = loadHandler("../api/sessions.js", sessionStore);
+ const concurrent = await Promise.all([
+  invoke(persistedStarts, request("POST", { session_id: retryStartId, device: "First attempt", user_id: "foreign-user", driver_id: "foreign-driver", fleet_id: "foreign-fleet" })),
+  invoke(persistedStarts, request("POST", { session_id: retryStartId, device: "Second attempt", started_at: "2099-01-01T00:00:00Z" })),
+ ]);
+ assert.equal(firstReads, 2);assert.equal(writes, 2);
+ assert.ok(concurrent.every(response => response.status === 200));
+ assert.deepEqual(concurrent[0].body.session, concurrent[1].body.session);
+ assert.equal((await startDb.query("select count(*)::integer as count from sessions")).rows[0].count, 1);
+ assert.equal(concurrent[0].body.session.driver_id, "11111111-1111-4111-8111-111111111111");
+ assert.equal(concurrent[0].body.session.fleet_id, "fleet-1");
+ assert.ok(Date.parse(concurrent[0].body.session.started_at) <= Date.now());
+
+ await startDb.query("update sessions set ended_at='2026-10-03T10:15:00Z', safety_score=77, alert_count=2 where id=$1", [retryStartId]);
+ await startDb.query("update drivers set fleet_id='new-fleet' where user_id='user-1'");
+ const completed = (await startDb.query("select * from sessions where id=$1", [retryStartId])).rows[0];
+ const replayCompleted = await invoke(persistedStarts, request("POST", { session_id: retryStartId, safety_score: 0, device: "Changed", fleet_id: "new-fleet" }));
+ assert.equal(replayCompleted.status, 200);
+ assert.deepEqual(replayCompleted.body.session, JSON.parse(JSON.stringify(completed)));
+ assert.equal(writes, 2, "a completed replay must preserve the original historical row without another insert");
+
+ const foreignStarts = loadHandler("../api/sessions.js", sessionStore, { id: "foreign-user" });
+ const denied = await invoke(foreignStarts, request("POST", { session_id: retryStartId, driver_id: concurrent[0].body.session.driver_id, user_id: "user-1" }));
+ assert.equal(denied.status, 409);assert.deepEqual(denied.body, { ok: false, error: "session_id_conflict" });
+ const hidden = await invoke(foreignStarts, { ...request("GET"), query: { session_id: retryStartId, driver_id: concurrent[0].body.session.driver_id } });
+ assert.equal(hidden.status, 200);assert.equal(hidden.body.session, null);
+ assert.equal(hidden.headers["cache-control"], "no-store");
+ assert.deepEqual((await startDb.query("select * from sessions where id=$1", [retryStartId])).rows[0], completed);
+
+ const uncertainId = "33333333-3333-4333-8333-333333333333";
+ const writesBeforeTimeout = writes;
+ lostReply = true;
+ const uncertain = await invoke(persistedStarts, request("POST", { session_id: uncertainId }));
+ assert.equal(uncertain.status, 502, "a lost insert reply remains an upstream failure");
+ assert.equal(writes, writesBeforeTimeout + 1, "an uncertain write must never trigger an automatic insert retry");
+ const recovered = await invoke(persistedStarts, { ...request("GET"), query: { session_id: uncertainId } });
+ assert.equal(recovered.status, 200);assert.equal(recovered.body.session.id, uncertainId);
+ assert.equal(writes, writesBeforeTimeout + 1, "lookup recovers an uncertain start without creating another drive");
+ assert.equal((await startDb.query("select count(*)::integer as count from sessions")).rows[0].count, 2);
+} finally { await startDb.close(); }
+
+await import("./test-session-uuid-interoperability.mjs");
 
 console.log("Occulert API security tests passed.");

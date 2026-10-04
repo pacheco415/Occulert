@@ -20,6 +20,19 @@ function boot(fetch) {
   return { lib: context.module.exports, context, timers, calls, expire() { for (const [id, timer] of [...timers]) { timers.delete(id); timer.fn(); } } };
 }
 
+test('storage configuration exposes only a Boolean and never makes a network request', () => {
+  const b = boot(() => assert.fail('a presence check must not contact Auth or PostgREST'));
+  assert.equal(b.lib.serverStorageConfigured(), true);
+  delete b.context.process.env.SUPABASE_SERVICE_ROLE_KEY;
+  assert.equal(b.lib.serverStorageConfigured(), false);
+  b.context.process.env.SUPABASE_SERVICE_ROLE_KEY = '';
+  assert.equal(b.lib.serverStorageConfigured(), false);
+  b.context.process.env.SUPABASE_SERVICE_ROLE_KEY = 'fixture-service-role';
+  delete b.context.process.env.SUPABASE_URL;
+  assert.equal(b.lib.serverStorageConfigured(), false);
+  assert.equal(b.calls.length, 0);
+});
+
 for (const status of [400, 401, 403, 429, 500, 503]) test(`token verification distinguishes status ${status} from confirmed invalid credentials`, async () => {
   const b = boot(() => json({ error: 'fixture-upstream' }, status));
   if ([400, 401, 403].includes(status)) assert.equal(await b.lib.verifyAccessToken('fixture-token'), null);
