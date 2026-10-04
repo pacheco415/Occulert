@@ -1,12 +1,5 @@
 {
   "schemaVersion": 1,
-  "production": {
-    "sourceCommit": "7b61530065b925cd0d58c60d7772f975b72bc5da",
-    "deploymentId": "dpl_FJteCFD9JBeQ3pJeDFRCuUeuEk3N",
-    "state": "READY",
-    "createdAt": "2026-10-04T16:37:18.513Z",
-    "observedAt": "2026-10-04T16:41:36Z"
-  },
   "testFlight": {
     "sourceCommit": "0d11ad22b66baab61ea9db6456bfaed837871537",
     "version": "1.0.0",
@@ -21,5 +14,23 @@
     "state": "unknown",
     "observedAt": "2026-10-04",
     "summary": "Read-only production ledger lookup failed PostgreSQL authentication (28P01); PRs #192 and #206 remain gated."
+  },
+  "previousProductionReceipt": {
+    "sourceCommit": "7b61530065b925cd0d58c60d7772f975b72bc5da",
+    "deploymentId": "dpl_FJteCFD9JBeQ3pJeDFRCuUeuEk3N",
+    "state": "READY",
+    "createdAt": "2026-10-04T16:37:18.513Z",
+    "observedAt": "2026-10-04T16:41:36Z"
+  },
+  "liveAssets": {
+    "observedAt": "2026-10-04T21:52:06Z",
+    "url": "https://occulert.com/sw.js",
+    "cache": "occulert-v111",
+    "driverAsset": "driver-app.v83.js",
+    "driverSha256": "035e3201d2059c97f8412dd716e290316116c8d37615e893936dfc8049a8b9ff",
+    "matchingSourceCommit": "39c32652ac3742f451077d0849125e0c382816d2",
+    "matchingPullRequest": 258,
+    "deploymentState": "unknown",
+    "summary": "Live service worker cache and driver bytes match main #258; deployment ID and exact deployed Git commit not independently verified."
   }
 }
