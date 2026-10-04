@@ -65,7 +65,6 @@
     "test:cloud-summary-presentation",
     "audit:asset-sizes",
     "test:migration-readiness",
-    "test:db-baseline",
     "test:asset-lineage",
     "test:workflow-policy",
     "test:deployment-ignore",
@@ -78,7 +77,8 @@
     "test:page-actions",
     "test:browser-history-data",
     "test:status",
-    "test:cached-jwks"
+    "test:cached-jwks",
+    "test:db-baseline"
   ],
   "additionalChecks": [
     "test:verify-runner"
