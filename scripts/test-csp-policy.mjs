@@ -21,3 +21,10 @@ test('missing script or connection directives are rejected', () => {
 for (const directive of ['script-src-elem', 'script-src-attr']) {
  for (const value of ["'unsafe-inline'", '*', "'self'"]) test(`${directive} ${value} cannot override the shared script restriction`, () => assert.ok(auditCspPolicy(`${valid}; ${directive} ${value}`).length));
 }
+
+for (const name of ['ScRiPt-SrC-ElEm', 'ScRiPt-SrC-AtTr']) test(`mixed-case ${name} cannot hide an override`, () => assert.ok(auditCspPolicy(`${valid}; ${name} 'unsafe-inline'`).length));
+test('mixed-case directive duplicates cannot conceal an unsafe first policy', () => {
+ assert.ok(auditCspPolicy(`ScRiPt-SrC 'unsafe-inline'; ${valid}`).length);
+ assert.ok(auditCspPolicy(`${valid}; ScRiPt-SrC 'unsafe-inline'`).length);
+});
+test('valid mixed-case directive names retain their browser-equivalent policy', () => assert.deepEqual(auditCspPolicy(valid.replace('script-src','ScRiPt-SrC').replace('connect-src','CoNnEcT-SrC')), []));

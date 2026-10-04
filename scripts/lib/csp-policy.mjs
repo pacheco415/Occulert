@@ -1,7 +1,8 @@
 export const SUPABASE_HOST = 'wbsynfcjpwlgdzioqpoa.supabase.co';
 
 export function auditCspPolicy(value) {
-  const entries = String(value).split(';').map(part => part.trim().split(/\s+/)).filter(part => part[0]);
+  const entries = String(value).split(';').map(part => part.trim().split(/\s+/)).filter(part => part[0])
+    .map(([name, ...sources]) => [name.replace(/[A-Z]/g, letter => letter.toLowerCase()), ...sources]);
   const directives = new Map(entries.map(([name, ...sources]) => [name, sources]));
   const errors = [];
   if (directives.size !== entries.length) errors.push('CSP directives must not be duplicated');

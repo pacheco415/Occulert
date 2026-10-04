@@ -300,27 +300,28 @@ test('a hung guard cannot activate a complete driver when released after the dea
 });
 
 for (const resource of ['backend', 'stylesheet']) {
- test(`a stalled ${resource} keeps controls disabled and late completion cannot activate monitoring`, async ({page}) => {
+ test(`a stalled ${resource}${resource==='stylesheet'?' and incomplete core':''} keeps controls disabled and late completion cannot activate monitoring`, async ({page}) => {
   await installPrivacyProbe(page);
   let release;const held=new Promise(resolve=>{release=resolve});
   const logical=resource==='backend'?'occulert-backend.js':'driver-app.css';
   const filename=assets[logical];
+  const delayedCore=resource==='stylesheet'?await driverRoute(page,'held'):null;
   await page.route('**/'+filename,async route=>{await held;await route.fulfill({status:200,contentType:resource==='backend'?'text/javascript':'text/css',body:readFileSync(resolve(root,filename),'utf8')})});
   try {
    await page.goto('/app.html',{waitUntil:'commit'});
-   // WebKit defers first paint behind a pending stylesheet. Verify the HTML
-   // protection directly until that style response returns, without extending
-   // the document deadline or enabling an uninitialized driver.
+   // Styles may delay first paint independently of script execution. Hold
+   // the core too, then prove that neither resource's late completion can
+   // enable an incomplete or expired initialization.
    await expect(page.locator('#startupRetryLink')).toHaveAttribute('href','/app.html');
    if(resource==='backend') await expect(page.locator('#startupRetryLink')).toBeVisible();
    await expect(page.locator('#startBtn')).toBeDisabled();
    await expectNoPermissionedWork(page);
    if(resource==='backend') await expectFailure(page);
    else await page.waitForTimeout(8100);
-   release();await page.waitForLoadState('domcontentloaded');
+   release();delayedCore?.release();await page.waitForLoadState('domcontentloaded');
    await expectFailure(page);await expectCoreGuards(page);
    expect(await page.evaluate(()=>window.OcculertStartup.isReady())).toBe(false);
-  } finally {release()}
+  } finally {release();delayedCore?.release()}
  });
 }
 
