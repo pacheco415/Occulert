@@ -3,23 +3,27 @@
 This directory contains the React Native (Expo) iPhone and Apple Watch source.
 Android configuration remains source; no released Android app is claimed.
 
-Current private distribution is TestFlight **1.0.0 (52)**: finished build,
-FINISHED submission, Apple VALID / IN_BETA_TESTING, and confirmed embedded
-Watch packaging. Its exact source remains
-`969849b0c551edb2de6f9230cbeecdce89346b6f`. **Build 52 has user-reported iPhone
-installation/general functional, Watch launch, and foreground/background urgent
-display/wrist vibration passes.** The user reports iPhone 17 Pro Max on iOS 27.2
-and Apple Watch Ultra 4, with Watch software described as the same version 27.2;
-these details are not independently verified. Exact delay, Focus/permission
-variations and individual accessory, safe-stop, recovery, accessibility,
-battery/heat checks remain undocumented. Earlier build-15/19/36 and build-49
-feedback is evidence for those exact builds.
+Latest saved distribution receipt is private TestFlight **1.0.0 (56)** from
+`0d11ad22b66baab61ea9db6456bfaed837871537`. EAS build and submission finished
+October 3, 2026; the saved Apple observation is VALID / IN_BETA_TESTING.
+This is a dated receipt, not a fresh availability or quota check. Build 56 has
+no recorded physical acceptance. The next release is being prepared; no build
+or submission has started. See [release intent and device checklist](../docs/RELEASE_2026-10-04.md).
 
-PR #144 is merged at `d3ae5a3` and its website/backend release is live. The
-native audit fixes in that source await a future binary and separate physical
-acceptance. Included iOS build usage is **15/15**; the next period begins
-**September 30 at 5 p.m. Pacific**. No new EAS build, submission, or OTA update
-is queued. See the [authoritative roadmap](../docs/APP_ROADMAP.md).
+Historical build-52 source remains
+`969849b0c551edb2de6f9230cbeecdce89346b6f`. On September 26, the user reported
+build-52 iPhone installation/general functionality, Watch launch and
+foreground/background urgent display/wrist vibration passes. Reported devices
+were iPhone 17 Pro Max/iOS 27.2 and Apple Watch Ultra 4, with Watch software
+described as 27.2; these details were not independently verified. Exact delay,
+Focus/permission variations and individual accessory, safe-stop, recovery,
+accessibility and battery/heat checks remain undocumented. Earlier
+build-15/19/36 and build-49 feedback applies only to those exact builds.
+
+Production EAS uses remote build numbers and automatic increment. Keep the
+existing project, bundle and App Store identities; the next number is pending
+remote assignment. Source changes and automated checks do not accept a binary
+on physical devices.
 
 ## Why Native?
 
@@ -50,15 +54,16 @@ alert delivery remain separate checks.
 ## Setup
 
 ### Prerequisites
-- Node 24 for source verification; EAS install CI matches Node 22.23.1/npm 10.9.8
+- Node 24 from `.nvmrc`; native CI also clean-installs with npm 10.9.8 on Node 24
 - Use the project's Expo CLI through `npx expo`; native features need a custom development or TestFlight build
 - iOS: SDK 57-compatible Xcode/toolchain; the production EAS profile pins Xcode 26.6
-- Android: Android Studio with API 31+ emulator
+- Android source requires API 26 or later; native build and device acceptance remain open
 
 ### Install
 ```bash
 cd native-app
 npm ci --include=dev
+npm run verify
 ```
 
 ### Run
@@ -104,8 +109,8 @@ native-app/
 
 ## Phase Milestones
 
-Build-15/19 statuses below describe historical evidence. They do not establish
-physical acceptance of the available build 52.
+Build-15/19/52 statuses below describe dated evidence. They do not establish
+physical acceptance of build 56 or the next release candidate.
 
 | Milestone | Status |
 |-----------|--------|
@@ -131,7 +136,7 @@ physical acceptance of the available build 52.
 | Head-nod detection | Experimental local camera and compatible-headphone observations; does not trigger alerts or sync |
 | HealthKit HRV/sleep integration | Done - optional read-only local context validated in private TestFlight build 19 |
 | Pre-drive risk score screen | Foundation in source - factual sleep/HRV context only; no score or alert influence |
-| Private iOS distribution | TestFlight 1.0.0 (52), FINISHED submission and Apple VALID / IN_BETA_TESTING; limited user-reported phone/Watch passes above, remaining acceptance open; PR #144 native audit fixes await a future binary |
+| Private iOS distribution | Saved receipt: TestFlight 1.0.0 (56), finished build/submission and Apple VALID / IN_BETA_TESTING; physical acceptance unrecorded. Next-release source and device checks are listed in the release intent. |
 
 Pilot testers can send general feedback from Settings or attach basic session
 metrics and a structured alert assessment from History. Alert assessments stay
@@ -142,7 +147,7 @@ location.
 History can also record lighting, eyewear, and phone position after the tester
 is safely parked. These structured conditions stay local unless the tester
 opens the editable session feedback email. These features are implemented;
-earlier build-19 validation is historical, and build-52 acceptance remains open.
+earlier build-19 validation is historical, and exact-build acceptance remains open.
 
 The same local review can capture subjective battery use and phone heat after
 the tester parks. These are explicitly described as tester observations rather
@@ -155,13 +160,13 @@ History counts reviewed Medium-sensitivity sessions toward the first 10-session
 review checkpoint and summarizes felt-right, false, missed, and late ratings
 without uploading those ratings.
 
-The next native source package adds Session History alert-feedback filters:
+Current native source includes Session History alert-feedback filters:
 All feedback, Felt right, Unnecessary alert, Missed alert, Too late and Not
 assessed. They compose with date and review-status filters, and shown summaries
 and review navigation keep that selected scope. Counts are saved user
 observations, not detection accuracy. Recovered partial records remain labeled
-and excluded from complete-session progress. These additions are untested at
-the user's request and are not installed in TestFlight 1.0.0 (52); see
+and excluded from complete-session progress. These source changes are included in the build-56 revision; automated verification
+and exact-build physical acceptance remain separate. See
 [alert-feedback preparation](../docs/HISTORY_ALERT_FEEDBACK.md).
 
 When false or missed alerts are reviewed, History also groups their local
@@ -204,15 +209,20 @@ Before App Store submission, the native app should match or exceed the PWA:
 Occulert is designed to use the driver's existing Apple / Android hardware the
 same way the web app does, but with deeper device access in a native build.
 
-### AirPods / Bluetooth audio (works today)
+### AirPods / Bluetooth audio (source policy; device checks required)
 
-Alert sounds route to whatever audio output is connected (AirPods Pro, car
-audio, headphones). This is handled by `lib/audioSession.ts`, which configures
-the audio session so alerts:
+`lib/audioSession.ts` requests playback through the system-selected audio route
+(speaker, Bluetooth headphones or car audio). It requests that alerts:
 
-- play even when the phone's mute switch is on (`playsInSilentModeIOS`),
-- keep the audio session available during active foreground monitoring,
-- duck music / navigation instead of stopping it.
+- play with Silent mode enabled (`playsInSilentMode: true`),
+- let a short audible cue finish across foreground loss,
+- duck other audio during playback.
+
+The five bundled short-cue players use `keepAudioSessionActive: false`; silence
+does not retain the shared session. Owned layout cleanup pauses the departing
+player before Expo disposal and preserves a concurrently playing newer cue.
+These are source policies, not guarantees of heard audio, route selection or
+external music/navigation restoration on a particular device.
 
 iOS and Android route audio to the connected Bluetooth device automatically;
 you cannot (and don't need to) address AirPods directly. Settings reports this
@@ -233,8 +243,8 @@ feed a separate candidate head-nod detector. Raw motion samples are discarded;
 session history stores only sample and candidate counts plus the source status.
 
 This path is diagnostic only. It does **not** change PERCLOS, fatigue scoring,
-alerts, Watch haptics, or cloud payloads. Use the available build 52 for physical
-checks; compatible-headphone calibration and independent validation remain
+alerts, Watch haptics, or cloud payloads. Record the exact installed build for
+physical checks; compatible-headphone calibration and independent validation remain
 required before treating these observations as a validated signal.
 
 ### Directional in-ear alert pattern (physical acceptance pending)
@@ -248,7 +258,7 @@ and tracking-loss alerts always use the centered tone at full audibility.
 The pattern never claims to detect a left/right hazard and does not depend on
 headphone-motion observations. Speaker, car-audio, and single-earbud users
 should leave the centered default selected. A physical stereo-earbud check on
-the available build 52 remains required before treating this as device-verified.
+the exact installed build remains required before treating this as device-verified.
 
 ### Apple Watch alerts (requires a development / TestFlight build)
 
@@ -294,7 +304,8 @@ confirmed the foreground urgent test displayed an alert and produced wrist
 vibration. The background test was also reported to display a notification and
 produce wrist vibration after returning to the watch face. These limited
 passes do not supply exact delivery delay or Focus/permission variations and
-do not accept the later merged native audit fixes, which need a future binary.
+do not accept any later binary or native changes. Repeat this protocol on the
+next installed build and record the actual result.
 
 ### Background camera and reduced-mode boundary
 
@@ -315,9 +326,10 @@ can be verified. See `CRITICAL_ALERTS_READINESS.md`.
 
 ### Android (Wear OS)
 
-The same `watchBridge` pattern applies; swap in a Wear OS `MessageClient`
-module in a dev build. `bluetooth-central` background mode is already declared
-in `app.json`.
+A Wear OS companion is future work. Android source excludes the iOS Watch stub
+from autolinking; no Android/Watch release is claimed. Current iOS
+`UIBackgroundModes` contains only `audio`; headphone-motion observation requires
+the foreground and does not use a Bluetooth-central background service.
 
 ### Message contract
 
