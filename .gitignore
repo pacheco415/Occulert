@@ -51,4 +51,6 @@ Thumbs.db
 .vscode/
 *.swp
 
+# Generated dependency audit evidence.
+dependency-reports/
 .verification-receipts/

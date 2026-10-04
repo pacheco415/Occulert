@@ -13,5 +13,10 @@ brand/
 playwright.config.mjs
 test-results/
 playwright-report/
+dependency-reports/
 
 .verification-receipts/
+
+asset-size-budgets.json
+
+startup-performance-budgets.json
