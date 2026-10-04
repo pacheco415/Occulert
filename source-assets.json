@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "driver-app.js": {
+      "source": "src/driver-app.js",
+      "mode": "copy"
+    }
+  }
+}

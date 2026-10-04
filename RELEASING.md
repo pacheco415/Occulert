@@ -34,6 +34,30 @@ before deploying routes or clients that use the new schema or functions.
 
 Use `npm run asset:bump -- <logical-name> --dry-run` to review an asset release plan, then run without `--dry-run` to copy the asset and any active versioned importers, rewrite page references, update manifests and cache lists, and add immutable headers. Edit the new file, then use `npm run asset:bump -- <logical-name> --refresh` before committing to refresh its integrity digest. Refresh rejects assets already active in HEAD. Review the plan and run all release verification before committing or publishing.
 
+### Editable source pilot
+
+`source-assets.json` currently registers only `driver-app.js`, copied from
+`src/driver-app.js`. Edit that source, then review `npm run asset:release --
+--dry-run` and run `npm run asset:release`. Release processes every changed
+registered source in one plan, copies its versioned importers, synchronizes
+guard/helper pins, and advances the aggregate cache once. An unchanged source
+is an exact no-op; it does not reserve another URL or cache name. Fetch and
+integrate `origin/main` first. Finish or discard an existing unpublished release
+before starting another source release.
+
+`npm run audit:source-assets` checks each registered source against its active
+immutable output. Existing bumps of an unregistered dependency also synchronize
+the source of a copied registered importer. Pending source edits block those
+bumps, so the tool cannot discard them. The copy pilot accepts classic UTF-8 JS
+or CSS; it does not bundle modules or generate maps. Other logical assets still
+use the existing bump workflow. The migration plan and coverage boundary are in
+[docs/SOURCE_ASSET_PLAN.md](docs/SOURCE_ASSET_PLAN.md).
+
+Source, registry and internal build output are excluded from deployment and
+offline caching. Validation and output staging happen before replacements; a
+failed replacement restores prior files. Keep the checkout idle while releasing,
+review the generated diff, and run all verification before committing.
+
 ### Prepared branch asset names
 
 Before choosing a new asset URL, fetch the current main and relevant remote branches into a full-history checkout. The release tool reserves filenames found anywhere in known Git history, including other local/remote-tracking branches and deleted files. It includes merge diffs so filenames and cache names first introduced during conflict resolution stay reserved after removal. It also advances the service-worker cache beyond every recorded cache version in known history, so two prepared releases cannot share a cache identity. It does not contact GitHub automatically or know branches that have never been fetched. Never reuse an immutable URL from another prepared release, even after its file is deleted.
