@@ -96,6 +96,8 @@ async function stripeRequest(path, options) {
       body: opts.fields ? new URLSearchParams(opts.fields).toString() : undefined,
       signal: controller.signal,
     });
+    // The hard deadline already settled the caller; discard late headers.
+    if (controller.signal.aborted) return;
     const responseText = await response.text();
     if (Buffer.byteLength(responseText) > MAX_RESPONSE_BYTES) throw new Error("stripe_response_too_large");
     let data;
