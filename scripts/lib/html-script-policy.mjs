@@ -1,55 +1,65 @@
-// Read HTML tag attributes without treating quoted text as attributes. This
-// intentionally ignores script bodies and comments, including generated markup
-// inside those bodies; callers scan active JS separately for that markup.
+import { parse, parseFragment } from 'parse5';
+import { parse as parseJavaScript } from 'acorn';
+
+// Development-only policy checks: complete documents and insertion fragments have
+// different parsing contexts. Union their located attributes rather than dropping
+// html/body or table-fragment tags. This audits literal markup, not dynamic values.
 export function scriptMarkupPolicy(source) {
-  const handlers = [], inlineScripts = [];
-  let offset = 0;
-  while (offset < source.length) {
-    const start = source.indexOf('<', offset);
-    if (start < 0) break;
-    if (source.startsWith('<!--', start)) {
-      const end = source.indexOf('-->', start + 4);
-      offset = end < 0 ? source.length : end + 3; continue;
-    }
-    const name = /^<([a-z][a-z0-9:-]*)\b/i.exec(source.slice(start));
-    if (!name) { offset = start + 1; continue; }
+  const handlers = new Map(), inlineScripts = new Map();
+  function visit(node) {
+    const location = node.sourceCodeLocation;
     const attributes = Object.create(null);
-    let index = start + name[0].length;
-    while (index < source.length) {
-      while (/[\s/]/.test(source[index] || '')) index += 1;
-      if (index >= source.length || source[index] === '>') break;
-      const attribute = /^[^\s=/>]+/.exec(source.slice(index));
-      if (!attribute) { index += 1; continue; }
-      const key = attribute[0].toLowerCase(); index += attribute[0].length;
-      while (/\s/.test(source[index] || '')) index += 1;
-      let value = '';
-      if (source[index] === '=') {
-        index += 1; while (/\s/.test(source[index] || '')) index += 1;
-        const delimiter = source[index];
-        if (delimiter === '"' || delimiter === "'") {
-          const from = ++index;
-          while (index < source.length && source[index] !== delimiter) index += 1;
-          value = source.slice(from, index); index += 1;
-        } else {
-          const from = index;
-          // Quotes within an unquoted HTML value are literal parse-error
-          // characters; they do not hide subsequent event attributes.
-          while (index < source.length && !/[\s>]/.test(source[index])) index += 1;
-          value = source.slice(from, index);
-        }
-      }
-      attributes[key] = value;
-      if (/^on[a-z]+$/.test(key)) handlers.push({ tag: name[1].toLowerCase(), attribute: key, offset: start });
+    for (const { name, value } of node.attrs || []) {
+      attributes[name] = value;
+      if (location && /^on[a-z]+$/.test(name)) handlers.set(`${location.startOffset}:${name}`, {
+        tag: node.tagName, attribute: name, offset: location.startOffset,
+      });
     }
-    if (index >= source.length) break;
-    offset = index + 1;
-    if (name[1].toLowerCase() === 'script') {
-      const closing = /<\/script\s*>/gi; closing.lastIndex = offset;
-      const match = closing.exec(source);
-      const body = source.slice(offset, match ? match.index : source.length);
-      if (!Object.hasOwn(attributes, 'src')) inlineScripts.push({ attributes, body, offset: start });
-      offset = match ? closing.lastIndex : source.length;
+    if (location && node.tagName === 'script' && !Object.hasOwn(attributes, 'src')) {
+      inlineScripts.set(location.startOffset, {
+        attributes,
+        body: source.slice(location.startTag.endOffset, location.endTag?.startOffset ?? location.endOffset),
+        offset: location.startOffset,
+      });
+    }
+    for (const child of node.childNodes || []) visit(child);
+    if (node.content) visit(node.content);
+  }
+  visit(parse(source, { sourceCodeLocationInfo: true }));
+  visit(parseFragment(source, { sourceCodeLocationInfo: true }));
+  return { handlers: [...handlers.values()], inlineScripts: [...inlineScripts.values()] };
+}
+
+// Parse JavaScript first: comparison operators and property callbacks are code,
+// not markup. Inspect decoded string literals, template text and concatenations;
+// placeholders preserve attribute boundaries without executing expressions.
+export function generatedScriptMarkupPolicy(source) {
+  const tree = parseJavaScript(source, { ecmaVersion: 'latest', sourceType: 'script' });
+  const handlers = [], inlineScripts = [];
+  function projection(node) {
+    if (node.type === 'Literal' && typeof node.value === 'string') return node.value;
+    if (node.type === 'TemplateLiteral') return node.quasis.map((part, index) =>
+      (part.value.cooked ?? part.value.raw) + (index < node.expressions.length ? 'auditValue' : '')).join('');
+    if (node.type === 'BinaryExpression' && node.operator === '+') {
+      const left = projection(node.left), right = projection(node.right);
+      if (left !== null || right !== null) return (left ?? 'auditValue') + (right ?? 'auditValue');
+    }
+    return null;
+  }
+  function visit(node) {
+    if (!node || typeof node !== 'object') return;
+    const markup = projection(node);
+    if (markup !== null && markup.includes('<')) {
+      const result = scriptMarkupPolicy(markup);
+      for (const item of result.handlers) handlers.push({ ...item, sourceOffset: node.start });
+      for (const item of result.inlineScripts) inlineScripts.push({ ...item, sourceOffset: node.start });
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'start' || key === 'end') continue;
+      if (Array.isArray(value)) for (const child of value) visit(child);
+      else if (value && typeof value === 'object') visit(value);
     }
   }
+  visit(tree);
   return { handlers, inlineScripts };
 }

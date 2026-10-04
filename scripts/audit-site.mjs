@@ -1,4 +1,4 @@
-import { scriptMarkupPolicy } from './lib/html-script-policy.mjs';
+import { scriptMarkupPolicy, generatedScriptMarkupPolicy } from './lib/html-script-policy.mjs';
 import { auditWorkflowPolicy } from './lib/workflow-policy.mjs';
 import { createHash } from 'node:crypto';
 import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
@@ -672,7 +672,10 @@ for(const rule of JSON.parse(read('vercel.json')).headers)for(const header of ru
  }
  if(header.key.toLowerCase()==='x-xss-protection')throw Error('Deprecated X-XSS-Protection header must remain absent');
 }
-for(const filename of Object.values(JSON.parse(read('asset-versions.json'))).filter(name=>name.endsWith('.js')))if(scriptMarkupPolicy(read(filename)).handlers.length)throw Error('Generated inline event handler in '+filename);
+for(const filename of Object.values(JSON.parse(read('asset-versions.json'))).filter(name=>name.endsWith('.js'))){
+ const policy=generatedScriptMarkupPolicy(read(filename));
+ if(policy.handlers.length || policy.inlineScripts.length)throw Error('Generated inline script or event handler in '+filename);
+}
 
 if (failures.length) {
   console.error("Occulert site audit failed:");

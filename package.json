@@ -87,7 +87,9 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
-    "@playwright/test": "^1.63.0"
+    "@playwright/test": "^1.63.0",
+    "acorn": "8.18.0",
+    "parse5": "8.0.1"
   },
   "engines": {
     "node": "24.x"
