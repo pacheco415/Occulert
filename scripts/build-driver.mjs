@@ -2,11 +2,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildDriverArtifact, inspectSourceGraph } from './lib/driver-build.mjs';
+import { buildDriverArtifact, inspectSourceGraph, readDriverContract } from './lib/driver-build.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const contractPath = join(root, 'source-driver-contract.json');
-const contract = JSON.parse(readFileSync(contractPath, 'utf8'));
+const { contract } = readDriverContract(contractPath);
 const args = process.argv.slice(2);
 if (args.some(arg => !['--stdout', '--overrides'].includes(arg)) || new Set(args).size !== args.length) throw new Error('Use build-driver [--stdout]');
 let sourceRoot = join(root, 'src'), temporary;

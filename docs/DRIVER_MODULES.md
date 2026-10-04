@@ -18,7 +18,10 @@ and a provenance receipt. Pinned esbuild creates a single classic-script compati
 output. The bounded build adapter restores real declaration kinds and runnable
 excerpt boundaries required by existing tests. It proves source functions,
 initializers, module evaluation and top-level effects, resolved local bindings,
-UTF-8 serialization and executable marker ownership. Unsupported transformations
+UTF-8 serialization and executable marker ownership. Contract, dependency lock and
+module inputs must be regular owned files; linked configuration is rejected before
+normal or staged builds read it. Excerpt boundaries move only actual hoisted
+function declarations, while startup effects retain their source order. Unsupported transformations
 fail instead of silently altering behavior. No old driver implementation is a
 build input, and no source map is emitted.
 

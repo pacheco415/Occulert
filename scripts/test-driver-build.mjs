@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -148,4 +148,47 @@ test('computed native lifecycle key writes fail closed in the actual module grap
  const path = join(cwd, 'src', 'driver-app.js');
  writeFileSync(path, readFileSync(path, 'utf8') + "\nconst computedLifecycleKey='stop';window[computedLifecycleKey]=()=>{};\n");
  await assert.rejects(build, /unknown computed global property writes/);
+}));
+
+test('chart and foreground excerpts contain only their owned real function bodies', () => {
+ const program = ast(base.code), functions = program.body.filter(node => node.type === 'FunctionDeclaration');
+ const chart = functions.find(node => node.id.name === 'updateChart'), install = functions.find(node => node.id.name === 'triggerPWAInstall');
+ assert.equal(program.body[program.body.indexOf(chart) + 1], install);
+ const feedback = program.body.find(node => node.type === 'VariableDeclaration' && node.declarations.some(binding => binding.id.name === 'feedbackForm'));
+ const index = program.body.indexOf(feedback), handler = program.body[index + 2], registration = program.body[index + 3];
+ assert.equal(program.body[index + 1].type, 'IfStatement');
+ assert.equal(handler.type, 'FunctionDeclaration'); assert.equal(handler.id.name, 'handleVisibilityChange');
+ assert.equal(registration.expression.callee.object.name, 'document');
+ assert.equal(registration.expression.arguments[0].value, 'visibilitychange');
+ assert.equal(base.code.slice(handler.end, registration.start).trim(), '');
+ assert.equal(base.code.slice(chart.end, install.start).trim(), '');
+});
+
+test('function boundary metadata cannot claim unrelated declarations', async () => changed(async (cwd, build) => {
+ const altered = structuredClone(contract); altered.adjacentDeclarations[1].move = 'riskText';
+ writeFileSync(join(cwd, 'driver-contract.json'), JSON.stringify(altered));
+ await assert.rejects(build, /owned function adjacency registry changed/);
+ altered.adjacentDeclarations = contract.adjacentDeclarations; altered.registrationBoundary.handler = 'demoAlert';
+ writeFileSync(join(cwd, 'driver-contract.json'), JSON.stringify(altered));
+ await assert.rejects(build, /owned registration boundary changed/);
+}));
+
+test('missing or displaced actual foreground registration fails before excerpt formatting', async () => changed(async (cwd, build) => {
+ const path = join(cwd, 'src/driver-app.js'), original = readFileSync(path, 'utf8'), registration = "document.addEventListener('visibilitychange', () => { void handleVisibilityChange(); });";
+ assert.ok(original.includes(registration));
+ writeFileSync(path, original.replace(registration, "const registrationDecoy='document.addEventListener';"));
+ await assert.rejects(build, /unique owned foreground registration/);
+ writeFileSync(path, original.replace(registration, "window.addEventListener('review-interposed-event',()=>{});\n" + registration));
+ await assert.rejects(build, /foreground registration must immediately follow actual feedback/);
+}));
+
+test('contract, lock and module inputs must be regular owned files before reads', async () => changed(async (cwd, build) => {
+ for (const file of ['driver-contract.json', 'package-lock.json', 'src/metrics.js']) {
+  const path = join(cwd, file), bytes = readFileSync(path), target = join(cwd, 'outside-' + file.replaceAll('/', '-'));
+  writeFileSync(target, bytes); rmSync(path); symlinkSync(target, path);
+  await assert.rejects(build, /regular owned file/);
+  rmSync(path); writeFileSync(path, bytes);
+ }
+ const parent = join(cwd, 'linked-parent'); symlinkSync(cwd, parent, 'dir');
+ await assert.rejects(() => buildDriverArtifact({ sourceRoot: join(cwd, 'src'), contractPath: join(parent, 'driver-contract.json') }), /owned directory/);
 }));

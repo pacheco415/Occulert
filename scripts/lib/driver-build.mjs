@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, lstatSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { resolve, relative, dirname } from 'node:path';
+import { resolve, relative, dirname, basename } from 'node:path';
 import { build, version as esbuildVersion } from 'esbuild';
 import { parse } from 'acorn';
 import { analyze } from 'eslint-scope';
@@ -33,6 +33,19 @@ function declarations(ast) { return ast.body.flatMap(raw => { const node = sourc
     return node.declarations.map(binding => ({ name: binding.id.name, kind: node.kind, node: binding, declaration: node })); if (['FunctionDeclaration', 'ClassDeclaration'].includes(node.type))
     return [{ name: node.id.name, kind: node.type === 'FunctionDeclaration' ? 'function' : 'class', node, declaration: node }]; return []; }); }
 function uniqueTopFunction(ast, name) { const matches = ast.body.map(sourceDeclaration).filter(node => node?.type === 'FunctionDeclaration' && node.id.name === name); requireContract(matches.length === 1, 'expected one top-level function ' + name); return matches[0]; }
+function ownedRegularFile(root, name) {
+    const directory = lstatSync(root);
+    requireContract(directory.isDirectory() && !directory.isSymbolicLink(), 'input parent must be an owned directory');
+    requireContract(/^[\w.-]+$/.test(name) && !['.', '..'].includes(name), 'input filename must be owned');
+    const path = resolve(root, name), entry = lstatSync(path);
+    requireContract(entry.isFile() && !entry.isSymbolicLink(), 'input must be a regular owned file: ' + name);
+    return path;
+}
+export function readDriverContract(contractPath) {
+    const bytes = readFileSync(ownedRegularFile(dirname(contractPath), basename(contractPath))), text = bytes.toString('utf8');
+    requireContract(Buffer.from(text, 'utf8').equals(bytes), 'contract must be valid UTF-8');
+    return { bytes, contract: JSON.parse(text) };
+}
 function factoryBindings(ast, factory, locals) {
     rejectDynamicScope(ast);
     const manager = analyze(ast, { ecmaVersion: 2022, sourceType: ast.sourceType, optimistic: false, ignoreEval: false });
@@ -64,14 +77,13 @@ function factoryBindings(ast, factory, locals) {
     return bindings;
 }
 export function inspectSourceGraph(sourceRoot, contract) {
-    requireContract(!lstatSync(sourceRoot).isSymbolicLink(), 'source directory must not be a symlink');
+    requireContract(lstatSync(sourceRoot).isDirectory() && !lstatSync(sourceRoot).isSymbolicLink(), 'source directory must be an owned directory');
     requireContract(contract.schema === 1 && Array.isArray(contract.modules) && new Set(contract.modules).size === contract.modules.length, 'invalid module registry');
     requireContract(contract.modules.includes(contract.entry), 'entry must be tracked by registry');
     const globals = new Map(), inputs = {}, asts = new Map(), edges = {};
     for (const module of contract.modules) {
         requireContract(/^[a-z][a-z-]*\.js$/.test(module), 'unsupported module path');
-        requireContract(!lstatSync(resolve(sourceRoot, module)).isSymbolicLink(), 'source module must not be a symlink');
-        const bytes = readFileSync(resolve(sourceRoot, module)), code = bytes.toString('utf8');
+        const bytes = readFileSync(ownedRegularFile(sourceRoot, module)), code = bytes.toString('utf8');
         requireContract(Buffer.from(code, 'utf8').equals(bytes), 'source module must be valid UTF-8: ' + module);
         const ast = parseJs(code, 'module');
         rejectDynamicScope(ast);
@@ -101,8 +113,12 @@ export function inspectSourceGraph(sourceRoot, contract) {
     for (const name of contract.partialPrefixFunctions)
         requireContract(globals.get(name)?.kind === 'function', 'prefix must name one owned function: ' + name);
     requireContract(new Set(contract.partialPrefixFunctions).size === contract.partialPrefixFunctions.length, 'duplicate prefix function');
-    for (const name of Object.values(contract.adjacentDeclarations))
+    requireContract(Array.isArray(contract.adjacentDeclarations), 'function adjacency registry required');
+    assert.deepEqual(contract.adjacentDeclarations, [{ after: 'demoAlert', move: 'onResults' }, { after: 'updateChart', move: 'triggerPWAInstall' }], 'owned function adjacency registry changed');
+    for (const name of contract.adjacentDeclarations.flatMap(pair => Object.values(pair)))
         requireContract(globals.get(name)?.kind === 'function', 'adjacency must name owned functions');
+    assert.deepEqual(contract.registrationBoundary, { binding: 'feedbackForm', handler: 'handleVisibilityChange', event: 'visibilitychange' }, 'owned registration boundary changed');
+    requireContract(globals.get(contract.registrationBoundary.handler)?.kind === 'function', 'registration boundary must name an owned function');
     for (const [name, coordinator] of Object.entries(contract.lifecycle.aliases)) {
         const binding = globals.get(name);
         requireContract(binding?.kind === 'const' && binding.node.init?.type === 'Identifier' && binding.node.init.name === coordinator, 'readonly coordinator alias changed: ' + name);
@@ -221,9 +237,19 @@ function assertSourceIdentity(graph, ast) {
             assert.deepEqual(canonical(binding.node), canonical(source.node), `Source declaration identity changed: ${binding.name}`);
     }
 }
+function ownedVisibilityRegistration(ast, contract) {
+    const boundary = contract.registrationBoundary;
+    const matches = ast.body.filter(node => {
+        const call = node.type === 'ExpressionStatement' ? node.expression : null, callback = call?.arguments?.[1];
+        const invoke = callback?.body?.type === 'BlockStatement' && callback.body.body.length === 1 ? callback.body.body[0]?.expression : null;
+        return call?.type === 'CallExpression' && call.callee.type === 'MemberExpression' && !call.callee.computed && call.callee.object?.name === 'document' && call.callee.property?.name === 'addEventListener' && call.arguments.length === 2 && call.arguments[0]?.value === boundary.event && callback.type === 'ArrowFunctionExpression' && callback.params.length === 0 && invoke?.type === 'UnaryExpression' && invoke.operator === 'void' && invoke.argument?.type === 'CallExpression' && invoke.argument.callee?.name === boundary.handler && invoke.argument.arguments.length === 0;
+    });
+    requireContract(matches.length === 1, 'unique owned foreground registration required');
+    return matches[0];
+}
 function assertExecutableMarkers(ast, code, contract, bindings) {
-    requireContract(Array.isArray(contract.markerRules) && contract.markerRules.length === 9 && new Set(contract.markerRules.map(rule => rule.role)).size === 9, 'complete executable marker registry required');
-    const requiredOwners = [['alert-state', 'variable', '_ac'], ['local-start', 'local-function', 'start'], ['local-stop', 'local-function', 'stop'], ['local-capture', 'capture', 'startLocalSession'], ['demo-function', 'function', 'demoAlert'], ['results-boundary', 'function', 'onResults'], ['feedback-registration', 'variable', 'feedbackForm'], ['partial-startup', 'variable', 'recalBtn'], ['core-capability', 'variable', 'startupCore']];
+    requireContract(Array.isArray(contract.markerRules) && contract.markerRules.length === 11 && new Set(contract.markerRules.map(rule => rule.role)).size === 11, 'complete executable marker registry required');
+    const requiredOwners = [['alert-state', 'variable', '_ac'], ['local-start', 'local-function', 'start'], ['local-stop', 'local-function', 'stop'], ['local-capture', 'capture', 'startLocalSession'], ['demo-function', 'function', 'demoAlert'], ['results-boundary', 'function', 'onResults'], ['feedback-registration', 'variable', 'feedbackForm'], ['partial-startup', 'variable', 'recalBtn'], ['core-capability', 'variable', 'startupCore'], ['chart-boundary', 'function', 'triggerPWAInstall'], ['foreground-handler', 'function', 'handleVisibilityChange']];
     assert.deepEqual(contract.markerRules.map(({ role, kind, name }) => [role, kind, name]), requiredOwners, 'Executable marker ownership registry changed');
     for (const rule of contract.markerRules) {
         let node;
@@ -248,6 +274,12 @@ function assertExecutableMarkers(ast, code, contract, bindings) {
     requireContract(feedback?.node.init?.type === 'CallExpression' && feedback.node.init.callee?.object?.name === 'document' && feedback.node.init.callee?.property?.name === 'getElementById' && feedback.node.init.arguments[0]?.value === 'feedbackForm' && follower?.type === 'IfStatement' && follower.test?.name === 'feedbackForm' && follower.consequent?.expression?.callee?.object?.name === 'feedbackForm' && follower.consequent.expression.arguments[0]?.value === 'submit', 'feedback marker must own the actual form registration');
     const audio = declarations(ast).find(binding => binding.name === '_ac');
     requireContract(audio?.node.init?.type === 'Literal' && audio.node.init.value === null, 'audio state marker must own the nullable context');
+    for (const pair of contract.adjacentDeclarations) {
+        const after = uniqueTopFunction(ast, pair.after), move = uniqueTopFunction(ast, pair.move);
+        requireContract(ast.body[ast.body.indexOf(after) + 1] === move, 'owned function adjacency changed');
+    }
+    const handler = uniqueTopFunction(ast, contract.registrationBoundary.handler), registration = ownedVisibilityRegistration(ast, contract);
+    requireContract(ast.body[index + 2] === handler && ast.body[index + 3] === registration, 'foreground handler must immediately follow actual feedback and precede its registration');
 }
 function normalizedProgram(ast) { return { initializers: ast.body.filter(node => node.type !== 'FunctionDeclaration').map(canonical), functions: ast.body.filter(node => node.type === 'FunctionDeclaration').map(canonical).sort((a, b) => a.id.name.localeCompare(b.id.name)) }; }
 export function formatDriverBundle(stock, graph, contract) {
@@ -277,11 +309,20 @@ export function formatDriverBundle(stock, graph, contract) {
     const expectedCode = applyEdits(stock, [...alphaEdits(before, bindings), ...before.body.filter(node => node.type === 'VariableDeclaration').map(node => ({ start: node.start, end: node.start + 3, text: graph.globals.get(node.declarations[0].id.name).kind }))]);
     const expected = parseJs(expectedCode, 'script');
     let code = applyEdits(stock, edits), ast = parseJs(code, 'script');
-    const anchor = uniqueTopFunction(ast, contract.adjacentDeclarations.after), moving = uniqueTopFunction(ast, contract.adjacentDeclarations.move);
-    requireContract(moving.start > anchor.end, 'unexpected adjacency declaration order');
-    const text = code.slice(moving.start, moving.end);
-    code = code.slice(0, moving.start) + code.slice(moving.end);
-    code = code.slice(0, anchor.end) + '\n' + text + code.slice(anchor.end);
+    for (const pair of contract.adjacentDeclarations) {
+        const anchor = uniqueTopFunction(ast, pair.after), moving = uniqueTopFunction(ast, pair.move);
+        requireContract(moving.start > anchor.end, 'unexpected adjacency declaration order');
+        const text = code.slice(moving.start, moving.end);
+        code = code.slice(0, moving.start) + code.slice(moving.end);
+        code = code.slice(0, anchor.end) + '\n' + text + code.slice(anchor.end);
+        ast = parseJs(code, 'script');
+    }
+    const movingHandler = uniqueTopFunction(ast, contract.registrationBoundary.handler), handlerText = code.slice(movingHandler.start, movingHandler.end);
+    code = code.slice(0, movingHandler.start) + code.slice(movingHandler.end);
+    ast = parseJs(code, 'script');
+    const registration = ownedVisibilityRegistration(ast, contract), feedbackBinding = declarations(ast).find(binding => binding.name === contract.registrationBoundary.binding), feedbackIndex = ast.body.indexOf(feedbackBinding?.declaration);
+    requireContract(feedbackIndex >= 0 && ast.body[feedbackIndex + 1]?.type === 'IfStatement' && ast.body[feedbackIndex + 2] === registration, 'foreground registration must immediately follow actual feedback');
+    code = code.slice(0, registration.start) + '\n' + handlerText + '\n' + code.slice(registration.start);
     ast = parseJs(code, 'script');
     const marker = contract.newlineBeforeBindingFollower, indices = ast.body.flatMap((node, index) => node.type === 'VariableDeclaration' && node.declarations.some(decl => decl.id.name === marker.binding) ? [index] : []);
     requireContract(indices.length === 1 && ast.body[indices[0] + 1]?.type === marker.follower, 'binding/follower boundary changed');
@@ -308,12 +349,11 @@ export function formatDriverBundle(stock, graph, contract) {
     return { code, proof: { compiledSha256: hash(code), compiledBytes: Buffer.byteLength(code), initializerOrderExact: true, functionBodiesExact: true, sourceFunctionIdentityExact: true, sourceInitializersExact: true, sourceEffectOrderExact: true, serializedUtf8Exact: true, executableMarkersOwned: true, resolvedLifecycleAlpha: bindings.map(binding => ({ from: binding.bound.name, to: binding.desired, references: binding.bound.references.length })), partialPrefixFunctions: prefix.map(node => node.id.name), literalMarkers: contract.requiredLiterals.length } };
 }
 export async function buildDriverArtifact({ sourceRoot, contractPath }) {
-    const contractBytes = readFileSync(contractPath), contractText = contractBytes.toString('utf8');
-    requireContract(Buffer.from(contractText, 'utf8').equals(contractBytes), 'contract must be valid UTF-8');
-    const contract = JSON.parse(contractText), graph = inspectSourceGraph(sourceRoot, contract);
+    const { bytes: contractBytes, contract } = readDriverContract(contractPath);
+    const lockBytes = readFileSync(ownedRegularFile(dirname(contractPath), 'package-lock.json')), graph = inspectSourceGraph(sourceRoot, contract);
     const result = await build({ ...compilerOptions, absWorkingDir: sourceRoot, entryPoints: [contract.entry] });
     const compiledInputs = Object.keys(result.metafile.inputs).map(path => relative(sourceRoot, resolve(sourceRoot, path)).replaceAll('\\', '/')).sort();
     assert.deepEqual(compiledInputs, [...contract.modules].sort(), 'Compiler read an untracked source input');
     const stock = result.outputFiles[0].text, formatted = formatDriverBundle(stock, graph, contract);
-    return { ...formatted, stock, provenance: { esbuildVersion, compilerOptions, sourceInputs: graph.inputs, dependencyEvaluationEdges: graph.edges, moduleEvaluationOrder: graph.executionModules, contractSha256: hash(contractBytes), stockSha256: hash(stock), adapterSha256: hash(readFileSync(new URL(import.meta.url))), packageLockSha256: hash(readFileSync(resolve(dirname(contractPath), 'package-lock.json'))) } };
+    return { ...formatted, stock, provenance: { esbuildVersion, compilerOptions, sourceInputs: graph.inputs, dependencyEvaluationEdges: graph.edges, moduleEvaluationOrder: graph.executionModules, contractSha256: hash(contractBytes), stockSha256: hash(stock), adapterSha256: hash(readFileSync(new URL(import.meta.url))), packageLockSha256: hash(lockBytes) } };
 }

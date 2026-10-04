@@ -58,10 +58,16 @@
     "saveLocalSessionHistory",
     "setMonitoringUi"
   ],
-  "adjacentDeclarations": {
-    "after": "demoAlert",
-    "move": "onResults"
-  },
+  "adjacentDeclarations": [
+    {
+      "after": "demoAlert",
+      "move": "onResults"
+    },
+    {
+      "after": "updateChart",
+      "move": "triggerPWAInstall"
+    }
+  ],
   "newlineBeforeBindingFollower": {
     "binding": "feedbackForm",
     "follower": "IfStatement"
@@ -92,7 +98,9 @@
     "\nfunction onResults",
     "const feedbackForm=document.getElementById('feedbackForm');\nif(feedbackForm)feedbackForm.addEventListener",
     "const recalBtn=",
-    "const startupCore=Object.freeze"
+    "const startupCore=Object.freeze",
+    "\nfunction triggerPWAInstall",
+    "\nasync function handleVisibilityChange"
   ],
   "provenance": "Declarations are derived from these real module files. Prefix names encode reviewed partial-startup prerequisites; short literal markers encode unchanged runnable excerpt contracts. No published driver implementation is an adapter input.",
   "markerRules": [
@@ -150,6 +158,25 @@
       "kind": "variable",
       "name": "startupCore",
       "literal": "const startupCore=Object.freeze"
+    },
+    {
+      "role": "chart-boundary",
+      "kind": "function",
+      "name": "triggerPWAInstall",
+      "literal": "\nfunction triggerPWAInstall",
+      "leadingNewline": true
+    },
+    {
+      "role": "foreground-handler",
+      "kind": "function",
+      "name": "handleVisibilityChange",
+      "literal": "\nasync function handleVisibilityChange",
+      "leadingNewline": true
     }
-  ]
+  ],
+  "registrationBoundary": {
+    "binding": "feedbackForm",
+    "handler": "handleVisibilityChange",
+    "event": "visibilitychange"
+  }
 }

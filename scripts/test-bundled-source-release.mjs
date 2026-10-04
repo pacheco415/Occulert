@@ -74,3 +74,17 @@ test('broken module compilation and public source configuration fail before rele
   writeFileSync(path, original); writeFileSync(join(cwd, '.vercelignore'), read(cwd, '.vercelignore').replace('source-driver-contract.json\n', ''));
   assert.throws(() => auditSourceAssets(cwd), /exclude source-driver-contract/);
 }));
+
+test('actual builder rejects a linked contract in normal and override-staging modes before output', () => fixture(cwd => {
+  const path = join(cwd, 'source-driver-contract.json'), original = readFileSync(path), external = join(cwd, 'external-contract.json');
+  writeFileSync(external, original); rmSync(path); symlinkSync(external, path);
+  const before = snapshot(cwd);
+  for (const args of [['--stdout'], ['--stdout', '--overrides']]) {
+    let failure;
+    try { execFileSync(process.execPath, [join(cwd, 'scripts/build-driver.mjs'), ...args], { cwd, input: '{}', encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }); } catch (error) { failure = error; }
+    assert.ok(failure, 'actual builder must reject the contract link');
+    assert.match(String(failure.stderr), /regular owned file: source-driver-contract.json/);
+    assert.equal(String(failure.stdout), '');
+    assert.deepEqual(snapshot(cwd), before);
+  }
+}));
