@@ -3,10 +3,10 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import { PGlite } from '@electric-sql/pglite';
+import { initializeTestSchema } from './lib/test-schema.mjs';
 
 // Isolated PostgreSQL roles and fixture identities, never a deployed database.
 const db = new PGlite();
-const schema = readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8').replace('create extension if not exists "pgcrypto";', '');
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const ownerA = id(1), ownerB = id(2), driverA = id(3), driverB = id(4), unassigned = id(5), fleetA = id(11), fleetB = id(12), profileA = id(13), profileB = id(14), sessionA = id(23), sessionB = id(24);
 const tables = ['fleets', 'drivers', 'sessions', 'events', 'fleet_invitations', 'pilot_leads'];
@@ -17,10 +17,10 @@ async function asUser(user, expected) {
   await db.exec('reset role');
 }
 try {
-  await db.exec(`create schema auth; create role anon; create role authenticated; create role service_role bypassrls;
-    create table auth.users(id uuid primary key);
-    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;`);
-  await db.exec(schema);
+  const replayed = await initializeTestSchema(db);
+  assert.ok(replayed.includes('20260929010000_billing_ignored_webhook_events.sql'));
+  const unsecured = await db.query("select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and not c.relrowsecurity");
+  assert.deepEqual(unsecured.rows, [], 'every replayed public table must enable RLS');
   await db.exec(`grant usage on schema public,auth to anon,authenticated,service_role;
     grant select,insert,update,delete on all tables in schema public to anon,authenticated,service_role;
     insert into auth.users values ('${ownerA}'),('${ownerB}'),('${driverA}'),('${driverB}'),('${unassigned}');
@@ -100,6 +100,7 @@ try {
   assert.equal((await db.query('select name,fleet_id from drivers where user_id=$1', [driverB])).rows[0].name, 'B');
   assert.equal((await db.query('select name,fleet_id from drivers where user_id=$1', [driverB])).rows[0].fleet_id, fleetB);
 
-  const policyCount = Number((await db.query("select count(*) as n from pg_policies where schemaname='public'")).rows[0].n); assert.equal(policyCount, 6);
+  const policyCount = Number((await db.query("select count(*) as n from pg_policies where schemaname='public' and tablename in ('fleets','drivers','sessions','events','fleet_invitations','pilot_leads')")).rows[0].n); assert.equal(policyCount, 6);
+  console.log(`Replayed ${replayed.length} migrations before tenant boundaries.`);
   console.log('Tenant/RLS PostgreSQL fixtures passed: two owners, two members, unassigned/anonymous identities, closed writes and PII tables, invitation identity/one-time/assignment boundaries and concurrent profile recovery.');
 } finally { await db.close(); }

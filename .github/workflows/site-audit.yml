@@ -14,17 +14,23 @@ concurrency:
 
 jobs:
   audit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Verify asset lineage against the actual PR head
+        if: github.event_name == 'pull_request'
+        env:
+          ASSET_LINEAGE_HEAD: ${{ github.event.pull_request.head.sha }}
+          ASSET_LINEAGE_BASE: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/audit-asset-lineage.mjs
       - name: Audit every site change
         run: npm run audit:site
       - run: npm run verify
