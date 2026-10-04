@@ -1,12 +1,7 @@
 {
-  "observedAt": "2026-10-04T16:51:58Z",
+  "observedAt": "2026-10-04T17:07:15Z",
   "complete": true,
   "pullRequests": [
-    {
-      "number": 247,
-      "headRefName": "dependabot/npm_and_yarn/native-app/kingstinct/react-native-healthkit-14.1.0",
-      "isDraft": false
-    },
     {
       "number": 246,
       "headRefName": "codex/vision-camera-compatibility-plan",

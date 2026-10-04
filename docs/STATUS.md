@@ -2,8 +2,8 @@
 
 These are dated snapshots. Source, deployment, build availability and device tests are separate.
 
-- Inspected source (origin/main): `7e73967cdf7237b440fb41075e546f9a5e86178c`.
-- Source commit date: 2026-10-04T09:48:53-07:00.
+- Inspected source (origin/main): `3198c8e7dfef45c6915bf5c992d7624346d7a5ac`.
+- Source commit date: 2026-10-04T10:01:49-07:00.
 
 - Production website: `7b61530065b925cd0d58c60d7772f975b72bc5da`.
 - Deployment: dpl_FJteCFD9JBeQ3pJeDFRCuUeuEk3N, READY; created 2026-10-04T16:37:18.513Z.
@@ -21,7 +21,7 @@ These are dated snapshots. Source, deployment, build availability and device tes
   - native-app/hooks/useAlertAudioPlayer.ts
   - 4 more; inspect the source comparison before preparing a binary.
 
-- Open PRs (2026-10-04T16:51:58Z): 8 total; 7 Codex, 1 Dependabot, 0 other; 1 draft.
+- Open PRs (2026-10-04T17:07:15Z): 7 total; 7 Codex, 0 Dependabot, 0 other; 1 draft.
 - Production migrations (2026-10-04): unknown. Read-only production ledger lookup failed PostgreSQL authentication (28P01); PRs #192 and #206 remain gated.
 
 Next steps:
