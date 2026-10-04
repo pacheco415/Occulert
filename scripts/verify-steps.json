@@ -63,7 +63,9 @@
     "test:native-session-completion",
     "test:cloud-summary-presentation",
     "audit:asset-sizes",
-    "test:migration-readiness"
+    "test:migration-readiness",
+    "test:asset-lineage",
+    "test:workflow-policy"
   ],
   "additionalChecks": [
     "test:verify-runner"
