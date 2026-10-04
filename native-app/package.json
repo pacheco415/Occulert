@@ -11,17 +11,18 @@
     "postinstall": "node ./scripts/patch-watch-connectivity.mjs && node ./scripts/patch-query-decoder.mjs",
     "check:dependencies": "expo install --check",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run check:dependencies && npm run typecheck && npm run test:dependencies",
+    "verify": "npm run check:dependencies && npm run typecheck && npm run test:dependencies && npm run test:audio-lifecycle",
     "build:dev": "eas build --profile development --platform ios",
     "build:ios": "eas build --platform ios",
     "build:android": "eas build --platform android",
     "submit:ios": "eas submit -p ios",
-    "test:dependencies": "node --test scripts/test-dependency-compatibility.mjs"
+    "test:dependencies": "node --test scripts/test-dependency-compatibility.mjs",
+    "test:audio-lifecycle": "node --test scripts/test-audio-lifecycle.mjs"
   },
   "dependencies": {
     "@bacons/apple-targets": "5.0.0",
     "@expo/vector-icons": "^15.0.3",
-    "@kingstinct/react-native-healthkit": "14.0.2",
+    "@kingstinct/react-native-healthkit": "14.1.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.26",
     "expo-asset": "~57.0.16",
@@ -54,6 +55,7 @@
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@types/react": "~19.2.2",
+    "react-test-renderer": "19.2.3",
     "typescript": "~6.0.3"
   },
   "private": true,
