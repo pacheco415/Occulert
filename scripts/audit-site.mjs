@@ -397,6 +397,8 @@ if (staticAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the exp
 if (!networkOnlyAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the passkey client must be listed as a network-only asset");
 if (staticAssets.includes(`'/${assetByStem('supabase-loader.js')}'`)) fail("the resilient Supabase loader must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes(`'/${assetByStem('supabase-loader.js')}'`)) fail("the resilient Supabase loader must be listed as a network-only asset");
+if (staticAssets.includes("'/vendor/supabase-2.112.3.js'")) fail("the owned Supabase SDK must not be stored in the offline static cache");
+if (!networkOnlyAssets.includes("'/vendor/supabase-2.112.3.js'")) fail("the owned Supabase SDK must be listed as a network-only asset");
 assertIncludes("privacy.html", "passkey private key stay with your device", "privacy terms must disclose that Occulert does not receive passkey private keys or biometrics");
 assertIncludes("privacy.html", 'aria-label="Privacy and data controls"', "privacy terms must expose a clear data-controls navigation landmark");
 assertIncludes("privacy.html", 'id="local-history"', "privacy terms must explain native local history and recovery data");

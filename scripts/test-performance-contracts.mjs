@@ -612,7 +612,7 @@ test('network-only account scripts time out without exposing cached auth and pre
     respondWith: promise => { responsePromise = promise; },
     waitUntil: () => { lifetimeUpdates++; },
   });
-  for (const path of ['/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', `/${assetByStem('occulert-backend.js')}`, `/${assetByStem('auth-helper.js')}`, `/${assetByStem('passkey-auth.js')}`, `/${assetByStem('passwordless-auth.js')}`, `/${assetByStem('supabase-loader.js')}`]) {
+  for (const path of ['/vendor/supabase-2.112.3.js', '/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', `/${assetByStem('occulert-backend.js')}`, `/${assetByStem('auth-helper.js')}`, `/${assetByStem('passkey-auth.js')}`, `/${assetByStem('passwordless-auth.js')}`, `/${assetByStem('supabase-loader.js')}`]) {
     const old = deferred();
     network = () => old.promise;
     dispatch(path);
