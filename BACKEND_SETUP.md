@@ -174,3 +174,19 @@ for the existing project before enabling fleet onboarding.
 - [x] Manager-scoped session and event history excludes GPS, personal media, and raw motion
 - [ ] Protected session-history deployment and signed-in manager verification
 - [ ] Optional custom SMTP configured only if pilot volume outgrows Supabase's built-in sender
+
+### Shared provider time allowance and diagnostics
+
+Every API entry point creates one monotonic 12-second provider allowance, isolated per request. Nested consolidated routes reuse that allowance. Supabase authentication, REST/admin operations, Stripe test requests and the pilot-lead fallback webhook use the smaller of their existing per-call timeout and the remaining allowance. Optional stored-lead notification also uses the smaller of three seconds and the remaining allowance, and is skipped after exhaustion without failing a stored lead. A later provider mutation is not sent after exhaustion. Supabase and Stripe deadlines cover response bodies and ignore late completion; the fallback webhook also settles by its deadline when fetch ignores abort. Mutations are never retried automatically. This bounds provider waiting, not arbitrary application CPU work or the complete Vercel invocation. Existing response shapes remain unchanged.
+
+Responses include a generated `X-Occulert-Request-ID`. Failed server responses and unhandled exceptions emit a small JSON diagnostic with that ID, bounded status, elapsed milliseconds and an unhandled flag. Diagnostics omit request URLs, headers, bodies, identity, provider response details and exception messages. Use the response ID to locate a failure without collecting driver information. A timeout may follow a committed provider mutation; use the existing idempotent finalization behavior before retrying.
+
+### Repeat-safe session starts
+
+`POST /api/sessions` accepts an optional client-generated UUID in `session_id`. The server stores it as the existing session primary key and derives driver and fleet identity from the authenticated profile. Repeating that UUID returns the original owned session, including its original timestamps, provenance, historical fleet and any completed summary. A competing insert is reconciled by an owner-scoped read; a UUID occupied by another driver's session returns `409 session_id_conflict` without exposing the other row. Invalid supplied IDs return `400 invalid_session_id`. Omitting the field preserves server-generated IDs.
+
+Successful responses advertise `session_start_protocol: "client_uuid_v1"`. This server change does not enable automatic client retries or persist start intents. Clients must establish deployment support before retrying starts: older deployments ignore the supplied UUID and would create duplicates. Database exceptions other than UUID conflicts remain failures; the server never retries an insert automatically. No new migration is required.
+
+## Optional stored-lead notification
+
+Leave `LEAD_NOTIFY_WEBHOOK_URL` unset to keep notifications disabled. Configure it only with an authorized HTTPS email, Slack or Zapier webhook destination. After a successful Supabase insert the server sends only the event type, server-derived source, received timestamp and lead ID. It never forwards name, email, phone, company or message to this optional destination. The lead ID remains linkable metadata and should be treated as private. Redirects and URL credentials are rejected. Delivery is best effort, bounded to three seconds, and failure does not fail the stored lead submission. This is separate from the existing contact-data storage fallback webhook.
