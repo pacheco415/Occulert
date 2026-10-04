@@ -1,9 +1,10 @@
+import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const dashboard = readFileSync(new URL('../fleet-dashboard.html', import.meta.url), 'utf8');
+const dashboard = fleetDashboardContract();
 const start = dashboard.indexOf('/* pilot-launch-checklist:start */');
 const end = dashboard.indexOf('/* pilot-launch-checklist:end */');
 assert.ok(start >= 0 && end > start, 'pilot launch checklist block must be present');

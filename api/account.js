@@ -2,22 +2,17 @@
 // The service-role key is used only on the server after the bearer token has
 // been verified. The browser must send { confirm: "DELETE" } deliberately.
 
+const { hasRecentAuthentication } = require("./_lib/recent-auth");
 const supabaseLib = require("./_lib/supabase");
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const deleteAuthUser = supabaseLib.deleteAuthUser;
 const bearerToken = supabaseLib.bearerToken;
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { validJsonBody } = require("./_lib/validation");
+const { json } = require("./_lib/responses");
 
 function validBody(request) {
-  if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = request.body && typeof request.body === "object" && !Array.isArray(request.body) ? request.body : {};
-  return JSON.stringify(body).length <= 256 && body.confirm === "DELETE";
+  return validJsonBody(request, 256) && request.body.confirm === "DELETE";
 }
 
 module.exports = async function handler(request, response) {
@@ -32,8 +27,10 @@ module.exports = async function handler(request, response) {
   if (!validBody(request)) return json(response, 400, { ok: false, error: "confirmation_required" });
 
   try {
-    const user = await verifyAccessToken(bearerToken(request));
+    const accessToken = bearerToken(request);
+    const user = await verifyAccessToken(accessToken);
     if (!user || !user.id) return json(response, 401, { ok: false, error: "unauthorized" });
+    if (!hasRecentAuthentication(accessToken, user)) return json(response, 401, { ok: false, error: "reauth_required" });
     // Database foreign keys perform cleanup in the Auth deletion transaction.
     // Never pre-delete rows: any constraint/storage failure must roll back all data.
     await deleteAuthUser(user.id);
@@ -42,3 +39,5 @@ module.exports = async function handler(request, response) {
     return json(response, 502, { ok: false, error: "account_deletion_failed" });
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

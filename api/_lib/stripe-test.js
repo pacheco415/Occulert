@@ -1,6 +1,7 @@
 // Stripe test-mode REST and webhook helpers. This module deliberately refuses
 // live keys; enabling real payments requires a separate review and migration.
 const crypto = require("node:crypto");
+const { remainingProviderMs } = require("./provider-budget");
 
 const API_ORIGIN = "https://api.stripe.com";
 const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -74,8 +75,16 @@ async function stripeRequest(path, options) {
   if (!/^\/v1\/[A-Za-z0-9_/?=&.%\-]+$/.test(path)) {
     throw new Error("invalid_stripe_path");
   }
+  const timeoutMs = remainingProviderMs(8000);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  let timer;
+  const expired = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error("stripe_timeout"); error.status = 504;
+      reject(error); controller.abort();
+    }, timeoutMs);
+  });
+  const operation = (async () => {
   try {
     const method = opts.method || "GET";
     const headers = { Authorization: "Bearer " + cfg.secretKey };
@@ -87,6 +96,8 @@ async function stripeRequest(path, options) {
       body: opts.fields ? new URLSearchParams(opts.fields).toString() : undefined,
       signal: controller.signal,
     });
+    // The hard deadline already settled the caller; discard late headers.
+    if (controller.signal.aborted) return;
     const responseText = await response.text();
     if (Buffer.byteLength(responseText) > MAX_RESPONSE_BYTES) throw new Error("stripe_response_too_large");
     let data;
@@ -114,6 +125,8 @@ async function stripeRequest(path, options) {
   } finally {
     clearTimeout(timer);
   }
+  })();
+  return Promise.race([operation, expired]);
 }
 
 async function requireMonthlyTestPrice(priceId) {

@@ -6,14 +6,9 @@ const supabaseLib = require("./_lib/supabase");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { isUuid } = require("./_lib/validation");
 
-function json(response, status, body) {
-response.statusCode = status;
-response.setHeader("Content-Type", "application/json; charset=utf-8");
-response.setHeader("Cache-Control", "no-store");
-response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function shouldIncludeEvents(request) {
 let value = request.query && request.query.include_events;
@@ -73,8 +68,8 @@ const rosterLookupMs = Date.now() - rosterStartedAt;
 
 const includeEvents = shouldIncludeEvents(request);
 const sessionIds = sessions
-.map(function (session) { return String(session.id || ""); })
-.filter(function (id) { return UUID_PATTERN.test(id); });
+.map(function (session) { return session.id; })
+.filter(isUuid);
 let events = [];
 const eventsStartedAt = Date.now();
 if (includeEvents && sessionIds.length) {
@@ -124,3 +119,5 @@ includes_raw_motion: false,
 return json(response, 502, { ok: false, error: "supabase_error" });
 }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

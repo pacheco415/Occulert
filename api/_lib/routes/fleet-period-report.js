@@ -3,12 +3,10 @@
 const { pgFetch, verifyAccessToken, bearerToken } = require('../supabase');
 const { isUuid, validTimestamp } = require('../fleet-history-cursor');
 
+const { json: sendJson } = require("../responses");
 function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader('Content-Type', 'application/json; charset=utf-8');
-  response.setHeader('Cache-Control', 'no-store');
-  response.setHeader('Vary', 'Authorization');
-  response.end(JSON.stringify(body));
+  response.setHeader("Vary", "Authorization");
+  return sendJson(response, status, body);
 }
 
 function requestedDays(request) {
@@ -95,3 +93,5 @@ module.exports = async function handler(request, response) {
 };
 
 module.exports.validReport = validReport;
+
+module.exports = require("../provider-budget").withProviderBudget(module.exports);

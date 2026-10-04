@@ -8,12 +8,12 @@
   <meta name="robots" content="noindex">
   <meta name="theme-color" content="#0a0e1a">
   <link rel="canonical" href="https://www.occulert.com/fleet-history.html">
-  <link rel="stylesheet" href="/portal.v47.css">
+  <link rel="stylesheet" href="/portal.v49.css">
   <link rel="stylesheet" href="/accessibility.v52.css">
   <link rel="stylesheet" href="/fleet-history-page.v67.css">
   <script defer src="/security-utils.v47.js"></script>
-  <script defer src="/occulert-backend.v69.js"></script>
-  <script defer src="/fleet-history-page.v68.js"></script>
+  <script defer src="/occulert-backend.v79.js"></script>
+  <script defer src="/fleet-history-page.v71.js"></script>
 </head>
 <body class="portal-page fleet-history-page">
   <a class="skip-link" href="#main-content">Skip to session history</a>
@@ -80,7 +80,8 @@
           <div class="history-filter-field"><label for="historyTo">To date</label><input id="historyTo" type="date" aria-describedby="historyDateHelp historyDateStatus"></div>
         </div>
         <p class="history-date-status" id="historyDateStatus" role="status" aria-live="polite"></p>
-        <p class="muted" id="historyFilterHelp">Driver and start-date filters search the whole protected fleet before loading a page. Recorded end status and sorting apply to loaded matching records; load older pages to expand those views. Account changes or leaving this page clear filters.</p>
+        <p class="muted" id="historyFilterHelp">Driver and start-date filters search the whole protected fleet before loading a page. Recorded end status and sorting apply to loaded matching records; load older pages to expand those views. Account changes clear the active view and its saved preferences. Leaving this page clears protected records; date, end status and sort can be restored after fleet access is verified again.</p>
+        <p class="muted" id="historyPreferenceStatus" role="status">Date, end status and sort are remembered on this device for your account and fleet. Driver selection is not saved. Clear filters removes saved preferences.</p>
         <p class="muted" id="historyDateHelp">Recent periods include today and the preceding 6 or 29 local calendar days, through the time you apply the filter. Custom dates include each selected local day; either boundary can be left open, but enter at least one date. Future starts are excluded from date ranges. Sorting applies to loaded records; loading older sessions continues in the server’s newest-first order. Missing sort values appear last. Completed means a valid end was recorded; it does not verify client reports.</p>
       </fieldset>
       <p class="history-matches" id="historyMatches" role="status" aria-live="polite" aria-atomic="true">Verify fleet ownership to filter loaded sessions.</p>

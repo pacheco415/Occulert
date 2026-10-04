@@ -5,12 +5,10 @@ const CUSTOMER_RE = /^cus_[A-Za-z0-9]+$/;
 const SUBSCRIPTION_RE = /^sub_[A-Za-z0-9]+$/;
 const EVENT_RE = /^evt_[A-Za-z0-9]+$/;
 
+const { json: sendJson } = require("./responses");
 function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
   response.setHeader("X-Content-Type-Options", "nosniff");
-  response.end(JSON.stringify(body));
+  return sendJson(response, status, body);
 }
 
 function methodOnly(request, response, method) {
