@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/liquid-glass.v49.css">
   <link rel="stylesheet" href="/form-controls.v63.css">
   <script src="/static-page.v60.js" defer></script>
+<script src="/page-actions.v2.js"></script>
 </head>
 <body>
   <div class="top">
@@ -47,7 +48,7 @@
         </div>
         <div class="notice"><strong>Safety and privacy:</strong> Set up and review Occulert while parked. It cannot make tired driving safe or replace rest and fleet policy. Your contact details are sent to Occulert's protected request endpoint and are not stored in this browser. Read the <a href="/privacy.html">privacy policy</a>.</div>
       </div>
-      <form class="card" id="pilotForm" onsubmit="saveLead(event)">
+      <form class="card" id="pilotForm" data-page-action="saveLead-event">
         <h2 id="formTitle">Request a conversation</h2>
         <p class="field-note" id="formIntro">This sends your interest to Occulert. It does not create an account, reserve a trial date or charge you.</p>
         <div class="field"><label for="name">Name</label><input id="name" name="name" autocomplete="name" maxlength="160" placeholder="Your name" required></div>
