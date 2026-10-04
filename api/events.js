@@ -4,6 +4,7 @@
 // SUPABASE_SERVICE_ROLE_KEY are configured. See BACKEND_SETUP.md.
 
 const supabaseLib = require("./_lib/supabase");
+const { validTimestamp, compareTimestamps } = require("./_lib/fleet-history-cursor");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
@@ -81,21 +82,28 @@ module.exports = async function handler(request, response) {
 
     const session = sessions[0];
     const now = Date.now();
-    const endedAt = session.ended_at ? Date.parse(session.ended_at) : null;
-    if (endedAt !== null && Number.isFinite(endedAt) && endedAt < now - 120000) {
+    const nowTimestamp = new Date(now).toISOString();
+    const startedAt = session.started_at;
+    const endedAt = session.ended_at;
+    if (!validTimestamp(startedAt) || (endedAt !== null && !validTimestamp(endedAt))) {
+      throw new Error("invalid_session_time");
+    }
+    if (endedAt !== null && compareTimestamps(endedAt, new Date(now - 120000).toISOString()) < 0) {
       return json(response, 409, { ok: false, error: "session_ended" });
     }
-    let occurredAt = new Date(now).toISOString();
+    const upperBound = endedAt !== null && compareTimestamps(endedAt, nowTimestamp) < 0 ? endedAt : nowTimestamp;
+    if (compareTimestamps(startedAt, upperBound) > 0) throw new Error("invalid_session_time");
+    // Legacy clients omit occurrence time. During the delivery grace, never
+    // stamp their event after the stored session end.
+    let occurredAt = upperBound;
     if (Object.hasOwn(body, "occurred_at")) {
-      const timestamp = typeof body.occurred_at === "string" ? Date.parse(body.occurred_at) : NaN;
-      const startedAt = Date.parse(session.started_at);
-      const upperBound = endedAt === null ? now : Math.min(endedAt, now);
-      if (!Number.isFinite(timestamp) || !Number.isFinite(startedAt)
-        || !/^\d{4}-\d{2}-\d{2}T/.test(body.occurred_at)
-        || timestamp < startedAt || timestamp > upperBound) {
+      const timestamp = body.occurred_at;
+      if (!validTimestamp(timestamp) || compareTimestamps(timestamp, startedAt) < 0
+        || compareTimestamps(timestamp, upperBound) > 0) {
         return json(response, 400, { ok: false, error: "invalid_occurred_at" });
       }
-      occurredAt = new Date(timestamp).toISOString();
+      // Keep accepted timezone and microsecond precision for Postgres.
+      occurredAt = timestamp;
     }
 
     const created = await pgFetch("events", {
