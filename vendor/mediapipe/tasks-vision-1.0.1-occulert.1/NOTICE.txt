@@ -1,0 +1,6 @@
+MediaPipe Tasks Vision 1.0.1 and Face Landmarker model bundle version 1
+Copyright Google LLC. Licensed under Apache License 2.0.
+Runtime bytes are unmodified. Emscripten notices are retained separately.
+Model authors and licenses: see model-card links in runtime-manifest.json.
+
+Occulert local modification (2026-10-03): replace the vision_bundle.js telemetry transport with a local callback. Inference code and model bytes remain upstream. The upstream bundle SHA-256 and modified byte pins are recorded in runtime-manifest.json.

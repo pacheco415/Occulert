@@ -257,6 +257,12 @@ if (read('app.html').indexOf(driverGuardMarkup) > read('app.html').indexOf('<lin
 assertIncludes('app.html', 'id="startupRetryLink" href="/app.html"', 'parked startup recovery must remain available without a guard script');
 assertIncludes('sw.js', 'const STARTUP_GUARD_ASSETS =', 'the owned startup guard must join integrity-verified offline installation');
 assertIncludes('sw.js', driverGuardIntegrity, 'the offline startup guard integrity must match its current bytes');
+const experimentHelperName = assetByStem('detection-experiments.js');
+const experimentHelperIntegrity = 'sha256-' + createHash('sha256').update(read(experimentHelperName)).digest('base64');
+assertIncludes(assetByStem('driver-app.js'), `const EXPERIMENT_HELPER_INTEGRITY='${experimentHelperIntegrity}';`, 'the on-demand experimental helper must retain its exact owned integrity');
+assertIncludes(assetByStem('driver-app.js'), `script.src='/${experimentHelperName}'`, 'the on-demand experimental helper must use its active owned URL');
+const helperWorkerPins = read('sw.js').match(/const EXPERIMENT_HELPER_ASSETS = \[[\s\S]*?\];/)?.[0];
+if (!helperWorkerPins?.includes('/' + experimentHelperName) || !helperWorkerPins.includes(experimentHelperIntegrity)) fail('the optional offline helper must have the same exact pin as its driver importer');
 const driverAppPage = read("app.html");
 if (/<script\b(?=[^>]*\bsrc=)[^>]*>/.test(driverAppPage) && [...driverAppPage.matchAll(/<script\b(?=[^>]*\bsrc=)[^>]*>/g)].some(([tag])=> !/\bdefer\b/.test(tag) || /\basync\b/.test(tag))) fail('driver scripts must preserve ordered, nonblocking startup');
 const driverAppDependencies = [`/${assetByStem('occulert-backend.js')}`, `/${assetByStem('security-utils.js')}`, `/${assetByStem('driver-app.js')}`].map((path) => driverAppPage.indexOf(`src=\"${path}\"`));

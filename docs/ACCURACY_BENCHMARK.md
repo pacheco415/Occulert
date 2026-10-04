@@ -262,3 +262,7 @@ Synthetic tests cover three-second timelines at 3/7/15 fps, trim/fallback math,
 bounded samples, reset conditions, device storage and a late save after preview
 cancellation. Licensed face/lighting/glasses data and physical native validation
 remain required before changing default alerts or enabling this in normal builds.
+
+## Opt-in parked geometry and timing experiments
+
+See [Parked detection experiments](PARKED_DETECTION_EXPERIMENTS.md) for the default-off pixel EAR reference conversion, time-supported PERCLOS, elapsed fatigue, pitch/no-face gates and paired Tasks measurements. Shared extractor/oracle and desktop blank-frame evidence verify software contracts only; no labeled real-world accuracy result exists, and Tasks event metrics remain unavailable.
