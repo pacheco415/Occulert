@@ -41,6 +41,42 @@ test('recorded zero remains distinct from unknown dashboard measurements', async
   expect(values.fatigue).toBeNull();expect(values.confidence).toBeNull();expect(values.perclos).toBeNull();
 });
 
+const persistedScores = [
+  {name:'false',metrics:{safetyScore:false},score:null},
+  {name:'true',metrics:{safetyScore:true},score:null},
+  {name:'an empty array',metrics:{safetyScore:[]},score:null},
+  {name:'a numeric array',metrics:{safetyScore:[95]},score:null},
+  {name:'an object flagged as recorded',metrics:{safetyScore:{value:95},hasSafetyScore:true},score:null},
+  {name:'text flagged as recorded',metrics:{safetyScore:'not a score',hasSafetyScore:true},score:null},
+  {name:'false flagged as recorded',metrics:{safetyScore:false,hasSafetyScore:true},score:null},
+  {name:'an array flagged as recorded',metrics:{safetyScore:[],hasSafetyScore:true},score:null},
+  {name:'a recorded zero',metrics:{safetyScore:0},score:0},
+  {name:'a numeric-string zero',metrics:{safetyScore:'0'},score:0},
+  {name:'a numeric-string score',metrics:{safetyScore:'72.5'},score:72.5},
+  {name:'zero explicitly marked missing',metrics:{safetyScore:0,hasSafetyScore:false},score:null},
+];
+
+for (const {name,metrics,score} of persistedScores) {
+  test(`persisted local score ${name} stays truthful in rows, copy and CSV`, async ({page}) => {
+    await bootLocal(page, {...metrics,detectorPipeline:'web_mediapipe_ear'});
+    const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('occulert-live-session')));
+    expect(saved.safetyScore).toEqual(metrics.safetyScore);
+    if ('hasSafetyScore' in metrics) expect(saved.hasSafetyScore).toBe(metrics.hasSafetyScore);
+    await expect(page.locator('.driver-state .pill').first()).toHaveText('SAFE');
+    await expect(page.locator('.driver-score strong')).toHaveText(score===null?'--':String(score));
+    if (score===null) await expect(page.locator('.score-source')).toHaveCount(0);
+    else await expect(page.locator('.score-source')).toHaveText('Web camera (MediaPipe EAR)');
+    await page.locator('.driver-actions button').click();
+    expect(await page.evaluate(()=>window.fixtureClipboard[0])).toContain(
+      score===null?'Score not recorded':`Score ${score}/100`,
+    );
+    const csv=await page.evaluate(()=>{
+      let captured='';requestDashboardCSVDownload=(value)=>{captured=value};exportFleetCSV();return captured;
+    });
+    expect(csv.split('\n')[1].split(',')[2]).toBe(`"${score===null?'':score}"`);
+  });
+}
+
 test('protected summaries do not imply confidence or PERCLOS measurements', async ({page}) => {
   await bootLocal(page, {});
   const model=await page.evaluate(()=>{
