@@ -73,3 +73,18 @@ test('shared immutable rule stays when retained asset needs it; unused exact fix
  assert.equal(JSON.parse(readFileSync(join(root,'vercel.json'))).headers.length,2);
  assert.ok(!existsSync(join(root,'tests/fixtures/old.v1.js')));
 });
+test('legacy version rules prune orphan assets while retaining shared and unrelated policies', t => {
+ const {root,write,git}=fixture(t);
+ write('keep.v1.js',''); write('index.html','<script src="active.v2.js"></script><script src="keep.v1.js"></script>');
+ const immutable=[{key:'Cache-Control',value:'public, max-age=31536000, immutable'}];
+ const orphan={source:'/old.v1.js',headers:immutable};
+ const shared={source:'/(.*).v1.(js|css)',headers:immutable};
+ const active=JSON.parse(readFileSync(join(root,'vercel.json'),'utf8')).headers[1];
+ const unrelated={source:'/images/(.*)',headers:immutable};
+ const revalidating={source:'/old.v1.js',headers:[{key:'Cache-Control',value:'public, max-age=0, must-revalidate'}]};
+ write('vercel.json',JSON.stringify({headers:[orphan,shared,active,unrelated,revalidating]}));
+ git(['add','.']); git(['commit','-qm','Add legacy immutable and retained policies']);
+ assert.deepEqual(retireAssets({root,now:day(30),write:true,log:silent}),['old.v1.js']);
+ assert.ok(existsSync(join(root,'keep.v1.js')));
+ assert.deepEqual(JSON.parse(readFileSync(join(root,'vercel.json'),'utf8')).headers,[shared,active,unrelated,revalidating]);
+});

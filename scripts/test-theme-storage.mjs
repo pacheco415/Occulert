@@ -7,8 +7,8 @@ import vm from 'node:vm';
 const baseline = process.env.OCCULERT_THEME_BASELINE === '1';
 const variants = [
   ['homepage', baseline ? 'tests/fixtures/homepage-baseline.js' : assetByStem('homepage.js')],
-  ['public', baseline ? 'public-page.v51.js' : assetByStem('public-page.js')],
-  ['static', baseline ? 'static-page.v52.js' : assetByStem('static-page.js')],
+  ['public', baseline ? 'tests/fixtures/public-page.v51.js' : assetByStem('public-page.js')],
+  ['static', baseline ? 'tests/fixtures/static-page.v52.js' : assetByStem('static-page.js')],
 ];
 
 function boot(file, { blockedRead = false, blockedWrite = false, blockedAccess = false,
