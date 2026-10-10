@@ -28,7 +28,8 @@ export function retireAssets({ root = process.cwd(), now = Date.now(), write = f
   config.headers = config.headers.filter(rule => {
     // Only prune the owned immutable version rules; preserve all other policies.
     if (!rule.headers?.some(header => header.key.toLowerCase() === 'cache-control' && header.value.includes('immutable'))) return true;
-    if (!rule.source.includes('\\.v')) return true;
+    // Older owned rules used unescaped dots in their versioned filenames.
+    if (!/\\?\.v\d+\\?\./.test(rule.source)) return true;
     const pattern = new RegExp(`^${rule.source}$`);
     return retained.some(file => pattern.test(`/${file}`));
   });
