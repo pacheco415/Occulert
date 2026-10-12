@@ -9,6 +9,9 @@
 // accuracy, missed-alert / false-alert rates.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { buildDriverArtifact } from './lib/driver-build.mjs';
 import { createAppHarness } from './lib/app-page-harness.mjs';
 
 const OPEN = 0.30;
@@ -300,4 +303,91 @@ test('parked sample minimum accepts twelve and rejects eleven samples', () => {
   h.run('updateCalibration(.10)');
   assert.equal(h.state().calibrated,accepted===12);
  }
+});
+
+// Exercise the actual source compiler before release; the rest of this suite
+// and browser tests also exercise the active immutable output after release.
+const preferenceDriver = (await buildDriverArtifact({
+ sourceRoot:fileURLToPath(new URL('../src',import.meta.url)),
+ contractPath:fileURLToPath(new URL('../source-driver-contract.json',import.meta.url)),
+})).code;
+const preferenceHelper = readFileSync(new URL('../src/detection-experiments.js',import.meta.url),'utf8');
+const blockedPreferences = {
+ getter:"Object.defineProperty(window,'localStorage',{get(){throw Error('Storage blocked')}})",
+ read:"localStorage.getItem=()=>{throw Error('Read blocked')}",
+ readMethodGetter:"Object.defineProperty(localStorage,'getItem',{get(){throw Error('Read method blocked')}})",
+ write:"localStorage.setItem=()=>{throw Error('Write blocked')}",
+ methodGetter:"Object.defineProperty(localStorage,'setItem',{get(){throw Error('Write method blocked')}})",
+};
+for (const [failure, inject] of Object.entries(blockedPreferences)) {
+ for (const search of ['', '?perclos=time']) {
+  test(`compiled driver completes calibration and alerts with ${failure} preference failure ${search||'default'}`,async()=>{
+   let readyCore;
+   const h=createAppHarness({sourceOverride:preferenceDriver,preloadSources:[inject,preferenceHelper],
+    sandboxOverrides:{location:{search},URLSearchParams,OcculertStartup:{isReady:()=>true,refresh(){},ready(core){readyCore=core;return true}}}});
+   await h.run('Promise.resolve()');
+   assert.ok(readyCore);
+   assert.ok(Object.isFrozen(readyCore));
+   assert.equal(typeof readyCore.start,'function');
+   assert.equal(h.get('sensitivityLevel'),'medium');
+   assert.equal(h.get('_voiceEnabled'),false);
+   assert.equal(h.el('voiceToggleBtn').textContent,'🔇 Voice OFF');
+   assert.equal(h.run("getPreference('absent')"),null);
+   if(failure!=='read'&&failure!=='readMethodGetter')assert.equal(h.run("setPreference('probe','value')"),false);
+   h.run("applySensitivity('high');applyIntensity('bright');toggleVoice()");
+   assert.equal(h.get('sensitivityLevel'),'high');
+   assert.equal(h.get('_voiceEnabled'),true);
+   assert.equal(h.el('voiceToggleBtn').textContent,'🔊 Voice ON');
+   assert.equal(h.el('intensityLabel').textContent,'Bright');
+   await startRealSession(h);
+   h.feed({ear:OPEN},3400);
+   assert.equal(h.state().calibrating,false);
+   assert.equal(h.state().calibrated,true);
+   assert.ok(Math.abs(h.state().eyeClosedThreshold-(OPEN*.66+.03))<.001);
+   h.el('recalBtn').onclick();
+   assert.equal(h.state().calibrating,true);
+   h.feed({ear:OPEN},3400);
+   assert.equal(h.state().calibrated,true);
+   assert.ok(Math.abs(h.state().eyeClosedThreshold-(OPEN*.66+.03))<.001);
+   h.feed({ear:CLOSED},6000);
+   assert.ok(h.state().alerts>0,'accepted alerts continue after storage/calibration failures');
+   assert.equal(h.el('parkedControls').children.filter(child=>child.id==='preferenceStorageNotice').length,1);
+   assert.equal(h.el('parkedControls').children[0].textContent,"Settings won't be saved on this device.");
+   await h.run('stop()');
+   if(failure==='getter'||failure==='read'||failure==='readMethodGetter')assert.match(h.el('report').textContent,/Local history: Not saved/,'history still reports its own storage failure');
+  });
+ }
+}
+
+test('compiled voice restore uses one default consistently when only its first read fails',()=>{
+ const h=createAppHarness({sourceOverride:preferenceDriver,initialStorage:{'occulert-voice':'true'},preloadSources:[`
+  const originalPreferenceRead=localStorage.getItem;let voiceReads=0;
+  localStorage.getItem=key=>{if(key==='occulert-voice'&&++voiceReads===1)throw Error('Transient voice read failure');return originalPreferenceRead(key)};
+ `]});
+ assert.equal(h.get('voiceReads'),1);
+ assert.equal(h.get('_voiceEnabled'),false);
+ assert.equal(h.el('voiceToggleBtn').textContent,'🔇 Voice OFF');
+ assert.ok(Object.isFrozen(h.get('OcculertDriverCore')));
+ h.run('toggleVoice()');
+ assert.equal(h.get('_voiceEnabled'),true);
+ assert.equal(h.el('voiceToggleBtn').textContent,'🔊 Voice ON');
+});
+
+test('compiled calibration completes when storage writes first fail during monitoring',async()=>{
+ const h=createAppHarness({sourceOverride:preferenceDriver,initialStorage:{'occulert-driver-id':'local-existing','occulert-intensity':'bright','occulert-sensitivity':'high','occulert-voice':'true'}});
+ assert.equal(h.get('driverId'),'local-existing');
+ assert.equal(h.get('sensitivityLevel'),'high');
+ assert.equal(h.get('_voiceEnabled'),true);
+ assert.equal(h.el('intensityLabel').textContent,'Bright');
+ assert.equal(h.el('parkedControls').children.length,0);
+ await startRealSession(h);
+ h.run("localStorage.setItem=()=>{throw Error('Quota exhausted during calibration')}");
+ h.feed({ear:OPEN},3400);
+ assert.equal(h.state().calibrating,false);
+ assert.equal(h.state().calibrated,true);
+ assert.equal(h.el('calibration').textContent,'DONE');
+ assert.ok(Math.abs(h.state().eyeClosedThreshold-(OPEN*.66+.03))<.001);
+ h.feed({ear:CLOSED},6000);
+ assert.ok(h.state().alerts>0);
+ assert.equal(h.el('parkedControls').children.filter(child=>child.id==='preferenceStorageNotice').length,1);
 });

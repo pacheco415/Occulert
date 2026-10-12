@@ -4,7 +4,9 @@ import "./metrics.js";
 import "./alerts.js";
 import "./storage-history.js";
 import "./cloud-sync.js";
-import { calibrationMinimumSamples, experimentFlags, calibrationEl, calibrationFill, calHint, calibrating, calibrationUntil, calibrationSamples, baselineEAR, baseClosedThreshold, baseWatchThreshold, eyeClosedThreshold, CALIBRATION_MS, log, SENSITIVITY_PRESETS, set_calibrating, set_calibrated, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold } from "./ui.js";
+import { setPreference, calibrationMinimumSamples, experimentFlags, calibrationEl, calibrationFill, calHint, calibrating, calibrationUntil, calibrationSamples, baselineEAR, baseClosedThreshold, baseWatchThreshold, eyeClosedThreshold, CALIBRATION_MS, log, SENSITIVITY_PRESETS, set_calibrating, set_calibrated, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold } from "./ui.js";
+// Keep the selected setting for this page even when persistence is unavailable.
+export let sensitivityLevel = 'medium';
 export function finishCalibration() {
     if (calibrationSamples.length < calibrationMinimumSamples) {
         set_calibrating(false);
@@ -12,7 +14,7 @@ export function finishCalibration() {
         calibrationEl.textContent = 'DEFAULT';
         calibrationFill.style.width = '100%';
         if (typeof applySensitivity === 'function')
-            applySensitivity(localStorage.getItem('occulert-sensitivity') || 'medium');
+            applySensitivity(sensitivityLevel);
         if (calHint)
             calHint.textContent = 'Using default thresholds.';
         log('Calibration used default thresholds');
@@ -27,7 +29,7 @@ export function finishCalibration() {
     set_baseClosedThreshold(Math.max(.12, Math.min(.22, baselineEAR * .66)));
     set_baseWatchThreshold(Math.max(baseClosedThreshold + .025, Math.min(.28, baselineEAR * .82)));
     if (typeof applySensitivity === 'function')
-        applySensitivity(localStorage.getItem('occulert-sensitivity') || 'medium');
+        applySensitivity(sensitivityLevel);
     set_calibrated(true);
     set_calibrating(false);
     calibrationEl.textContent = 'DONE';
@@ -54,11 +56,12 @@ export function updateCalibration(ear) {
 }
 export function applySensitivity(level) {
     level = Object.prototype.hasOwnProperty.call(SENSITIVITY_PRESETS, level) ? level : 'medium';
+    sensitivityLevel = level;
     const preset = SENSITIVITY_PRESETS[level];
     const factor = experimentFlags.pixels ? 4 / 3 : 1;
     set_eyeClosedThreshold(Math.max(.10 * factor, Math.min(.25 * factor, baseClosedThreshold + preset.offset * factor)));
     set_eyeWatchThreshold(Math.max(eyeClosedThreshold + .025 * factor, Math.min(.31 * factor, baseWatchThreshold + preset.offset * factor)));
-    localStorage.setItem('occulert-sensitivity', level);
+    setPreference('occulert-sensitivity', level);
     document.querySelectorAll('[data-sensitivity]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.sensitivity === level);
     });

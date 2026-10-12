@@ -637,7 +637,7 @@ if(typeof module==='object'&&module.exports)module.exports=api;else root.Occuler
   calcEAR, smooth, headTurn, detectHeadNod, log, updateTrackingState, drawEyes,
   render, trigger, detectYawn, calcMAR, checkLightLevel */
 /* global calibrating: writable, calibrated: writable, calibrationUntil: writable,
-  calibrationSamples: writable, baselineEAR: writable, baseClosedThreshold: writable,
+  sensitivityLevel: readonly, calibrationSamples: writable, baselineEAR: writable, baseClosedThreshold: writable,
   baseWatchThreshold: writable, eyeClosedThreshold: writable, eyeWatchThreshold: writable,
   fatigue: writable, maxFatigue: writable, confidence: writable, fatigueSampleSum: writable,
   fatigueSampleCount: writable, noFaceSince: writable, lastFaceSeen: writable,
@@ -651,7 +651,7 @@ function createMountedController(flags){
  read:()=>({running,localSessionId,calibrating,calibrated,calibrationUntil,calibrationSamples,baselineEAR,baseClosedThreshold,baseWatchThreshold,eyeClosedThreshold,eyeWatchThreshold,fatigue,maxFatigue,confidence,fatigueSampleSum,fatigueSampleCount,noFaceSince,lastFaceSeen,perclosWindow,eyesClosedSince,lastMicro,microsleeps,turnedSince,totalDistractionMs}),
  write:s=>{({calibrating,calibrated,calibrationUntil,calibrationSamples,baselineEAR,baseClosedThreshold,baseWatchThreshold,eyeClosedThreshold,eyeWatchThreshold,fatigue,maxFatigue,confidence,fatigueSampleSum,fatigueSampleCount,noFaceSince,lastFaceSeen,perclosWindow,eyesClosedSince,lastMicro,microsleeps,turnedSince,totalDistractionMs}=s)},
  now:()=>typeof performance!=='undefined'&&typeof performance.now==='function'?performance.now():Date.now(),wallNow:()=>Date.now(),calibrationMs:CALIBRATION_MS,left:LEFT,right:RIGHT,
- dimensions:()=>({width:video.videoWidth,height:video.videoHeight}),applySensitivity:()=>applySensitivity(localStorage.getItem('occulert-sensitivity')||'medium'),
+ dimensions:()=>({width:video.videoWidth,height:video.videoHeight}),applySensitivity:()=>applySensitivity(sensitivityLevel),
  resetContinuous:resetContinuousObservations,resetMouth:()=>{_mouthOpenSince=0;_marHist=[]},defaultCalibration:updateCalibration,defaultEyeMetrics:updateEyeMetrics,
  calcEAR,smooth,headTurn,detectNod:detectHeadNod,log,tracking:updateTrackingState,clearEyes:()=>ctx.clearRect(0,0,canvas.width,canvas.height),
  draw:lm=>drawEyes(lm,fatigue>=60?'#ff3344':fatigue>=35?'#ffaa00':'#00ff88'),render,alert:(reason,eligibility)=>trigger(reason,eligibility),
