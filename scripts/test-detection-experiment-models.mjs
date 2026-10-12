@@ -215,6 +215,18 @@ test('flags require unique exact values; combinations and delegate stay explicit
   assert.ok(Object.isFrozen(flags)); assert.ok(Object.isFrozen(flags.names));
 });
 
+test('stable distraction confidence has exact independent and combined flag semantics',()=>{
+ const selected=parseFlags('?distraction-confidence=stable');
+ assert.equal(selected.distractionConfidence,true);assert.equal(selected.any,true);assert.equal(selected.primary,false);
+ assert.deepEqual(selected.names,['distractionConfidence']);
+ const combined=parseFlags('?distraction-confidence=stable&perclos=time&detector=tasks');
+ assert.equal(combined.distractionConfidence,true);assert.equal(combined.primary,true);
+ assert.deepEqual(combined.names,['distractionConfidence','tasks','timePerclos']);
+ for(const query of ['?distraction-confidence=stable&distraction-confidence=stable','?distraction-confidence=Stable','?distraction-confidence=stable%20']){
+  assert.equal(parseFlags(query).any,false,query);
+ }
+});
+
 test('Tasks parsing records unsupported signals as null and rejects duplicate or invalid coefficients', () => {
   const result = { faceLandmarks: [[{}]], faceBlendshapes: [{ categories: [
     {categoryName:'eyeBlinkLeft',score:.2},{categoryName:'eyeBlinkRight',score:.8},{categoryName:'jawOpen',score:.3}

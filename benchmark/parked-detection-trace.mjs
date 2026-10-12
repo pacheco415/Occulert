@@ -21,7 +21,7 @@ export const traceContract=Object.freeze({detectorPrefix:corePrefix,runtimeVersi
  helperIntegrity:'sha256-'+createHash('sha256').update(helperBytes).digest('base64'),
  runtimePins:Object.freeze(runtime.files.map(({url,integrity})=>Object.freeze({url,integrity}))),
  modelIntegrity:runtime.files.find(pin=>pin.file==='face_landmarker.task').integrity});
-const knownFlags=new Set(['elapsed','noface','pitch','pixels','tasks','timePerclos']);
+const knownFlags=new Set(['distractionConfidence','elapsed','noface','pitch','pixels','tasks','timePerclos']);
 function validateProvenance(s){
  const flags=s.experimentFlags;
  if(!Array.isArray(flags)||!flags.includes('tasks')||flags.some(flag=>!knownFlags.has(flag))||new Set(flags).size!==flags.length||

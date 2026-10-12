@@ -137,7 +137,9 @@ export function updateScore(ear, turned, nod, hasFace) {
         set_fatigue(Math.max(0, fatigue - 2));
         return;
     }
-    set_confidence(Math.min(100, confidence + (calibrated ? 5 : 3)));
+    // The parked mode uses the calibrated +5/-5 rule for every tracked turn.
+    const confidenceGain = calibrated || experimentFlags.distractionConfidence && turned ? 5 : 3;
+    set_confidence(Math.min(100, confidence + confidenceGain));
     let perclos = updateEyeMetrics(ear, turned);
     if (turned) {
         set_confidence(Math.max(35, confidence - 5));

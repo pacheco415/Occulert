@@ -7,14 +7,14 @@ import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistor
 import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
 export const start = startMonitoring;
 export const stop = stopMonitoring;
-export const EXPERIMENT_HELPER_INTEGRITY = 'sha256-cFKA32XIr6IWVtiwi4m8lXnpAa0DTmEwkVTk8BsFE2M=';
+export const EXPERIMENT_HELPER_INTEGRITY = "sha256-Rb1wRaEyMH36HT1YpYnTe10+J7jPFJKOZXX0jnnfPLc=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
     try {
         const q = new URLSearchParams(window.location?.search || ''), yes = (k, v) => q.getAll(k).length === 1 && q.get(k) === v;
-        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1') };
+        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable') };
         const names = Object.keys(f).filter(k => f[k]).sort();
-        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => k !== 'tasks'), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => k !== 'tasks' && k !== 'distractionConfidence'), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
     }
     catch (_) {
         return Object.freeze({ any: false, primary: false, names: Object.freeze([]) });
@@ -534,7 +534,7 @@ export function loadExperimentController() {
     }
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/detection-experiments.v1.js';
+        script.src = '/detection-experiments.v2.js';
         script.integrity = EXPERIMENT_HELPER_INTEGRITY;
         script.crossOrigin = 'anonymous';
         const timer = setTimeout(() => { script.remove(); reject(Error('Parked helper timed out')); }, 7000);

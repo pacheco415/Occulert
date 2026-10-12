@@ -4,6 +4,10 @@
     "driver-app.js": {
       "source": "src/driver-app.js",
       "mode": "bundle"
+    },
+    "detection-experiments.js": {
+      "source": "src/detection-experiments.js",
+      "mode": "copy"
     }
   }
 }

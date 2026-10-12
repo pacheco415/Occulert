@@ -51,7 +51,11 @@ test('asset release copies importers, preserves published bytes and supports gua
 test('the complete site audits pass after a sample asset release', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-site-release-'));
   try {
-    const paths = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+    const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
+    // Current registered source and emitted assets can be reviewed before staging.
+    const registry = JSON.parse(read(root, 'source-assets.json'));
+    for (const entry of Object.values(registry.assets)) paths.add(entry.source);
+    for (const name of Object.values(JSON.parse(read(root, 'asset-versions.json')))) paths.add(name);
     for (const name of paths) {
       const destination = join(cwd, name);
       mkdirSync(dirname(destination), { recursive: true });

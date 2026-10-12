@@ -24,7 +24,7 @@ test('empty query executes exactly the released default pipeline across calibrat
 });
 
 test('all exact selected modes disable every cloud route while preserving another ordinary pending outbox',async()=>{
- for(const query of ['?fatigue-timing=elapsed','?ear-units=pixels','?detector=tasks','?noface-escalation=1','?perclos=time','?pitch-gate=1','?detector=tasks&ear-units=pixels&perclos=time&pitch-gate=1&noface-escalation=1&fatigue-timing=elapsed']){
+ for(const query of ['?fatigue-timing=elapsed','?ear-units=pixels','?detector=tasks','?noface-escalation=1','?perclos=time','?pitch-gate=1','?distraction-confidence=stable','?detector=tasks&ear-units=pixels&perclos=time&pitch-gate=1&noface-escalation=1&fatigue-timing=elapsed&distraction-confidence=stable']){
   const calls=[];const api=new Proxy({}, {get:(_,name)=>()=>{calls.push(name);return Promise.resolve({})}});
   const h=createAppHarness({initialStorage:{'occulert-cloud-outbox':'ordinary-pending-value'},preloadSources:[helper],sandboxOverrides:{location:{search:query},URLSearchParams,OcculertBackend:api,OcculertSync:api}});
   assert.equal(h.el('cloudConsent').checked,false);assert.equal(h.el('cloudConsent').disabled,true);
@@ -147,4 +147,76 @@ test('actual onResults clears the nod trajectory before a recovery frame after a
  const h=calibrated(harness('?perclos=time'));h.run('noseYHistory=[];earHistory=[];headNods=0;fatigue=0');
  for(const y of [.5,.5,.5,.56,.56,.56,.56])actualFrame(h,{noseY:y});assert.equal(h.get('headNods'),0);
  actualFrame(h,{noseY:.5,dt:2000});assert.equal(h.get('headNods'),0);assert.equal(h.get('fatigue'),0);
+});
+
+function distractionSession(query,personalized,stepMs){
+ const h=harness(query);begin(h);
+ // An above-range open-eye sample falls back without creating closed-eye history.
+ h.feed({ear:personalized ? .3 : .5},3400);
+ assert.equal(h.get('calibrated'),personalized);
+ h.feed({ear:.3},5000);
+ assert.equal(h.get('confidence'),100);
+ assert.equal(h.get('alerts'),0);
+ h.frame({ear:.3,noseX:.7,stepMs:0});
+ const started=h.clock.now;
+ return {h,started,stepMs};
+}
+function firstDistraction({h,started,stepMs}){
+ while(h.clock.now-started<7000&&!h.get('alerts'))h.frame({ear:.3,noseX:.7,stepMs});
+ return h.run('_sessionLog.find(row=>row.type==="alert"&&row.value==="Distraction")')?.ts-started;
+}
+for(const personalized of [false,true])for(const stepMs of [135,300]){
+ test(`parked stable distraction alerts after ${personalized?'personalized':'default'} calibration at ${stepMs}ms per frame`,()=>{
+  const fixture=distractionSession('?distraction-confidence=stable',personalized,stepMs),{h}=fixture;
+  assert.equal(h.get('experimentFlags.primary'),false);
+  const at=firstDistraction(fixture);
+  assert.ok(at>6500&&at<=7000,'first Distraction alert at '+at+'ms');
+  assert.equal(h.get('alerts'),1);assert.equal(h.get('escalationLevel'),1);assert.equal(h.get('confidence'),95);
+  h.feed({ear:.3,noseX:.7},6000,stepMs);assert.equal(h.get('alerts'),1,'12-second cooldown retained');
+ });
+ test(`released distraction behavior remains unchanged after ${personalized?'personalized':'default'} calibration at ${stepMs}ms per frame`,()=>{
+  const fixture=distractionSession('',personalized,stepMs),at=firstDistraction(fixture);
+  if(personalized||stepMs===300)assert.ok(at>6500&&at<=7000);
+  else {assert.equal(Number.isNaN(at),true);assert.equal(fixture.h.get('alerts'),0);assert.equal(fixture.h.get('confidence'),35);}
+ });
+}
+test('stable flag leaves every calibrated turn and frontal-recovery sample identical to the released path',()=>{
+ for(const stepMs of [135,300]){
+  const ordinary=distractionSession('',true,stepMs),parked=distractionSession('?distraction-confidence=stable',true,stepMs);
+  for(const noseX of [...Array(60).fill(.7),...Array(15).fill(.5)]){
+   ordinary.h.frame({ear:.3,noseX,stepMs});parked.h.frame({ear:.3,noseX,stepMs});
+   assert.equal(JSON.stringify(parked.h.state()),JSON.stringify(ordinary.h.state()));
+  }
+ }
+});
+test('stable confidence combines with primary experimental scoring at both frame intervals',()=>{
+ for(const personalized of [false,true])for(const stepMs of [135,300]){
+  const fixture=distractionSession('?distraction-confidence=stable&fatigue-timing=elapsed&perclos=time',personalized,stepMs);
+  assert.equal(fixture.h.get('experimentFlags.primary'),true);
+  const at=firstDistraction(fixture);assert.ok(at>6500&&at<=7000,'first combined-mode Distraction alert at '+at+'ms');
+ }
+});
+test('stable confidence preserves the confidence guard and future snooze timestamp',()=>{
+ for(const scenario of ['low confidence','snoozed']){
+  const fixture=distractionSession('?distraction-confidence=stable',false,135),{h}=fixture;
+  if(scenario==='low confidence')h.run('confidence=40');else h.run('lastAlert=Date.now()+120000');
+  assert.equal(Number.isNaN(firstDistraction(fixture)),true,scenario);assert.equal(h.get('alerts'),0,scenario);
+ }
+});
+test('retained confidence permits the existing Fatigue alert later in a prolonged default-calibration turn',()=>{
+ const ordinary=distractionSession('',false,135),parked=distractionSession('?distraction-confidence=stable',false,135);
+ ordinary.h.feed({ear:.3,noseX:.7},22000);parked.h.feed({ear:.3,noseX:.7},22000);
+ assert.equal(ordinary.h.get('fatigue'),100);assert.equal(ordinary.h.get('alerts'),0);
+ const alerts=parked.h.run('_sessionLog.filter(row=>row.type==="alert")');
+ assert.deepEqual(JSON.parse(JSON.stringify(alerts.map(row=>row.value))),['Distraction','Fatigue']);
+ assert.ok(alerts[0].ts-parked.started>6500&&alerts[0].ts-parked.started<=7000);
+ assert.ok(alerts[1].ts-alerts[0].ts>=12000&&alerts[1].ts-alerts[0].ts<=12135);
+ assert.equal(parked.h.get('escalationLevel'),2);
+});
+test('duplicate and malformed distraction-confidence flags leave the ordinary monitor active',()=>{
+ for(const query of ['?distraction-confidence=stable&distraction-confidence=stable','?distraction-confidence=stable&distraction-confidence=other','?distraction-confidence=Stable','?distraction-confidence=true','?distraction-confidence=stable%20']){
+  const fixture=distractionSession(query,false,135),{h}=fixture;
+  assert.equal(h.get('experimentFlags.any'),false,query);assert.equal(h.get('experimentController'),null,query);
+  assert.equal(Number.isNaN(firstDistraction(fixture)),true,query);assert.equal(h.get('alerts'),0,query);
+ }
 });

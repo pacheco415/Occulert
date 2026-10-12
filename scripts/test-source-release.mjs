@@ -184,14 +184,28 @@ test('a mid-commit filesystem failure restores replaced files and removes new fi
 test('a changed real driver source produces an audited guard release without changing prior bytes', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-source-site-'));
   try {
-    const paths = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+    const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
+    // Include reviewable registered source and active assets before Git staging.
+    for (const entry of Object.values(json(root, 'source-assets.json').assets)) paths.add(entry.source);
+    for (const name of Object.values(json(root, 'asset-versions.json'))) paths.add(name);
     for (const name of paths) { mkdirSync(dirname(join(cwd, name)), { recursive: true }); cpSync(join(root, name), join(cwd, name)); }
     symlinkSync(join(root, 'node_modules'), join(cwd, 'node_modules'), 'dir');
     git(cwd, 'init', '-q'); commit(cwd); git(cwd, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
-    const prior = json(cwd, 'asset-integrity.json');
-    write(cwd, 'src/driver-app.js', read(cwd, 'src/driver-app.js') + '\n// Fixture source release.\n');
-    run(cwd, '--release');
-    assert.equal(auditSourceAssets(cwd).length, 1);
+    const prior = json(cwd, 'asset-integrity.json'), before = json(cwd, 'asset-versions.json');
+    const metrics = read(cwd, 'src/metrics.js');
+    assert.ok(metrics.includes("'SAFE'")); write(cwd, 'src/metrics.js', metrics.replace("'SAFE'", "'READY'"));
+    const plan = JSON.parse(run(cwd, '--release'));
+    assert.equal(plan.sources.find(entry => entry.logical === 'driver-app.js').changed, true);
+    assert.equal(plan.sources.find(entry => entry.logical === 'detection-experiments.js').changed, false);
+    const manifest = json(cwd, 'asset-versions.json');
+    assert.notEqual(manifest['driver-app.js'], before['driver-app.js']);
+    assert.notEqual(manifest['driver-startup-guard.js'], before['driver-startup-guard.js']);
+    assert.equal(manifest['detection-experiments.js'], before['detection-experiments.js']);
+    assert.ok(read(cwd, manifest['driver-app.js']).includes("'READY'"));
+    assert.deepEqual(auditSourceAssets(cwd).map(({ logical, mode }) => ({ logical, mode })), [
+      { logical: 'driver-app.js', mode: 'bundle' },
+      { logical: 'detection-experiments.js', mode: 'copy' },
+    ]);
     for (const [name, hash] of Object.entries(prior)) assert.equal(sha(readFileSync(join(cwd, name))), hash);
     const output = execFileSync(process.execPath, ['scripts/audit-site.mjs'], { cwd, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
     assert.match(output, /passed/i);

@@ -17,6 +17,13 @@ function fixture(){const trace=models.createTraceStore();
  trace.recordAlert(135,'Fatigue');return {schema:'occulert.parked-detection-trace',version:1,session:{sessionId:'local-test',durationMs:2500,platform:'web',detectorVersion:traceContract.detectorPrefix+'tasks',experimentFlags:['tasks'],geometryUnits:'normalized',runtimeVersion:traceContract.runtimeVersion,runtimePins:models.tasksPins,helperIntegrity:traceContract.helperIntegrity,modelIntegrity:traceContract.modelIntegrity,...trace.summary()},samples:trace.samples(),legacyAlerts:trace.alerts()};
 }
 const labels=[{session_id:'local-test',start_ms:0,end_ms:270,label:'drowsy'}];
+test('stable-distraction Tasks exports retain distinct accepted provenance',()=>{
+ const trace=fixture();trace.session.experimentFlags=['distractionConfidence','tasks'];
+ trace.session.detectorVersion=traceContract.detectorPrefix+'distractionConfidence+tasks';
+ const result=adaptTrace(trace,{participant:'P001',split:'test',episodes:labels});
+ assert.deepEqual(result.summary.experimentFlags,['distractionConfidence','tasks']);
+ assert.equal(result.sessions[0].detector_version,trace.session.detectorVersion);
+});
 test('adapter grants only retained supported intervals and leaves every Tasks event metric unavailable',()=>{
  const result=adaptTrace(fixture(),{participant:'P001',split:'test',episodes:labels});
  assert.deepEqual(result.tracking,[{session_id:'local-test',start_ms:0,end_ms:270}]);
