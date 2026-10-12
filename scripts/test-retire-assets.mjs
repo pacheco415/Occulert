@@ -73,3 +73,28 @@ test('shared immutable rule stays when retained asset needs it; unused exact fix
  assert.equal(JSON.parse(readFileSync(join(root,'vercel.json'))).headers.length,2);
  assert.ok(!existsSync(join(root,'tests/fixtures/old.v1.js')));
 });
+test('legacy root JS/CSS rules prune orphan assets while preserving shared and nested policies', t => {
+ const {root,write,git}=fixture(t);
+ write('old.v1.css',''); write('keep.v1.js','');
+ mkdirSync(join(root,'audio')); mkdirSync(join(root,'vendor'));
+ write('audio/alert.v1.wav','audio'); write('vendor/runtime.v1.js','vendor');
+ write('index.html','<script src="active.v2.js"></script><script src="keep.v1.js"></script><script src="vendor/runtime.v1.js"></script><audio src="audio/alert.v1.wav"></audio>');
+ const immutable=[{key:'Cache-Control',value:'public, max-age=31536000, immutable'}];
+ const orphan={source:'/old.v1.js',headers:immutable};
+ const orphanCss={source:'/old.v1.css',headers:immutable};
+ const escapedOrphan={source:'/old\\.v1\\.js',headers:immutable};
+ const groupedOrphan={source:'/(old|gone)\\.v1\\.(js|css)',headers:immutable};
+ const shared={source:'/(.*).v1.(js|css)',headers:immutable};
+ const active=JSON.parse(readFileSync(join(root,'vercel.json'),'utf8')).headers[1];
+ const audio={source:'/audio/alert.v1.wav',headers:immutable};
+ const vendor={source:'/vendor/runtime\\.v1\\.js',headers:immutable};
+ const unrelated={source:'/images/(.*)',headers:immutable};
+ const revalidating={source:'/old.v1.js',headers:[{key:'Cache-Control',value:'public, max-age=0, must-revalidate'}]};
+ write('vercel.json',JSON.stringify({headers:[orphan,orphanCss,escapedOrphan,groupedOrphan,shared,active,audio,vendor,unrelated,revalidating]}));
+ git(['add','.']); git(['commit','-qm','Add legacy root and active nested asset policies']);
+ assert.deepEqual(retireAssets({root,now:day(30),write:true,log:silent}),['old.v1.css','old.v1.js']);
+ assert.ok(existsSync(join(root,'keep.v1.js')));
+ assert.ok(existsSync(join(root,'audio/alert.v1.wav')));
+ assert.ok(existsSync(join(root,'vendor/runtime.v1.js')));
+ assert.deepEqual(JSON.parse(readFileSync(join(root,'vercel.json'),'utf8')).headers,[shared,active,audio,vendor,unrelated,revalidating]);
+});
