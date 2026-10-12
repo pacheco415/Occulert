@@ -134,18 +134,26 @@ for (const mode of ['failed', 'malformed', 'partial']) {
 
 for (const failure of [
   { label: 'before Start binding', key: 'occulert-intensity', occurrence: 1, handlerBound: false },
-  { label: 'after Start binding', key: 'occulert-voice', occurrence: 2, handlerBound: true },
+  { label: 'after Start binding', key: 'occulert-voice', occurrence: 1, handlerBound: true },
 ]) {
-  test(`an eager local preference failure ${failure.label} prevents incomplete startup`, async ({ page }) => {
+  test(`an eager local preference failure ${failure.label} still permits complete startup`, async ({ page }) => {
     await installPrivacyProbe(page, failure);
     const route = await driverRoute(page, 'full');
     await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
-    await expectFailure(page);
+    await expect(page.locator('#startBtn')).toBeEnabled();
+    await expect(page.locator('#startBtn')).toHaveText('START MONITORING');
+    await expect(page.locator('#preferenceStorageNotice')).toHaveCount(1);
+    await expect(page.locator('#preferenceStorageNotice')).toHaveText("Settings won't be saved on this device.");
+    await expect(page.locator('#voiceToggleBtn')).toHaveText('🔇 Voice OFF');
+    await expect(page.locator('#sensitivityMedium')).toHaveClass(/active/);
+    await expect(page.locator('html')).toHaveAttribute('data-intensity', 'standard');
+    expect(await page.evaluate(() => ({ ready: window.OcculertStartup.isReady(), core: Object.isFrozen(window.OcculertDriverCore) })))
+      .toEqual({ ready: true, core: true });
     expect(await page.evaluate(() => ({ failures: window.__startupProbe.storageFailures,
       handlerBound: window.__startupProbe.handlerBoundAtStorageFailure })))
       .toEqual({ failures: 1, handlerBound: failure.handlerBound });
-    await expectCoreGuards(page);
-    expect(route.count).toBe(1, 'a runtime failure must not retry the script in the failed document');
+    await expectNoPermissionedWork(page);
+    expect(route.count).toBe(1, 'a preference failure must not retry the script in the same document');
   });
 }
 

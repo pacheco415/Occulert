@@ -7,7 +7,7 @@ import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistor
 import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
 export const start = startMonitoring;
 export const stop = stopMonitoring;
-export const EXPERIMENT_HELPER_INTEGRITY = "sha256-Rb1wRaEyMH36HT1YpYnTe10+J7jPFJKOZXX0jnnfPLc=";
+export const EXPERIMENT_HELPER_INTEGRITY = "sha256-M8psrrb+lz//+iJ/tcz/r2OIpnKXgAXmdE89dbS5BSY=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
     try {
@@ -29,6 +29,34 @@ export const calibrationMinimumSamples = (() => {
 })();
 export let experimentController = /** @type {MountedExperimentController|null} */ (null), experimentGeneration = 0, experimentSessionSummary = null, experimentStopping = false;
 export function startupAllowsMonitoring() { return typeof window.OcculertStartup?.isReady === 'function' && window.OcculertStartup.isReady() === true; }
+let preferenceStorageNoticeShown = false;
+function showPreferenceStorageNotice() {
+    try {
+        if (preferenceStorageNoticeShown)
+            return;
+        const controls = document.getElementById('parkedControls');
+        if (!controls)
+            return;
+        const note = document.createElement('p');
+        note.id = 'preferenceStorageNotice';
+        note.className = 'small';
+        note.setAttribute('role', 'status');
+        note.textContent = "Settings won't be saved on this device.";
+        controls.prepend(note);
+        preferenceStorageNoticeShown = true;
+    }
+    catch (_) { }
+}
+/** @param {string} key @returns {string|null} */
+export function getPreference(key) {
+    try { return localStorage.getItem(key); }
+    catch (_) { showPreferenceStorageNotice(); return null; }
+}
+/** @param {string} key @param {string} value @returns {boolean} */
+export function setPreference(key, value) {
+    try { localStorage.setItem(key, value); return true; }
+    catch (_) { showPreferenceStorageNotice(); return false; }
+}
 export const INTENSITIES = ['dim', 'standard', 'bright'];
 export const INTENSITY_ICONS = { dim: '🔅', standard: '🔆', bright: '☀️' };
 export const INTENSITY_LABELS = { dim: 'Dim', standard: 'Standard', bright: 'Bright' };
@@ -47,7 +75,7 @@ export function applyIntensity(val) {
     document.querySelectorAll('.preset-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.intensity === val);
     });
-    localStorage.setItem('occulert-intensity', val);
+    setPreference('occulert-intensity', val);
     // Update meta theme-color so mobile chrome matches
     const mc = { dim: '#020508', standard: '#050a0f', bright: '#0d1f30' };
     let meta = document.querySelector('meta[name="theme-color"]');
@@ -63,7 +91,7 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
     btn.addEventListener('click', () => applyIntensity(btn.dataset.intensity));
 });
 (function () {
-    const saved = localStorage.getItem('occulert-intensity');
+    const saved = getPreference('occulert-intensity');
     applyIntensity(saved || 'standard');
 })();
 export const $ = id => document.getElementById(id), video = /** @type {HTMLVideoElement} */ ($('video')), canvas = /** @type {HTMLCanvasElement} */ ($('canvas')), ctx = canvas.getContext('2d'), statusEl = $('status'), startBtn = /** @type {HTMLButtonElement} */ ($('startBtn')), demoBtn = $('demoBtn'), overlay = $('overlay'), overlayTitle = $('overlayTitle'), overlayText = $('overlayText'), overlayHint = $('overlayHint'), stateCard = $('stateCard'), driveStateEl = $('driveState'), driveHintEl = $('driveHint'), fatigueEl = $('fatigue'), confidenceEl = $('confidence'), calibrationEl = $('calibration'), calibrationFill = $('calibrationFill'), faceStateEl = $('faceState'), earEl = $('ear'), alertsEl = /** @type {CoercingTextElement} */ ($('alerts')), riskEl = $('risk'), riskDetailEl = $('riskDetail'), fatigueFill = $('fatigueFill'), confidenceFill = $('confidenceFill'), alertScreen = /** @type {HTMLElement} */ ($('alertScreen')), alertTitle = /** @type {HTMLElement} */ ($('alertTitle')), alertSub = /** @type {HTMLElement} */ ($('alertSub')), logEl = $('log'), reportEl = $('report'), nodsEl = $('nods'), syncEl = $('sync'), gpsEl = $('gps'), locationEl = $('location'), perclosEl = $('perclos'), microsleepsEl = $('microsleeps'), distractionEl = $('distraction'), escalationEl = $('escalation'), gpsConsent = $('gpsConsent'), cloudConsent = $('cloudConsent'), sessionTimerEl = $('sessionTimer'), nightOpacity = /** @type {HTMLInputElement} */ ($('nightOpacity')), nightVal = $('nightVal'), phoneGuide = $('phoneGuide'), calHint = $('calHint'), cameraSourceRow = $('cameraSourceRow'), cameraSourceSelect = $('cameraSourceSelect'), cameraSourceHint = $('cameraSourceHint'), cameraRefreshBtn = $('cameraRefreshBtn');
@@ -96,7 +124,7 @@ nightOpacity.addEventListener('input', () => {
     alertScreen.style.background = 'rgba(255,51,68,' + v / 100 + ')';
 });
 alertScreen.style.background = 'rgba(255,51,68,' + nightOpacity.value / 100 + ')';
-export let wakeLock = null, running = false, starting = false, startCancelled = false, stream = /** @type {MediaStream|null} */ (null), detectionResultGeneration = 0, raf = null, lastRender = 0, fatigue = 0, confidence = 0, earHistory = [], sessionStart = 0, maxFatigue = 0, fatigueSampleSum = 0, fatigueSampleCount = 0, noseYHistory = [], headNods = 0, lastNod = 0, lastFleetPush = 0, cloudReady = false, backendSessionId = null, backendSessionPromise = null, backendEventQueue = Promise.resolve(), backendSessionGeneration = 0, backendSessionScope = null, cloudConsentRevision = 0, cloudSummaryOutbox = null, cloudSummaryClearPending = false, driverId = migrateLocalDriverIdentity(localStorage.getItem('occulert-driver-id')), gpsWatch = null, lastPosition = null, routePoints = [], distanceMeters = 0, perclosWindow = [], eyesClosedSince = 0, microsleeps = 0, lastMicro = 0, turnedSince = 0, totalDistractionMs = 0, calibrating = false, calibrated = false, calibrationUntil = 0, calibrationSamples = [], baselineEAR = .28, baseClosedThreshold = .18, baseWatchThreshold = .22, eyeClosedThreshold = .18, eyeWatchThreshold = .22, noFaceSince = 0, lastFaceSeen = 0, hiddenAt = 0, performanceSamples = [], processedFrames = 0, performanceSessionStart = 0;
+export let wakeLock = null, running = false, starting = false, startCancelled = false, stream = /** @type {MediaStream|null} */ (null), detectionResultGeneration = 0, raf = null, lastRender = 0, fatigue = 0, confidence = 0, earHistory = [], sessionStart = 0, maxFatigue = 0, fatigueSampleSum = 0, fatigueSampleCount = 0, noseYHistory = [], headNods = 0, lastNod = 0, lastFleetPush = 0, cloudReady = false, backendSessionId = null, backendSessionPromise = null, backendEventQueue = Promise.resolve(), backendSessionGeneration = 0, backendSessionScope = null, cloudConsentRevision = 0, cloudSummaryOutbox = null, cloudSummaryClearPending = false, driverId = migrateLocalDriverIdentity(getPreference('occulert-driver-id')), gpsWatch = null, lastPosition = null, routePoints = [], distanceMeters = 0, perclosWindow = [], eyesClosedSince = 0, microsleeps = 0, lastMicro = 0, turnedSince = 0, totalDistractionMs = 0, calibrating = false, calibrated = false, calibrationUntil = 0, calibrationSamples = [], baselineEAR = .28, baseClosedThreshold = .18, baseWatchThreshold = .22, eyeClosedThreshold = .18, eyeWatchThreshold = .22, noFaceSince = 0, lastFaceSeen = 0, hiddenAt = 0, performanceSamples = [], processedFrames = 0, performanceSessionStart = 0;
 export const LEFT = [362, 385, 387, 263, 373, 380], RIGHT = [33, 160, 158, 133, 153, 144], PROCESS_INTERVAL = 135, RENDER_INTERVAL = 180, FLEET_PUSH_INTERVAL = 5000, CALIBRATION_MS = 3200, DETECTION_INFERENCE_TIMEOUT_MS = 3000, DETECTION_CLOSE_TIMEOUT_MS = 750;
 window.OcculertPerformance = Object.freeze({ snapshot: framePerformanceSnapshot });
 export function log(msg) {
@@ -534,7 +562,7 @@ export function loadExperimentController() {
     }
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/detection-experiments.v2.js';
+        script.src = '/detection-experiments.v3.js';
         script.integrity = EXPERIMENT_HELPER_INTEGRITY;
         script.crossOrigin = 'anonymous';
         const timer = setTimeout(() => { script.remove(); reject(Error('Parked helper timed out')); }, 7000);

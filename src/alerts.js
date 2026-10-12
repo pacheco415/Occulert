@@ -8,7 +8,7 @@ import "./calibration.js";
 import "./metrics.js";
 import "./storage-history.js";
 import { pushFleet } from "./cloud-sync.js";
-import { experimentFlags, experimentController, startupAllowsMonitoring, alertsEl, alertScreen, alertTitle, alertSub, nightOpacity, running, starting, confidence, sessionStart, calibrating, log, _lastBreakPrompt, set__lastBreakPrompt } from "./ui.js";
+import { getPreference, setPreference, experimentFlags, experimentController, startupAllowsMonitoring, alertsEl, alertScreen, alertTitle, alertSub, nightOpacity, running, starting, confidence, sessionStart, calibrating, log, _lastBreakPrompt, set__lastBreakPrompt } from "./ui.js";
 export let acceptedAlertHook = /** @type {((reason:string)=>void)|null} */ (null);
 /** @param {(reason:string)=>void} hook */
 export function registerAcceptedAlertHook(hook) { acceptedAlertHook = hook; }
@@ -319,9 +319,9 @@ export function demoAlert() {
 export let _voiceEnabled;
 // Restore at the original entry phase, after control/camera registrations.
 export function initializeVoicePreference() {
-    _voiceEnabled = localStorage.getItem('occulert-voice') === 'true';
+    _voiceEnabled = getPreference('occulert-voice') === 'true';
 }
-/** A failed restore keeps the entry-owned preference uninitialized. */
+/** Partial startup must not use voice actions before the entry restores defaults. */
 function readVoicePreference() {
     if (typeof _voiceEnabled !== 'boolean')
         throw new ReferenceError("Cannot access '_voiceEnabled' before initialization");
@@ -345,8 +345,8 @@ export function speak(msg) {
     catch (e) { }
 }
 export function toggleVoice() {
-    _voiceEnabled = !readVoicePreference(); /** @type {WebIdlStorage} */
-    (localStorage).setItem('occulert-voice', _voiceEnabled);
+    _voiceEnabled = !readVoicePreference();
+    setPreference('occulert-voice', String(_voiceEnabled));
     const b = document.getElementById('voiceToggleBtn');
     if (b)
         b.textContent = _voiceEnabled ? '🔊 Voice ON' : '🔇 Voice OFF';

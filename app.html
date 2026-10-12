@@ -9,11 +9,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
-<!-- Request the integrity-checked guard early; core loading must not block parsing. -->
-<script id="driver-startup-guard" src="/driver-startup-guard.v6.js" integrity="sha256-mTgweukdfvSd5vgtPbbK4A++fSy11BPTLn0L8F23Nhk=" crossorigin="anonymous" defer></script>
+
+<script id="driver-startup-guard" src="/driver-startup-guard.v7.js" integrity="sha256-xKeICIU1tKTb9gQjvXJVx/AD/INHmnQ+kODRfXTlL+o=" crossorigin="anonymous" defer></script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
-<!-- The supported cloud path uses authenticated Occulert API endpoints. -->
+
 <link rel="stylesheet" href="/driver-app.v68.css" />
 <link rel="stylesheet" href="/liquid-glass.v49.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
@@ -73,7 +73,7 @@
     </div>
     <fieldset id="driverControls" disabled aria-label="Monitoring controls" style="border:0;padding:0;margin:0;min-width:0">
 
-    <!-- ── Background / Screen-Lock Warning ─────────────────────────────── -->
+
     <div class="screen-warning" id="screenWarning" style="display:none">
       ⚠️ <strong>Monitoring stopped after screen lock or leaving this tab.</strong> Return to Occulert and restart only while safely parked.
     </div>
@@ -103,7 +103,7 @@
       <p class="camera-source-hint" id="cameraSourceHint" aria-live="polite">Choose your Mac camera to keep Safari from using your iPhone.</p>
     </div>
 
-    <!-- Display Intensity Controls -->
+
     <div class="intensity-row">
       <label>&#128261; Display Intensity</label>
       <div class="intensity-presets">
@@ -113,7 +113,7 @@
       </div>
     </div>
 
-    <!-- ── Sensitivity Control ──────────────────────────────────────────── -->
+
     <div class="intensity-row" id="sensitivityRow">
       <label>🎚 Alert Sensitivity</label>
       <div class="intensity-presets">
@@ -169,22 +169,22 @@
       <p id="feedbackStatus" class="small" role="status" aria-live="polite"></p>
     </div>
     <div class="card"><div class="label">Event Log</div><div id="log"></div></div>
-  
-    <!-- ── NEW FEATURE UI BLOCKS ─────────────────────────────────── -->
 
-    <!-- Yawn Card -->
+
+
+
     <div class="grid" style="margin-bottom:10px">
       <div class="card"><div class="label">Yawns</div><div class="value" id="yawnCountEl">0</div></div>
       <div class="card"><div class="label">MAR Signal</div><div class="value" style="font-size:12px;color:var(--text2)" id="marEl">--</div></div>
     </div>
 
-    <!-- Alertness Mini-Chart -->
+
     <div class="card" style="padding:10px 12px;margin-bottom:10px">
       <div class="label" style="margin-bottom:6px">Alertness Over Time</div>
       <canvas id="alertnessChart" style="width:100%;height:60px;display:block;border-radius:6px;background:rgba(0,0,0,.3)"></canvas>
     </div>
 
-    <!-- Controls: Voice, Snooze, CSV Export, PWA Install -->
+
     <div class="card" style="padding:12px 14px;margin-bottom:10px">
       <div class="label" style="margin-bottom:10px">Controls</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
@@ -193,7 +193,7 @@
       </div>
     </div>
 
-    <!-- Export + Install row -->
+
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
       <button data-page-action="exportCSV" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
       <button id="pwaInstallBtn" data-page-action="triggerPWAInstall" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
@@ -205,10 +205,10 @@
 <script src="/occulert-backend.v81.js" defer></script>
 <script src="/security-utils.v47.js" defer></script>
 <script src="/local-history.v2.js" defer></script>
-<script src="/driver-app.v85.js" defer></script>
+<script src="/driver-app.v86.js" defer></script>
 <script src="/lang.v47.js" defer></script>
 
-<!-- iOS Add to Home Screen Modal -->
+
 <div id="iosInstallModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom)">
   <div style="background:#0f1e2e;border:1px solid #1a3a4a;border-radius:20px 20px 0 0;padding:28px 24px 32px;width:100%;max-width:480px;position:relative">
     <button data-page-action="closeIOSInstallModal" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1">✕</button>

@@ -11,7 +11,14 @@ hooks run only after the original cooldown, calibration and confidence checks.
 Application `start`/`stop` are readonly lexical aliases. The browser's own
 `window.stop` remains available. Audio recovery listeners stay at the tested
 alerts boundary; preference restore and final readiness are explicit entry phases.
-A failed voice restore keeps voice actions uninitialized and fails before writes.
+Unavailable browser storage restores standard brightness, medium sensitivity,
+and voice off. The UI-owned preference helpers catch both storage property and
+method failures, return null/false, and show one parked settings note. Changes
+remain active for this page even when they cannot be saved; calibration reapplies
+the current sensitivity. The driver identity bootstrap also uses the safe helper
+so a missing persisted identity does not block readiness. Session-history storage
+and its existing failure reporting remain unchanged. Partial startup still
+keeps voice actions uninitialized until the entry restores their preference.
 
 `npm run build` compiles the actual source graph into ignored `build/driver-app.js`
 and a provenance receipt. Pinned esbuild creates a single classic-script compatible

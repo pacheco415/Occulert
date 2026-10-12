@@ -4,7 +4,7 @@ import "./calibration.js";
 import "./metrics.js";
 import { alerts } from "./alerts.js";
 import "./cloud-sync.js";
-import { fatigue, sessionStart, headNods, microsleeps, log, localSessionId, _sessionLog } from "./ui.js";
+import { setPreference, fatigue, sessionStart, headNods, microsleeps, log, localSessionId, _sessionLog } from "./ui.js";
 export function createLocalDriverId() {
     try {
         if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
@@ -54,7 +54,7 @@ export function migrateLocalDriverIdentity(value) {
     const oldId = String(value || '').trim(), newId = normalizeLocalDriverId(oldId);
     if (oldId && oldId !== newId)
         ['occulert-profile', 'occulert-live-session', 'occulert-session-history', 'occulert-drivers'].forEach(key => rewriteStoredDriverId(key, oldId, newId));
-    localStorage.setItem('occulert-driver-id', newId);
+    setPreference('occulert-driver-id', newId);
     return newId;
 }
 export function saveLocalSessionHistory(payload) {
