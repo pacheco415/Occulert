@@ -9,6 +9,7 @@ These opt-in web experiments are for stationary software evaluation. The empty-q
 | `noface-escalation=1` | Request the existing full alert once when face loss follows closed eyes, WATCH fatigue (35), or a downward nose estimate within 3 seconds; freeze fatigue decay for that qualified loss episode. |
 | `perclos=time` | Compute closed / usable observed milliseconds in a 60-second window, rather than a fraction of frames. |
 | `pitch-gate=1` | Calibrate a dimensionless neutral nose/eye/chin ratio while parked; pause eye/microsleep evidence while down or while calibrated pitch geometry is unknown. |
+| `distraction-confidence=stable` | Use the calibrated confidence rule during a tracked head turn even after calibration falls back to defaults. |
 | `detector=tasks` | Collect the owned Tasks detector's bilateral blink, jaw and matrix measurements alongside the legacy detector on the same captured frame. Tasks does not control alerts. |
 | `tasks-delegate=cpu` | Explicitly request CPU for the optional Tasks runtime; its default is GPU. No silent fallback. |
 
@@ -75,3 +76,35 @@ flag parked until labeled sessions support changing the default.
 
 Every new session and Recalibrate clears the preceding personal baseline and
 base thresholds, including when calibration later has no accepted samples.
+
+## Parked distraction confidence
+
+`distraction-confidence=stable` uses the existing calibrated confidence rule
+during a tracked head turn: add five confidence points, cap at 100, then
+subtract five with the existing floor of 35. Sessions that fell back to default
+eye thresholds use this same rule while turned. Frontal frames keep their
+existing calibrated or uncalibrated confidence gain. Calibrated behavior,
+eye thresholds, the confidence requirement of 45, the head-turn duration
+requirement above 6500 ms, alert cooldowns and escalation remain unchanged.
+
+With this flag, a continuously tracked head turn beginning with adequate
+confidence can fire the Distraction alert after calibration falls back to
+defaults. At the ordinary 135 ms frame interval, those alerts previously never
+fired because confidence fell below 45 before 6.5 seconds. At 300 ms intervals,
+they already fired in the same example; the flag preserves confidence instead
+of letting it decay with the number of processed frames. Synthetic tests at
+both intervals place the first alert at 6.6 seconds for calibrated and default
+sessions. Low confidence still suppresses alerts; the flag does not fabricate
+tracking confidence or validate physical head-turn accuracy.
+
+Retained confidence can also let the existing Fatigue alert fire later in a
+prolonged default-calibration head turn once fatigue reaches 80 and the alert
+cooldown permits it. The existing microsleep counter can qualify when its
+closed-eye duration and confidence rules are met. These rules are unchanged;
+the flag removes the confidence decay that previously blocked them.
+
+The flag requires a unique exact value, stays local to this browser, and can be
+combined with the other parked modes. Used alone, it retains the ordinary
+scoring path; primary experimental modes apply the same confidence rule in
+their controller. Keep it off by default until labeled parked evaluation
+supports changing the released behavior.

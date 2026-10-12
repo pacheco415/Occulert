@@ -102,6 +102,13 @@ The driver now uses the bundled source mode described in
 then release through `asset:release`; do not copy compiled output into the entry.
 Other logical assets retain the existing manual immutable release process.
 
+The optional parked helper now has editable copy-mode source at
+`src/detection-experiments.js`, registered as `detection-experiments.js`.
+`asset:release` releases its changes together with the compiled driver and
+startup guard, synchronizing helper integrity and importer references in one
+cache update. The helper remains outside the nine-module driver bundle and
+loads only for selected parked experiments.
+
 ### Weekly retired asset cleanup
 
 Run `npm run asset:retire` in a full-history checkout to review eligible files,

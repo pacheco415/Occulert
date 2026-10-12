@@ -22,7 +22,10 @@ function snapshot(cwd) {
 function fixture(body) {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-bundle-release-'));
   try {
-    const paths = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+    const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
+    // Include new reviewable source and release outputs before Git staging.
+    for (const entry of Object.values(json(root, 'source-assets.json').assets)) paths.add(entry.source);
+    for (const name of Object.values(json(root, 'asset-versions.json'))) paths.add(name);
     for (const name of paths) { mkdirSync(dirname(join(cwd, name)), { recursive: true }); cpSync(join(root, name), join(cwd, name)); }
     symlinkSync(join(root, 'node_modules'), join(cwd, 'node_modules'), 'dir');
     git(cwd, 'init', '-q'); commit(cwd); git(cwd, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
@@ -38,7 +41,7 @@ test('real bundled output and both release no-op modes preserve every file', () 
   const commentOnly = snapshot(cwd);
   assert.equal(JSON.parse(run(cwd, '--release')).noOp, true);
   assert.deepEqual(snapshot(cwd), commentOnly);
-  assert.equal(auditSourceAssets(cwd).length, 1);
+  assert.equal(auditSourceAssets(cwd).length, 2);
 }));
 
 test('a real module edit releases compiled output and guard while pending work blocks dependency bumps', () => fixture(cwd => {
@@ -47,7 +50,7 @@ test('a real module edit releases compiled output and guard while pending work b
   const pending = snapshot(cwd); assert.throws(() => run(cwd, 'detection-experiments.js'), /Pending source edits/); assert.deepEqual(snapshot(cwd), pending);
   const plan = JSON.parse(run(cwd, '--release', '--dry-run')); assert.equal(plan.sources[0].changed, true); assert.deepEqual(snapshot(cwd), pending);
   run(cwd, '--release'); const active = json(cwd, 'asset-versions.json')['driver-app.js'];
-  assert.ok(read(cwd, active).includes("'READY'")); assert.equal(read(cwd, 'src/driver-app.js'), entry); assert.equal(auditSourceAssets(cwd).length, 1);
+  assert.ok(read(cwd, active).includes("'READY'")); assert.equal(read(cwd, 'src/driver-app.js'), entry); assert.equal(auditSourceAssets(cwd).length, 2);
   for (const [name, digest] of Object.entries(prior)) assert.equal(hash(readFileSync(join(cwd, name))), digest);
 }));
 
@@ -59,13 +62,34 @@ test('real helper bump and unpublished refresh synchronize modules and exact com
     const helper = readFileSync(join(cwd, manifest['detection-experiments.js'])), pin = 'sha256-' + createHash('sha256').update(helper).digest('base64');
     assert.ok(read(cwd, 'src/ui.js').includes(manifest['detection-experiments.js'])); assert.ok(read(cwd, 'src/ui.js').includes(pin));
     assert.equal(read(cwd, 'src/driver-app.js'), entry); assert.ok(read(cwd, manifest['driver-app.js']).includes(pin));
-    assert.equal(auditSourceAssets(cwd).length, 1);
+    assert.equal(auditSourceAssets(cwd).length, 2);
     const hashes = json(cwd, 'asset-integrity.json'); for (const [name, digest] of Object.entries(hashes)) assert.equal(hash(readFileSync(join(cwd, name))), digest);
   };
   assertPins(); writeFileSync(join(cwd, manifest['detection-experiments.js']), read(cwd, manifest['detection-experiments.js']) + '\n// New unpublished helper fixture.\n');
   run(cwd, 'detection-experiments.js', '--refresh'); assertPins();
   for (const [name, digest] of Object.entries(prior)) assert.equal(hash(readFileSync(join(cwd, name))), digest);
   commit(cwd); assert.equal(JSON.parse(run(cwd, '--release')).noOp, true);
+}));
+
+test('changed helper source and driver module release together with one guard and cache update',()=>fixture(cwd=>{
+  const before=json(cwd,'asset-versions.json'),prior=json(cwd,'asset-integrity.json');
+  const previousCache=Number(read(cwd,'sw.js').match(/const CACHE = 'occulert-v(\d+)'/)[1]);
+  writeFileSync(join(cwd,'src/metrics.js'),read(cwd,'src/metrics.js').replace("'SAFE'","'READY'"));
+  const helper=read(cwd,'src/detection-experiments.js')+'\n// Paired helper source release fixture.\n';
+  writeFileSync(join(cwd,'src/detection-experiments.js'),helper);
+  const pending=snapshot(cwd),plan=JSON.parse(run(cwd,'--release','--dry-run'));
+  assert.equal(plan.sources.filter(entry=>entry.changed).length,2);
+  assert.equal(Object.keys(plan.copies).length,3);assert.deepEqual(snapshot(cwd),pending);
+  run(cwd,'--release');const manifest=json(cwd,'asset-versions.json');
+  for(const logical of ['driver-app.js','detection-experiments.js','driver-startup-guard.js'])assert.notEqual(manifest[logical],before[logical]);
+  assert.equal(read(cwd,manifest['detection-experiments.js']),helper);
+  const pin='sha256-'+createHash('sha256').update(helper).digest('base64');
+  assert.ok(read(cwd,'src/ui.js').includes(pin));assert.ok(read(cwd,manifest['driver-app.js']).includes(pin));
+  assert.ok(read(cwd,manifest['driver-app.js']).includes("'READY'"));
+  assert.ok(read(cwd,manifest['driver-startup-guard.js']).includes(manifest['driver-app.js']));
+  assert.ok(read(cwd,'sw.js').includes("const CACHE = 'occulert-v"+(previousCache+1)+"'"));
+  assert.equal(auditSourceAssets(cwd).length,2);
+  for(const [name,digest]of Object.entries(prior))assert.equal(hash(readFileSync(join(cwd,name))),digest);
 }));
 
 test('broken module compilation and public source configuration fail before release writes', () => fixture(cwd => {
@@ -98,7 +122,7 @@ test('prebuilt Vercel deployments skip the excluded compiler while CI verifies c
   for (const path of ['src/', 'build/', 'scripts/', 'source-assets.json', 'source-driver-contract.json', 'jsconfig.json', 'eslint.config.mjs'])
     assert.ok(exclusions.has(path), 'Development input must stay excluded from deployment: ' + path);
   const manifest = json(root, 'asset-versions.json'), pins = json(root, 'asset-integrity.json');
-  for (const logical of ['driver-app.js', 'driver-startup-guard.js']) {
+  for (const logical of ['driver-app.js', 'driver-startup-guard.js', 'detection-experiments.js']) {
     const active = manifest[logical];
     assert.ok(!exclusions.has(active), 'The committed runtime must remain a deployment asset');
     assert.equal(hash(readFileSync(join(root, active))), pins[active], 'The prebuilt runtime must retain its committed integrity pin');
