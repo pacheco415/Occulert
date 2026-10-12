@@ -49,6 +49,8 @@ Record both whether a signal was **sent** and whether a person actually
 | Phone speaker and vibration | ____ | ____ | ____ |
 | Phone muted or low volume | ____ | ____ | ____ |
 | iPhone Safari + Home Screen PWA, Silent switch ON: alert audible (pass/fail) | Not tested | Not tested | Physical iPhone acceptance required |
+| Optional `alert-pattern=strong`, Safari and Home Screen PWA, Silent ON/OFF: 2.5-second lower and 4-second higher patterns | Not tested | Not tested | Record exact deployment, volume, duration and speaker/headphone/car route |
+| Optional strong pattern: Stop, tab hidden or screen lock ends sound and red screen immediately; visible return does not replay | Not tested | Not tested | Verify each route while parked; separately record interruption and recovery behavior |
 | Car audio connected | ____ | ____ | ____ |
 | Headphones connected | ____ | ____ | ____ |
 | Focus or notification restrictions | ____ | ____ | ____ |

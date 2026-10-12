@@ -36,3 +36,30 @@ this small sound for the new offline cache. Keep its published URL immutable.
 Detection thresholds, scoring, alert cooldowns and escalation timing are
 unchanged. Software stubs verify delivery paths and rejection handling; they
 cannot verify a physical speaker, Silent switch or notification route.
+
+## Optional stronger pattern
+
+Open `/app.html?alert-pattern=strong` only for parked evaluation. The option
+requires one exact value; absent, duplicate or differently cased values retain
+the standard alerts. It is not saved as a preference and remains off by default.
+It changes audio and the red alert screen independently of the detector flags;
+scoring, confidence, cooldowns, escalation timing and cloud consent are unchanged.
+
+Levels 1–2 alternate 880/1100 Hz every 250 ms for 2.5 seconds at Web Audio gain
+0.6. Levels 3–4 use the same alternating pattern for 4 seconds at gain 1.0.
+The red screen lasts for the same duration. Strong mode replaces the existing
+short main tone and delayed 55 Hz pulses; notifications and vibration retain
+their existing mappings. The deliberate parked Test Alert uses the lower band
+without adding a detection event or delivered-alert count.
+
+When Web Audio is unavailable or interrupted at alert start, the existing 880 Hz WAV loops
+for the same bounded duration at media volume 0.6 or 1.0. This fallback repeats
+one pitch; it does not reproduce the two Web Audio pitches. One owned oscillator
+or one reusable audio element produces the pattern. Stop, a hidden tab, a new
+audio scope and pattern completion cancel its output and red screen. Stale
+completion callbacks cannot cancel a newer pattern or monitoring scope.
+
+Keep this option parked until the exact website release passes the physical
+checks in [DEVICE_ACCEPTANCE.md](DEVICE_ACCEPTANCE.md), including Safari and
+Home Screen PWA Silent mode, speaker/headphone/car routes, interruptions and
+immediate Stop/background cancellation. All these results remain **Not tested**.

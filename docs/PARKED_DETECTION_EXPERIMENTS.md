@@ -108,3 +108,17 @@ combined with the other parked modes. Used alone, it retains the ordinary
 scoring path; primary experimental modes apply the same confidence rule in
 their controller. Keep it off by default until labeled parked evaluation
 supports changing the released behavior.
+
+## Independent stronger-alert audio option
+
+`alert-pattern=strong` is a separate parked audio option, described in
+[Browser alert audio recovery](IOS_BROWSER_ALERT_AUDIO.md#optional-stronger-pattern).
+It requires a unique exact value and stays off by default. It does not select
+the experimental detector controller or add a detector flag; existing detector
+selection and cloud consent behavior remain unchanged. The parked Test Alert
+uses its 2.5-second lower-level pattern without changing detection counters.
+Qualifying levels 3–4 use a 4-second pattern. Both alternate 880/1100 Hz with
+Web Audio; the unavailable/interrupted-context fallback repeats the existing
+880 Hz WAV. The red screen has the same duration, and Stop or foreground loss
+cancels all owned strong output immediately. These software paths do not establish
+physical alert perception or support changing the default pattern.

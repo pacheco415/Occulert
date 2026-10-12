@@ -46,6 +46,7 @@ test('parked output check leaves session telemetry untouched and is disabled whi
     startupAllowsMonitoring: () => true,
     running: false,
     starting: false,
+    strongAlertPattern: false,
     sessionStart: 12345,
     localSessionId: 'saved-session',
     alerts: 2,

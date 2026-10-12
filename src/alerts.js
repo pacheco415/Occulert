@@ -16,6 +16,73 @@ export let lastAlert = 0, alerts = 0, escalationLevel = 0, lastEscalation = 0;
 export let _ac = /** @type {BrowserAudioContext|null} */ (null), _acResumePending = /** @type {BrowserAudioContext|null} */ (null), _alertAudio = /** @type {HTMLAudioElement|null} */ (null), _alertAudioRequested = false;
 export let _alertAudioTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null), _alertAudioRevision = 0, _alertAudioOwner = 0, _alertAudioSession = /** @type {OwnedAudioSession|null} */ (null), _alertTestOwner = 0;
 export const ALERT_AUDIO_URL = '/audio/alert.v1.wav';
+// Output-only parked prototype; detection/controller flags remain independent.
+export const strongAlertPattern = (() => {
+    try {
+        const query = new URLSearchParams(window.location?.search || '');
+        return query.getAll('alert-pattern').length === 1 && query.get('alert-pattern') === 'strong';
+    } catch (_) { return false; }
+})();
+let strongTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null), strongRevision = 0;
+let strongOscillator = /** @type {OscillatorNode|null} */ (null), strongGain = /** @type {GainNode|null} */ (null);
+function stopStrongOscillator() {
+    const oscillator = strongOscillator, gain = strongGain;
+    strongOscillator = null;
+    strongGain = null;
+    try { oscillator?.stop(); } catch (_) { }
+    try { oscillator?.disconnect(); } catch (_) { }
+    try { gain?.disconnect(); } catch (_) { }
+}
+export function cancelStrongAlert() {
+    strongRevision++;
+    if (strongTimer !== null) {
+        clearTimeout(strongTimer);
+        strongTimer = null;
+        cancelFallbackAlert();
+        alertScreen.classList.remove('show');
+    }
+    stopStrongOscillator();
+}
+/** @param {number} level */
+export function playStrongAlert(level) {
+    cancelStrongAlert();
+    if (document.hidden) {
+        alertScreen.classList.remove('show');
+        return;
+    }
+    const duration = level >= 3 ? 4000 : 2500, gain = level >= 3 ? 1 : .6;
+    const revision = strongRevision;
+    alertScreen.classList.add('show');
+    strongTimer = setTimeout(() => {
+        if (revision === strongRevision)
+            cancelStrongAlert();
+    }, duration);
+    if (!_alertAudioRequested)
+        return;
+    try {
+        const ac = getAC();
+        if (ac && (ac.state === 'suspended' || ac.state === 'interrupted'))
+            primeAlertAudio();
+        if (!ac || ac.state !== 'running') {
+            playFallbackAlert(duration, gain, true);
+            return;
+        }
+        const oscillator = strongOscillator = ac.createOscillator();
+        const volume = strongGain = ac.createGain();
+        oscillator.connect(volume);
+        volume.connect(ac.destination);
+        oscillator.type = 'sine';
+        volume.gain.value = gain;
+        const at = ac.currentTime;
+        for (let i = 0; i < duration / 250; i++)
+            oscillator.frequency.setValueAtTime(i % 2 ? 1100 : 880, at + i / 4);
+        oscillator.start();
+        oscillator.stop(at + duration / 1000);
+    } catch (_) {
+        stopStrongOscillator();
+        playFallbackAlert(duration, gain, true);
+    }
+}
 /** @returns {BrowserAudioContext|null} */
 export function getAC() {
     if (!_ac || _ac.state === 'closed') {
@@ -43,6 +110,7 @@ export function requestAlertPlaybackSession() {
 }
 /** @returns {AudioScopeOwner} */
 export function beginAlertAudioScope() {
+    cancelStrongAlert();
     const owner = ++_alertAudioOwner;
     _alertAudioRequested = true;
     primeAlertAudio(true);
@@ -54,6 +122,7 @@ export function releaseAlertAudioScope(owner = _alertAudioOwner) {
         return false;
     _alertAudioOwner++;
     _alertAudioRequested = false;
+    cancelStrongAlert();
     cancelFallbackAlert();
     const held = _alertAudioSession;
     _alertAudioSession = null;
@@ -94,6 +163,7 @@ export function cancelFallbackAlert() {
     _alertAudioTimer = null;
     if (_alertAudio) {
         try {
+            _alertAudio.loop = false;
             _alertAudio.pause();
             _alertAudio.currentTime = 0;
         }
@@ -147,8 +217,8 @@ export function primeAlertAudio(userGesture = false) {
         }
     }
 }
-/** @param {number} dur @param {number} gain */
-export function playFallbackAlert(dur, gain) {
+/** @param {number} dur @param {number} gain @param {boolean} [repeat] */
+export function playFallbackAlert(dur, gain, repeat = false) {
     if (!_alertAudioRequested || document.hidden)
         return;
     const audio = getAlertAudio();
@@ -160,10 +230,11 @@ export function playFallbackAlert(dur, gain) {
         audio.muted = false;
         audio.volume = Math.max(0, Math.min(1, gain));
         audio.currentTime = 0;
+        audio.loop = repeat;
         _alertAudioTimer = setTimeout(() => {
             if (revision === _alertAudioRevision)
                 cancelFallbackAlert();
-        }, Math.max(1, Math.min(900, dur)));
+        }, Math.max(1, Math.min(repeat ? 4000 : 900, dur)));
         Promise.resolve(audio.play()).catch(() => {
             if (revision === _alertAudioRevision)
                 cancelFallbackAlert();
@@ -204,9 +275,15 @@ export function tone(freq, dur, gain) {
     }
 }
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden)
+    if (document.hidden) {
+        cancelStrongAlert();
         cancelFallbackAlert();
-    else if (_alertAudioRequested)
+        if (strongAlertPattern && _alertTestOwner) {
+            const owner = _alertTestOwner;
+            clearParkedAlertTest(owner);
+            releaseAlertAudioScope(owner);
+        }
+    } else if (_alertAudioRequested)
         primeAlertAudio();
 });
 document.addEventListener('pointerdown', () => {
@@ -231,9 +308,11 @@ export function trigger(reason, eligibility) {
     alertSub.textContent = escalationLevel >= 3 ? 'Driver should pull over and confirm safety' : 'Pull over safely';
     alertScreen.style.background = 'rgba(255,51,68,' + Number(nightOpacity.value) / 100 + ')';
     alertScreen.classList.add('show');
-    setTimeout(() => alertScreen.classList.remove('show'), 1300);
+    if (!strongAlertPattern)
+        setTimeout(() => alertScreen.classList.remove('show'), 1300);
     if (navigator.vibrate)
         navigator.vibrate(escalationLevel >= 3 ? [700, 150, 700, 150, 700, 150, 700] : [500, 150, 500, 150, 300]);
+    if (!strongAlertPattern) {
     try {
         const _hac = getAC();
         if (_hac && (_hac.state === 'suspended' || _hac.state === 'interrupted'))
@@ -267,6 +346,7 @@ export function trigger(reason, eligibility) {
         }
     }
     catch (e) { }
+    }
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         try {
             const _ntitle = 'Occulert ⚠️ Drowsiness Alert';
@@ -289,7 +369,10 @@ export function trigger(reason, eligibility) {
         }
         catch (e) { }
     }
-    tone(escalationLevel >= 3 ? 1100 : 880, escalationLevel >= 3 ? 900 : 450, escalationLevel >= 3 ? .35 : .2);
+    if (strongAlertPattern)
+        playStrongAlert(escalationLevel);
+    else
+        tone(escalationLevel >= 3 ? 1100 : 880, escalationLevel >= 3 ? 900 : 450, escalationLevel >= 3 ? .35 : .2);
     log((reason || 'Drowsy') + ' alert triggered - escalation ' + escalationLevel);
     pushFleet(true);
     if (typeof acceptedAlertHook === 'function')
@@ -305,7 +388,10 @@ export function demoAlert() {
     alertSub.textContent = 'Sound and vibration check only';
     alertScreen.style.background = 'rgba(255,51,68,' + Number(nightOpacity.value) / 100 + ')';
     alertScreen.classList.add('show');
-    tone(880, 450, .25);
+    if (strongAlertPattern)
+        playStrongAlert(1);
+    else
+        tone(880, 450, .25);
     if (navigator.vibrate)
         navigator.vibrate([500, 150, 500]);
     if (result)
@@ -313,7 +399,7 @@ export function demoAlert() {
     setTimeout(() => {
         clearParkedAlertTest(audioOwner);
         releaseAlertAudioScope(audioOwner);
-    }, 1800);
+    }, strongAlertPattern ? 2500 : 1800);
 }
 /** @type {boolean | undefined} */
 export let _voiceEnabled;
