@@ -26,9 +26,10 @@ export function retireAssets({ root = process.cwd(), now = Date.now(), write = f
   const config = JSON.parse(read('vercel.json'));
   const retained = readdirSync(root).filter(file => !removals.has(file));
   config.headers = config.headers.filter(rule => {
-    // Only prune the owned immutable version rules; preserve all other policies.
+    // Only prune owned root JS/CSS version rules, including legacy unescaped dots.
+    // Nested audio/vendor assets are outside this tool's retained root file list.
     if (!rule.headers?.some(header => header.key.toLowerCase() === 'cache-control' && header.value.includes('immutable'))) return true;
-    if (!rule.source.includes('\\.v')) return true;
+    if (!/^\/[^/]*\\?\.v\d+\\?\.(?:js|css|\(js\|css\))$/.test(rule.source)) return true;
     const pattern = new RegExp(`^${rule.source}$`);
     return retained.some(file => pattern.test(`/${file}`));
   });
