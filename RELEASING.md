@@ -125,3 +125,15 @@ rules and unreferenced exact-name asset fixtures, and advances CACHE once beyond
 all recorded cache versions. Review tests that use fixtures with other names
 (the tool preserves these), run full verification, and follow the normal PR
 checks before merge. An empty cleanup does not change files or CACHE.
+
+The Weekly Asset Retirement Check runs on Monday at 16:17 UTC (09:17 PDT /
+08:17 PST) and can also be started manually in GitHub Actions. It runs
+`npm run asset:retire -- --check --fail-within-days=7` with full history. This
+read-only check lists eligible files and fails from exactly day 14, covering
+deadlines through the next weekly run, including weekends. The default manual
+`--check` window is three days and starts failing at day 18. Both include overdue
+files and retired dependencies protected by retained consumers and report each
+affected file's exact day-21 audit deadline. `--fail-within-days` accepts an
+integer from 1 through 21 and requires `--check`.
+Review protected references separately; the scheduled check never deletes
+files, rewrites references, or creates a cleanup release.
