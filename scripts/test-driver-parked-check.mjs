@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 import {createRequire} from 'node:module';
+import { parse, serialize } from 'parse5';
 const require=createRequire(import.meta.url);
 const manifest=JSON.parse(readFileSync(new URL('../asset-versions.json',import.meta.url),'utf8'));
 const historyData=require('../'+manifest['local-history.js']);
@@ -21,9 +22,11 @@ function extract(start, end) {
 
 test('active monitoring shows status and alerts while parked diagnostics are hidden', () => {
   const parkedStart = html.indexOf('<section id="parkedControls"');
-  const parkedEnd = html.indexOf('</section>', parkedStart);
-  assert.ok(parkedStart > 0 && parkedEnd > parkedStart);
-  const parked = html.slice(parkedStart, parkedEnd);
+  const findParked = node => node.attrs?.some(attr => attr.name === 'id' && attr.value === 'parkedControls')
+    ? node : node.childNodes?.map(findParked).find(Boolean);
+  const parkedNode = findParked(parse(html));
+  assert.ok(parkedStart > 0 && parkedNode, 'Parked controls must exist');
+  const parked = serialize(parkedNode);
   const live = html.slice(0, parkedStart);
   assert.match(parked, /id="demoBtn"/);
   assert.match(parked, /id="report"/);

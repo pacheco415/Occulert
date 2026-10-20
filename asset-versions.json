@@ -64,11 +64,13 @@
   "public-guidance.css": "public-guidance.v67.css",
   "fleet-followups.css": "fleet-followups.v67.css",
   "inter-fonts.css": "inter-fonts.v2.css",
-  "fleet-dashboard.js": "fleet-dashboard.v2.js",
+  "fleet-dashboard.js": "fleet-dashboard.v3.js",
   "homepage-bootstrap.js": "homepage-bootstrap.v2.js",
   "page-actions.js": "page-actions.v2.js",
   "local-history.js": "local-history.v2.js",
   "driver-startup-guard.js": "driver-startup-guard.v8.js",
   "detection-experiments.js": "detection-experiments.v3.js",
-  "public-page.css": "public-page.v1.css"
+  "public-page.css": "public-page.v1.css",
+  "driver-overview.js": "driver-overview.v1.js",
+  "driver-overview.css": "driver-overview.v1.css"
 }
