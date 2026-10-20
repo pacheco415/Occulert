@@ -27,14 +27,15 @@ and Reload remain outside the disabled monitoring fieldset.
 
 Keyboard users can Tab from Stop into the named “Monitoring status and guidance”
 and “Session details and safety notice” regions, then scroll with keyboard
-navigation. Stopped-reason recovery focuses and brings the status card into view.
+navigation. Camera guidance and alert overlays also expose named keyboard
+scroll targets. Stopped-reason recovery focuses and brings the status card into view.
 Foreground loss or camera disconnection stops monitoring; restarting remains a
 deliberate action taken while safely parked.
 
 ## Browser evidence
 
 [The compact layout tests](../tests/driver-compact-layout.spec.mjs) passed all
-22 focused cases across Chromium and WebKit. Repository verification passed
+24 focused cases across Chromium and WebKit. Repository verification passed
 all 88 checks. The full browser suite and required hosted checks remain separate
 release gates.
 
@@ -56,7 +57,7 @@ their own implementation and device evidence.
 The new driver stylesheet is 22,188 raw bytes, versus 15,776 for the previous
 version; gzip measures 5,427 bytes (about 5.4 KB). Its raw size budget deliberately
 increases to 23,000 bytes. The static install-cache cap increases from 330,000 to
-338,000 bytes to cover the measured 336,734-byte asset set (about 336.7 KB). These
+338,000 bytes to cover the measured 336,848-byte asset set (about 336.7 KB). These
 limits retain bounded headroom; the driver JavaScript budget stays at 90,000
 bytes. The separately loaded detector runtime is outside this static asset sum.
 

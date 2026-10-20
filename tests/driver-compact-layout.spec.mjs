@@ -163,7 +163,9 @@ test('large landscape text and the active alert leave Stop unobstructed', async 
   await expect(page.locator('#startBtn')).toHaveText('STOP MONITORING');
   await page.evaluate(() => { _alertAudioRequested = false; playStrongAlert(3); });
   await expect(page.locator('#alertScreen')).toHaveClass(/show/);
-  await page.locator('#alertSub').scrollIntoViewIfNeeded();
+  await page.getByRole('region', { name: 'DROWSY ALERT', exact: true }).focus();
+  await expect(page.locator('#alertScreen')).toBeFocused();
+  await page.keyboard.press('End');
   await inViewport(page.locator('#alertSub'), viewport);
   await expect(page.locator('#alertSub')).toHaveText('Pull over safely');
   await stopIsUsable(page, viewport);
@@ -171,6 +173,17 @@ test('large landscape text and the active alert leave Stop unobstructed', async 
   await page.locator('#startBtn').click();
   await expect(page.locator('#alertScreen')).not.toHaveClass(/show/);
   expect(await page.evaluate(() => window.__compactCameraOpens)).toBe(1);
+});
+
+test('parked camera guidance is keyboard scrollable on a short phone viewport', async ({ page }) => {
+  const viewport = { width: 320, height: 568 };
+  await ready(page, viewport);
+  await page.getByRole('region', { name: 'AI Fatigue Monitoring', exact: true }).focus();
+  await expect(page.locator('#overlay')).toBeFocused();
+  await page.keyboard.press('End');
+  await expect.poll(() => page.locator('#overlay').evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await inViewport(page.locator('#overlayHint'), viewport);
+  expect(await page.evaluate(() => window.__compactCameraOpens)).toBe(0);
 });
 
 test('keyboard users can scroll full status and secondary details while Stop stays visible', async ({ page }) => {

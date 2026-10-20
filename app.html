@@ -47,7 +47,7 @@
   <div class="camera">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
-    <div class="overlay" id="overlay"><div>
+    <div class="overlay" id="overlay" role="region" aria-labelledby="overlayTitle" tabindex="0"><div>
       <h2 id="overlayTitle" style="font-size:22px;font-weight:900;letter-spacing:-0.5px">AI Fatigue Monitoring</h2>
       <p class="small" id="overlayText">Supplemental prototype only. Keep your eyes on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.</p>
       <div class="phone-guide" id="phoneGuide">
@@ -61,7 +61,7 @@
       </div>
       <div class="hint" id="overlayHint"><strong>iPhone tip:</strong> Keep Safari open, screen unlocked, and Low Power Mode off for best reliability.</div>
     </div></div>
-    <div class="alertScreen" id="alertScreen"><div><h2 id="alertTitle" style="font-size:48px;color:#fff;margin:0">DROWSY ALERT</h2><p id="alertSub">Pull over safely</p></div></div>
+    <div class="alertScreen" id="alertScreen" role="region" aria-labelledby="alertTitle" tabindex="0"><div><h2 id="alertTitle" style="font-size:48px;color:#fff;margin:0">DROWSY ALERT</h2><p id="alertSub">Pull over safely</p></div></div>
   </div>
   <aside class="panel" id="driverPanel" aria-label="Occulert controls and metrics">
     <h1 id="driverPanelTitle" style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>
