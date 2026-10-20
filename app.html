@@ -15,6 +15,7 @@
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 
 <link rel="stylesheet" href="/driver-app.v68.css" />
+<link rel="stylesheet" href="/driver-overview.v1.css" />
 <link rel="stylesheet" href="/liquid-glass.v49.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
 <script src="/static-page.v60.js" defer></script>
@@ -92,6 +93,14 @@
 
     <section id="parkedControls" aria-label="Parked setup and diagnostics">
     <p class="small">Set up and review these controls only while safely parked. They are hidden during monitoring.</p>
+    <section class="card" id="driverOverview" aria-labelledby="driverOverviewTitle">
+      <div class="overview-heading"><h2 id="driverOverviewTitle">Your recent sessions</h2><button id="overviewRefresh" type="button">Refresh</button></div>
+      <p class="small" id="overviewLastSession">Loading saved sessions…</p>
+      <dl class="overview-metrics"><div><dt>Saved sessions</dt><dd id="overviewSessions">—</dd></div><div><dt>Recorded minutes</dt><dd id="overviewMinutes">—</dd></div><div><dt>Recorded alerts</dt><dd id="overviewAlerts">—</dd></div></dl>
+      <p class="small" id="overviewNextStep">Complete setup and review sessions only while parked.</p>
+      <div class="overview-actions"><a class="btn" href="/session-history.html">Review History</a><button class="btn" id="overviewAlertCheck" type="button">Check sound &amp; vibration</button></div>
+      <p class="small" id="overviewCoverage">Last 7 days · saved on this browser. Local records do not confirm cloud delivery.</p>
+    </section>
     <div class="camera-source-row" id="cameraSourceRow" hidden>
       <label for="cameraSourceSelect">Camera</label>
       <div class="camera-source-controls">
@@ -206,6 +215,7 @@
 <script src="/security-utils.v47.js" defer></script>
 <script src="/local-history.v2.js" defer></script>
 <script src="/driver-app.v87.js" defer></script>
+<script src="/driver-overview.v1.js" defer></script>
 <script src="/lang.v47.js" defer></script>
 
 

@@ -79,6 +79,7 @@
   .dashboard-page .followup-controls select,.dashboard-page .followup-controls button,.dashboard-page #followupRefresh{min-height:44px}
   .dashboard-page .followup-controls select{appearance:none;height:44px;font-size:16px;width:100%;padding:9px 10px}
   .followup-saved{color:#b3bccb}.followup-controls :disabled{opacity:.6}
+  .dashboard-page #actionQueue .action-guidance{margin:2px 0 0;color:var(--portal-muted);font-size:13px;line-height:1.55}
   .dashboard-page #actionQueue .action-open{justify-self:start;margin-top:4px}
   .dashboard-page .status-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:stretch;margin-top:10px}.dashboard-page .status-row .notice{margin:0}.dashboard-page .status-row .btn{min-width:110px}
   @media(max-width:1100px){.dashboard-page .launch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -99,7 +100,7 @@
       <div>
         <p class="eyebrow">Fleet workspace</p>
         <h1>Fleet overview</h1>
-        <p class="muted">Start with drivers who need attention, then review live status and recent sessions. Protected fleet views never include GPS coordinates or personal media.</p>
+        <p class="muted">Start with drivers who need attention, then review recorded status, data gaps, and recent sessions. Protected fleet views never include GPS coordinates or personal media.</p>
       </div>
       <details class="panel-details dashboard-tools">
         <summary>Dashboard tools</summary>
@@ -112,6 +113,10 @@
     </details>
     <div class="status-row"><div class="notice" id="cloudStatus" role="status" aria-live="polite">Checking protected fleet access...</div><button class="btn hidden" id="refreshNow" type="button" data-page-action="refreshProtectedFleetNow">Refresh now</button></div>
     <div class="empty-actions signed-out-recovery hidden" id="signedOutActions" aria-label="Signed-out fleet actions"><a class="btn primary" href="/login.html">Sign In</a><a class="btn" href="/">Back home</a></div>
+    <section class="ops ops-primary" aria-label="Fleet priorities">
+      <div class="card"><div class="section-title"><h2>Needs attention</h2><button class="btn" data-page-action="copyOpsSummary">Copy</button></div><p class="sub" id="actionQueueNote">Review the latest available records and check data gaps before drawing conclusions.</p><div class="ops-list" id="actionQueue"></div></div>
+      <div class="card"><div class="section-title"><h2>Reporting coverage</h2><a class="btn" id="rosterManageLink" href="/driver-profiles.html">Manage drivers</a></div><p class="sub">Latest session per active driver within the loaded 50-session snapshot. Missing records do not establish driver availability.</p><div class="ops-list" id="rosterSummary"></div></div>
+    </section>
     <section class="card launch-panel" aria-labelledby="pilotLaunchTitle">
       <div class="launch-header">
         <div><p class="eyebrow">Manager launch path</p><h2 id="pilotLaunchTitle">30-day pilot checklist</h2><p>Start with up to five drivers. <a href="/pilot-guide.html">Read the manager and driver quick start</a>. Progress uses protected fleet records only. Recorded sessions do not start a trial or establish its agreed dates.</p></div>
@@ -156,10 +161,6 @@
       <div class="pilot-report-actions"><button class="btn primary" id="pilotReportPrint" type="button" disabled>Print / save PDF</button><button class="btn" id="pilotReportCSV" type="button" disabled>Download complete report CSV</button><span class="sub">Use your browser’s print dialog to save the aggregate report as a PDF.</span></div>
       <details id="pilotReportPreview" class="pilot-report-preview"><summary>Preview manager report</summary><article id="pilotPrintableReport" aria-label="Printable aggregate pilot report"><h2>Occulert pilot report</h2><p>Protected report unavailable. Sign in and refresh protected data before printing.</p></article></details>
     </section>
-    <section class="ops ops-primary" aria-label="Fleet priorities">
-      <div class="card"><div class="section-title"><h2>Needs attention</h2><button class="btn" data-page-action="copyOpsSummary">Copy</button></div><div class="ops-list" id="actionQueue"></div></div>
-      <div class="card"><div class="section-title"><h2>Driver roster</h2><a class="btn" href="/driver-profiles.html">Manage drivers</a></div><div class="ops-list" id="rosterSummary"></div></div>
-    </section>
     <div class="dashboard-content">
     <section class="main">
       <div class="card">
@@ -167,8 +168,8 @@
           <h2>Driver status</h2>
           <div class="toolbar">
             <input class="input" id="driverSearch" aria-label="Search drivers" placeholder="Search driver, route, vehicle" data-page-action="queueDriverListRender-input">
-            <select class="select" id="riskFilter" aria-label="Filter drivers" data-page-action="queueDriverListRender"><option value="all">All drivers</option><option value="danger">High risk</option><option value="watch">Watch</option><option value="stale">Stale</option><option value="gps">Local GPS shared</option><option value="nogps">No local GPS</option></select>
-            <select class="select" id="sortMode" aria-label="Sort drivers" data-page-action="queueDriverListRender"><option value="risk">Sort by risk</option><option value="updated">Newest first</option><option value="score">Lowest score</option><option value="alerts">Most alerts</option></select>
+            <select class="select" id="riskFilter" aria-label="Filter drivers" data-page-action="queueDriverListRender"><option value="all">All drivers</option><option value="danger">Flagged</option><option value="watch">Watch</option><option value="stale">Older records</option><option value="gps">Local GPS shared</option><option value="nogps">No local GPS</option></select>
+            <select class="select" id="sortMode" aria-label="Sort drivers" data-page-action="queueDriverListRender"><option value="risk">Review priority</option><option value="updated">Newest first</option><option value="score">Lowest score</option><option value="alerts">Most alerts</option></select>
             <span class="sub" id="updated">waiting for data</span>
           </div>
         </div>
@@ -197,14 +198,14 @@
       <div class="card"><div class="label">Active Drivers</div><div class="kpi" id="kpiDrivers">0</div><div class="sub" id="kpiDriversSub">waiting</div></div>
       <div class="card"><div class="label">Fleet Safety Score</div><div class="kpi green" id="kpiScore">--</div><div class="sub" id="kpiScoreSub">no sessions</div></div>
       <div class="card"><div class="label">Drowsy Alerts</div><div class="kpi yellow" id="kpiAlerts">0</div><div class="sub" id="kpiAlertsSub">today</div></div>
-      <div class="card"><div class="label">High Risk</div><div class="kpi red" id="kpiRisk">0</div><div class="sub" id="kpiRiskSub">current</div></div>
-      <div class="card"><div class="label">Stale Sessions</div><div class="kpi blue" id="kpiStale">0</div><div class="sub">older than 5m</div></div>
+      <div class="card"><div class="label">Flagged records</div><div class="kpi red" id="kpiRisk">0</div><div class="sub" id="kpiRiskSub">current</div></div>
+      <div class="card"><div class="label">Older records</div><div class="kpi blue" id="kpiStale">0</div><div class="sub">older than 5m</div></div>
     </section>
     <details class="panel-details fleet-tools">
       <summary>More fleet tools</summary>
       <section class="ops ops-secondary">
         <div class="card"><div class="section-title"><h2>Fleet leads</h2><a class="btn good" href="https://docs.google.com/spreadsheets/d/1XimPQE-X4yv4yDdy6Itwf1tOyQCmq4Gpeoj436E6O1Y/edit" target="_blank" rel="noopener">Open sheet</a></div><div class="ops-list" id="leadSummary"></div></div>
-        <div class="card"><div class="section-title"><h2>Coverage details</h2><a class="btn" href="/session-history.html">History</a></div><div class="ops-list" id="coverageSummary"></div></div>
+        <div class="card"><div class="section-title"><h2>Coverage details</h2><a class="btn" id="coverageHistoryLink" href="/session-history.html">History</a></div><div class="ops-list" id="coverageSummary"></div></div>
       </section>
     </details>
     <details class="panel-details secondary-panel" id="fleetFollowups" hidden>
@@ -230,6 +231,6 @@
   </main>
   <div class="toast" id="toast"></div>
   <footer class="footer"><a href="/">Occulert</a> &nbsp;·&nbsp; <a href="/app.html">Driver App</a> &nbsp;·&nbsp; <a href="/privacy.html">Privacy</a><div style="margin-top:8px">© 2026 Occulert. Prototype only — not a certified safety, medical, emergency, or compliance device.</div></footer>
-<script src="/fleet-dashboard.v2.js"></script>
+<script src="/fleet-dashboard.v3.js"></script>
 </body>
 </html>
