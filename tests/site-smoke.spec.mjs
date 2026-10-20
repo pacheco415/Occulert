@@ -1025,9 +1025,10 @@ test("authenticated fleet dashboards never fall back to unrelated local driver d
   await expect(page.locator("#driverAppNav")).toBeHidden();
   await expect(page.locator("#kpiDrivers")).toHaveText("0");
   await expect(page.getByText("Unrelated Local Driver")).toHaveCount(0);
-  await page.getByRole("link", { name: "Manage drivers" }).focus();
+  await expect(page.locator("#rosterManageLink")).toHaveAttribute("href", "/fleet-onboarding.html");
+  await page.locator("#driverSearch").focus();
   await page.keyboard.press("Tab");
-  await expect(page.locator("#driverSearch")).toBeFocused();
+  await expect(page.locator("#riskFilter")).toBeFocused();
   const driverStatusTop = await page.locator(".main").evaluate((element) => element.getBoundingClientRect().top);
   const summaryMetricsTop = await page.locator(".dashboard-kpis").evaluate((element) => element.getBoundingClientRect().top);
   expect(driverStatusTop).toBeLessThan(summaryMetricsTop);
@@ -1066,7 +1067,8 @@ test("fleet dashboard clears protected data when auth changes in another tab", a
   });
 
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText("Owner A Driver")).toBeVisible();
+  await expect(page.locator(".driver .name").filter({ hasText: "Owner A Driver" })).toBeVisible();
+  await expect(page.locator("#actionQueue")).toContainText("Owner A Driver");
   const accountSwitchPage = await page.context().newPage();
   await accountSwitchPage.goto("/", { waitUntil: "domcontentloaded" });
   await accountSwitchPage.evaluate(() => {
@@ -1119,7 +1121,7 @@ test("fleet dashboard does not turn missing or inactive telemetry into active sa
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
   await expect(page.locator("#kpiDrivers")).toHaveText("2");
-  await expect(page.locator("#kpiDriversSub")).toHaveText("1 live");
+  await expect(page.locator("#kpiDriversSub")).toHaveText("recorded profiles; availability unknown");
   await expect(page.locator("#kpiScore")).toHaveText("64");
   await expect(page.locator("#kpiScoreSub")).toHaveText("1 below 70");
   await expect(page.locator("#valueCoverage")).toHaveText("50%");

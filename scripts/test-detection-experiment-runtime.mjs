@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import {createAppHarness} from './lib/app-page-harness.mjs';
 const versions=JSON.parse(fs.readFileSync('asset-versions.json','utf8'));
 const helper=fs.readFileSync(versions['detection-experiments.js'],'utf8');
-const old=fs.readFileSync('driver-app.v80.js','utf8');
+const old=fs.readFileSync('tests/fixtures/driver-app.v80.js','utf8');
 const vendor=JSON.parse(fs.readFileSync('vendor/mediapipe/tasks-vision-1.0.1-occulert.1/runtime-manifest.json','utf8'));
 const pins=vendor.files.map(({url,integrity})=>({url,integrity}));
 function harness(query,extra={}){return createAppHarness({preloadSources:[helper],sandboxOverrides:{location:{search:query},URLSearchParams,...extra}})}

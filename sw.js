@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v117';
+const CACHE = 'occulert-v119';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -56,6 +56,8 @@ function selectedRuntimeAssets() {
 }
 const SELECTED_RUNTIME_ASSETS = selectedRuntimeAssets();
 const STATIC_ASSETS = [
+  '/driver-overview.v1.js',
+  '/driver-overview.v1.css',
   ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
   '/local-history.v2.js',
   '/homepage-bootstrap.v2.js',
