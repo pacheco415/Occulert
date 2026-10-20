@@ -42,6 +42,17 @@ for (const [consumer, intermediates] of [
   });
 }
 
+test('React DevTools shell quoting preserves arguments and rejects line terminators after comments', () => {
+  const devtoolsRequire = createRequire(require.resolve('react-devtools-core'));
+  const { parse, quote } = devtoolsRequire('shell-quote');
+  const args = ['echo', 'driver name', "driver's route", 'route; literal', 'Café'];
+  assert.deepEqual(parse(quote(args)), args);
+  assert.deepEqual(parse('echo "driver name"'), ['echo', 'driver name']);
+  for (const terminator of ['\n', '\r', '\u2028', '\u2029']) {
+    assert.throws(() => quote(['echo', 'ok', { comment: 'fixture' }, `a${terminator}id;#`]), TypeError);
+  }
+});
+
 test('query-string keeps named parse/stringify and route options with the patched decoder', () => {
   const query = require('query-string');
   assert.deepEqual({ ...query.parse('name=Caf%C3%A9+driver&name=Second&key=a%26b', { arrayFormat: 'none' }) }, { name: ['Café driver', 'Second'], key: 'a&b' });
