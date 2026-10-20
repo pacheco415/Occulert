@@ -8,6 +8,7 @@ and dated release notes preserve historical evidence.
 
 - [Backend implementation and next steps](BACKEND_ROADMAP.md)
 - [Detection evidence and future upgrades](FACIAL_RECOGNITION_ROADMAP.md)
+- [Verified 2026–2028 phone, Watch, headphone and glasses roadmap](DEVICE_ROADMAP_2026_2028.md)
 - [Performance targets and validation](PERFORMANCE_ROADMAP.md)
 - [Beta test and pilot evidence plan](BETA_TEST_PLAN.md)
 - [Accuracy benchmark](ACCURACY_BENCHMARK.md)
