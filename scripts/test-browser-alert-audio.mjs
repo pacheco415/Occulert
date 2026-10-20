@@ -47,9 +47,11 @@ function harness({ state = 'running', noContext = false, noMedia = false, runnin
     experimentFlags: {any:false,noface:false}, experimentController: null,
     document, navigator: { audioSession: session }, window: { AudioContext: noContext ? undefined : Context, location: { search } },
     Audio: noMedia ? undefined : Media, Promise, URLSearchParams,
+    driveStateEl: {}, driveHintEl: {}, statusEl: {},
     setTimeout(callback, duration) { const id = ++timerId; timers.set(id, { callback, duration }); return id; },
     clearTimeout(id) { timers.delete(id); },
   });
+  vm.runInContext(driver.slice(driver.indexOf('function setTextIfChanged('), driver.indexOf('function render(')), context);
   vm.runInContext(audioCode, context);
   return {
     context, document, contexts, media, oscillators, gains, pendingPlays, timers, session,

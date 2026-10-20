@@ -248,7 +248,7 @@ for (const path of ["app.html", "session-history.html"]) {
   assertIncludes(path, 'id="main-content" tabindex="-1"', `${path} must expose a focusable main destination`);
   assertIncludes(path, `<link rel="stylesheet" href="/${assetByStem('accessibility.css')}" />`, `${path} must use the shared keyboard-navigation layer`);
 }
-assertIncludes("app.html", '<h1 style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>', "driver app must keep its main heading visible while monitoring");
+assertIncludes("app.html", '<h1 id="driverPanelTitle" style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>', "driver app must keep its main heading visible while monitoring");
 assertIncludes("app.html", '<h2 id="overlayTitle"', "camera guidance must remain a subordinate heading");
 assertIncludes("app.html", '<h2 id="alertTitle"', "driver alert overlay must not replace the page's main heading");
 assertIncludes("app.html", '<label for="nightOpacity">', "driver app must label the night alert brightness slider");
@@ -432,8 +432,8 @@ const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
   return total + statSync(join(root, file)).size;
 }, 0);
 // Accommodate the bounded alert pattern within the unchanged 90 KB driver cap.
-// Include the 6 KB parked session overview while keeping a bounded offline install.
-if (staticAssetBytes > 330_000) fail(`service worker install cache must remain at or below 330 KB (found ${staticAssetBytes} bytes)`);
+// Include the parked overview and compact driver styles with bounded headroom.
+if (staticAssetBytes > 338_000) fail(`service worker install cache must remain at or below 338 KB (found ${staticAssetBytes} bytes)`);
 if (staticAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the experimental passkey client must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the passkey client must be listed as a network-only asset");
 if (staticAssets.includes(`'/${assetByStem('supabase-loader.js')}'`)) fail("the resilient Supabase loader must not be stored in the offline static cache");

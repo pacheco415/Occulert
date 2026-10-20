@@ -76,13 +76,30 @@ export function saveLocalSessionHistory(payload) {
     }
 }
 export function setMonitoringUi(active) {
-    document.body.classList.toggle('monitoring-active', active);
+    const wasActive = document.body.classList.contains('monitoring-active');
+    const focused = document.activeElement;
     const parkedControls = document.getElementById('parkedControls');
+    const intensityToggle = document.getElementById('intensityToggle');
+    const focusWillHide = active && (parkedControls?.contains?.(focused)
+        || focused === intensityToggle || focused?.closest?.('.navlinks, .brand'));
+    document.body.classList.toggle('monitoring-active', active);
     if (parkedControls)
         parkedControls.hidden = active;
-    const intensityToggle = document.getElementById('intensityToggle');
     if (intensityToggle)
         intensityToggle.disabled = active;
+    if (wasActive !== active) {
+        for (const id of ['driverPanel', 'monitoringMessages', 'driverSecondary']) {
+            const region = document.getElementById(id);
+            if (region) region.scrollTop = 0;
+        }
+        if (focusWillHide) {
+            const status = document.getElementById('stateCard');
+            if (status) {
+                status.tabIndex = -1;
+                status.focus?.({ preventScroll: true });
+            }
+        }
+    }
     for (const badgeId of ['trackingBadge', 'lightBadge', 'batteryBadge']) {
         const badge = document.getElementById(badgeId);
         if (badge)
