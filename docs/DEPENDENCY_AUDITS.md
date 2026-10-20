@@ -38,4 +38,15 @@ reported zero critical and 21 high-severity affected-package entries, with no
 `shell-quote` or `source-map-js` finding. Only the `braces` and `node-forge`
 advisories remained; the audit exited 1 for those high-severity findings.
 
+On October 20, 2026, the shell-quoting branch was refreshed by merging current
+main `9600145`. The native package manifest, lockfile and regression test bytes
+are unchanged from `a119922`. A fresh clean `npm ci --include=dev && npm run verify`
+passed with Node 24.19.0 and npm 10.9.8, including the online Expo dependency
+check, typecheck and all 23 tests. Both postinstall patches applied. Fresh full
+native and `--omit=dev` audits each reported zero critical and 21 high-severity
+affected-package entries, with no `shell-quote` finding. The only underlying
+advisories remained `braces` and `node-forge`; both audit commands exited 1.
+This confirms the npm 10.9.8 installation and source checks, not a native build
+or physical-device result.
+
 Keep build tooling on trusted source/configuration and the development server private. These constraints reduce exposure; they are not a claim that upstream vulnerabilities have been repaired.
