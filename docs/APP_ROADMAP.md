@@ -51,6 +51,12 @@ release receipts, build-52 device reports and testing deferrals.
 
 ## Remaining evidence and later work
 
+The [verified 2026–2028 device roadmap](DEVICE_ROADMAP_2026_2028.md) expands the
+phone, Watch, headphone and glasses plan with primary sources and explicit
+access/acceptance gates. Its planning windows do not override the backlog or
+release evidence rules here. Keep the phone product standalone; accessory
+corroboration remains experimental until independently validated.
+
 - **Physical acceptance:** parked iPhone Silent-mode Safari/PWA alerts, Watch
   delay and Focus/permissions, audio routes, install-over-existing History,
   cloud retries, interruptions, accessibility, battery and heat. Genuine
