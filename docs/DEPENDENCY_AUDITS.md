@@ -38,8 +38,9 @@ reported zero critical and 21 high-severity affected-package entries, with no
 `shell-quote` or `source-map-js` finding. Only the `braces` and `node-forge`
 advisories remained; the audit exited 1 for those high-severity findings.
 
-On October 20, 2026, the shell-quoting branch was refreshed by merging current
-main `9600145`. The native package manifest, lockfile and regression test bytes
+On October 20, 2026, the shell-quoting branch was refreshed against main
+`9600145`, then documentation-only main `083d6a1`. The latter merge left native
+and root source/configuration unchanged. The native manifest, lockfile and test bytes
 are unchanged from `a119922`. A fresh clean `npm ci --include=dev && npm run verify`
 passed with Node 24.19.0 and npm 10.9.8, including the online Expo dependency
 check, typecheck and all 23 tests. Both postinstall patches applied. Fresh full
