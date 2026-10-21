@@ -90,6 +90,33 @@ for (const level of [1, 2, 3, 4]) {
   });
 }
 
+for (const query of ['', '?alert-pattern=strong']) {
+  for (const sharing of [false, true]) {
+    for (const level of [3, 4]) {
+      test(`${query ? 'strong' : 'ordinary'} level ${level} gives truthful guidance with cloud sharing ${sharing ? 'on' : 'off'}`, async ({ page }) => {
+        await openProbe(page, query);
+        await page.evaluate(({ level, sharing }) => {
+          cloudConsent.checked = sharing;
+          cloudReady = sharing;
+          sessionStart = Date.now() - 60_000;
+          window.alertLabelCloudSaves = 0;
+          window.OcculertSync = { saveLiveSession: async () => { window.alertLabelCloudSaves++; } };
+          running = true; calibrating = false; confidence = 70; lastAlert = 0;
+          lastEscalation = Date.now(); escalationLevel = level - 1;
+          beginAlertAudioScope(); trigger('Fatigue');
+        }, { level, sharing });
+        await expect(page.locator('#cloudConsent')).toBeChecked({ checked: sharing });
+        expect(await page.evaluate(() => cloudReady)).toBe(sharing);
+        await expect.poll(() => page.evaluate(() => window.alertLabelCloudSaves)).toBe(sharing ? 1 : 0);
+        await expect(page.locator('#alertTitle')).toHaveText(level === 3 ? 'STRONG ALERT' : 'PULL OVER NOW');
+        await expect(page.locator('#alertSub')).toHaveText('Pull over safely and rest');
+        await expect(page.locator('#alertScreen')).not.toContainText(/fleet|saved|emergency|confirm safety/i);
+        expect(await snapshot(page)).toMatchObject({ visible: true, alerts: 1, accepted: ['Fatigue'] });
+      });
+    }
+  }
+}
+
 for (const state of ['unavailable', 'interrupted']) {
   test(`strong parked fallback repeats one bundled WAV with WebAudio ${state}`, async ({ page }) => {
     await openProbe(page, '?alert-pattern=strong', state);

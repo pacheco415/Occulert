@@ -303,9 +303,9 @@ export function trigger(reason, eligibility) {
         escalationLevel = 0;
     escalationLevel = Math.min(4, escalationLevel + 1);
     lastEscalation = now;
-    let titles = ['DROWSY ALERT', 'LOUD ALERT', 'FLEET WARNING', 'EMERGENCY CHECK'];
+    const titles = ['DROWSY ALERT', 'LOUD ALERT', 'STRONG ALERT', 'PULL OVER NOW'];
     alertTitle.textContent = titles[Math.max(0, escalationLevel - 1)] || 'DROWSY ALERT';
-    alertSub.textContent = escalationLevel >= 3 ? 'Driver should pull over and confirm safety' : 'Pull over safely';
+    alertSub.textContent = escalationLevel >= 3 ? 'Pull over safely and rest' : 'Pull over safely';
     alertScreen.style.background = 'rgba(255,51,68,' + Number(nightOpacity.value) / 100 + ')';
     alertScreen.classList.add('show');
     if (!strongAlertPattern)
