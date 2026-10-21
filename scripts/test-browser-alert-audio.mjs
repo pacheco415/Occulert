@@ -363,6 +363,8 @@ test('all four accepted escalation levels use one alternating sine and the match
     h.run('beginAlertAudioScope();trigger("Fatigue");');
     assert.equal(h.context.alerts, 1);
     assert.equal(h.context.escalationLevel, level);
+    assert.equal(h.context.alertTitle.textContent, ['DROWSY ALERT', 'LOUD ALERT', 'STRONG ALERT', 'PULL OVER NOW'][level - 1]);
+    if (level >= 3) assert.equal(h.context.alertSub.textContent, 'Pull over safely and rest');
     assert.deepEqual(output.accepted, ['Fatigue']);
     assert.equal(output.notifications.length, 1);
     assert.deepEqual(Array.from(output.vibrations[0]), level >= 3 ? [700,150,700,150,700,150,700] : [500,150,500,150,300]);
