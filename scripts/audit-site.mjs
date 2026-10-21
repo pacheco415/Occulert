@@ -518,12 +518,14 @@ assertIncludes("docs/APP_ROADMAP.md", "Review the full diff and repair findings"
 assertNotIncludes("features.html", "designed to actually wake you up", "public alert copy must not imply that alerts make drowsy driving safe");
 assertIncludes("native-app/components/AlertSystem.tsx", "setTrackingLost(true)", "native monitoring must apply a grace period before warning about tracking loss");
 assertIncludes("native-app/components/AlertSystem.tsx", "TRACKING LOST", "native monitoring must warn after sustained tracking loss");
-assertIncludes("native-app/components/AlertSystem.tsx", "top:132", "native alert banners must remain below the top navigation");
-assertIncludes("native-app/app/monitor.tsx", "sensorFault: { position: 'absolute', top: 132", "native sensor-fault banners must remain below the top navigation");
+assertIncludes("native-app/app/monitor.tsx", "          inline", "native alert banners must use the scrolling layout flow");
+assertNotIncludes("native-app/app/monitor.tsx", "sensorFault: { position: 'absolute'", "native sensor-fault banners must share the scrolling layout flow");
 assertNotIncludes("native-app/app/monitor.tsx", "Alert.alert('Monitoring stopped'", "native sensor faults must not stack a blocking modal over the in-app warning");
 assertIncludes("native-app/app/monitor.tsx", "SENSOR_STARTUP_GRACE_MS = 10_000", "native camera startup must have a distinct first-frame grace period");
 assertIncludes("native-app/app/monitor.tsx", "hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS", "native camera watchdog must distinguish startup from an active-pipeline stall");
-assertIncludes("native-app/app/monitor.tsx", "<View style={s.ctrl}>", "native monitoring controls must stay in one layout flow");
+assertIncludes("native-app/app/monitor.tsx", "<MonitorLayout", "native monitoring must use the bounded camera and controls layout");
+assertIncludes("native-app/components/MonitorLayout.tsx", 'testID="monitor-primary-action"', "Start and Stop must have a separate fixed layout slot");
+assertIncludes("native-app/components/MonitorLayout.tsx", 'testID="monitor-details"', "native guidance and metrics must have a scrolling region");
 assertIncludes("native-app/app/monitor.tsx", "<CameraSetupGuide", "the parked camera guide must share the monitoring control layout flow");
 assertIncludes("native-app/app/monitor.tsx", "<LiveMetrics", "native metrics must share the control layout flow so alert actions cannot overlap them");
 assertNotIncludes("native-app/app/monitor.tsx", "metrics: {\n    position: 'absolute'", "native metrics must not rely on a fixed bottom offset that can overlap added controls");

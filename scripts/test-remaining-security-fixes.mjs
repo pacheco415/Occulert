@@ -56,7 +56,9 @@ test('monitoring fails visibly without overlapping the navigation or showing a d
   assert.match(monitor, /lastSampleAtRef\.current = Date\.now\(\)/);
   assert.match(monitor, /Monitoring stopped: camera analysis stalled/);
   assert.doesNotMatch(monitor, /Alert\.alert\('Monitoring stopped'/);
-  assert.match(monitor, /sensorFault: \{ position: 'absolute', top: 132/);
+  assert.match(monitor, /<MonitorLayout/);
+  assert.doesNotMatch(monitor, /sensorFault: \{ position: 'absolute'/);
+  assert.match(monitor, /attentionKey=\{sensorFault \|\|/);
   assert.match(monitor, /sensitivityLoaded/);
   assert.match(monitor, /disabled=\{isStarting \|\| isStopping \|\| !sensitivityLoaded \|\| !baselineLoaded \|\| baselineBusy\}/);
   assert.match(monitor, /updateSessionHistory/);

@@ -6,13 +6,14 @@ import {
   Linking,
   Modal,
   Platform,
-  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Camera,
   type CameraRuntimeError,
@@ -38,6 +39,7 @@ import { AlertSystem, type AlertTimingEvent } from '../components/AlertSystem';
 import { CameraSetupGuide } from '../components/CameraSetupGuide';
 import { LiveMetrics } from '../components/LiveMetrics';
 import { GlassSurface } from '../components/GlassSurface';
+import { MonitorLayout } from '../components/MonitorLayout';
 import { loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 import {
@@ -171,6 +173,7 @@ export default function MonitorScreen() {
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [sessionEndedAt, setSessionEndedAt] = useState<number | null>(null);
   const [alertCount, setAlertCount] = useState(0);
+  const [visibleAlertLevel, setVisibleAlertLevel] = useState<AlertLevel>('none');
   const [safeStopOpen, setSafeStopOpen] = useState(false);
   const [safeStopBusy, setSafeStopBusy] = useState(false);
   const [setupPreviewActive, setSetupPreviewActive] = useState(false);
@@ -1103,22 +1106,6 @@ export default function MonitorScreen() {
   return (
     <View style={s.container}>
       {isRunning && <MonitoringWakeLock />}
-      {isRunning || setupPreviewActive ? (
-        <Camera
-          key={`front-camera-${cameraEpoch}`}
-          style={StyleSheet.absoluteFill}
-          device={device}
-          isActive={isRunning || setupPreviewActive}
-          frameProcessor={frameProcessor}
-          pixelFormat="yuv"
-          onError={(error) => handleCameraError(error, cameraEpoch)}
-        />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, s.camOff]}>
-          <Ionicons name="eye-off" size={64} color="#1a3a4a" />
-          <Text style={s.camOffTxt}>Tap Start to begin monitoring</Text>
-        </View>
-      )}
 
       <Modal
         animationType={modalAnimationType(reduceMotion)}
@@ -1128,55 +1115,57 @@ export default function MonitorScreen() {
           if (!safeStopBusy) setSafeStopOpen(false);
         }}
       >
-        <View style={s.safeStopBackdrop}>
+        <SafeAreaView style={s.safeStopBackdrop}>
           <View
             accessibilityLabel="Safe stop options"
             accessibilityViewIsModal
             style={s.safeStopSheet}
           >
-            <View style={s.safeStopHeader}>
-              <View style={s.safeStopIconWrap}>
-                <Ionicons name="navigate" size={24} color="#7dd3fc" />
+            <ScrollView style={s.safeStopScroll} contentContainerStyle={s.safeStopContent}>
+              <View style={s.safeStopHeader}>
+                <View style={s.safeStopIconWrap}>
+                  <Ionicons name="navigate" size={24} color="#7dd3fc" />
+                </View>
+                <View style={s.safeStopHeadingText}>
+                  <Text style={s.safeStopTitle}>Find a safe place to stop</Text>
+                  <Text style={s.safeStopKicker}>DROWSINESS ALERT FOLLOW-UP</Text>
+                </View>
               </View>
-              <View style={s.safeStopHeadingText}>
-                <Text style={s.safeStopTitle}>Find a safe place to stop</Text>
-                <Text style={s.safeStopKicker}>DROWSINESS ALERT FOLLOW-UP</Text>
+
+              <Text style={s.safeStopWarning}>
+                Only use this after you are safely parked, or ask a passenger. Opening Maps ends monitoring and saves this drive first.
+              </Text>
+              <Text style={s.safeStopPrivacy}>
+                Occulert sends only a search phrase to Maps and does not read, store, or upload your location.
+              </Text>
+
+              <View style={s.safeStopOptions}>
+                {SAFE_STOP_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.kind}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Find ${option.label.toLowerCase()}`}
+                    accessibilityHint={`${option.detail}. Ends monitoring, saves this drive, then opens Maps.`}
+                    accessibilityState={{ disabled: safeStopBusy, busy: safeStopBusy }}
+                    disabled={safeStopBusy}
+                    style={[s.safeStopOption, safeStopBusy && s.disabledBtn]}
+                    onPress={() => {
+                      void handleSafeStopChoice(option.kind);
+                    }}
+                  >
+                    <View style={s.safeStopOptionIcon}>
+                      <Ionicons name={SAFE_STOP_ICONS[option.kind]} size={22} color="#e0f2fe" />
+                    </View>
+                    <View style={s.safeStopOptionText}>
+                      <Text style={s.safeStopOptionTitle}>{option.label}</Text>
+                      <Text style={s.safeStopOptionDetail}>{option.detail}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#4a7a8a" />
+                  </TouchableOpacity>
+                ))}
               </View>
-            </View>
 
-            <Text style={s.safeStopWarning}>
-              Only use this after you are safely parked, or ask a passenger. Opening Maps ends monitoring and saves this drive first.
-            </Text>
-            <Text style={s.safeStopPrivacy}>
-              Occulert sends only a search phrase to Maps and does not read, store, or upload your location.
-            </Text>
-
-            <View style={s.safeStopOptions}>
-              {SAFE_STOP_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option.kind}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Find ${option.label.toLowerCase()}`}
-                  accessibilityHint={`${option.detail}. Ends monitoring, saves this drive, then opens Maps.`}
-                  accessibilityState={{ disabled: safeStopBusy, busy: safeStopBusy }}
-                  disabled={safeStopBusy}
-                  style={[s.safeStopOption, safeStopBusy && s.disabledBtn]}
-                  onPress={() => {
-                    void handleSafeStopChoice(option.kind);
-                  }}
-                >
-                  <View style={s.safeStopOptionIcon}>
-                    <Ionicons name={SAFE_STOP_ICONS[option.kind]} size={22} color="#e0f2fe" />
-                  </View>
-                  <View style={s.safeStopOptionText}>
-                    <Text style={s.safeStopOptionTitle}>{option.label}</Text>
-                    <Text style={s.safeStopOptionDetail}>{option.detail}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#4a7a8a" />
-                </TouchableOpacity>
-              ))}
-            </View>
-
+            </ScrollView>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={safeStopBusy ? 'Ending and saving drive' : 'Cancel safe stop search'}
@@ -1190,115 +1179,58 @@ export default function MonitorScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
-      <SafeAreaView style={s.overlay} pointerEvents="box-none">
-        <GlassSurface style={s.topBar} tintColor="rgba(5, 10, 18, 0.5)">
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={isRunning ? 'Return home and end monitoring' : 'Return home'}
-            style={s.backBtn}
-            onPress={() => {
-              void leaveMonitor(() => router.back());
-            }}
-          >
-            <Ionicons name="chevron-back" size={20} color="#c8e8f0" />
-            <Text style={s.backLbl}>Home</Text>
-          </TouchableOpacity>
-          <View
-            accessibilityLiveRegion="polite"
-            accessibilityRole="text"
-            accessibilityLabel={`Monitoring status: ${monitorStatusLabel}`}
-            style={s.pill}
-          >
-            <View style={[s.dot, { backgroundColor: monitorStatusColor }]} />
-            <Text style={s.pillTxt}>{monitorStatusLabel}</Text>
-          </View>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={isRunning ? 'Open settings and end monitoring' : 'Open settings'}
-            style={s.settingsBtn}
-            onPress={() => {
-              void leaveMonitor(() => router.push('/settings'));
-            }}
-          >
-            <Ionicons name="settings-outline" size={20} color="#c8e8f0" />
-          </TouchableOpacity>
-        </GlassSurface>
-
-        {sensorFault && (
-          <View style={s.sensorFault} accessibilityRole="alert">
-            <Text style={s.sensorFaultTitle}>
-              {recoveryRequired ? 'RECOVERY REQUIRED' : 'CAMERA ANALYSIS STOPPED'}
-            </Text>
-            <Text style={s.sensorFaultText}>{sensorFault}</Text>
-            {recoveryRequired && (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Return Home to recover the previous drive"
-                accessibilityHint="Leaves monitoring and starts the interrupted-drive recovery check"
-                onPress={() => {
-                  setupPreviewActiveRef.current = false;
-                  setSetupPreviewActive(false);
-                  router.replace('/');
-                }}
-                style={s.recoveryHomeButton}
-              >
-                <Ionicons name="arrow-back" size={16} color="#fee2e2" />
-                <Text style={s.recoveryHomeButtonText}>RETURN HOME TO RECOVER</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        <AlertSystem
-          metrics={metrics}
-          isRunning={isRunning}
-          sessionStartedAt={sessionStartedAt}
-          sessionEndedAt={sessionEndedAt}
-          onTimingEvent={recordAlertTiming}
-        />
-
-        <View style={s.ctrl}>
-          {EYE_BASELINE_EXPERIMENT && <Text accessibilityLiveRegion="polite" style={{color:'#22d3ee',padding:12}}>{baselineMessage}</Text>}
-          {!isRunning && (
-            <CameraSetupGuide
-              active={setupPreviewActive}
-              assessment={cameraSetup}
-              disabled={isStarting || isStopping || baselineBusy}
-              onTogglePreview={toggleSetupPreview}
+      <MonitorLayout
+        reduceMotion={reduceMotion}
+        attentionKey={sensorFault || (cameraRecovering ? 'camera-recovering' : isRunning ? `${metrics.state}:${visibleAlertLevel}` : 'parked')}
+        camera={
+          (isRunning || setupPreviewActive) ? (
+            <Camera
+              key={`front-camera-${cameraEpoch}`}
+              style={StyleSheet.absoluteFill}
+              device={device}
+              isActive={isRunning || setupPreviewActive}
+              frameProcessor={frameProcessor}
+              pixelFormat="yuv"
+              resizeMode="contain"
+              onError={(error) => handleCameraError(error, cameraEpoch)}
             />
-          )}
-
-          {isRunning && (
-            <LiveMetrics
-              metrics={metrics}
-              alertCount={alertCount}
-              cameraRecovering={cameraRecovering}
-              isRunning={isRunning}
-              sessionStartedAt={sessionStartedAt}
-              sessionEndedAt={sessionEndedAt}
-            />
-          )}
-
-          {isRunning && alertCount > 0 && (
+          ) : (
+            <View style={[StyleSheet.absoluteFill, s.camOff]}>
+              <Ionicons name="eye-off" size={64} color="#1a3a4a" />
+              <Text style={s.camOffTxt}>Tap Start to begin monitoring</Text>
+            </View>
+          )
+        }
+        header={
+          <GlassSurface style={s.topBar} tintColor="rgba(5, 10, 18, 0.5)">
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Find a safe place to stop"
-              accessibilityHint="Open parked-only rest area, gas, food, and coffee options"
-              style={s.safeStopBtn}
-              onPress={() => setSafeStopOpen(true)}
+              accessibilityLabel={isRunning ? 'Return home and end monitoring' : 'Return home'}
+              style={s.backBtn}
+              onPress={() => {
+                void leaveMonitor(() => router.back());
+              }}
             >
-              <Ionicons name="navigate-circle" size={23} color="#082f49" />
-              <View style={s.safeStopBtnTextWrap}>
-                <Text style={s.safeStopBtnText}>FIND A SAFE STOP</Text>
-                <Text style={s.safeStopBtnSub}>Rest area · Gas · Food or coffee</Text>
-              </View>
+              <Ionicons name="chevron-back" size={20} color="#c8e8f0" />
+              <Text style={s.backLbl}>Home</Text>
             </TouchableOpacity>
-          )}
-
-          {!isRunning ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={isRunning ? 'Open settings and end monitoring' : 'Open settings'}
+              style={s.settingsBtn}
+              onPress={() => {
+                void leaveMonitor(() => router.push('/settings'));
+              }}
+            >
+              <Ionicons name="settings-outline" size={20} color="#c8e8f0" />
+            </TouchableOpacity>
+          </GlassSurface>
+        }
+        primaryAction={
+          !isRunning ? (
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Start fatigue monitoring"
@@ -1335,23 +1267,104 @@ export default function MonitorScreen() {
               <Ionicons name="stop-circle" size={22} color="#fff" />
               <Text style={s.stopTxt}>STOP</Text>
             </TouchableOpacity>
-          )}
-          {isRunning && (
-            <Text style={s.awakeNote}>
-              {cameraLoadPolicy.mode === 'reduced'
-                ? 'Battery and heat saver active · Keep app in foreground'
-                : 'Screen kept on · Keep app in foreground'}
-            </Text>
-          )}
+          )
+        }
+      >
+        <View
+          accessibilityLiveRegion="polite"
+          accessibilityRole="text"
+          accessibilityLabel={`Monitoring status: ${monitorStatusLabel}`}
+          style={s.pill}
+        >
+          <View style={[s.dot, { backgroundColor: monitorStatusColor }]} />
+          <Text style={s.pillTxt}>{monitorStatusLabel}</Text>
         </View>
-      </SafeAreaView>
+        {sensorFault && (
+          <View style={s.sensorFault} accessibilityRole="alert">
+            <Text style={s.sensorFaultTitle}>
+              {recoveryRequired ? 'RECOVERY REQUIRED' : 'CAMERA ANALYSIS STOPPED'}
+            </Text>
+            <Text style={s.sensorFaultText}>{sensorFault}</Text>
+            {recoveryRequired && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Return Home to recover the previous drive"
+                accessibilityHint="Leaves monitoring and starts the interrupted-drive recovery check"
+                onPress={() => {
+                  setupPreviewActiveRef.current = false;
+                  setSetupPreviewActive(false);
+                  router.replace('/');
+                }}
+                style={s.recoveryHomeButton}
+              >
+                <Ionicons name="arrow-back" size={16} color="#fee2e2" />
+                <Text style={s.recoveryHomeButtonText}>RETURN HOME TO RECOVER</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        <AlertSystem
+          metrics={metrics}
+          isRunning={isRunning}
+          sessionStartedAt={sessionStartedAt}
+          sessionEndedAt={sessionEndedAt}
+          onTimingEvent={recordAlertTiming}
+          onLevelChange={setVisibleAlertLevel}
+          inline
+        />
+
+        {EYE_BASELINE_EXPERIMENT && <Text accessibilityLiveRegion="polite" style={{color:'#22d3ee',padding:12}}>{baselineMessage}</Text>}
+        {!isRunning && (
+          <CameraSetupGuide
+            active={setupPreviewActive}
+            assessment={cameraSetup}
+            disabled={isStarting || isStopping || baselineBusy}
+            onTogglePreview={toggleSetupPreview}
+          />
+        )}
+
+        {isRunning && (
+          <LiveMetrics
+            metrics={metrics}
+            alertCount={alertCount}
+            cameraRecovering={cameraRecovering}
+            isRunning={isRunning}
+            sessionStartedAt={sessionStartedAt}
+            sessionEndedAt={sessionEndedAt}
+          />
+        )}
+
+        {isRunning && alertCount > 0 && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Find a safe place to stop"
+            accessibilityHint="Open parked-only rest area, gas, food, and coffee options"
+            style={s.safeStopBtn}
+            onPress={() => setSafeStopOpen(true)}
+          >
+            <Ionicons name="navigate-circle" size={23} color="#082f49" />
+            <View style={s.safeStopBtnTextWrap}>
+              <Text style={s.safeStopBtnText}>FIND A SAFE STOP</Text>
+              <Text style={s.safeStopBtnSub}>Rest area · Gas · Food or coffee</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {isRunning && (
+          <Text style={s.awakeNote}>
+            {cameraLoadPolicy.mode === 'reduced'
+              ? 'Battery and heat saver active · Keep app in foreground'
+              : 'Screen kept on · Keep app in foreground'}
+          </Text>
+        )}
+      </MonitorLayout>
     </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  overlay: { flex: 1, justifyContent: 'space-between' },
   camOff: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#050a0f' },
   camOffTxt: { color: '#1a3a4a', marginTop: 12, fontSize: 14 },
   topBar: {
@@ -1382,12 +1395,11 @@ const s = StyleSheet.create({
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   pillTxt: { color: '#c8e8f0', flexShrink: 1, fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textAlign: 'center' },
-  sensorFault: { position: 'absolute', top: 132, left: 16, right: 16, zIndex: 4, backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
+  sensorFault: { backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
   sensorFaultTitle: { color: '#fecaca', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
   sensorFaultText: { color: '#fff1f2', fontSize: 12, lineHeight: 18, marginTop: 4 },
   recoveryHomeButton: { alignSelf: 'flex-start', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, paddingRight: 14 },
-  recoveryHomeButtonText: { color: '#fee2e2', fontSize: 11, fontWeight: '900', letterSpacing: 0.45 },
-  ctrl: { padding: 20, gap: 10 },
+  recoveryHomeButtonText: { flexShrink: 1, color: '#fee2e2', fontSize: 11, fontWeight: '900', letterSpacing: 0.45 },
   startBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1395,14 +1407,16 @@ const s = StyleSheet.create({
     gap: 12,
     backgroundColor: '#2563eb',
     borderRadius: 16,
-    paddingVertical: 20,
+    minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
     shadowColor: '#2563eb',
     shadowOpacity: 0.4,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
   },
   disabledBtn: { opacity: 0.55 },
-  startTxt: { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
+  startTxt: { flexShrink: 1, textAlign: 'center', color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
   stopBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1410,9 +1424,11 @@ const s = StyleSheet.create({
     gap: 12,
     backgroundColor: '#dc2626',
     borderRadius: 16,
-    paddingVertical: 20,
+    minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
   },
-  stopTxt: { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
+  stopTxt: { flexShrink: 1, textAlign: 'center', color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
   awakeNote: { textAlign: 'center', color: '#4a7a8a', fontSize: 11 },
   safeStopBtn: {
     flexDirection: 'row',
@@ -1435,7 +1451,11 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.72)',
     padding: 14,
   },
+  safeStopScroll: { flexShrink: 1, minHeight: 0 },
+  safeStopContent: { paddingBottom: 8 },
   safeStopSheet: {
+    maxHeight: '100%',
+    flexShrink: 1,
     backgroundColor: '#07131e',
     borderRadius: 24,
     borderWidth: 1,
