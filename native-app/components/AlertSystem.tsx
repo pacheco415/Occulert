@@ -37,11 +37,13 @@ const ALERT_SOUND_RIGHT = require('../assets/alert-right.wav');
 const WATCH_STATUS_SYNC_INTERVAL_MS = 2_000;
 
 interface AlertSystemProps {
+  inline?: boolean;
   metrics: EyeMetrics;
   isRunning: boolean;
   sessionStartedAt: number | null;
   sessionEndedAt: number | null;
   onTimingEvent?: (event: AlertTimingEvent) => void;
+  onLevelChange?: (level: AlertLevel) => void;
 }
 
 export type AlertTimingEvent =
@@ -67,6 +69,8 @@ export function AlertSystem({
   sessionStartedAt,
   sessionEndedAt,
   onTimingEvent,
+  onLevelChange,
+  inline = false,
 }: AlertSystemProps) {
   const { reduceMotion } = useAccessibilityPreferences();
   const sessionTime = sessionStartedAt === null
@@ -223,6 +227,10 @@ export function AlertSystem({
     criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
   });
 
+  React.useEffect(() => {
+    onLevelChange?.(level);
+  }, [level, onLevelChange]);
+
   const fire = useCallback((lv: AlertLevel) => {
     const now = Date.now();
     const previous = lastAlert.current;
@@ -329,7 +337,7 @@ export function AlertSystem({
 
   const cfg = CONFIGS[level];
   return (
-    <Animated.View style={[s.banner, { backgroundColor: cfg.bg, borderColor: cfg.border, transform: [{ scale: pulse }] }]}
+    <Animated.View style={[s.banner, !inline && s.floatingBanner, { backgroundColor: cfg.bg, borderColor: cfg.border, transform: inline ? undefined : [{ scale: pulse }] }]}
       accessibilityRole="alert" accessibilityLabel={cfg.title}>
       <Text style={s.icon}>{cfg.icon}</Text>
       <View style={s.txt}>
@@ -348,7 +356,8 @@ const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;colo
 };
 
 const s = StyleSheet.create({
-  banner: { position:'absolute', top:132, left:16, right:16, zIndex:2, flexDirection:'row', alignItems:'center', gap:14, borderWidth:1.5, borderRadius:16, padding:18 },
+  floatingBanner: { position:'absolute', top:132, left:16, right:16, zIndex:2 },
+  banner: { flexDirection:'row', alignItems:'center', gap:14, borderWidth:1.5, borderRadius:16, padding:18 },
   icon: { fontSize:28 },
   txt:  { flex:1 },
   title:{ fontSize:16, fontWeight:'900', letterSpacing:0.5 },

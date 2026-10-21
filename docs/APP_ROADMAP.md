@@ -23,6 +23,7 @@ release receipts, build-52 device reports and testing deferrals.
 |---|---|---|
 | Browser monitoring and PWA | Shipped web | Foreground camera processing, local eye/fatigue estimates, sensitivity, alerts and History. Foreground loss stops monitoring. No camera video upload. Browser and audio-route behavior require device checks. |
 | [Compact browser driver view](COMPACT_DRIVER_VIEW.md) | Implemented source | Narrow and short viewports keep camera, Stop and scrollable full status separate. Keyboard and recovery checks use software adapters; physical-device acceptance and multitasking camera access remain separate evidence gates. |
+| [Compact native monitoring screen](NATIVE_COMPACT_MONITOR.md) | Implemented source | Start/Stop is separate from scrolling warnings, setup and metrics. Camera identity and alert continuity have software checks; exact-build, physical layout, VoiceOver and camera/audio acceptance remain required. |
 | Fleet identity and consent | Shipped web | Verified identity, hashed one-time invitations, deliberate cloud consent and owner-scoped reports. Local demo data stays separate. |
 | Manager reporting and follow-ups | Shipped web | Recent summaries select the latest 50 protected sessions. The separate 7/30-day period report depends on its migration and includes all stored sessions in its selected period. Telemetry is an unverified client report. |
 | Older fleet History | Released source | Filters, sorting, CSV and print cover loaded records. They do not search unloaded records or broaden the recent-summary snapshot. |

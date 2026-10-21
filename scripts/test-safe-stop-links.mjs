@@ -51,9 +51,12 @@ test('the monitor stops and saves before handing off to Maps', () => {
   assert.match(monitor, /Linking\.openURL\(url\)/);
   assert.match(monitor, /does not read, store, or upload your location/i);
 
-  const controlsStart = monitor.indexOf('<View style={s.ctrl}>');
+  const controlsStart = monitor.indexOf('<MonitorLayout');
   const metricsStart = monitor.indexOf('<LiveMetrics');
   const safeStopStart = monitor.indexOf('style={s.safeStopBtn}', controlsStart);
-  assert.ok(controlsStart < metricsStart && metricsStart < safeStopStart);
+  assert.ok(controlsStart >= 0 && controlsStart < metricsStart && metricsStart < safeStopStart);
+  const primaryStart = monitor.indexOf('primaryAction={', controlsStart);
+  const stopStart = monitor.indexOf('accessibilityLabel="Stop monitoring and save this drive"', primaryStart);
+  assert.ok(primaryStart > controlsStart && stopStart > primaryStart && stopStart < metricsStart);
   assert.doesNotMatch(liveMetrics, /metrics:\s*\{\s*position:\s*'absolute'/);
 });
