@@ -10,11 +10,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
 
-<script id="driver-startup-guard" src="/driver-startup-guard.v8.js" integrity="sha256-57hdFKTDcFemMQtet2n0pyCx5oMkyx/KOL4uf3fq7D8=" crossorigin="anonymous" defer></script>
+<script id="driver-startup-guard" src="/driver-startup-guard.v9.js" integrity="sha256-6LZ//ihRTKfPJrp+6wFWyTEsszFv2rpQYcRYPNBPOU4=" crossorigin="anonymous" defer></script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 
-<link rel="stylesheet" href="/driver-app.v68.css" />
+<link rel="stylesheet" href="/driver-app.v69.css" />
 <link rel="stylesheet" href="/driver-overview.v1.css" />
 <link rel="stylesheet" href="/liquid-glass.v49.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
@@ -47,7 +47,7 @@
   <div class="camera">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
-    <div class="overlay" id="overlay"><div>
+    <div class="overlay" id="overlay" role="region" aria-labelledby="overlayTitle" tabindex="0"><div>
       <h2 id="overlayTitle" style="font-size:22px;font-weight:900;letter-spacing:-0.5px">AI Fatigue Monitoring</h2>
       <p class="small" id="overlayText">Supplemental prototype only. Keep your eyes on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.</p>
       <div class="phone-guide" id="phoneGuide">
@@ -61,10 +61,10 @@
       </div>
       <div class="hint" id="overlayHint"><strong>iPhone tip:</strong> Keep Safari open, screen unlocked, and Low Power Mode off for best reliability.</div>
     </div></div>
-    <div class="alertScreen" id="alertScreen"><div><h2 id="alertTitle" style="font-size:48px;color:#fff;margin:0">DROWSY ALERT</h2><p id="alertSub">Pull over safely</p></div></div>
+    <div class="alertScreen" id="alertScreen" role="region" aria-labelledby="alertTitle" tabindex="0"><div><h2 id="alertTitle" style="font-size:48px;color:#fff;margin:0">DROWSY ALERT</h2><p id="alertSub">Pull over safely</p></div></div>
   </div>
-  <aside class="panel" aria-label="Occulert controls and metrics">
-    <h1 style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>
+  <aside class="panel" id="driverPanel" aria-label="Occulert controls and metrics">
+    <h1 id="driverPanelTitle" style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>
 
     <div class="card notice-card" id="startupNotice" role="status" aria-live="polite">
       <h2 id="startupTitle" style="font-size:18px;margin:0 0 8px">Loading app…</h2>
@@ -75,17 +75,21 @@
     <fieldset id="driverControls" disabled aria-label="Monitoring controls" style="border:0;padding:0;margin:0;min-width:0">
 
 
+    <div id="monitoringEssentials">
+    <button class="btn primary" id="startBtn" disabled>Loading app…</button>
+    <div id="monitoringMessages" role="region" aria-label="Monitoring status and guidance" tabindex="0">
     <div class="screen-warning" id="screenWarning" style="display:none">
       ⚠️ <strong>Monitoring stopped after screen lock or leaving this tab.</strong> Return to Occulert and restart only while safely parked.
     </div>
-
-    <button class="btn primary" id="startBtn" disabled>Loading app…</button>
+    <div class="card state-card" id="stateCard" tabindex="-1" role="status" aria-live="polite" aria-atomic="true"><div class="label">Monitoring Status</div><div class="state-value" id="driveState">NOT MONITORING</div><p class="metric-note" id="driveHint">Monitoring has not started.</p></div>
+    </div>
+    </div>
+    <div id="driverSecondary" role="region" aria-label="Session details and safety notice" tabindex="0">
     <div class="timer-card" id="timerCard"><span class="timer-label">Session Time</span><span class="timer-value" id="sessionTimer">00:00</span></div>
-    <div class="card state-card" id="stateCard" role="status" aria-live="polite" aria-atomic="true"><div class="label">Monitoring Status</div><div class="state-value" id="driveState">NOT MONITORING</div><p class="metric-note" id="driveHint">Monitoring has not started.</p></div>
-    <div class="card notice-card"><div class="label">Safety Notice</div><p class="small">Occulert is a supplemental prototype only, not a certified safety, medical, emergency, insurance, legal, employment, fleet compliance, or transportation compliance device. It may miss drowsiness and may trigger false alerts. If you feel tired or unsafe, pull over safely and rest.</p></div>
+    <div class="card notice-card" id="driverSafetyNotice"><div class="label">Safety Notice</div><p class="small">Occulert is a supplemental prototype only, not a certified safety, medical, emergency, insurance, legal, employment, fleet compliance, or transportation compliance device. It may miss drowsiness and may trigger false alerts. If you feel tired or unsafe, pull over safely and rest.</p></div>
 
     <div id="breakBanner" role="alert" style="display:none;background:rgba(255,170,0,.12);border:1px solid #ffaa00;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13px;color:#ffcc44;font-weight:700;line-height:1.5;"></div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center" aria-live="polite">
+    <div id="driverStatusBadges" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center" aria-live="polite">
       <span id="trackingBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(0,255,136,.08);border:1px solid currentColor;white-space:nowrap">Tracking status unknown</span>
       <span id="lightBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,170,0,.08);border:1px solid currentColor;white-space:nowrap">Low light</span>
       <span id="batteryBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,68,68,.08);border:1px solid currentColor;color:#ff6666;white-space:nowrap"></span>
@@ -208,13 +212,14 @@
       <button id="pwaInstallBtn" data-page-action="triggerPWAInstall" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
     </div>
     </section>
+    </div>
     </fieldset>
 </aside>
 </main>
 <script src="/occulert-backend.v81.js" defer></script>
 <script src="/security-utils.v47.js" defer></script>
 <script src="/local-history.v2.js" defer></script>
-<script src="/driver-app.v87.js" defer></script>
+<script src="/driver-app.v88.js" defer></script>
 <script src="/driver-overview.v1.js" defer></script>
 <script src="/lang.v47.js" defer></script>
 

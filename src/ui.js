@@ -209,6 +209,8 @@ export function showStoppedReason(message) {
     setTextIfChanged(statusEl, 'MONITORING STOPPED');
     statusEl.className = 'status alert';
     stateCard.className = 'card state-card danger';
+    stateCard.focus?.({ preventScroll: true });
+    stateCard.scrollIntoView?.({ block: 'nearest' });
 }
 export function drawEyes(lm, color) { ctx.clearRect(0, 0, canvas.width, canvas.height); [LEFT, RIGHT].forEach(idx => { ctx.beginPath(); idx.forEach((i, k) => { let p = lm[i], x = p.x * canvas.width, y = p.y * canvas.height; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke(); }); }
 export function requireForegroundStart() {
@@ -249,6 +251,10 @@ export function createLocalLifecycleOperations() {
         startCancelled = false;
         startBtn.disabled = true;
         startBtn.textContent = 'STARTING...';
+        setTextIfChanged(driveStateEl, 'PREPARING MONITORING');
+        setTextIfChanged(driveHintEl, 'Stay parked while the camera and on-device model are prepared. Monitoring has not started.');
+        setTextIfChanged(statusEl, 'PREPARING');
+        statusEl.className = 'status';
         setCameraControlsDisabled(true);
         setOverlay('Preparing Monitoring', 'Occulert is preparing the on-device model before opening the camera.', 'Stay parked until camera monitoring has started. GPS and cloud sync use the choices you made before starting.', false);
         try {
