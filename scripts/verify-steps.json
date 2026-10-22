@@ -65,6 +65,7 @@
     "test:cloud-summary-presentation",
     "audit:asset-sizes",
     "test:migration-readiness",
+    "test:migration-grants",
     "test:asset-lineage",
     "test:workflow-policy",
     "test:deployment-ignore",
