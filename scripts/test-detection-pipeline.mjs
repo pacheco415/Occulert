@@ -312,13 +312,13 @@ const preferenceDriver = (await buildDriverArtifact({
  contractPath:fileURLToPath(new URL('../source-driver-contract.json',import.meta.url)),
 })).code;
 
-function openMouthFrame(h, stepMs = 135) {
+function openMouthFrame(h, stepMs = 135, mar = 1) {
  const lm=h.landmarks({ear:OPEN});
  for(const point of lm)point.z=0;
  lm[61]={x:.4,y:.5,z:0};
  lm[291]={x:.6,y:.5,z:0};
- lm[13]={x:.5,y:.4,z:0};
- lm[14]={x:.5,y:.6,z:0};
+ lm[13]={x:.5,y:.5-mar*.1,z:0};
+ lm[14]={x:.5,y:.5+mar*.1,z:0};
  h.set('__yawnLandmarks',lm);
  h.clock.advance(stepMs);
  h.run('onResults({multiFaceLandmarks:[__yawnLandmarks]})');
@@ -361,6 +361,47 @@ test('compiled yawn hold starts when calibration completes and requires its full
  assert.equal(h.get('_yawnsSinceBreak'),1);
  assert.equal(h.state().fatigue,8);
  assert.equal(h.state().alerts,0);
+});
+
+test('compiled MAR display uses the rolling five-frame average as mouth opening changes',()=>{
+ const h=createAppHarness({sourceOverride:preferenceDriver});
+ h.startSession();
+ openMouthFrame(h,2000,.2);
+ openMouthFrame(h,1200,.2);
+ assert.equal(h.state().calibrating,false);
+ assert.equal(h.state().calibrated,true);
+ assert.equal(h.get('_marHist.length'),1);
+ const displayed=[];
+ for(const mar of [.4,.6,.8,1,.1,.3]){
+  openMouthFrame(h,135,mar);
+  displayed.push(h.el('marEl').textContent);
+ }
+ assert.deepEqual(displayed,['0.30','0.40','0.50','0.60','0.58','0.56'],
+  'display must retain the same smoothed ratio used by yawn detection, including after the five-frame window rolls');
+ assert.equal(h.get('_marHist.length'),5);
+ assert.equal(h.get('yawnCount'),0);
+});
+
+test('compiled mouth frames calculate MAR once for detection and display',()=>{
+ const h=createAppHarness({sourceOverride:preferenceDriver});
+ h.startSession();
+ openMouthFrame(h,2000,.2);
+ openMouthFrame(h,1200,.2);
+ assert.equal(h.state().calibrating,false);
+ h.run(`var __lipCoordinateReads=0;
+  for(const index of [13,14,61,291]){
+   const point=__yawnLandmarks[index];
+   for(const axis of ['x','y','z']){
+    const value=point[axis];
+    Object.defineProperty(point,axis,{get(){__lipCoordinateReads++;return value}});
+   }
+  }`);
+ h.clock.advance(135);
+ h.run('onResults({multiFaceLandmarks:[__yawnLandmarks]})');
+ assert.equal(h.get('__lipCoordinateReads'),12,
+  'one mouth-ratio calculation reads each of the four lip points in x, y and z once');
+ assert.equal(h.el('marEl').textContent,'0.20');
+ assert.equal(h.get('_marHist.length'),2);
 });
 
 const preferenceHelper = readFileSync(new URL('../src/detection-experiments.js',import.meta.url),'utf8');
