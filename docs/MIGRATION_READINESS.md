@@ -1,12 +1,12 @@
 # Production migration coverage
 
-`supabase/migrations` is the canonical fresh-install chain: the July baseline followed by the eight September migrations. The baseline embeds the unchanged `db/schema.sql` and two legacy migrations in their original order; `db/` remains read-only history. New projects replay only the canonical chain. Existing projects must follow [baseline adoption guidance](../db/README.md) before any deployment or ledger repair; a missing baseline ledger entry is not evidence that core tables are absent.
+`supabase/migrations` is the canonical fresh-install chain: the July baseline followed by the eight September migrations and the October 22 direct-access revoke. The baseline embeds the unchanged `db/schema.sql` and two legacy migrations in their original order; `db/` remains read-only history. New projects replay only the canonical chain. Existing projects must follow [baseline adoption guidance](../db/README.md) before any deployment or ledger repair; a missing baseline ledger entry is not evidence that core tables are absent.
 
 `node scripts/check-migration-readiness.mjs` inventories the canonical chain and archived sources, prints their SHA-256 hashes and a read-only ledger query, and exits 2 without production evidence. It does not connect to Supabase, use credentials, execute SQL or apply migrations.
 
 Export `select version::text from supabase_migrations.schema_migrations order by version;` as a JSON array of objects such as `[{"version":"20260927010000"}]`, then run `node scripts/check-migration-readiness.mjs path/to/ledger.json`. Exit 1 means required Supabase versions are missing; exit 2 means malformed/unavailable evidence; exit 0 means all required versions are recorded.
 
-The September 27 period-report/billing migrations and September 29 webhook migration are included. The archived files are listed separately because they are not represented by the 14-digit ledger. A successful comparison proves ledger coverage only, not identical deployed definitions. Verify deployed definitions, RLS, grants, function bodies/security/search paths and foreign-key actions before adopting the baseline or activating dependent features. Do not recreate deployed objects merely because archived files have no ledger entries.
+The September 27 period-report/billing migrations, September 29 webhook migration and October 22 direct-access revoke are included. The archived files are listed separately because they are not represented by the 14-digit ledger. A successful comparison proves ledger coverage only, not identical deployed definitions. Verify deployed definitions, RLS, grants, function bodies/security/search paths and foreign-key actions before adopting the baseline or activating dependent features. Do not recreate deployed objects merely because archived files have no ledger entries.
 
 ## Optional read-only database observation
 
