@@ -2,7 +2,7 @@ import { setCameraControlsDisabled, refreshCameraChoices, openSelectedCamera, cl
 import { detectorFailureStopping, discardFaceMesh, initModel, verifyFirstInference, loop, framePerformanceSnapshot, set_processingFrame, set_detectorFailureStopping, set_consecutiveInferenceFailures, set_lastDetectionResultAt } from "./detector.js";
 import "./calibration.js";
 import { startGPS, stopGPS, riskText, fleetPayload } from "./metrics.js";
-import { alerts, escalationLevel, _alertTestOwner, beginAlertAudioScope, releaseAlertAudioScope, clearParkedAlertTest, set_alerts, set_escalationLevel } from "./alerts.js";
+import { alerts, escalationLevel, _alertTestOwner, beginAlertAudioScope, releaseAlertAudioScope, clearParkedAlertTest, resetBreakReminder, dismissBreak, triggerBreakCheck, set_alerts, set_escalationLevel } from "./alerts.js";
 import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistory, setMonitoringUi } from "./storage-history.js";
 import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
 export const start = startMonitoring;
@@ -97,6 +97,8 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
 export const $ = id => document.getElementById(id), video = /** @type {HTMLVideoElement} */ ($('video')), canvas = /** @type {HTMLCanvasElement} */ ($('canvas')), ctx = canvas.getContext('2d'), statusEl = $('status'), startBtn = /** @type {HTMLButtonElement} */ ($('startBtn')), demoBtn = $('demoBtn'), overlay = $('overlay'), overlayTitle = $('overlayTitle'), overlayText = $('overlayText'), overlayHint = $('overlayHint'), stateCard = $('stateCard'), driveStateEl = $('driveState'), driveHintEl = $('driveHint'), fatigueEl = $('fatigue'), confidenceEl = $('confidence'), calibrationEl = $('calibration'), calibrationFill = $('calibrationFill'), faceStateEl = $('faceState'), earEl = $('ear'), alertsEl = /** @type {CoercingTextElement} */ ($('alerts')), riskEl = $('risk'), riskDetailEl = $('riskDetail'), fatigueFill = $('fatigueFill'), confidenceFill = $('confidenceFill'), alertScreen = /** @type {HTMLElement} */ ($('alertScreen')), alertTitle = /** @type {HTMLElement} */ ($('alertTitle')), alertSub = /** @type {HTMLElement} */ ($('alertSub')), logEl = $('log'), reportEl = $('report'), nodsEl = $('nods'), syncEl = $('sync'), gpsEl = $('gps'), locationEl = $('location'), perclosEl = $('perclos'), microsleepsEl = $('microsleeps'), distractionEl = $('distraction'), escalationEl = $('escalation'), gpsConsent = $('gpsConsent'), cloudConsent = $('cloudConsent'), sessionTimerEl = $('sessionTimer'), nightOpacity = /** @type {HTMLInputElement} */ ($('nightOpacity')), nightVal = $('nightVal'), phoneGuide = $('phoneGuide'), calHint = $('calHint'), cameraSourceRow = $('cameraSourceRow'), cameraSourceSelect = $('cameraSourceSelect'), cameraSourceHint = $('cameraSourceHint'), cameraRefreshBtn = $('cameraRefreshBtn');
 export let timerInterval = null;
 export function startTimer() {
+    resetBreakReminder();
+    let lastBreakCheck = Date.now();
     if (timerInterval)
         clearInterval(timerInterval);
     timerInterval = setInterval(() => {
@@ -104,13 +106,19 @@ export function startTimer() {
             sessionTimerEl.textContent = '00:00';
             return;
         }
-        const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+        const now = Date.now();
+        const elapsed = Math.floor((now - sessionStart) / 1000);
         const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
         const s = (elapsed % 60).toString().padStart(2, '0');
         sessionTimerEl.textContent = m + ':' + s;
+        if (running && now - lastBreakCheck >= 60_000) {
+            lastBreakCheck = now;
+            triggerBreakCheck();
+        }
     }, 1000);
 }
 export function stopTimer() {
+    dismissBreak();
     if (timerInterval)
         clearInterval(timerInterval);
     timerInterval = null;

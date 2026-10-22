@@ -437,16 +437,24 @@ export function toggleVoice() {
     if (b)
         b.textContent = _voiceEnabled ? '🔊 Voice ON' : '🔇 Voice OFF';
 }
-export let _alertsSinceBreak = 0;
-export function triggerBreakCheck() {
-    _alertsSinceBreak++;
-    const sessionMs = sessionStart ? Date.now() - sessionStart : 0;
-    if ((_alertsSinceBreak >= 3 || sessionMs > 40 * 60 * 1000) && Date.now() - _lastBreakPrompt > 15 * 60 * 1000) {
-        set__lastBreakPrompt(Date.now());
+export let _alertsSinceBreak = 0, _yawnsSinceBreak = 0;
+/** @param {'alert'|'yawn'} [kind] */
+export function triggerBreakCheck(kind) {
+    if (!running || !sessionStart)
+        return;
+    if (kind === 'alert')
+        _alertsSinceBreak++;
+    else if (kind === 'yawn')
+        _yawnsSinceBreak++;
+    const now = Date.now(), sessionMs = now - sessionStart;
+    if ((_alertsSinceBreak + _yawnsSinceBreak >= 3 || sessionMs >= 40 * 60 * 1000) && now - _lastBreakPrompt > 15 * 60 * 1000) {
+        set__lastBreakPrompt(now);
         const el = document.getElementById('breakBanner');
         if (el) {
             const mins = Math.round(sessionMs / 60000);
-            el.innerHTML = '🛑 Rest Stop Recommended — ' + mins + ' min driving, ' + _alertsSinceBreak + ' alerts. <button data-page-action="dismissBreak" style="background:none;border:1px solid #00ff88;color:#00ff88;padding:4px 10px;border-radius:6px;cursor:pointer;margin-left:10px">Dismiss</button>';
+            const counts = _alertsSinceBreak + ' alert' + (_alertsSinceBreak === 1 ? '' : 's')
+                + ', ' + _yawnsSinceBreak + ' yawn' + (_yawnsSinceBreak === 1 ? '' : 's');
+            el.innerHTML = '🛑 Rest Stop Recommended — ' + mins + ' min driving, ' + counts + '. <button data-page-action="dismissBreak" style="background:none;border:1px solid #00ff88;color:#00ff88;padding:4px 10px;border-radius:6px;cursor:pointer;margin-left:10px">Dismiss</button>';
             el.style.display = 'block';
         }
         speak('Rest stop recommended. Please pull over safely and take a break.');
@@ -457,6 +465,11 @@ export function dismissBreak() {
     if (el)
         el.style.display = 'none';
     _alertsSinceBreak = 0;
+    _yawnsSinceBreak = 0;
+}
+export function resetBreakReminder() {
+    dismissBreak();
+    set__lastBreakPrompt(0);
 }
 /** @param {number} value */
 export function set_alerts(value) { alerts = value; return value; }
