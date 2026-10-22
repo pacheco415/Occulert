@@ -311,6 +311,58 @@ const preferenceDriver = (await buildDriverArtifact({
  sourceRoot:fileURLToPath(new URL('../src',import.meta.url)),
  contractPath:fileURLToPath(new URL('../source-driver-contract.json',import.meta.url)),
 })).code;
+
+function openMouthFrame(h, stepMs = 135) {
+ const lm=h.landmarks({ear:OPEN});
+ for(const point of lm)point.z=0;
+ lm[61]={x:.4,y:.5,z:0};
+ lm[291]={x:.6,y:.5,z:0};
+ lm[13]={x:.5,y:.4,z:0};
+ lm[14]={x:.5,y:.6,z:0};
+ h.set('__yawnLandmarks',lm);
+ h.clock.advance(stepMs);
+ h.run('onResults({multiFaceLandmarks:[__yawnLandmarks]})');
+}
+
+test('compiled calibration ignores sustained mouth opening without yawn side effects',()=>{
+ const h=createAppHarness({sourceOverride:preferenceDriver});
+ h.startSession();
+ let peakFatigue=0;
+ for(let frame=0;frame<23;frame++){
+  openMouthFrame(h);
+  peakFatigue=Math.max(peakFatigue,h.state().fatigue);
+ }
+ assert.equal(h.state().calibrating,true);
+ assert.deepEqual({
+  yawns:h.get('yawnCount'),
+  peakFatigue,
+  restYawns:h.get('_yawnsSinceBreak'),
+  mouthOpenSince:h.get('_mouthOpenSince'),
+  mouthSamples:h.get('_marHist.length'),
+ },{yawns:0,peakFatigue:0,restYawns:0,mouthOpenSince:0,mouthSamples:0});
+});
+
+test('compiled yawn hold starts when calibration completes and requires its full duration',()=>{
+ const h=createAppHarness({sourceOverride:preferenceDriver});
+ h.startSession();
+ openMouthFrame(h,2000);
+ assert.equal(h.state().calibrating,true);
+ openMouthFrame(h,1200);
+ assert.equal(h.state().calibrating,false);
+ assert.equal(h.state().calibrated,true);
+ const monitoringStarted=h.clock.now;
+ openMouthFrame(h,1);
+ assert.equal(h.get('yawnCount'),0,'calibration time must not satisfy the yawn hold');
+ assert.equal(h.get('_mouthOpenSince'),monitoringStarted);
+ openMouthFrame(h,1199);
+ assert.equal(h.get('yawnCount'),0,'the hold threshold is strictly more than 1200 ms');
+ openMouthFrame(h,1);
+ assert.equal(h.get('yawnCount'),1,'a valid yawn still counts after calibration');
+ assert.equal(h.get('_yawnsSinceBreak'),1);
+ assert.equal(h.state().fatigue,8);
+ assert.equal(h.state().alerts,0);
+});
+
 const preferenceHelper = readFileSync(new URL('../src/detection-experiments.js',import.meta.url),'utf8');
 const blockedPreferences = {
  getter:"Object.defineProperty(window,'localStorage',{get(){throw Error('Storage blocked')}})",
