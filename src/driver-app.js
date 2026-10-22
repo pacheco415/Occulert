@@ -247,7 +247,7 @@ initCloud();
     else
         window.addEventListener('load', () => { typeof initChart === 'function' && initChart(); });
 })();
-registerAcceptedAlertHook(reason => { experimentController?.recordAlert(reason); speak(VOICE_MSGS[Math.max(0, Math.min(escalationLevel - 1, VOICE_MSGS.length - 1))]); triggerBreakCheck(); logEvent('alert', reason || 'Fatigue', 'esc=' + escalationLevel); queueBackendEvent(reason === 'Distraction' ? 'distracted' : 'drowsy'); updateChart(fatigue); });
+registerAcceptedAlertHook(reason => { experimentController?.recordAlert(reason); speak(VOICE_MSGS[Math.max(0, Math.min(escalationLevel - 1, VOICE_MSGS.length - 1))]); triggerBreakCheck('alert'); logEvent('alert', reason || 'Fatigue', 'esc=' + escalationLevel); queueBackendEvent(reason === 'Distraction' ? 'distracted' : 'drowsy'); updateChart(fatigue); });
 const startupCore = Object.freeze({ version: 'v68', start, stop, findCameraChoices, initModel });
 if (experimentFlags.any)
     loadExperimentController().then(() => publishDriverReadiness(startupCore)).catch(() => { log('Parked experiment helper unavailable — reload while parked.'); });

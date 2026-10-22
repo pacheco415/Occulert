@@ -267,7 +267,7 @@ export function detectYawn(lm) {
                 yEl.textContent = yawnCount;
             log('Yawn detected (MAR=' + mar.toFixed(2) + ')');
             queueBackendEvent('yawn');
-            triggerBreakCheck();
+            triggerBreakCheck('yawn');
             set_fatigue(Math.min(100, fatigue + 8));
         }
     }
