@@ -211,7 +211,7 @@ export function onResults(res) {
     let lm = res.multiFaceLandmarks[0], raw = (calcEAR(lm, LEFT) + calcEAR(lm, RIGHT)) / 2, ear = smooth(raw), turned = headTurn(lm), nod = calibrating ? false : detectHeadNod(lm);
     updateScore(ear, turned, nod, true);
     // ── New: MAR/Yawn, Light, Tracking ──
-    if (typeof detectYawn === 'function')
+    if (!calibrating && typeof detectYawn === 'function')
         detectYawn(lm);
     if (typeof calcMAR === 'function') {
         const mar = calcMAR(lm);
