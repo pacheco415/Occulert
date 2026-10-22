@@ -7,7 +7,7 @@
   <meta name="description" content="Sign in to Occulert as a driver or fleet manager.">
   <meta name="theme-color" content="#0a0e1a">
   <script src="/supabase-loader.v49.js"></script>
-  <script src="/occulert-backend.v81.js"></script>
+  <script src="/occulert-backend.v82.js"></script>
   <script src="/passkey-auth.v60.js"></script>
   <script src="/auth-helper.v60.js"></script>
   <link rel="stylesheet" href="/login-page-1.v47.css" />
@@ -72,6 +72,13 @@
       </div>
       <aside class="card login-aside" aria-labelledby="profileStateLabel">
         <div class="label" id="profileStateLabel" tabindex="-1">Account status</div>
+        <section id="linkConfirm" class="notice hidden" aria-labelledby="linkConfirmHeading">
+          <h2 id="linkConfirmHeading" tabindex="-1">Confirm this sign-in link</h2>
+          <p id="linkConfirmText"></p>
+          <p class="tiny">Continue only if you asked for this link. Continuing signs this browser into that account and replaces any account signed in here.</p>
+          <button class="btn primary" id="linkConfirmBtn" type="button">Continue</button>
+          <button class="btn link" id="linkCancelBtn" type="button">Cancel</button>
+        </section>
         <p id="completionStatus" role="status" aria-live="polite"></p>
         <button class="btn hidden" id="retryProfileBtn" data-page-action="retryProfileSync" type="button">Retry profile sync</button>
         <div id="profileBox" aria-live="polite"><div class="notice">Checking sign-in status…</div></div>
@@ -80,7 +87,7 @@
       </aside>
     </section>
   </main>
-<script src="/passwordless-auth.v60.js"></script>
-<script src="/login-page-1.v62.js"></script>
+<script src="/passwordless-auth.v61.js"></script>
+<script src="/login-page-1.v63.js"></script>
 </body>
 </html>
