@@ -6,6 +6,7 @@ import { createCachedBooleanPreference } from './cachedBooleanPreference';
 import { currentAppBuildInfo, formatAppBuildLabel } from './appBuildInfo';
 import { updateSessionHistory } from './sessionHistory';
 import { createSessionSummaryOutbox, type PendingSessionSummary, type SummaryScope } from './sessionSummaryOutbox';
+import { pinnedSupabaseConfig, type PinnedSupabaseConfig } from './supabaseHost';
 
 const API_BASE = 'https://www.occulert.com';
 const AUTH_KEY = 'occulert.cloud.auth.v1';
@@ -16,11 +17,7 @@ const SECURE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
 
-interface PublicConfig {
-  configured: boolean;
-  url: string;
-  anonKey: string;
-}
+type PublicConfig = PinnedSupabaseConfig;
 
 interface StoredAuth {
   access_token: string;
@@ -146,18 +143,11 @@ async function readJson<T>(response: Response): Promise<T> {
 
 async function loadConfig(): Promise<PublicConfig | null> {
   if (!configPromise) {
-    configPromise = fetchJsonWithTimeout<{ supabase?: Partial<PublicConfig> }>(`${API_BASE}/api/public-config`, {
+    configPromise = fetchJsonWithTimeout<{ supabase?: unknown }>(`${API_BASE}/api/public-config`, {
       headers: { Accept: 'application/json' },
     })
-      .then(({ response, body }) => {
-        const config = body.supabase;
-        if (!response.ok || !config?.configured || !config.url || !config.anonKey) return null;
-        return {
-          configured: true,
-          url: config.url,
-          anonKey: config.anonKey,
-        };
-      })
+      // Credentials go only to the pinned project, whatever the response names.
+      .then(({ response, body }) => (response.ok ? pinnedSupabaseConfig(body.supabase) : null))
       .catch(() => null);
   }
   const config = await configPromise;
