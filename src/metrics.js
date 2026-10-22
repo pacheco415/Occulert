@@ -213,12 +213,6 @@ export function onResults(res) {
     // ── New: MAR/Yawn, Light, Tracking ──
     if (!calibrating && typeof detectYawn === 'function')
         detectYawn(lm);
-    if (typeof calcMAR === 'function') {
-        const mar = calcMAR(lm);
-        const marEl = document.getElementById('marEl');
-        if (marEl)
-            marEl.textContent = mar.toFixed(2);
-    }
     const videoEl = document.getElementById('video') || document.querySelector('video');
     if (typeof checkLightLevel === 'function' && videoEl)
         checkLightLevel(videoEl);
