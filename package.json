@@ -47,6 +47,7 @@
     "test:local-pages": "node --test scripts/test-local-pages.mjs",
     "test:static-server": "node --test scripts/test-static-server.mjs",
     "test:auth-races": "node --test scripts/test-auth-races.mjs",
+    "test:auth-link-confirmation": "node --test scripts/test-auth-link-confirmation.mjs",
     "test:supabase-transport": "node --test scripts/test-supabase-transport.mjs",
     "test:native-async-reliability": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-native-async-reliability.mjs",
     "test:fleet-invitations": "node scripts/test-fleet-invitations-db.mjs",

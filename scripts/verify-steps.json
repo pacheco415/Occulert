@@ -48,6 +48,7 @@
     "test:local-pages",
     "test:static-server",
     "test:auth-races",
+    "test:auth-link-confirmation",
     "test:supabase-transport",
     "test:native-async-reliability",
     "test:fleet-invitations",
