@@ -123,6 +123,8 @@ for (const stage of ['setSession', 'getUser']) test(`email-link ${stage} rejects
 
 test('email-link profile completion cannot overwrite a new account profile', async () => {
   const b = boot(), pending = deferred(); b.context.location.hash = '#type=signup&access_token=access-A&refresh_token=refresh-A'; b.hooks.fetch = () => pending.promise;
+  // This browser requested the link, so it is adopted without a confirmation step.
+  b.backend.recordAuthLinkRequest('signup', 'A@example.com');
   const request = b.passwordless.consumeRedirect(); const rejected = assert.rejects(request, error => error.code === 'auth_session_changed'); await tick();
   b.backend.adoptSession(session('B')); b.auth.saveProfile({ uid: 'B', driverId: 'B', authenticated: true }); pending.resolve(json({ ok: true })); await rejected; assert.equal(b.auth.getProfile().uid, 'B');
 });
@@ -186,7 +188,10 @@ for (const blocked of [false, true]) test(`recovery from A to B ${blocked ? 'rej
   const request = b.backend.consumeAuthRedirect(); await tick();
   if (blocked) b.context.localStorage.setItem = () => { throw new Error('fixture write blocked'); };
   pending.resolve(json(session('B').user));
-  const result = await request; assert.equal(result.handled, true);
+  const pendingLink = await request; assert.equal(pendingLink.handled, true);
+  // A link for another account never replaces A before an explicit Continue.
+  assert.equal(pendingLink.needsConfirmation, true); assert.equal(pendingLink.email, 'B@example.com'); assert.equal(b.backend.currentUser().id, 'A');
+  const result = await pendingLink.confirm(); assert.equal(result.handled, true);
   if (blocked) { assert.equal(result.ok, false); assert.equal(result.status, 503); assert.equal(b.backend.currentUser().id, 'A'); }
   else { assert.equal(result.ok, true); const saved = await b.backend.getSession(); assert.equal(saved.user.id, 'B'); assert.equal(saved.access_token, 'access-B'); assert.equal(saved.refresh_token, 'refresh-B'); assert.equal(saved.expires_at, expires); }
 });
