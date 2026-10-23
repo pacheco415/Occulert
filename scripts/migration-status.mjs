@@ -24,6 +24,7 @@ const dependencies = {
   '20260927010000': { routes: ['fleet-period-report'], purpose: 'Complete owner-scoped 7/30-day aggregates.' },
   '20260927030000': { routes: ['billing-status', 'billing-checkout', 'billing-portal', 'billing-webhook'], purpose: 'Informational Stripe test-mode state and service-role functions; no live billing or entitlements.' },
   '20260929010000': { routes: ['billing-webhook'], purpose: 'Durable acknowledgment of ignored Stripe test webhook events.' },
+  '20261023010000': { routes: ['pilot-leads'], purpose: 'Bounded cleanup of idle pilot-form rate-limit rows; same function signature and grants.' },
 };
 
 export function statusReport(ledger, { inventory = migrationInventory(), source = 'offline_ledger_export' } = {}) {
