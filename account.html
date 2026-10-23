@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="/supabase-loader.v49.js"></script>
-<script src="/occulert-backend.v81.js"></script>
+<script src="/occulert-backend.v83.js"></script>
 <script src="/passkey-auth.v60.js"></script>
 <script src="/auth-helper.v60.js"></script>
 <link rel="stylesheet" href="/account-page-1.v49.css" />
@@ -39,6 +39,15 @@
 <aside class="account-access">
   <div class="card">
     <div class="section-label">Account access</div>
+    <section id="linkConfirm" class="notice hidden" aria-labelledby="linkConfirmHeading">
+      <h2 id="linkConfirmHeading" tabindex="-1">Confirm this reset link</h2>
+      <p id="linkConfirmText"></p>
+      <p>Continue only if you asked for this link. Continuing signs this browser into that account and replaces any account signed in here.</p>
+      <div class="action-row">
+        <button class="btn primary" id="linkConfirmBtn" type="button">Continue</button>
+        <button class="btn" id="linkCancelBtn" type="button">Cancel</button>
+      </div>
+    </section>
     <div id="profileBox"><div style="color:var(--text3);font-size:13px">Loading profile…</div></div>
     <div class="action-row">
       <a class="btn primary" id="continueBtn" href="/app.html">Continue to App</a>
@@ -134,7 +143,7 @@
 </aside>
 </section>
 </main>
-<script src="/account-page-2.v63.js"></script>
+<script src="/account-page-2.v64.js"></script>
 
 <footer class="account-footer" style="text-align:center;padding:28px 16px 24px;border-top:1px solid #1e293b;font-size:12px;margin-top:40px"><a href="/" style="text-decoration:none;font-weight:700">Occulert</a> &nbsp;·&nbsp; <a href="/privacy.html" style="text-decoration:none">Privacy</a> &nbsp;·&nbsp; <a href="/safety.html" style="text-decoration:none">Safety</a> &nbsp;·&nbsp; <a href="/app.html" style="text-decoration:none">Driver App</a><div style="margin-top:8px">© 2026 Occulert. Prototype — not a substitute for rest or safe driving.</div></footer>
 </body>
