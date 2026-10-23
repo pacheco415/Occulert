@@ -9,7 +9,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 function deferred() { let resolve; const promise = new Promise(yes => { resolve = yes; }); return { promise, resolve }; }
 const session = id => ({ access_token: 'access-' + id, refresh_token: 'refresh-' + id, expires_at: Math.floor(Date.now()/1000)+3600, user: { id, email: id+'@example.com' } });
 function element(id) {
-  const classes = new Set(['securityForms','createCard','inviteCard','listCard','inviteLinkBox','passkeySetup'].includes(id)?['hidden']:[]), listeners = new Map();
+  const classes = new Set(['securityForms','createCard','inviteCard','listCard','inviteLinkBox','passkeySetup','linkConfirm'].includes(id)?['hidden']:[]), listeners = new Map();
   return { id,value:'',textContent:'',innerHTML:'',href:'#',disabled:false,dataset:{},className:'',
     classList:{ add:name=>classes.add(name),remove:name=>classes.delete(name),contains:name=>classes.has(name),toggle(name,force){if(force===undefined?!classes.has(name):force)classes.add(name);else classes.delete(name)} },
     setAttribute(k,v){this[k]=String(v)},getAttribute(){return 'dark'},addEventListener(name,fn){listeners.set(name,fn)},dispatch(name,event={}){listeners.get(name)?.(event)},focus(){},select(){},listeners,
@@ -18,10 +18,11 @@ function element(id) {
 async function boot(page='account-page-2', initial='A', options={}) {
   const store = new Map(), elements = new Map(), listeners = new Map(), documentListeners = new Map(), calls = [], timers=[];
   const hooks = { fetch:null, passkeys:null, otp:null }, el = id => {if(!elements.has(id))elements.set(id,element(id));return elements.get(id)};
+  const bootOptions=options;if(bootOptions.beforeRun)bootOptions.beforeRun(store);
   if(initial){store.set('occulert-auth',JSON.stringify(session(initial)));store.set('occulert-profile',JSON.stringify({uid:initial,driverId:initial,name:'Private '+initial,email:initial+'@example.com',company:'Company '+initial,role:'driver',authenticated:true}));}
   const context = { console,URL,URLSearchParams,Response,AbortController,setTimeout(fn,ms){const timer=setTimeout(fn,ms);timers.push(timer);return timer},clearTimeout,
     document:{documentElement:element('html'),getElementById:el,querySelector:()=>null,querySelectorAll:()=>[],addEventListener(name,fn){if(!documentListeners.has(name))documentListeners.set(name,[]);documentListeners.get(name).push(fn)},hidden:false},
-    location:{origin:'https://www.occulert.com',pathname:'/account.html',search:'',hash:''},history:{replaceState(){}},matchMedia:()=>({matches:false}),isSecureContext:true,
+    location:{origin:'https://www.occulert.com',pathname:'/account.html',search:options.search||'',hash:options.hash||''},history:{replaceState(){}},matchMedia:()=>({matches:false}),isSecureContext:true,
     navigator:{platform:'fixture',userAgent:'fixture',credentials:{},clipboard:{async writeText(value){calls.push({action:'copy',value})}}},
     confirm:()=>true,prompt:()=> 'new name',
     localStorage:{ get length(){return store.size},key:i=>[...store.keys()][i],getItem(key){if(options.blockStorage||options.blockTheme&&key==='occulert-theme')throw new Error('fixture storage unavailable');return store.get(key)??null},setItem(key,value){if(options.blockStorage||options.blockTheme&&key==='occulert-theme')throw new Error('fixture storage unavailable');store.set(key,String(value))},removeItem:key=>store.delete(key)},
@@ -30,6 +31,7 @@ async function boot(page='account-page-2', initial='A', options={}) {
       const call={url:String(url),options};calls.push(call);
       if(url==='/api/public-config')return new Response(JSON.stringify({supabase:{configured:true,url:'https://example.supabase.co',anonKey:'fixture-public'}}));
       if(hooks.fetch){const result=hooks.fetch(call);if(result)return result}
+      if(bootOptions.fetch){const result=bootOptions.fetch(call);if(result)return result}
       const owner=String(options.headers?.Authorization||'').replace('Bearer access-','');
       let body={ok:true};
       if(url==='/api/fleets')body={ok:true,fleet:{id:'fleet-'+owner,company_name:'Fleet '+owner}};
@@ -362,4 +364,39 @@ test('late previous-account finally cannot release a newer pending password reau
     newResponse.resolve(Response.json({error:'invalid_credentials'},{status:400}));await fresh;
     assert.equal(vm.runInContext('deletionReauthBusy',b.context),false);assert.equal(b.el('deleteReauthPasswordBtn').disabled,false);
   }finally{b.cleanup()}
+});
+
+// A reset link carries a complete session for whichever account requested it.
+const resetLinkFor = id => ({ search:'?recovery=1', hash:`#type=recovery&access_token=access-${id}-link&refresh_token=refresh-${id}-link&expires_in=3600`,
+  fetch:call=>call.url.endsWith('/auth/v1/user')?new Response(JSON.stringify({id,email:id+'@example.com'})):null });
+test('Account asks before a reset link for another account replaces A, and Continue verifies the reset',async()=>{
+  const b=await boot('account-page-2','A',resetLinkFor('B'));try{
+    assert.equal(b.el('linkConfirm').classList.contains('hidden'),false);
+    assert.match(b.el('linkConfirmText').textContent,/B@example\.com/);
+    assert.equal(JSON.parse(b.store.get('occulert-auth')).user.id,'A');
+    assert.match(b.el('profileBox').innerHTML,/A@example/);
+    b.el('linkConfirmBtn').dispatch('click');for(let i=0;i<8;i++)await tick();
+    assert.equal(JSON.parse(b.store.get('occulert-auth')).user.id,'B');
+    assert.equal(b.el('linkConfirm').classList.contains('hidden'),true);
+    assert.match(b.el('status').textContent,/Secure reset link verified/);
+  }finally{b.cleanup()}
+});
+test('Account Cancel on an unrequested reset link keeps A signed in',async()=>{
+  const b=await boot('account-page-2','A',resetLinkFor('B'));try{
+    b.el('linkCancelBtn').dispatch('click');await tick();
+    assert.equal(JSON.parse(b.store.get('occulert-auth')).user.id,'A');
+    assert.equal(b.el('linkConfirm').classList.contains('hidden'),true);
+    assert.match(b.el('status').textContent,/not used/);
+  }finally{b.cleanup()}
+});
+test('Account adopts a reset link this browser requested without asking',async()=>{
+  const options=resetLinkFor('B');
+  const b=await boot('account-page-2',null,{...options,fetch:call=>options.fetch(call)});try{
+    assert.equal(b.el('linkConfirm').classList.contains('hidden'),false,'no marker was recorded in this browser');
+  }finally{b.cleanup()}
+  const marked=await boot('account-page-2',null,{...options,fetch:call=>options.fetch(call),beforeRun:store=>store.set('occulert-auth-link-requests',JSON.stringify({recovery:{email:'b@example.com',created_at:Date.now()}}))});try{
+    assert.equal(marked.el('linkConfirm').classList.contains('hidden'),true);
+    assert.equal(JSON.parse(marked.store.get('occulert-auth')).user.id,'B');
+    assert.match(marked.el('status').textContent,/Secure reset link verified/);
+  }finally{marked.cleanup()}
 });

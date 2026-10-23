@@ -33,11 +33,13 @@ function makeElement(id) {
       },
     },
     setAttribute(name, value) { this[name] = String(value); },
+    listeners: {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
     focus() {},
   };
 }
 
-async function boot({ resetResult = { ok: true, body: {} }, fleetResult = { status: 404, ok: false, body: { error: 'fleet_not_found' } }, passkeyError = null, search = '', savedProfile = null, initialUser = null } = {}) {
+async function boot({ resetResult = { ok: true, body: {} }, fleetResult = { status: 404, ok: false, body: { error: 'fleet_not_found' } }, passkeyError = null, search = '', savedProfile = null, initialUser = null, linkResult = null } = {}) {
   const elements = new Map();
   const calls = { auth: [], reset: [], fleet: 0, passkey: 0, retry: 0 };
   let currentPasskeyError = passkeyError;
@@ -66,7 +68,7 @@ async function boot({ resetResult = { ok: true, body: {} }, fleetResult = { stat
     },
   };
   context.window = context;
-  context.window.location = { search };
+  context.window.location = { search, hash: linkResult ? '#type=magiclink' : '' };
   context.window.OcculertBackend = {
     requestPasswordReset(email) { calls.reset.push(email); return Promise.resolve(resetResult); },
     passwordResetMessage: () => 'mapped reset failure',
@@ -77,7 +79,7 @@ async function boot({ resetResult = { ok: true, body: {} }, fleetResult = { stat
     isAuthContextCurrent: context => !!context&&context.revision===revision&&context.auth?.user?.id===signedInUser?.id,
     getFleet() { calls.fleet += 1; return Promise.resolve(fleetResult); },
   };
-  context.window.OcculertPasswordless = { start(email, extra) { calls.auth.push({email, mode: 'signup', extra}); return Promise.resolve(); }, consumeRedirect: () => null };
+  context.window.OcculertPasswordless = { start(email, extra) { calls.auth.push({email, mode: 'signup', extra}); return Promise.resolve(); }, consumeRedirect: async () => (typeof linkResult === 'function' ? linkResult({ signIn(user) { signedInUser = user; revision += 1; } }) : linkResult) };
   context.window.OcculertPasskeys = {
     isSupported: () => true,
     message: () => 'mapped passkey failure',
@@ -281,4 +283,40 @@ test('password recovery has a stable deep link that opens reset mode directly', 
   assert.equal(el('authHeading').textContent, 'Reset your password');
   assert.equal(el('passwordField').classList.contains('hidden'), true);
   assert.equal(el('backToSignInBtn').classList.contains('hidden'), false);
+});
+
+test('an email link this browser did not request asks before switching, and Continue completes sign-in', async () => {
+  let confirmed = 0;
+  const { el } = await boot({
+    initialUser: { id: 'driver-1', email: 'current@example.com' },
+    linkResult: ({ signIn }) => ({ needsConfirmation: true, email: 'other@example.com', cancel() {}, async confirm() {
+      confirmed += 1; signIn({ id: 'driver-2', email: 'other@example.com' });
+      return { profile: { uid: 'driver-2', role: 'driver', email: 'other@example.com', authenticated: true, cloudProfile: true }, enroll: false, fleetRequested: false };
+    } }),
+  });
+  await settle();
+  assert.equal(el('linkConfirm').classList.contains('hidden'), false);
+  assert.match(el('linkConfirmText').textContent, /other@example\.com/);
+  assert.match(el('profileBox').innerHTML, /current@example\.com/);
+  assert.equal(confirmed, 0);
+  el('linkConfirmBtn').listeners.click();
+  for (let i = 0; i < 5; i++) await settle();
+  assert.equal(confirmed, 1);
+  assert.equal(el('linkConfirm').classList.contains('hidden'), true);
+  assert.match(el('profileBox').innerHTML, /other@example\.com/);
+});
+
+test('Cancel on an unrequested email link keeps the current account and says the link was not used', async () => {
+  let cancelled = 0, confirmed = 0;
+  const { el } = await boot({
+    initialUser: { id: 'driver-1', email: 'current@example.com' },
+    linkResult: { needsConfirmation: true, email: 'other@example.com', cancel() { cancelled += 1; }, async confirm() { confirmed += 1; } },
+  });
+  await settle();
+  el('linkCancelBtn').listeners.click();
+  await settle();
+  assert.equal(cancelled, 1); assert.equal(confirmed, 0);
+  assert.equal(el('linkConfirm').classList.contains('hidden'), true);
+  assert.match(el('completionStatus').textContent, /not used/);
+  assert.match(el('profileBox').innerHTML, /current@example\.com/);
 });
