@@ -20,7 +20,7 @@ function session(id, token = id) {
 function json(body, status = 200) { return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }); }
 
 function boot() {
-  const store = new Map(), calls = [];
+  const store = new Map(), calls = [], listeners = new Map();
   // The link sender's account is what Auth verifies for the presented tokens.
   let linkUser = user('B');
   const context = {
@@ -29,9 +29,12 @@ function boot() {
     navigator: { credentials: {}, platform: 'fixture', userAgent: 'fixture' },
     location: { origin: 'https://www.occulert.com', hash: '', search: '', pathname: '/login.html' }, history: { replaceState() {} },
     isSecureContext: true, PublicKeyCredential() {},
+    addEventListener(name, listener) { if (!listeners.has(name)) listeners.set(name, []); listeners.get(name).push(listener); },
+    dispatchEvent(event) { for (const listener of listeners.get(event.type) || []) listener(event); },
     fetch(url, options = {}) {
       calls.push(String(url));
       if (url === '/api/public-config') return json({ supabase: { configured: true, url: 'https://example.supabase.co', anonKey: 'fixture-public' } });
+      if (String(url).includes('/auth/v1/token?grant_type=refresh_token')) return json(session('A', 'fresh'));
       if (String(url).endsWith('/auth/v1/user')) return json(linkUser);
       if (url === '/api/profile') return json({ ok: true, driver: { id: 'driver-fixture' } });
       return json({});
@@ -40,7 +43,7 @@ function boot() {
   context.window = context;
   context.supabase = { createClient() {
     return { auth: {
-      async setSession(value) { return { data: { session: { ...value, user: linkUser } }, error: null }; },
+      async setSession(value) { return { data: { session: { ...value, user: linkUser, expires_at: Math.floor(Date.now() / 1000) + 3600 } }, error: null }; },
       async getUser() { return { data: { user: linkUser }, error: null }; },
       async signInWithOtp() { return { error: null }; },
     } };
@@ -107,10 +110,12 @@ test('an account change while the prompt is shown makes Continue fail without sw
   }
 });
 
-test('a link for the account already signed in here is adopted without a prompt', async () => {
+test('a link for the same signed-in account still needs matching local intent', async () => {
   const b = boot(); b.backend.adoptSession(session('B')); b.link('recovery', 'B');
-  const result = await b.backend.consumeAuthRedirect();
-  assert.equal(result.ok, true); assert.equal(result.needsConfirmation, undefined);
+  const pending = await b.backend.consumeAuthRedirect(); assert.equal(pending.needsConfirmation, true);
+  assert.equal((await b.backend.getSession()).access_token, 'access-B'); pending.cancel();
+  await b.backend.requestPasswordReset('B@example.com'); b.link('recovery', 'B');
+  const result = await b.backend.consumeAuthRedirect(); assert.equal(result.ok, true); assert.equal(result.needsConfirmation, undefined);
   assert.equal((await b.backend.getSession()).access_token, 'access-B-link');
 });
 
@@ -153,3 +158,63 @@ test('an unrequested magic link with nobody signed in still asks first', async (
   pending.cancel(); await assert.rejects(pending.confirm(), error => error.code === 'auth_session_changed');
   assert.equal(b.backend.currentUser(), null);
 });
+
+for (const type of ['recovery', 'magiclink', 'signup']) {
+  test(`${type} a newer sign-in attempt still wins after an automatic refresh settles`, async () => {
+    const b = boot(); b.backend.adoptSession({ ...session('A'), expires_at: 1 }); b.link(type, 'B');
+    const write = b.context.localStorage.setItem;
+    b.context.localStorage.setItem = (key, value) => {
+      write(key, value);
+      if (key === 'occulert-auth' && JSON.parse(value).access_token === 'access-fresh') queueMicrotask(() => b.backend.beginAuthAttempt());
+    };
+    if (type === 'recovery') assert.equal((await b.backend.consumeAuthRedirect()).status, 409);
+    else await assert.rejects(b.passwordless.consumeRedirect(), error => error.code === 'auth_session_changed');
+    assert.equal(b.backend.currentUser().id, 'A');
+  });
+  test(`${type} completes the existing session refresh before showing a usable confirmation`, async () => {
+    const b = boot(); b.backend.adoptSession({ ...session('A'), expires_at: 1 }); b.link(type, 'B');
+    const pending = type === 'recovery' ? await b.backend.consumeAuthRedirect() : await b.passwordless.consumeRedirect();
+    assert.equal(pending.needsConfirmation, true); assert.equal((await b.backend.getSession()).access_token, 'access-fresh');
+    assert.equal(b.calls.filter(url => url.includes('grant_type=refresh_token')).length, 1);
+    const result = await pending.confirm();
+    if (type === 'recovery') assert.equal(result.ok, true); else assert.equal(result.profile.uid, 'B');
+    assert.equal(b.backend.currentUser().id, 'B');
+  });
+  test(`${type} observed cross-tab changes cannot revive the same original auth after a prompt`, async () => {
+    const b = boot(); b.backend.adoptSession(session('A')); b.link(type, 'B');
+    const before = b.store.get('occulert-auth');
+    const pending = type === 'recovery' ? await b.backend.consumeAuthRedirect() : await b.passwordless.consumeRedirect();
+    b.store.set('occulert-auth', JSON.stringify(session('C'))); b.context.dispatchEvent({ type: 'storage', key: 'occulert-auth' });
+    b.store.set('occulert-auth', before); b.context.dispatchEvent({ type: 'storage', key: 'occulert-auth' });
+    if (type === 'recovery') assert.equal((await pending.confirm()).status, 409);
+    else await assert.rejects(pending.confirm(), error => error.code === 'auth_session_changed');
+    assert.equal(b.store.get('occulert-auth'), before);
+  });
+  for (const invalid of ['future', 'string', 'deadline']) test(`${type} ${invalid} request time still requires confirmation`, async () => {
+    const b = boot(), ttl = type === 'recovery' ? 3600000 : 86400000;
+    const created = invalid === 'future' ? Date.now() + 60000 : invalid === 'string' ? String(Date.now()) : Date.now() - ttl;
+    b.store.set(MARKERS, JSON.stringify({ [type === 'recovery' ? 'recovery' : 'signin']: { email: 'b@example.com', created_at: created } }));
+    b.link(type, 'B');
+    const pending = type === 'recovery' ? await b.backend.consumeAuthRedirect() : await b.passwordless.consumeRedirect();
+    assert.equal(pending.needsConfirmation, true); assert.equal(b.backend.currentUser(), null); pending.cancel();
+  });
+  for (const replacement of ['new-session', 'signout-then-same-user']) test(`${type} Continue rejects ${replacement} for the same user after the prompt`, async () => {
+    const b = boot(); b.backend.adoptSession(session('A')); b.link(type, 'B');
+    const pending = type === 'recovery' ? await b.backend.consumeAuthRedirect() : await b.passwordless.consumeRedirect();
+    if (replacement === 'signout-then-same-user') b.backend.signOut();
+    b.backend.adoptSession(session('A', 'replacement'));
+    const before = b.store.get('occulert-auth');
+    if (type === 'recovery') { const result = await pending.confirm(); assert.equal(result.ok, false); assert.equal(result.status, 409); }
+    else await assert.rejects(pending.confirm(), error => error.code === 'auth_session_changed');
+    assert.equal(b.store.get('occulert-auth'), before);
+  });
+  test(`${type} Continue rejects expiry without writing the link session`, async () => {
+    const b = boot(); b.backend.adoptSession(session('A')); b.link(type, 'B');
+    const pending = type === 'recovery' ? await b.backend.consumeAuthRedirect() : await b.passwordless.consumeRedirect();
+    const before = b.store.get('occulert-auth');
+    let now = Date.now() + 7200000; b.context.Date = class extends Date { static now() { return now; } };
+    if (type === 'recovery') assert.equal((await pending.confirm()).ok, false);
+    else await assert.rejects(pending.confirm());
+    assert.equal(b.store.get('occulert-auth'), before);
+  });
+}

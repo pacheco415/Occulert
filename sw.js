@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v129';
+const CACHE = 'occulert-v132';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -89,6 +89,7 @@ const NETWORK_ONLY_DOCUMENTS = new Set([
   '/fleet-history.html',
 ]);
 const NETWORK_ONLY_ASSETS = new Set([
+  '/occulert-backend.v82.js',
   '/occulert-backend.v80.js',
   '/occulert-backend.v79.js',
   '/occulert-backend.v68.js',
@@ -113,7 +114,7 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v60.js',
   '/occulert-backend.v78.js',
   '/occulert-backend.v81.js',
-  '/occulert-backend.v82.js',
+  '/occulert-backend.v83.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
   '/supabase-loader.v47.js',
@@ -123,6 +124,7 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passwordless-auth.v49.js',
   '/passwordless-auth.v60.js',
   '/passwordless-auth.v61.js',
+  '/passwordless-auth.v62.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
   '/driver-startup-guard.v13.js',

@@ -13,13 +13,14 @@ account already signed in there, and later opted-in drives would upload to it.
   `signin`), the lowercased email and the time. Markers hold no secrets. Reset
   markers expire after one hour; sign-in and signup markers after 24 hours.
 - After the existing fragment removal and Auth verification, a link is adopted
-  without a prompt only when either the same account is already signed in here,
-  or nobody is signed in and an unexpired marker of the same kind matches the
-  verified email.
+  without a prompt only when an unexpired marker of the same kind matches the
+  verified email and nobody, or the same account, is signed in here.
 - Every other link shows a confirmation naming the verified email. Tokens stay
   in memory until the person presses Continue. Cancel discards them and keeps
   the current account. Continue fails without changes if this browser's account
-  changed while the confirmation was shown.
+  changed while the confirmation was shown, including a replacement session for
+  the same account. A link that expires during confirmation is rejected before
+  its tokens can replace the current session.
 - Markers are cleared after adoption and on sign-out, which also runs after
   account deletion.
 
