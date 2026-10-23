@@ -139,6 +139,9 @@ verify asymmetric JWTs with cached public keys; these do not check current Auth
 account or session status. They still require current owned database rows, which
 account deletion removes. See [cached verification and its revocation limits](docs/CACHED_JWKS_VERIFICATION.md).
 Successful deletion clears local app state and signs out the browser SDK.
+Password changes and passkey changes on the Account page need a sign-in from
+the last 10 minutes in the browser; see [recent sign-in](docs/ACCOUNT_RECENT_SIGN_IN.md)
+for the rule and the Supabase password settings that back it.
 Keep the service-role key on the server; it is never sent to the browser.
 
 Invitation creation returns the one-time link only to the verified manager.

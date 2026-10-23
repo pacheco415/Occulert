@@ -160,6 +160,7 @@ for(const page of ['account-page-2','fleet-onboarding-page-1','login-page-1'])te
 
 test('legitimate credential request that refreshes tokens re-verifies and restores usable controls',async()=>{
   const b=await boot();try{
+    b.context.recentSignIn=()=>true;
     b.backend.updatePassword=async()=>{b.backend.adoptSession({...session('A'),access_token:'refreshed-A'});return {ok:true}};
     b.el('newPassword').value='fixture-password';await b.context.changePassword({preventDefault});await tick();await tick();
     assert.equal(b.el('newPassword').value,'');assert.equal(b.el('passwordBtn').disabled,false);assert.match(b.el('securityIntro').textContent,/A@example/);
@@ -309,6 +310,35 @@ for(const event of ['focus','visibility'])for(const change of ['newer-intent','a
     assert.equal(b.el('email').value,'');assert.equal(b.el('password').value,'');assert.equal(vm.runInContext('loginPendingAction',b.context),null);assert.equal(b.el('submitBtn').disabled,true);
     pending.resolve(new Response(JSON.stringify({error:'invalid_grant'}),{status:400}));await old;
     assert.equal(b.el('submitBtn').disabled,true);assert.equal(b.el('status').textContent,'');
+  }finally{b.cleanup()}
+});
+
+test('password change waits for a fresh sign-in by the same account, then runs once',async()=>{
+  const b=await boot();try{
+    const sent=[];b.backend.updatePassword=async(password,current)=>{sent.push([password,current]);return {ok:true}};
+    b.el('newPassword').value='fixture-password';await b.context.changePassword({preventDefault});
+    assert.deepEqual(sent,[]);assert.equal(b.el('securityReauthSection').hidden,false);
+    b.hooks.fetch=call=>call.url.includes('/auth/v1/token')?Response.json({...session('A'),access_token:'access-A-fresh',expires_in:3600}):null;
+    b.el('securityReauthPassword').value='A-private-password';await b.context.reauthenticateForSecurity({preventDefault});
+    assert.deepEqual(sent,[['fixture-password','A-private-password']]);assert.equal(b.el('securityReauthSection').hidden,true);
+    assert.equal(b.backend.currentUser().id,'A');assert.match(b.el('status').textContent,/Password updated/);
+  }finally{b.cleanup()}
+});
+
+for(const action of ['changePassword','registerPasskey','removePasskey'])test(`${action} re-auth that finishes after an account switch changes nothing`,async()=>{
+  const b=await boot();try{
+    const sent=[];b.backend.updatePassword=async()=>{sent.push('password');return {ok:true}};
+    b.el('newPassword').value='fixture-password';
+    await b.context[action](action==='changePassword'?{preventDefault}:'11111111-1111-4111-8111-111111111111');
+    assert.equal(b.el('securityReauthSection').hidden,false);b.calls.length=0;
+    const pending=deferred();b.hooks.fetch=call=>call.url.includes('/auth/v1/token')?pending.promise:null;
+    b.el('securityReauthPassword').value='A-private-password';const old=b.context.reauthenticateForSecurity({preventDefault});await tick();
+    assert.equal(b.el('securityReauthPasswordBtn').disabled,true);
+    b.switchTo('B');await tick();await tick();
+    assert.equal(b.el('securityReauthSection').hidden,true,'the prompt for A disappears with A');
+    pending.resolve(Response.json({...session('A'),expires_in:3600}));await old;
+    assert.deepEqual(sent,[]);assert.equal(b.calls.filter(call=>['register','remove'].includes(call.action)).length,0);
+    assert.equal(b.backend.currentUser().id,'B');assert.equal(vm.runInContext('securityReauth',b.context),null);
   }finally{b.cleanup()}
 });
 
