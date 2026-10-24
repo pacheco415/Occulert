@@ -289,12 +289,14 @@ test('actual account deletion preserves fresh Auth and the same-token recent-AMR
     const token = liveJwt('ec', { claims: { session_id: subject, amr: [{ method: 'password', timestamp: Math.floor(Date.now() / 1000) - (recent ? 0 : 601) }] } });
     const f = networkFixture(async (url, options) => {
       if (url.endsWith('/auth/v1/user')) return Response.json({ id: subject, last_sign_in_at: new Date().toISOString() });
+      // Billing cleanup reads the owned fleet first; this account owns none.
+      if (url.includes('/rest/v1/fleets?')) { assert.equal(options.method, 'GET'); return Response.json([]); }
       assert.equal(url, issuer + '/admin/users/' + subject); assert.equal(options.method, 'DELETE'); return new Response(null, { status: 204 });
     });
     const result = await invoke(f.load('account.js'), protectedRequest('account', token, 'DELETE', { confirm: 'DELETE' }));
     assert.equal(result.statusCode, recent ? 200 : 401);
     if (!recent) assert.equal(result.body.error, 'reauth_required');
-    assert.equal(f.calls.length, recent ? 2 : 1);
+    assert.equal(f.calls.length, recent ? 3 : 1);
   }
 });
 
