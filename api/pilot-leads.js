@@ -59,6 +59,13 @@ function clean(value, max = MAX_FIELD_LENGTH) {
   return String(value || "").replace(/\0/g, "").trim().slice(0, max);
 }
 
+// Contact addresses are refused, never shortened: a cut-down address can be a
+// different, valid inbox.
+function cleanEmail(value) {
+  const email = String(value || "").trim().toLowerCase();
+  return email.length <= 240 && !email.includes("\0") ? email : "";
+}
+
 function allowlistedLabel(value, labels) {
   if (typeof value !== "string") return "";
   const key = clean(value, 80);
@@ -201,7 +208,7 @@ module.exports = async function handler(request, response) {
     name: clean(body.name, 160),
     role: clean(body.role, 160),
     company: clean(body.company, 220),
-    email: clean(body.email, 240).toLowerCase(),
+    email: cleanEmail(body.email),
     phone: clean(body.phone, 80),
     fleet: clean(body.fleet, 80),
     useCase: clean(body.useCase, 120),
@@ -271,6 +278,8 @@ module.exports = async function handler(request, response) {
     const webhookResponse = await Promise.race([
       fetch(webhookUrl, {
         method: "POST",
+        // Contact details must not follow a redirect to another destination.
+        redirect: "error",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "occulert.pilot_lead", lead }),
         signal: controller.signal,

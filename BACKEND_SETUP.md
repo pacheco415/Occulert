@@ -120,6 +120,10 @@ existing-project adoption check above:
    `pilot_leads`, and grants the service role explicitly. The web and native
    apps never query these tables directly, so no route changes. Apply it any
    time after the baseline; see [direct table access](docs/DIRECT_TABLE_ACCESS.md).
+6. `supabase/migrations/20261023010000_prune_pilot_lead_rate_limits.sql`
+   makes the pilot-form rate limiter delete up to 100 rows idle for more than
+   a day on each call, so the table stops growing forever. The function keeps
+   its signature and grants; `/api/pilot-leads` works the same before and after.
 
 The complete canonical chain also includes atomic account deletion, fleet
 follow-ups, query indexes and atomic invitation creation. Production database

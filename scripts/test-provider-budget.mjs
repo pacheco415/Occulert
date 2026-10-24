@@ -166,7 +166,7 @@ for(const[rateAt,expectedMs]of [[0,5000],[7000,5000],[11950,50],[12000,null],[12
   await settleTasks();assert.equal(settled,true,'the response must settle at its hard deadline');
   assert.equal(f.response.statusCode,502);assert.deepEqual(f.response.body,{ok:false,error:'webhook_unreachable'});
   assert.equal(f.writes(),1);assert.equal(f.calls.length,expectedMs===null?0:1);assert.equal(f.response.headers['Cache-Control'],'no-store');
-  if(expectedMs!==null){assert.equal(f.calls[0].options.signal.aborted,true);assert.equal(f.calls[0].url,'https://hook.example.invalid/leads')}
+  if(expectedMs!==null){assert.equal(f.calls[0].options.signal.aborted,true);assert.equal(f.calls[0].url,'https://hook.example.invalid/leads');assert.equal(f.calls[0].options.redirect,'error','contact details must not follow a redirect')}
  }finally{f.late.resolve({ok:true});await pending;await settleTasks()}
  assert.equal(f.writes(),1);assert.equal(f.response.statusCode,502,'late headers cannot overwrite a timeout');assert.equal(f.timers.size,0);
  assert.equal(f.b.logs.length,1);assert.doesNotMatch(f.b.logs[0],/Fixture|fixture@example|hook\.example|fixture-key/);
