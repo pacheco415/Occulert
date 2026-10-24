@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
 
-<script id="driver-startup-guard" src="/driver-startup-guard.v13.js" integrity="sha256-ks5eGf7+7IF1w4Etnzwp/jj9RLGgmQ1Ifj+yuQCb6Qs=" crossorigin="anonymous" defer></script>
+<script id="driver-startup-guard" src="/driver-startup-guard.v14.js" integrity="sha256-btyIFTmCnTybGyGdyXFMWnzgywxWdovaFPVlCojSYoQ=" crossorigin="anonymous" defer></script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 
@@ -82,6 +82,7 @@
       ⚠️ <strong>Monitoring stopped after screen lock or leaving this tab.</strong> Return to Occulert and restart only while safely parked.
     </div>
     <div class="card state-card" id="stateCard" tabindex="-1" role="status" aria-live="polite" aria-atomic="true"><div class="label">Monitoring Status</div><div class="state-value" id="driveState">NOT MONITORING</div><p class="metric-note" id="driveHint">Monitoring has not started.</p></div>
+    <p class="card notice-card small" id="viewportWarning" role="status" aria-live="polite" hidden></p>
     </div>
     </div>
     <div id="driverSecondary" role="region" aria-label="Session details and safety notice" tabindex="0">
@@ -219,7 +220,7 @@
 <script src="/occulert-backend.v84.js" defer></script>
 <script src="/security-utils.v47.js" defer></script>
 <script src="/local-history.v2.js" defer></script>
-<script src="/driver-app.v92.js" defer></script>
+<script src="/driver-app.v93.js" defer></script>
 <script src="/driver-overview.v1.js" defer></script>
 <script src="/lang.v47.js" defer></script>
 
