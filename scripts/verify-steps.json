@@ -49,6 +49,7 @@
     "test:static-server",
     "test:auth-races",
     "test:auth-link-confirmation",
+    "test:server-sign-out",
     "test:supabase-transport",
     "test:native-async-reliability",
     "test:fleet-invitations",
