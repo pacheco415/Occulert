@@ -47,10 +47,15 @@ Occulert is an assistive prototype. It cannot guarantee crash prevention, driver
 | Device | Support |
 |---|---|
 | iPhone Safari | ✅ Supported, keep screen unlocked |
+| iPhone Duo | Policy: folded driving only; device acceptance pending. Unfolded uses the inner camera (lower confidence, untested at night). |
 | Android Chrome | ✅ Supported |
 | Phone vibration | Device/browser dependent; iOS Safari does not support vibration |
 | Wearables / earbuds | May work through paired-device behavior, not guaranteed |
 | GPS / fleet dashboard | Optional and consent-based |
+
+Duo camera accuracy and side-by-side monitoring are unverified. The
+[Duo readiness policy and device checks](docs/DEVICE_ROADMAP_2026_2028.md#iphone-duo-driving-mode-policy-and-acceptance)
+separate the intended driving mode from completed physical-device validation.
 
 ---
 
