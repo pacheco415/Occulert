@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="/supabase-loader.v49.js"></script>
-<script src="/occulert-backend.v83.js"></script>
+<script src="/occulert-backend.v84.js"></script>
 <script src="/passkey-auth.v60.js"></script>
 <script src="/auth-helper.v60.js"></script>
 <link rel="stylesheet" href="/account-page-1.v49.css" />
@@ -82,7 +82,8 @@
         <button class="btn primary" id="emailBtn" type="submit">Change Email</button>
       </form>
       <form class="form" data-page-action="changePassword-event">
-        <div class="field"><label for="newPassword">New Password</label><input id="newPassword" type="password" required minlength="6" placeholder="Minimum 6 characters" autocomplete="new-password"></div>
+        <div class="field"><label for="currentPassword">Current Password</label><input id="currentPassword" type="password" autocomplete="current-password" placeholder="Leave blank after a reset link or passkey sign-in"></div>
+        <div class="field"><label for="newPassword">New Password</label><input id="newPassword" type="password" required minlength="8" placeholder="Minimum 8 characters" autocomplete="new-password"></div>
         <button class="btn primary" id="passwordBtn" type="submit">Change Password</button>
       </form>
       <div class="security-divider"></div>
@@ -97,6 +98,19 @@
         <div class="passkey-list" id="passkeyList" aria-live="polite"><div class="passkey-empty">Loading passkeys…</div></div>
         <div class="status" id="passkeyStatus" role="status" aria-live="polite"></div>
         <button class="btn hidden" id="passkeyRetryBtn" type="button" style="margin-top:10px" data-page-action="retryPasskeySetup">Retry passkey setup</button>
+      </section>
+      <section id="securityReauthSection" hidden aria-labelledby="securityReauthTitle">
+        <div class="security-divider"></div>
+        <h3 id="securityReauthTitle">Confirm your sign-in</h3>
+        <p id="securityReauthText">Sign in again to continue.</p>
+        <p>Password and passkey changes need a sign-in from the last 10 minutes.</p>
+        <form id="securityReauthForm">
+          <div class="field"><label for="securityReauthPassword">Current password</label><input id="securityReauthPassword" type="password" autocomplete="current-password" required></div>
+          <button class="btn" id="securityReauthPasswordBtn" type="submit">Sign in and continue</button>
+        </form>
+        <button class="btn" id="securityReauthPasskeyBtn" type="button">Use a passkey</button>
+        <button class="btn" id="securityReauthCancelBtn" type="button">Cancel</button>
+        <p>No password or passkey? <a href="/login.html">Sign in with an email link</a>, then come back. Forgot your password? <a href="/login.html?mode=reset">Request a reset link</a>.</p>
       </section>
     </div>
     <div class="note"><strong>Note:</strong> Changing your email sends a confirmation link to the new address, and depending on your account security settings your current address may receive one too. Your sign-in email stays the same until confirmation is complete. Occulert never stores your password.</div>
@@ -143,7 +157,7 @@
 </aside>
 </section>
 </main>
-<script src="/account-page-2.v64.js"></script>
+<script src="/account-page-2.v65.js"></script>
 
 <footer class="account-footer" style="text-align:center;padding:28px 16px 24px;border-top:1px solid #1e293b;font-size:12px;margin-top:40px"><a href="/" style="text-decoration:none;font-weight:700">Occulert</a> &nbsp;·&nbsp; <a href="/privacy.html" style="text-decoration:none">Privacy</a> &nbsp;·&nbsp; <a href="/safety.html" style="text-decoration:none">Safety</a> &nbsp;·&nbsp; <a href="/app.html" style="text-decoration:none">Driver App</a><div style="margin-top:8px">© 2026 Occulert. Prototype — not a substitute for rest or safe driving.</div></footer>
 </body>

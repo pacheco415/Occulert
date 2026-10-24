@@ -233,15 +233,6 @@
       ]
     },
     {
-      "source": "/(.*)\\.v65\\.(js|css)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
       "source": "/(.*)\\.v66\\.(js|css)",
       "headers": [
         {
@@ -405,15 +396,6 @@
     },
     {
       "source": "/(.*)\\.v4\\.(js|css)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)\\.v84\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -648,6 +630,24 @@
     },
     {
       "source": "/(.*)\\.v62\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v65\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v84\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",
