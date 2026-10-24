@@ -10,9 +10,22 @@ export async function initializeTestAuth(db) {
     $$;`);
 }
 
+/**
+ * Supabase projects created before October 30, 2026 grant the API roles every
+ * privilege on new public tables, sequences and functions. Opt in to replay
+ * migrations under those defaults and prove each revoke actually takes effect.
+ */
+export async function grantSupabaseDefaultPrivileges(db) {
+  await db.exec(`grant usage on schema public to anon, authenticated, service_role;
+    alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+    alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+    alter default privileges in schema public grant all on functions to anon, authenticated, service_role;`);
+}
+
 /** Fresh databases use the canonical Supabase chain, never both baselines. */
-export async function initializeTestSchema(db, { legacy = false, baselineSql } = {}) {
+export async function initializeTestSchema(db, { legacy = false, baselineSql, supabaseDefaults = false } = {}) {
   await initializeTestAuth(db);
+  if (supabaseDefaults) await grantSupabaseDefaultPrivileges(db);
   const files = (legacy ? ['db/migrations', 'supabase/migrations'] : ['supabase/migrations']).flatMap(directory =>
     readdirSync(new URL(`../../${directory}/`, import.meta.url)).filter(name => name.endsWith('.sql'))
       .map(name => ({ name, path: new URL(`../../${directory}/${name}`, import.meta.url) })))

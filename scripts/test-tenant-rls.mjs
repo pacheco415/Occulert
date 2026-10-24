@@ -17,10 +17,39 @@ async function asUser(user, expected) {
   await db.exec('reset role');
 }
 try {
-  const replayed = await initializeTestSchema(db);
-  assert.ok(replayed.includes('20260929010000_billing_ignored_webhook_events.sql'));
+  // Replay under Supabase's legacy default grants so every revoke is exercised.
+  const replayed = await initializeTestSchema(db, { supabaseDefaults: true });
+  assert.ok(replayed.includes('20261022120000_revoke_direct_table_access.sql'));
   const unsecured = await db.query("select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and not c.relrowsecurity");
   assert.deepEqual(unsecured.rows, [], 'every replayed public table must enable RLS');
+
+  // Browser roles hold no table privilege at all; only the API's service role does.
+  const publicTables = (await db.query("select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','v','m','p') order by 1")).rows.map(row => row.relname);
+  assert.ok(tables.every(table => publicTables.includes(table)));
+  const privileges = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'];
+  for (const role of ['anon', 'authenticated']) for (const table of publicTables) for (const privilege of privileges)
+    assert.equal((await db.query('select has_table_privilege($1,$2,$3) as ok', [role, 'public.' + table, privilege])).rows[0].ok, false, `${role} ${privilege} on ${table}`);
+  for (const table of tables) for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
+    assert.equal((await db.query('select has_table_privilege($1,$2,$3) as ok', ['service_role', 'public.' + table, privilege])).rows[0].ok, true, `service_role ${privilege} on ${table}`);
+  const executable = (await db.query("select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and (has_function_privilege('anon',p.oid,'EXECUTE') or has_function_privilege('authenticated',p.oid,'EXECUTE')) order by 1")).rows;
+  assert.deepEqual(executable, [], 'browser roles must not execute public functions');
+  // Without the default-privilege fallback, the six tables still grant the API explicitly.
+  const explicit = new PGlite();
+  try {
+    await initializeTestSchema(explicit);
+    for (const table of tables) for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
+      assert.equal((await explicit.query("select has_table_privilege('service_role',$1,$2) as ok", ['public.' + table, privilege])).rows[0].ok, true, `explicit service_role ${privilege} on ${table}`);
+  } finally { await explicit.close(); }
+  await db.exec(`insert into auth.users values ('${ownerA}'); insert into fleets(id,owner_user_id,company_name) values ('${fleetA}','${ownerA}','Fixture A');`);
+  for (const role of ['anon', 'authenticated']) {
+    await db.exec(`set role ${role}`); await db.query("select set_config('request.jwt.claim.sub',$1,false)", [role === 'anon' ? '' : ownerA]);
+    for (const table of tables) await assert.rejects(db.query(`select * from ${table}`), /permission denied/, `${role} direct select on ${table}`);
+    await assert.rejects(db.query('update fleets set company_name=$1', ['Changed']), /permission denied/);
+    await db.exec('reset role');
+  }
+  await db.exec(`delete from fleets where id='${fleetA}'; delete from auth.users where id='${ownerA}';`);
+
+  // Simulate an accidental re-grant: row-level security must still scope rows.
   await db.exec(`grant usage on schema public,auth to anon,authenticated,service_role;
     grant select,insert,update,delete on all tables in schema public to anon,authenticated,service_role;
     insert into auth.users values ('${ownerA}'),('${ownerB}'),('${driverA}'),('${driverB}'),('${unassigned}');
