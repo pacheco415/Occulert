@@ -114,6 +114,12 @@ existing-project adoption check above:
    `docs/BILLING_INTEGRATION.md`; it does not enable paid access.
 4. `supabase/migrations/20260929010000_billing_ignored_webhook_events.sql`
    records ignored test webhook events for safe repeated acknowledgment.
+5. `supabase/migrations/20261022120000_revoke_direct_table_access.sql`
+   removes the browser roles' (`anon`, `authenticated`) direct table access to
+   `fleets`, `drivers`, `fleet_invitations`, `sessions`, `events` and
+   `pilot_leads`, and grants the service role explicitly. The web and native
+   apps never query these tables directly, so no route changes. Apply it any
+   time after the baseline; see [direct table access](docs/DIRECT_TABLE_ACCESS.md).
 
 The complete canonical chain also includes atomic account deletion, fleet
 follow-ups, query indexes and atomic invitation creation. Production database
