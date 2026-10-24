@@ -6,9 +6,21 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { patchQueryDecoder } from './patch-query-decoder.mjs';
+import { applyQueryDecoderPatch, patchQueryDecoder } from './patch-query-decoder.mjs';
 
 const require = createRequire(new URL('../package.json', import.meta.url));
+
+test('Expo 58, React Native and the React renderer use matching supported versions', () => {
+  const expo = require('expo/package.json');
+  const bundled = require('expo/bundledNativeModules.json');
+  const react = require('react/package.json').version;
+  assert.match(expo.version, /^58\./);
+  assert.equal(require('react-native/package.json').version, bundled['react-native']);
+  assert.equal(react, bundled.react);
+  assert.equal(require('react-dom/package.json').version, react);
+  assert.equal(require('react-test-renderer/package.json').version, react);
+});
+
 for (const [consumer, intermediates] of [
   ['@bacons/apple-targets', ['glob', 'minimatch']],
   ['@expo/fingerprint', ['minimatch']],
@@ -53,19 +65,25 @@ test('React DevTools shell quoting preserves arguments and rejects line terminat
   }
 });
 
-test('query-string keeps named parse/stringify and route options with the patched decoder', () => {
-  const query = require('query-string');
-  assert.deepEqual({ ...query.parse('name=Caf%C3%A9+driver&name=Second&key=a%26b', { arrayFormat: 'none' }) }, { name: ['Café driver', 'Second'], key: 'a&b' });
-  assert.equal(query.stringify({ route: 'a/b', name: 'Café driver', empty: null }), 'empty&name=Caf%C3%A9%20driver&route=a%2Fb');
-  assert.deepEqual({ ...query.parse('driver[]=one&driver[]=two', { arrayFormat: 'bracket' }) }, { driver: ['one', 'two'] });
-  assert.equal(query.parseUrl('occulert://accept-invite?code=a%2Bb#details').query.code, 'a+b');
-  const source = readFileSync(require.resolve('query-string'), 'utf8');
-  assert.equal(patchQueryDecoder(source).changed, false, 'clean installs must apply the patch idempotently');
+test('SDK 58 Router preserves route query values without the legacy decoder', () => {
+  const routerRoot = dirname(require.resolve('expo-router/package.json'));
+  const { parseQueryParams } = require(join(routerRoot, 'build/fork/getStateFromPath-forks.js'));
+  const { stringifySearchParams } = require(join(routerRoot, 'build/utils/queryParams.js'));
+  const parse = path => ({ ...parseQueryParams(path, { name: 'fixture' }) });
+  assert.deepEqual(parse('/?name=Caf%C3%A9+driver&name=Second&key=a%26b'), { name: ['Café driver', 'Second'], key: 'a&b' });
+  assert.deepEqual(parse('/?' + stringifySearchParams({ route: 'a/b', name: 'Café driver', empty: null })), { route: 'a/b', name: 'Café driver', empty: '' });
+  assert.deepEqual(parse('/?driver=one&driver=two'), { driver: ['one', 'two'] });
+  assert.equal(parse('occulert://accept-invite?code=a%2Bb#details').code, 'a+b');
+  assert.throws(() => require.resolve('query-string/package.json'), { code: 'MODULE_NOT_FOUND' });
+  assert.equal(applyQueryDecoderPatch(), false, 'SDK 58 has no legacy decoder to patch');
+  const patched = patchQueryDecoder("const decodeComponent = require('decode-uri-component');");
+  assert.equal(patchQueryDecoder(patched.source).changed, false, 'the legacy patch remains idempotent');
   assert.throws(() => patchQueryDecoder('unrecognized upstream source'), /Cannot safely patch/);
 });
 
 test('malformed URL input is decoded without an unbounded CPU wait', async () => {
-  const worker = new Worker(`const {parentPort}=require('node:worker_threads');const query=require(${JSON.stringify(require.resolve('query-string'))});parentPort.postMessage(typeof query.parse('value='+ '%FF'.repeat(12000)).value);`, { eval: true });
+  const parser = join(dirname(require.resolve('expo-router/package.json')), 'build/fork/getStateFromPath-forks.js');
+  const worker = new Worker(`const {parentPort}=require('node:worker_threads');const {parseQueryParams}=require(${JSON.stringify(parser)});parentPort.postMessage(typeof parseQueryParams('/?value='+ '%FF'.repeat(12000),{name:'fixture'}).value);`, { eval: true });
   try {
     const result = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(Error('Malformed query decoding stalled')), 3000);

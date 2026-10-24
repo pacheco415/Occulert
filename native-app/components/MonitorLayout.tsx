@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface MonitorLayoutProps {
@@ -21,7 +21,7 @@ export function MonitorLayout({
   const availableHeight = height - insets.top - insets.bottom;
   const columns = availableWidth >= 480 && availableWidth > availableHeight && fontScale < 1.6;
   const compact = availableHeight < 650 || availableWidth < 360 || fontScale >= 1.3;
-  const details = useRef<ScrollView>(null);
+  const details = useRef<ScrollViewInstance>(null);
 
   useEffect(() => {
     details.current?.scrollTo({ y: 0, animated: !reduceMotion });

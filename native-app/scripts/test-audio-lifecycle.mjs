@@ -12,14 +12,14 @@ const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 function load(source, names, bindings) {
   const body = source.replace(/^import[\s\S]*?;\s*/gm, '').replace(/^export /gm, '');
   const exports = {};
-  vm.runInNewContext(`${stripTypeScriptTypes(body)}\nObject.assign(exports, {${names.join(',')}});`,
+  vm.runInNewContext(`${stripTypeScriptTypes(body, { mode: 'transform' })}\nObject.assign(exports, {${names.join(',')}});`,
     { exports, ...React, ...bindings }, { timeout: 1000 });
   return exports;
 }
 
 // Run real React and Expo's installed shared-object/useAudioPlayer hooks. Only
 // the native AudioPlayer/AVAudioSession bridge is substituted: its inactivity
-// check follows expo-audio57's registry-wide guard, not a per-component timer.
+// check follows expo-audio58's registry-wide guard, not a per-component timer.
 function fixture() {
   const log = [], players = [], pendingRelease = [];
   let sessionActive = false;
