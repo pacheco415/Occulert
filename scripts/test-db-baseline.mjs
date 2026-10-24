@@ -12,6 +12,7 @@ test('canonical baseline and ordered migrations preserve the legacy catalog and 
     const canonicalFiles = await initializeTestSchema(canonical);
     assert.equal(canonicalFiles[0], '20260701000000_baseline.sql');
     assert.ok(canonicalFiles.includes('20260929010000_billing_ignored_webhook_events.sql'));
+    assert.ok(canonicalFiles.includes('20261022120000_revoke_direct_table_access.sql'));
     assert.equal(canonicalFiles.length, historicalFiles.length - 1);
     const expected = await schemaCatalog(historical);
     assert.deepEqual(await schemaCatalog(canonical), expected);
