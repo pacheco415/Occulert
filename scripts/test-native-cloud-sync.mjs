@@ -7,6 +7,8 @@ import { createSingleFlightActionRunner } from '../native-app/lib/singleFlightAc
 import { createAsyncMutationQueue } from '../native-app/lib/asyncMutationQueue.ts';
 import { createCachedBooleanPreference } from '../native-app/lib/cachedBooleanPreference.ts';
 import { colors } from '../native-app/constants/theme.ts';
+import { SUPABASE_HOST as NATIVE_SUPABASE_HOST, SUPABASE_ORIGIN, pinnedSupabaseConfig } from '../native-app/lib/supabaseHost.ts';
+import { SUPABASE_HOST as WEB_SUPABASE_HOST } from './lib/csp-policy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -248,5 +250,80 @@ assert.equal(duplicate, false, 'a duplicate cloud action must be ignored while b
 releaseFirst();
 assert.equal(await first, true);
 assert.deepEqual(overlapBusyStates, [true, false]);
+
+// Sign-in credentials go only to the pinned Supabase project, never to a
+// host named by a changed or spoofed /api/public-config response.
+assert.equal(NATIVE_SUPABASE_HOST, WEB_SUPABASE_HOST, 'the app and website CSP must pin the same Supabase project');
+assert.equal(SUPABASE_ORIGIN, `https://${WEB_SUPABASE_HOST}`);
+const anonKey = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.c2lnbmF0dXJl';
+assert.deepEqual(pinnedSupabaseConfig({ configured: true, url: SUPABASE_ORIGIN, anonKey }),
+  { configured: true, url: SUPABASE_ORIGIN, anonKey });
+assert.equal(pinnedSupabaseConfig({ configured: true, url: SUPABASE_ORIGIN, anonKey: 'sb_publishable_AbC123_x' })?.anonKey, 'sb_publishable_AbC123_x');
+for (const url of [
+  'https://attacker.supabase.co',
+  'https://attacker.example',
+  `http://${WEB_SUPABASE_HOST}`,
+  `${SUPABASE_ORIGIN}/`,
+  `${SUPABASE_ORIGIN}/auth`,
+  `${SUPABASE_ORIGIN}:443`,
+  `${SUPABASE_ORIGIN}:8443`,
+  `https://user:pass@${WEB_SUPABASE_HOST}`,
+  `https://${WEB_SUPABASE_HOST}.attacker.example`,
+  `https://${WEB_SUPABASE_HOST.toUpperCase()}`,
+  ` ${SUPABASE_ORIGIN}`,
+  `${SUPABASE_ORIGIN}?x=1`,
+  `${SUPABASE_ORIGIN}#x`,
+  '',
+  undefined,
+  null,
+  ['https://' + WEB_SUPABASE_HOST],
+]) assert.equal(pinnedSupabaseConfig({ configured: true, url, anonKey }), null, `config url ${JSON.stringify(url)} must be refused`);
+for (const key of ['', ' ', 'key\r\nX-Injected: 1', 'a'.repeat(2049), 123, null, undefined, { key: anonKey }]) {
+  assert.equal(pinnedSupabaseConfig({ configured: true, url: SUPABASE_ORIGIN, anonKey: key }), null, 'malformed anon keys must be refused');
+}
+for (const config of [null, undefined, 'https://' + WEB_SUPABASE_HOST, [], { configured: false, url: SUPABASE_ORIGIN, anonKey },
+  { configured: 'true', url: SUPABASE_ORIGIN, anonKey }, { url: SUPABASE_ORIGIN, anonKey }]) {
+  assert.equal(pinnedSupabaseConfig(config), null);
+}
+assert.match(cloud, /response\.ok \? pinnedSupabaseConfig\(body\.supabase\) : null/, 'loadConfig must accept only the pinned project');
+
+// Run the real loadConfig and authFetch: a config naming another host must not
+// receive the email and password.
+// Remove the few TypeScript annotations so the shipped source runs unchanged.
+const sliceSource = (start, end, annotations) => {
+  const from = cloud.indexOf(start), to = cloud.indexOf(end, from);
+  assert.ok(from >= 0 && to > from, `${start} must remain directly testable`);
+  return annotations.reduce((source, [typed, plain]) => {
+    assert.ok(source.includes(typed), `expected ${typed}`);
+    return source.replace(typed, plain);
+  }, cloud.slice(from, to));
+};
+const configAndAuthSource = sliceSource('async function loadConfig', 'async function secureStoreAvailable', [
+  ['loadConfig(): Promise<PublicConfig | null>', 'loadConfig()'],
+  ['fetchJsonWithTimeout<{ supabase?: unknown }>(', 'fetchJsonWithTimeout('],
+]) + sliceSource('async function authFetch', 'function authErrorText', [
+  ['authFetch(path: string, body: Record<string, unknown>): Promise<ApiResult<AuthResponse>>', 'authFetch(path, body)'],
+  ['fetchJsonWithTimeout<AuthResponse>(', 'fetchJsonWithTimeout('],
+]);
+const makeAuthFetch = new Function('API_BASE', 'pinnedSupabaseConfig', 'fetchJsonWithTimeout',
+  `let configPromise = null;\n${configAndAuthSource}\nreturn authFetch;`);
+const credentialRequests = [];
+const fakeTransport = publicConfig => async (url, init = {}) => {
+  if (url === 'https://www.occulert.com/api/public-config') return { response: { ok: true }, body: { ok: true, supabase: publicConfig } };
+  credentialRequests.push({ url, apikey: init.headers?.apikey, body: init.body });
+  return { response: { ok: true, status: 200 }, body: { access_token: 'fixture' } };
+};
+const credentials = { email: 'driver@example.com', password: 'fixture-password' };
+for (const url of ['https://attacker.supabase.co', `${SUPABASE_ORIGIN}/`, `http://${WEB_SUPABASE_HOST}`]) {
+  const authFetch = makeAuthFetch('https://www.occulert.com', pinnedSupabaseConfig, fakeTransport({ configured: true, url, anonKey }));
+  const result = await authFetch('/token?grant_type=password', credentials);
+  assert.deepEqual({ ok: result.ok, status: result.status, error: result.body.error }, { ok: false, status: 503, error: 'cloud_not_configured' });
+}
+assert.deepEqual(credentialRequests, [], 'credentials must never be sent to an unpinned host');
+const pinnedAuthFetch = makeAuthFetch('https://www.occulert.com', pinnedSupabaseConfig,
+  fakeTransport({ configured: true, url: SUPABASE_ORIGIN, anonKey }));
+assert.equal((await pinnedAuthFetch('/token?grant_type=password', credentials)).ok, true);
+assert.deepEqual(credentialRequests, [{ url: `${SUPABASE_ORIGIN}/auth/v1/token?grant_type=password`, apikey: anonKey, body: JSON.stringify(credentials) }]);
+assert.doesNotMatch(cloud, /config\.url \|\| |url: config\.url/, 'no unpinned config URL may reach a request');
 
 console.log('Occulert native cloud-sync contract tests passed.');
