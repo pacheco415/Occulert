@@ -107,7 +107,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
-    "@electric-sql/pglite": "0.5.8",
+    "@electric-sql/pglite": "0.5.11",
     "@playwright/test": "^1.63.0",
     "acorn": "8.18.0",
     "esbuild": "0.28.2",
