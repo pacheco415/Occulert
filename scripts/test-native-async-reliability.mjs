@@ -8,6 +8,7 @@ import { createAsyncMutationQueue } from '../native-app/lib/asyncMutationQueue.t
 import { createCachedBooleanPreference } from '../native-app/lib/cachedBooleanPreference.ts';
 import { createHealthReadinessSnapshot, isHealthReadinessSnapshot } from '../native-app/lib/healthReadiness.ts';
 import { alertDeliveryPlan, deliverCueIfCurrent } from '../native-app/lib/alertDelivery.ts';
+import { SUPABASE_ORIGIN, pinnedSupabaseConfig } from '../native-app/lib/supabaseHost.ts';
 
 // Execute the production TS logic with native bridges replaced. Removing imports
 // and JSX presentation avoids requiring a device, Expo, or a TS compiler in CI.
@@ -64,14 +65,14 @@ function cloudFixture(initial, { consent = false } = {}) {
   ], {
     SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage,
     updateSessionHistory: async update => { fixture.history = update(fixture.history || []); },
-    createSessionSummaryOutbox, Platform: { OS: 'ios', Version: '26' }, createAsyncMutationQueue, createCachedBooleanPreference,
+    createSessionSummaryOutbox, pinnedSupabaseConfig, Platform: { OS: 'ios', Version: '26' }, createAsyncMutationQueue, createCachedBooleanPreference,
     currentAppBuildInfo: () => ({ appVersion: '1.0.0', appBuildNumber: 'test' }),
     formatAppBuildLabel: ({ appVersion, appBuildNumber }) => `v${appVersion} (${appBuildNumber})`,
     setTimeout: (fn, delay) => { timers.set(++nextTimer, { fn, delay }); return nextTimer; },
     clearTimeout: id => timers.delete(id),
     fetch: async (url, init) => {
       requests.push({ url, init });
-      if (url.endsWith('/api/public-config')) return response(200, { supabase: { configured: true, url: 'https://test.supabase.co', anonKey: 'public' } });
+      if (url.endsWith('/api/public-config')) return response(200, { supabase: { configured: true, url: SUPABASE_ORIGIN, anonKey: 'public' } });
       if (url.endsWith('/api/profile') && !fixture.profile) return response(200, { driver: { id: 'driver' } });
       if (url.endsWith('/logout')) return response(200, {});
       if (url.endsWith('/api/profile')) return fixture.profile(url, init);
