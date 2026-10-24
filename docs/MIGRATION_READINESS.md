@@ -8,6 +8,10 @@ Export `select version::text from supabase_migrations.schema_migrations order by
 
 The September 27 period-report/billing migrations, September 29 webhook migration and October 23 rate-limit cleanup are included. The archived files are listed separately because they are not represented by the 14-digit ledger. A successful comparison proves ledger coverage only, not identical deployed definitions. Verify deployed definitions, RLS, grants, function bodies/security/search paths and foreign-key actions before adopting the baseline or activating dependent features. Do not recreate deployed objects merely because archived files have no ledger entries.
 
+## Explicit grants for new tables
+
+Supabase applies its "tables not exposed automatically" change to existing projects on 2026-10-30. From then on, a new table or sequence in `public` gets no default privileges for `anon`, `authenticated` or `service_role`. Tables that already exist keep their grants. Every table or sequence a migration after the baseline creates must therefore grant `service_role` explicitly and enable RLS. `npm run test:migration-grants` enforces both in source and checks the replayed PGlite privileges, where roles have no default grants. Reference: [Supabase changelog](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically).
+
 ## Optional read-only database observation
 
 With a separately supplied read-only `DATABASE_URL` in the invocation environment and PostgreSQL's `psql` installed on `PATH`, run `npm run migration:status`. The script reads only `supabase_migrations.schema_migrations` inside a fixed `BEGIN TRANSACTION READ ONLY`, with statement/lock/connection and child-process time limits. It ignores psql startup files and never prompts for a password. The URL is passed through libpq's environment, not command arguments, and neither credentials nor provider error text are printed. See [PostgreSQL transaction rules](https://www.postgresql.org/docs/current/sql-set-transaction.html).
