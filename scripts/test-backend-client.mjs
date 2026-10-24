@@ -39,7 +39,8 @@ async function fetchMock(url, options = {}) {
   }
   if (String(url).includes("/auth/v1/user") && options.method === "PUT") {
     const sent = JSON.parse(options.body || "{}");
-    if (sent.password === "short") return response({ error_code: "weak_password", msg: "Password should be at least 6 characters" }, 422);
+    if (sent.password === "short") return response({ error_code: "weak_password", msg: "Password should be at least 8 characters" }, 422);
+    if (sent.current_password === "wrong-current") return response({ error_code: "current_password_mismatch", msg: "Current password is incorrect" }, 400);
     if (sent.email === "taken@example.com") return response({ error_code: "email_exists", msg: "email address already registered" }, 422);
     return response({ id: "user-1", email: "driver@example.com", new_email: sent.email });
   }
@@ -148,10 +149,15 @@ assert.equal((await backend.updatePassword("longenough")).ok, true);
 const passwordCall = calls.filter((call) => String(call.url).includes("/auth/v1/user") && call.method === "PUT").pop();
 assert.equal(JSON.parse(passwordCall.body).password, "longenough");
 assert.equal(JSON.parse(passwordCall.body).email, undefined);
+assert.equal(Object.hasOwn(JSON.parse(passwordCall.body), "current_password"), false, "no current_password unless one was entered");
+assert.equal((await backend.updatePassword("longenough", "old-secret")).ok, true);
+assert.deepEqual(JSON.parse(calls.filter((call) => String(call.url).includes("/auth/v1/user") && call.method === "PUT").pop().body), { password: "longenough", current_password: "old-secret" });
+const wrongCurrent = await backend.updatePassword("longenough", "wrong-current");
+assert.equal(backend.accountMessage(wrongCurrent, "password"), "Your current password was not accepted. Check it and try again.");
 
 const weak = await backend.updatePassword("short");
 assert.equal(weak.ok, false);
-assert.equal(backend.accountMessage(weak, "password"), "Use a password with at least 6 characters.");
+assert.equal(backend.accountMessage(weak, "password"), "Use a password with at least 8 characters.");
 const taken = await backend.updateEmail("taken@example.com");
 assert.equal(taken.ok, false);
 assert.equal(backend.accountMessage(taken, "email"), "Another account already uses that email address.");

@@ -35,9 +35,17 @@ function makeElement(id) {
   };
 }
 
-async function boot({ user, updateEmail, updatePassword, deleteAccount, confirm = () => true, signOut }) {
-  let revision=0;
-  const authSnapshot=()=>user?{access_token:'fixture-access',refresh_token:'fixture-refresh',expires_at:9999999999,user}:null;
+// An access token shaped like Supabase's, signed in by `method` `ago` seconds earlier.
+const base64url = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+function fixtureToken(user, { ago = 60, method = 'password', ...claims } = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  return [base64url({ alg: 'ES256' }), base64url({ sub: user.id, role: 'authenticated', session_id: '11111111-1111-4111-8111-111111111111',
+    amr: [{ method, timestamp: now - ago }], ...claims }), 'signature'].join('.');
+}
+
+async function boot({ user, updateEmail, updatePassword, deleteAccount, confirm = () => true, signOut, signedIn = {}, signIn }) {
+  let revision=0,token=user?fixtureToken(user,signedIn):null;
+  const authSnapshot=()=>user?{access_token:token,refresh_token:'fixture-refresh',expires_at:9999999999,user}:null;
   const elements = new Map();
   const store = new Map();
   const context = {
@@ -48,6 +56,8 @@ async function boot({ user, updateEmail, updatePassword, deleteAccount, confirm 
     Date,
     Math,
     Promise,
+    atob,
+    TextDecoder,
     setTimeout() {},
     document: {
       documentElement: makeElement('html'),
@@ -75,6 +85,14 @@ async function boot({ user, updateEmail, updatePassword, deleteAccount, confirm 
     captureAuthContext: () => ({revision,auth:authSnapshot()}),
     isAuthContextCurrent: context => !!context&&context.revision===revision&&context.auth?.user?.id===user?.id,
     signOut() { user=null;revision++; },
+    beginAuthAttempt: () => ({ revision: ++revision, auth: authSnapshot() }),
+    async signIn(email, password, attempt) {
+      const result = signIn ? await signIn(email, password) : { ok: true };
+      if (result.ok && attempt.revision === revision) { token = fixtureToken(user, { ago: 0 }); revision++; }
+      return result;
+    },
+    completedAuthContext: () => ({ revision, auth: authSnapshot() }),
+    authMessage: () => 'mapped sign-in error',
     updateEmail,
     updatePassword,
     deleteAccount,
@@ -206,15 +224,118 @@ test('passkey names are escaped and removal requires confirmation', async () => 
   assert.equal(removals, 0);
 });
 
-test('short passwords are rejected before any request', async () => {
+test('passwords under 8 characters are rejected before any request', async () => {
   const { context, el } = await boot({
     user: { id: 'u1', email: 'driver@example.com' },
     updateEmail: noCall,
     updatePassword: noCall,
   });
-  el('newPassword').value = 'abc';
+  for (const value of ['abc', 'seven77']) {
+    el('newPassword').value = value;
+    await context.changePassword({ preventDefault });
+    assert.match(el('status').textContent, /at least 8 characters/);
+  }
+});
+
+test('the browser recent sign-in rule matches the deletion route', async () => {
+  const user = { id: 'u1', email: 'driver@example.com' };
+  const { context } = await boot({ user, updateEmail: noCall, updatePassword: noCall });
+  const recent = (options, auth = {}) => context.recentSignIn({ access_token: fixtureToken(user, options), user, ...auth });
+  for (const method of ['password', 'passkey', 'magiclink', 'otp', 'recovery']) assert.equal(recent({ method, ago: 30 }), true, method);
+  assert.equal(recent({ ago: 600 }), true, 'exactly ten minutes still counts');
+  assert.equal(recent({ ago: 601 }), false);
+  assert.equal(recent({ ago: -5 }), false, 'a future sign-in time is refused');
+  assert.equal(recent({ method: 'token_refresh', ago: 1 }), false, 'a token refresh is not a sign-in');
+  assert.equal(recent({ ago: 1, sub: 'someone-else' }), false);
+  assert.equal(recent({ ago: 1, role: 'anon' }), false);
+  assert.equal(recent({ ago: 1, is_anonymous: true }), false);
+  assert.equal(recent({ ago: 1, amr: 'password' }), false);
+  for (const access_token of ['fixture-access', 'a.%%%.c', '', null]) assert.equal(context.recentSignIn({ access_token, user }), false);
+});
+
+test('without a recent sign-in, password and passkey changes ask first and send nothing', async () => {
+  const id = '11111111-1111-4111-8111-111111111111', calls = [];
+  const { context, el } = await boot({
+    user: { id: 'u1', email: 'driver@example.com' }, signedIn: { ago: 3600 },
+    updateEmail: noCall, updatePassword: noCall,
+  });
+  context.window.OcculertPasskeys = {
+    isSupported: () => true, list: () => Promise.resolve([{ id, friendly_name: 'Laptop' }]),
+    register: () => { calls.push('register'); return Promise.resolve({}); },
+    remove: () => { calls.push('remove'); return Promise.resolve({}); },
+    message: () => 'mapped passkey error', canRetry: () => false,
+  };
+  context.renderPasskeys([{ id, friendly_name: 'Laptop' }]);
+  el('newPassword').value = 'longenough';
   await context.changePassword({ preventDefault });
-  assert.match(el('status').textContent, /at least 6 characters/);
+  assert.equal(el('securityReauthSection').hidden, false);
+  assert.match(el('securityReauthText').textContent, /change your password/);
+  assert.match(el('status').textContent, /Sign in again.*Nothing has changed/);
+  await context.registerPasskey();
+  assert.match(el('securityReauthText').textContent, /add a passkey/);
+  await context.removePasskey(id);
+  assert.match(el('securityReauthText').textContent, /remove Laptop/);
+  assert.deepEqual(calls, []);
+  context.cancelSecurityReauth();
+  assert.equal(el('securityReauthSection').hidden, true);
+  assert.match(el('passkeyStatus').textContent, /Nothing was changed/);
+});
+
+test('signing in again by password continues the change and sends current_password', async () => {
+  const sent = [], signIns = [];
+  const { context, el } = await boot({
+    user: { id: 'u1', email: 'driver@example.com' }, signedIn: { ago: 3600 },
+    signIn: async (email, password) => { signIns.push([email, password]); return { ok: true }; },
+    updateEmail: noCall,
+    updatePassword: (password, current) => { sent.push([password, current]); return Promise.resolve({ ok: true, body: {} }); },
+  });
+  el('newPassword').value = 'longenough';
+  await context.changePassword({ preventDefault });
+  assert.deepEqual(sent, []);
+  el('securityReauthPassword').value = 'old-secret';
+  await context.reauthenticateForSecurity({ preventDefault });
+  assert.deepEqual(signIns, [['driver@example.com', 'old-secret']]);
+  assert.deepEqual(sent, [['longenough', 'old-secret']]);
+  assert.equal(el('securityReauthSection').hidden, true);
+  assert.equal(el('securityReauthPassword').value, '');
+  assert.match(el('status').textContent, /Password updated/);
+});
+
+test('a typed current password is checked by signing in, even with a recent sign-in', async () => {
+  const sent = [], signIns = [];
+  let accept = false;
+  const { context, el } = await boot({
+    user: { id: 'u1', email: 'driver@example.com' },
+    signIn: async (email, password) => { signIns.push(password); return accept ? { ok: true } : { ok: false, body: { error: 'invalid_credentials' } }; },
+    updateEmail: noCall,
+    updatePassword: (password, current) => { sent.push([password, current]); return Promise.resolve({ ok: true, body: {} }); },
+  });
+  el('currentPassword').value = 'wrong-secret';
+  el('newPassword').value = 'longenough';
+  await context.changePassword({ preventDefault });
+  assert.deepEqual(sent, [], 'a wrong current password changes nothing');
+  assert.match(el('status').textContent, /not confirmed/);
+  assert.equal(el('currentPassword').value, '');
+  accept = true;
+  el('currentPassword').value = 'old-secret';
+  await context.changePassword({ preventDefault });
+  assert.deepEqual(signIns, ['wrong-secret', 'old-secret']);
+  assert.deepEqual(sent, [['longenough', 'old-secret']]);
+});
+
+test('a recent sign-in, including a reset link, changes the password without asking', async () => {
+  for (const method of ['password', 'recovery']) {
+    const sent = [];
+    const { context, el } = await boot({
+      user: { id: 'u1', email: 'driver@example.com' }, signedIn: { method, ago: 120 },
+      updateEmail: noCall,
+      updatePassword: (password, current) => { sent.push([password, current]); return Promise.resolve({ ok: true, body: {} }); },
+    });
+    el('newPassword').value = 'longenough';
+    await context.changePassword({ preventDefault });
+    assert.deepEqual(sent, [['longenough', '']]);
+    assert.notEqual(el('securityReauthSection').hidden, false);
+  }
 });
 
 test('a successful email change reports that confirmation is pending', async () => {
