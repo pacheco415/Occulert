@@ -74,7 +74,7 @@ function cloudFixture(initial, { consent = false } = {}) {
       requests.push({ url, init });
       if (url.endsWith('/api/public-config')) return response(200, { supabase: { configured: true, url: SUPABASE_ORIGIN, anonKey: 'public' } });
       if (url.endsWith('/api/profile') && !fixture.profile) return response(200, { driver: { id: 'driver' } });
-      if (url.endsWith('/logout')) return response(200, {});
+      if (url.includes('/auth/v1/logout')) return response(200, {});
       if (url.endsWith('/api/profile')) return fixture.profile(url, init);
       return fixture.transport(url, init);
     },
@@ -700,4 +700,50 @@ test('native success requires the matching stored ended row before acknowledging
   await f.api.retryPendingCloudSessions();assert.equal(f.history[0].cloudSynced,true);assert.equal(f.history[0].cloudOwnerId,'old');
   assert.equal((await f.api.getPendingCloudSummaryState()).count,0);
  }
+});
+
+// Sign-out clears this phone first, then revokes only this session on Supabase.
+const logoutRequests = f => f.requests.filter(request => request.url.includes('/auth/v1/logout'));
+test('sign-out revokes the live session with one scope=local logout', async () => {
+  const f = cloudFixture(auth('driver', 4000000000));
+  assert.equal((await f.api.getCloudState()).signedIn, true);
+  f.requests.length = 0;
+  await f.api.signOutOfCloud();
+  assert.equal(f.secure.has(AUTH_KEY), false, 'local tokens are cleared before revocation finishes');
+  await flush();
+  assert.deepEqual(logoutRequests(f).map(request => [request.url, request.init.method, request.init.headers.Authorization, request.init.headers.apikey]),
+    [[`${SUPABASE_ORIGIN}/auth/v1/logout?scope=local`, 'POST', 'Bearer driver-access', 'public']]);
+  assert.equal(f.requests.some(request => request.url.includes('grant_type=refresh_token')), false);
+});
+test('sign-out with an expired token refreshes once, revokes with the new token, and stores nothing', async () => {
+  const expired = cloudFixture(auth('driver', 1));
+  expired.transport = async url => url.includes('grant_type=refresh_token')
+    ? response(200, { ...token('fresh'), user: { id: 'driver', email: 'driver@example.com' } }) : response(200, {});
+  await expired.api.getCloudState();
+  expired.requests.length = 0;
+  await expired.api.signOutOfCloud();
+  await flush();
+  const urls = expired.requests.map(request => request.url);
+  assert.equal(urls.filter(url => url.includes('grant_type=refresh_token')).length, 1);
+  assert.deepEqual(logoutRequests(expired).map(request => request.init.headers.Authorization), ['Bearer fresh-access']);
+  assert.ok(urls.indexOf(logoutRequests(expired)[0].url) > urls.findIndex(url => url.includes('grant_type=refresh_token')));
+  assert.equal(expired.secure.has(AUTH_KEY), false, 'the refreshed session is never saved');
+  assert.equal((await expired.api.getCloudState()).signedIn, false);
+});
+test('a failed refresh or an offline logout still leaves the phone signed out', async () => {
+  for (const failure of ['refresh-rejected', 'logout-offline']) {
+    const f = cloudFixture(auth('driver', failure === 'refresh-rejected' ? 1 : 4000000000));
+    f.transport = async url => {
+      if (url.includes('grant_type=refresh_token')) return response(400, { error: 'invalid_grant' });
+      if (failure === 'logout-offline') throw new TypeError('Network request failed');
+      return response(200, {});
+    };
+    await f.api.getCloudState();
+    f.requests.length = 0;
+    await f.api.signOutOfCloud();
+    await flush();
+    if (failure === 'refresh-rejected') assert.deepEqual(logoutRequests(f), [], 'no logout without a usable token');
+    assert.equal(f.secure.has(AUTH_KEY), false);
+    assert.equal((await f.api.getCloudState()).signedIn, false);
+  }
 });

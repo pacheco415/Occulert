@@ -497,18 +497,33 @@ export async function signOutOfCloud(): Promise<void> {
   const auth = authCache ?? null;
   await clearAuth();
   if (!auth) return;
-  loadConfig().then(config => {
+  void revokeCloudSession(auth);
+}
+
+// Ask Supabase to revoke this phone's session; scope=local keeps the driver's
+// other devices signed in. An expired access token cannot authorize logout, so
+// the refresh token is traded once. The new session is never stored.
+async function revokeCloudSession(auth: StoredAuth): Promise<void> {
+  try {
+    let accessToken: string | null = auth.access_token;
+    if (auth.expires_at <= Math.floor(Date.now() / 1000) + 30) {
+      const refreshed = await authFetch('/token?grant_type=refresh_token', { refresh_token: auth.refresh_token });
+      accessToken = refreshed.ok && typeof refreshed.body.access_token === 'string' && refreshed.body.access_token
+        ? refreshed.body.access_token
+        : null;
+    }
+    const config = accessToken ? await loadConfig() : null;
     if (!config) return;
-    return fetchJsonWithTimeout(`${config.url}/auth/v1/logout`, {
+    await fetchJsonWithTimeout(`${config.url}/auth/v1/logout?scope=local`, {
       method: 'POST',
       headers: {
         apikey: config.anonKey,
-        Authorization: `Bearer ${auth.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     });
-  }).catch(() => {
+  } catch {
     // Local tokens and consent are already cleared even if revocation is offline.
-  });
+  }
 }
 
 export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {

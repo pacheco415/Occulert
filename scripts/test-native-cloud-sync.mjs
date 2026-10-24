@@ -84,6 +84,7 @@ assert.equal(
   'session start, alert logging, and session finish must bind consent and owner before transport',
 );
 assert.match(cloud, /https:\/\/www\.occulert\.com/);
+assert.match(cloud, /\/auth\/v1\/logout\?scope=local/, 'sign-out must revoke only this phone\'s Supabase session');
 
 const loadAuthSource = cloud
   .slice(cloud.indexOf('async function loadAuth'), cloud.indexOf('async function saveAuth'))

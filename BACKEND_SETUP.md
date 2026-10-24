@@ -168,7 +168,11 @@ key at runtime; it must never expose the service-role key. Email/password
 login creates or updates the authenticated user's driver profile, and
 `app.html` writes opted-in session summaries and alert events through the
 protected API routes. Local storage remains the fallback when cloud sync is
-off, unavailable, or the user is signed out. A verified manager creates a
+off, unavailable, or the user is signed out. Signing out clears the
+browser or phone first, then sends one bounded `POST /auth/v1/logout?scope=local`
+so Supabase revokes that session's refresh token; other devices stay signed in.
+An expired access token is first exchanged once with the refresh token. If the
+request fails, the device is still signed out locally. A verified manager creates a
 server-owned fleet at `fleet-onboarding.html`, then generates a seven-day
 one-time link for the driver's exact email. The raw token is shown once and
 only its SHA-256 digest is stored. `accept-invite.html` requires the driver to
