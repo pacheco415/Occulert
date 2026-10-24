@@ -12,6 +12,18 @@ let validToken = makeToken({ amr: [{ method: 'password', timestamp: Math.floor(D
 let deletedUser = null;
 let authFailure = false;
 let deleteFailure = false;
+let ownedFleet = null, billingCustomer = null, billingReadFailure = null, stripeResponse = null;
+const stripeCalls = [], reads = [];
+globalThis.fetch = async (url, options = {}) => {
+  stripeCalls.push({ url: String(url), method: options.method || "GET" });
+  calls.push(["stripe", options.method || "GET", String(url)]);
+  if (!stripeResponse) throw new Error("unexpected fetch " + url);
+  return new Response(JSON.stringify(stripeResponse.body), { status: stripeResponse.status });
+};
+function configureStripe(secret = "sk_test_fixture") {
+  Object.assign(process.env, { STRIPE_TEST_SECRET_KEY: secret, STRIPE_TEST_WEBHOOK_SECRET: "whsec_fixture",
+    STRIPE_TEST_PRICE_STARTER: "price_starter", STRIPE_TEST_PRICE_GROWTH: "price_growth" });
+}
 const handlerPath = require.resolve("../api/account.js");
 delete require.cache[handlerPath];
 require.cache[libPath] = {
@@ -29,7 +41,13 @@ require.cache[libPath] = {
       deletedUser = id; calls.push(["auth", id]);
     },
     pgFetch: async (table, options = {}) => {
-      throw new Error("Account deletion must never pre-delete application data");
+      // Billing cleanup may read the owned fleet and its billing row only.
+      if (options.method) throw new Error("Account deletion must never pre-delete application data");
+      reads.push(table);
+      if (billingReadFailure) { const error = new Error("supabase_request_failed"); error.details = billingReadFailure; throw error; }
+      if (table === "fleets") return ownedFleet ? [{ id: ownedFleet }] : [];
+      if (table === "fleet_billing_test") return billingCustomer ? [{ fleet_id: ownedFleet, stripe_customer_id: billingCustomer }] : [];
+      throw new Error("unexpected read " + table);
     },
   },
 };
@@ -97,6 +115,44 @@ for (const claims of [
 validToken = makeToken({ amr: [{ method: 'passkey', timestamp: Math.floor(Date.now() / 1000) }] });
 result = await invoke(request({ confirm: 'DELETE' }));
 assert.equal(result.statusCode, 200);
+// Stripe cleanup: the customer is deleted before Auth; failures keep the account.
+const freshToken = () => makeToken({ amr: [{ method: 'password', timestamp: Math.floor(Date.now() / 1000) }] });
+async function deletion() { validToken = freshToken(); calls.length = 0; stripeCalls.length = 0; reads.length = 0; deletedUser = null; return invoke(request({ confirm: 'DELETE' })); }
+ownedFleet = '22222222-2222-4222-8222-222222222222'; billingCustomer = null;
+result = await deletion();
+assert.equal(result.statusCode, 200); assert.equal(stripeCalls.length, 0, 'a fleet without billing makes no Stripe call');
+billingCustomer = 'cus_Fixture1'; configureStripe(); stripeResponse = { status: 200, body: { id: 'cus_Fixture1', object: 'customer', deleted: true } };
+result = await deletion();
+assert.equal(result.statusCode, 200);
+assert.deepEqual(stripeCalls, [{ url: 'https://api.stripe.com/v1/customers/cus_Fixture1', method: 'DELETE' }]);
+assert.deepEqual(calls.map(call => call[0]), ['stripe', 'auth'], 'Stripe cleanup runs before the Auth deletion');
+assert.deepEqual(reads, ['fleets', 'fleet_billing_test'], 'cleanup only reads the owned fleet and its billing row');
+stripeResponse = { status: 404, body: { error: { code: 'resource_missing', message: 'No such customer' } } };
+result = await deletion();
+assert.equal(result.statusCode, 200, 'an already-deleted customer does not block account deletion'); assert.equal(deletedUser, 'user-1');
+for (const failure of [{ status: 500, body: { error: { code: 'api_error' } } }, { status: 200, body: { id: 'cus_Other', object: 'customer', deleted: true } }, { status: 200, body: { id: 'cus_Fixture1', object: 'customer', deleted: false, livemode: false } }]) {
+  stripeResponse = failure;
+  result = await deletion();
+  assert.equal(result.statusCode, 503); assert.equal(result.body.error, 'billing_cleanup_unavailable'); assert.equal(deletedUser, null, 'billing failure must keep the account');
+}
+stripeResponse = { status: 200, body: { id: 'cus_Fixture1', object: 'customer', deleted: true } };
+for (const secret of ['', 'sk_live_Forbidden']) {
+  configureStripe(secret);
+  result = await deletion();
+  assert.equal(result.statusCode, 503); assert.equal(stripeCalls.length, 0, 'unconfigured or live keys never reach Stripe'); assert.equal(deletedUser, null);
+}
+configureStripe();
+billingCustomer = 'not-a-customer';
+result = await deletion();
+assert.equal(result.statusCode, 503); assert.equal(stripeCalls.length, 0); assert.equal(deletedUser, null);
+billingCustomer = 'cus_Fixture1';
+billingReadFailure = { code: 'PGRST205' };
+result = await deletion();
+assert.equal(result.statusCode, 200, 'a database without the billing migration has nothing to clean up'); assert.equal(stripeCalls.length, 0);
+billingReadFailure = { code: '08006' };
+result = await deletion();
+assert.equal(result.statusCode, 503); assert.equal(deletedUser, null, 'an unreadable billing row keeps the account');
+billingReadFailure = null; ownedFleet = null;
 console.log("Occulert account deletion tests passed.");
 
 const { hasRecentAuthentication } = require('../api/_lib/recent-auth.js');

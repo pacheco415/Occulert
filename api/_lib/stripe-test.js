@@ -111,7 +111,11 @@ async function stripeRequest(path, options) {
       error.stripeCode = data && data.error && data.error.code;
       throw error;
     }
-    if (!data || typeof data !== "object" || data.livemode !== false) {
+    // Stripe's deletion confirmation omits livemode. Accept it only for the
+    // exact object this test-key request deleted.
+    const deletedObject = Boolean(opts.deletedObjectId) && method === "DELETE" && data && data.deleted === true &&
+      data.id === opts.deletedObjectId && data.livemode === undefined;
+    if (!deletedObject && (!data || typeof data !== "object" || data.livemode !== false)) {
       throw new Error("stripe_live_object_rejected");
     }
     return data;
@@ -127,6 +131,23 @@ async function stripeRequest(path, options) {
   }
   })();
   return Promise.race([operation, expired]);
+}
+
+// Deleting a Stripe customer also cancels its active subscriptions. A
+// customer that is already gone is the desired end state.
+async function deleteTestCustomer(customerId) {
+  if (!/^cus_[A-Za-z0-9]+$/.test(customerId || "")) throw new Error("invalid_test_customer");
+  let deleted;
+  try {
+    deleted = await stripeRequest("/v1/customers/" + customerId, { method: "DELETE", deletedObjectId: customerId });
+  } catch (error) {
+    if (error && error.stripeCode === "resource_missing") return { deleted: true, already: true };
+    throw error;
+  }
+  if (!deleted || deleted.id !== customerId || deleted.object !== "customer" || deleted.deleted !== true) {
+    throw new Error("stripe_customer_not_deleted");
+  }
+  return { deleted: true, already: false };
 }
 
 async function requireMonthlyTestPrice(priceId) {
@@ -196,6 +217,6 @@ function verifyWebhookSignature(rawBody, signatureHeader, secret, nowMs) {
 
 module.exports = {
   config, portalConfigurationId, fixedReturnUrls, safeStripeUrl, idempotencyKey,
-  stripeRequest, requireMonthlyTestPrice, requireSafePortalConfiguration,
+  stripeRequest, deleteTestCustomer, requireMonthlyTestPrice, requireSafePortalConfiguration,
   readRawBody, verifyWebhookSignature,
 };
