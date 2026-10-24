@@ -55,3 +55,36 @@ test('baseline contains the archived SQL exactly in its original order', () => {
     end = position + source.length;
   }
 });
+
+test('the pilot-lead rate limiter prunes idle rows in bounded batches without resetting live windows', async () => {
+  const db = new PGlite();
+  try {
+    const replayed = await initializeTestSchema(db);
+    assert.ok(replayed.includes('20261023010000_prune_pilot_lead_rate_limits.sql'));
+    const key = n => n.toString(16).padStart(64, '0');
+    // 150 rows idle for two days, 3 recent rows, and the caller's own live window.
+    await db.exec(`insert into public.pilot_lead_rate_limits(rate_key,window_started_at,request_count,updated_at)
+      select lpad(to_hex(n),64,'0'), now()-interval '2 days', 5, now()-interval '2 days' from generate_series(1,150) n;
+      insert into public.pilot_lead_rate_limits(rate_key,window_started_at,request_count,updated_at)
+      select lpad(to_hex(n),64,'0'), now()-interval '1 minute', 2, now()-interval '1 minute' from generate_series(1001,1003) n;
+      insert into public.pilot_lead_rate_limits values ('${key(2000)}', now()-interval '1 minute', 5, now()-interval '1 minute');`);
+    const count = async () => Number((await db.query('select count(*)::int as n from public.pilot_lead_rate_limits')).rows[0].n);
+    // Only the API's service role may call the limiter; it has no table grant of its own.
+    const call = async (rateKey, windowSeconds = 900) => {
+      await db.exec('set role service_role');
+      try { return (await db.query('select * from public.check_pilot_lead_rate_limit($1,5,$2)', [rateKey, windowSeconds])).rows[0]; }
+      finally { await db.exec('reset role'); }
+    };
+    // The caller already used 5 of 5 in this window: still limited after cleanup.
+    assert.equal((await call(key(2000))).allowed, false);
+    assert.equal(await count(), 54, 'one call removes at most 100 idle rows');
+    assert.equal((await call(key(3000))).allowed, true);
+    assert.equal(await count(), 5, 'the next call removes the remaining idle rows and adds its own');
+    assert.equal(Number((await db.query("select count(*)::int as n from public.pilot_lead_rate_limits where updated_at < now() - interval '1 day'")).rows[0].n), 0);
+    // A window longer than a day keeps rows that are still inside it.
+    await db.exec(`insert into public.pilot_lead_rate_limits values ('${key(4000)}', now()-interval '2 days', 5, now()-interval '2 days')`);
+    assert.equal((await call(key(4000), 3 * 86400)).allowed, false, 'a three-day window must survive its own cleanup');
+    const fn = (await db.query("select prosecdef, proconfig, has_function_privilege('anon',p.oid,'EXECUTE') as anon, has_function_privilege('authenticated',p.oid,'EXECUTE') as authed, has_function_privilege('service_role',p.oid,'EXECUTE') as service from pg_proc p where proname='check_pilot_lead_rate_limit'")).rows;
+    assert.deepEqual(fn, [{ prosecdef: true, proconfig: ['search_path=public, pg_temp'], anon: false, authed: false, service: true }]);
+  } finally { await db.close(); }
+});

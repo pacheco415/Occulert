@@ -484,6 +484,21 @@ const rawInviteToken = createdInvitation.body.invitation.accept_path.split("#tok
 assert.ok(rawInviteToken.length >= 32);
 assert.equal(JSON.stringify(invitationRpcBody).includes(rawInviteToken), false, "only a digest may reach the database");
 assert.equal(JSON.stringify(createdInvitation.body).includes(originalHash), false);
+// 241 characters whose first 240 are a different valid address: truncating
+// would invite someone else. Over-long and NUL-bearing addresses are refused.
+const truncatable = "a".repeat(228) + "@example.com" + "x";
+assert.equal(truncatable.length, 241);
+for (const email of [truncatable, "a".repeat(229) + "@example.com", "driver\0@example.com", "dri\0ver@example.com"]) {
+  invitationRpcBody = undefined;
+  const refused = await invoke(invitations, request("POST", { email }));
+  assert.equal(refused.status, 400, `invitation email ${JSON.stringify(email.slice(-20))} must be refused`);
+  assert.equal(refused.body.error, "invalid_email");
+  assert.equal(invitationRpcBody, undefined, "a refused address must not reach the database");
+}
+const longestAllowed = "b".repeat(228) + "@example.com";
+assert.equal(longestAllowed.length, 240);
+assert.equal((await invoke(invitations, request("POST", { email: longestAllowed.toUpperCase() }))).status, 201);
+assert.equal(invitationRpcBody.p_email, longestAllowed);
 const replacementId = "22222222-2222-4222-8222-222222222222";
 const replacedInvitation = await invoke(invitations, request("POST", { replace_invitation_id: replacementId, email: "attacker@example.com" }));
 assert.equal(replacedInvitation.status, 201);
@@ -758,6 +773,15 @@ assert.equal(stored.status, 200);
 assert.equal(stored.body.stored, true);
 assert.equal(storedLead.email, "driver@example.com");
 assert.equal(storedLead.use_case, null);
+for (const [index, email] of [truncatable, "driver\0@example.com"].entries()) {
+  storedLead = undefined;
+  const refusedLead = await invoke(pilotLeads, request("POST", { ...validLead, email }, `203.0.113.${40 + index}`));
+  assert.equal(refusedLead.status, 400, "over-long or NUL-bearing contact addresses must be refused, not shortened");
+  assert.equal(refusedLead.body.error, "invalid_lead");
+  assert.equal(storedLead, undefined);
+}
+assert.equal((await invoke(pilotLeads, request("POST", { ...validLead, email: ` ${longestAllowed.toUpperCase()} ` }, "203.0.113.42"))).status, 200);
+assert.equal(storedLead.email, longestAllowed);
 assert.equal(storedLead.source, "pilot-signup-page", "browser callers must not choose arbitrary lead sources");
 const originalNotifyFetch = globalThis.fetch;
 try {

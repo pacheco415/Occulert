@@ -19,9 +19,14 @@ function validBody(request) {
   return validJsonBody(request, MAX_BODY_LENGTH);
 }
 
+const MAX_EMAIL_LENGTH = 240;
+
+// Reject rather than shorten or strip: either could turn the address the owner
+// typed into a different, valid one that someone else controls.
 function normalizedEmail(value) {
-  const email = String(value || "").replace(/\0/g, "").trim().toLowerCase().slice(0, 240);
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
+  const email = String(value || "").trim().toLowerCase();
+  return email.length <= MAX_EMAIL_LENGTH && !email.includes("\0") &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
 }
 
 function validUuid(value) {
