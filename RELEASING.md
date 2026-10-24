@@ -94,6 +94,9 @@ release, strict offline, and trace adapter checks after a helper change.
 CSP connections use the exact project host declared in
 `scripts/lib/csp-policy.mjs`. If the backend project changes, update that constant
 and all Vercel connection policies together and verify `/api/public-config`.
+The iPhone app pins the same host in `native-app/lib/supabaseHost.ts` and refuses
+any other project, so moving projects also needs a new native build;
+`npm run test:native-cloud` fails until both constants match.
 Retained old SDK loaders require their documented CDN compatibility grant during
 the existing 14-day retention window; remove it after the reference audit passes.
 
