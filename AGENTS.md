@@ -14,6 +14,9 @@
 - Keep superseded assets for the release guide's retention window.
 - Add database changes to `supabase/migrations/<timestamp>_<name>.sql`.
 - Enable RLS on new tables and add meaningful PGlite database regressions.
+- Grant service_role explicitly on every new table and sequence; from
+  2026-10-30 Supabase gives new objects no default grants. Grant anon or
+  authenticated nothing unless a client truly reads the table directly.
 - Apply required migrations before deploying code that depends on them.
 - Derive server identity from verified bearer tokens; ignore client claims of
   owner, driver or fleet authority. Keep service-role credentials server-only.
