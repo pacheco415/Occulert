@@ -8,7 +8,8 @@ import { act, create } from 'react-test-renderer';
 import ts from 'typescript';
 import babel from '@babel/core';
 import * as capturePolicy from '../../lib/captureLoadPolicy.ts';
-import { canRestartStalledCamera } from '../../lib/cameraResilience.ts';
+import { canRestartStalledCamera, shouldRestartCamera } from '../../lib/cameraResilience.ts';
+import { MULTITASKING_CAMERA_MESSAGE, unknownCameraInterruption } from '../../lib/cameraInterruptions.ts';
 import { createMonitorPerformanceTracker } from '../../lib/monitorPerformance.ts';
 
 const require = createRequire(import.meta.url);
@@ -69,18 +70,20 @@ export function createCaptureCameraFixture({ device, onCaptureConfiguration = ()
 }
 
 /** Execute the actual screen's configuration callback, recovery and watchdog. */
-export function createCaptureWatchdogFixture() {
+export function createCaptureWatchdogFixture({ readInterruption = async () => unknownCameraInterruption('front') } = {}) {
   const filename = new URL('../../app/monitor.tsx', import.meta.url).pathname;
   const source = readFileSync(filename, 'utf8');
   const ast = babel.parseSync(source, { filename, babelrc: false, configFile: false, parserOpts: { plugins: ['typescript', 'jsx'] } });
   const callbacks = new Map();
   let watchdogEffect;
+  let lifetimeEffect;
   function visit(node) {
     if (!node || typeof node !== 'object') return;
     if (node.type === 'VariableDeclarator' && node.init?.callee?.name === 'useCallback') callbacks.set(node.id.name, node.init.arguments[0]);
     if (node.type === 'CallExpression' && node.callee?.name === 'useEffect') {
       const callback = node.arguments[0];
       if (callback?.body?.body?.some(statement => statement.declarations?.some(declaration => declaration.id.name === 'watchdog'))) watchdogEffect = callback;
+      if (callback?.body?.body?.some(statement => statement.expression?.left?.object?.name === 'cameraScreenMountedRef')) lifetimeEffect = callback;
     }
     for (const value of Object.values(node)) {
       if (Array.isArray(value)) value.forEach(visit);
@@ -91,26 +94,38 @@ export function createCaptureWatchdogFixture() {
   let now = 1_000, tick;
   const tracker = createMonitorPerformanceTracker();
   tracker.recordSessionStart(now);
-  const events = { epochs: [], faults: [], cues: 0, stops: 0 };
+  const events = { epochs: [], faults: [], cues: 0, stops: 0, stopOptions: [] };
   const state = {
     stoppingRef: { current: false }, isRunningRef: { current: true },
     hasCameraSampleRef: { current: true }, lastSampleAtRef: { current: now },
     cameraRestartCountRef: { current: 0 }, cameraEpochRef: { current: 0 },
     cameraRecoveringRef: { current: false },
+    cameraInterruptionGenerationRef: { current: 0 }, multitaskingCameraPausedRef: { current: false },
+    cameraCallbackOwnerRef: { current: 0 },
+    cameraScreenMountedRef: { current: true },
+    cameraDeviceIdRef: { current: 'front' },
+    setupPreviewActiveRef: { current: false }, startingRef: { current: false },
+    baselineGenerationRef: { current: 0 }, baselineCollectorRef: { current: { reset() {} } },
     captureTransitionRef: { current: capturePolicy.createCaptureTransitionGuard() },
     performanceTrackerRef: { current: tracker },
   };
   class Clock extends Date { static now() { return now; } }
   const context = vm.createContext({
-    ...state, exports: {}, Date: Clock, isRunning: true, canRestartStalledCamera,
+    ...state, exports: {}, Date: Clock, isRunning: true, canRestartStalledCamera, shouldRestartCamera,
+    device: { id: 'front' }, getCameraInterruptionState: readInterruption, MULTITASKING_CAMERA_MESSAGE,
+    setSetupPreviewActive() {}, setCameraSetup() {}, initialCameraSetupAssessment: () => ({}),
+    Alert: { alert() {} },
     SENSOR_STALL_MS: 5_000, SENSOR_STARTUP_GRACE_MS: 10_000,
     setCameraRecovering() {}, setCameraEpoch: epoch => events.epochs.push(epoch),
     setSensorFault: message => events.faults.push(message),
     deliverMonitoringPausedCue: () => events.cues++,
-    handleStopRef: { current: async () => {
+    handleStopRef: { current: async options => {
       events.stops++;
+      events.stopOptions.push(options);
       state.stoppingRef.current = true;
       state.isRunningRef.current = false;
+      state.cameraInterruptionGenerationRef.current++;
+      state.cameraCallbackOwnerRef.current++;
       state.captureTransitionRef.current.reset();
     } },
     setInterval: (callback, interval) => { assert.equal(interval, 500); tick = callback; return 1; },
@@ -125,15 +140,22 @@ export function createCaptureWatchdogFixture() {
     return context.exports.callback;
   };
   const configure = loadCallback(callbacks.get('handleCaptureConfiguration'));
+  context.handleCameraInterruption = loadCallback(callbacks.get('handleCameraInterruption'));
+  context.checkCameraInterruption = loadCallback(callbacks.get('checkCameraInterruption'));
   context.attemptCameraRecovery = loadCallback(callbacks.get('attemptCameraRecovery'));
-  const cleanup = loadCallback(watchdogEffect)();
+  const cameraError = loadCallback(callbacks.get('handleCameraError'));
+  let disposeLifetime = loadCallback(lifetimeEffect)();
+  const disposeWatchdog = loadCallback(watchdogEffect)();
   return {
     events, state, tracker,
     get now() { return now; },
     setNow(at) { now = at; },
     configure(change) { configure(change); },
     sample(at) { now = at; state.lastSampleAtRef.current = at; state.hasCameraSampleRef.current = true; tracker.recordSample(at, 1); },
-    tick(at) { now = at; assert.ok(tick); tick(); },
-    cleanup,
+    tick(at) { now = at; assert.ok(tick); return tick(); },
+    error(code = 'unknown/unknown', epoch = state.cameraEpochRef.current, owner = state.cameraCallbackOwnerRef.current) { return cameraError({ code }, epoch, owner); },
+    interrupt(value) { context.handleCameraInterruption(value); },
+    replayLifetime() { disposeLifetime?.(); disposeLifetime = loadCallback(lifetimeEffect)(); },
+    cleanup() { disposeWatchdog?.(); disposeLifetime?.(); },
   };
 }

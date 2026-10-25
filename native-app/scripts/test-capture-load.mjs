@@ -184,7 +184,7 @@ test('an actual FPS change immediately after a frame extends the stall deadline 
     const identity = f.camera.props.identity;
     watchdog.setNow(1_001);
     await f.update({ loadMode: 'reduced' });
-    watchdog.tick(6_001);
+    await watchdog.tick(6_001);
     assert.equal(f.camera.props.fps, 15);
     assert.strictEqual(f.camera.props.identity, identity);
     assert.equal(watchdog.state.lastSampleAtRef.current, 1_000, 'configuration cannot fabricate a camera sample');
@@ -193,18 +193,18 @@ test('an actual FPS change immediately after a frame extends the stall deadline 
     for (const at of [6_200, 6_400, 6_600, 6_800, 7_000, 7_200, 7_400, 7_600, 7_800]) {
       watchdog.setNow(at);
       await f.update({ loadMode: at % 400 ? 'normal' : 'reduced' });
-      watchdog.tick(at);
+      await watchdog.tick(at);
     }
     assert.equal(watchdog.state.cameraRestartCountRef.current, 0);
     assert.deepEqual(watchdog.events.epochs, []);
     assert.equal(watchdog.tracker.snapshot().captureLoad.transitionGraceCount, 1);
-    watchdog.tick(7_999);
+    await watchdog.tick(7_999);
     assert.equal(watchdog.state.cameraRestartCountRef.current, 0, 'the gap may exceed five seconds but never seven');
-    watchdog.tick(8_000);
+    await watchdog.tick(8_000);
     assert.equal(watchdog.state.cameraRestartCountRef.current, 1, 'the actual expired stall still gets the existing single recovery');
     assert.deepEqual(watchdog.events.epochs, [1]);
     assert.equal(watchdog.tracker.snapshot().cameraStalls, 1);
-    watchdog.tick(18_001);
+    await watchdog.tick(18_001);
     assert.equal(watchdog.state.cameraRestartCountRef.current, 1, 'a persistent stall cannot obtain another automatic recovery');
     assert.equal(watchdog.tracker.snapshot().cameraStalls, 2);
     assert.equal(watchdog.events.stops, 1);
@@ -225,11 +225,11 @@ test('a frame after actual FPS reconfiguration clears grace and later real stall
     watchdog.setNow(5_900);
     await f.update({ loadMode: 'reduced' });
     watchdog.sample(6_000);
-    watchdog.tick(6_100);
+    await watchdog.tick(6_100);
     assert.equal(watchdog.events.stops, 0);
     assert.equal(watchdog.state.cameraRestartCountRef.current, 0);
     assert.equal(watchdog.state.captureTransitionRef.current.shouldDefer(6_100, 6_000), false);
-    watchdog.tick(11_001);
+    await watchdog.tick(11_001);
     assert.equal(watchdog.state.cameraRestartCountRef.current, 1);
   } finally { await f.unmount(); watchdog.cleanup(); }
 });
@@ -252,7 +252,7 @@ test('actual format changes preserve the Camera instance, record new dimensions,
     assert.equal(watchdog.tracker.snapshot().captureLoad.width, 1920);
     assert.equal(watchdog.tracker.snapshot().captureLoad.changes, 1);
     assert.equal(watchdog.tracker.snapshot().captureLoad.transitionGraceCount, 0);
-    watchdog.tick(6_001);
+    await watchdog.tick(6_001);
     assert.equal(watchdog.state.cameraRestartCountRef.current, 1, 'an overdue stream is protected immediately despite a new format request');
   } finally { await f.unmount(); watchdog.cleanup(); }
 });

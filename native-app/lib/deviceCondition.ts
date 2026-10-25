@@ -5,6 +5,10 @@ import {
   unknownFrontCameraIdentity,
 } from './frontCameraIdentity';
 import type { FrontCameraIdentity, FrontCameraNativeModule, FrontPhysicalCamera } from './frontCameraIdentity';
+import { createCameraInterruptionObservation, readCameraInterruption } from './cameraInterruptions';
+import type { CameraInterruptionNativeModule, CameraInterruptionState } from './cameraInterruptions';
+export { MULTITASKING_CAMERA_MESSAGE } from './cameraInterruptions';
+export type { CameraInterruptionState, CameraInterruptionReason, CameraInterruptionObservation } from './cameraInterruptions';
 export type { FrontCameraIdentity, FrontCameraKind, FrontPhysicalCamera, FrontCameraObservation } from './frontCameraIdentity';
 
 export interface DeviceCondition {
@@ -53,7 +57,8 @@ export interface MultiCamStabilityResult {
   roadStreamStayedEnabled: boolean;
 }
 
-interface DeviceConditionNativeModule extends FrontCameraNativeModule {
+interface DeviceConditionNativeModule extends FrontCameraNativeModule, CameraInterruptionNativeModule {
+  addListener?(event: 'frontCameraChanged' | 'cameraInterrupted', listener: (value: unknown) => void): { remove(): void };
   getCondition(): Promise<DeviceCondition>;
   probeMultiCamConfiguration(): Promise<MultiCamConfigurationProbe>;
   runMultiCamStabilityTest(durationMs: number): Promise<MultiCamStabilityResult>;
@@ -82,6 +87,22 @@ const UNKNOWN_STABILITY_RESULT: MultiCamStabilityResult = {
 const nativeModule = requireOptionalNativeModule<DeviceConditionNativeModule>(
   'OcculertDeviceCondition',
 );
+
+export function getCameraInterruptionState(deviceId: string): Promise<CameraInterruptionState> {
+  return readCameraInterruption(nativeModule, deviceId);
+}
+
+export function observeCameraInterruptions(deviceId: string, listener: (state: CameraInterruptionState) => void) {
+  return createCameraInterruptionObservation(nativeModule, deviceId, listener);
+}
+
+/** A fresh, unconfigured session reports device/entitlement support without starting a camera. */
+export async function isMultitaskingCameraAccessSupported(): Promise<boolean | null> {
+  try {
+    const result = await nativeModule?.isMultitaskingCameraAccessSupported?.();
+    return typeof result === 'boolean' ? result : null;
+  } catch { return null; }
+}
 
 const UNKNOWN_CONDITION: DeviceCondition = {
   thermalState: 'unknown',

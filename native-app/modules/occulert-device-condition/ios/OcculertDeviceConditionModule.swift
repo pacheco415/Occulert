@@ -53,6 +53,7 @@ private enum OcculertMultiCamGraphError: Error {
  */
 public final class OcculertDeviceConditionModule: Module {
   private let frontCameraIdentity = OcculertFrontCameraIdentity()
+  private let cameraInterruptions = OcculertCameraInterruptions()
   private let stabilityQueue = DispatchQueue(
     label: "com.occulert.camera-stability",
     qos: .userInitiated
@@ -61,16 +62,27 @@ public final class OcculertDeviceConditionModule: Module {
   public func definition() -> ModuleDefinition {
     Name("OcculertDeviceCondition")
 
-    Events("frontCameraChanged")
+    Events("frontCameraChanged", "cameraInterrupted")
     OnCreate { [weak self] in
       self?.frontCameraIdentity.onChange = { [weak self] event in
         self?.sendEvent("frontCameraChanged", event)
       }
+      self?.cameraInterruptions.onChange = { [weak self] event in
+        self?.sendEvent("cameraInterrupted", event)
+      }
+      self?.cameraInterruptions.start()
     }
-    OnDestroy { self.frontCameraIdentity.shutdown() }
-    OnAppContextDestroys { self.frontCameraIdentity.shutdown() }
+    OnDestroy { self.frontCameraIdentity.shutdown(); self.cameraInterruptions.shutdown() }
+    OnAppContextDestroys { self.frontCameraIdentity.shutdown(); self.cameraInterruptions.shutdown() }
     OnAppEntersBackground { self.frontCameraIdentity.pause() }
     OnAppEntersForeground { self.frontCameraIdentity.resume() }
+
+    AsyncFunction("getCameraInterruptionState") { (deviceId: String) -> [String: Any] in
+      self.cameraInterruptions.snapshot(deviceId: deviceId)
+    }
+    AsyncFunction("isMultitaskingCameraAccessSupported") { () -> Bool in
+      OcculertCameraInterruptions.multitaskingSupported()
+    }
 
     AsyncFunction("getFrontCameraIdentity") { (deviceId: String) -> [String: Any] in
       OcculertFrontCameraIdentity.identity(deviceId)

@@ -106,7 +106,11 @@ import {
   shouldRestartCamera,
   type DeviceThermalState,
 } from '../lib/cameraResilience';
-import { getDeviceCondition, observeFrontCameraIdentity, type FrontCameraIdentity } from '../lib/deviceCondition';
+import {
+  getDeviceCondition, observeFrontCameraIdentity, type FrontCameraIdentity,
+  getCameraInterruptionState, observeCameraInterruptions, MULTITASKING_CAMERA_MESSAGE,
+  type CameraInterruptionState,
+} from '../lib/deviceCondition';
 import {
   frontCameraTransition, initialFrontCameraSwitchState,
   INNER_CAMERA_SETUP_MESSAGE, INNER_CAMERA_MONITOR_MESSAGE,
@@ -222,6 +226,21 @@ export default function MonitorScreen() {
   const hasCameraSampleRef = useRef(false);
   const cameraEpochRef = useRef(0);
   const cameraRestartCountRef = useRef(0);
+  const cameraDeviceIdRef = useRef(device?.id);
+  cameraDeviceIdRef.current = device?.id;
+  const cameraInterruptionGenerationRef = useRef(0);
+  const cameraCallbackOwnerRef = useRef(0);
+  const cameraCallbackOwner = cameraCallbackOwnerRef.current;
+  const cameraScreenMountedRef = useRef(true);
+  const multitaskingCameraPausedRef = useRef(false);
+
+  useEffect(() => {
+    cameraScreenMountedRef.current = true;
+    return () => {
+      cameraScreenMountedRef.current = false;
+      cameraInterruptionGenerationRef.current += 1;
+    };
+  }, []);
   const cameraRecoveringRef = useRef(false);
   const headNodDetectorRef = useRef(new HeadNodDetector());
   const headNodObservationsRef = useRef(0);
@@ -454,6 +473,9 @@ export default function MonitorScreen() {
   const toggleSetupPreview = useCallback(() => {
     if (isRunningRef.current || startingRef.current || stoppingRef.current || baselineBusyRef.current) return;
     const next = !setupPreviewActiveRef.current;
+    cameraInterruptionGenerationRef.current += 1;
+    cameraCallbackOwnerRef.current += 1;
+    if (next) multitaskingCameraPausedRef.current = false;
     setupPreviewActiveRef.current = next;
     baselineGenerationRef.current += 1;
     baselineCollectorRef.current.reset();
@@ -466,6 +488,9 @@ export default function MonitorScreen() {
 
   const handleStart = async () => {
     if (startingRef.current || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusyRef.current) return;
+    cameraInterruptionGenerationRef.current += 1;
+    cameraCallbackOwnerRef.current += 1;
+    multitaskingCameraPausedRef.current = false;
     const startAttempt = startAttemptRef.current + 1;
     let reservedSessionId: string | null = null;
     let monitoringStarted = false;
@@ -670,6 +695,8 @@ export default function MonitorScreen() {
     // Invalidate any sensor start that is awaiting permission or optional
     // headphone-motion setup before it can activate monitoring.
     startAttemptRef.current += 1;
+    cameraInterruptionGenerationRef.current += 1;
+    cameraCallbackOwnerRef.current += 1;
     if (stoppingRef.current) return;
     stoppingRef.current = true;
     setIsStopping(true);
@@ -822,6 +849,57 @@ export default function MonitorScreen() {
     return () => subscription.remove();
   }, [deliverMonitoringPausedCue]);
 
+  const handleCameraInterruption = useCallback((state: CameraInterruptionState) => {
+    if (!cameraScreenMountedRef.current) return;
+    if (state.interrupted !== true || state.reason !== 'multitasking' || multitaskingCameraPausedRef.current) return;
+    const active = isRunningRef.current || setupPreviewActiveRef.current || startingRef.current;
+    if (!active && !stoppingRef.current) return;
+    // Latch until the next explicit parked start. An end notification cannot resume.
+    multitaskingCameraPausedRef.current = true;
+    cameraInterruptionGenerationRef.current += 1;
+    baselineGenerationRef.current += 1;
+    baselineCollectorRef.current.reset();
+    setupPreviewActiveRef.current = false;
+    setSetupPreviewActive(false);
+    setCameraSetup(initialCameraSetupAssessment());
+    setSensorFault(MULTITASKING_CAMERA_MESSAGE);
+    if (active) deliverMonitoringPausedCue();
+    if (isRunningRef.current || startingRef.current) {
+      void handleStopRef.current({ deferCloudFinalization: true }).catch(() => {
+        Alert.alert('Drive may not be fully saved', 'Camera monitoring is paused. Occulert could not finish saving this drive.');
+      });
+    }
+  }, [deliverMonitoringPausedCue]);
+
+  useEffect(() => {
+    if (!cameraIdentityActive || !device?.id) return;
+    let active = true;
+    const subscription = observeCameraInterruptions(device.id, state => {
+      if (active && cameraCallbackOwnerRef.current === cameraCallbackOwner
+        && cameraDeviceIdRef.current === device.id && cameraEpochRef.current === cameraEpoch) handleCameraInterruption(state);
+    });
+    void subscription.ready.catch(() => {});
+    return () => {
+      active = false;
+      cameraInterruptionGenerationRef.current += 1;
+      subscription.remove();
+    };
+  }, [cameraIdentityActive, cameraEpoch, cameraCallbackOwner, device?.id, handleCameraInterruption]);
+
+  const checkCameraInterruption = useCallback(async (epoch: number) => {
+    const deviceId = device?.id;
+    if (!cameraScreenMountedRef.current || deviceId !== cameraDeviceIdRef.current || multitaskingCameraPausedRef.current
+      || stoppingRef.current || epoch !== cameraEpochRef.current) return 'paused';
+    const generation = cameraInterruptionGenerationRef.current;
+    const state = deviceId ? await getCameraInterruptionState(deviceId) : null;
+    if (!cameraScreenMountedRef.current || deviceId !== cameraDeviceIdRef.current || generation !== cameraInterruptionGenerationRef.current || epoch !== cameraEpochRef.current
+      || stoppingRef.current || multitaskingCameraPausedRef.current) return 'paused';
+    if (state) handleCameraInterruption(state);
+    if (multitaskingCameraPausedRef.current || stoppingRef.current
+      || !(isRunningRef.current || setupPreviewActiveRef.current || startingRef.current)) return 'paused';
+    return state?.state === 'queryFailed' ? 'queryFailed' : 'ready';
+  }, [device?.id, handleCameraInterruption]);
+
   const handleCaptureConfiguration = useCallback(({ key, configuration }: CaptureConfigurationChange) => {
     if (!isRunningRef.current || stoppingRef.current) return;
     const graceGranted = captureTransitionRef.current.observe({
@@ -837,6 +915,8 @@ export default function MonitorScreen() {
   const attemptCameraRecovery = useCallback(() => {
     if (
       stoppingRef.current
+      || !cameraScreenMountedRef.current
+      || multitaskingCameraPausedRef.current
       || !isRunningRef.current
       || !canRestartStalledCamera(cameraRestartCountRef.current)
     ) return false;
@@ -854,23 +934,39 @@ export default function MonitorScreen() {
 
   useEffect(() => {
     if (!isRunning) return;
-    const watchdog = setInterval(() => {
+    const watchdog = setInterval(async () => {
       const timeoutMs = hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS;
       const now = Date.now();
       if (stoppingRef.current || now - lastSampleAtRef.current <= timeoutMs) return;
-      if (captureTransitionRef.current.shouldDefer(now, lastSampleAtRef.current)) return;
+      // Read native state before grace or restart reservation: its named event
+      // may still be queued behind this watchdog/error on the JS thread.
+      const epoch = cameraEpochRef.current;
+      const generation = cameraInterruptionGenerationRef.current;
+      const interruption = await checkCameraInterruption(epoch);
+      if (interruption === 'paused') return;
+      if (epoch !== cameraEpochRef.current || generation !== cameraInterruptionGenerationRef.current
+        || stoppingRef.current || multitaskingCameraPausedRef.current) return;
+      const checkedAt = Date.now();
+      const checkedTimeout = hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS;
+      if (checkedAt - lastSampleAtRef.current <= checkedTimeout) return;
+      if (interruption === 'ready' && captureTransitionRef.current.shouldDefer(checkedAt, lastSampleAtRef.current)) return;
       performanceTrackerRef.current.recordCameraStall();
-      if (attemptCameraRecovery()) return;
+      if (interruption === 'ready' && attemptCameraRecovery()) return;
       const message = 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.';
       setSensorFault(message);
       deliverMonitoringPausedCue();
       void handleStopRef.current();
     }, 500);
     return () => clearInterval(watchdog);
-  }, [attemptCameraRecovery, deliverMonitoringPausedCue, isRunning]);
+  }, [attemptCameraRecovery, checkCameraInterruption, deliverMonitoringPausedCue, isRunning]);
 
-  const handleCameraError = useCallback((error: CameraRuntimeError, epoch: number) => {
-    if (epoch !== cameraEpochRef.current) return;
+  const handleCameraError = useCallback(async (error: CameraRuntimeError, epoch: number, owner: number) => {
+    if (!cameraScreenMountedRef.current || owner !== cameraCallbackOwnerRef.current || epoch !== cameraEpochRef.current) return;
+    const generation = cameraInterruptionGenerationRef.current;
+    const interruption = await checkCameraInterruption(epoch);
+    if (interruption === 'paused') return;
+    if (epoch !== cameraEpochRef.current || generation !== cameraInterruptionGenerationRef.current
+      || stoppingRef.current || multitaskingCameraPausedRef.current) return;
     if (setupPreviewActiveRef.current && !isRunningRef.current) {
       baselineGenerationRef.current += 1;baselineCollectorRef.current.reset();
       setupPreviewActiveRef.current = false;
@@ -881,7 +977,8 @@ export default function MonitorScreen() {
     if (!isRunningRef.current || stoppingRef.current) return;
     performanceTrackerRef.current.recordCameraStall();
     if (
-      shouldRestartCamera(error.code, cameraRestartCountRef.current)
+      interruption === 'ready'
+      && shouldRestartCamera(error.code, cameraRestartCountRef.current)
       && attemptCameraRecovery()
     ) return;
     setSensorFault(
@@ -889,7 +986,7 @@ export default function MonitorScreen() {
     );
     deliverMonitoringPausedCue();
     void handleStopRef.current();
-  }, [attemptCameraRecovery, deliverMonitoringPausedCue]);
+  }, [attemptCameraRecovery, checkCameraInterruption, deliverMonitoringPausedCue]);
 
   useEffect(() => {
     if (!isRunning || cameraLoadPolicy.mode !== 'stop') return;
@@ -1283,7 +1380,7 @@ export default function MonitorScreen() {
               frameProcessor={frameProcessor}
               pixelFormat="yuv"
               resizeMode="contain"
-              onError={(error) => handleCameraError(error, cameraEpoch)}
+              onError={(error) => { void handleCameraError(error, cameraEpoch, cameraCallbackOwner); }}
             />
           ) : (
             <View style={[StyleSheet.absoluteFill, s.camOff]}>

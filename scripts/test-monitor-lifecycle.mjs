@@ -105,7 +105,8 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /currentAlertPreferences\(\)/);
   assert.match(monitor, /stopBeforeNavigation/);
   assert.equal(
-    [...monitor.matchAll(/handleStopRef\.current\(\{ deferCloudFinalization: true \}\)/g)].length,
+    [...monitor.slice(monitor.indexOf('  const leaveMonitor'), monitor.indexOf('  const handleCameraInterruption'))
+      .matchAll(/handleStopRef\.current\(\{ deferCloudFinalization: true \}\)/g)].length,
     2,
     'navigation and AppState shutdown must not wait for optional cloud finalization',
   );
