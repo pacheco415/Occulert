@@ -1,7 +1,8 @@
 # Occulert device roadmap, 2026–2028
 
-Verified planning revision: **October 19, 2026**. Planning windows are conditional,
-not release commitments. Hardware announcements, developer access, implemented
+**Duo readiness update: October 24, 2026.** Other planning findings retain their
+October 19 verification date. Planning windows are conditional, not release
+commitments. Hardware announcements, developer access, implemented
 source, installed builds and physical acceptance are separate evidence.
 
 ## Product direction and current baseline
@@ -29,7 +30,8 @@ latest source's installation; consult [Status](STATUS.md).
 
 | Item | Verified finding | Development boundary |
 |---|---|---|
-| iPhone Duo | Apple announced U.S. availability for October 23, 2026, starting at $1,999. It is upcoming as of this revision. [Apple announcement](https://www.apple.com/newsroom/2026/09/apple-unveils-iphone-duo/) | Do not claim Occulert camera operation alongside another app until tested on the exact hardware and OS. |
+| iPhone Duo | Released October 23, 2026; Apple's announcement records that availability date. [Apple announcement](https://www.apple.com/newsroom/2026/09/apple-unveils-iphone-duo/) | Folded is the supported driving-mode policy. Occulert device acceptance remains pending; no accuracy or side-by-side monitoring claim. |
+| Duo front camera | A front-camera selection can be a virtual device whose active physical camera changes with the display in use. Read the active constituent rather than treating a stable virtual device ID as a stable camera. [Apple camera guidance](https://developer.apple.com/documentation/avkit/choosing-a-camera-by-the-direction-it-faces) | Record outer/inner/unknown identity locally. Setup and experimental eye-baseline evidence from one physical camera must not silently carry over to another. |
 | Duo layout | Apple documents side-by-side use and a 50/50 split. [Design talk](https://developer.apple.com/videos/play/tech-talks/111466/?time=120), [layout guidance](https://developer.apple.com/design/human-interface-guidelines/designing-for-iphone-duo) | Use adaptive widths and size classes. The input's 313/445-point examples are test cases, not fixed layout constants or verified camera dimensions. |
 | Watch Ultra 4 | Apple describes five-second background heart-rate sampling and HRV as often as every five minutes. [Apple health announcement](https://www.apple.com/newsroom/2026/09/apple-advances-health-and-fitness-capabilities-using-apple-intelligence/) | Hardware sampling does not establish third-party delivery cadence, freshness or continuous HRV access. |
 | AirPods Pro 3 | Apple supports heart-rate measurement with at least one AirPod during supported workouts, with the relevant permissions. [Apple Support](https://support.apple.com/en-us/123184) | This does not establish continuous heart-rate availability during driving. One-ear HR support also does not prove one-ear motion support or local driving legality. |
@@ -43,6 +45,40 @@ is adopted from the input. Measure the selected device, camera and capture
 configuration. Apple exposes a [multitasking camera capability check](https://developer.apple.com/documentation/avfoundation/avcapturesession/ismultitaskingcameraaccesssupported);
 its existence does not establish Safari/PWA behavior or Occulert support.
 
+## iPhone Duo driving-mode policy and acceptance
+
+**Folded is the supported driving mode.** This is the product policy, not a
+completed device-acceptance result. No physical Duo is available for this
+revision, and native, Safari and home-screen PWA behavior remain unverified on
+that device. The unfolded inner camera is treated as lower confidence and is
+untested at night. Split View beside Maps is reserved for an off-by-default
+experiment, not advertised monitoring support.
+
+Hardware-access check, October 24: Apple's [Cupertino Duo workshop](https://developer.apple.com/events/view/RQJY598JC6/dashboard)
+was October 13–14 and registration is closed. No future Bay Area hands-on Duo
+session was confirmed in this check; consult Apple's [upcoming workshops](https://developer.apple.com/events/view/upcoming-events?formats=inperson&topics=iphone-duo)
+before considering a test-phone purchase. No registration or purchase is part
+of this readiness work.
+
+Parked setup on the inner camera should ask the driver to fold the phone before
+starting. A switch while monitoring should keep monitoring, clear the optional
+experimental eye baseline, and give one notice plus an inner-camera status line.
+These are readiness implementation requirements, not claims that the installed
+TestFlight build already implements them. Preserve released alert thresholds;
+if monitoring is actually lost, stop visibly under the existing recovery policy.
+
+Before making Duo support claims, record the exact source, installed build, OS
+and physical camera for parked testing under [Device acceptance](DEVICE_ACCEPTANCE.md):
+
+- Camera identity, fold/unfold frame gaps, face orientation and switch notices.
+- Folded/inner-camera night comparison and the same-phone heat/capture benchmark.
+- Sustained folded monitoring in the intended mount, including sun and shade.
+- Full-screen versus Split View interruption reasons, camera capability and audio
+  over Maps; do not enable capture where the system reports it unsupported.
+- Safari and home-screen PWA resize, stale-calibration guidance and track recovery.
+- Watch delivery and audio routes after a new SDK 58 build, plus outer/inner
+  screenshots. Simulator layout evidence cannot establish camera or thermal behavior.
+
 ## Phase 1: phone reliability and compact layout — now to February 2027
 
 1. Finish exact-build acceptance of the existing native app: startup, tracking,
@@ -50,7 +86,7 @@ its existence does not establish Safari/PWA behavior or Occulert support.
 2. Prepare an adaptive compact view that emphasizes monitoring state and alerts.
    Keep setup, feedback and diagnostic interaction parked. Test narrow widths,
    large text and orientation changes without hiding stop/recovery controls.
-3. After Duo availability, test native and Safari/home-screen PWA separately
+3. With Duo now released, test native and Safari/home-screen PWA separately
    alongside Maps or another app. Record foreground state, camera interruptions,
    physical camera identity, thermal behavior and alert delivery. Stop visibly
    on lost monitoring; do not force capture through unsupported system states.
