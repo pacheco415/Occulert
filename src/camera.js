@@ -5,6 +5,84 @@ import { tone, speak } from "./alerts.js";
 import "./storage-history.js";
 import "./cloud-sync.js";
 import { startupAllowsMonitoring, startBtn, cameraSourceRow, cameraSourceSelect, cameraSourceHint, cameraRefreshBtn, CAMERA_DEVICE_STORAGE_KEY, availableCameraDevices, cameraLabelsRevealed, unavailableCameraDeviceId, guardedCameraTrack, cameraMuteTimer, cameraFailureStopping, running, starting, log, setOverlay, showStoppedReason, stop, set_availableCameraDevices, set_cameraLabelsRevealed, set_unavailableCameraDeviceId, set_guardedCameraTrack, set_cameraMuteTimer, set_cameraFailureStopping } from "./ui.js";
+let cameraViewport = null, viewportCalibrationStale = false, cameraViewportDiagnostics = [];
+export const VIEWPORT_CALIBRATION_NOTICE = 'Screen changed size. If you unfolded your phone, recalibrate when parked.';
+export function captureViewportGeometry() {
+    const width = window.innerWidth, height = window.innerHeight;
+    return Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0 ? { width, height } : null;
+}
+export function captureViewportEnvironment() {
+    const capture = {}, segments = [];
+    let posture = null;
+    // Capture settings are diagnostics, never a reason to reopen the camera.
+    // Omit identifiers and arbitrary browser fields from this local snapshot.
+    try {
+        const settings = guardedCameraTrack?.getSettings?.();
+        for (const key of ['width', 'height', 'frameRate'])
+            if (Number.isFinite(settings?.[key]) && settings[key] >= 0)
+                capture[key] = settings[key];
+        if (['user', 'environment', 'left', 'right'].includes(settings?.facingMode))
+            capture.facingMode = settings.facingMode;
+    }
+    catch (error) { }
+    try {
+        const type = navigator.devicePosture?.type;
+        if (type === 'continuous' || type === 'folded')
+            posture = type;
+    }
+    catch (error) { }
+    try {
+        const regions = window.viewport?.segments;
+        if (Array.isArray(regions))
+            for (const region of regions.slice(0, 8)) {
+                if (['x', 'y', 'width', 'height'].every(key => Number.isFinite(region?.[key])) && region.width > 0 && region.height > 0)
+                    segments.push({ x: region.x, y: region.y, width: region.width, height: region.height });
+            }
+    }
+    catch (error) { }
+    return { capture, posture, segments };
+}
+export function cameraViewportSnapshot() {
+    // Copies keep a diagnostics reader from mutating the live session state.
+    return { calibrationStaleForNextStart: viewportCalibrationStale, events: cameraViewportDiagnostics.map(event => ({ ...event,
+        viewport: { ...event.viewport }, capture: { ...event.capture }, segments: event.segments.map(segment => ({ ...segment })) })) };
+}
+export function recordCameraViewport(source, viewport) {
+    cameraViewportDiagnostics.push({ source, viewport: { ...viewport }, ...captureViewportEnvironment() });
+    if (cameraViewportDiagnostics.length > 20)
+        cameraViewportDiagnostics.shift();
+}
+export function beginCameraViewportObservation() {
+    cameraViewport = captureViewportGeometry();
+    cameraViewportDiagnostics = [];
+    if (viewportCalibrationStale)
+        log('Starting fresh parked calibration after the screen changed size');
+    viewportCalibrationStale = false;
+    const warning = document.getElementById('viewportWarning');
+    if (warning)
+        warning.hidden = true;
+    if (cameraViewport)
+        recordCameraViewport('start', cameraViewport);
+}
+export function endCameraViewportObservation() { cameraViewport = null; }
+export function handleCameraViewportChange(source = 'resize') {
+    if (!running || !cameraViewport)
+        return;
+    const next = captureViewportGeometry();
+    if (!next || !['width', 'height'].some(key => Math.abs(next[key] - cameraViewport[key]) / cameraViewport[key] > .25))
+        return;
+    // Retain the last significant geometry so gradual fold animations still
+    // cross the threshold. The following orientation/resize event deduplicates.
+    cameraViewport = next;
+    viewportCalibrationStale = true;
+    recordCameraViewport(source, next);
+    const warning = document.getElementById('viewportWarning');
+    if (warning) {
+        warning.textContent = VIEWPORT_CALIBRATION_NOTICE;
+        warning.hidden = false;
+    }
+    log('Screen size changed to ' + next.width + '×' + next.height + '. Calibration is stale for the next parked start.');
+}
 export function isMobileCaptureDevice(nav = navigator) { const userAgent = String(nav && nav.userAgent || '').toLowerCase(), platform = String(nav && nav.platform || '').toLowerCase(), touchPoints = Number(nav && nav.maxTouchPoints) || 0; return /android|iphone|ipad|ipod|mobile/.test(userAgent) || (platform === 'macintel' && touchPoints > 1); }
 export function buildCameraConstraints(deviceId = '', nav = navigator) {
     const videoConstraints = { width: { ideal: 480 }, height: { ideal: 360 }, frameRate: { ideal: 12, max: 16 } };

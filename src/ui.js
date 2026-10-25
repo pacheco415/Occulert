@@ -1,4 +1,4 @@
-import { setCameraControlsDisabled, refreshCameraChoices, openSelectedCamera, clearCameraTrackGuards, attachCameraTrackGuards, cameraRecoveryGuidance } from "./camera.js";
+import { setCameraControlsDisabled, refreshCameraChoices, openSelectedCamera, clearCameraTrackGuards, attachCameraTrackGuards, cameraRecoveryGuidance, beginCameraViewportObservation, endCameraViewportObservation } from "./camera.js";
 import { detectorFailureStopping, discardFaceMesh, initModel, verifyFirstInference, loop, framePerformanceSnapshot, set_processingFrame, set_detectorFailureStopping, set_consecutiveInferenceFailures, set_lastDetectionResultAt } from "./detector.js";
 import "./calibration.js";
 import { startGPS, stopGPS, riskText, fleetPayload } from "./metrics.js";
@@ -322,6 +322,7 @@ export function createLocalLifecycleOperations() {
             calibrated = false;
             calibrationSamples = [];
             calibrationUntil = Date.now() + CALIBRATION_MS;
+            beginCameraViewportObservation();
             baselineEAR = .28;
             baseClosedThreshold = .18;
             baseWatchThreshold = .22;
@@ -416,6 +417,7 @@ export function createLocalLifecycleOperations() {
         calibrating = false;
         stopTimer();
         clearCameraTrackGuards();
+        endCameraViewportObservation();
         const rb3 = document.getElementById('recalBtn');
         if (rb3)
             rb3.style.display = 'none';
