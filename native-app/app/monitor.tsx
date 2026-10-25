@@ -1455,6 +1455,16 @@ export default function MonitorScreen() {
           )
         }
       >
+        <AlertSystem
+          metrics={metrics}
+          isRunning={isRunning}
+          sessionStartedAt={sessionStartedAt}
+          sessionEndedAt={sessionEndedAt}
+          onTimingEvent={recordAlertTiming}
+          onLevelChange={setVisibleAlertLevel}
+          inline
+        />
+
         <View
           accessibilityLiveRegion="polite"
           accessibilityRole="text"
@@ -1494,16 +1504,6 @@ export default function MonitorScreen() {
             {isRunning ? INNER_CAMERA_MONITOR_MESSAGE : INNER_CAMERA_SETUP_MESSAGE}
           </Text>
         )}
-
-        <AlertSystem
-          metrics={metrics}
-          isRunning={isRunning}
-          sessionStartedAt={sessionStartedAt}
-          sessionEndedAt={sessionEndedAt}
-          onTimingEvent={recordAlertTiming}
-          onLevelChange={setVisibleAlertLevel}
-          inline
-        />
 
         {EYE_BASELINE_EXPERIMENT && <Text accessibilityLiveRegion="polite" style={{color:'#22d3ee',padding:12}}>{baselineMessage}</Text>}
         {!isRunning && (

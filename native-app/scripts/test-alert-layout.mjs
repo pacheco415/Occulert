@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAlertSystemFixture } from './lib/alert-system-test-harness.mjs';
 import { flattenStyle } from './lib/monitor-layout-test-harness.mjs';
+import { duoWindows } from './lib/duo-layout-fixtures.mjs';
+import { assertVisible, measureLayout } from './lib/measure-layout.mjs';
 
 test('actual inline warnings keep their full instructions in document flow without scale transforms', async () => {
   const f = createAlertSystemFixture({ state: 'watch' });
@@ -119,5 +121,114 @@ test('tracking loss after its grace period publishes attention without requiring
     await f.update({ metrics: { fatigueScore: 0 } });
     assert.equal(f.scrolls.length, beforeWarning + 1);
     assert.deepEqual(f.levelChanges, ['none', 'tracking']);
+  } finally { await f.unmount(); }
+});
+
+test('floating banner follows safe areas and the measured header through resizing without replaying alerts', async () => {
+  const f = createAlertSystemFixture({ withLayout: true, inline: false });
+  await f.mount();
+  try {
+    const players = [...f.players];
+    const camera = f.cameraIdentity;
+    const initialDecisions = f.timings.filter(event => event.kind === 'decision').length;
+    for (const [index, fixture] of duoWindows.entries()) {
+      await f.update(fixture);
+      const measuredHeaderHeight = index % 2 ? 94 : 70;
+      await f.resizeHeader(measuredHeaderHeight);
+      const frames = measureLayout(f.tree, f.window);
+      const alert = frames.get('alert');
+      assert.equal(flattenStyle(f.banner.props.style).transform, undefined, 'normal-flow dock does not scale beyond its reserved bounds');
+      assertVisible(alert, `${fixture.name}: floating warning`);
+      const close = (actual, expected) => assert.ok(Math.abs(actual - expected) <= .34, `${actual} follows viewport coordinate ${expected}`);
+      const header = frames.get('monitor-header');
+      close(header.height, measuredHeaderHeight);
+      close(alert.y, header.y + header.height);
+      close(alert.x, fixture.safeArea.left + 16);
+      close(alert.x + alert.width, fixture.window.width - fixture.safeArea.right - 16);
+      assert.equal(alert.clips.length, 1, 'header warning is outside the scrolling/clipping details');
+      await f.scrollDetails(200);
+      assert.deepEqual(measureLayout(f.tree, f.window).get('alert'), alert, 'details scrolling cannot move a viewport overlay');
+      const host = f.root.find(node => typeof node.type === 'string' && node.props.testID === 'monitor-alert-overlay');
+      assert.equal(host.props.pointerEvents, 'box-none');
+      assert.equal(f.banner.props.pointerEvents, 'none', 'the informational overlay passes taps through');
+      assert.deepEqual(f.players, players);
+      assert.strictEqual(f.cameraIdentity, camera);
+      assert.equal(f.timings.filter(event => event.kind === 'decision').length, initialDecisions);
+    }
+    assert.equal(f.calls.cameraMounts, 1);
+    assert.equal(f.calls.cameraUnmounts, 0);
+    assert.equal(f.playCount, 1, 'placement changes do not replay the immediate cue');
+    await f.advance(900);
+    assert.equal(f.playCount, 2, 'the original pending second cue still delivers');
+  } finally { await f.unmount(); }
+});
+
+for (const inline of [true, false]) test(`Duo ${inline ? 'inline' : 'header'} warning and Stop fit every display and split allocation`, async () => {
+  const f = createAlertSystemFixture({ withLayout: true, inline, closedDurationMs: 1_500 });
+  await f.mount();
+  try {
+    const camera = f.cameraIdentity;
+    for (const fixture of duoWindows) {
+      for (const fontScale of [1, 1.6, 2]) {
+        await f.update({ ...fixture, window: { ...fixture.window, fontScale } });
+        const frames = measureLayout(f.tree, f.window);
+        assertVisible(frames.get('fixture-stop'), `${fixture.name} font ${fontScale}: Stop`);
+        assertVisible(frames.get('alert'), `${fixture.name} font ${fontScale}: complete warning`);
+        assertVisible(frames.get('camera'), `${fixture.name} font ${fontScale}: camera`);
+        const stop = frames.get('fixture-stop');
+        const alert = frames.get('alert');
+        const overlapWidth = Math.max(0, Math.min(alert.x + alert.width, stop.x + stop.width) - Math.max(alert.x, stop.x));
+        const overlapHeight = Math.max(0, Math.min(alert.y + alert.height, stop.y + stop.height) - Math.max(alert.y, stop.y));
+        assert.equal(overlapWidth * overlapHeight, 0, 'warning does not cover Stop');
+        assert.strictEqual(f.cameraIdentity, camera);
+        assert.equal(f.calls.cameraMounts, 1);
+        assert.equal(f.calls.cameraUnmounts, 0);
+      }
+    }
+    assert.equal(f.banner.props.accessibilityLabel, 'PULL OVER NOW');
+    assert.match(f.text(), /High fatigue detected\. Pull over safely and rest now\./);
+    assert.match(f.text(), /Inner camera - lower confidence/);
+    assert.match(f.text(), /Monitoring status: DROWSINESS ALERT/);
+  } finally { await f.unmount(); }
+});
+
+test('a disappearing portal cannot clear a newer owner and removes its host content on cleanup', async () => {
+  const f = createAlertSystemFixture({ withLayout: true, inline: false });
+  await f.mount();
+  try {
+    const camera = f.cameraIdentity;
+    const players = [...f.players];
+    await f.update({ overlayProbe: true });
+    assert.equal(f.root.findAll(node => typeof node.type === 'string' && node.props.testID === 'fixture-overlay-probe').length, 1);
+    // The alert portal now unmounts while a newer owner occupies the same host.
+    await f.update({ isRunning: false });
+    assert.equal(f.root.findAllByType('Animated.View').length, 0);
+    assert.equal(f.root.findAll(node => typeof node.type === 'string' && node.props.testID === 'fixture-overlay-probe').length, 1);
+    await f.update({ overlayProbe: false });
+    const host = f.root.find(node => typeof node.type === 'string' && node.props.testID === 'monitor-alert-overlay');
+    assert.equal(host.children.length, 0, 'current owner cleanup removes its content');
+    assert.strictEqual(f.cameraIdentity, camera);
+    assert.deepEqual(f.players, players);
+    assert.equal(f.calls.playerDisposals, 0);
+    const plays = f.playCount;
+    await f.advance(2_000);
+    assert.equal(f.playCount, plays, 'stopping still cancels delayed cues');
+  } finally { await f.unmount(); }
+  assert.equal(f.calls.playerDisposals, 3);
+  assert.equal(f.calls.cameraUnmounts, 1);
+});
+
+test('header portal remains present through React Strict Mode effect replay and clears after stopping', async () => {
+  const f = createAlertSystemFixture({ withLayout: true, inline: false, strictMode: true });
+  await f.mount();
+  try {
+    assert.equal(f.root.findAllByType('Animated.View').length, 1);
+    const frames = measureLayout(f.tree, f.window);
+    const header = frames.get('monitor-header');
+    assert.equal(frames.get('alert').y, header.y + header.height);
+    await f.update({ isRunning: false });
+    assert.equal(f.root.findAllByType('Animated.View').length, 0);
+    const host = f.root.find(node => typeof node.type === 'string' && node.props.testID === 'monitor-alert-overlay');
+    assert.equal(host.children.length, 0);
   } finally { await f.unmount(); }
 });

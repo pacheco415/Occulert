@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createMonitorLayoutFixture, flattenStyle } from './lib/monitor-layout-test-harness.mjs';
+import { duoWindows } from './lib/duo-layout-fixtures.mjs';
+import { assertVisible, measureLayout } from './lib/measure-layout.mjs';
 
 test('monitor controls remain outside scrolling details through preparation, monitoring and recovery', async () => {
   const f = createMonitorLayoutFixture();
@@ -100,4 +102,27 @@ test('short windows and large text reserve more space for controls and scrolling
     assert.ok(detailsStyle.flex > 0);
     assert.equal(detailsStyle.minHeight, 0);
   } finally { await f.unmount(); }
+});
+
+test('Duo display, rotation and half-width fixtures keep Stop reachable and the same camera mounted', async () => {
+  const f = createMonitorLayoutFixture();
+  await f.mount();
+  try {
+    const camera = f.cameraIdentity;
+    for (const fixture of duoWindows) {
+      for (const fontScale of [1, 1.6, 2]) {
+        await f.update({ ...fixture, window: { ...fixture.window, fontScale }, running: true });
+        const frames = measureLayout(f.tree, f.window);
+        assertVisible(frames.get('fixture-stop'), `${fixture.name} font ${fontScale}: Stop`);
+        assertVisible(frames.get('camera'), `${fixture.name} font ${fontScale}: camera`);
+        assert.ok(frames.get('monitor-details').height > 0, 'guidance retains a scrolling viewport');
+        assert.strictEqual(f.cameraIdentity, camera, `${fixture.name}: camera identity`);
+        assert.equal(f.events.cameraMounts, 1);
+        assert.equal(f.events.cameraUnmounts, 0);
+        await f.pressPrimary();
+      }
+    }
+    assert.equal(f.events.stops, duoWindows.length * 3);
+  } finally { await f.unmount(); }
+  assert.equal(f.events.cameraUnmounts, 1);
 });
