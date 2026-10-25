@@ -4,6 +4,12 @@ Snapshot only. Run npm run status before relying on PR counts or deploy state.
 
 These are dated snapshots. Source, deployment, build availability and device tests are separate.
 
+SDK 58 upgrade note (2026-10-24): the prepared Expo 58 / React Native 0.88 source
+requires a new TestFlight build and exact-build device acceptance. The build-56
+receipts below remain historical. Google ML Kit's arm64-simulator exclusion
+currently blocks launch in the iPhone Duo simulator; no Duo camera, heat, layout
+or Watch result is claimed. See [native upgrade details](../native-app/UPGRADE_README.md).
+
 - Inspected source (origin/main): `39c32652ac3742f451077d0849125e0c382816d2`.
 - Source commit date: 2026-10-04T13:55:00-07:00.
 

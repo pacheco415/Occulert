@@ -37,7 +37,7 @@ const contrastRatio = (foreground, background) => {
 
 assert.equal(
   nativePackage.dependencies['expo-secure-store'],
-  '~57.0.4',
+  '~58.0.2',
   'native auth tokens must use the SDK-compatible SecureStore package',
 );
 assert.ok(

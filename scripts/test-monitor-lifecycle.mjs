@@ -40,6 +40,16 @@ test('a pending start cannot finish after cancellation or foreground loss', () =
   }
 });
 
+test('unset and future native app states keep monitoring unavailable', () => {
+  for (const state of [null, undefined, 'future-system-state']) {
+    const label = String(state);
+    assert.equal(shouldAbortMonitoringStart(false, state), true, label);
+    assert.equal(shouldStopMonitoringForAppState(true, false, false, state), true, label);
+    assert.equal(shouldStopMonitoringForAppState(false, true, false, state), true, label);
+    assert.equal(shouldStopMonitoringForAppState(false, true, true, state), false, label);
+  }
+});
+
 test('navigation waits for monitoring to stop', async () => {
   const events = [];
   let finishStop = () => {};

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share, type LayoutChangeEvent } from 'react-native';
+import { View, Text, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -48,7 +48,7 @@ export default function HistoryScreen() {
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const [sessionOperations, setSessionOperations] = useState<Record<string, SessionOperation>>({});
   const [reviewQueueMessage, setReviewQueueMessage] = useState<{ key: string; text: string } | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const pendingReviewScrollRef = useRef<string | null>(null);
   const historyRevisionRef = useRef(0);
   const filterRevisionRef = useRef(0);

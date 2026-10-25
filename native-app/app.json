@@ -6,6 +6,9 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "web": {
+      "output": "single"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -38,7 +41,14 @@
     },
     "plugins": [
       "@bacons/apple-targets",
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "asyncRoutes": {
+            "web": false
+          }
+        }
+      ],
       [
         "expo-audio",
         {

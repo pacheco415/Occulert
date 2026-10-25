@@ -1,9 +1,6 @@
-export type MonitorAppState =
-  | 'active'
-  | 'background'
-  | 'inactive'
-  | 'unknown'
-  | 'extension';
+// RN 0.88 can expose an unset initial state or a future native state string.
+// The existing policy treats every value except 'active' as unavailable.
+export type MonitorAppState = string | null | undefined;
 
 export function shouldStopMonitoringForAppState(
   isRunning: boolean,
