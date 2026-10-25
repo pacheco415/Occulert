@@ -284,17 +284,20 @@ for (const reuseTokens of [false, true]) {
 }
 
 {
+  // Concurrent callers with an expired token share one refresh (previously each
+  // sent its own, and the losers failed with auth_session_changed).
   const h = refreshHarness();
-  const first = h.backend.getSession();
-  const second = h.backend.getSession();
-  const rejected = assert.rejects(second, { code: 'auth_session_changed' });
-  await waitForRefresh(h, 2);
+  const callers = [h.backend.getSession(), h.backend.getSession(), h.backend.getSession()];
+  await waitForRefresh(h, 1);
+  for (let i = 0; i < 10; i++) await new Promise(setImmediate);
+  assert.equal(h.pending.length, 1, 'three concurrent callers send one refresh');
   h.pending[0](response({ ...h.fresh, user: { id: 'owner-a' } }));
-  assert.equal((await first).access_token, 'new-access');
-  h.pending[1](response({ error: 'refresh_token_already_used' }, 400));
-  await rejected;
+  const sessions = await Promise.all(callers);
+  assert.deepEqual(sessions.map(session => session.access_token), ['new-access', 'new-access', 'new-access']);
   assert.equal(h.backend.currentUser().id, 'owner-a');
-  assert.equal(JSON.parse(h.storage.get('occulert-auth')).access_token, 'new-access', 'concurrent stale token failure must preserve rotated session');
+  assert.equal(JSON.parse(h.storage.get('occulert-auth')).access_token, 'new-access');
+  assert.equal((await h.backend.getSession()).access_token, 'new-access', 'a settled refresh is not reused for later calls');
+  assert.equal(h.pending.length, 1);
 }
 
 {

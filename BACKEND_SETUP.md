@@ -163,7 +163,12 @@ fresh token, and is limited to reduce abuse without adding a paid provider.
 
 The endpoints expect an `Authorization: Bearer <access_token>`
 header, where `access_token` comes from Supabase Auth running in the
-browser. `api/public-config.js` exposes only the public project URL and anon
+browser. The browser client refreshes the access token 60 seconds before it
+expires. Concurrent calls in a tab share one refresh, and tabs take turns through
+the `occulert-auth-refresh` Web Lock, reusing a session another tab just stored.
+Local sign-in and sign-out actions invalidate an older refresh even while it
+waits for that lock; cross-tab storage updates can still supply a rotated token.
+If an early refresh cannot reach Supabase, the still-valid token keeps working. `api/public-config.js` exposes only the public project URL and anon
 key at runtime; it must never expose the service-role key. Email/password
 login creates or updates the authenticated user's driver profile, and
 `app.html` writes opted-in session summaries and alert events through the
