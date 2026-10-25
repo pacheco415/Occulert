@@ -53,6 +53,7 @@ function harness({ state = 'running', noContext = false, noMedia = false, runnin
   });
   vm.runInContext(driver.slice(driver.indexOf('function setTextIfChanged('), driver.indexOf('function render(')), context);
   vm.runInContext(audioCode, context);
+  vm.runInContext('let cameraViewport={width:800,height:800};' + driver.slice(driver.indexOf('function endCameraViewportObservation('), driver.indexOf('function handleCameraViewportChange(')), context);
   return {
     context, document, contexts, media, oscillators, gains, pendingPlays, timers, session,
     run(code) { return vm.runInContext(code, context); },

@@ -1,3 +1,10 @@
+import { createFrontCameraDiagnostics } from './frontCameraSwitch.ts';
+import type { FrontCameraDiagnostics } from './frontCameraSwitch';
+import type { FrontCameraIdentity } from './deviceCondition';
+import { createCaptureLoadDiagnostics } from './captureLoadDiagnostics.ts';
+import type { CaptureLoadSnapshot } from './captureLoadDiagnostics';
+import type { CaptureLoadConfiguration } from './captureLoadPolicy';
+
 export const MONITOR_UI_UPDATE_INTERVAL_MS = 250;
 
 export function shouldRefreshMonitorMetrics({
@@ -32,6 +39,8 @@ export interface MonitorPerformanceSnapshot {
   uiUpdatesPerSecond: number;
   cameraStalls: number;
   cameraRestarts: number;
+  frontCamera?: FrontCameraDiagnostics;
+  captureLoad?: CaptureLoadSnapshot;
   alertTiming: {
     alertsTriggered: number;
     phoneDispatches: number;
@@ -51,6 +60,8 @@ export interface MonitorPerformanceTracker {
   recordUiUpdate: () => void;
   recordCameraStall: () => void;
   recordCameraRestart: () => void;
+  recordFrontCamera: (identity: FrontCameraIdentity, at: number, baselineCleared?: boolean) => void;
+  recordCaptureLoad: (configuration: CaptureLoadConfiguration | null, graceGranted?: boolean) => void;
   recordAlertDecision: (at: number) => void;
   recordPhoneDispatch: (decisionAt: number, dispatchedAt: number) => void;
   recordWatchDelivery: (
@@ -91,6 +102,8 @@ export function createMonitorPerformanceTracker(
   windowSize = MONITOR_PERFORMANCE_WINDOW_SIZE,
 ): MonitorPerformanceTracker {
   const inferenceDurations: number[] = [];
+  const frontCamera = createFrontCameraDiagnostics();
+  const captureLoad = createCaptureLoadDiagnostics();
   const sampleIntervals: number[] = [];
   let samples = 0;
   let uiUpdates = 0;
@@ -117,6 +130,8 @@ export function createMonitorPerformanceTracker(
       if (!Number.isFinite(at) || at < 0) return;
       sessionStartedAt = at;
       firstSampleAt = null;
+      frontCamera.reset(at);
+      captureLoad.reset();
     },
     recordSample(at, inferenceMs) {
       samples += 1;
@@ -135,6 +150,12 @@ export function createMonitorPerformanceTracker(
     },
     recordCameraRestart() {
       cameraRestarts += 1;
+    },
+    recordFrontCamera(identity, at, baselineCleared = false) {
+      frontCamera.record(identity, at, baselineCleared);
+    },
+    recordCaptureLoad(configuration, graceGranted = false) {
+      captureLoad.record(configuration, graceGranted);
     },
     recordAlertDecision(at) {
       if (!Number.isFinite(at) || at < sessionStartedAt) return;
@@ -175,11 +196,15 @@ export function createMonitorPerformanceTracker(
       sessionStartedAt = 0;
       firstSampleAt = null;
       lastSampleAt = 0;
+      frontCamera.reset();
+      captureLoad.reset();
     },
     snapshot(at = lastSampleAt) {
       const durationMs = sessionStartedAt > 0 && at >= sessionStartedAt
         ? at - sessionStartedAt
         : 0;
+      const frontCameraSnapshot = frontCamera.snapshot(at);
+      const captureLoadSnapshot = captureLoad.snapshot();
       return {
         samples,
         uiUpdates,
@@ -192,6 +217,8 @@ export function createMonitorPerformanceTracker(
         uiUpdatesPerSecond: roundedRate(uiUpdates, durationMs),
         cameraStalls,
         cameraRestarts,
+        ...(frontCameraSnapshot ? { frontCamera: frontCameraSnapshot } : {}),
+        ...(captureLoadSnapshot ? { captureLoad: captureLoadSnapshot } : {}),
         alertTiming: {
           alertsTriggered,
           phoneDispatches: phoneDispatchDurations.length,

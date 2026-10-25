@@ -63,6 +63,37 @@ submission receipts before updating distribution status.
 
 ## Upgrading Expo SDK
 
+The current source targets Expo SDK 58, React Native 0.88.0 and React 19.3.0.
+React DOM and the test renderer stay on the same React version. The production
+EAS `sdk-58` image selects Xcode 27.1. A new TestFlight binary and the exact-build
+checks in `docs/DEVICE_ACCEPTANCE.md` are required before this source is used in
+a pilot.
+
+Prebuild generates `SceneDelegate.swift` and `UIApplicationSceneManifest`;
+the Watch app remains an embedded target. Generated `ios/` and `android/`
+directories are local build output, not maintained source. SDK 57's optional
+`ios.enableSceneSupport` setting is not used. Router uses the existing opaque
+Stack header background, with no native-tabs imports to migrate. The native
+web preview explicitly keeps single-page output and synchronous web routes;
+the separately released browser PWA is unchanged.
+
+The postinstall camera patch keeps VisionCamera 4.7.3 and worklets-core 1.6.3,
+using React Native's public JSI initialization hook after removal of
+`RCTCxxBridge`. It preserves the existing proxy, worklet API and frame pipeline.
+The patch refuses unreviewed versions or source bytes; run its native binding
+tests and compile the actual iOS app before changing either dependency. The
+Watch nil-safety patch remains active. Router 58 uses `URLSearchParams`, so the
+legacy query-decoder patch intentionally does nothing when that reviewed
+Router version no longer installs `query-string`.
+
+The iPhone Duo simulator cannot currently run this complete camera stack:
+[GoogleMLKit 8.0.0 excludes arm64 simulators](https://github.com/CocoaPods/Specs/blob/master/Specs/b/e/b/GoogleMLKit/8.0.0/GoogleMLKit.podspec.json),
+and the installed Duo runtime supports only arm64. Do not remove architecture
+exclusions or relabel an iOS device binary as a simulator binary. Scene generation
+and an unsigned iPhone SDK compile are separate evidence from simulator launch,
+camera behavior or physical-device acceptance. No Duo support or accuracy claim
+follows from prebuild or unit tests.
+
 Use one planned `codex/` branch for each SDK upgrade. Review the target SDK's
 release notes and the camera, face detector, worklets and custom Watch module
 compatibility before changing dependencies. Move one SDK version at a time.

@@ -16,7 +16,17 @@ export function patchQueryDecoder(source) {
 }
 
 export function applyQueryDecoderPatch() {
-  const packagePath = require.resolve('query-string/package.json');
+  let packagePath;
+  try {
+    packagePath = require.resolve('query-string/package.json');
+  } catch (error) {
+    if (error.code !== 'MODULE_NOT_FOUND') throw error;
+    const router = JSON.parse(readFileSync(require.resolve('expo-router/package.json'), 'utf8'));
+    // SDK 58 uses URLSearchParams instead. A missing legacy decoder is expected
+    // only for this reviewed Router generation; a later upgrade needs review.
+    if (router.version.startsWith('58.') && !router.dependencies?.['query-string']) return false;
+    throw Error('Review query decoder compatibility: query-string is unexpectedly absent.');
+  }
   const queryPackage = JSON.parse(readFileSync(packagePath, 'utf8'));
   if (queryPackage.version !== '7.1.3') throw Error('Review the decoder compatibility patch before changing query-string versions.');
   const sourcePath = require.resolve('query-string');
@@ -27,6 +37,6 @@ export function applyQueryDecoderPatch() {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    console.log(applyQueryDecoderPatch() ? 'Applied query decoder compatibility patch.' : 'Query decoder compatibility patch already applied.');
+    console.log(applyQueryDecoderPatch() ? 'Applied query decoder compatibility patch.' : 'Query decoder compatibility checked; no changes needed.');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

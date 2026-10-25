@@ -40,6 +40,16 @@ test('a pending start cannot finish after cancellation or foreground loss', () =
   }
 });
 
+test('unset and future native app states keep monitoring unavailable', () => {
+  for (const state of [null, undefined, 'future-system-state']) {
+    const label = String(state);
+    assert.equal(shouldAbortMonitoringStart(false, state), true, label);
+    assert.equal(shouldStopMonitoringForAppState(true, false, false, state), true, label);
+    assert.equal(shouldStopMonitoringForAppState(false, true, false, state), true, label);
+    assert.equal(shouldStopMonitoringForAppState(false, true, true, state), false, label);
+  }
+});
+
 test('navigation waits for monitoring to stop', async () => {
   const events = [];
   let finishStop = () => {};
@@ -95,7 +105,8 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /currentAlertPreferences\(\)/);
   assert.match(monitor, /stopBeforeNavigation/);
   assert.equal(
-    [...monitor.matchAll(/handleStopRef\.current\(\{ deferCloudFinalization: true \}\)/g)].length,
+    [...monitor.slice(monitor.indexOf('  const leaveMonitor'), monitor.indexOf('  const handleCameraInterruption'))
+      .matchAll(/handleStopRef\.current\(\{ deferCloudFinalization: true \}\)/g)].length,
     2,
     'navigation and AppState shutdown must not wait for optional cloud finalization',
   );

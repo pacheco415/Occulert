@@ -64,25 +64,35 @@ export function createMonitorLayoutFixture() {
       events.cameraMounts++;
       return () => { events.cameraUnmounts++; };
     }, []);
-    return React.createElement('CameraFixture', { identity: identity.current });
+    return React.createElement('CameraFixture', {
+      identity: identity.current, style: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+    });
   }
   let props = { attentionKey: '', reduceMotion: false, running: false, preparing: false, detail: 'Parked camera setup' };
   let renderer;
   const element = () => React.createElement(MonitorLayout, {
     camera: React.createElement(CameraProbe),
-    header: React.createElement('Text', null, 'Monitor navigation'),
+    // The current monitor top bar: 44-point controls, 10-point vertical padding,
+    // and a 6-point top margin. Device measurement remains a separate gate.
+    header: React.createElement('View', { style: { marginTop: 6, paddingVertical: 10 } },
+      React.createElement('Text', { style: { minHeight: 44, fontSize: 15 } }, 'Monitor navigation')),
     primaryAction: React.createElement('TouchableOpacity', {
+      testID: 'fixture-stop',
+      style: { minHeight: 56, paddingVertical: 14, paddingHorizontal: 12 },
       accessibilityLabel: props.running ? 'Stop monitoring and save this drive' : 'Start fatigue monitoring',
       accessibilityState: { disabled: props.preparing },
       disabled: props.preparing,
       onPress: () => { if (!props.preparing) events[props.running ? 'stops' : 'starts']++; },
-    }),
+    }, React.createElement('Text', { style: { fontSize: 18, textAlign: 'center' } }, props.running ? 'STOP MONITORING' : 'START MONITORING')),
     attentionKey: props.attentionKey,
     reduceMotion: props.reduceMotion,
   }, React.createElement('Text', { testID: 'fixture-detail' }, props.detail));
   const fixture = {
     events, scrolls,
     get root() { return renderer.root; },
+    get tree() { return renderer.toJSON(); },
+    get window() { return dimensions; },
+    get safeArea() { return insets; },
     get cameraIdentity() { return renderer.root.findByType('CameraFixture').props.identity; },
     host(id) { return renderer.root.find(node => typeof node.type === 'string' && node.props.testID === id); },
     async mount() { await act(async () => { renderer = create(element()); }); },

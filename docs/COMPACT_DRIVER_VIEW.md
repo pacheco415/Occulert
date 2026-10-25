@@ -32,6 +32,33 @@ scroll targets. Stopped-reason recovery focuses and brings the status card into 
 Foreground loss or camera disconnection stops monitoring; restarting remains a
 deliberate action taken while safely parked.
 
+### Screen changes during monitoring
+
+The October 24 source watches window resizing and screen-orientation changes.
+A change greater than 25% in either viewport dimension shows “Screen changed
+size. If you unfolded your phone, recalibrate when parked.” Monitoring keeps the
+same stream, current calibration thresholds and track-failure guards. The next
+deliberate start already performs a fresh parked calibration; the pending stale
+marker and warning clear when that calibration starts. Small incremental resizes
+are compared with the last significant size, so a fold animation cannot hide a
+large cumulative change. A repeated orientation event at the same size adds no
+second warning.
+
+`window.OcculertViewport.snapshot()` exposes at most 20 local, in-memory records
+containing viewport size, bounded capture settings, optional device posture and
+optional viewport segment rectangles. Capture identifiers are omitted. These
+records do not enter cloud payloads, session history or exports. Optional API
+absence or failure never changes monitoring behavior. The feature detections
+follow the [Device Posture](https://www.w3.org/TR/device-posture/) and
+[Viewport Segments](https://drafts.csswg.org/css-viewport/#the-viewport-interface)
+interfaces; they do not infer which physical camera Safari uses.
+
+The resize regressions exercise Chromium and WebKit with software camera/model
+adapters: 10 new resize cases and 48 existing camera/compact-layout cases passed
+on October 24, with all 90 repository verification checks passing. Real
+Safari/PWA camera switching, folding and Split View still require the parked
+physical-Duo checklist. Hosted checks and deployment remain separate gates.
+
 ## Browser evidence
 
 [The compact layout tests](../tests/driver-compact-layout.spec.mjs) passed all
@@ -58,8 +85,12 @@ The new driver stylesheet is 22,188 raw bytes, versus 15,776 for the previous
 version; gzip measures 5,427 bytes (about 5.4 KB). Its raw size budget deliberately
 increases to 23,000 bytes. The static install-cache cap increases from 330,000 to
 338,000 bytes to cover the measured 336,848-byte asset set (about 336.7 KB). These
-limits retain bounded headroom; the driver JavaScript budget stays at 90,000
-bytes. The separately loaded detector runtime is outside this static asset sum.
+limits originally retained bounded headroom. The October 24 viewport guidance
+raises the driver JavaScript budget from 90,500 to 94,000 raw bytes and the
+static install-cache cap from 338,000 to 341,000 bytes. The measured new static
+asset set is 340,418 bytes. The driver grows from 90,085 raw / 25,519 gzip bytes
+to 93,208 raw / 26,460 gzip bytes. The separately loaded detector runtime is
+outside this static asset sum.
 
 Published asset bytes remain immutable. Follow [the release guide](../RELEASING.md)
 for versioned outputs, integrity pins, cache identity and required pull-request
