@@ -148,11 +148,11 @@ test('camera resilience reduces load and permits only one safe restart', () => {
   assert.equal(shouldRestartCamera('session/camera-not-ready', 1), false);
 });
 
-test('Build 30 pins its iOS toolchain and exposes local aggregate diagnostics', () => {
+test('the native build pins its SDK 58 toolchain and exposes local aggregate diagnostics', () => {
   const eas = JSON.parse(read('native-app/eas.json'));
   const historyOwners = readHistorySourceOwners(read);
   const history = historyOwners.screen;
-  assert.equal(eas.build.production.ios.image, 'macos-tahoe-26.5-xcode-26.6');
+  assert.equal(eas.build.production.ios.image, 'sdk-58');
   assert.match(historyOwners.diagnostics, /LOCAL PERFORMANCE DIAGNOSTICS/);
   assert.match(historyOwners.diagnostics, /First camera sample/);
   assert.match(historyOwners.diagnostics, /Inference p95/);

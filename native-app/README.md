@@ -57,7 +57,7 @@ alert delivery remain separate checks.
 ### Prerequisites
 - Node 24 from `.nvmrc`; native CI also clean-installs with npm 10.9.8 on Node 24
 - Use the project's Expo CLI through `npx expo`; native features need a custom development or TestFlight build
-- iOS: SDK 57-compatible Xcode/toolchain; the production EAS profile pins Xcode 26.6
+- iOS: Expo SDK 58 / React Native 0.88 with Xcode 27.1; the production EAS profile uses `sdk-58`
 - Android source requires API 26 or later; the earlier private preview finished,
   while this candidate still needs its own build and physical acceptance
 
@@ -68,10 +68,16 @@ npm ci --include=dev
 npm run verify
 ```
 
-Verification includes dependency checks, TypeScript, audio lifecycle fixtures and
+Verification includes dependency checks, TypeScript, compiled camera-binding
+compatibility checks, audio lifecycle fixtures and
 mounted History interactions using the actual TSX components with React. The
 History fixtures substitute native storage, navigation and sharing bridges;
 they do not establish physical device or signed-binary acceptance.
+
+SDK 58 generates the UIKit scene lifecycle during prebuild. The current camera
+stack still requires a physical-device build: Google ML Kit 8 excludes arm64
+simulators, while the iPhone Duo simulator runs only arm64. Do not clear that
+exclusion to claim simulator support. See [upgrade details](UPGRADE_README.md).
 
 ### Run
 ```bash

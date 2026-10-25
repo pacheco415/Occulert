@@ -1,6 +1,6 @@
 import type { HeadphoneMotionStatus } from './headphoneMotion';
 import type { WatchStatus } from './watchBridge';
-import type { MultiCamConfigurationProbe } from './deviceCondition';
+import type { FrontPhysicalCamera, MultiCamConfigurationProbe } from './deviceCondition';
 
 export const READINESS_MAX_AGE_MS = 30_000;
 export const READINESS_TIMEOUT_MS = 3_000;
@@ -10,6 +10,7 @@ export interface CameraReadiness {
   frontAvailable: boolean;
   backAvailable: boolean;
   backPhysicalDevices: string[];
+  frontPhysicalDevices: FrontPhysicalCamera[];
   multiCamSupported: boolean | null;
   frontBackMultiCamSupported: boolean | null;
   multiCamProbe: MultiCamConfigurationProbe;

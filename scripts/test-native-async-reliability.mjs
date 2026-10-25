@@ -9,6 +9,19 @@ import { createCachedBooleanPreference } from '../native-app/lib/cachedBooleanPr
 import { createHealthReadinessSnapshot, isHealthReadinessSnapshot } from '../native-app/lib/healthReadiness.ts';
 import { alertDeliveryPlan, deliverCueIfCurrent } from '../native-app/lib/alertDelivery.ts';
 import { SUPABASE_ORIGIN, pinnedSupabaseConfig } from '../native-app/lib/supabaseHost.ts';
+import * as frontCameraPolicy from '../native-app/lib/frontCameraSwitch.ts';
+import * as monitorPerformance from '../native-app/lib/monitorPerformance.ts';
+import * as monitorLifecycle from '../native-app/lib/monitorLifecycle.ts';
+import * as cameraSetup from '../native-app/lib/cameraSetup.ts';
+import * as cameraResilience from '../native-app/lib/cameraResilience.ts';
+import * as captureLoadPolicy from '../native-app/lib/captureLoadPolicy.ts';
+import * as monitorThresholds from '../native-app/constants/thresholds.ts';
+import * as eyeBaselineModel from '../native-app/lib/eyeBaselineModel.ts';
+import * as sensorFusion from '../native-app/lib/sensorFusionObservation.ts';
+import * as sessionCompletion from '../native-app/lib/sessionCompletion.ts';
+import * as monitorAlertPolicy from '../native-app/lib/alertPolicy.ts';
+import { RollingClosedFraction } from '../native-app/lib/rollingClosedFraction.ts';
+import { HeadNodDetector } from '../native-app/lib/headNodDetector.ts';
 
 // Execute the production TS logic with native bridges replaced. Removing imports
 // and JSX presentation avoids requiring a device, Expo, or a TS compiler in CI.
@@ -359,6 +372,123 @@ function hookFixture() {
     return value;
   }, unmount() { effects.forEach(effect => effect?.cleanup?.()); } };
 }
+
+function monitorCameraStartFixture(stage) {
+  const h = hookFixture(), entered = deferred(), pending = deferred();
+  const f = { entered, pending, history: [], checkpoints: [], hookBaselines: [], baselineSaves: [], cameraClears: 0,
+    clock: 1_000_000, cameraListener: null, held: false };
+  class Clock extends Date { static now() { return f.clock; } }
+  const { useEyeTracking: realEyeTracking } = load(read('native-app/hooks/useEyeTracking.ts'), ['useEyeTracking'], {
+    ...h.React, ...monitorThresholds, baselinePreset: eyeBaselineModel.baselinePreset, RollingClosedFraction, Date: Clock,
+  });
+  const identity = kind => ({ state: 'available', deviceId: 'virtual-front', deviceType: 'virtual', isVirtual: true,
+    constituentDeviceTypes: ['outer', 'inner'], streamingDeviceType: kind, streamingUniqueId: kind, streamingType: kind });
+  const boundary = async name => {
+    if (stage !== name || f.held) return;
+    f.held = true;
+    entered.resolve();
+    await pending.promise;
+  };
+  const player = { pause() {}, seekTo: async () => {}, play() {} }, isCurrent = () => true;
+  const device = { id: 'virtual-front' }, router = { replace() {}, back() {}, push() {} };
+  const source = read('native-app/app/monitor.tsx');
+  const cutoff = source.indexOf('\n  if (!hasPermission) {');
+  assert.ok(cutoff > source.indexOf('  const frameProcessor ='));
+  const component = source.slice(0, cutoff)
+    + '\nreturn {handleStart,handleStop,toggleSetupPreview,onEyeState,eyeBaseline,isRunning,baselineMessage};\n}';
+  const api = load(component, ['MonitorScreen'], {
+    ...h.React, React: h.React, ...frontCameraPolicy, ...monitorPerformance, ...monitorLifecycle,
+    ...cameraSetup, ...cameraResilience, ...captureLoadPolicy, ...monitorThresholds, ...eyeBaselineModel,
+    ...sensorFusion, ...sessionCompletion, ...monitorAlertPolicy, HeadNodDetector,
+    EYE_BASELINE_EXPERIMENT: true, Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
+    useRouter: () => router, useAccessibilityPreferences: () => ({ reduceMotion: true }),
+    useCameraDevice: () => device, useCameraPermission: () => ({ hasPermission: true, requestPermission: async () => true }),
+    useFaceDetector: () => ({ detectFaces: () => [] }), useFrameProcessor: callback => callback,
+    useRunOnJS: callback => callback, useSharedValue: value => h.React.useRef({ value }).current,
+    useAlertAudioPlayer: () => ({ player, isCurrent }),
+    useEyeTracking: (level, baseline) => { f.hookBaselines.push(baseline); return realEyeTracking(level, baseline); },
+    Battery: { usePowerState: () => ({ batteryLevel: 1, batteryState: 0, lowPowerMode: false }), BatteryState: { CHARGING: 1, FULL: 2 } },
+    AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
+    BackHandler: { addEventListener: () => ({ remove() {} }) },
+    currentAlertPreferences: () => ({ audioEnabled: false, hapticEnabled: false }),
+    deliverCueIfCurrent, loadAlertPreferences: () => boundary('preferences'), getWatchAlertsEnabled: async () => false,
+    loadSavedSensitivity: async () => 'medium', loadDeviceEyeBaseline: async () => .9,
+    clearDeviceEyeBaseline: async () => { f.cameraClears++; },
+    saveDeviceEyeBaseline: async (baseline, samples) => { f.baselineSaves.push({ baseline, samples }); },
+    getDeviceCondition: async () => ({ thermalState: 'nominal' }),
+    getCameraInterruptionState: async deviceId => ({ state: 'notAvailable', deviceId, interrupted: null, reason: 'unknown', rawReason: null, sequence: 0 }),
+    observeCameraInterruptions: () => ({ ready: Promise.resolve(null), remove() {} }),
+    observeFrontCameraIdentity: (_id, listener) => {
+      f.cameraListener = listener;
+      listener(identity('outer'));
+      return { ready: Promise.resolve(identity('outer')), remove() { if (f.cameraListener === listener) f.cameraListener = null; } };
+    },
+    addHeadphoneMotionSampleListener: () => ({ remove() {} }), addHeadphoneMotionStatusListener: () => ({ remove() {} }),
+    startHeadphoneMotion: async () => ({ state: 'unavailable' }), stopHeadphoneMotion: async () => {},
+    getWatchStatus: async () => ({ moduleAvailable: false, paired: false, appInstalled: false, reachable: false }),
+    consumePreDriveSafety: () => true, currentAppBuildInfo: () => ({ appVersion: 'fixture', appBuildNumber: 'fixture' }),
+    saveActiveSessionCheckpoint: async value => { await boundary('checkpoint'); f.checkpoints.push(value); },
+    clearActiveSessionCheckpoint: async () => {},
+    updateSessionHistory: async update => { f.history = update(f.history); },
+    finishCloudSession: async () => { assert.fail('experimental camera sessions must remain local'); },
+    Alert: { alert() {} }, setInterval: () => 1, clearInterval() {},
+  });
+  f.render = () => h.render(() => api.MonitorScreen());
+  f.switchToInner = () => { assert.equal(typeof f.cameraListener, 'function'); f.cameraListener(identity('inner')); };
+  f.unmount = () => h.unmount();
+  f.render();
+  return f;
+}
+
+for (const stage of ['preferences', 'checkpoint']) {
+  test(`camera switch during awaited ${stage} cannot restore an invalidated baseline in the running session or saved provenance`, async () => {
+    const f = monitorCameraStartFixture(stage);
+    await flush();
+    let screen = f.render();
+    assert.equal(screen.eyeBaseline, .9);
+    screen.toggleSetupPreview();
+    screen = f.render();
+    screen = f.render();
+    await flush();
+    screen = f.render();
+    assert.equal(screen.eyeBaseline, null, 'first Duo identity must discard the old camera-unbound baseline');
+    assert.equal(f.cameraClears, 1);
+    // Establish a real fresh baseline on the now-known outer camera. Start
+    // must capture a non-null value so the later switch exercises invalidation.
+    const calibrationStartedAt = f.clock;
+    for (let index = 0; index <= 20; index++) {
+      f.clock = calibrationStartedAt + index * 150;
+      screen.onEyeState(.9, .9, true, 0, 0, 0, 1, 20, 20, 60, 60, 100, 100);
+    }
+    await flush();
+    screen = f.render();
+    assert.equal(f.baselineSaves.length, 1);
+    assert.equal(f.baselineSaves[0].samples, 21);
+    assert.ok(Math.abs(screen.eyeBaseline - .9) < 1e-12);
+    assert.ok(Math.abs(f.hookBaselines.at(-1) - .9) < 1e-12);
+    const starting = screen.handleStart();
+    await f.entered.promise;
+    f.switchToInner();
+    await flush();
+    screen = f.render();
+    assert.equal(screen.eyeBaseline, null);
+    assert.equal(f.hookBaselines.at(-1), null, 'the actual eye-tracking hook must receive the cleared baseline');
+    f.pending.resolve();
+    await starting;
+    screen = f.render();
+    assert.equal(screen.isRunning, true);
+    assert.equal(screen.eyeBaseline, null);
+    assert.equal(f.hookBaselines.at(-1), null);
+    assert.equal(f.cameraClears, 2);
+    f.clock += 10_000;
+    await screen.handleStop();
+    assert.equal(f.history.length, 1);
+    assert.equal(f.history[0].eyeBaselineExperiment.baseline, null, 'resumed Start must not copy its captured pre-switch baseline back into the saved record');
+    assert.match(screen.baselineMessage, /current presets/);
+    f.unmount();
+  });
+}
+
 function alertFixture() {
   const h = hookFixture(), preference = deferred(), delivery = deferred(), sends = [], events = [];
   const source = read('native-app/components/AlertSystem.tsx');
@@ -367,6 +497,8 @@ function alertFixture() {
     ...h.React, React: h.React, require: () => 'sound',
     Animated: { Value: class { stopAnimation() {} setValue() {} } },
     useAccessibilityPreferences: () => ({ reduceMotion: true }),
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+    useMonitorAlertDock: () => false,
     useAlertAudioPlayer: () => ({ player: { pause() {} } }),
     loadAlertPreferences: async () => {}, configureAlertAudioMode: async () => {},
     currentAlertPreferences: () => ({ audioEnabled: false, hapticEnabled: false }),

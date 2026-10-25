@@ -11,6 +11,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type TextInputInstance,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -44,7 +45,7 @@ export function CloudSyncCard() {
   const statusReadRef = useRef(0);
   const statusBusyRef = useRef(false);
   const actionBusyRef = useRef(false);
-  const passwordInputRef = useRef<TextInput | null>(null);
+  const passwordInputRef = useRef<TextInputInstance | null>(null);
   const actionRunnerRef = useRef(createSingleFlightActionRunner());
   const busy = actionBusy || statusBusy;
   const visible = useCallback(() => mountedRef.current && focusedRef.current && appActiveRef.current, []);
