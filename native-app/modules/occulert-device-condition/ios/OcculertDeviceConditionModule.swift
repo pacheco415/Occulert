@@ -52,6 +52,7 @@ private enum OcculertMultiCamGraphError: Error {
  stay inside AVFoundation and are never stored or sent across the JS bridge.
  */
 public final class OcculertDeviceConditionModule: Module {
+  private let frontCameraIdentity = OcculertFrontCameraIdentity()
   private let stabilityQueue = DispatchQueue(
     label: "com.occulert.camera-stability",
     qos: .userInitiated
@@ -59,6 +60,33 @@ public final class OcculertDeviceConditionModule: Module {
 
   public func definition() -> ModuleDefinition {
     Name("OcculertDeviceCondition")
+
+    Events("frontCameraChanged")
+    OnCreate { [weak self] in
+      self?.frontCameraIdentity.onChange = { [weak self] event in
+        self?.sendEvent("frontCameraChanged", event)
+      }
+    }
+    OnDestroy { self.frontCameraIdentity.shutdown() }
+    OnAppContextDestroys { self.frontCameraIdentity.shutdown() }
+    OnAppEntersBackground { self.frontCameraIdentity.pause() }
+    OnAppEntersForeground { self.frontCameraIdentity.resume() }
+
+    AsyncFunction("getFrontCameraIdentity") { (deviceId: String) -> [String: Any] in
+      OcculertFrontCameraIdentity.identity(deviceId)
+    }.runOnQueue(frontCameraIdentity.queue)
+
+    AsyncFunction("getFrontPhysicalCameras") { () -> [[String: Any]] in
+      OcculertFrontCameraIdentity.physicalCameras()
+    }.runOnQueue(frontCameraIdentity.queue)
+
+    AsyncFunction("startObservingFrontCamera") { (deviceId: String, observationId: String) -> [String: Any] in
+      self.frontCameraIdentity.start(deviceId: deviceId, owner: observationId)
+    }.runOnQueue(frontCameraIdentity.queue)
+
+    AsyncFunction("stopObservingFrontCamera") { (observationId: String) in
+      self.frontCameraIdentity.stop(owner: observationId)
+    }.runOnQueue(frontCameraIdentity.queue)
 
     AsyncFunction("getCondition") { () -> [String: Any] in
       return [
