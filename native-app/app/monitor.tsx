@@ -32,7 +32,7 @@ import * as Haptics from 'expo-haptics';
 import * as Battery from 'expo-battery';
 import { Ionicons } from '@expo/vector-icons';
 import { EYE_BASELINE_EXPERIMENT, ParkedEyeBaseline } from '../lib/eyeBaselineModel';
-import { loadDeviceEyeBaseline, saveDeviceEyeBaseline } from '../lib/eyeBaselineStorage';
+import { clearDeviceEyeBaseline, loadDeviceEyeBaseline, saveDeviceEyeBaseline } from '../lib/eyeBaselineStorage';
 import { useEyeTracking } from '../hooks/useEyeTracking';
 import { deliverCueIfCurrent } from '../lib/alertDelivery';
 import { AlertSystem, type AlertTimingEvent } from '../components/AlertSystem';
@@ -106,7 +106,11 @@ import {
   shouldRestartCamera,
   type DeviceThermalState,
 } from '../lib/cameraResilience';
-import { getDeviceCondition } from '../lib/deviceCondition';
+import { getDeviceCondition, observeFrontCameraIdentity, type FrontCameraIdentity } from '../lib/deviceCondition';
+import {
+  frontCameraTransition, initialFrontCameraSwitchState,
+  INNER_CAMERA_SETUP_MESSAGE, INNER_CAMERA_MONITOR_MESSAGE,
+} from '../lib/frontCameraSwitch';
 import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
 import { modalAnimationType } from '../lib/accessibilityPreferencesModel';
 import { createSensorFusionObservationTracker } from '../lib/sensorFusionObservation';
@@ -159,16 +163,21 @@ export default function MonitorScreen() {
   const [sensitivity, setSensitivity] = useState<SensitivityLevel>('medium');
   const [sensitivityLoaded, setSensitivityLoaded] = useState(false);
   const [eyeBaseline, setEyeBaseline] = useState<number | null>(null);
+  const eyeBaselineRef = useRef<number | null>(null);
   const [baselineLoaded, setBaselineLoaded] = useState(!EYE_BASELINE_EXPERIMENT);
   const [baselineBusy, setBaselineBusy] = useState(false);
   const [baselineMessage, setBaselineMessage] = useState('Parked eye-baseline experiment · local sessions only.');
   const baselineCollectorRef = useRef(new ParkedEyeBaseline());
   const baselineGenerationRef = useRef(0);
+  const cameraBaselineRevisionRef = useRef(0);
   const baselineFinishedRef = useRef(false);
   const baselineCanSaveRef = useRef(false);
   const baselineBusyRef = useRef(false);
   const baselineMountedRef = useRef(true);
   const sessionEyeBaselineRef = useRef<number | null>(null);
+  const [frontCameraIdentity, setFrontCameraIdentity] = useState<FrontCameraIdentity | null>(null);
+  const frontCameraIdentityRef = useRef<FrontCameraIdentity | null>(null);
+  const frontCameraSwitchRef = useRef(initialFrontCameraSwitchState());
   const [sensorFault, setSensorFault] = useState<string | null>(null);
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [sessionEndedAt, setSessionEndedAt] = useState<number | null>(null);
@@ -274,16 +283,71 @@ export default function MonitorScreen() {
     }
   }, []);
 
+  const handleFrontCameraIdentity = useCallback((identity: FrontCameraIdentity) => {
+    if (!isRunningRef.current && !setupPreviewActiveRef.current) return;
+    const running = isRunningRef.current;
+    const transition = frontCameraTransition(frontCameraSwitchRef.current, identity, running);
+    frontCameraSwitchRef.current = transition.state;
+    frontCameraIdentityRef.current = identity;
+    setFrontCameraIdentity(identity);
+    if (transition.resetParkedSetup) {
+      baselineGenerationRef.current += 1;
+      baselineCollectorRef.current.reset();
+      baselineFinishedRef.current = false;
+      lastCameraSetupUiAtRef.current = 0;
+      setCameraSetup(initialCameraSetupAssessment());
+    }
+    const baselineCleared = transition.clearEyeBaseline && EYE_BASELINE_EXPERIMENT;
+    if (baselineCleared) {
+      baselineGenerationRef.current += 1;
+      const cameraRevision = ++cameraBaselineRevisionRef.current;
+      baselineCollectorRef.current.reset();
+      baselineFinishedRef.current = false;
+      sessionEyeBaselineRef.current = null;
+      eyeBaselineRef.current = null;
+      baselineCanSaveRef.current = false;
+      // This state is the real useEyeTracking input, not only the saved-session label.
+      setEyeBaseline(null);
+      setBaselineMessage(running
+        ? 'Camera changed. Experimental eye baseline cleared; current presets apply.'
+        : 'Camera changed. Parked setup and the experimental eye baseline were reset.');
+      void clearDeviceEyeBaseline().then(() => {
+        if (baselineMountedRef.current && cameraRevision === cameraBaselineRevisionRef.current) {
+          baselineCanSaveRef.current = true;
+        }
+      }).catch(() => {
+        if (!baselineMountedRef.current || cameraRevision !== cameraBaselineRevisionRef.current) return;
+        baselineCanSaveRef.current = false;
+        setBaselineMessage('Experimental baseline could not be cleared from storage. Current presets apply; reset it in Settings before another session.');
+      });
+    }
+    if (running) performanceTrackerRef.current.recordFrontCamera(identity, Date.now(), baselineCleared);
+    if (transition.playNotice) deliverMonitoringPausedCue();
+  }, [deliverMonitoringPausedCue]);
+
+  const cameraIdentityActive = isRunning || setupPreviewActive;
+  useEffect(() => {
+    if (!cameraIdentityActive || !device?.id) return;
+    let active = true;
+    const subscription = observeFrontCameraIdentity(device.id, identity => {
+      if (active) handleFrontCameraIdentity(identity);
+    });
+    void subscription.ready.catch(() => {});
+    return () => { active = false; subscription.remove(); };
+  }, [cameraIdentityActive, device?.id, handleFrontCameraIdentity]);
+
   useEffect(() => {
     if (!EYE_BASELINE_EXPERIMENT) return;
     let active = true;baselineMountedRef.current=true;
+    const cameraRevision = cameraBaselineRevisionRef.current;
     void loadDeviceEyeBaseline().then(value => {
-      if (!active) return;
+      if (!active || cameraRevision !== cameraBaselineRevisionRef.current) return;
       baselineCanSaveRef.current = true;
+      eyeBaselineRef.current = value;
       setEyeBaseline(value);
       setBaselineMessage(value === null ? 'While parked, open Setup check and look forward with eyes open for three seconds.' : 'Saved parked eye baseline · experimental local sessions only.');
     }).catch(() => {
-      if (active) setBaselineMessage('Saved baseline unavailable. Current presets apply; use Recalibrate in Settings to reset it.');
+      if (active && cameraRevision === cameraBaselineRevisionRef.current) setBaselineMessage('Saved baseline unavailable. Current presets apply; use Recalibrate in Settings to reset it.');
     }).finally(() => { if (active) setBaselineLoaded(true); });
     return () => { active = false; baselineMountedRef.current=false;baselineGenerationRef.current += 1; };
   }, []);
@@ -475,8 +539,8 @@ export default function MonitorScreen() {
       }
 
       reset();
-      sessionEyeBaselineRef.current = eyeBaseline;
-      if(EYE_BASELINE_EXPERIMENT)setBaselineMessage(eyeBaseline===null?'Experimental local session uses current presets; no personal baseline was saved.':'Experimental local session uses the saved parked baseline.');
+      sessionEyeBaselineRef.current = eyeBaselineRef.current;
+      if(EYE_BASELINE_EXPERIMENT)setBaselineMessage(sessionEyeBaselineRef.current===null?'Experimental local session uses current presets; no personal baseline was saved.':'Experimental local session uses the saved parked baseline.');
       baselineGenerationRef.current += 1;
       setupPreviewActiveRef.current = false;
       setSetupPreviewActive(false);
@@ -516,6 +580,9 @@ export default function MonitorScreen() {
       sessionStartedAtRef.current = nextSessionStartedAt;
       activeSessionIdRef.current = nextSessionId;
       performanceTrackerRef.current.recordSessionStart(nextSessionStartedAt);
+      if (frontCameraIdentityRef.current) {
+        performanceTrackerRef.current.recordFrontCamera(frontCameraIdentityRef.current, nextSessionStartedAt);
+      }
       setSessionStartedAt(nextSessionStartedAt);
       setSessionEndedAt(null);
       isRunningRef.current = true;
@@ -845,7 +912,7 @@ export default function MonitorScreen() {
             baselineBusyRef.current = true;setBaselineBusy(true);
             void saveDeviceEyeBaseline(value,result.samples).then(() => {
               if (generation === baselineGenerationRef.current && setupPreviewActiveRef.current && !isRunningRef.current) {
-                setEyeBaseline(value);setBaselineMessage('Parked baseline saved on this device · experimental local sessions only.');
+                eyeBaselineRef.current = value;setEyeBaseline(value);setBaselineMessage('Parked baseline saved on this device · experimental local sessions only.');
               }
             }).catch(() => {
               if (generation === baselineGenerationRef.current) setBaselineMessage('Baseline was not saved. Current presets apply; retry the parked Setup check.');
@@ -1184,7 +1251,7 @@ export default function MonitorScreen() {
 
       <MonitorLayout
         reduceMotion={reduceMotion}
-        attentionKey={sensorFault || (cameraRecovering ? 'camera-recovering' : isRunning ? `${metrics.state}:${visibleAlertLevel}` : 'parked')}
+        attentionKey={sensorFault || (cameraRecovering ? 'camera-recovering' : isRunning ? `${metrics.state}:${visibleAlertLevel}:${frontCameraIdentity?.streamingType ?? 'unknown'}` : `parked:${frontCameraIdentity?.streamingType ?? 'unknown'}`)}
         camera={
           (isRunning || setupPreviewActive) ? (
             <Camera
@@ -1304,6 +1371,12 @@ export default function MonitorScreen() {
           </View>
         )}
 
+        {frontCameraIdentity?.streamingType === 'inner' && (isRunning || setupPreviewActive) && (
+          <Text accessibilityLiveRegion="polite" style={s.cameraIdentityNote}>
+            {isRunning ? INNER_CAMERA_MONITOR_MESSAGE : INNER_CAMERA_SETUP_MESSAGE}
+          </Text>
+        )}
+
         <AlertSystem
           metrics={metrics}
           isRunning={isRunning}
@@ -1365,6 +1438,7 @@ export default function MonitorScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
+  cameraIdentityNote: { color: '#fbbf24', paddingHorizontal: 16, paddingVertical: 10, fontSize: 15 },
   camOff: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#050a0f' },
   camOffTxt: { color: '#1a3a4a', marginTop: 12, fontSize: 14 },
   topBar: {
