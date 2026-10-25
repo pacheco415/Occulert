@@ -416,6 +416,8 @@ function monitorCameraStartFixture(stage) {
     clearDeviceEyeBaseline: async () => { f.cameraClears++; },
     saveDeviceEyeBaseline: async (baseline, samples) => { f.baselineSaves.push({ baseline, samples }); },
     getDeviceCondition: async () => ({ thermalState: 'nominal' }),
+    getCameraInterruptionState: async deviceId => ({ state: 'notAvailable', deviceId, interrupted: null, reason: 'unknown', rawReason: null, sequence: 0 }),
+    observeCameraInterruptions: () => ({ ready: Promise.resolve(null), remove() {} }),
     observeFrontCameraIdentity: (_id, listener) => {
       f.cameraListener = listener;
       listener(identity('outer'));

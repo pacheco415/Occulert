@@ -9,6 +9,7 @@ import {
   normalizeFrontPhysicalCameras, unknownFrontCameraIdentity,
 } from '../lib/frontCameraIdentity.ts';
 import * as model from '../lib/frontCameraIdentity.ts';
+import * as interruptions from '../lib/cameraInterruptions.ts';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -133,20 +134,28 @@ test('missing, older and rejecting bridges report unavailable and remain removab
 function loadModule(file, bindings) {
   const code = ts.transpileModule(readFileSync(new URL(file, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Script(code).runInNewContext({ exports, require: name => { if (!(name in bindings)) throw Error(`Unexpected dependency ${name}`); return bindings[name]; }, Promise, WeakMap, Map, Set, Date, Math });
+  new Script(code).runInNewContext({ exports, require: name => { if (!(name in bindings)) throw Error(`Unexpected dependency ${name}`); return bindings[name]; }, Promise, WeakMap, Map, Set, Date, Math, setTimeout, clearTimeout });
   return exports;
 }
 
 test('public wrappers support a missing optional module and native readiness reports physical front inventory', async () => {
-  const missing = loadModule('../lib/deviceCondition.ts', { 'expo-modules-core': { requireOptionalNativeModule: () => null }, './frontCameraIdentity': model });
+  const missing = loadModule('../lib/deviceCondition.ts', { 'expo-modules-core': { requireOptionalNativeModule: () => null }, './frontCameraIdentity': model, './cameraInterruptions': interruptions });
   assert.deepEqual(await missing.getFrontCameraIdentity('virtual-front'), unknownFrontCameraIdentity());
   assert.equal((await missing.getFrontPhysicalCameras()).length, 0);
+  assert.equal(await missing.isMultitaskingCameraAccessSupported(), null);
+  assert.equal((await missing.getCameraInterruptionState('virtual-front')).state, 'notAvailable');
   const cameras = [{ uniqueId: 'inner', deviceType: 'native-inner', camera: 'inner' }];
   const wrapper = loadModule('../lib/deviceCondition.ts', {
-    'expo-modules-core': { requireOptionalNativeModule: () => ({ getFrontCameraIdentity: async () => identity('inner'), getFrontPhysicalCameras: async () => cameras }) },
+    'expo-modules-core': { requireOptionalNativeModule: () => ({ getFrontCameraIdentity: async () => identity('inner'), getFrontPhysicalCameras: async () => cameras,
+      isMultitaskingCameraAccessSupported: async () => true,
+      getCameraInterruptionState: async deviceId => ({ state: 'available', deviceId, interrupted: true, rawReason: 4, sequence: 9 }),
+    }) },
     './frontCameraIdentity': model,
+    './cameraInterruptions': interruptions,
   });
   assert.equal((await wrapper.getFrontCameraIdentity('virtual-front')).streamingType, 'inner');
+  assert.equal(await wrapper.isMultitaskingCameraAccessSupported(), true);
+  assert.equal((await wrapper.getCameraInterruptionState('virtual-front')).reason, 'multitasking');
   const sources = loadModule('../lib/deviceReadinessSources.ts', {
     '@react-native-async-storage/async-storage': {},
     'react-native-vision-camera': { Camera: { getAvailableCameraDevices: () => [{ position: 'front', physicalDevices: ['wide-angle-camera'] }], getCameraPermissionStatus: () => 'granted' } },
