@@ -48,8 +48,17 @@ export function queueBackendEvent(type) {
         return;
     if (!cloudConsent.checked || !cloudReady || !window.OcculertBackend)
         return;
+    // Capture the detection time now, before any wait for the session or queue.
+    const occurredAt = new Date().toISOString();
     const location = gpsConsent.checked && lastPosition ? { latitude: lastPosition.lat, longitude: lastPosition.lng } : {}, sessionReference = backendSessionPromise || backendSessionId;
-    set_backendEventQueue(backendEventQueue.then(() => sessionReference).then(id => id && cloudConsent.checked ? window.OcculertBackend.logEvent(id, type, Object.assign({ fatigue_score: Math.round(fatigue), confidence: Math.round(confidence) }, location)) : null).catch(() => null));
+    const details = Object.assign({ fatigue_score: Math.round(fatigue), confidence: Math.round(confidence) }, location);
+    set_backendEventQueue(backendEventQueue.then(() => sessionReference).then(id => id && cloudConsent.checked
+        ? window.OcculertBackend.logEvent(id, type, Object.assign({ occurred_at: occurredAt }, details)).then(result =>
+            // The server bounds occurred_at by its own clock and the session's start; when
+            // this device's clock disagrees, send once more and let the server stamp arrival.
+            result && result.status === 400 && result.body && result.body.error === 'invalid_occurred_at' && cloudConsent.checked
+                ? window.OcculertBackend.logEvent(id, type, details) : result)
+        : null).catch(() => null));
 }
 export function detachBackendSession() { const state = { id: backendSessionId, promise: backendSessionPromise, eventQueue: backendEventQueue, consented: cloudConsent.checked, scope: backendSessionScope, endedAt: new Date().toISOString(), localSessionId }; set_backendSessionScope(null); (set_backendSessionGeneration(backendSessionGeneration + 1) - 1); set_backendSessionId(null); set_backendSessionPromise(null); set_backendEventQueue(Promise.resolve()); return state; }
 export function cloudSummaryScope() {

@@ -182,7 +182,8 @@ assert.doesNotMatch(
 );
 
 assert.match(monitor, /beginCloudSession\(\)/);
-assert.match(monitor, /logCloudAlert\(sessionId, result\.fatigueScore\)/);
+assert.match(monitor, /const occurredAt = new Date\(\)\.toISOString\(\);\s*cloudEventQueueRef\.current = cloudEventQueueRef\.current/, 'the alert time is captured at detection, before the queue wait');
+assert.match(monitor, /logCloudAlert\(sessionId, result\.fatigueScore, occurredAt\)/);
 const completion = read('native-app/lib/sessionCompletion.ts');
 assert.match(monitor, /finalizeCompletedNativeSession/);
 assert.match(monitor, /finish: finishCloudSession/);

@@ -1152,10 +1152,11 @@ export default function MonitorScreen() {
       setAlertCount(alertCountRef.current);
       const cloudSession = cloudSessionRef.current;
       if (cloudSession) {
+        const occurredAt = new Date().toISOString();
         cloudEventQueueRef.current = cloudEventQueueRef.current
           .then(async () => {
             const sessionId = await cloudSession;
-            if (sessionId) await logCloudAlert(sessionId, result.fatigueScore);
+            if (sessionId) await logCloudAlert(sessionId, result.fatigueScore, occurredAt);
           })
           .catch(() => {});
       }

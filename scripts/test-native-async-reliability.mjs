@@ -833,3 +833,26 @@ test('native success requires the matching stored ended row before acknowledging
   assert.equal((await f.api.getPendingCloudSummaryState()).count,0);
  }
 });
+
+// Alert events carry the time they were detected, not the time they arrive.
+const eventBodies = f => f.requests.filter(request => request.url.endsWith('/api/events')).map(request => JSON.parse(request.init.body));
+test('a native alert sends the detection time it was given', async () => {
+  const f = cloudFixture(auth('driver', 4000000000), { consent: true });
+  const detected = '2026-10-25T17:00:00.000Z';
+  assert.equal(await f.api.logCloudAlert('session', 61.4, detected), true);
+  assert.deepEqual(eventBodies(f), [{ session_id: 'session', type: 'drowsy', fatigue_score: 61, occurred_at: detected }]);
+});
+test('a rejected detection time is resent once for the server to stamp', async () => {
+  const f = cloudFixture(auth('driver', 4000000000), { consent: true });
+  f.transport = async (url, options) => url.endsWith('/api/events') && JSON.parse(options.body).occurred_at
+    ? response(400, { ok: false, error: 'invalid_occurred_at' }) : response(200, { ok: true });
+  assert.equal(await f.api.logCloudAlert('session', 40, '2030-01-01T00:00:00.000Z'), true);
+  assert.deepEqual(eventBodies(f).map(body => body.occurred_at ?? null), ['2030-01-01T00:00:00.000Z', null]);
+});
+test('other event failures and untimed alerts are not resent', async () => {
+  const f = cloudFixture(auth('driver', 4000000000), { consent: true });
+  f.transport = async url => url.endsWith('/api/events') ? response(409, { ok: false, error: 'session_ended' }) : response(200, { ok: true });
+  assert.equal(await f.api.logCloudAlert('session', 40, '2026-10-25T17:00:00.000Z'), false);
+  assert.equal(await f.api.logCloudAlert('session', 40), false);
+  assert.deepEqual(eventBodies(f).map(body => Object.hasOwn(body, 'occurred_at')), [true, false]);
+});

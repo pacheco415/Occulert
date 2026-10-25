@@ -588,14 +588,22 @@ export async function beginCloudSession(): Promise<string | null> {
   return sessionId;
 }
 
-export async function logCloudAlert(sessionId: string, fatigueScore: number): Promise<boolean> {
+// occurredAt is captured when the alert is detected, before any queue wait.
+export async function logCloudAlert(sessionId: string, fatigueScore: number, occurredAt?: string): Promise<boolean> {
   const syncContext = await currentSyncContext();
   if (!syncContext) return false;
-  const result = await backendApi('POST', '/api/events', {
+  const event = {
     session_id: sessionId,
     type: 'drowsy',
     fatigue_score: Math.max(0, Math.min(100, Math.round(fatigueScore))),
-  }, true, syncContext);
+  };
+  const timed = occurredAt && Number.isFinite(Date.parse(occurredAt)) ? { ...event, occurred_at: occurredAt } : event;
+  let result = await backendApi<{ error?: string }>('POST', '/api/events', timed, true, syncContext);
+  // The server bounds occurred_at by its own clock and the session's start. If
+  // this phone's clock disagrees, send once more and let the server stamp it.
+  if (timed !== event && result.status === 400 && result.body?.error === 'invalid_occurred_at') {
+    result = await backendApi('POST', '/api/events', event, true, syncContext);
+  }
   return result.ok;
 }
 
