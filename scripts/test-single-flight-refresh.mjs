@@ -14,17 +14,18 @@ const owner = { id: 'owner-a', email: 'owner@example.com' };
 const session = (name, expiresIn, user = owner) => ({ access_token: `${name}-access`, refresh_token: `${name}-refresh`, expires_at: now() + expiresIn, user });
 const rotated = { access_token: 'rotated-access', refresh_token: 'rotated-refresh', expires_in: 3600, user: owner };
 
-function boot({ auth, refresh = () => json(rotated), locks }) {
-  const store = new Map(), requests = [], refreshes = [];
+function boot({ auth, refresh = () => json(rotated), password = () => json(rotated), locks }) {
+  const store = new Map(), requests = [], refreshes = [], listeners = new Map();
   if (auth) store.set('occulert-auth', JSON.stringify(auth));
   const context = {
-    window: { location: { origin: 'https://www.occulert.com', pathname: '/fleet-dashboard.html', search: '', hash: '' }, history: { replaceState() {} } },
+    window: { location: { origin: 'https://www.occulert.com', pathname: '/fleet-dashboard.html', search: '', hash: '' }, history: { replaceState() {} }, addEventListener: (name, listener) => listeners.set(name, listener) },
     localStorage: { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key) },
     navigator: { platform: 'fixture', userAgent: 'fixture', ...(locks ? { locks } : {}) },
     async fetch(url, options = {}) {
       url = String(url);
       if (url === '/api/public-config') return json({ supabase: { configured: true, url: 'https://example.supabase.co', anonKey: 'public-key' } });
       if (url.includes('grant_type=refresh_token')) { refreshes.push(JSON.parse(options.body).refresh_token); return refresh(); }
+      if (url.includes('grant_type=password')) return password();
       requests.push({ url, authorization: options.headers && options.headers.Authorization });
       return json({ ok: true, fleet: { id: 'fleet-1' }, invitations: [], drivers: [], sessions: [], events: [] });
     },
@@ -34,7 +35,7 @@ function boot({ auth, refresh = () => json(rotated), locks }) {
   context.window.navigator = context.navigator;
   vm.createContext(context);
   vm.runInContext(source, context);
-  return { backend: context.window.OcculertBackend, store, requests, refreshes, stored: () => JSON.parse(store.get('occulert-auth') || 'null') };
+  return { backend: context.window.OcculertBackend, store, requests, refreshes, stored: () => JSON.parse(store.get('occulert-auth') || 'null'), storageChanged: () => listeners.get('storage')?.({ key: 'occulert-auth' }) };
 }
 
 test('three fleet calls with an expired token share one refresh and all succeed', async () => {
@@ -93,10 +94,28 @@ test('a newer session another tab stored while this tab waited is reused without
   const pending = h.backend.getSession();
   await tick();
   h.store.set('occulert-auth', JSON.stringify(session('other-tab', 3600)));
+  h.storageChanged();
   release();
   assert.equal((await pending).access_token, 'other-tab-access');
   assert.deepEqual(h.refreshes, [], 'the other tab already rotated the refresh token');
   assert.equal(h.stored().access_token, 'other-tab-access');
+});
+
+test('a second queued flight reuses the first rotation of a newer same-user token', async () => {
+  const releases = [];
+  const locks = { request(name, task) { return new Promise(resolve => { releases.push(() => resolve(task())); }); } };
+  const h = boot({ auth: session('old', -10), locks });
+  const first = h.backend.getSession();
+  await tick();
+  h.store.set('occulert-auth', JSON.stringify(session('other-tab', 30)));
+  h.storageChanged();
+  const second = h.backend.getSession();
+  await tick();
+  releases[0]();
+  assert.equal((await first).access_token, 'rotated-access');
+  releases[1]();
+  assert.equal((await second).access_token, 'rotated-access');
+  assert.deepEqual(h.refreshes, ['other-tab-refresh'], 'internal rotation must remain reusable by another queued flight');
 });
 
 test('a different account stored while waiting is never refreshed or overwritten', async () => {
@@ -107,10 +126,43 @@ test('a different account stored while waiting is never refreshed or overwritten
   await tick();
   const other = session('owner-b', 3600, { id: 'owner-b', email: 'b@example.com' });
   h.store.set('occulert-auth', JSON.stringify(other));
+  h.storageChanged();
   release();
   await assert.rejects(pending, { code: 'auth_session_changed' });
   assert.deepEqual(h.refreshes, []);
   assert.equal(h.stored().user.id, 'owner-b');
+});
+
+test('a sign-in begun while refresh waits for its Web Lock wins without refreshing the old account', async () => {
+  let release, respond;
+  const locks = { request(name, task) { return new Promise(resolve => { release = () => resolve(task()); }); } };
+  const other = session('owner-b', 3600, { id: 'owner-b', email: 'b@example.com' });
+  const h = boot({ auth: session('old', -10), locks, password: () => new Promise(resolve => { respond = resolve; }) });
+  const pending = h.backend.getSession();
+  const rejected = assert.rejects(pending, { code: 'auth_session_changed' });
+  await tick();
+  const login = h.backend.signIn('b@example.com', 'fixture-password');
+  await tick();
+  release();
+  await rejected;
+  assert.deepEqual(h.refreshes, [], 'an older queued operation must not refresh after a newer sign-in begins');
+  respond(json(other));
+  assert.equal((await login).status, 200);
+  assert.equal(h.stored().user.id, 'owner-b');
+});
+
+test('a same-user sign-in completed while refresh waits invalidates the queued operation', async () => {
+  let release;
+  const locks = { request(name, task) { return new Promise(resolve => { release = () => resolve(task()); }); } };
+  const h = boot({ auth: session('old', -10), locks });
+  const pending = h.backend.getSession();
+  const rejected = assert.rejects(pending, { code: 'auth_session_changed' });
+  await tick();
+  h.backend.adoptSession(session('new-login', 3600));
+  release();
+  await rejected;
+  assert.deepEqual(h.refreshes, []);
+  assert.equal(h.stored().access_token, 'new-login-access');
 });
 
 test('an unusable Web Locks API falls back to an unlocked refresh', async () => {
