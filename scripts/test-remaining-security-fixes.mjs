@@ -4,6 +4,7 @@ import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import test from 'node:test';
 import { createSettingPersister } from '../native-app/lib/settingPersistence.ts';
 import {
@@ -468,6 +469,39 @@ test('legacy monitors are retired and stale auth helpers are never cached', () =
   const assetList = sw.slice(sw.indexOf('const STATIC_ASSETS'), sw.indexOf('];') + 2);
   assert.doesNotMatch(assetList, /occulert-backend\.v47\.js|auth-helper\.v47\.js/);
   assert.match(sw, /NETWORK_ONLY_ASSETS/);
+});
+
+test('runtime cache writes require the exact worker origin', async () => {
+  const trustedOrigin = 'https://www.occulert.com';
+  for (const origin of [trustedOrigin, `${trustedOrigin}.example.net`]) {
+    const listeners = {}, writes = [];
+    const response = new Response('runtime fixture');
+    runInNewContext(read('sw.js'), {
+      URL, Request, Response,
+      fetch: async () => response,
+      caches: {
+        match: async () => undefined,
+        open: async () => ({
+          put: async request => { writes.push(request.url); },
+        }),
+      },
+      self: {
+        location: { origin: trustedOrigin },
+        addEventListener: (name, handler) => { listeners[name] = handler; },
+      },
+    });
+    const request = new Request(`${origin}/runtime-security-probe.txt`);
+    let result;
+    listeners.fetch({
+      request,
+      respondWith: promise => { result = promise; },
+    });
+    const returned = await result;
+    // Runtime cache writes finish outside the response promise.
+    await new Promise(setImmediate);
+    assert.equal(await returned.text(), 'runtime fixture');
+    assert.deepEqual(writes, origin === trustedOrigin ? [request.url] : []);
+  }
 });
 
 test('claims, outreach, offline wording, and localized safety copy are bounded', () => {

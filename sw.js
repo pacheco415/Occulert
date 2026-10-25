@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v139';
+const CACHE = 'occulert-v140';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -327,7 +327,7 @@ self.addEventListener('fetch', event => {
       if (match) return match;
       const integrity = url.origin === self.location.origin && RUNTIME_INTEGRITY.get(url.pathname);
       return fetch(integrity ? new Request(req, { integrity }) : req).then(res => {
-        if (res && res.ok && req.url.startsWith(self.location.origin)) {
+        if (res && res.ok && url.origin === self.location.origin) {
           const copy = res.clone();
           caches.open(CACHE).then(cache => cache.put(req, copy));
         }
