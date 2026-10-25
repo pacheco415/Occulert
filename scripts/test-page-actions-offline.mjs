@@ -50,3 +50,29 @@ for (const failure of ['none', 'dispatcher', 'guard-missing', 'guard-integrity']
     }
   });
 }
+
+test('the runtime cache stores only exact same-origin responses, not look-alike hosts', async () => {
+  const events = new Map(), stored = [];
+  const context = {
+    Request, URL, Headers, Response, AbortController, Uint8Array, setTimeout, clearTimeout,
+    WebAssembly: { validate: () => false },
+    self: { location: { origin: 'https://www.occulert.com' }, addEventListener: (name, handler) => events.set(name, handler) },
+    fetch: async () => new Response('fixture bytes', { status: 200 }),
+    caches: {
+      match: async () => undefined,
+      open: async () => ({ put: async request => { stored.push(new URL(request.url).href); } }),
+    },
+  };
+  vm.runInNewContext(readFileSync('sw.js', 'utf8'), context);
+  for (const href of [
+    'https://www.occulert.com/fixture-runtime.png',
+    'https://www.occulert.com.example.net/fixture-runtime.png',
+    'https://cdn.example.net/fixture-runtime.png',
+  ]) {
+    let responded;
+    events.get('fetch')({ request: new Request(href), respondWith: promise => { responded = promise; }, waitUntil() {} });
+    assert.equal((await responded).status, 200, href);
+  }
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(stored, ['https://www.occulert.com/fixture-runtime.png']);
+});
