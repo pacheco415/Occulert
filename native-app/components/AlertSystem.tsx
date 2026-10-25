@@ -1,5 +1,6 @@
 import React, { useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useAlertAudioPlayer } from '../hooks/useAlertAudioPlayer';
 import { sendAlertToWatch, sendMonitoringStatusToWatch } from '../lib/watchBridge';
@@ -28,6 +29,7 @@ import {
 import { alertDeliveryPlan, deliverCueIfCurrent } from '../lib/alertDelivery';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
+import { MonitorAlertPortal, useMonitorAlertDock } from './MonitorLayout';
 
 export type { AlertLevel } from '../lib/alertPolicy';
 
@@ -73,6 +75,8 @@ export function AlertSystem({
   inline = false,
 }: AlertSystemProps) {
   const { reduceMotion } = useAccessibilityPreferences();
+  const insets = useSafeAreaInsets();
+  const docked = useMonitorAlertDock();
   const sessionTime = sessionStartedAt === null
     ? 0
     : Math.max(0, Math.floor(((sessionEndedAt ?? Date.now()) - sessionStartedAt) / 1_000));
@@ -336,8 +340,13 @@ export function AlertSystem({
   if (level === 'none') return null;
 
   const cfg = CONFIGS[level];
-  return (
-    <Animated.View style={[s.banner, !inline && s.floatingBanner, { backgroundColor: cfg.bg, borderColor: cfg.border, transform: inline ? undefined : [{ scale: pulse }] }]}
+  const banner = (
+    <Animated.View style={[s.banner, !inline && (docked ? s.dockedBanner : s.floatingBanner), !inline && !docked && {
+      top: insets.top,
+      left: insets.left + 16,
+      right: insets.right + 16,
+    }, { backgroundColor: cfg.bg, borderColor: cfg.border, transform: inline || docked ? undefined : [{ scale: pulse }] }]}
+      pointerEvents={inline ? 'auto' : 'none'}
       accessibilityRole="alert" accessibilityLabel={cfg.title}>
       <Text style={s.icon}>{cfg.icon}</Text>
       <View style={s.txt}>
@@ -346,6 +355,7 @@ export function AlertSystem({
       </View>
     </Animated.View>
   );
+  return inline ? banner : <MonitorAlertPortal>{banner}</MonitorAlertPortal>;
 }
 
 const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;color:string;subColor:string;icon:string;title:string;sub:string }> = {
@@ -356,7 +366,8 @@ const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;colo
 };
 
 const s = StyleSheet.create({
-  floatingBanner: { position:'absolute', top:132, left:16, right:16, zIndex:2 },
+  floatingBanner: { position:'absolute', zIndex:2 },
+  dockedBanner: { marginHorizontal: 16, marginBottom: 8 },
   banner: { flexDirection:'row', alignItems:'center', gap:14, borderWidth:1.5, borderRadius:16, padding:18 },
   icon: { fontSize:28 },
   txt:  { flex:1 },

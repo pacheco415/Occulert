@@ -64,7 +64,8 @@
     "@babel/plugin-transform-react-jsx": "7.29.7",
     "@types/react": "~19.3.0",
     "react-test-renderer": "19.3.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "yoga-layout": "3.2.1"
   },
   "private": true,
   "overrides": {

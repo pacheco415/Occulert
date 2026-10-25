@@ -497,6 +497,8 @@ function alertFixture() {
     ...h.React, React: h.React, require: () => 'sound',
     Animated: { Value: class { stopAnimation() {} setValue() {} } },
     useAccessibilityPreferences: () => ({ reduceMotion: true }),
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+    useMonitorAlertDock: () => false,
     useAlertAudioPlayer: () => ({ player: { pause() {} } }),
     loadAlertPreferences: async () => {}, configureAlertAudioMode: async () => {},
     currentAlertPreferences: () => ({ audioEnabled: false, hapticEnabled: false }),
