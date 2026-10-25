@@ -15,7 +15,6 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  Camera,
   type CameraRuntimeError,
   useCameraDevice,
   useCameraPermission,
@@ -37,6 +36,7 @@ import { useEyeTracking } from '../hooks/useEyeTracking';
 import { deliverCueIfCurrent } from '../lib/alertDelivery';
 import { AlertSystem, type AlertTimingEvent } from '../components/AlertSystem';
 import { CameraSetupGuide } from '../components/CameraSetupGuide';
+import { MonitorCaptureCamera, type CaptureConfigurationChange } from '../components/MonitorCaptureCamera';
 import { LiveMetrics } from '../components/LiveMetrics';
 import { GlassSurface } from '../components/GlassSurface';
 import { MonitorLayout } from '../components/MonitorLayout';
@@ -114,6 +114,7 @@ import {
 import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
 import { modalAnimationType } from '../lib/accessibilityPreferencesModel';
 import { createSensorFusionObservationTracker } from '../lib/sensorFusionObservation';
+import { createCaptureTransitionGuard } from '../lib/captureLoadPolicy';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -217,6 +218,7 @@ export default function MonitorScreen() {
   const cloudSessionRef = useRef<Promise<string | null> | null>(null);
   const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastSampleAtRef = useRef(0);
+  const captureTransitionRef = useRef(createCaptureTransitionGuard());
   const hasCameraSampleRef = useRef(false);
   const cameraEpochRef = useRef(0);
   const cameraRestartCountRef = useRef(0);
@@ -565,6 +567,7 @@ export default function MonitorScreen() {
       displayedMetricsStateRef.current = 'noFace';
       displayedAlertLevelRef.current = 'none';
       cameraRestartCountRef.current = 0;
+      captureTransitionRef.current.reset();
       cameraRecoveringRef.current = false;
       setCameraRecovering(false);
 
@@ -693,6 +696,7 @@ export default function MonitorScreen() {
     cloudEventQueueRef.current = Promise.resolve();
     isRunningRef.current = false;
     setIsRunning(false);
+    captureTransitionRef.current.reset();
     cameraRecoveringRef.current = false;
     setCameraRecovering(false);
     reset();
@@ -818,6 +822,18 @@ export default function MonitorScreen() {
     return () => subscription.remove();
   }, [deliverMonitoringPausedCue]);
 
+  const handleCaptureConfiguration = useCallback(({ key, configuration }: CaptureConfigurationChange) => {
+    if (!isRunningRef.current || stoppingRef.current) return;
+    const graceGranted = captureTransitionRef.current.observe({
+      key,
+      at: Date.now(),
+      lastSampleAt: lastSampleAtRef.current,
+      hasSample: hasCameraSampleRef.current,
+      stallTimeoutMs: SENSOR_STALL_MS,
+    });
+    performanceTrackerRef.current.recordCaptureLoad(configuration, graceGranted);
+  }, []);
+
   const attemptCameraRecovery = useCallback(() => {
     if (
       stoppingRef.current
@@ -840,7 +856,9 @@ export default function MonitorScreen() {
     if (!isRunning) return;
     const watchdog = setInterval(() => {
       const timeoutMs = hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS;
-      if (stoppingRef.current || Date.now() - lastSampleAtRef.current <= timeoutMs) return;
+      const now = Date.now();
+      if (stoppingRef.current || now - lastSampleAtRef.current <= timeoutMs) return;
+      if (captureTransitionRef.current.shouldDefer(now, lastSampleAtRef.current)) return;
       performanceTrackerRef.current.recordCameraStall();
       if (attemptCameraRecovery()) return;
       const message = 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.';
@@ -1254,8 +1272,11 @@ export default function MonitorScreen() {
         attentionKey={sensorFault || (cameraRecovering ? 'camera-recovering' : isRunning ? `${metrics.state}:${visibleAlertLevel}:${frontCameraIdentity?.streamingType ?? 'unknown'}` : `parked:${frontCameraIdentity?.streamingType ?? 'unknown'}`)}
         camera={
           (isRunning || setupPreviewActive) ? (
-            <Camera
+            <MonitorCaptureCamera
               key={`front-camera-${cameraEpoch}`}
+              loadMode={cameraLoadPolicy.mode}
+              monitoring={isRunning}
+              onCaptureConfiguration={handleCaptureConfiguration}
               style={StyleSheet.absoluteFill}
               device={device}
               isActive={isRunning || setupPreviewActive}

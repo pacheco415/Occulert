@@ -14,6 +14,7 @@ import * as monitorPerformance from '../native-app/lib/monitorPerformance.ts';
 import * as monitorLifecycle from '../native-app/lib/monitorLifecycle.ts';
 import * as cameraSetup from '../native-app/lib/cameraSetup.ts';
 import * as cameraResilience from '../native-app/lib/cameraResilience.ts';
+import * as captureLoadPolicy from '../native-app/lib/captureLoadPolicy.ts';
 import * as monitorThresholds from '../native-app/constants/thresholds.ts';
 import * as eyeBaselineModel from '../native-app/lib/eyeBaselineModel.ts';
 import * as sensorFusion from '../native-app/lib/sensorFusionObservation.ts';
@@ -397,7 +398,7 @@ function monitorCameraStartFixture(stage) {
     + '\nreturn {handleStart,handleStop,toggleSetupPreview,onEyeState,eyeBaseline,isRunning,baselineMessage};\n}';
   const api = load(component, ['MonitorScreen'], {
     ...h.React, React: h.React, ...frontCameraPolicy, ...monitorPerformance, ...monitorLifecycle,
-    ...cameraSetup, ...cameraResilience, ...monitorThresholds, ...eyeBaselineModel,
+    ...cameraSetup, ...cameraResilience, ...captureLoadPolicy, ...monitorThresholds, ...eyeBaselineModel,
     ...sensorFusion, ...sessionCompletion, ...monitorAlertPolicy, HeadNodDetector,
     EYE_BASELINE_EXPERIMENT: true, Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
     useRouter: () => router, useAccessibilityPreferences: () => ({ reduceMotion: true }),

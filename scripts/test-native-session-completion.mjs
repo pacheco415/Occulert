@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import vm from 'node:vm';
 import {elapsedSessionSeconds} from '../native-app/lib/monitorPerformance.ts';
+import {createCaptureTransitionGuard} from '../native-app/lib/captureLoadPolicy.ts';
 import {saveCompletedNativeSession,markCompletedNativeSessionSynced,finalizeCompletedNativeSession,completeNativeSessionStop} from '../native-app/lib/sessionCompletion.ts';
 const snapshot={sessionId:'local',durationSec:60,alerts:2,fatigueSum:91,fatigueSamples:3,headNodObservations:4,headphoneHeadNodObservations:1,headphoneMotionSamples:12,headphoneMotionStatus:'ready',monitorPerformance:{bounded:true},sensorFusion:{observationOnly:true},sensitivity:'medium',extra:{appVersion:'1.0.0'}};
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}}
@@ -83,9 +84,12 @@ test('the actual monitor preserves unobserved metrics, disarms before saving and
  const source=readFileSync(new URL('../native-app/app/monitor.tsx',import.meta.url),'utf8');
  const start=source.indexOf('  const handleStop = useCallback('),end=source.indexOf('  // App-state and hardware-back',start);assert.ok(start>=0&&end>start);
  const pendingSave=deferred(),order=[];
+ const captureTransition=createCaptureTransitionGuard();
+ captureTransition.observe({key:'30',at:10000,lastSampleAt:10000,hasSample:true,stallTimeoutMs:5000});
+ captureTransition.observe({key:'15',at:11000,lastSampleAt:10000,hasSample:true,stallTimeoutMs:5000});
  class FixedDate extends Date {static now(){return 12000}}
  const ref=current=>({current});
- const context={Date:FixedDate,useCallback:fn=>fn,__DEV__:false,elapsedSessionSeconds,completeNativeSessionStop,finalizeCompletedNativeSession,
+ const context={Date:FixedDate,useCallback:fn=>fn,__DEV__:false,elapsedSessionSeconds,completeNativeSessionStop,finalizeCompletedNativeSession,captureTransitionRef:ref(captureTransition),
   startAttemptRef:ref(0),stoppingRef:ref(false),isRunningRef:ref(true),sessionStartedAtRef:ref(1000),alertCountRef:ref(2),activeSessionIdRef:ref('local'),fatigueSamplesRef:ref(sampleCount),fatigueSumRef:ref(sampleCount?40:0),maxFatigueRef:ref(40),cloudSessionRef:ref(Promise.resolve('cloud')),cloudEventQueueRef:ref(Promise.resolve()),performanceTrackerRef:ref({snapshot:()=>({bounded:true})}),monitoringActiveRef:ref(true),cameraRecoveringRef:ref(false),
   setIsStopping:value=>order.push('stopping:'+value),setSessionEndedAt:()=>{},setIsRunning:()=>{},setCameraRecovering:()=>{},reset:()=>order.push('reset'),stopHeadphoneMotion:()=>Promise.resolve(),
   saveSession:async(id,duration,alerts)=>{assert.equal(context.monitoringActiveRef.current,false);assert.equal(context.isRunningRef.current,false);assert.equal(context.cloudSessionRef.current,null);assert.equal(duration,11);assert.equal(alerts,2);order.push('save:'+id);await pendingSave.promise;return id},
@@ -93,6 +97,7 @@ test('the actual monitor preserves unobserved metrics, disarms before saving and
  };
  vm.runInNewContext(stripTypeScriptTypes(source.slice(start,end))+'\nglobalThis.stop=handleStop;',context);
  const first=context.stop();await new Promise(resolve=>setImmediate(resolve));await context.stop();
+ assert.equal(captureTransition.shouldDefer(12000,10000),false,'stopping clears the previous capture-transition grace before persistence');
  assert.equal(order.filter(item=>item==='save:local').length,1);assert.equal(order.includes('cloud'),false);
  pendingSave.resolve();await first;
  assert.deepEqual(order,['stopping:true','reset','save:local','cleared','cloud','badge','stopping:false']);
