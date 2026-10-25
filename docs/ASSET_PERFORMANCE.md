@@ -10,4 +10,9 @@ measures 37,353 raw bytes, 8,957 gzip bytes and 7,698 Brotli bytes, compared wit
 35,940 / 8,657 / 7,445 for v84. The 1,413-byte raw increase implements session
 revocation without blocking local sign-out or writing refreshed credentials.
 
+The single-flight refresh release raises it to 40 KB. `occulert-backend.v87.js`
+measures 39,084 raw bytes and 9,431 gzip bytes. The 1,731-byte raw increase
+shares one refresh per refresh token in a tab, refreshes 60 seconds before
+expiry and serializes refreshes across tabs with a Web Lock.
+
 The selected set covers frequently loaded first-party entry assets. It does not represent the complete request waterfall, MediaPipe/WASM/model sizes, real-device heat or battery use. Existing startup and browser checks test behavior; physical-device startup measurements remain separate evidence.
