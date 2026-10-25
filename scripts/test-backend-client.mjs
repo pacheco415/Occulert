@@ -34,6 +34,7 @@ async function fetchMock(url, options = {}) {
   if (String(url).includes("/auth/v1/signup")) return response({ user: { id: "pending-user", email: "new@example.com" } });
   if (String(url).includes("/auth/v1/resend")) return response({});
   if (String(url).includes("/auth/v1/recover")) return response({});
+  if (String(url).includes("/auth/v1/logout?scope=local")) return new Response(null, { status: 204 });
   if (String(url).includes("/auth/v1/user") && (options.method || "GET") === "GET") {
     return response({ id: "user-1", email: "driver@example.com" });
   }
@@ -205,6 +206,7 @@ function refreshHarness() {
       requests.push(String(url));
       if (url === '/api/public-config') return Promise.resolve(response({ supabase: { configured: true, url: 'https://example.supabase.co', anonKey: 'public' } }));
       if (String(url).includes('grant_type=refresh_token')) return new Promise(resolve => pending.push(resolve));
+      if (String(url).endsWith('/auth/v1/logout?scope=local')) return Promise.resolve(new Response(null, { status: 204 }));
       if (String(url).includes('/api/fleet-summary') || String(url).endsWith('/auth/v1/user')) return new Promise(resolve => protectedPending.push(resolve));
       throw new Error('Unexpected protected request after superseded auth: ' + url);
     },
@@ -230,6 +232,10 @@ for (const status of [200, 400]) {
     else if (replacement === 'other-tab') h.storage.set('occulert-auth', JSON.stringify(h.fresh));
     else h.backend.adoptSession(replacement === 'same-session' ? h.expired : h.fresh);
     const expected = h.storage.get('occulert-auth');
+    if (replacement === 'signout') {
+      await waitForRefresh(h, 2);
+      h.pending[1](response({ access_token: 'revoke-access', refresh_token: 'revoke-refresh', expires_in: 3600, user: { id: 'owner-a' } }));
+    }
     h.pending[0](response({ access_token: 'late-access', refresh_token: 'late-refresh', user: { id: 'owner-a' }, expires_in: 3600 }, status));
     await rejected;
     assert.equal(h.storage.get('occulert-auth'), expected, `late ${status} response must preserve ${replacement}`);
@@ -387,6 +393,168 @@ for (const stalledStage of ['fetch', 'body']) {
   assert.equal(configCalls, 2);
   assert.ok(transport.includes('https://current.supabase.co/auth/v1/token?grant_type=refresh_token'));
   assert.ok(!transport.some(url => String(url).includes('discarded.supabase.co')));
+}
+
+function signOutHarness() {
+  const storage = new Map(), requests = [], timers = new Map(), logged = [];
+  let nextTimer = 0, blockStorage = false;
+  const session = {
+    access_token: 'captured-access', refresh_token: 'captured-refresh',
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    user: { id: 'captured-owner', email: 'fixture@example.com' },
+  };
+  const hooks = {
+    config: () => response({ supabase: { configured: true, url: 'https://example.supabase.co', anonKey: 'fixture-public' } }),
+    refresh: () => response({ access_token: 'revocation-access', refresh_token: 'revocation-refresh', expires_in: 3600, user: session.user }),
+    logout: () => new Response(null, { status: 204 }),
+  };
+  const window = {};
+  vm.runInNewContext(clientSource, {
+    window, navigator: {}, Response, ReadableStream, TextEncoder, URLSearchParams,
+    Date, JSON, Promise, AbortController,
+    console: { log: (...args) => logged.push(args), warn: (...args) => logged.push(args), error: (...args) => logged.push(args) },
+    localStorage: {
+      getItem: key => storage.get(key) ?? null,
+      setItem(key, value) { if (blockStorage) throw Error('Storage unavailable'); storage.set(key, String(value)); },
+      removeItem(key) { if (blockStorage) throw Error('Storage unavailable'); storage.delete(key); },
+    },
+    fetch(url, options = {}) {
+      requests.push({ url: String(url), options });
+      if (url === '/api/public-config') return hooks.config(options);
+      if (String(url).endsWith('/auth/v1/token?grant_type=refresh_token')) return hooks.refresh(options);
+      if (String(url).endsWith('/auth/v1/logout?scope=local')) return hooks.logout(options);
+      throw Error('Unexpected revocation endpoint');
+    },
+    setTimeout(fn, delay) { const id = ++nextTimer; timers.set(id, { fn, delay }); return id; },
+    clearTimeout: id => timers.delete(id),
+  });
+  const backend = window.OcculertBackend;
+  backend.adoptSession(session);
+  return {
+    backend, hooks, requests, timers, storage, logged, session,
+    blockStorage() { blockStorage = true; },
+    expire() { for (const [id, timer] of [...timers]) { timers.delete(id); timer.fn(); } },
+  };
+}
+async function flushSignOut() {
+  for (let i = 0; i < 8; i++) await new Promise(setImmediate);
+}
+const refreshRequests = h => h.requests.filter(r => r.url.includes('grant_type=refresh_token'));
+const logoutRequests = h => h.requests.filter(r => r.url.includes('/auth/v1/logout'));
+
+{
+  const h = signOutHarness();
+  assert.equal(h.backend.signOut(), undefined, 'web sign-out remains synchronous');
+  assert.equal(h.backend.currentUser(), null);
+  assert.equal(h.storage.has('occulert-auth'), false, 'local credentials clear before network work');
+  h.backend.signOut();
+  await flushSignOut();
+  assert.equal(refreshRequests(h).length, 0);
+  assert.equal(logoutRequests(h).length, 1, 'a second local sign-out cannot revoke twice');
+  const { url, options } = logoutRequests(h)[0];
+  assert.equal(new URL(url).search, '?scope=local');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers.apikey, 'fixture-public');
+  assert.equal(options.headers.Authorization, 'Bearer captured-access');
+  assert.equal(options.keepalive, true);
+  assert.equal(options.redirect, 'error');
+  assert.equal(h.timers.size, 0);
+  assert.equal(h.logged.length, 0);
+}
+
+for (const owner of ['captured-owner', 'other-owner']) {
+  const h = signOutHarness();
+  h.backend.adoptSession({ ...h.session, expires_at: 1 });
+  let finishRefresh;
+  h.hooks.refresh = () => new Promise(resolve => { finishRefresh = resolve; });
+  h.backend.signOut();
+  assert.equal(h.backend.currentUser(), null);
+  await flushSignOut();
+  assert.equal(refreshRequests(h).length, 1);
+  assert.equal(JSON.parse(refreshRequests(h)[0].options.body).refresh_token, 'captured-refresh');
+  assert.equal(refreshRequests(h)[0].options.headers.apikey, 'fixture-public');
+  assert.equal(logoutRequests(h).length, 0);
+  const replacement = { ...h.session, access_token: 'new-login-access', refresh_token: 'new-login-refresh', user: { id: owner, email: 'new@example.com' } };
+  h.backend.adoptSession(replacement);
+  const saved = h.storage.get('occulert-auth');
+  finishRefresh(response({ access_token: 'revocation-access', refresh_token: 'rotated-old-refresh', expires_in: 3600, user: h.session.user }));
+  await flushSignOut();
+  assert.equal(logoutRequests(h).length, 1);
+  assert.equal(logoutRequests(h)[0].options.headers.Authorization, 'Bearer revocation-access');
+  assert.equal(h.storage.get('occulert-auth'), saved, 'revocation must not save tokens or overwrite a new login');
+  assert.equal(h.backend.currentUser().id, owner);
+  assert.equal(h.timers.size, 0);
+}
+
+for (const invalid of [
+  { status: 401, body: { error: 'invalid_refresh_token' } },
+  { status: 503, body: { error: 'unavailable' } },
+  { body: { access_token: 'wrong-owner-access', expires_in: 3600, user: { id: 'other-owner' } } },
+  { body: { access_token: 'bad-header\n', expires_in: 3600, user: { id: 'captured-owner' } } },
+  { body: { expires_in: 3600, user: { id: 'captured-owner' } } },
+  { body: { access_token: 'expired-access', expires_in: 0, user: { id: 'captured-owner' } } },
+  { body: { access_token: 'negative-expiry', expires_in: -1, user: { id: 'captured-owner' } } },
+  { body: { access_token: 'string-expiry', expires_in: '3600', user: { id: 'captured-owner' } } },
+  { body: { access_token: 'missing-expiry', user: { id: 'captured-owner' } } },
+]) {
+  const h = signOutHarness();
+  h.backend.adoptSession({ ...h.session, expires_at: 1 });
+  h.hooks.refresh = () => response(invalid.body, invalid.status || 200);
+  h.backend.signOut();
+  await flushSignOut();
+  assert.equal(refreshRequests(h).length, 1);
+  assert.equal(logoutRequests(h).length, 0, 'failed or invalid refresh cannot revoke an unverified session');
+  assert.equal(h.backend.currentUser(), null);
+  assert.equal(h.storage.has('occulert-auth'), false);
+  assert.equal(h.timers.size, 0);
+  assert.equal(h.logged.length, 0);
+}
+
+for (const blocked of [false, true]) {
+  const h = signOutHarness();
+  if (blocked) h.blockStorage();
+  h.hooks.logout = () => Promise.reject(Error('Offline'));
+  h.backend.signOut();
+  assert.equal(h.backend.currentUser(), null);
+  await flushSignOut();
+  assert.equal(logoutRequests(h).length, 1);
+  assert.equal(await h.backend.getSession(), null, 'offline revocation cannot restore local access');
+  assert.equal(h.timers.size, 0);
+  assert.equal(h.logged.length, 0);
+}
+
+for (const stage of ['config', 'refresh', 'logout']) {
+  for (const phase of ['headers', 'body']) {
+    const h = signOutHarness();
+    if (stage === 'refresh') h.backend.adoptSession({ ...h.session, expires_at: 1 });
+    let resolveHeaders, stream, signal;
+    h.hooks[stage] = options => {
+      signal = options.signal;
+      if (phase === 'headers') return new Promise(resolve => { resolveHeaders = resolve; });
+      return new Response(new ReadableStream({ start(controller) { stream = controller; controller.enqueue(new TextEncoder().encode('{')); } }));
+    };
+    h.backend.signOut();
+    await flushSignOut();
+    assert.equal(h.timers.size, 1, `${stage}/${phase} must have one active deadline`);
+    assert.equal([...h.timers.values()][0].delay, 8000);
+    h.expire();
+    await flushSignOut();
+    assert.equal(signal.aborted, true);
+    assert.equal(h.backend.currentUser(), null);
+    h.backend.adoptSession({ ...h.session, access_token: 'later-login', user: { id: 'later-owner', email: 'later@example.com' } });
+    const saved = h.storage.get('occulert-auth');
+    const lateBody = stage === 'config'
+      ? { supabase: { configured: true, url: 'https://example.supabase.co', anonKey: 'fixture-public' } }
+      : { access_token: 'late-access', expires_in: 3600, user: h.session.user };
+    if (phase === 'headers') resolveHeaders(response(lateBody));
+    else { stream.enqueue(new TextEncoder().encode(JSON.stringify(lateBody).slice(1))); stream.close(); }
+    await flushSignOut();
+    assert.equal(h.storage.get('occulert-auth'), saved);
+    assert.equal(h.timers.size, 0);
+    assert.equal(logoutRequests(h).length, stage === 'logout' ? 1 : 0, 'timed-out work cannot start a later logout');
+    assert.equal(refreshRequests(h).length, stage === 'refresh' ? 1 : 0);
+    assert.equal(h.logged.length, 0);
+  }
 }
 
 console.log("Occulert browser backend client tests passed.");

@@ -250,11 +250,28 @@ async function clearAuth(): Promise<void> {
   authMutationVersion += 1;
   authCache = null;
   authRefreshPromise = null;
+  cloudSessionScopes.clear();
   await Promise.allSettled([
     authStorageQueue.run(() => SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS)),
     cloudSyncPreference.set(false),
     sessionOutbox.clear(),
   ]);
+}
+
+function captureSignOutAuth(): Promise<StoredAuth | null> {
+  if (authCache !== undefined) return Promise.resolve(authCache);
+  // A cold sign-out needs the saved session, not loadAuth's stale-read fallback
+  // (which could resolve a newer login). Queue this raw snapshot before deletion
+  // and later token writes; it never caches or restores the captured credentials.
+  return authStorageQueue.run(async () => {
+    try {
+      const raw = await withCloudReadDeadline(() => SecureStore.getItemAsync(AUTH_KEY, SECURE_OPTIONS));
+      const parsed: unknown = raw ? JSON.parse(raw) : null;
+      return validStoredAuth(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  });
 }
 
 async function authFetch(path: string, body: Record<string, unknown>): Promise<ApiResult<AuthResponse>> {
@@ -494,20 +511,39 @@ export async function signInToCloud(email: string, password: string): Promise<Cl
 
 export async function signOutOfCloud(): Promise<void> {
   // Invalidate pending login/refresh work before any native storage wait.
-  const auth = authCache ?? null;
-  await clearAuth();
-  if (!auth) return;
-  loadConfig().then(config => {
-    if (!config) return;
-    return fetchJsonWithTimeout(`${config.url}/auth/v1/logout`, {
-      method: 'POST',
-      headers: {
-        apikey: config.anonKey,
-        Authorization: `Bearer ${auth.access_token}`,
-      },
-    });
-  }).catch(() => {
-    // Local tokens and consent are already cleared even if revocation is offline.
+  const capturedAuth = captureSignOutAuth();
+  const localClearing = clearAuth();
+  void capturedAuth.then(revokeCapturedSignOutAuth).catch(() => {
+    // Runtime auth/consent are already cleared even if revocation is offline.
+  });
+  await localClearing;
+}
+
+function headerSafeAccessToken(value: unknown): value is string {
+  return typeof value === 'string' && !/\s/.test(value) && /^[A-Za-z0-9._~+/-]+=*$/.test(value);
+}
+
+async function revokeCapturedSignOutAuth(auth: StoredAuth | null): Promise<void> {
+  if (!auth?.user.id) return;
+  const config = await loadConfig();
+  if (!config) return;
+  let accessToken = auth.access_token;
+  if (!(auth.expires_at > Math.floor(Date.now() / 1000))) {
+    if (!auth.refresh_token) return;
+    // Refresh only the captured session. Normal refresh helpers persist auth and
+    // consult the current account, so they must never run on this revocation path.
+    const result = await authFetch('/token?grant_type=refresh_token', { refresh_token: auth.refresh_token });
+    if (!result.ok || result.body.user?.id !== auth.user.id || !headerSafeAccessToken(result.body.access_token)
+      || typeof result.body.expires_in !== 'number' || !Number.isFinite(result.body.expires_in) || result.body.expires_in <= 0) return;
+    accessToken = result.body.access_token;
+  }
+  if (!headerSafeAccessToken(accessToken)) return;
+  await fetchJsonWithTimeout(`${config.url}/auth/v1/logout?scope=local`, {
+    method: 'POST',
+    headers: {
+      apikey: config.anonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 }
 
