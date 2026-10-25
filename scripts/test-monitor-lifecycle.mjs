@@ -130,12 +130,12 @@ test('foreground loss has a packaged spoken warning and explicit visible limitat
   assert.doesNotMatch(monitor, /setIsAudioActiveAsync|keepAudioSessionActive: true/);
 });
 
-test('permission text covers both implemented camera paths without unused location or Health writes', () => {
+test('permission text covers camera paths and required read-only Health disclosures without location access', () => {
   const config = JSON.parse(readFileSync(new URL('../native-app/app.json', import.meta.url), 'utf8')).expo;
   assert.match(config.ios.infoPlist.NSCameraUsageDescription, /front camera.*both cameras/i);
   assert.equal(config.ios.infoPlist.NSLocationWhenInUseUsageDescription, undefined);
   const health = config.plugins.find(plugin => Array.isArray(plugin) && plugin[0] === '@kingstinct/react-native-healthkit');
-  assert.equal(health[1].NSHealthUpdateUsageDescription, false);
+  assert.match(health[1].NSHealthUpdateUsageDescription, /does not write or modify Apple Health data/i);
   const hook = readFileSync(new URL('../native-app/hooks/useAlertAudioPlayer.ts', import.meta.url), 'utf8');
   assert.match(hook, /useLayoutEffect/);
   assert.match(hook, /keepAudioSessionActive: false/);

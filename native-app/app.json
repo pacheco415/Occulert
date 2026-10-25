@@ -60,7 +60,7 @@
         "@kingstinct/react-native-healthkit",
         {
           "NSHealthShareUsageDescription": "Occulert reads recent sleep and heart rate variability data to show optional pre-drive context. This data stays on this iPhone and does not change alerts.",
-          "NSHealthUpdateUsageDescription": false,
+          "NSHealthUpdateUsageDescription": "Occulert does not write or modify Apple Health data. Optional Health access only reads sleep and heart rate variability for private pre-drive context on this iPhone.",
           "background": false
         }
       ],

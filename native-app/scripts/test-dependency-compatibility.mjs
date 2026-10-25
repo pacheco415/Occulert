@@ -10,6 +10,20 @@ import { applyQueryDecoderPatch, patchQueryDecoder } from './patch-query-decoder
 
 const require = createRequire(new URL('../package.json', import.meta.url));
 
+test('generated iOS HealthKit declarations include both Apple-required purpose strings', () => {
+  const cwd = fileURLToPath(new URL('../', import.meta.url));
+  const cli = require.resolve('expo/bin/cli');
+  const config = JSON.parse(execFileSync(process.execPath, [cli, 'config', '--type', 'introspect', '--json'], {
+    cwd, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, EXPO_NO_TELEMETRY: '1' },
+  }));
+  const ios = config._internal.modResults.ios;
+  assert.match(ios.infoPlist.NSHealthShareUsageDescription, /reads.*sleep.*heart rate variability/i);
+  assert.match(ios.infoPlist.NSHealthUpdateUsageDescription, /does not write or modify Apple Health data/i);
+  assert.equal(ios.entitlements['com.apple.developer.healthkit'], true);
+  assert.notEqual(ios.entitlements['com.apple.developer.healthkit.background-delivery'], true);
+});
+
 test('Expo 58, React Native and the React renderer use matching supported versions', () => {
   const expo = require('expo/package.json');
   const bundled = require('expo/bundledNativeModules.json');

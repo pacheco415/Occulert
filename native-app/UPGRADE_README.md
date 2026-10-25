@@ -39,6 +39,16 @@ pipeline. Sensitivity presets do not establish equal accuracy across the two.
 The optional parked eye-baseline flag is experimental and local; keep it off
 for an ordinary release unless a separate experiment is explicitly selected.
 
+Keep both HealthKit purpose strings in the generated iPhone Info.plist. Apple
+rejected build 57 with error 90683 when `NSHealthUpdateUsageDescription` was
+absent: the linked HealthKit library contains APIs that trigger Apple's check
+even though Occulert requests only read access. The required update-purpose
+text explicitly states that Occulert does not write or modify Health data.
+This declaration does not grant write permission; `appleHealth.ts` requests only
+sleep and HRV reads, and Health background delivery remains disabled. Native
+verification introspects Expo's actual generated iOS declarations so this
+requirement is checked after the config plugins run.
+
 Alert tones, directional variants, the monitoring-paused warning and Settings
 sound test are bundled WAV assets. Short-cue players automatically release the
 shared audio session while silent; owned layout cleanup precedes Expo disposal.
