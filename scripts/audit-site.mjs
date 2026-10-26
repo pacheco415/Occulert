@@ -314,7 +314,8 @@ assertIncludes("api/accept-invitation.js", "rpc/accept_fleet_invitation", "invit
 assertIncludes("sw.js", "url.pathname.startsWith('/api/')", "service worker must never intercept or cache API responses");
 assertIncludes("api/sessions.js", "driver_id: \"eq.\" + driver.id", "session updates must be scoped to the authenticated driver's own sessions");
 assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes must verify the session belongs to the authenticated driver");
-assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event GPS latitude must be range validated");
+assertIncludes("api/events.js", "strictNumberOrNull(body.latitude, -90, 90)", "event GPS latitude must reject out-of-range values");
+assertIncludes("api/events.js", "strictNumberOrNull(body.longitude, -180, 180)", "event GPS longitude must reject out-of-range values");
 assertIncludes("api/sessions.js", "validJsonBody(request)", "session API must use bounded shared JSON validation");
 assertIncludes("api/_lib/validation.js", "maxLength = 4096", "shared session JSON validation must retain the request size limit");
 assertIncludes("api/_lib/validation.js", "JSON.stringify(body).length <= maxLength", "shared JSON validation must enforce its limit");
