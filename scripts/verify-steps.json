@@ -91,7 +91,8 @@
     "test:driver-build",
     "test:asset-retirement",
     "test:event-outbox",
-    "test:event-idempotency"
+    "test:event-idempotency",
+    "test:offline-cache-diagnostics"
   ],
   "additionalChecks": [
     "test:verify-runner"
