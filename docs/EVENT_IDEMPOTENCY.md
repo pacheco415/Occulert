@@ -126,7 +126,7 @@ row-lock/unique-key contract; this implementation needs no pgcrypto extension.
 `scripts/test-event-idempotency-concurrency.mjs` starts a fresh PostgreSQL 17
 cluster with synthetic fixtures, a private temporary Unix socket directory and
 TCP disabled. It accepts **no database URL**, cannot target production, and removes
-its cluster on completion/failure. Install the isolated test runtime outside the
+its cluster after confirmed shutdown; uncertain server state preserves the directory. Install the isolated test runtime outside the
 checkout (Linux x64), then run:
 
 ```sh
@@ -145,5 +145,45 @@ PGlite aggregate because it requires a local PostgreSQL process/socket runtime.
 In the current restricted cloud workspace, the pinned binary reports PostgreSQL
 17.10 and initdb succeeds, but server startup fails creating its private Unix
 socket with `Operation not permitted`. Therefore these multi-connection cases
-have **not run**. No alternative networking or permission bypass was attempted.
-Run the harness in an authorized local/staging test environment before activation.
+did **not run in that restricted workspace**. No alternative networking or
+permission bypass was attempted there. The separately approved isolated hosted
+run below subsequently provided real PostgreSQL concurrency evidence.
+
+### Isolated hosted concurrency job and recorded acceptance
+
+`.github/workflows/event-concurrency.yml` prepares a separate ephemeral GitHub
+runner for the six real-connection scenarios. It builds official PostgreSQL
+17.11 from its checksum-pinned source archive under `RUNNER_TEMP`, as the
+unprivileged runner user. It does not install system packages, start a system
+service, request production secrets, accept a database URL, or access Supabase.
+The Node client has its own committed manifest/lockfile under
+`scripts/event-concurrency-runtime`; root/runtime app dependencies are unchanged.
+
+The harness accepts `OCCULERT_PG_BIN` only as an absolute local executable
+directory. It still starts its own fresh synthetic cluster with a private Unix
+socket and TCP disabled. External database configuration is rejected. First-key,
+session-close and deletion races use bounded observed lock waits rather than
+assuming that an arbitrary sleep creates concurrency. Statement/connection
+and workflow timeouts bound failures. The temporary cluster is stopped before
+removal; uncertain shutdown does not delete its data directory.
+
+After all six scenarios and cleanup succeed, the workflow uploads
+`event-concurrency.json` with exact commit, migration SHA-256, PostgreSQL/Node
+versions, scenario names and completion time. A failed run cannot emit a success
+receipt. A successful source build or policy test is **not** real concurrency
+acceptance; require that successful hosted receipt for the exact migration under
+review. The separately approved [hosted run 40384554158](https://github.com/pacheco415/Occulert/actions/runs/40384554158)
+passed all six scenarios on October 26, 2026 at 19:14:29 UTC with PostgreSQL
+17.11 and Node 24.21.0. Its [receipt artifact](https://github.com/pacheco415/Occulert/actions/runs/40384554158/artifacts/12679888028)
+records tested synthetic merge commit `d30968a71de3a11f0c036a6419c20a5fc15bb59e`.
+Its tree `073910947e65763128da4fe7a95995251f813e5e` exactly matches PR head
+`3497af5b9c19a00d50dcfe67e80abac9f598a9ea`; migration SHA-256 is
+`e693e6ee46ccb8380defe4f249fd587cd89cee3777d47eb8d7ac4974190b53ab`.
+This closes the six-scenario SQL concurrency evidence gap for that exact
+migration, not every possible production load or lifecycle condition. A passing
+hosted run does not approve production migration, establish server-side consent
+revocation, or enable retries. Re-run for subsequent migration/harness changes.
+
+Sources verified: [PostgreSQL 17.11 release files](https://ftp.postgresql.org/pub/source/v17.11/),
+[non-root private-prefix source build](https://www.postgresql.org/docs/17/install-make.html),
+and [local socket/TCP configuration](https://www.postgresql.org/docs/17/runtime-config-connection.html).
