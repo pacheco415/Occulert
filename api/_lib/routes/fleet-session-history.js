@@ -2,6 +2,7 @@
 // Cursors exclude newer ordering tuples but are not transactional snapshots:
 // concurrent edits/deletions can still change the visible history.
 const { pgFetch, verifyAccessToken, bearerToken } = require('../supabase');
+const { supabaseErrorStatus } = require('../supabase-errors');
 const { requestHistoryQuery, encodeCursor, validTimestamp, validTuple, compareTuples, compareTimestamps, isUuid } = require('../fleet-history-cursor');
 const PAGE_SIZE = 50;
 const SESSION_SELECT = 'id,driver_id,started_at,ended_at,average_fatigue,max_fatigue,safety_score,alert_count,head_nod_count,detector_pipeline,detector_version,app_version';
@@ -200,7 +201,7 @@ module.exports = async function handler(request, response) {
     if (error && ['invalid_query', 'invalid_cursor'].includes(error.code)) {
       return json(response, 400, { ok: false, error: error.code });
     }
-    return json(response, 502, { ok: false,
+    return json(response, supabaseErrorStatus(error), { ok: false,
       error: error && error.code === 'fleet_history_invalid_response'
         ? 'fleet_history_invalid_response' : 'fleet_history_unavailable' });
   }

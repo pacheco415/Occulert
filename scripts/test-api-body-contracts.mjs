@@ -122,7 +122,7 @@ test('body consolidation retains authentication and owner lookup precedence', as
   assert.equal((await followup.invoke([], 'text/plain')).body.error, 'fleet_not_found'); assert.equal(followup.mutations.length, 0);
   const pilotEntry = cases.find(entry => entry.route === 'pilot-leads');
   for (const allowed of [false, 'outage']) {
-    const pilot = harness(pilotEntry, { pgFetch: async table => { assert.equal(table, 'rpc/check_pilot_lead_rate_limit'); if (allowed === 'outage') throw new Error('outage'); return [{ allowed, retry_after_seconds: 30 }]; } });
+    const pilot = harness(pilotEntry, { pgFetch: async table => { assert.equal(table, 'rpc/check_pilot_lead_rate_limit'); if (allowed === 'outage') throw Object.assign(new Error('supabase_unavailable'), { provider: 'supabase', status: 503 }); return [{ allowed, retry_after_seconds: 30 }]; } });
     const response = await pilot.invoke([]);
     assert.equal(response.status, allowed === 'outage' ? 503 : 429); assert.equal(pilot.mutations.length, 0);
   }

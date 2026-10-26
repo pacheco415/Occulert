@@ -221,6 +221,17 @@ Every API entry point creates one monotonic 12-second provider allowance, isolat
 
 Responses include a generated `X-Occulert-Request-ID`. Failed server responses and unhandled exceptions emit a small JSON diagnostic with that ID, bounded status, elapsed milliseconds and an unhandled flag. Diagnostics omit request URLs, headers, bodies, identity, provider response details and exception messages. Use the response ID to locate a failure without collecting driver information. A timeout may follow a committed provider mutation; use the existing idempotent finalization behavior before retrying.
 
+Supabase requests bound complete response bodies to 2 MiB for PostgREST and
+64 KiB for Auth user/admin responses; JWKS retains its existing 64 KiB limit.
+The reader cancels a stream as soon as it exceeds the byte limit and rejects
+an oversized advertised Content-Length before reading. Oversized responses
+fail explicitly rather than returning partial fleet records. Successful
+malformed or oversized responses return 502. Known deadlines return 504;
+Supabase network failures and other upstream 5xx return 503, including HTML
+gateway pages. Existing validation, permission and migration-specific errors
+keep their documented responses, and provider pages are never sent to clients.
+These statuses do not authorize automatic mutation retries.
+
 ### Repeat-safe session starts
 
 `POST /api/sessions` accepts an optional client-generated UUID in `session_id`. The server stores it as the existing session primary key and derives driver and fleet identity from the authenticated profile. Repeating that UUID returns the original owned session, including its original timestamps, provenance, historical fleet and any completed summary. A competing insert is reconciled by an owner-scoped read; a UUID occupied by another driver's session returns `409 session_id_conflict` without exposing the other row. Invalid supplied IDs return `400 invalid_session_id`. Omitting the field preserves server-generated IDs.

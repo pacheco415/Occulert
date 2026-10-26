@@ -5,6 +5,7 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX = 5;
 const crypto = require("node:crypto");
 const { pgFetch } = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const { remainingProviderMs } = require("./_lib/provider-budget");
 // Optional notification metadata excludes contact fields; the ID remains linkable.
 async function notifyStoredLead(lead, leadId) {
@@ -151,8 +152,9 @@ module.exports = async function handler(request, response) {
   let rateLimit;
   try {
     rateLimit = await rateLimitState(request);
-  } catch {
-    return json(response, 503, { ok: false, error: "rate_limit_unavailable" });
+  } catch (error) {
+    const status = error && error.message === "durable_rate_limit_not_configured" ? 503 : supabaseErrorStatus(error);
+    return json(response, status, { ok: false, error: "rate_limit_unavailable" });
   }
   if (rateLimit.limited) {
     response.setHeader("Retry-After", String(rateLimit.retryAfter));
@@ -227,7 +229,7 @@ module.exports = async function handler(request, response) {
 
   let stored = false;
   let storedLeadId = null;
-  let storageError = false;
+  let storageError = null;
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     try {
       const created = await pgFetch("pilot_leads", {
@@ -247,8 +249,8 @@ module.exports = async function handler(request, response) {
       });
       stored = Array.isArray(created) && created.length > 0;
       if (stored) storedLeadId = created[0].id;
-    } catch {
-      storageError = true;
+    } catch (error) {
+      storageError = error;
     }
   }
 
@@ -260,12 +262,12 @@ module.exports = async function handler(request, response) {
   }
 
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return json(response, 502, { ok: false, error: "storage_unavailable" });
+    return json(response, supabaseErrorStatus(storageError), { ok: false, error: "storage_unavailable" });
   }
 
   const webhookUrl = parseWebhookUrl(process.env.PILOT_LEADS_WEBHOOK_URL);
   if (!webhookUrl) {
-    if (storageError) return json(response, 502, { ok: false, error: "storage_unavailable" });
+    if (storageError) return json(response, supabaseErrorStatus(storageError), { ok: false, error: "storage_unavailable" });
     return json(response, 202, { ok: true, stored: false, message: "Lead validated but server storage is not configured." });
   }
 
