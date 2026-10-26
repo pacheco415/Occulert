@@ -77,3 +77,22 @@ test('browser container is immutable and matches the locked Playwright version',
   assert.match(workflow, /- run: npm run test:browser\s*\n/);
   assert.doesNotMatch(workflow, /continue-on-error|--privileged|--cap-add|--ipc=host|playwright install --with-deps/);
 });
+
+test('container ownership alignment is limited to its fresh checkout directory', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
+  const alignment = workflow.indexOf('- name: Align fresh workspace ownership');
+  assert.ok(alignment >= 0 && alignment < workflow.indexOf('- uses: actions/checkout'));
+  assert.ok(workflow.includes('test "$GITHUB_WORKSPACE" = "$PWD"'));
+  assert.ok(workflow.includes('test -d "$GITHUB_WORKSPACE" && test ! -L "$GITHUB_WORKSPACE"'));
+  assert.ok(workflow.includes('entries="$(ls -A "$GITHUB_WORKSPACE")"'));
+  assert.ok(workflow.includes('test -z "$entries"'));
+  for (const guard of [
+    'test "$(realpath "$GITHUB_WORKSPACE")" = "$(pwd -P)"',
+    'mode="$(stat -c %a "$GITHUB_WORKSPACE")"',
+    'owner="$(id -u):$(id -g)"',
+    'chown "$owner" "$GITHUB_WORKSPACE"',
+    'test "$(stat -c %a "$GITHUB_WORKSPACE")" = "$mode"',
+    'test "$(stat -c %u:%g "$GITHUB_WORKSPACE")" = "$owner"'
+  ]) assert.ok(workflow.includes(guard));
+  assert.doesNotMatch(workflow, /safe\.directory|GIT_CONFIG_|chown\s+-|chmod/);
+});
