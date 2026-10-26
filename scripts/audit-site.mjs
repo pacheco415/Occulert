@@ -30,6 +30,14 @@ function fail(message) {
   failures.push(message);
 }
 
+// Browser assets use immutable versioned URLs; the worker itself revalidates.
+for (const entry of readdirSync(root, { withFileTypes: true })) {
+  if ((entry.isFile() || entry.isSymbolicLink()) && /\.(js|css)$/i.test(entry.name) && entry.name !== 'sw.js'
+      && !/\.v\d+\.(js|css)$/.test(entry.name)) {
+    fail(`${entry.name}: root JavaScript and CSS assets must use versioned filenames (only sw.js may be unversioned)`);
+  }
+}
+
 function read(path) {
   return readFileSync(join(root, path), "utf8");
 }
