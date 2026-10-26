@@ -104,7 +104,8 @@
     "typecheck:source": "tsc -p jsconfig.json",
     "test:driver-build": "node --test scripts/test-driver-build.mjs scripts/test-driver-hook-policy.mjs scripts/test-bundled-source-release.mjs",
     "asset:retire": "node scripts/retire-assets.mjs",
-    "test:asset-retirement": "node --test scripts/test-retire-assets.mjs"
+    "test:asset-retirement": "node --test scripts/test-retire-assets.mjs",
+    "test:event-outbox": "tsc --noEmit --strict --target ES2022 --module nodenext --moduleResolution nodenext lib/event-outbox.ts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-event-outbox.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
