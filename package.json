@@ -108,7 +108,7 @@
     "test:event-outbox": "tsc --noEmit --strict --target ES2022 --module nodenext --moduleResolution nodenext lib/event-outbox.ts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-event-outbox.mjs"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.13.0",
+    "@axe-core/playwright": "4.14.0",
     "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "^1.63.0",
     "acorn": "8.18.0",
