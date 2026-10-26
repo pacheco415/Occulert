@@ -9,7 +9,7 @@ const { validTimestamp, compareTimestamps } = require("./_lib/fleet-history-curs
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const { isUuid, numberOrNull, validJsonBody } = require("./_lib/validation");
+const { isUuid, numberOrNull, strictNumberOrNull, validJsonBody } = require("./_lib/validation");
 
 const { json } = require("./_lib/responses");
 
@@ -96,8 +96,8 @@ module.exports = async function handler(request, response) {
         confidence: numberOrNull(body.confidence, 0, 100),
         // GPS is opt-in only; omit lat/lng entirely unless the driver has
         // explicitly enabled location sharing on the client.
-        latitude: numberOrNull(body.latitude, -90, 90),
-        longitude: numberOrNull(body.longitude, -180, 180),
+        latitude: strictNumberOrNull(body.latitude, -90, 90),
+        longitude: strictNumberOrNull(body.longitude, -180, 180),
         created_at: occurredAt,
       },
     });
