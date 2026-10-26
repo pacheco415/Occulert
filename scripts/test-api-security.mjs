@@ -902,7 +902,7 @@ for (const [index, invalidFields] of [
 
 const unavailableRateLimit = loadHandler("../api/pilot-leads.js", async (table) => {
   assert.equal(table, "rpc/check_pilot_lead_rate_limit");
-  throw new Error("rate store offline");
+  throw Object.assign(new Error("supabase_unavailable"), { provider: "supabase", status: 503 });
 });
 const unavailableRateResult = await invoke(unavailableRateLimit, request("POST", validLead, "203.0.113.23"));
 assert.equal(unavailableRateResult.status, 503, "pilot contact writes must fail closed if durable throttling is unavailable");
@@ -1182,7 +1182,7 @@ try {
  const writesBeforeTimeout = writes;
  lostReply = true;
  const uncertain = await invoke(persistedStarts, request("POST", { session_id: uncertainId }));
- assert.equal(uncertain.status, 502, "a lost insert reply remains an upstream failure");
+ assert.equal(uncertain.status, 504, "a lost insert reply reports its known deadline");
  assert.equal(writes, writesBeforeTimeout + 1, "an uncertain write must never trigger an automatic insert retry");
  const recovered = await invoke(persistedStarts, { ...request("GET"), query: { session_id: uncertainId } });
  assert.equal(recovered.status, 200);assert.equal(recovered.body.session.id, uncertainId);

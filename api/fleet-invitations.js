@@ -7,6 +7,7 @@
 
 const crypto = require("node:crypto");
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
@@ -136,7 +137,7 @@ module.exports = async function handler(request, response) {
       if (code === "invitation_rate_limited") response.setHeader("Retry-After", "3600");
       return json(response, statuses[code], { ok: false, error: code });
     }
-    return json(response, 502, { ok: false, error: "supabase_error" });
+    return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });
   }
 };
 

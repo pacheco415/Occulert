@@ -4,6 +4,7 @@
 // SUPABASE_SERVICE_ROLE_KEY are configured. See BACKEND_SETUP.md.
 
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const { validTimestamp, compareTimestamps } = require("./_lib/fleet-history-cursor");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
@@ -107,7 +108,7 @@ module.exports = async function handler(request, response) {
       message: "Client-reported telemetry is not independently measured or attested.",
     });
   } catch (error) {
-    return json(response, 502, { ok: false, error: "supabase_error" });
+    return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });
   }
 };
 
