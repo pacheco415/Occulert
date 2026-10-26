@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 20
     # Match package-lock.json; preinstalled browsers avoid slow apt mirrors.
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
     steps:
       - name: Align fresh workspace ownership with the container user
         run: |
@@ -44,7 +44,7 @@ jobs:
           const assert = require('node:assert/strict');
           const { accessSync, constants } = require('node:fs');
           const { chromium, webkit } = require('@playwright/test');
-          assert.equal(require('@playwright/test/package.json').version, '1.63.0');
+          assert.equal(require('@playwright/test/package.json').version, '1.64.1');
           for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK);
           NODE
       - name: Check native form controls on Linux WebKit
@@ -71,3 +71,55 @@ jobs:
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
+
+  offline-runtime-repeat:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Match package-lock.json; preinstalled browsers avoid slow apt mirrors.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+    steps:
+      - name: Align fresh workspace ownership with the container user
+        run: |
+          test "$GITHUB_WORKSPACE" = "$PWD"
+          test -d "$GITHUB_WORKSPACE" && test ! -L "$GITHUB_WORKSPACE"
+          test "$(realpath "$GITHUB_WORKSPACE")" = "$(pwd -P)"
+          entries="$(ls -A "$GITHUB_WORKSPACE")"
+          test -z "$entries"
+          mode="$(stat -c %a "$GITHUB_WORKSPACE")"
+          owner="$(id -u):$(id -g)"
+          chown "$owner" "$GITHUB_WORKSPACE"
+          test "$(stat -c %a "$GITHUB_WORKSPACE")" = "$mode"
+          test "$(stat -c %u:%g "$GITHUB_WORKSPACE")" = "$owner"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Verify pinned browser runtime
+        run: |
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          const { accessSync, constants } = require('node:fs');
+          const { chromium, webkit } = require('@playwright/test');
+          assert.equal(require('@playwright/test/package.json').version, '1.64.1');
+          for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK);
+          NODE
+      - name: Repeat synthetic offline startup without retries
+        shell: bash
+        env:
+          DEBUG: pw:browser
+        run: |
+          set -o pipefail
+          npm run test:browser -- tests/driver-startup-recovery.spec.mjs --project=webkit --grep 'cached complete driver startup' --repeat-each=10 --retries=0 --workers=1 2>&1 | tee offline-browser-process.log
+      - name: Preserve repeated offline diagnostics and browser process log
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: offline-runtime-repeat-diagnostics
+          path: |
+            offline-browser-process.log
+            test-results/
+          if-no-files-found: error
+          retention-days: 7

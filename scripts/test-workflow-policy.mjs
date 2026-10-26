@@ -73,7 +73,16 @@ test('browser container is immutable and matches the locked Playwright version',
   const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'));
   const image = workflow.match(/^\s+image: mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-noble@sha256:([a-f0-9]{64})$/m);
   assert.ok(image, 'use the official digest-pinned Noble image');
+  const images = [...workflow.matchAll(/^\s+image: (.+)$/gm)].map(match => match[1]);
+  assert.equal(images.length, 2);
+  assert.equal(new Set(images).size, 1, 'full and repeated runs use the same immutable image');
   assert.equal(image[1], lock.packages['node_modules/@playwright/test'].version);
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(manifest.devDependencies['@playwright/test'], image[1], 'pin the package exactly with its container');
+  assert.equal(lock.packages[''].devDependencies['@playwright/test'], image[1]);
+  for (const name of ['playwright', 'playwright-core']) {
+    assert.equal(lock.packages[`node_modules/${name}`].version, image[1], `${name} must match the browser image`);
+  }
   assert.ok(workflow.includes(`assert.equal(require('@playwright/test/package.json').version, '${image[1]}')`));
   assert.ok(workflow.includes('for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK)'));
   assert.ok(workflow.includes('run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit'));
@@ -145,4 +154,23 @@ test('concurrency harness rejects remote configuration before loading or startin
   const relative = spawnSync(process.execPath, [harness], {env:{...base,OCCULERT_PG_BIN:'relative'}, encoding:'utf8'});
   assert.notEqual(relative.status, 0);
   assert.match(relative.stderr, /must be an absolute local binary directory/);
+});
+
+
+test('repeated offline browser experiment is isolated, bounded and failure preserving', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
+  const repeated = workflow.split('  offline-runtime-repeat:\n')[1];
+  assert.ok(repeated);
+  assert.match(repeated, /timeout-minutes: 20/);
+  assert.match(repeated, /shell: bash/);
+  assert.match(repeated, /DEBUG: pw:browser/);
+  assert.match(repeated, /set -o pipefail/);
+  assert.ok(repeated.includes("--grep 'cached complete driver startup' --repeat-each=10 --retries=0 --workers=1 2>&1 | tee offline-browser-process.log"));
+  assert.match(repeated, /name: offline-runtime-repeat-diagnostics/);
+  assert.match(repeated, /if-no-files-found: error/);
+  assert.match(repeated, /retention-days: 7/);
+  const guard = repeated.indexOf('test -z "$entries"');
+  assert.ok(guard >= 0 && guard < repeated.indexOf('- uses: actions/checkout'));
+  assert.ok(repeated.includes("assert.equal(require('@playwright/test/package.json').version, '1.64.1')"));
+  assert.doesNotMatch(repeated, /continue-on-error|secrets\.|DATABASE_URL|supabase db|needs:|--timeout=/);
 });
