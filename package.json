@@ -78,6 +78,7 @@
     "test:verify-runner": "node --test scripts/test-verify-runner.mjs scripts/test-verify-coverage.mjs",
     "test:asset-lineage": "node --test scripts/test-asset-lineage.mjs",
     "test:workflow-policy": "node --test scripts/test-workflow-policy.mjs",
+    "test:browser-retry-report": "node --test scripts/test-browser-retry-report.mjs",
     "test:deployment-ignore": "node --test scripts/test-deployment-ignore.mjs",
     "sitemap:update": "node scripts/update-sitemap.mjs",
     "audit:sitemap": "node scripts/update-sitemap.mjs --check",

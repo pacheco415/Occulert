@@ -48,14 +48,24 @@ jobs:
           for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK);
           NODE
       - name: Check native form controls on Linux WebKit
-        run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit
-      - run: npm run test:browser
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-report/onboarding.json
+        run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit --reporter=line,json --output=test-results/onboarding
+      - name: Run the full browser suite
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-report/browser.json
+        run: npm run test:browser -- --reporter=line,json --output=test-results/browser
+      - name: List browser tests that passed after retry
+        if: ${{ !cancelled() }}
+        run: node scripts/report-browser-retries.mjs playwright-report/onboarding.json playwright-report/browser.json
       - name: Preserve browser failure and retry diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: browser-test-diagnostics
-          path: test-results/
+          path: |
+            test-results/
+            playwright-report/
           if-no-files-found: ignore
           retention-days: 7
 

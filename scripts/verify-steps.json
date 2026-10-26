@@ -70,6 +70,7 @@
     "test:migration-grants",
     "test:asset-lineage",
     "test:workflow-policy",
+    "test:browser-retry-report",
     "test:deployment-ignore",
     "audit:sitemap",
     "test:sitemap",

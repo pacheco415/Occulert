@@ -3,12 +3,38 @@ import { test, expect } from '@playwright/test';
 
 const owner = '11111111-1111-4111-8111-111111111111';
 const id = '33333333-3333-4333-8333-333333333333';
-async function setup(page, { fail = false, conflict = false, slow = false, sessions = null } = {}) {
-  const state = { followup: { session_id: id, status: 'open', version: 0, updated_at: null }, posts: 0 };
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
+}
+
+async function openFollowups(page, { fail = false } = {}) {
+  // Visibility comes before bootstrap's final render, which can reset the panel.
+  await expect(page.locator('#cloudStatus')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('#cloudStatus')).toContainText('Protected connection active for Example fleet.');
+  const panel = page.locator('#fleetFollowups');
+  await expect(panel).toBeVisible();
+  if (!await panel.evaluate(element => element.open)) {
+    await page.getByText('Saved session follow-ups', { exact: true }).click();
+  }
+  await expect(panel).toHaveJSProperty('open', true);
+  await expect(page.locator('#followupList')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('#followupNotice')).toContainText(fail ? 'not enabled yet' : 'sessions loaded (up to 50)');
+}
+
+async function setup(page, { fail = false, conflict = false, sessions = null } = {}) {
+  const state = { followup: { session_id: id, status: 'open', version: 0, updated_at: null }, posts: 0, nextLoad: null };
   const session = { id, driver_id: 'driver', started_at: new Date().toISOString(), ended_at: new Date().toISOString(), alert_count: 2, safety_score: 65 };
   const records = sessions || [session];
   await page.route(`**/${assetByStem('occulert-backend.js')}`, route => route.fulfill({ contentType: 'application/javascript', body: `
     window.fixtureUser = { id: '${owner}' };
+    window.fixtureFollowupBodiesSettled = 0;
+    window.addEventListener('message', event => {
+      if (event.source === window && event.origin === location.origin && event.data === 'fixture-followup-body-consumed') {
+        window.fixtureFollowupBodiesSettled += 1;
+      }
+    });
     window.OcculertBackend = {
       currentUser: () => window.fixtureUser,
       getSession: async () => ({user: window.fixtureUser,access_token:'fixture-token',refresh_token:'fixture-refresh'}),
@@ -21,12 +47,23 @@ async function setup(page, { fail = false, conflict = false, slow = false, sessi
         if (!window.fixtureUser || captured?.auth?.user?.id !== window.fixtureUser.id) throw Error('auth_session_changed');
         return captured;
       },
-      fetchWithDeadline: (url, options) => fetch(url, options),
+      fetchWithDeadline: async (url, options) => {
+        const response = await fetch(url, url === '/api/fleet-followups' && window.fixtureIgnoreFollowupAbort ? { ...options, signal: undefined } : options);
+        if (url === '/api/fleet-followups') {
+          const readJson = response.json.bind(response);
+          response.json = async () => {
+            const data = await readJson();
+            // The posted task runs after request/load promise continuations settle.
+            window.postMessage('fixture-followup-body-consumed', location.origin);
+            return data;
+          };
+        }
+        return response;
+      },
       getFleetSummary: async () => ({ok:true,body:{fleet:{id:'fleet',company_name:'Example fleet'},drivers:[{id:'driver',name:'Avery Example',active:true}],sessions:${JSON.stringify(records)},events:[]}}),
       signOut: () => {window.fixtureUser=null;}
     };` }));
   await page.route('**/api/fleet-followups', async route => {
-    if (slow) await new Promise(resolve => setTimeout(resolve, 200));
     if (route.request().method() === 'POST') {
       state.posts += 1;
       const body = route.request().postDataJSON();
@@ -34,14 +71,19 @@ async function setup(page, { fail = false, conflict = false, slow = false, sessi
       state.followup = { ...state.followup, status: body.status, version: state.followup.version + 1, updated_at: new Date().toISOString() };
       return route.fulfill({ json: { ok: true, followup: state.followup } });
     }
+    if (state.nextLoad) {
+      const pending = state.nextLoad;
+      state.nextLoad = null;
+      pending.started.resolve();
+      await pending.release.promise;
+    }
     if (fail) return route.fulfill({ status: 503, json: { ok: false, error: 'followups_not_enabled' } });
     return route.fulfill({ json: { ok: true, limit: 50, sessions: records.map(record => ({ ...record,
       driver_name: record.driver_name || 'Avery Example <script>', followup: { ...state.followup, session_id: record.id },
     })) } });
   });
   await page.goto('/fleet-dashboard.html');
-  await expect(page.locator('#fleetFollowups')).toBeVisible();
-  await page.getByText('Saved session follow-ups', { exact: true }).click();
+  await openFollowups(page, { fail });
   return state;
 }
 
@@ -54,8 +96,7 @@ test('saved follow-up survives refresh and page reload; names are plain text', a
   await expect(page.locator('#followupNotice')).toContainText('Follow-up saved for Avery Example');
   expect(state.posts).toBe(1);
   await page.reload();
-  await expect(page.locator('#fleetFollowups')).toBeVisible();
-  await page.getByText('Saved session follow-ups', { exact: true }).click();
+  await openFollowups(page);
   await expect(page.locator('.followup-saved')).toHaveText('Saved status: Reviewed');
 });
 
@@ -67,7 +108,16 @@ test('conflicting edits do not claim success or silently overwrite', async ({ pa
   await expect(page.locator('.followup-item')).toHaveCount(1);
   await expect(page.locator('.followup-issue')).toContainText('Refresh is required');
   await expect(page.getByRole('button', { name: 'Save follow-up', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Refresh follow-ups', exact: true }).click();
+  await Promise.all([
+    page.waitForEvent('dialog').then(async dialog => {
+      expect(dialog.type()).toBe('confirm');
+      expect(dialog.message()).toContain('Refreshing will discard 1 unsaved follow-up choices.');
+      await dialog.accept();
+    }),
+    page.getByRole('button', { name: 'Refresh follow-ups', exact: true }).click(),
+  ]);
+  await expect(page.locator('#followupNotice')).toContainText('sessions loaded (up to 50)');
+  await expect(page.locator('#followupList')).toHaveAttribute('aria-busy', 'false');
   await expect(page.locator('.followup-saved')).toContainText('Open');
 });
 
@@ -79,14 +129,34 @@ test('migration not enabled leaves the existing dashboard usable', async ({ page
 });
 
 test('account changes clear protected outcomes and discard in-flight loads', async ({ page }) => {
-  await setup(page, { slow: true });
-  await page.evaluate(() => {
-    window.fixtureUser = null;
-    window.dispatchEvent(new StorageEvent('storage', { key: 'occulert-auth' }));
-  });
+  const state = await setup(page);
+  await expect(page.locator('.followup-item')).toHaveCount(1);
+  await page.waitForFunction(() => window.fixtureFollowupBodiesSettled === 1);
+  await page.evaluate(() => { window.fixtureIgnoreFollowupAbort = true; });
+  const pending = { started: deferred(), release: deferred() };
+  state.nextLoad = pending;
+  const responseComplete = page.waitForResponse(response => response.url().endsWith('/api/fleet-followups') && response.request().method() === 'GET');
+  // Preserve the primary assertion failure if teardown closes the response wait.
+  responseComplete.catch(() => {});
+  try {
+    await page.getByRole('button', { name: 'Refresh follow-ups', exact: true }).click();
+    await pending.started.promise;
+    await expect(page.locator('#followupList')).toHaveAttribute('aria-busy', 'true');
+    await page.evaluate(() => {
+      window.fixtureUser = null;
+      window.dispatchEvent(new StorageEvent('storage', { key: 'occulert-auth' }));
+    });
+    await expect(page.locator('#fleetFollowups')).toBeHidden();
+    await expect(page.locator('#followupList')).toBeEmpty();
+  } finally {
+    pending.release.resolve();
+  }
+  const response = await responseComplete;
+  expect(await response.finished()).toBeNull();
+  await page.waitForFunction(() => window.fixtureFollowupBodiesSettled === 2);
   await expect(page.locator('#fleetFollowups')).toBeHidden();
-  await page.waitForTimeout(300);
   await expect(page.locator('#followupList')).toBeEmpty();
+  expect(state.posts).toBe(0);
 });
 
 test('session descriptions distinguish recorded completion and measured zero from missing or invalid telemetry', async ({ page }) => {
