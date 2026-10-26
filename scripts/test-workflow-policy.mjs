@@ -115,7 +115,7 @@ test('real event concurrency job is isolated, bounded and never uses production 
   assert.match(build, /version=17\.11/);
   assert.match(build, /checksum=dd27f2b3c59e73ed14aa3324901242bf69a032a6347805f274e6260322d42979/);
   assert.ok(build.indexOf('sha256sum --check --strict') < build.indexOf('tar -xjf'));
-  assert.match(build, /https:\/\/ftp.postgresql.org\/pub\/source/);
+  assert.match(build, /https:\/\/ftp\.postgresql\.org\/pub\/source/);
   assert.match(build, /test "\$\(id -u\)" -ne 0/);
   assert.match(harness, /listen_addresses=''/);
   assert.match(harness, /host:root/);
