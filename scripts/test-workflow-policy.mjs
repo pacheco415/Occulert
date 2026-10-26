@@ -64,3 +64,16 @@ test('checked-in workflow actions retain full SHAs and version-compatible Node i
     assert.deepEqual(auditWorkflowPolicy(readFileSync(new URL(file, directory), 'utf8')), [], file);
   }
 });
+
+test('browser container is immutable and matches the locked Playwright version', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
+  const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'));
+  const image = workflow.match(/^\s+image: mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-noble@sha256:([a-f0-9]{64})$/m);
+  assert.ok(image, 'use the official digest-pinned Noble image');
+  assert.equal(image[1], lock.packages['node_modules/@playwright/test'].version);
+  assert.ok(workflow.includes(`assert.equal(require('@playwright/test/package.json').version, '${image[1]}')`));
+  assert.ok(workflow.includes('for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK)'));
+  assert.ok(workflow.includes('run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit'));
+  assert.match(workflow, /- run: npm run test:browser\s*\n/);
+  assert.doesNotMatch(workflow, /continue-on-error|--privileged|--cap-add|--ipc=host|playwright install --with-deps/);
+});
