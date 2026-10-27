@@ -77,7 +77,7 @@ test('browser container is immutable and matches the locked Playwright version',
   assert.ok(workflow.includes(`assert.equal(require('@playwright/test/package.json').version, '${image[1]}')`));
   assert.ok(workflow.includes('for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK)'));
   assert.ok(workflow.includes('run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit'));
-  assert.match(workflow, /- run: npm run test:browser\s*\n/);
+  assert.match(workflow, /run: npm run test:browser -- --reporter=line,json --output=test-results\/browser\s*\n/);
   assert.doesNotMatch(workflow, /continue-on-error|--privileged|--cap-add|--ipc=host|playwright install --with-deps/);
 });
 
