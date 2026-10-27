@@ -69,8 +69,10 @@ export function queueBackendEvent(type) {
     const scope = backendEventScope;
     if (!eventScopeCurrent(scope))
         return;
+    // Snapshot detection data before waiting for session creation or earlier events.
+    const details = { fatigue_score: Math.round(fatigue), confidence: Math.round(confidence) };
     const location = gpsConsent.checked && lastPosition ? { latitude: lastPosition.lat, longitude: lastPosition.lng } : {}, sessionReference = backendSessionPromise || backendSessionId;
-    set_backendEventQueue(backendEventQueue.then(() => sessionReference).then(id => id && eventScopeCurrent(scope) ? scope.backend.logEvent(id, type, Object.assign({ fatigue_score: Math.round(fatigue), confidence: Math.round(confidence) }, location), () => eventScopeCurrent(scope)) : null).catch(() => null));
+    set_backendEventQueue(backendEventQueue.then(() => sessionReference).then(id => id && eventScopeCurrent(scope) ? scope.backend.logEvent(id, type, Object.assign(details, location), () => eventScopeCurrent(scope)) : null).catch(() => null));
 }
 export function detachBackendSession() { const state = { id: backendSessionId, promise: backendSessionPromise, eventQueue: backendEventQueue, consented: cloudConsent.checked, scope: backendSessionScope, endedAt: new Date().toISOString(), localSessionId }; set_backendSessionScope(null); (set_backendSessionGeneration(backendSessionGeneration + 1) - 1); set_backendSessionId(null); set_backendSessionPromise(null); set_backendEventQueue(Promise.resolve()); return state; }
 export function cloudSummaryScope() {
