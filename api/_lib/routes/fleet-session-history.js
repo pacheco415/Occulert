@@ -95,9 +95,12 @@ module.exports = async function handler(request, response) {
         roster.some(driver => !driver || !isUuid(driver.id) || typeof driver.name !== 'string')) throw invalidResponse();
     let driverFilterComplete = roster.length <= 1000;
     const driverOptions = roster.slice(0, 1000).map(driver => ({ id: driver.id, name: driver.name.slice(0, 80) }));
-    if (filters.driver_id && !roster.some(driver => driver.id.toLowerCase() === filters.driver_id.toLowerCase())) {
+    if (filters.driver_id && !driverOptions.some(driver => driver.id.toLowerCase() === filters.driver_id.toLowerCase())) {
       // A capped selector is not proof that a driver is outside this fleet.
-      const exact = await pgFetch('drivers', { params: { select: 'id,name', fleet_id: 'eq.' + fleet.id,
+      // The 1,001st roster row is only a truncation look-ahead, but may be
+      // the selected driver after roster ordering changes between requests.
+      const knownDriver = roster.find(driver => driver.id.toLowerCase() === filters.driver_id.toLowerCase());
+      const exact = knownDriver ? [knownDriver] : await pgFetch('drivers', { params: { select: 'id,name', fleet_id: 'eq.' + fleet.id,
         id: 'eq.' + filters.driver_id, limit: '1' } });
       if (!Array.isArray(exact) || exact.length > 1) throw invalidResponse();
       if (!exact.length) return json(response, 400, { ok: false, error: 'invalid_driver' });
