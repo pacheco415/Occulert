@@ -190,3 +190,53 @@ test('a sign-in during a shared refresh still wins for every caller', async () =
   assert.equal(h.stored().user.id, 'owner-b');
   assert.equal(h.refreshes.length, 1);
 });
+
+test('event authorization is checked again after token refresh before dispatch', async () => {
+  let release, active = true;
+  const h = boot({ auth: session('old', -10), refresh: () => new Promise(resolve => { release = () => resolve(json(rotated)); }) });
+  const pending = h.backend.logEvent('session-a', 'fatigue', {}, () => active);
+  await tick(); active = false; release(); await pending;
+  assert.equal(h.requests.length, 0);
+});
+test('event lifecycle remains valid across refresh, not same-owner reauthentication', async () => {
+  const h = boot({ auth: session('old', -10) });
+  const lifecycle = h.backend.captureAuthLifecycle();
+  const result = await h.backend.logEvent('session-a', 'fatigue', {}, () => h.backend.isAuthLifecycleCurrent(lifecycle));
+  assert.equal(result.status, 200);
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.backend.isAuthLifecycleCurrent(lifecycle), true);
+  h.backend.beginAuthAttempt();
+  assert.equal(h.backend.isAuthLifecycleCurrent(lifecycle), false);
+});
+test('cross-tab auth storage changes invalidate queued event lifecycle', () => {
+  const h = boot({ auth: session('old', 3600) });
+  const lifecycle = h.backend.captureAuthLifecycle();
+  h.storageChanged();
+  assert.equal(h.backend.isAuthLifecycleCurrent(lifecycle), false);
+});
+test('event authorization is rechecked in the final fetch microtask', async () => {
+  let active = true, checks = 0;
+  const h = boot({ auth: session('valid', 3600) });
+  await h.backend.logEvent('session-a', 'fatigue', {}, () => {
+    if (++checks === 1) queueMicrotask(() => { active = false; });
+    return active;
+  });
+  assert.equal(h.requests.length, 0);
+});
+test('auth change in the final fetch microtask prevents even an unguarded event', async () => {
+  const h = boot({ auth: session('valid', 3600) });
+  const pending = h.backend.logEvent('session-a', 'fatigue');
+  queueMicrotask(() => h.backend.beginAuthAttempt());
+  await pending;
+  assert.equal(h.requests.length, 0);
+});
+test('a new lifecycle after a cross-tab auth change can dispatch normally', async () => {
+  const h = boot({ auth: session('valid', 3600) });
+  const oldLifecycle = h.backend.captureAuthLifecycle();
+  h.storageChanged();
+  await h.backend.logEvent('old-session', 'fatigue', {}, () => h.backend.isAuthLifecycleCurrent(oldLifecycle));
+  assert.equal(h.requests.length, 0);
+  const newLifecycle = h.backend.captureAuthLifecycle();
+  assert.equal((await h.backend.logEvent('new-session', 'fatigue', {}, () => h.backend.isAuthLifecycleCurrent(newLifecycle))).status, 200);
+  assert.equal(h.requests.length, 1);
+});
