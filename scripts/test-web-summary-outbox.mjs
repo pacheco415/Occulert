@@ -221,3 +221,30 @@ test('cloud readiness refresh does not hide an invalidated active-session notice
   assert.equal(h.get('syncEl.textContent'), 'LOCAL');
   assert.equal(h.get("logEl.children.filter(entry => entry.textContent.includes('Cloud alerts paused')).length"), 1);
 });
+
+for (const wait of ['session', 'event queue']) test(`event snapshots metrics before waiting for ${wait}`, async () => {
+  const h = eventHarness();
+  if (wait === 'event queue') {
+    h.run('releaseSession();'); await h.get('backendSessionPromise');
+    h.run('let releasePrevious; backendEventQueue = new Promise(resolve => { releasePrevious = resolve; });');
+  }
+  h.run("fatigue = 61.4; confidence = 82.6; queueBackendEvent('drowsy');");
+  h.clock.advance(30000);
+  h.run('fatigue = 2; confidence = 3;');
+  h.run(wait === 'session' ? 'releaseSession();' : 'releasePrevious();');
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 1);
+  assert.equal(h.get("Object.hasOwn(sentEvents[0].extra, 'occurred_at')"), false, 'preserve server receipt time for pre-session or skewed-clock detections');
+  assert.deepEqual(JSON.parse(h.get('JSON.stringify(sentEvents[0].extra)')), {
+    fatigue_score: 61, confidence: 83,
+  });
+});
+for (const status of [400, 409, 503]) test(`event failure ${status} is never automatically resent`, async () => {
+  const h = eventHarness();
+  h.run(`window.OcculertBackend.logEvent = async (id, type, extra, isCurrent) => {
+    if (isCurrent()) sentEvents.push({ id, type, extra });
+    return { status: ${status}, body: { error: 'invalid_occurred_at' } };
+  }; queueBackendEvent('drowsy'); releaseSession();`);
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 1);
+});
