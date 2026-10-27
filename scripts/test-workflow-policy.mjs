@@ -77,8 +77,42 @@ test('browser container is immutable and matches the locked Playwright version',
   assert.ok(workflow.includes(`assert.equal(require('@playwright/test/package.json').version, '${image[1]}')`));
   assert.ok(workflow.includes('for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK)'));
   assert.ok(workflow.includes('run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit'));
-  assert.match(workflow, /run: npm run test:browser -- --reporter=line,json --output=test-results\/browser\s*\n/);
+  assert.match(workflow, /run: npm run test:browser -- --project=\$\{\{ matrix\.browser \}\} --reporter=line,json --output=test-results\/browser\s*\n/);
   assert.doesNotMatch(workflow, /continue-on-error|--privileged|--cap-add|--ipc=host|playwright install --with-deps/);
+});
+
+test('both browser projects feed a stable check that rejects unsuccessful matrix results', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /browser: \[chromium, webkit\]/);
+  assert.match(workflow, /fail-fast: false/);
+  const aggregate = workflow.split('\n  smoke:\n')[1];
+  assert.match(aggregate, /name: smoke\n/);
+  assert.match(aggregate, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(aggregate, /needs: browser\n/);
+  assert.match(aggregate, /BROWSER_RESULT: \$\{\{ needs\.browser\.result \}\}/);
+  const command = aggregate.match(/^        run: (.+)$/m)?.[1];
+  assert.ok(command);
+  for (const result of ['success', 'failure', 'cancelled', 'skipped', '', 'unknown']) {
+    const ran = spawnSync('/bin/sh', ['-e', '-c', command], { encoding: 'utf8', env: { ...process.env, BROWSER_RESULT: result } });
+    assert.equal(ran.status === 0, result === 'success', result);
+  }
+});
+
+test('retry report inputs match each browser and artifacts cannot collide across matrix jobs or attempts', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /if: \$\{\{ matrix\.browser == 'webkit' \}\}/);
+  assert.match(workflow, /name: browser-test-diagnostics-\$\{\{ matrix\.browser \}\}-\$\{\{ github\.run_attempt \}\}/);
+  assert.match(workflow, /write-verification-receipt\.mjs browser-\$\{\{ matrix\.browser \}\}/);
+  assert.match(workflow, /name: verification-browser-\$\{\{ matrix\.browser \}\}-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}/);
+  const step = workflow.split('      - name: List browser tests that passed after retry\n')[1].split('      - name: Preserve browser failure')[0];
+  const command = step.split('        run: |\n')[1].split('\n').filter(Boolean).map(line => line.slice(10)).join('\n');
+  for (const browser of ['chromium', 'webkit']) {
+    const probe = 'node() { printf "%s\\n" "$@"; }\n' + command;
+    const ran = spawnSync('/bin/sh', ['-e', '-c', probe], { encoding: 'utf8', env: { ...process.env, BROWSER: browser } });
+    assert.equal(ran.status, 0, ran.stderr);
+    assert.deepEqual(ran.stdout.trim().split('\n'), ['scripts/report-browser-retries.mjs',
+      ...(browser === 'webkit' ? ['playwright-report/onboarding.json'] : []), 'playwright-report/browser.json']);
+  }
 });
 
 test('container ownership alignment is limited to its fresh checkout directory', () => {
