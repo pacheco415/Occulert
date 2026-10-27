@@ -589,8 +589,14 @@ export async function beginCloudSession(): Promise<string | null> {
 }
 
 export async function logCloudAlert(sessionId: string, fatigueScore: number): Promise<boolean> {
+  // A delayed alert belongs to the sharing choice and owner that started its
+  // session. Re-enabling sharing must not authorize an old queued alert.
+  const sessionScope = cloudSessionScopes.get(sessionId);
+  if (!sessionScope) return false;
   const syncContext = await currentSyncContext();
   if (!syncContext) return false;
+  if (sessionScope.ownerId !== syncContext.ownerId
+    || sessionScope.consentVersion !== syncContext.consentVersion) return false;
   const result = await backendApi('POST', '/api/events', {
     session_id: sessionId,
     type: 'drowsy',
