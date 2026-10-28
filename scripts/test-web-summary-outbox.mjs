@@ -114,3 +114,137 @@ test('a matching ID requires a valid stored end timestamp before acknowledgement
   assert.equal((await f.outbox.flush(scope)).has('one'),true);assert.equal(acknowledged,1);assert.equal(JSON.parse(f.values.get(KEY)).length,0);
  }
 });
+
+// Events belong to the consent/account lifecycle that created their session,
+// even when the session response or an earlier event is still pending.
+function eventHarness() {
+  const h = createAppHarness();
+  h.run(`cloudConsent.checked = true; cloudReady = true;
+    let eventOwner = 'owner-a', eventAuthRevision = 0, releaseSession;
+    const sentEvents = [];
+    window.OcculertBackend = {
+      currentUser: () => eventOwner ? { id: eventOwner } : null,
+      captureAuthLifecycle: () => ({ ownerId: eventOwner, revision: eventAuthRevision }),
+      isAuthLifecycleCurrent: scope => scope.ownerId === eventOwner && scope.revision === eventAuthRevision,
+      startSession: () => new Promise(resolve => { releaseSession = () => resolve({ ok: true, body: { session: { id: 'old-session' } } }); }),
+      logEvent: async (id, type, extra, isCurrent) => { if (!isCurrent || isCurrent()) sentEvents.push({ id, type, extra }); }
+    };
+    beginBackendSession();`);
+  return h;
+}
+for (const [label, change] of [
+  ['consent off', 'cloudConsent.checked = false; cloudConsentRevision++;'],
+  ['consent off/on', 'cloudConsent.checked = false; cloudConsentRevision++; cloudConsent.checked = true; cloudConsentRevision++;'],
+  ['account switch', "eventOwner = 'owner-b'; eventAuthRevision++;"],
+  ['same-owner logout/login', "eventOwner = null; eventAuthRevision++; eventOwner = 'owner-a'; eventAuthRevision++;"],
+]) test(`queued event is discarded after ${label} while session is pending`, async () => {
+  const h = eventHarness();
+  h.run(`queueBackendEvent('fatigue'); ${change} releaseSession();`);
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 0);
+});
+test('new event cannot attach to a session from an earlier consent lifecycle', async () => {
+  const h = eventHarness();
+  h.run('releaseSession();'); await h.get('backendSessionPromise');
+  h.run("cloudConsentRevision += 2; queueBackendEvent('fatigue');");
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 0);
+});
+test('normal stop still drains a valid queued event', async () => {
+  const h = eventHarness();
+  h.run("queueBackendEvent('fatigue'); const detachedEvents = detachBackendSession().eventQueue; releaseSession();");
+  await h.get('detachedEvents');
+  assert.equal(h.get('sentEvents.length'), 1);
+});
+test('event waiting behind another event rechecks consent before dispatch', async () => {
+  const h = eventHarness();
+  h.run('releaseSession();'); await h.get('backendSessionPromise');
+  h.run("let releasePrevious; backendEventQueue = new Promise(resolve => { releasePrevious = resolve; }); queueBackendEvent('fatigue'); cloudConsentRevision += 2; releasePrevious();");
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 0);
+});
+test('dispatch guard rejects consent revoked while logEvent awaits credentials', async () => {
+  const h = eventHarness();
+  h.run(`let releaseCredentials;
+    window.OcculertBackend.logEvent = async (id, type, extra, isCurrent) => {
+      await new Promise(resolve => { releaseCredentials = resolve; });
+      if (!isCurrent || isCurrent()) sentEvents.push({ id, type, extra });
+    };
+    releaseSession();`);
+  await h.get('backendSessionPromise');
+  h.run("queueBackendEvent('fatigue');");
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  assert.equal(h.get('typeof releaseCredentials'), 'function');
+  h.run('cloudConsentRevision += 2; releaseCredentials();');
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 0);
+});
+test('new session after reconsent uploads normally without reviving old session', async () => {
+  const h = eventHarness();
+  h.run('releaseSession();'); await h.get('backendSessionPromise');
+  h.run('cloudConsentRevision += 2; beginBackendSession(); releaseSession();');
+  await h.get('backendSessionPromise');
+  h.run("queueBackendEvent('fatigue');"); await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 1);
+});
+test('invalidated active session shows one local notice and a new session recovers', async () => {
+  const h = eventHarness(); h.startSession();
+  h.run('releaseSession();'); await h.get('backendSessionPromise');
+  h.run("eventAuthRevision++; queueBackendEvent('fatigue'); queueBackendEvent('fatigue');");
+  assert.equal(h.get('syncEl.textContent'), 'LOCAL');
+  const notices = () => h.get("logEl.children.filter(entry => entry.textContent.includes('Cloud alerts paused')).length");
+  assert.equal(notices(), 1);
+  assert.equal(h.get('running'), true, 'local monitoring is not interrupted');
+  assert.equal(h.get('sentEvents.length'), 0);
+  h.run('beginBackendSession(); releaseSession();'); await h.get('backendSessionPromise');
+  h.run("queueBackendEvent('fatigue');"); await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 1);
+  assert.equal(h.get('syncEl.textContent'), 'ON');
+  assert.equal(notices(), 1);
+});
+test('a detached old queue cannot mark a newer session local', async () => {
+  const h = eventHarness(); h.startSession();
+  h.run(`queueBackendEvent('fatigue'); const oldQueue = detachBackendSession().eventQueue;
+    const releaseOld = releaseSession; eventAuthRevision++; beginBackendSession();
+    syncEl.textContent = 'ON'; releaseSession(); releaseOld();`);
+  await h.get('backendSessionPromise'); await h.get('oldQueue');
+  assert.equal(h.get('syncEl.textContent'), 'ON');
+  assert.equal(h.get("logEl.children.filter(entry => entry.textContent.includes('Cloud alerts paused')).length"), 0);
+});
+test('cloud readiness refresh does not hide an invalidated active-session notice', async () => {
+  const h = eventHarness(); h.startSession();
+  h.run('window.OcculertBackend.isConfigured = async () => true; releaseSession();');
+  await h.get('backendSessionPromise');
+  h.run('cloudConsentRevision += 2;');
+  await h.run('initCloud()'); await h.run('initCloud()');
+  assert.equal(h.get('cloudReady'), true, 'a future session can still use this account');
+  assert.equal(h.get('syncEl.textContent'), 'LOCAL');
+  assert.equal(h.get("logEl.children.filter(entry => entry.textContent.includes('Cloud alerts paused')).length"), 1);
+});
+
+for (const wait of ['session', 'event queue']) test(`event snapshots metrics before waiting for ${wait}`, async () => {
+  const h = eventHarness();
+  if (wait === 'event queue') {
+    h.run('releaseSession();'); await h.get('backendSessionPromise');
+    h.run('let releasePrevious; backendEventQueue = new Promise(resolve => { releasePrevious = resolve; });');
+  }
+  h.run("fatigue = 61.4; confidence = 82.6; queueBackendEvent('drowsy');");
+  h.clock.advance(30000);
+  h.run('fatigue = 2; confidence = 3;');
+  h.run(wait === 'session' ? 'releaseSession();' : 'releasePrevious();');
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 1);
+  assert.equal(h.get("Object.hasOwn(sentEvents[0].extra, 'occurred_at')"), false, 'preserve server receipt time for pre-session or skewed-clock detections');
+  assert.deepEqual(JSON.parse(h.get('JSON.stringify(sentEvents[0].extra)')), {
+    fatigue_score: 61, confidence: 83,
+  });
+});
+for (const status of [400, 409, 503]) test(`event failure ${status} is never automatically resent`, async () => {
+  const h = eventHarness();
+  h.run(`window.OcculertBackend.logEvent = async (id, type, extra, isCurrent) => {
+    if (isCurrent()) sentEvents.push({ id, type, extra });
+    return { status: ${status}, body: { error: 'invalid_occurred_at' } };
+  }; queueBackendEvent('drowsy'); releaseSession();`);
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 1);
+});

@@ -5,10 +5,25 @@ import { fleetPayload } from "./metrics.js";
 import "./alerts.js";
 import { browserHistoryStore } from "./storage-history.js";
 import { experimentFlags, startupAllowsMonitoring, syncEl, gpsConsent, cloudConsent, running, fatigue, confidence, sessionStart, lastFleetPush, cloudReady, backendSessionId, backendSessionPromise, backendEventQueue, backendSessionGeneration, backendSessionScope, cloudConsentRevision, cloudSummaryOutbox, lastPosition, FLEET_PUSH_INTERVAL, log, localSessionId, set_lastFleetPush, set_cloudReady, set_backendSessionId, set_backendSessionPromise, set_backendEventQueue, set_backendSessionGeneration, set_backendSessionScope, set_cloudSummaryOutbox } from "./ui.js";
+// Event authorization is captured at session creation, not at upload time.
+// Detaching a stopped session may drain its queue without reviving revoked work.
+let backendEventScope = null;
+function eventScopeCurrent(scope) {
+    const current = Boolean(scope && cloudConsent.checked && scope.revision === cloudConsentRevision
+        && window.OcculertBackend === scope.backend
+        && scope.backend.isAuthLifecycleCurrent(scope.auth));
+    if (!current && scope && scope === backendEventScope && running) {
+        syncEl.textContent = 'LOCAL';
+        if (!scope.notified) log('Cloud alerts paused after an account or sharing change. Local monitoring continues; cloud alerts can resume with your next session.');
+        scope.notified = true;
+    }
+    return current;
+}
 export function beginBackendSession() {
     if (experimentFlags.any)
         return Promise.resolve(null);
     set_backendSessionScope(cloudSummaryScope());
+    backendEventScope = null;
     void retryCloudSummaries();
     const generation = set_backendSessionGeneration(backendSessionGeneration + 1);
     set_backendSessionId(null);
@@ -16,13 +31,16 @@ export function beginBackendSession() {
     set_backendEventQueue(Promise.resolve());
     if (!cloudConsent.checked || !cloudReady || !window.OcculertBackend)
         return Promise.resolve(null);
-    set_backendSessionPromise(window.OcculertBackend.startSession().then(result => {
-        if (!cloudConsent.checked)
+    const backend = window.OcculertBackend;
+    const scope = backendEventScope = { backend, revision: cloudConsentRevision, auth: backend.captureAuthLifecycle() };
+    set_backendSessionPromise(backend.startSession().then(result => {
+        if (!eventScopeCurrent(scope))
             return null;
         if (result.ok && result.body.session) {
             const id = result.body.session.id;
             if (generation === backendSessionGeneration) {
                 set_backendSessionId(id);
+                syncEl.textContent = 'ON';
                 log('Protected cloud session started');
             }
             return id;
@@ -48,8 +66,13 @@ export function queueBackendEvent(type) {
         return;
     if (!cloudConsent.checked || !cloudReady || !window.OcculertBackend)
         return;
+    const scope = backendEventScope;
+    if (!eventScopeCurrent(scope))
+        return;
+    // Snapshot detection data before waiting for session creation or earlier events.
+    const details = { fatigue_score: Math.round(fatigue), confidence: Math.round(confidence) };
     const location = gpsConsent.checked && lastPosition ? { latitude: lastPosition.lat, longitude: lastPosition.lng } : {}, sessionReference = backendSessionPromise || backendSessionId;
-    set_backendEventQueue(backendEventQueue.then(() => sessionReference).then(id => id && cloudConsent.checked ? window.OcculertBackend.logEvent(id, type, Object.assign({ fatigue_score: Math.round(fatigue), confidence: Math.round(confidence) }, location)) : null).catch(() => null));
+    set_backendEventQueue(backendEventQueue.then(() => sessionReference).then(id => id && eventScopeCurrent(scope) ? scope.backend.logEvent(id, type, Object.assign(details, location), () => eventScopeCurrent(scope)) : null).catch(() => null));
 }
 export function detachBackendSession() { const state = { id: backendSessionId, promise: backendSessionPromise, eventQueue: backendEventQueue, consented: cloudConsent.checked, scope: backendSessionScope, endedAt: new Date().toISOString(), localSessionId }; set_backendSessionScope(null); (set_backendSessionGeneration(backendSessionGeneration + 1) - 1); set_backendSessionId(null); set_backendSessionPromise(null); set_backendEventQueue(Promise.resolve()); return state; }
 export function cloudSummaryScope() {
@@ -143,7 +166,7 @@ export async function initCloud() {
         const configured = window.OcculertBackend && await window.OcculertBackend.isConfigured();
         const user = configured && window.OcculertBackend.currentUser();
         set_cloudReady(!!user);
-        syncEl.textContent = cloudReady ? 'ON' : 'LOCAL';
+        syncEl.textContent = cloudReady && (!running || !backendEventScope || eventScopeCurrent(backendEventScope)) ? 'ON' : 'LOCAL';
         if (cloudReady)
             void retryCloudSummaries();
         log(cloudReady ? 'Protected cloud sync ready' : configured ? 'Sign in before enabling cloud sync' : 'Cloud sync is not configured - using local mode');
