@@ -104,18 +104,16 @@ This is JavaScript packaging evidence. It starts no native/cloud build,
 submission or version operation, sets no outbox flag in an EAS profile, and
 does not establish installed-device acceptance.
 
-## Future simulator composition
+## Simulator composition
 
-The separate simulator branch has a profile-conditional ML Kit resolver. When
-it lands through main, compose that resolver with these watch-folder/block-list
-changes; do not replace either entire Metro configuration. Preview/production
-resolution must retain their ordinary modules.
+The simulator profile composes its conditional ML Kit resolver with the same
+watch-folder/block-list boundary. Preview/production resolution retains ordinary
+modules and the existing shared-engine exclusions.
 
-Its local snapshot helper currently stages the native app as `output/project`.
-After composition, stage only the canonical engine at
-`output/lib/event-outbox.ts`, verify its source bytes/hash and include that
-sibling hash among staged inputs. Metro's `__dirname/../lib` path then works in
-both layouts. Do not copy the repository or private work directories into the
-snapshot. Existing simulator-build receipts remain tied to their original
-native-only source; rerun the appropriate proof after composition. No simulator
-checkout or helper was changed by this packaging work.
+Its local snapshot helper stages the native app as `output/project` and only the
+canonical engine at `output/lib/event-outbox.ts`. It checks owned regular UTF-8
+input, copies exact bytes and includes that sibling's raw hash among staged
+inputs. Metro's `__dirname/../lib` path works in both layouts. The repository and
+private work directories are not copied. Existing simulator-build receipts stay
+tied to their original native-only source; the changed graph requires a fresh
+proof. See [the simulator procedure](../native-app/docs/SIMULATOR_TRACE.md).

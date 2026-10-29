@@ -4,6 +4,7 @@
     "camera.js",
     "detector.js",
     "calibration.js",
+    "scoring-core.js",
     "metrics.js",
     "alerts.js",
     "storage-history.js",

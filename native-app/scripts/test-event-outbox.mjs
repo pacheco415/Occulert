@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from './lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -156,7 +157,7 @@ test('corruption after adoption fails closed until explicit cleanup', async () =
 // Execute the complete native cloud module with only native bridges replaced.
 const source = readFileSync(new URL('../lib/cloudSync.ts', import.meta.url), 'utf8');
 const token = (owner = OWNER, login = LOGIN) => `unused.${Buffer.from(JSON.stringify({ sub: owner, session_id: login })).toString('base64url')}.unused`;
-function cloudFixture({ enabled = true, capability = true, expiresIn = 3600, login = LOGIN } = {}) {
+function cloudFixture({ enabled = true, capability = true, expiresIn = 3600, login = LOGIN, simulatorTrace = false } = {}) {
   const time = clock(), storage = new Map([['occulert-cloud-sync-enabled', 'true']]), calls = [], listeners = [];
   const secure = new Map([['occulert.cloud.auth.v1', JSON.stringify({ access_token: token(OWNER, login), refresh_token: 'fixture-refresh', expires_at: time.now() / 1000 + expiresIn, user: { id: OWNER, email: 'driver@example.com' } })]]);
   class Clock extends Date { static now() { return time.now(); } }
@@ -168,7 +169,7 @@ function cloudFixture({ enabled = true, capability = true, expiresIn = 3600, log
   } };
   const exports = {}, body = source.replace(/^import[\s\S]*?;\s*/gm, '').replace(/^export /gm, '');
   vm.runInNewContext(`${stripTypeScriptTypes(body)}\nObject.assign(exports,{beginCloudSession,logCloudAlert,queueNativeCloudAlert,stopNativeCloudEvents,signOutOfCloud,setCloudSyncEnabled,signInToCloud,nativeCloudEventRetryStatus,refreshIfNeeded,nativeEventLogin});`, {
-    exports, process: { env: { EXPO_PUBLIC_EVENT_OUTBOX: enabled ? '1' : undefined } }, Date: Clock, AbortController,
+    exports, SIMULATOR_TRACE: simulatorTrace, process: { env: { EXPO_PUBLIC_EVENT_OUTBOX: enabled ? '1' : undefined } }, Date: Clock, AbortController,
     createNativeEventOutbox, createAsyncMutationQueue, createCachedBooleanPreference, createSessionSummaryOutbox, pinnedSupabaseConfig,
     uuid: { v4: () => { const id = uuid(); f.uuids.push(id); return id; } }, Platform: { OS: 'ios', Version: 'test' },
     AppState: Object.assign(f.appState, { addEventListener: (_name, callback) => { listeners.push(callback); return { remove() {} }; } }),
@@ -232,7 +233,7 @@ for (const waitingFor of ['session response', 'earlier event']) test(`actual mon
   const f = cloudFixture(), wait = deferred(); if (waitingFor === 'session response') f.sessionWait = wait.promise;
   const session = f.api.beginCloudSession(), detectedAt = f.time.now(), result = { state: 'closed', fatigueScore: 61.4 };
   const queue = { current: waitingFor === 'earlier event' ? wait.promise : Promise.resolve() }, count = { current: 0 };
-  const monitor = readFileSync(new URL('../app/monitor.tsx', import.meta.url), 'utf8');
+  const monitor = readNativeMonitorSourceOwners().cloud;
   const from = monitor.indexOf("    const alerting = result.state === 'closed';"), end = '    prevAlertingRef.current = alerting;';
   assert.ok(from >= 0 && monitor.indexOf(end, from) > from);
   vm.runInNewContext(monitor.slice(from, monitor.indexOf(end, from) + end.length), {
@@ -345,4 +346,13 @@ for (const [header, expected] of [['60', 60_000], ['999999999', 900_000], ['inva
   const f = cloudFixture(); f.transport = async () => Response.json({ error: 'event_rate_limited' }, { status: 429, headers: { 'Retry-After': header } });
   await f.api.queueNativeCloudAlert(f.api.beginCloudSession(), 30, new Date(f.time.now()).toISOString());
   assert.equal(f.api.nativeCloudEventRetryStatus().nextAttemptAt - f.time.now(), expected);
+});
+test('simulator input disables native retry construction and every cloud request even with its flag enabled', async () => {
+  const f = cloudFixture({ enabled: true, simulatorTrace: true });
+  assert.equal(await f.api.beginCloudSession(), null);
+  assert.equal(f.api.queueNativeCloudAlert(Promise.resolve(SESSION), 90, new Date(f.time.now()).toISOString()), null);
+  assert.equal(f.api.nativeCloudEventRetryStatus(), null);
+  assert.equal(f.storage.has(EVENT_OUTBOX_KEY), false);
+  assert.equal(f.listeners.length, 0);
+  assert.equal(f.calls.length, 0);
 });

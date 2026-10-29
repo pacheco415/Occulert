@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readNativeMonitorSourceOwners } from './monitor-source-owners.mjs';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -71,14 +72,13 @@ export function createCaptureCameraFixture({ device, onCaptureConfiguration = ()
 
 /** Execute the actual screen's configuration callback, recovery and watchdog. */
 export function createCaptureWatchdogFixture({ readInterruption = async () => unknownCameraInterruption('front') } = {}) {
-  const filename = new URL('../../app/monitor.tsx', import.meta.url).pathname;
-  const source = readFileSync(filename, 'utf8');
-  const ast = babel.parseSync(source, { filename, babelrc: false, configFile: false, parserOpts: { plugins: ['typescript', 'jsx'] } });
-  const callbacks = new Map();
+  const owners = readNativeMonitorSourceOwners();
+  const callbacks = new Map(), sourceByNode = new WeakMap();
   let watchdogEffect;
   let lifetimeEffect;
-  function visit(node) {
+  function visit(node, source) {
     if (!node || typeof node !== 'object') return;
+    sourceByNode.set(node, source);
     if (node.type === 'VariableDeclarator' && node.init?.callee?.name === 'useCallback') callbacks.set(node.id.name, node.init.arguments[0]);
     if (node.type === 'CallExpression' && node.callee?.name === 'useEffect') {
       const callback = node.arguments[0];
@@ -86,11 +86,14 @@ export function createCaptureWatchdogFixture({ readInterruption = async () => un
       if (callback?.body?.body?.some(statement => statement.expression?.left?.object?.name === 'cameraScreenMountedRef')) lifetimeEffect = callback;
     }
     for (const value of Object.values(node)) {
-      if (Array.isArray(value)) value.forEach(visit);
-      else if (value && typeof value === 'object') visit(value);
+      if (Array.isArray(value)) value.forEach(item => visit(item, source));
+      else if (value && typeof value === 'object') visit(value, source);
     }
   }
-  visit(ast);
+  for (const { filename, source } of owners.cameraCallbacks) {
+    const ast = babel.parseSync(source, { filename, babelrc: false, configFile: false, parserOpts: { plugins: ['typescript', 'jsx'] } });
+    visit(ast, source);
+  }
   let now = 1_000, tick;
   const tracker = createMonitorPerformanceTracker();
   tracker.recordSessionStart(now);
@@ -133,7 +136,7 @@ export function createCaptureWatchdogFixture({ readInterruption = async () => un
   });
   const loadCallback = node => {
     assert.ok(node, 'the actual MonitorScreen callback exists');
-    const code = ts.transpileModule('exports.callback = ' + source.slice(node.start, node.end), {
+    const code = ts.transpileModule('exports.callback = ' + sourceByNode.get(node).slice(node.start, node.end), {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
     }).outputText;
     vm.runInContext(code, context, { timeout: 1000 });
