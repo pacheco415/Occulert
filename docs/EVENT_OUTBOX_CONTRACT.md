@@ -101,3 +101,55 @@ See [EVENT_IDEMPOTENCY.md](EVENT_IDEMPOTENCY.md) for the new local SQL/API
 implementation and its deployment gates. No web/native outbox adapter is enabled
 by it. Server consent generations, storage/lifecycle and device acceptance remain
 separate prerequisites.
+
+## Browser transport prerequisite (adapter still disabled)
+
+`/api/public-config` adds
+`capabilities.event_idempotency_protocol: "client_event_uuid_v1"` only when
+public Auth configuration and server storage are configured and the existing
+`OCCULERT_EVENT_IDEMPOTENCY_ENABLED` flag is exactly `true`. With the flag off,
+the public response is unchanged. This advertisement is a route capability,
+not proof of production migration coverage or consent authority.
+
+`OcculertBackend.eventOutboxCapability()` checks that exact protocol in the
+cached successful configuration response. Unknown protocols, failed responses
+and configuration attempts superseded by an explicit refresh fail closed. The
+existing Auth configuration object and legacy `logEvent` method stay unchanged.
+
+`logQueuedEvent(sessionId, type, details, isCurrent, { signal })` supplies one
+keyed attempt. `details` requires a UUID `client_event_id` and accepts only
+optional canonical ISO `occurred_at`, fatigue score and confidence. Metrics are
+finite numbers from 0 through 100 or null. It snapshots those primitive fields,
+requires a synchronous `isCurrent() === true` owner/consent predicate, captures
+the Auth lifecycle before awaiting configuration or refresh, and rechecks both
+at dispatch and completion. The method itself requires the exact capability.
+It never removes the key, normalizes the payload, falls back to legacy sending,
+replays a 401, or retries any event POST. Routine pre-dispatch token refresh may
+still occur within the captured login.
+
+Results retain `{ status, ok, body }`. A 429 may additionally expose
+`retryAfterMs`, parsed from [Retry-After delta-seconds or a canonical HTTP-date](https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after) and bounded to
+0–900,000 milliseconds. Malformed or oversized values are omitted; raw response
+headers are not exposed. This is metadata only: no timer or retry is scheduled.
+The eventual adapter/core must persist backoff and clamp it to immutable expiry.
+Any explicit timestamp-rejection transition must also be persisted before a
+later attempt; the transport does not perform that transition.
+
+The actual POST has the existing eight-second header/body deadline and accepts
+an AbortSignal. An abort or timeout is uncertain, represented as 503, rather
+than acknowledgement or proof that no commit occurred. Shared configuration
+and Auth/Web Lock waits are not cancelled globally: the adapter must race its
+**whole attempt** against its own eight-second deadline, abort its signal and
+release ownership at that boundary. Late shared work then cannot send an event.
+Do not call this prerequisite without that adapter boundary and cross-tab owner.
+
+The local `occulert:auth-lifecycle` Event has no detail payload. It signals an
+explicit Auth attempt, new-login adoption or local sign-out/clearing; consumer
+errors cannot stop Auth cleanup. Routine same-login refresh does not emit it.
+Other tabs still use the browser's storage event. A future adapter must compare
+the login identity, revoke its consent generation and clear its own queue on
+real account/login changes; this notification does not activate that behavior.
+
+`npm run test:event-outbox-transport` covers the public gate, legacy behavior,
+one-attempt identity, Retry-After bounds, revocation, cancellation and response
+deadlines. No running source imports the outbox or calls these new methods yet.

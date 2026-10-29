@@ -26,11 +26,15 @@ module.exports = function handler(request, response) {
   const url = validSupabaseUrl(process.env.SUPABASE_URL);
   const anonKey = String(process.env.SUPABASE_ANON_KEY || "").trim();
   const configured = Boolean(url && anonKey);
+  const capabilities = configured && serverStorageConfigured() && process.env.SESSION_START_RECOVERY_ENABLED === "true"
+    ? { session_start_protocol: "client_uuid_v1", session_lookup_protocol: "client_uuid_lookup_v1" } : {};
+  if (configured && serverStorageConfigured() && process.env.OCCULERT_EVENT_IDEMPOTENCY_ENABLED === "true") {
+    capabilities.event_idempotency_protocol = "client_event_uuid_v1";
+  }
 
   return json(response, 200, {
     ok: true,
-    capabilities: configured && serverStorageConfigured() && process.env.SESSION_START_RECOVERY_ENABLED === "true"
-      ? { session_start_protocol: "client_uuid_v1", session_lookup_protocol: "client_uuid_lookup_v1" } : {},
+    capabilities,
     supabase: configured ? { configured: true, url, anonKey } : { configured: false },
   });
 };
