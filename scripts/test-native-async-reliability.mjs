@@ -440,6 +440,7 @@ function monitorCameraStartFixture(stage) {
     ...h.React, React: h.React, ...frontCameraPolicy, ...monitorPerformance, ...monitorLifecycle,
     ...cameraSetup, ...cameraResilience, ...captureLoadPolicy, ...monitorThresholds, ...eyeBaselineModel,
     ...sensorFusion, ...sessionCompletion, ...monitorAlertPolicy, HeadNodDetector,
+    stopNativeCloudEvents() {}, queueNativeCloudAlert: () => null,
     EYE_BASELINE_EXPERIMENT: true, Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
     useRouter: () => router, useAccessibilityPreferences: () => ({ reduceMotion: true }),
     useCameraDevice: () => device, useCameraPermission: () => ({ hasPermission: true, requestPermission: async () => true }),
