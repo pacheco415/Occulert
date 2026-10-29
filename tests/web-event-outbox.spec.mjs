@@ -220,13 +220,38 @@ test('an unchecked tab cannot erase the live owner queue, and page reload never 
   await expect(page.locator('#cloudConsent')).not.toBeChecked(); expect(events).toHaveLength(1); expect(await rows(page)).toEqual(saved);
   await page.locator('#cloudConsent').check(); await expect.poll(async () => (await rows(page)).length).toBe(0); expect(events).toHaveLength(1);
 });
-test('two opted-in tabs use a single persistent owner and never concurrently send the same queue', async ({ page, context }) => {
+test('two opted-in tabs use a single persistent owner and never concurrently send the same queue', async ({ page, context }, testInfo) => {
   const events = await setup(page, { response: route => route.fulfill({ status: 429, headers: { 'Retry-After': '60' }, json: { ok: false, error: 'event_rate_limited' } }) });
   await emit(page); const saved = await rows(page);
   const other = await context.newPage(), otherEvents = await setup(other); await emit(other, 'yawn');
   expect(otherEvents).toHaveLength(1); expect(otherEvents[0]).not.toHaveProperty('client_event_id'); expect(await rows(other)).toEqual(saved);
   expect(events).toHaveLength(1);
-  await page.close(); await other.bringToFront(); await emit(other, 'head_nod');
-  expect(otherEvents).toHaveLength(2); expect(otherEvents[1]).toHaveProperty('client_event_id'); expect(otherEvents[1].client_event_id).not.toBe(saved[0].event.event_id);
-  expect(await rows(other)).toHaveLength(0); await other.close();
+  const handoff = [];
+  const observeLease = async phase => {
+    const observation = await other.evaluate(async phase => {
+      const name = 'occulert.event-outbox.live-tab.v1';
+      const snapshot = await navigator.locks.query();
+      let available = false;
+      await navigator.locks.request(name, { mode: 'exclusive', ifAvailable: true }, lock => { available = lock !== null; });
+      return { phase, at: performance.now(), available,
+        held: snapshot.held.filter(lock => lock.name === name).map(({ name, mode }) => ({ name, mode })),
+        pending: snapshot.pending.filter(lock => lock.name === name).map(({ name, mode }) => ({ name, mode })) };
+    }, phase);
+    handoff.push(observation);
+    return observation.available;
+  };
+  try {
+    expect(await observeLease('owner-live')).toBe(false);
+    expect(handoff.at(-1).held).toHaveLength(1);
+    await page.close(); await other.bringToFront();
+    // Closing a page can finish before WebKit releases its document's lease.
+    // Assert takeover only after a real nonblocking acquisition succeeds.
+    await expect.poll(() => observeLease('owner-closed')).toBe(true);
+    await emit(other, 'head_nod');
+    expect(otherEvents).toHaveLength(2); expect(otherEvents[1]).toHaveProperty('client_event_id'); expect(otherEvents[1].client_event_id).not.toBe(saved[0].event.event_id);
+    expect(await rows(other)).toHaveLength(0);
+  } finally {
+    await testInfo.attach('live-tab-lock-handoff', { body: Buffer.from(JSON.stringify(handoff, null, 2)), contentType: 'application/json' });
+    await other.close();
+  }
 });
