@@ -1,6 +1,6 @@
 
 (() => {
-  const corePath = '/driver-app.v86.js';
+  const corePath = '/driver-app.v100.js';
   let state = 'loading';
   const byId = id => document.getElementById(id);
   const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };

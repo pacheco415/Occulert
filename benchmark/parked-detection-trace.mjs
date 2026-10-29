@@ -21,10 +21,10 @@ export const traceContract=Object.freeze({detectorPrefix:corePrefix,runtimeVersi
  helperIntegrity:'sha256-'+createHash('sha256').update(helperBytes).digest('base64'),
  runtimePins:Object.freeze(runtime.files.map(({url,integrity})=>Object.freeze({url,integrity}))),
  modelIntegrity:runtime.files.find(pin=>pin.file==='face_landmarker.task').integrity});
-const knownFlags=new Set(['distractionConfidence','elapsed','noface','pitch','pixels','tasks','timePerclos']);
-function validateProvenance(s){
+const knownFlags=new Set(['calibrationMin','distractionConfidence','elapsed','noface','observer','pitch','pixels','tasks','timePerclos']);
+export function validateProvenance(s){
  const flags=s.experimentFlags;
- if(!Array.isArray(flags)||!flags.includes('tasks')||flags.some(flag=>!knownFlags.has(flag))||new Set(flags).size!==flags.length||
+ if(!Array.isArray(flags)||(!flags.includes('tasks')&&!flags.includes('observer'))||flags.some(flag=>!knownFlags.has(flag))||new Set(flags).size!==flags.length||
    flags.join('+')!==[...flags].sort().join('+')||s.detectorVersion!==traceContract.detectorPrefix+flags.join('+')||
    s.geometryUnits!==(flags.includes('pixels')?'pixels-reference-3x4':'normalized'))throw Error('Detector and experiment flags disagree');
  if(s.runtimeVersion!==traceContract.runtimeVersion||s.helperIntegrity!==traceContract.helperIntegrity||s.modelIntegrity!==traceContract.modelIntegrity||
@@ -39,7 +39,7 @@ export function adaptTrace(trace,{participant,split,episodes}={}){
  if(split!=='train'&&split!=='test')throw Error('Supply an explicit participant-level train/test split');
  if(!Array.isArray(episodes))throw Error('Supply independently labeled episodes (an explicit empty list is permitted)');
  const s=trace?.session;
- if(trace?.schema!=='occulert.parked-detection-trace'||trace.version!==1||!s||s.platform!=='web'||
+ if(trace?.schema!=='occulert.parked-detection-trace'||![1,2].includes(trace.version)||!s||s.platform!=='web'||
    typeof s.sessionId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(s.sessionId)||typeof s.detectorVersion!=='string'||!s.detectorVersion||
    !finite(s.durationMs)||s.durationMs<=0||!Array.isArray(trace.samples)||trace.samples.length>20000||!Array.isArray(trace.legacyAlerts)||trace.legacyAlerts.length>4096)throw Error('Invalid parked trace');
  validateProvenance(s);
@@ -53,6 +53,7 @@ export function adaptTrace(trace,{participant,split,episodes}={}){
   const row={session_id};
   for(let i=0;i<keys.length;i++){const value=sample[keys[i]];if(i>=18){if(typeof value!=='boolean')throw Error('Invalid trace boolean');row[columns[i+1]]=value?1:0}else{if(value!==null&&value!==undefined&&!finite(value))throw Error('Invalid trace measurement');row[columns[i+1]]=value??null}}
   for(const name of ['eyeBlinkLeft','eyeBlinkRight','jawOpen'])if(sample[name]!==null&&sample[name]!==undefined&&(sample[name]<0||sample[name]>1))throw Error('Invalid blendshape coefficient');
+  if(!s.experimentFlags.includes('tasks')&&(sample.tasksUsable||['eyeBlinkLeft','eyeBlinkRight','jawOpen','pitchDeg','yawDeg','tasksInferenceMs'].some(name=>sample[name]!==null&&sample[name]!==undefined)))throw Error('Observer-only trace cannot contain Tasks measurements');
   for(const name of ['legacyInferenceMs','tasksInferenceMs','combinedFrameMs','observedMs','closedMs'])if(sample[name]!==null&&sample[name]!==undefined&&sample[name]<0)throw Error('Invalid nonnegative measurement');
   if(sample.legacyUsable&&(sample.calibrating||sample.pitchDown))throw Error('Usable legacy frame contradicts calibration or downward pitch');
   if(sample.pitchDown&&!s.experimentFlags.includes('pitch'))throw Error('Downward pitch requires the selected pitch gate');

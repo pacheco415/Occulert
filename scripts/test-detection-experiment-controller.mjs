@@ -5,7 +5,10 @@ import {readFileSync} from 'node:fs';
 const sandbox={module:{exports:{}},URLSearchParams};
 vm.runInNewContext(readFileSync(new URL('../'+JSON.parse(readFileSync(new URL('../asset-versions.json',import.meta.url),'utf8'))['detection-experiments.js'],import.meta.url),'utf8'),sandbox);
 const models=sandbox.module.exports;
-function fixture(query) {
+const observerSandbox={module:{exports:{}},URLSearchParams};
+vm.runInNewContext(readFileSync(new URL('../src/detection-experiments.js',import.meta.url),'utf8'),observerSandbox);
+const observerModels=observerSandbox.module.exports;
+function fixture(query, selectedModels=models) {
   let time=0, wall=1700000000000, dims={width:360,height:480};
   const state={running:true,localSessionId:'local-fixture',calibrating:false,calibrated:true,calibrationUntil:0,calibrationSamples:[],
     baselineEAR:.28,baseClosedThreshold:.18,baseWatchThreshold:.22,eyeClosedThreshold:.18,eyeWatchThreshold:.22,
@@ -19,7 +22,7 @@ function fixture(query) {
     defaultCalibration:()=>{},defaultEyeMetrics:()=>0,alert:(reason,context)=>requests.push({reason,context}),
     detectorVersion:()=> 'legacy-fixture',provenance:()=>({}),render:()=>{},resetMouth:()=>{},clearEyes:()=>{},tracking:()=>{},
     captureCanvas:()=>({captured:true}),createTasks:()=>({sample:()=>null,stop:()=>{},status:()=> 'unavailable'})};
-  const flags=models.parseFlags(query),c=models.createController(b,flags);c.begin();
+  const flags=selectedModels.parseFlags(query),c=selectedModels.createController(b,flags);c.begin();
   return {c,state,requests,percents,statuses,b,at:(t)=>{time=t;wall=1700000000000+t},dims:d=>dims=d};
 }
 function scoreAt(h,t,{ear=.3,turned=false,nod=false,face=true,ratio=.375,nose=.55,missing=true}={}){
@@ -118,4 +121,30 @@ test('exported legacy support rejects pitch-unknown frames at the same boundary 
 test('the last calibration frame remains unsupported in the exported pipeline even when it finishes calibration',()=>{
  const h=fixture('?detector=tasks');h.state.calibrating=true;h.at(100);h.c.capture({currentTime:.1});h.c.legacyResult();h.state.calibrating=false;
  h.c.recordResults({},.3,.3,false);h.state.running=false;h.c.stop();const row=h.c.exportData().samples[0];assert.equal(row.calibrating,true);assert.equal(row.legacyUsable,false);assert.equal(row.tasksUsable,false);
+});
+
+test('observer CSV and legacy-only scalar trace share session identity and the same clock',()=>{
+ const h=fixture('?observer=1',observerModels);
+ assert.throws(()=>h.c.exportObserverEpisodes(),/Stop monitoring/);
+ for(const at of [100,250,400]){
+  h.at(at);h.c.capture({currentTime:at/1000});h.c.recordResults({},.3,.3,false);
+  if(at===100||at===400)assert.equal(h.c.markObserver('drowsy'),true);
+ }
+ h.at(550);h.c.markObserver('high_fatigue');h.state.fatigue=100;h.state.confidence=0;
+ h.at(800);h.c.recordAlert('Fatigue');h.state.running=false;h.c.stop();
+ assert.equal(h.c.exportObserverEpisodes(),'session_id,start_ms,end_ms,label\nlocal-fixture,100,400,drowsy\nlocal-fixture,550,800,high_fatigue\n');
+ const trace=h.c.exportData();assert.equal(trace.session.sessionId,'local-fixture');assert.equal(trace.session.durationMs,800);
+ assert.equal(trace.samples.length,3);assert.ok(trace.samples.every(row=>row.legacyUsable&&!row.tasksUsable));
+ assert.equal(trace.legacyAlerts[0].atMs,800);assert.equal(trace.session.observerEpisodes,2);
+ assert.equal(h.c.markObserver('drowsy'),false);
+ h.state.running=true;h.state.localSessionId='second-session';h.c.begin();
+ h.at(900);h.c.markObserver('drowsy');h.at(1000);h.state.running=false;h.c.stop();
+ assert.equal(h.c.exportObserverEpisodes(),'session_id,start_ms,end_ms,label\nsecond-session,100,200,drowsy\n');
+});
+
+test('malformed observer identity cannot block Stop or create an injectable CSV',()=>{
+ const h=fixture('?observer=1',observerModels);h.at(100);h.c.markObserver('drowsy');
+ h.state.localSessionId='injected,identity\n';h.at(200);h.state.running=false;
+ assert.doesNotThrow(()=>h.c.stop());assert.equal(h.c.exportObserverEpisodes(),null);
+ assert.equal(h.c.observerState().collecting,false);
 });

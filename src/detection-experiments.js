@@ -11,10 +11,10 @@
     const selected = { elapsed: matches('fatigue-timing', 'elapsed'), pixels: matches('ear-units', 'pixels'),
       tasks: matches('detector', 'tasks'), noface: matches('noface-escalation', '1'),
       timePerclos: matches('perclos', 'time'), pitch: matches('pitch-gate', '1'),
-      distractionConfidence: matches('distraction-confidence', 'stable') };
+      distractionConfidence: matches('distraction-confidence', 'stable'), observer: matches('observer', '1'), calibrationMin: matches('calibration-min', '12') };
     const names = Object.keys(selected).filter(key => selected[key]).sort();
     return Object.freeze({ ...selected, names: Object.freeze(names), any: names.length > 0,
-      primary: names.some(name => name !== 'tasks' && name !== 'distractionConfidence'), delegate: matches('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+      primary: names.some(name => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin'].includes(name)), delegate: matches('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
   }
 
   function eyeEAR(landmarks, indices, width, height) {
@@ -222,6 +222,32 @@
       poseUsable: !!pose && !pose.gimbal, tasksUsable: face && fields.eyeBlinkLeft !== null && fields.eyeBlinkRight !== null };
   }
 
+  // Independent observer input only; detector values never enter this model.
+  function createObserverEpisodes({ capacity = 256 } = {}) {
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 4096) throw Error('Invalid observer episode bound');
+    let rows = [], open = null, lastAt = 0, rejected = 0;
+    const validTime = at => finite(at) && at >= lastAt;
+    function close(at) {
+      if (open && at > open.start_ms) rows.push({ ...open, end_ms: at });
+      open = null;
+    }
+    function mark(label, at) {
+      if (!['drowsy', 'high_fatigue'].includes(label) || !validTime(at)) return false;
+      lastAt = at;
+      const previous = open?.label;
+      close(at);
+      if (previous === label) return true;
+      if (rows.length >= capacity) { rejected++; return false; }
+      open = { start_ms: at, label };
+      return true;
+    }
+    function stop(at) { if (!validTime(at)) return false; lastAt = at; close(at); return true; }
+    function reset() { rows = []; open = null; lastAt = rejected = 0; }
+    function entries() { return rows.map(row => ({ ...row })); }
+    function summary() { return { episodes: rows.length, activeLabel: open?.label ?? null, capacity, rejected }; }
+    return Object.freeze({ mark, stop, reset, entries, summary });
+  }
+
   const TRACE_FIELDS = Object.freeze(['frameId', 'atMs', 'mediaTime', 'rawEar', 'smoothedEar',
     'eyeBlinkLeft', 'eyeBlinkRight', 'jawOpen', 'pitchDeg', 'yawDeg', 'legacyInferenceMs',
     'tasksInferenceMs', 'combinedFrameMs', 'perclos', 'observedMs', 'closedMs', 'fatigue',
@@ -288,7 +314,7 @@
   }
 
   const api = Object.freeze({ parseFlags, eyeEAR, createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline,
-    createNoFaceEvidence, matrixPose, parseTasksResult, createTraceStore });
+    createNoFaceEvidence, matrixPose, parseTasksResult, createTraceStore, createObserverEpisodes });
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.OcculertDetectionExperiments = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -305,8 +331,34 @@
     let pitchDown = false, pitchUnknownLast = false, lossEpisode = null, lossRequested = false, calibrationDeadline = null;
     let distractionAt = null, previousDistracted = false, frame = null, frameSequence = 0, collector = null;
     let trace = models.createTraceStore(), lastTrace = null, invalidatedFrames = 0, skippedRepeatedFrames = 0;
+    let scoringReplay = null, scoringWallStart = 0, scoringOrder = 0;
+    const observer = flags.observer ? models.createObserverEpisodes() : null;
+    let lastObserverCsv = null;
     const units = value => flags.pixels ? value * 4 / 3 : value;
     const now = () => b.now();
+    function scoringSnapshot() {
+      const source = b.scoringState(), result = {};
+      const keys = ['fatigue','confidence','maxFatigue','fatigueSampleSum','fatigueSampleCount','perclosWindow','eyesClosedSince','microsleeps','lastMicro','turnedSince','totalDistractionMs','noFaceSince','lastFaceSeen','calibrating','calibrated','calibrationUntil','calibrationSamples','baselineEAR','baseClosedThreshold','baseWatchThreshold','eyeClosedThreshold','eyeWatchThreshold','lastAlert','earHistory','noseYHistory','lastNod','headNods'];
+      for (const key of keys) result[key] = source[key];
+      const snapshot = JSON.parse(JSON.stringify(result)), stamp = value => value === 0 ? 0 : 1700000000000 + value - scoringWallStart;
+      for (const key of ['eyesClosedSince','lastMicro','turnedSince','noFaceSince','lastFaceSeen','calibrationUntil','lastAlert','lastNod']) snapshot[key] = stamp(snapshot[key]);
+      snapshot.perclosWindow = snapshot.perclosWindow.map(row => ({ t: stamp(row.t), closed: row.closed }));
+      snapshot.noseYHistory = snapshot.noseYHistory.map(row => ({ y: row.y, t: stamp(row.t) }));
+      return snapshot;
+    }
+    function recordScoringInput(input) {
+      if (!active || !scoringReplay || !frame || frame.recorded || frame.generation !== generation) return;
+      frame.scoringInput = { order: ++scoringOrder, frameId: frame.frameId, atMs: now() - startedAt,
+        wallMs: input.wall - scoringWallStart, rawEar: input.hasFace ? input.rawEar : null,
+        ear: input.hasFace ? input.ear : null, hasFace: input.hasFace === true, faceMissing: input.faceMissing === true,
+        turned: input.turned === true, nod: input.nod === true, noseY: input.hasFace ? input.noseY : null,
+        sensitivity: b.scoringSettings().sensitivity, clocks: frame.scoringClocks ??= {} };
+    }
+    function recordScoringClock(phase, wall) {
+      if (!active || !scoringReplay || !frame || frame.recorded || frame.generation !== generation
+          || !['score','calibration','eye','distraction','nodSample','nodDecision','eligibility','trigger'].includes(phase)) return;
+      (frame.scoringClocks ??= {})[phase] = { wallMs: wall - scoringWallStart, atMs: now() - startedAt };
+    }
     function resetContinuity() {
       b.resetContinuous(); rates.reset(); evidence.reset(); previousNose = null; pitchUnknownLast = false;
       distractionAt = null; previousDistracted = false; lossEpisode = null; lossRequested = false;
@@ -335,11 +387,19 @@
       stop(); active = true; generation++; startedAt = now(); geometry = '';
       previousFrameAt = null; frameSequence = invalidatedFrames = skippedRepeatedFrames = 0;
       trace = models.createTraceStore(); lastTrace = null; calibrationRevision = 0;
+      observer?.reset(); lastObserverCsv = null;
       perclos.reset(); rates.reset(); baseline.reset(); evidence.reset();
       pitchBaseline = calibration = null; pitchDown = pitchUnknownLast = false; calibrationDeadline = null;
       previousNose = distractionAt = null; previousDistracted = false; lossEpisode = null; lossRequested = false;
       if (flags.pixels || flags.pitch) resetCalibration();
+      scoringReplay = null; scoringOrder = 0;
+      if ((flags.tasks || flags.observer) && typeof b.scoringState === 'function' && typeof b.scoringSettings === 'function') {
+        scoringWallStart = b.wallNow();
+        scoringReplay = { version: 1, epochMs: 1700000000000, initialState: scoringSnapshot(),
+          initialSettings: { ...b.scoringSettings() }, frames: [], controls: [], droppedFrames: 0, droppedControls: 0 };
+      }
       observeGeometry();
+      b.ui.observer?.();
       if (flags.tasks && typeof b.createTasks === 'function') {
         const owner = generation;
         collector = b.createTasks({ delegate: flags.delegate, onStatus: status => {
@@ -374,12 +434,12 @@
       }
       baseline.add(time, ear, ratio, !turned && Number.isFinite(ear) && ear > Math.max(units(.16), s.eyeWatchThreshold) && ear < units(.45) &&
         (!flags.pitch || ratio !== null));
-      const remaining = Math.max(0, s.calibrationUntil - b.wallNow()), progress = Math.min(100, Math.round((1 - remaining / b.calibrationMs) * 100));
+      const remaining = Math.max(0, s.calibrationUntil - b.wallNow('calibration')), progress = Math.min(100, Math.round((1 - remaining / b.calibrationMs) * 100));
       b.ui.calibration(progress + '%', 'Keep eyes open and face centered while parked… ' + progress + '%');
       if (!remaining) finishCalibration();
     }
     function eyeMetrics(ear, turned, down, time, unknown = false) {
-      const s = b.read(), wall = b.wallNow(), usable = Number.isFinite(ear) && !turned && !down && !unknown;
+      const s = b.read(), wall = b.wallNow('eye'), usable = Number.isFinite(ear) && !turned && !down && !unknown;
       const closed = usable && ear < s.eyeClosedThreshold;
       let percent;
       if (flags.timePerclos) percent = perclos.update(time, usable ? closed : null);
@@ -422,7 +482,8 @@
       }
     }
     function score(ear, turned, nod, hasFace, ratio = null, noseY = null, faceMissing = true, prepared = false) {
-      const time = now(), wall = b.wallNow();
+      const time = now(), wall = b.wallNow('score');
+      recordScoringInput({ ear, rawEar: frame?.scoringRawEar ?? ear, turned, nod, hasFace, noseY, wall, faceMissing });
       if (!prepared) prepareObservation(time, hasFace, faceMissing);
       previousFrameAt = time;
       const scale = flags.elapsed ? rates.scale(time, hasFace) : 1;
@@ -489,6 +550,7 @@
       const has = Array.isArray(lm) && [4, 234, 454].every(i => lm[i] && Number.isFinite(lm[i].x) && Number.isFinite(lm[i].y));
       prepareObservation(now(), has, !res.multiFaceLandmarks?.length);
       if (has) raw = (b.calcEAR(lm, b.left) + b.calcEAR(lm, b.right)) / 2;
+      if (frame) frame.scoringRawEar = raw;
       if (!has || !Number.isFinite(raw) || raw <= 0 || raw > 1) {
         b.clearEyes(); score(0, false, false, false, null, null, !res.multiFaceLandmarks?.length, true); b.tracking(false, false); b.render();
         recordResults(res, null, null, false); return;
@@ -504,7 +566,7 @@
       if (flags.pitch && (pitchDown || ratio === null && pitchBaseline !== null)) b.resetMouth(); else b.otherFaceMetrics(lm); b.tracking(true, ear > .05 && ear < .65); b.draw(lm); b.render(ear);
       const after = b.read();
       if (!after.calibrating && after.confidence >= 45 && after.fatigue >= 80) b.alert('Fatigue');
-      else if (!after.calibrating && after.confidence >= 45 && after.turnedSince && b.wallNow() - after.turnedSince > 6500) b.alert('Distraction');
+      else if (!after.calibrating && after.confidence >= 45 && after.turnedSince && b.wallNow('eligibility') - after.turnedSince > 6500) b.alert('Distraction');
       recordResults(res, raw, ear, turned);
     }
     function capture(video) {
@@ -520,7 +582,7 @@
       return frame;
     }
     function recordResults(res, rawEar, smoothedEar, turned) {
-      if (!active || !flags.tasks || !frame || frame.recorded || frame.generation !== generation) return;
+      if (!active || (!flags.tasks && !flags.observer) || !frame || frame.recorded || frame.generation !== generation) return;
       if (frame.calibrationRevision !== calibrationRevision) { invalidatedFrames++; frame.recorded = true; return; }
       const time = now(), s = b.read();
       let parsed = models.parseTasksResult(null), tasksMs = null;
@@ -530,25 +592,48 @@
       }
       const end = now(), support = flags.timePerclos ? perclos.snapshot() : null;
       trace.add({ frameId: frame.frameId, atMs: frame.at - startedAt, mediaTime: frame.mediaTime,
-        rawEar, smoothedEar, ...parsed, legacyUsable: frame.paired && Number.isFinite(rawEar) && !frame.calibrating && !s.calibrating && !turned && !pitchDown && (!flags.pitch || pitchBaseline === null || models.pitchRatio(res.multiFaceLandmarks?.[0]) !== null),
+        rawEar, smoothedEar, ...parsed, legacyUsable: (frame.paired || flags.observer && !flags.tasks) && Number.isFinite(rawEar) && !frame.calibrating && !s.calibrating && !turned && !pitchDown && (!flags.pitch || pitchBaseline === null || models.pitchRatio(res.multiFaceLandmarks?.[0]) !== null),
         tasksUsable: frame.paired && parsed.tasksUsable && !frame.calibrating && !s.calibrating,
         legacyInferenceMs: frame.legacyEndedAt === null ? null : Math.max(0, frame.legacyEndedAt - frame.inferenceStartedAt), tasksInferenceMs: tasksMs,
         combinedFrameMs: Math.max(0, end - frame.at), perclos: support?.perclos ?? null,
         observedMs: support?.observedMs ?? null, closedMs: support?.closedMs ?? null,
         fatigue: s.fatigue, confidence: s.confidence, calibrating: frame.calibrating || s.calibrating, pitchDown });
+      if (scoringReplay && frame.scoringInput) {
+        if (scoringReplay.frames.length === 2400) { scoringReplay.frames.shift(); scoringReplay.droppedFrames++; }
+        scoringReplay.frames.push(frame.scoringInput);
+      }
       frame.recorded = true;
     }
-    function recalibrate() { if (!active) return; if (flags.pixels || flags.pitch) resetCalibration(); else { resetContinuity(); perclos.reset(); calibrationRevision++; } }
+    function recalibrate() {
+      if (!active) return;
+      if (flags.pixels || flags.pitch) resetCalibration(); else { resetContinuity(); perclos.reset(); calibrationRevision++; }
+      if (scoringReplay) {
+        if (scoringReplay.controls.length === 256) { scoringReplay.controls.shift(); scoringReplay.droppedControls++; }
+        scoringReplay.controls.push({ order: ++scoringOrder, atMs: now() - startedAt,
+          wallMs: b.wallNow() - scoringWallStart, kind: 'recalibrate', state: scoringSnapshot(), settings: { ...b.scoringSettings() } });
+      }
+    }
     function qualifiedLoss(context) { return active && flags.noface && context === lossEpisode && context?.qualified && !b.read().calibrating; }
     function legacyResult() { if (active && frame && frame.generation === generation) frame.legacyEndedAt = now(); }
-    function recordAlert(reason) { if (active && flags.tasks) trace.recordAlert(now() - startedAt, reason); }
+    function recordAlert(reason) { if (active && (flags.tasks || flags.observer)) trace.recordAlert(now() - startedAt, reason); }
+    function markObserver(label) {
+      const marked = !!observer && active && observer.mark(label, Math.max(0, now() - startedAt));
+      if (marked) b.ui.observer?.();
+      return marked;
+    }
+    function observerState() { return observer ? { ...observer.summary(), collecting: active } : null; }
+    function exportObserverEpisodes() {
+      if (active || b.read().running) throw Error('Stop monitoring and remain parked before exporting.');
+      return lastObserverCsv;
+    }
     function summary() {
       return { version: 1, experimentFlags: flags.names, primary: 'legacy-ear', secondary: flags.tasks ? 'tasks-measurement-only' : null,
         alertsChangedByTasks: false, requestedDelegate: flags.tasks ? flags.delegate : null,
         usableDelegate: collector?.status?.() === 'ready' ? flags.delegate : null, comparisonStatus: collector?.status?.() ?? 'off',
         calibration, geometryUnits: flags.pixels ? 'pixels-reference-3x4' : 'normalized',
         timePerclos: flags.timePerclos ? perclos.snapshot(now()) : null,
-        ...trace.summary(), invalidatedFrames, skippedRepeatedFrames };
+        ...trace.summary(), invalidatedFrames, skippedRepeatedFrames,
+        ...(observer ? { observerEpisodes: observer.summary().episodes, observerRejected: observer.summary().rejected } : {}) };
     }
     function exportData() {
       if (active || b.read().running) throw Error('Stop monitoring and remain parked before exporting.');
@@ -557,18 +642,28 @@
     function stop() {
       if (active) {
         const s = b.read();
-        lastTrace = { schema: 'occulert.parked-detection-trace', version: 1,
-          session: { sessionId: s.localSessionId, durationMs: Math.max(0, now() - startedAt), platform: 'web',
+        const durationMs = Math.max(0, now() - startedAt);
+        if (observer) {
+          const stopped = observer.stop(durationMs);
+          lastObserverCsv = stopped && /^[A-Za-z0-9_-]{1,128}$/.test(s.localSessionId)
+            ? 'session_id,start_ms,end_ms,label\n' + observer.entries().map(row =>
+              [s.localSessionId, row.start_ms, row.end_ms, row.label].join(',')).join('\n') + '\n' : null;
+        }
+        lastTrace = { schema: 'occulert.parked-detection-trace', version: scoringReplay ? 2 : 1,
+          session: { sessionId: s.localSessionId, durationMs, platform: 'web',
             detectorVersion: b.detectorVersion(), ...b.provenance(), ...summary() },
-          samples: trace.samples(), legacyAlerts: trace.alerts() };
+          samples: trace.samples(), legacyAlerts: trace.alerts(),
+          ...(scoringReplay ? { scoringReplay: { ...scoringReplay, invalidatedFrames } } : {}) };
       }
       active = false; generation++; frame = null; pitchDown = pitchUnknownLast = false; lossEpisode = null; lossRequested = false;
+      b.ui.observer?.();
       if (collector) { collector.stop(); collector = null; }
       rates.reset(); baseline.reset(); evidence.reset(); previousNose = null;
       return lastTrace?.session ?? null;
     }
     return Object.freeze({ begin, stop, score, results, observeGeometry, finishCalibration, capture, recordResults,
-      qualifiedLoss, recordAlert, summary, exportData, units, legacyResult, recalibrate });
+      qualifiedLoss, recordAlert, summary, exportData, units, legacyResult, recalibrate, recordScoringInput, recordScoringClock, prepareObservation,
+      markObserver, observerState, exportObserverEpisodes });
   }
   const api = Object.freeze({ ...models, createController });
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -635,7 +730,7 @@ if(typeof module==='object'&&module.exports)module.exports=api;else root.Occuler
   faceStateEl, perclosEl, microsleepsEl, distractionEl, calibrationEl, calibrationFill,
   applySensitivity, resetContinuousObservations, updateCalibration, updateEyeMetrics,
   calcEAR, smooth, headTurn, detectHeadNod, log, updateTrackingState, drawEyes,
-  render, trigger, detectYawn, calcMAR, checkLightLevel */
+  render, trigger, detectYawn, calcMAR, checkLightLevel, scoringMetricState, scoringReadWallClock, lastAlert, calibrationMinimumSamples */
 /* global calibrating: writable, calibrated: writable, calibrationUntil: writable,
   sensitivityLevel: readonly, calibrationSamples: writable, baselineEAR: writable, baseClosedThreshold: writable,
   baseWatchThreshold: writable, eyeClosedThreshold: writable, eyeWatchThreshold: writable,
@@ -648,22 +743,59 @@ if(typeof module==='object'&&module.exports)module.exports=api;else root.Occuler
 function createMountedController(flags){
  const api=window.OcculertDetectionExperiments;let capturedCanvas=null;
  const controller=api.createController({
+ scoringState:()=>({...scoringMetricState(),lastAlert,calibrationUntil,calibrationSamples,baselineEAR,baseClosedThreshold,baseWatchThreshold}),
+ scoringSettings:()=>({sensitivity:sensitivityLevel,minimumSamples:calibrationMinimumSamples}),
  read:()=>({running,localSessionId,calibrating,calibrated,calibrationUntil,calibrationSamples,baselineEAR,baseClosedThreshold,baseWatchThreshold,eyeClosedThreshold,eyeWatchThreshold,fatigue,maxFatigue,confidence,fatigueSampleSum,fatigueSampleCount,noFaceSince,lastFaceSeen,perclosWindow,eyesClosedSince,lastMicro,microsleeps,turnedSince,totalDistractionMs}),
  write:s=>{({calibrating,calibrated,calibrationUntil,calibrationSamples,baselineEAR,baseClosedThreshold,baseWatchThreshold,eyeClosedThreshold,eyeWatchThreshold,fatigue,maxFatigue,confidence,fatigueSampleSum,fatigueSampleCount,noFaceSince,lastFaceSeen,perclosWindow,eyesClosedSince,lastMicro,microsleeps,turnedSince,totalDistractionMs}=s)},
- now:()=>typeof performance!=='undefined'&&typeof performance.now==='function'?performance.now():Date.now(),wallNow:()=>Date.now(),calibrationMs:CALIBRATION_MS,left:LEFT,right:RIGHT,
+ now:()=>typeof performance!=='undefined'&&typeof performance.now==='function'?performance.now():Date.now(),wallNow:phase=>scoringReadWallClock(phase),calibrationMs:CALIBRATION_MS,left:LEFT,right:RIGHT,
  dimensions:()=>({width:video.videoWidth,height:video.videoHeight}),applySensitivity:()=>applySensitivity(sensitivityLevel),
  resetContinuous:resetContinuousObservations,resetMouth:()=>{_mouthOpenSince=0;_marHist=[]},defaultCalibration:updateCalibration,defaultEyeMetrics:updateEyeMetrics,
  calcEAR,smooth,headTurn,detectNod:detectHeadNod,log,tracking:updateTrackingState,clearEyes:()=>ctx.clearRect(0,0,canvas.width,canvas.height),
  draw:lm=>drawEyes(lm,fatigue>=60?'#ff3344':fatigue>=35?'#ffaa00':'#00ff88'),render,alert:(reason,eligibility)=>trigger(reason,eligibility),
  otherFaceMetrics:lm=>{detectYawn(lm);const el=document.getElementById('marEl');if(el)el.textContent=calcMAR(lm).toFixed(2);checkLightLevel(video)},
  ui:{face:has=>{faceStateEl.textContent=has?'OK':'NO'},perclos:value=>{perclosEl.textContent=value===null?'--':Math.round(value)+'%'},microsleeps:n=>{microsleepsEl.textContent=n},distraction:n=>{distractionEl.textContent=n+'s'},
- calibration:(label,hint)=>{calibrationEl.textContent=label;calibrationFill.style.width=label==='DONE'||label==='DEFAULT'?'100%':label;if(calHint)calHint.textContent=hint;const rb=document.getElementById('recalBtn');if(rb)rb.style.display=label==='DONE'||label==='DEFAULT'?'block':'none'},tasks:value=>{const el=document.getElementById('experimentStatus');if(el)el.textContent='Parked experiment · local only · Tasks '+value}},
+ calibration:(label,hint)=>{calibrationEl.textContent=label;calibrationFill.style.width=label==='DONE'||label==='DEFAULT'?'100%':label;if(calHint)calHint.textContent=hint;const rb=document.getElementById('recalBtn');if(rb)rb.style.display=label==='DONE'||label==='DEFAULT'?'block':'none'},tasks:value=>{const el=document.getElementById('experimentStatus');if(el)el.textContent='Parked experiment · local only · Tasks '+value},observer:()=>refreshObserverPanel()},
  captureCanvas:input=>{const snapshot=capturedCanvas??=document.createElement('canvas');snapshot.width=input.videoWidth;snapshot.height=input.videoHeight;const context=snapshot.getContext('2d');if(!context||!snapshot.width||!snapshot.height)throw Error('No capture');context.drawImage(input,0,0);return snapshot},
  createTasks:options=>api.createTasks(options),detectorVersion:()=> 'web-v81:parked:'+flags.names.join('+'),provenance:()=>({runtimeVersion:'1.0.1-occulert.1',runtimePins:api.tasksPins,modelIntegrity:api.tasksPins.find(pin=>pin.url.endsWith('.task')).integrity,helperIntegrity:EXPERIMENT_HELPER_INTEGRITY,poseConvention:'column-major Rz Ry Rx metric-coordinate degrees; physical orientation unvalidated'})
  },flags);
+ function refreshObserverPanel(){
+  if(!flags.observer)return;
+  const state=controller.observerState(),active=state.collecting&&running;
+  const note=document.getElementById('observerLabelStatus');
+  if(note)note.textContent=state.rejected?'Episode limit reached. Stop and export before starting another session.':active?(state.activeLabel?'Marking '+state.activeLabel.replace('_',' ')+'. Press again to end.':'Labeling active. Mark only what you observe.'):'Labeling stopped. Start a new parked session or export the completed episodes.';
+  for(const [id,label]of [['observerDrowsy','drowsy'],['observerHighFatigue','high_fatigue']]){
+   const button=document.getElementById(id);if(button){button.disabled=!active;button.setAttribute('aria-pressed',String(state.activeLabel===label))}
+  }
+  const button=document.getElementById('exportObserverEpisodes');if(button)button.hidden=running||starting||!controller.exportObserverEpisodes();
+ }
+ if(flags.observer){
+  const panel=document.getElementById('observerLabels');
+  if(panel){panel.hidden=false;panel.style.removeProperty('display')}
+  // Hide all detector-derived indicators, logs and colored overlays from both
+  // visual and accessibility views. Keep Stop and lifecycle warnings usable.
+  for(const id of ['driverStatusBadges','alertScreen','breakBanner','report','feedbackCard']){
+   document.getElementById(id)?.style.setProperty('display','none','important');
+  }
+  for(const id of ['fatigue','confidence','faceState','ear','perclos','risk','riskDetail','microsleeps','nods','distraction','alerts','escalation','log','alertnessChart','calibration','yawnCountEl','marEl']){
+   document.getElementById(id)?.closest('.card')?.style.setProperty('display','none','important');
+  }
+  const mark=label=>{const marked=controller.markObserver(label);refreshObserverPanel();if(marked)panel?.focus({preventScroll:true})};
+  document.getElementById('observerDrowsy')?.addEventListener('click',()=>mark('drowsy'));
+  document.getElementById('observerHighFatigue')?.addEventListener('click',()=>mark('high_fatigue'));
+  document.addEventListener('keydown',event=>{
+   if(!running||starting||event.repeat||event.altKey||event.ctrlKey||event.metaKey||event.target?.isContentEditable||event.target?.closest?.('input,textarea,select,button,a'))return;
+   const label=event.code==='Space'||event.key===' '?'drowsy':event.key?.toLowerCase()==='h'?'high_fatigue':null;
+   if(label){event.preventDefault();mark(label)}
+  });
+  document.getElementById('exportObserverEpisodes')?.addEventListener('click',()=>{
+   if(running||starting)return;const csv=controller.exportObserverEpisodes();if(!csv)return;
+   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'})),link=document.createElement('a');link.href=url;link.download='occulert-observer-episodes.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  });
+  refreshObserverPanel();
+ }
  cloudConsent.checked=false;cloudConsent.disabled=true;
  const status=document.getElementById('experimentStatus');if(status){status.hidden=false;status.textContent='Parked experiment · local only · '+flags.names.join(', ')}
- const exportBtn=document.getElementById('exportDetectionTrace');if(exportBtn){exportBtn.hidden=!flags.tasks;exportBtn.addEventListener('click',()=>{
+ const exportBtn=document.getElementById('exportDetectionTrace');if(exportBtn){exportBtn.hidden=!flags.tasks&&!flags.observer;exportBtn.addEventListener('click',()=>{
   if(running||starting)return;const data=controller.exportData();if(!data){log('Run and stop a parked comparison first.');return}
   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='occulert-parked-detection.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  })}
