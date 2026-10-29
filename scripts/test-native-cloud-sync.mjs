@@ -182,7 +182,7 @@ assert.doesNotMatch(
 );
 
 assert.match(monitor, /beginCloudSession\(\)/);
-assert.match(monitor, /logCloudAlert\(sessionId, result\.fatigueScore\)/);
+assert.match(monitor, /logCloudAlert\(sessionId, result\.fatigueScore, occurredAt\)/);
 const completion = read('native-app/lib/sessionCompletion.ts');
 assert.match(monitor, /finalizeCompletedNativeSession/);
 assert.match(monitor, /finish: finishCloudSession/);
@@ -392,7 +392,7 @@ function signOutFixture(initial = cloudAuth()) {
   const body = cloud.replace(/^import[\s\S]*?;\s*/gm, '').replace(/^export /gm, '');
   const exports = {};
   vm.runInNewContext(`${stripTypeScriptTypes(body)}\nObject.assign(exports, {
-    getCloudState, signInToCloud, signOutOfCloud, setCloudSyncEnabled, loadAuth, refreshIfNeeded, cloudSessionScopes,
+    getCloudState, signInToCloud, signOutOfCloud, setCloudSyncEnabled, loadAuth, refreshIfNeeded, cloudSessionScopes, logCloudAlert,
     snapshot: () => ({ auth: authCache, authVersion: authMutationVersion, consent: consentRuntimeOverride }),
   });`, { exports, AbortController, Date, ...bindings }, { timeout: 1000 });
   fixture.api = exports;
@@ -406,6 +406,100 @@ function signOutFixture(initial = cloudAuth()) {
   };
   return fixture;
 }
+
+const eventRequests = fixture => fixture.requests.filter(({ url }) => url.endsWith('/api/events'));
+const eventBodies = fixture => eventRequests(fixture).map(({ init }) => JSON.parse(init.body));
+
+for (const wait of ['session creation', 'an earlier event']) {
+  test(`native monitor captures occurrence time before waiting for ${wait}`, async () => {
+    const f = signOutFixture(), pending = deferred();
+    const detectedAt = Date.parse('2026-10-28T20:00:00.000Z');
+    const queue = { current: wait === 'an earlier event' ? pending.promise : Promise.resolve() };
+    const from = monitor.indexOf("    const alerting = result.state === 'closed';");
+    const to = monitor.indexOf('    prevAlertingRef.current = alerting;', from);
+    assert.ok(from >= 0 && to > from, 'exercise the production monitor alert transition');
+    vm.runInNewContext(monitor.slice(from, to + '    prevAlertingRef.current = alerting;'.length), {
+      Date, now: detectedAt, result: { state: 'closed', fatigueScore: 61.4 },
+      prevAlertingRef: { current: false }, alertCountRef: { current: 0 }, setAlertCount() {},
+      cloudSessionRef: { current: wait === 'session creation' ? pending.promise : Promise.resolve('old-session') },
+      cloudEventQueueRef: queue, logCloudAlert: f.api.logCloudAlert,
+    });
+    await flushCloud();
+    assert.equal(eventRequests(f).length, 0, 'local alert handling must not wait for cloud work');
+    pending.resolve(wait === 'session creation' ? 'old-session' : undefined);
+    await queue.current;
+    assert.deepEqual(eventBodies(f), [{ session_id: 'old-session', type: 'drowsy', fatigue_score: 61, occurred_at: new Date(detectedAt).toISOString() }]);
+  });
+}
+
+for (const fallbackStatus of [200, 400, 401]) {
+  test(`native skew fallback sends only one untimed request, ending in ${fallbackStatus}`, async () => {
+    const f = signOutFixture();
+    f.transport = async () => cloudResponse(eventRequests(f).length === 1 ? 400 : fallbackStatus, { error: 'invalid_occurred_at' });
+    const detectedAt = '2030-01-01T00:00:00.000Z';
+    assert.equal(await f.api.logCloudAlert('old-session', 61.4, detectedAt), fallbackStatus === 200);
+    assert.deepEqual(eventBodies(f), [
+      { session_id: 'old-session', type: 'drowsy', fatigue_score: 61, occurred_at: detectedAt },
+      { session_id: 'old-session', type: 'drowsy', fatigue_score: 61 },
+    ]);
+    assert.equal(refreshRequests(f).length, 0, 'the untimed fallback must not trigger another authenticated event POST');
+    assert.equal(f.timers.size, 0);
+  });
+}
+
+for (const [status, error] of [[400, 'invalid_event'], [409, 'invalid_occurred_at'], [503, 'invalid_occurred_at']]) {
+  test(`native alert failure ${status} ${error} does not resend`, async () => {
+    const f = signOutFixture();
+    f.transport = async () => cloudResponse(status, { error });
+    assert.equal(await f.api.logCloudAlert('old-session', 40, '2026-10-28T20:00:00.000Z'), false);
+    assert.equal(eventRequests(f).length, 1);
+  });
+}
+
+test('native untimed alerts do not retry invalid_occurred_at', async () => {
+  const f = signOutFixture();
+  f.transport = async () => cloudResponse(400, { error: 'invalid_occurred_at' });
+  assert.equal(await f.api.logCloudAlert('old-session', 40), false);
+  assert.deepEqual(eventBodies(f), [{ session_id: 'old-session', type: 'drowsy', fatigue_score: 40 }]);
+});
+
+for (const change of ['sharing off', 'sharing off/on', 'account switch', 'logout/login', 'session finished']) {
+  test(`native timestamp fallback cannot survive ${change}`, async () => {
+    const f = signOutFixture(), started = deferred(), rejected = deferred();
+    const transport = f.transport;
+    f.transport = async (url, init) => {
+      if (url.endsWith('/api/events')) { started.resolve(); return rejected.promise; }
+      if (change === 'logout/login' && url.includes('grant_type=password')) return cloudResponse(200, cloudToken('old'));
+      return transport(url, init);
+    };
+    const pending = f.api.logCloudAlert('old-session', 40, '2030-01-01T00:00:00.000Z');
+    await started.promise;
+    if (change === 'sharing off' || change === 'sharing off/on') {
+      assert.equal(await f.api.setCloudSyncEnabled(false), true);
+      if (change === 'sharing off/on') assert.equal(await f.api.setCloudSyncEnabled(true), true);
+    } else if (change === 'session finished') {
+      f.api.cloudSessionScopes.delete('old-session');
+    } else {
+      if (change === 'logout/login') await f.api.signOutOfCloud();
+      assert.equal((await f.api.signInToCloud('driver@example.com', 'fixture-password')).ok, true);
+    }
+    rejected.resolve(cloudResponse(400, { error: 'invalid_occurred_at' }));
+    assert.equal(await pending, false);
+    assert.equal(eventRequests(f).length, 1);
+  });
+}
+
+test('a stalled native skew fallback remains bounded by the existing request deadline', async () => {
+  const f = signOutFixture(), stalled = deferred();
+  f.transport = async () => eventRequests(f).length === 1
+    ? cloudResponse(400, { error: 'invalid_occurred_at' }) : stalled.promise;
+  const pending = f.api.logCloudAlert('old-session', 40, '2030-01-01T00:00:00.000Z');
+  await flushCloud();
+  assert.equal(eventRequests(f).length, 2);
+  await f.expire();
+  assert.equal(await pending, false);
+  assert.equal(eventRequests(f).length, 2);
+});
 
 test('native sign-out invalidates local state and revokes once while token deletion is stalled', async () => {
   const f = signOutFixture(), deletion = deferred();

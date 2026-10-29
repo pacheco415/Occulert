@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v139';
+const CACHE = 'occulert-v148';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -39,7 +39,7 @@ const RUNTIME_ASSETS = [
   }
 ];
 const ALERT_AUDIO_ASSETS = [{ url: '/audio/alert.v1.wav', integrity: 'sha256-3fLbb34F09Mw3TsC1oy1Hkyg6pFnE5K5IbqP3YtPPCI=' }];
-const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v14.js","integrity":"sha256-btyIFTmCnTybGyGdyXFMWnzgywxWdovaFPVlCojSYoQ="}];
+const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v19.js","integrity":"sha256-dJ14YBpsImxDI8h3od5hMer0yTkIJA3gjVwQdwGP064="}];
 const EXPERIMENT_HELPER_ASSETS = [{"url":"/detection-experiments.v3.js","integrity":"sha256-M8psrrb+lz//+iJ/tcz/r2OIpnKXgAXmdE89dbS5BSY="}];
 const TASKS_RUNTIME_ASSETS = [{"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/vision_bundle.js", "integrity": "sha256-pCfCa2tALe6263Th9sdo0m7AzBWWlYyenj1RibfL9ao="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.js", "integrity": "sha256-4XDuZ91OFsGm/NiECiBmh+WlmyLCDkqQK8RFsJVFTXM="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.wasm", "integrity": "sha256-jaJ3pzOSbqzQR0uHBLNnQtbsMjHFeoYMW4id/48d+IY="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.js", "integrity": "sha256-6B1xWj1CzDNzYC6y96/3ldFkk022gOMklrZdq1N/llg="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.wasm", "integrity": "sha256-ooSDzULnToVb9evba0DZtmpbSeNelQILyXZp5oIqMZI="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/face_landmarker.task", "integrity": "sha256-ZBhOIpsmMQe8K4BMZiXbE0H/K7cxh0sLzC/mVE4Lyf8="}];
 const OPTIONAL_ASSETS = [...EXPERIMENT_HELPER_ASSETS, ...TASKS_RUNTIME_ASSETS];
@@ -79,7 +79,7 @@ const STATIC_ASSETS = [
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v69.css',
-  '/driver-app.v93.js',
+  '/driver-app.v98.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
@@ -119,6 +119,7 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v86.js',
   '/occulert-backend.v87.js',
   '/occulert-backend.v88.js',
+  '/occulert-backend.v89.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
   '/supabase-loader.v47.js',
@@ -131,9 +132,9 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passwordless-auth.v62.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
-  '/driver-startup-guard.v14.js',
+  '/driver-startup-guard.v19.js',
   '/driver-app.v60.js',
-  '/driver-app.v93.js',
+  '/driver-app.v98.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
   ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
@@ -145,7 +146,7 @@ const CRITICAL_OFFLINE_ASSETS = [
   '/base.v47.css',
   '/app.html',
   '/driver-app.v69.css',
-  '/driver-app.v93.js',
+  '/driver-app.v98.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;
@@ -274,6 +275,8 @@ self.addEventListener('fetch', event => {
 
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  // Let the browser handle foreign requests without consulting the app cache.
+  if (url.origin !== self.location.origin) return;
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
   if(url.origin===self.location.origin&&OPTIONAL_PATHS.has(url.pathname)){event.respondWith(verifiedOptionalResponse(req,url.pathname));return}
   if (url.origin === self.location.origin && NETWORK_ONLY_DOCUMENTS.has(url.pathname)) {
@@ -307,7 +310,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (req.mode === 'navigate' || req.url.endsWith('.html')) {
+  if (url.origin === self.location.origin && (req.mode === 'navigate' || req.url.endsWith('.html'))) {
     const networkAttempt = fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
     const cacheUpdate = networkAttempt
       .then(response => response && response.ok ? cacheResponseBestEffort(req, response) : null)
@@ -327,7 +330,7 @@ self.addEventListener('fetch', event => {
       if (match) return match;
       const integrity = url.origin === self.location.origin && RUNTIME_INTEGRITY.get(url.pathname);
       return fetch(integrity ? new Request(req, { integrity }) : req).then(res => {
-        if (res && res.ok && req.url.startsWith(self.location.origin)) {
+        if (res && res.ok && url.origin === self.location.origin) {
           const copy = res.clone();
           caches.open(CACHE).then(cache => cache.put(req, copy));
         }

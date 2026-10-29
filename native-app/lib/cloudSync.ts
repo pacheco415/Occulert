@@ -588,14 +588,29 @@ export async function beginCloudSession(): Promise<string | null> {
   return sessionId;
 }
 
-export async function logCloudAlert(sessionId: string, fatigueScore: number): Promise<boolean> {
+export async function logCloudAlert(sessionId: string, fatigueScore: number, occurredAt?: string): Promise<boolean> {
+  // A delayed alert belongs to the sharing choice and owner that started its
+  // session. Re-enabling sharing must not authorize an old queued alert.
+  const sessionScope = cloudSessionScopes.get(sessionId);
+  if (!sessionScope) return false;
   const syncContext = await currentSyncContext();
   if (!syncContext) return false;
-  const result = await backendApi('POST', '/api/events', {
+  if (sessionScope.ownerId !== syncContext.ownerId
+    || sessionScope.consentVersion !== syncContext.consentVersion) return false;
+  const event = {
     session_id: sessionId,
     type: 'drowsy',
     fatigue_score: Math.max(0, Math.min(100, Math.round(fatigueScore))),
-  }, true, syncContext);
+  };
+  const timed = typeof occurredAt === 'string' && Number.isFinite(Date.parse(occurredAt))
+    ? { ...event, occurred_at: occurredAt } : event;
+  let result = await backendApi('POST', '/api/events', timed, true, syncContext);
+  // Only a rejected occurrence time permits this one fallback. Keep the same
+  // captured context so revoked sharing or a new login cannot authorize it.
+  if (timed !== event && result.status === 400 && result.body?.error === 'invalid_occurred_at'
+    && cloudSessionScopes.get(sessionId) === sessionScope) {
+    result = await backendApi('POST', '/api/events', event, false, syncContext);
+  }
   return result.ok;
 }
 

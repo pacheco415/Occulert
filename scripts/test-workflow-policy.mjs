@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { auditWorkflowPolicy } from './lib/workflow-policy.mjs';
 
 const sha = '1234567890abcdef1234567890abcdef12345678';
@@ -74,8 +77,42 @@ test('browser container is immutable and matches the locked Playwright version',
   assert.ok(workflow.includes(`assert.equal(require('@playwright/test/package.json').version, '${image[1]}')`));
   assert.ok(workflow.includes('for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK)'));
   assert.ok(workflow.includes('run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit'));
-  assert.match(workflow, /- run: npm run test:browser\s*\n/);
+  assert.match(workflow, /run: npm run test:browser -- --project=\$\{\{ matrix\.browser \}\} --reporter=line,json --output=test-results\/browser\s*\n/);
   assert.doesNotMatch(workflow, /continue-on-error|--privileged|--cap-add|--ipc=host|playwright install --with-deps/);
+});
+
+test('both browser projects feed a stable check that rejects unsuccessful matrix results', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /browser: \[chromium, webkit\]/);
+  assert.match(workflow, /fail-fast: false/);
+  const aggregate = workflow.split('\n  smoke:\n')[1];
+  assert.match(aggregate, /name: smoke\n/);
+  assert.match(aggregate, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(aggregate, /needs: browser\n/);
+  assert.match(aggregate, /BROWSER_RESULT: \$\{\{ needs\.browser\.result \}\}/);
+  const command = aggregate.match(/^        run: (.+)$/m)?.[1];
+  assert.ok(command);
+  for (const result of ['success', 'failure', 'cancelled', 'skipped', '', 'unknown']) {
+    const ran = spawnSync('/bin/sh', ['-e', '-c', command], { encoding: 'utf8', env: { ...process.env, BROWSER_RESULT: result } });
+    assert.equal(ran.status === 0, result === 'success', result);
+  }
+});
+
+test('retry report inputs match each browser and artifacts cannot collide across matrix jobs or attempts', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /if: \$\{\{ matrix\.browser == 'webkit' \}\}/);
+  assert.match(workflow, /name: browser-test-diagnostics-\$\{\{ matrix\.browser \}\}-\$\{\{ github\.run_attempt \}\}/);
+  assert.match(workflow, /write-verification-receipt\.mjs browser-\$\{\{ matrix\.browser \}\}/);
+  assert.match(workflow, /name: verification-browser-\$\{\{ matrix\.browser \}\}-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}/);
+  const step = workflow.split('      - name: List browser tests that passed after retry\n')[1].split('      - name: Preserve browser failure')[0];
+  const command = step.split('        run: |\n')[1].split('\n').filter(Boolean).map(line => line.slice(10)).join('\n');
+  for (const browser of ['chromium', 'webkit']) {
+    const probe = 'node() { printf "%s\\n" "$@"; }\n' + command;
+    const ran = spawnSync('/bin/sh', ['-e', '-c', probe], { encoding: 'utf8', env: { ...process.env, BROWSER: browser } });
+    assert.equal(ran.status, 0, ran.stderr);
+    assert.deepEqual(ran.stdout.trim().split('\n'), ['scripts/report-browser-retries.mjs',
+      ...(browser === 'webkit' ? ['playwright-report/onboarding.json'] : []), 'playwright-report/browser.json']);
+  }
 });
 
 test('container ownership alignment is limited to its fresh checkout directory', () => {
@@ -95,4 +132,51 @@ test('container ownership alignment is limited to its fresh checkout directory',
     'test "$(stat -c %u:%g "$GITHUB_WORKSPACE")" = "$owner"'
   ]) assert.ok(workflow.includes(guard));
   assert.doesNotMatch(workflow, /safe\.directory|GIT_CONFIG_|chown\s+-|chmod/);
+});
+
+test('real event concurrency job is isolated, bounded and never uses production credentials', () => {
+  const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const workflow = read('../.github/workflows/event-concurrency.yml');
+  const build = read('./build-concurrency-postgres.sh');
+  const harness = read('./test-event-idempotency-concurrency.mjs');
+  assert.match(workflow, /contents: read/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /timeout-minutes: 25/);
+  assert.match(workflow, /npm ci --ignore-scripts --prefix scripts\/event-concurrency-runtime/);
+  assert.match(workflow, /node scripts\/test-event-idempotency-concurrency.mjs/);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.doesNotMatch(workflow + build, /pull_request_target|secrets\.|sudo\s|continue-on-error|supabase db|DATABASE_URL/);
+  assert.match(build, /version=17\.11/);
+  assert.match(build, /checksum=dd27f2b3c59e73ed14aa3324901242bf69a032a6347805f274e6260322d42979/);
+  assert.ok(build.indexOf('sha256sum --check --strict') < build.indexOf('tar -xjf'));
+  assert.match(build, /https:\/\/ftp\.postgresql\.org\/pub\/source/);
+  assert.match(build, /test "\$\(id -u\)" -ne 0/);
+  assert.match(harness, /listen_addresses=''/);
+  assert.match(harness, /host:root/);
+  assert.match(harness, /pg_blocking_pids/);
+  assert.doesNotMatch(harness, /await sleep\(100\)|pg_sleep/);
+  assert.match(harness, /assert.equal\(scenarios.length,6\)/);
+  assert.match(harness, /status:'passed'/);
+  const manifest = JSON.parse(read('./event-concurrency-runtime/package.json'));
+  const lock = JSON.parse(read('./event-concurrency-runtime/package-lock.json'));
+  assert.deepEqual(manifest.dependencies, {pg:'8.16.3'});
+  assert.equal(lock.packages['node_modules/pg'].version, '8.16.3');
+});
+
+
+test('concurrency harness rejects remote configuration before loading or starting PostgreSQL', () => {
+  const harness = fileURLToPath(new URL('./test-event-idempotency-concurrency.mjs', import.meta.url));
+  const base = {...process.env, OCCULERT_PG_TEST_RUNTIME: tmpdir()};
+  for (const key of ['DATABASE_URL','SUPABASE_URL','PGHOST','PGHOSTADDR','PGSERVICE','PGSERVICEFILE']) delete base[key];
+  for (const key of ['DATABASE_URL','SUPABASE_URL','PGHOST','PGHOSTADDR','PGSERVICE','PGSERVICEFILE']) {
+    const result = spawnSync(process.execPath, [harness], {env:{...base,[key]:'not-a-real-target'}, encoding:'utf8'});
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, new RegExp(`External database configuration is not accepted: ${key}`));
+  }
+  const args = spawnSync(process.execPath, [harness, '--url=not-a-real-target'], {env:base, encoding:'utf8'});
+  assert.notEqual(args.status, 0);
+  assert.match(args.stderr, /No arguments or database URLs accepted/);
+  const relative = spawnSync(process.execPath, [harness], {env:{...base,OCCULERT_PG_BIN:'relative'}, encoding:'utf8'});
+  assert.notEqual(relative.status, 0);
+  assert.match(relative.stderr, /must be an absolute local binary directory/);
 });

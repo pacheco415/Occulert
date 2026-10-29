@@ -94,3 +94,10 @@ acceptance. Before wiring: server/database dedup tests; reviewed privacy/retenti
 and session-end policy; web/native lifecycle adapters; token refresh/account
 switch tests; Retry-After handling; offline/online, timeout-after-commit, reload,
 sign-out and device acceptance. No deployment or build is authorized by these tests.
+
+## Server prerequisite implementation (still gated)
+
+See [EVENT_IDEMPOTENCY.md](EVENT_IDEMPOTENCY.md) for the new local SQL/API
+implementation and its deployment gates. No web/native outbox adapter is enabled
+by it. Server consent generations, storage/lifecycle and device acceptance remain
+separate prerequisites.
