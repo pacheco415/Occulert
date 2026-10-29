@@ -201,8 +201,11 @@ test('repeated offline browser experiment is isolated, bounded and failure prese
   assert.match(repeated, /set -o pipefail/);
   assert.ok(repeated.includes("--grep 'cached complete driver startup' --repeat-each=10 --retries=0 --workers=1 2>&1 | tee offline-browser-process.log"));
   assert.match(repeated, /name: offline-runtime-repeat-diagnostics/);
+  assert.match(repeated, /name: offline-runtime-repeat-diagnostics-\$\{\{ github\.run_attempt \}\}/);
   assert.match(repeated, /if-no-files-found: error/);
   assert.match(repeated, /retention-days: 7/);
+  assert.match(repeated, /write-verification-receipt\.mjs browser-webkit-offline-repeat '\$\{\{ job\.status \}\}'/);
+  assert.match(repeated, /name: verification-browser-webkit-offline-repeat-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}/);
   const guard = repeated.indexOf('test -z "$entries"');
   assert.ok(guard >= 0 && guard < repeated.indexOf('- uses: actions/checkout'));
   assert.ok(repeated.includes("assert.equal(require('@playwright/test/package.json').version, '1.64.1')"));

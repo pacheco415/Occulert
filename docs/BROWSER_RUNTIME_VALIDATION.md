@@ -51,3 +51,51 @@ available; lack of a crash signature means causality remains unconfirmed. A
 successful finite sample supports improvement, not a guarantee that all offline
 bugs are fixed. Hosted results must be read from checks on the exact PR head; preparing this
 change locally does not establish a browser pass.
+
+## Retained acceptance failure and current evaluation
+
+The [October 26 Linux run](https://github.com/pacheco415/Occulert/actions/runs/40396072913)
+tested PR #324 head `1a14deee56bf07a9eb833fcf4b1221ec9401f24d`, with
+GitHub's test merge `b7c9b2ce40acd236bdd08d26c71c401054b15c20`:
+
+- The independent offline job passed all twenty cases with no retries in
+  37.7 seconds. Its [process-log artifact](https://github.com/pacheco415/Occulert/actions/runs/40396072913/artifacts/12687460048)
+  remains the dated receipt, not evidence for every offline scenario.
+- The seven-case native form probe ran with **one worker**. Six passed;
+  `/account.html` failed on the first attempt and both retries. The log resolves
+  the Name label correctly, then waits for visibility/stability until the
+  unchanged thirty-second test deadline. The [diagnostic artifact](https://github.com/pacheco415/Occulert/actions/runs/40396072913/artifacts/12685084627)
+  retains all three traces. The full browser suite did not run.
+
+The [upstream r2370 regression](https://github.com/microsoft/playwright/issues/43426)
+reproduces near-zero paint rates for backdrop-filter pages on constrained Linux
+runners with Playwright 1.64.0/1.64.1. A
+[maintainer's follow-up](https://github.com/microsoft/playwright/issues/43426#issuecomment-6221528470)
+warns that newer alpha revisions only partly fix the problem when filters overlap.
+Occulert's account cards already disable blur, but its header, nested buttons,
+fields, badges and footer retain shipped filter effects. The correct label,
+populated DOM and white captured frame are consistent with that renderer defect;
+they do not by themselves establish its cause in Occulert.
+
+As checked October 28, the [latest official stable release](https://github.com/microsoft/playwright/releases/tag/v1.64.1)
+is still 1.64.1. Do not substitute an alpha, disable rendering effects, force
+clicks, reduce assertion coverage or extend the probe's test deadline to obtain
+a passing result. Reducing probe workers cannot address the retained failure:
+that run already used one.
+
+The refreshed workflow preserves main's parallel browser matrix, required
+`smoke` aggregate, retry report and verification receipts, plus the independent
+repeat job. Repeat-job artifact names include the run attempt and it now writes
+its own source/environment receipt. Every job using a browser keeps the exact
+same package, lockfile, container digest and runtime-version assertion.
+
+The form probe observes animation-frame callbacks without waiting for them or
+changing any actionability assertion. On failure only, it records a bounded
+JSON diagnostic with frame counts, label bounds/styles, font/viewport state,
+active filter metadata and runner CPU/memory availability. It records no form
+values. These observations help distinguish a missing label from a renderer
+stall on the next actual Linux run; they are not a rendering workaround.
+
+**The upgrade remains not ready for merge** until the unchanged Linux form
+probe, complete browser matrix and offline repetitions pass on the refreshed
+PR head. A local macOS pass cannot resolve a Linux-specific acceptance failure.
