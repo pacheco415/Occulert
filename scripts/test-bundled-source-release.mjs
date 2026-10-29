@@ -44,6 +44,25 @@ test('real bundled output and both release no-op modes preserve every file', () 
   assert.equal(auditSourceAssets(cwd).length, 2);
 }));
 
+test('real bundle audit supports a nested active output without changing compiled bytes', () => fixture(cwd => {
+  const manifest = json(cwd, 'asset-versions.json');
+  const prior = manifest['driver-app.js'], active = 'assets/runtime/' + prior;
+  const bytes = readFileSync(join(cwd, prior));
+  mkdirSync(join(cwd, 'assets/runtime'), { recursive: true });
+  writeFileSync(join(cwd, active), bytes);
+  manifest['driver-app.js'] = active;
+  writeFileSync(join(cwd, 'asset-versions.json'), JSON.stringify(manifest));
+  const integrity = json(cwd, 'asset-integrity.json'); integrity[active] = hash(bytes);
+  writeFileSync(join(cwd, 'asset-integrity.json'), JSON.stringify(integrity));
+  const before = snapshot(cwd);
+  const entry = auditSourceAssets(cwd).find(entry => entry.logical === 'driver-app.js');
+  assert.equal(entry.mode, 'bundle');
+  assert.equal(entry.active, active);
+  assert.equal(entry.sha256, hash(bytes));
+  assert.deepEqual(snapshot(cwd), before);
+  assert.deepEqual(readFileSync(join(cwd, prior)), bytes, 'retained output is unchanged');
+}));
+
 test('a real module edit releases compiled output and guard while pending work blocks dependency bumps', () => fixture(cwd => {
   const prior = json(cwd, 'asset-integrity.json'), entry = read(cwd, 'src/driver-app.js'), metrics = read(cwd, 'src/metrics.js');
   assert.ok(metrics.includes("'SAFE'")); writeFileSync(join(cwd, 'src/metrics.js'), metrics.replace("'SAFE'", "'READY'"));

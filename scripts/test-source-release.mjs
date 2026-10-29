@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { auditSourceAssets, commitAssetPlan } from './lib/source-assets.mjs';
+import { auditSourceAssets, commitAssetPlan, loadSourceAssets } from './lib/source-assets.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const script = join(root, 'scripts/bump-asset.mjs');
@@ -66,6 +66,45 @@ test('unchanged source and dry-run are exact filesystem no-ops', () => fixture(c
     assert.deepEqual(snapshot(cwd), before);
   }
   assert.equal(auditSourceAssets(cwd).length, 2);
+}));
+
+test('source audits accept nested copy output and check full-path integrity and bytes', () => fixture((cwd, original) => {
+  const active = 'assets/runtime/utility.v1.js';
+  write(cwd, active, original['utility.v1.js']);
+  const manifest = json(cwd, 'asset-versions.json'); manifest['utility.js'] = active;
+  write(cwd, 'asset-versions.json', JSON.stringify(manifest));
+  const hashes = json(cwd, 'asset-integrity.json'); hashes[active] = sha(original['utility.v1.js']);
+  write(cwd, 'asset-integrity.json', JSON.stringify(hashes));
+  const before = snapshot(cwd);
+  assert.equal(auditSourceAssets(cwd).find(entry => entry.logical === 'utility.js').active, active);
+  assert.deepEqual(snapshot(cwd), before, 'validation must not move or release files');
+  hashes[active] = '0'.repeat(64);
+  write(cwd, 'asset-integrity.json', JSON.stringify(hashes));
+  assert.throws(() => auditSourceAssets(cwd), /Source output integrity mismatch: assets\/runtime\/utility\.v1\.js/);
+  hashes[active] = sha(original['utility.v1.js']);
+  write(cwd, 'asset-integrity.json', JSON.stringify(hashes));
+  write(cwd, active, 'const altered=2;\n');
+  assert.throws(() => auditSourceAssets(cwd), /Source mismatch: utility\.js/);
+}));
+
+test('source output validation rejects unsafe locations and symlinked parents or files', () => fixture((cwd, original) => {
+  const manifest = json(cwd, 'asset-versions.json');
+  for (const active of ['src/utility.v1.js', '../utility.v1.js', '/utility.v1.js', 'assets/runtime/../utility.v1.js', 'assets/runtime/utility.v1.js?cache=1', 'assets/runtime/utility.js']) {
+    assert.throws(() => loadSourceAssets(cwd, { ...manifest, 'utility.js': active }), /Invalid active source asset: utility\.js/);
+  }
+  mkdirSync(join(cwd, 'assets'));
+  symlinkSync(cwd, join(cwd, 'assets/runtime'), 'dir');
+  const nested = { ...manifest, 'utility.js': 'assets/runtime/utility.v1.js' };
+  assert.throws(() => loadSourceAssets(cwd, nested), /symlink/i);
+  rmSync(join(cwd, 'assets/runtime'));
+  mkdirSync(join(cwd, 'assets/runtime'));
+  const output = join(cwd, nested['utility.js']);
+  symlinkSync(join(cwd, 'utility.v1.js'), output);
+  assert.throws(() => loadSourceAssets(cwd, nested), /symlink/i);
+  rmSync(output);
+  symlinkSync(join(cwd, 'missing.v1.js'), output);
+  assert.throws(() => loadSourceAssets(cwd, nested), /symlink/i);
+  assert.equal(read(cwd, 'utility.v1.js'), original['utility.v1.js']);
 }));
 
 test('one release composes every changed source, copied importer, guard and pins', () => fixture((cwd, original) => {
