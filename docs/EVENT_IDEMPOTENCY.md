@@ -5,8 +5,11 @@ This is the server-side prerequisite for the gated outbox in
 `OCCULERT_EVENT_IDEMPOTENCY_ENABLED` is **off by default**. The web adapter imports
 the shared engine only through its reviewed bundle and requires explicit client
 opt-in, current sharing consent, Web Locks and the exact advertised server protocol.
-Ordinary clients continue unkeyed best-effort sends. Native adoption and server
-flag changes remain separate gates; this document records no production state.
+The native adapter imports the same engine and separately requires the exact
+`EXPO_PUBLIC_EVENT_OUTBOX=1` client gate, current native sharing and advertised
+server protocol. No build profile enables it. Ordinary clients continue unkeyed
+best-effort sends. Server flag changes remain a separate gate; this document
+records no production state.
 
 ## Wire and atomic behavior
 
@@ -71,7 +74,7 @@ owner. No hashing of user credentials is involved.
 
 There is **no authoritative server consent-generation field in the current
 schema**. This change does not invent one or claim to verify consent revocation
-that has not reached the server. The web adapter fails closed on local logout,
+that has not reached the server. Both adapters fail closed on local logout,
 account switch and consent changes, and cannot recall an already dispatched
 request. Authoritative server revocation semantics require separate design.
 
