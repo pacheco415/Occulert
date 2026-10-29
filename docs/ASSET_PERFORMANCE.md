@@ -32,3 +32,17 @@ the outbox adapter remains disabled. These are local compressed measurements;
 they do not establish network latency or real-device startup performance.
 
 The selected set covers frequently loaded first-party entry assets. It does not represent the complete request waterfall, MediaPipe/WASM/model sizes, real-device heat or battery use. Existing startup and browser checks test behavior; physical-device startup measurements remain separate evidence.
+
+The gated web event adapter raises only the driver ceiling from 95 KB to 125 KB.
+`driver-app.v99.js` measures 120,762 raw bytes, 33,927 gzip bytes and 28,340 Brotli
+bytes, compared with 94,419 / 26,805 / 22,625 for v98: increases of 26,343 raw,
+7,122 gzip and 5,715 Brotli bytes. The measured increase contains the actual shared
+TypeScript delivery engine, bounded storage and lifecycle adapter, cross-tab
+ownership and pending/discard counters. Feature flags default off; the larger
+compiled artifact does not itself enable retries. Other per-asset ceilings are
+unchanged. Selected `STATIC_ASSETS` install bytes increase from 341,629 to 368,055
+(+26,426, including the new status element in HTML). Their separate review ceiling
+moves from 342 KB to 375 KB, which also accommodates the 125 KB driver ceiling.
+This selected total excludes separately budgeted runtime/model resources. These
+are local compression measurements, not device
+startup, network latency or operational rollout evidence.

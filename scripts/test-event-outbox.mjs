@@ -54,6 +54,75 @@ test('retry backoff and attempts are bounded', async () => {
   f.advance(16000); await f.outbox.flush(scope, send); assert.equal(calls, 5);
   assert.deepEqual(await f.outbox.pendingEntries(scope), []);
 });
+test('timestamp fallback persists untimed intent before a lost response and restart', async () => {
+  const f = fixture(), sent = [];
+  await f.outbox.enqueue(scope, event());
+  await f.outbox.flush(scope, async (row, delivery) => {
+    sent.push({ row, ...delivery });
+    if (sent.length === 1) return { status: 400, error: 'invalid_occurred_at' };
+    assert.equal(JSON.parse(f.raw()).rows[0].timestampMode, 'server');
+    throw Error('Accepted fallback response was lost');
+  });
+  assert.deepEqual(sent.map(row => row.timestampMode), ['detected', 'server']);
+  f.advance(2000);
+  const restarted = createEventOutbox(f.storage, f.current, f.config);
+  await restarted.flush(scope, async (row, delivery) => {
+    assert.deepEqual(row, event());
+    assert.equal(delivery.timestampMode, 'server');
+    return { status: 200 };
+  });
+  assert.deepEqual(await restarted.pendingEntries(scope), []);
+});
+test('a rejected untimed fallback is final and counts toward the five-send budget', async () => {
+  const f = fixture(); let calls = 0;
+  await f.outbox.enqueue(scope, event());
+  await f.outbox.flush(scope, async () => { calls++; return { status: 400, error: 'invalid_occurred_at' }; });
+  assert.equal(calls, 2);
+  assert.equal((await f.outbox.status(scope)).permanentRejected, 1);
+  assert.deepEqual(await f.outbox.pendingEntries(scope), []);
+});
+test('a timestamp rejection on the fifth send cannot create a sixth fallback attempt', async () => {
+  const f = fixture(); let calls = 0;
+  await f.outbox.enqueue(scope, event());
+  const send = async () => ++calls === 5 ? { status: 400, error: 'invalid_occurred_at' } : { status: 503 };
+  await f.outbox.flush(scope, send);
+  for (const delay of [1000, 2000, 4000, 8000]) { f.advance(delay); await f.outbox.flush(scope, send); }
+  assert.equal(calls, 5); assert.equal((await f.outbox.status(scope)).exhausted, 1);
+  assert.deepEqual(await f.outbox.pendingEntries(scope), []);
+});
+test('Retry-After survives restart and overrides exponential backoff without exceeding expiry', async () => {
+  const f = fixture(); let calls = 0;
+  await f.outbox.enqueue(scope, event());
+  await f.outbox.flush(scope, async () => { calls++; return { status: 429, retryAfterMs: 30_000 }; });
+  f.advance(29_999);
+  const restarted = createEventOutbox(f.storage, f.current, f.config);
+  await restarted.flush(scope, async () => assert.fail('Retry-After has not elapsed'));
+  f.advance(1);
+  await restarted.flush(scope, async () => { calls++; return { status: 429, retryAfterMs: 900_000 }; });
+  assert.equal(calls, 2);
+  assert.equal((await restarted.status(scope)).nextAttemptAt, start + 60_000);
+  f.advance(30_000);
+  assert.equal((await restarted.status(scope)).expired, 1);
+});
+test('session end invalidates pending enqueues and discards only that session', async () => {
+  const f = fixture();
+  await f.outbox.enqueue(scope, event());
+  await f.outbox.enqueue(scope, { ...event('event-2'), session_id: 'session-2' });
+  const queued = f.outbox.enqueue(scope, event('late'));
+  const ended = f.outbox.invalidateSession(scope, 'session-1');
+  assert.equal(await queued, false); await ended;
+  assert.deepEqual((await f.outbox.pendingEntries(scope)).map(row => row.event_id), ['event-2']);
+  assert.equal((await f.outbox.status(scope)).stopped, 1);
+  assert.equal(await f.outbox.enqueue(scope, event('after-end')), false);
+});
+test('all current alert types retain their identity without substitutions', async () => {
+  const f = fixture();
+  const types = ['drowsy', 'distracted', 'yawn', 'head_nod'];
+  for (const type of types) await f.outbox.enqueue(scope, { ...event(type), type });
+  const sent = [];
+  await f.outbox.flush(scope, async row => { sent.push(row.type); return { status: 200 }; });
+  assert.deepEqual(sent, types);
+});
 test('owner and consent generation isolate saved events', async () => {
   const f = fixture(); await f.outbox.enqueue(scope, event());
   for (const next of [{ ownerId: 'owner-b', consentVersion: 1 }, { ownerId: 'owner-a', consentVersion: 2 }]) {

@@ -4,8 +4,9 @@ import { applySensitivity, sensitivityLevel } from "./calibration.js";
 import "./metrics.js";
 import { escalationLevel, demoAlert, VOICE_MSGS, _voiceEnabled, initializeVoicePreference, speak, toggleVoice, triggerBreakCheck, dismissBreak, registerAcceptedAlertHook, set_alerts, set_escalationLevel } from "./alerts.js";
 import { logEvent, exportCSV, browserHistoryStore } from "./storage-history.js";
-import { queueBackendEvent, getCloudSummaryOutbox, retryCloudSummaries, initCloud } from "./cloud-sync.js";
+import { queueBackendEvent, getCloudSummaryOutbox, retryCloudSummaries, initCloud, changeWebEventConsent, initializeWebEventConsent } from "./cloud-sync.js";
 import { getPreference, experimentFlags, experimentController, startupAllowsMonitoring, demoBtn, calibrationEl, calibrationFill, alertsEl, alertScreen, logEl, reportEl, nodsEl, perclosEl, microsleepsEl, distractionEl, escalationEl, cloudConsent, cameraSourceSelect, cameraRefreshBtn, running, starting, fatigue, cloudConsentRevision, cloudSummaryClearPending, hiddenAt, CALIBRATION_MS, log, render, _sessionLog, initChart, updateChart, _isIOS, _isStandalone, triggerPWAInstall, loadExperimentController, publishDriverReadiness, initializeLocalLifecycle, handleVisibilityChange, startBtn, localSessionId, start, stop, set_unavailableCameraDeviceId, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_cloudConsentRevision, set_cloudSummaryClearPending, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_turnedSince, set_totalDistractionMs, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold, set_calibrating, set_calibrated, set_calibrationUntil, set_calibrationSamples, set_hiddenAt } from "./ui.js";
+initializeWebEventConsent();
 initializeLocalLifecycle();
 window.OcculertViewport = Object.freeze({ snapshot: cameraViewportSnapshot });
 window.addEventListener('resize', () => handleCameraViewportChange('resize'));
@@ -107,6 +108,7 @@ cloudConsent.addEventListener('change', () => {
         return;
     }
     (set_cloudConsentRevision(cloudConsentRevision + 1) - 1);
+    changeWebEventConsent();
     if (cloudSummaryClearPending && cloudConsent.checked) {
         try {
             const outbox = getCloudSummaryOutbox();
