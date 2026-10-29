@@ -46,6 +46,7 @@ test('parked output check leaves session telemetry untouched and is disabled whi
   const vibration = [];
   const timers = [];
   const context = {
+    experimentFlags: { observer: false },
     startupAllowsMonitoring: () => true,
     running: false,
     starting: false,
@@ -85,6 +86,11 @@ test('parked output check leaves session telemetry untouched and is disabled whi
   context.running = true;
   vm.runInNewContext('demoAlert();', context);
   assert.equal(sound.length, 1);
+  assert.equal(vibration.length, 1);
+  context.running = false;
+  context.experimentFlags.observer = true;
+  vm.runInNewContext('demoAlert();', context);
+  assert.equal(sound.length, 1, 'independent observer mode must not emit a parked test cue');
   assert.equal(vibration.length, 1);
 });
 
