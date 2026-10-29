@@ -1,30 +1,37 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { parseRuntimeAssetPath, resolveRuntimeAssetPath } from './asset-paths.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const manifest = readFileSync(new URL('../../asset-versions.json', import.meta.url), 'utf8');
 const versions = JSON.parse(manifest);
 
-export function asset(logicalName) {
-  const filename = versions[logicalName];
-  if (!filename) throw new Error(`Unknown active asset: ${logicalName}`);
-  return filename;
+// Keep fixture manifests independent of the checkout's active release.
+export function createAssetLookup(assetRoot, assetVersions) {
+  function checked(filename) {
+    resolveRuntimeAssetPath(assetRoot, filename);
+    return filename;
+  }
+  function asset(logicalName) {
+    if (!Object.hasOwn(assetVersions, logicalName)) throw new Error(`Unknown active asset: ${logicalName}`);
+    return checked(assetVersions[logicalName]);
+  }
+  function assetPath(logicalName) {
+    return parseRuntimeAssetPath(asset(logicalName)).publicPath;
+  }
+  // Several pages share one output; match its basename, retaining the full path.
+  function assetByStem(stemAndExtension) {
+    if (typeof stemAndExtension !== 'string' || !/^[\w-]+\.(js|css)$/.test(stemAndExtension)) throw new Error(`Invalid asset stem: ${stemAndExtension}`);
+    const matches = new Set(Object.values(assetVersions).filter(filename =>
+      parseRuntimeAssetPath(filename).logicalName === stemAndExtension));
+    if (matches.size !== 1) throw new Error(`Expected one active version of ${stemAndExtension}; found ${matches.size}`);
+    return checked([...matches][0]);
+  }
+  return { asset, assetPath, assetByStem };
 }
 
-export function assetPath(logicalName) {
-  return `/${asset(logicalName)}`;
-}
-
-// Several pages share one versioned file but use different manifest keys.
-export function assetByStem(stemAndExtension) {
-  const [stem, extension] = stemAndExtension.match(/^(.+)\.(js|css)$/)?.slice(1) ?? [];
-  if (!stem) throw new Error(`Invalid asset stem: ${stemAndExtension}`);
-  const matches = new Set(Object.values(versions).filter((filename) =>
-    filename.match(/^(.+)\.v\d+\.(js|css)$/)?.slice(1).join('.') === stemAndExtension));
-  if (matches.size !== 1) throw new Error(`Expected one active version of ${stemAndExtension}; found ${matches.size}`);
-  return [...matches][0];
-}
+export const { asset, assetPath, assetByStem } = createAssetLookup(root, versions);
 
 export function cacheName() {
   const source = readFileSync(new URL('../../sw.js', import.meta.url), 'utf8');

@@ -64,6 +64,15 @@ password, then register a new passkey from Account Settings. Email/password and
 the privacy-safe reset-link flow remain available for recovery. If the
 experimental provider is disabled, those existing methods continue to work.
 
+### Event identity and quotas (disabled)
+
+The optional `OCCULERT_EVENT_IDEMPOTENCY_ENABLED=true` route requires the
+reviewed migration and rollout gates in [docs/EVENT_IDEMPOTENCY.md](docs/EVENT_IDEMPOTENCY.md).
+Leave it off until schema/permission and multi-connection acceptance are verified.
+Turning it on also enables 60 accepted events/minute/user and 500/session quotas
+for legacy clients. It does not enable the web/native retry outbox. Do not also
+apply the overlapping unmerged PR #192 quota migration.
+
 ## 2. Collect your keys
 
 From Project Settings -> API, copy:

@@ -24,15 +24,80 @@ test('generated iOS HealthKit declarations include both Apple-required purpose s
   assert.notEqual(ios.entitlements['com.apple.developer.healthkit.background-delivery'], true);
 });
 
-test('Expo 58, React Native and the React renderer use matching supported versions', () => {
+test('Expo 58, React Native and the React renderer use matching supported versions', async () => {
   const expo = require('expo/package.json');
-  const bundled = require('expo/bundledNativeModules.json');
+  const expoRequire = createRequire(require.resolve('expo/package.json'));
+  const cliRoot = dirname(expoRequire.resolve('@expo/cli/package.json'));
+  const { getCombinedKnownVersionsAsync } = expoRequire(join(cliRoot, 'build/src/start/doctor/dependencies/getVersionedPackages.js'));
+  // Use the same compatibility source as expo install --check: Expo's online
+  // overrides can deliberately supersede the bundled dependency map.
+  const supported = await getCombinedKnownVersionsAsync({
+    projectRoot: fileURLToPath(new URL('../', import.meta.url)),
+    sdkVersion: `${expo.version.split('.')[0]}.0.0`, skipCache: true,
+  });
+  const { satisfies } = expoRequire('semver');
   const react = require('react/package.json').version;
   assert.match(expo.version, /^58\./);
-  assert.equal(require('react-native/package.json').version, bundled['react-native']);
-  assert.equal(react, bundled.react);
+  assert.ok(satisfies(require('react-native/package.json').version, supported['react-native']), 'React Native must match Expo compatibility requirements');
+  assert.ok(satisfies(react, supported.react), 'React must match Expo compatibility requirements');
   assert.equal(require('react-dom/package.json').version, react);
   assert.equal(require('react-test-renderer/package.json').version, react);
+});
+
+test('Expo compatibility overrides supersede the bundle and unavailable overrides preserve its fallback', () => {
+  const projectRoot = fileURLToPath(new URL('../', import.meta.url));
+  // Isolate the API fixtures in a child so the installed resolver, its bundle
+  // fallback and SDK normalization run without changing the online check above.
+  execFileSync(process.execPath, ['-e', `
+    const assert = require('node:assert/strict');
+    const { createRequire } = require('node:module');
+    const { dirname, join } = require('node:path');
+    const projectRoot = ${JSON.stringify(projectRoot)};
+    const appRequire = createRequire(join(projectRoot, 'package.json'));
+    const expoRequire = createRequire(appRequire.resolve('expo/package.json'));
+    const cliRoot = dirname(expoRequire.resolve('@expo/cli/package.json'));
+    const cliFile = path => join(cliRoot, 'build/src', path);
+    const { CommandError } = expoRequire(cliFile('utils/errors.js'));
+    const bundled = appRequire('expo/bundledNativeModules.json');
+    const { satisfies } = expoRequire('semver');
+    assert.equal(bundled['react-native'], '0.88.1');
+    let metadata = { sdkVersions: { '58.0.0': {
+      facebookReactNativeVersion: '0.88.0', facebookReactVersion: '19.3.0',
+    } } };
+    let sdkRequests = 0;
+    let nativeRequests = 0;
+    for (const [path, exports] of [
+      ['api/getVersions.js', { getVersionsAsync: async options => {
+        assert.equal(options.skipCache, true);
+        sdkRequests++;
+        return metadata;
+      } }],
+      ['api/getNativeModuleVersions.js', { getNativeModuleVersionsAsync: async sdk => {
+        assert.equal(sdk, '58.0.0');
+        nativeRequests++;
+        throw new CommandError('API', 'Controlled native-module endpoint failure');
+      } }],
+    ]) {
+      const filename = expoRequire.resolve(cliFile(path));
+      require.cache[filename] = { id: filename, filename, loaded: true, exports };
+    }
+    const { getCombinedKnownVersionsAsync } = expoRequire(cliFile('start/doctor/dependencies/getVersionedPackages.js'));
+    (async () => {
+      const options = { projectRoot, sdkVersion: '58.0.0', skipCache: true };
+      const supported = await getCombinedKnownVersionsAsync(options);
+      assert.equal(supported['react-native'], '0.88.0');
+      assert.equal(supported.react, '19.3.0');
+      assert.equal(supported['react-dom'], '19.3.0');
+      assert.equal(supported['expo-font'], bundled['expo-font']);
+      assert.ok(satisfies('0.88.0', supported['react-native']));
+      metadata = { sdkVersions: {} };
+      const fallback = await getCombinedKnownVersionsAsync(options);
+      assert.equal(fallback['react-native'], bundled['react-native']);
+      assert.equal(satisfies('0.88.0', fallback['react-native']), false);
+      assert.equal(sdkRequests, 2);
+      assert.equal(nativeRequests, 2);
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+  `], { cwd: projectRoot, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
 });
 
 for (const [consumer, intermediates] of [

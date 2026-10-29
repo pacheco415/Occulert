@@ -343,7 +343,9 @@ assertIncludes("db/schema.sql", "create table if not exists pilot_leads", "datab
 assertIncludes("pilot-signup.html", "<form class=\"card\"", "pilot signup controls must use a semantic form");
 try { auditDriverHooks(readFileSync(assetByStem('driver-app.js'), 'utf8')); }
 catch (error) { failures.push('Driver hooks: ' + error.message); }
-assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
+assertIncludes(`${assetByStem('driver-app.js')}`, "backend.startSession()", "driver app must start protected cloud sessions when opted in");
+assertIncludes(`${assetByStem('driver-app.js')}`, "backend.captureAuthLifecycle()", "cloud sessions must capture their auth lifecycle");
+assertIncludes(`${assetByStem('driver-app.js')}`, "scope.backend.isAuthLifecycleCurrent(scope.auth)", "cloud events must check the captured auth lifecycle");
 assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.createCloudSummaryOutbox", "driver app must finish protected cloud sessions through the durable outbox when opted in");
 assertIncludes(`${assetByStem('driver-app.js')}`, "queueBackendEvent", "driver app must queue protected alert events when opted in");
 assertIncludes(`${assetByStem('driver-app.js')}`, "function cameraRecoveryGuidance", "driver app must keep camera failure recovery guidance available");
@@ -440,8 +442,8 @@ const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
   const file = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");
   return total + statSync(join(root, file)).size;
 }, 0);
-// Include the compact driver and bounded viewport diagnostics with measured headroom.
-if (staticAssetBytes > 341_000) fail(`service worker install cache must remain at or below 341 KB (found ${staticAssetBytes} bytes)`);
+// Includes session-scoped cloud consent guards and the local-mode notice (341275 bytes).
+if (staticAssetBytes > 342_000) fail(`service worker install cache must remain at or below 342 KB (found ${staticAssetBytes} bytes)`);
 if (staticAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the experimental passkey client must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the passkey client must be listed as a network-only asset");
 if (staticAssets.includes(`'/${assetByStem('supabase-loader.js')}'`)) fail("the resilient Supabase loader must not be stored in the offline static cache");

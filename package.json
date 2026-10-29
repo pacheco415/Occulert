@@ -78,6 +78,7 @@
     "test:verify-runner": "node --test scripts/test-verify-runner.mjs scripts/test-verify-coverage.mjs",
     "test:asset-lineage": "node --test scripts/test-asset-lineage.mjs",
     "test:workflow-policy": "node --test scripts/test-workflow-policy.mjs",
+    "test:browser-retry-report": "node --test scripts/test-browser-retry-report.mjs",
     "test:deployment-ignore": "node --test scripts/test-deployment-ignore.mjs",
     "sitemap:update": "node scripts/update-sitemap.mjs",
     "audit:sitemap": "node scripts/update-sitemap.mjs --check",
@@ -98,6 +99,7 @@
     "asset:release": "node scripts/bump-asset.mjs --release",
     "audit:source-assets": "node scripts/audit-source-assets.mjs",
     "test:source-release": "node --test scripts/test-source-release.mjs",
+    "test:asset-paths": "node --test scripts/test-asset-paths.mjs scripts/test-current-assets.mjs",
     "test:history-model": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-history-model.mjs",
     "build": "node scripts/build-driver.mjs",
     "lint:source": "eslint src",
@@ -105,7 +107,10 @@
     "test:driver-build": "node --test scripts/test-driver-build.mjs scripts/test-driver-hook-policy.mjs scripts/test-bundled-source-release.mjs",
     "asset:retire": "node scripts/retire-assets.mjs",
     "test:asset-retirement": "node --test scripts/test-retire-assets.mjs",
-    "test:event-outbox": "tsc --noEmit --strict --target ES2022 --module nodenext --moduleResolution nodenext lib/event-outbox.ts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-event-outbox.mjs"
+    "test:event-outbox": "tsc --noEmit --strict --target ES2022 --module nodenext --moduleResolution nodenext lib/event-outbox.ts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-event-outbox.mjs",
+    "test:event-idempotency": "node --test scripts/test-event-idempotency.mjs",
+    "test:event-outbox-transport": "node --test scripts/test-event-outbox-transport.mjs",
+    "test:offline-cache-diagnostics": "node --test scripts/test-offline-cache-diagnostics.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
