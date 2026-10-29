@@ -37,7 +37,8 @@ Use `npm run asset:bump -- <logical-name> --dry-run` to review an asset release 
 ### Editable source pilot
 
 `source-assets.json` currently registers `driver-app.js` in bundle mode, built
-from `src/driver-app.js` and its eight domain modules. Edit the actual source,
+from `src/driver-app.js`, its nine domain modules and the exact shared
+`lib/event-outbox.ts` input. Edit the actual source,
 then review `npm run asset:release -- --dry-run` and run `npm run asset:release`.
 Release processes every changed registered source in one plan, copies its
 versioned importers, synchronizes
@@ -101,7 +102,7 @@ Retained old SDK loaders require their documented CDN compatibility grant during
 the existing 14-day retention window; remove it after the reference audit passes.
 
 The driver now uses the bundled source mode described in
-[docs/DRIVER_MODULES.md](docs/DRIVER_MODULES.md). Edit its eight modules and entry,
+[docs/DRIVER_MODULES.md](docs/DRIVER_MODULES.md). Edit its domain modules and entry,
 then release through `asset:release`; do not copy compiled output into the entry.
 Other logical assets retain the existing manual immutable release process.
 
@@ -109,7 +110,7 @@ The optional parked helper now has editable copy-mode source at
 `src/detection-experiments.js`, registered as `detection-experiments.js`.
 `asset:release` releases its changes together with the compiled driver and
 startup guard, synchronizing helper integrity and importer references in one
-cache update. The helper remains outside the nine-module driver bundle and
+cache update. The helper remains outside the driver bundle and
 loads only for selected parked experiments.
 
 ### Weekly retired asset cleanup
