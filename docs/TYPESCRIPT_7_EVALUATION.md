@@ -91,6 +91,14 @@ A separate migration could evaluate a pinned TypeScript 6 API compatibility
 package alongside the 7 CLI while preserving all syntax and dependency proofs.
 That arrangement is not implemented or validated by this evaluation.
 
+## Composed source follow-up
+
+PR [#342](https://github.com/pacheco415/Occulert/pull/342) subsequently merged
+the shared-source guard described above. It remains present on the integrated
+main `515a3cc4d623a502eac9924650d34b0b9212b6c8`; the supported compiler stays
+at 6.0.3. The candidate checks and 35-test results in this document describe the
+dated evaluation baseline, not a new 7.0.2 run against that later main.
+
 ## Final state
 
 Both `package.json` / `package-lock.json` pairs were restored byte-for-byte to
