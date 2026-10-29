@@ -1,9 +1,10 @@
+// GET /api/sessions   -> look up the authenticated driver's session by ID
 // POST /api/sessions  -> start a new driving session for the authenticated driver
 // PATCH /api/sessions -> end an existing session and record final scores
 //
 // Requires a Supabase Auth access token in the Authorization: Bearer header.
-// This endpoint is scaffolding: it returns 501 until SUPABASE_URL and
-// SUPABASE_SERVICE_ROLE_KEY are configured. See BACKEND_SETUP.md.
+// Reads and writes only sessions owned by the verified driver's profile.
+// Storage requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY; see BACKEND_SETUP.md.
 
 const supabaseLib = require("./_lib/supabase");
 const { supabaseErrorStatus } = require("./_lib/supabase-errors");

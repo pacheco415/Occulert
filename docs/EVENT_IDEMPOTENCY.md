@@ -1,9 +1,12 @@
 # Atomic event identity and quota prerequisite
 
-This is a server-side prerequisite for the disabled outbox in
-[EVENT_OUTBOX_CONTRACT.md](EVENT_OUTBOX_CONTRACT.md), not offline-upload rollout.
-`OCCULERT_EVENT_IDEMPOTENCY_ENABLED` is **off by default**. No client generates
-keys or imports the outbox in this change; no remote migration or flag is applied.
+This is the server-side prerequisite for the gated outbox in
+[EVENT_OUTBOX_CONTRACT.md](EVENT_OUTBOX_CONTRACT.md), not an offline-upload rollout.
+`OCCULERT_EVENT_IDEMPOTENCY_ENABLED` is **off by default**. The web adapter imports
+the shared engine only through its reviewed bundle and requires explicit client
+opt-in, current sharing consent, Web Locks and the exact advertised server protocol.
+Ordinary clients continue unkeyed best-effort sends. Native adoption and server
+flag changes remain separate gates; this document records no production state.
 
 ## Wire and atomic behavior
 
@@ -68,9 +71,9 @@ owner. No hashing of user credentials is involved.
 
 There is **no authoritative server consent-generation field in the current
 schema**. This change does not invent one or claim to verify consent revocation
-that has not reached the server. The future client adapter must fail closed on
-logout/account switch/consent changes, and server revocation semantics require
-separate design before retries are enabled.
+that has not reached the server. The web adapter fails closed on local logout,
+account switch and consent changes, and cannot recall an already dispatched
+request. Authoritative server revocation semantics require separate design.
 
 ## Reconciliation and deployment gates
 

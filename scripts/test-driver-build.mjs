@@ -3,6 +3,8 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writ
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { stripTypeScriptTypes } from 'node:module';
 import { parse } from 'acorn';
 import test from 'node:test';
 import { buildDriverArtifact, formatDriverBundle, inspectSourceGraph } from './lib/driver-build.mjs';
@@ -13,7 +15,7 @@ const graph = inspectSourceGraph(sourceRoot, contract);
 const ast = code => parse(code, { ecmaVersion: 2022, sourceType: 'script', ranges: true });
 const top = (code, name) => ast(code).body.find(node => node.type === 'FunctionDeclaration' && node.id.name === name);
 const replace = (code, node, text) => code.slice(0, node.start) + text + code.slice(node.end);
-function clone() { const cwd = mkdtempSync(join(tmpdir(), 'occulert-adapter-')); cpSync(sourceRoot, join(cwd, 'src'), { recursive: true }); cpSync(contractPath, join(cwd, 'driver-contract.json')); cpSync(join(root, 'package-lock.json'), join(cwd, 'package-lock.json')); return cwd; }
+function clone() { const cwd = mkdtempSync(join(tmpdir(), 'occulert-adapter-')); cpSync(sourceRoot, join(cwd, 'src'), { recursive: true }); mkdirSync(join(cwd, 'lib')); for (const input of contract.sharedInputs) cpSync(join(root, input), join(cwd, input)); cpSync(contractPath, join(cwd, 'driver-contract.json')); cpSync(join(root, 'package-lock.json'), join(cwd, 'package-lock.json')); return cwd; }
 function change(cwd, file, old, next) { const path = join(cwd, 'src', file), code = readFileSync(path, 'utf8'); assert.ok(code.includes(old), `fixture precondition: ${file}`); writeFileSync(path, code.replace(old, next)); }
 async function changed(body) { const cwd = clone(); try {
     return await body(cwd, () => buildDriverArtifact({ sourceRoot: join(cwd, 'src'), contractPath: join(cwd, 'driver-contract.json') }));
@@ -29,7 +31,7 @@ test('real modules compile deterministically with source bodies, ordered initial
     for (const key of ['initializerOrderExact', 'functionBodiesExact', 'sourceFunctionIdentityExact', 'sourceInitializersExact', 'sourceEffectOrderExact', 'serializedUtf8Exact', 'executableMarkersOwned'])
         assert.equal(base.proof[key], true);
     assert.equal(base.proof.partialPrefixFunctions.length, 50);
-    assert.equal(Object.keys(base.provenance.sourceInputs).length, 9);
+    assert.equal(Object.keys(base.provenance.sourceInputs).length, contract.modules.length + 1);
 });
 test('counterfeit compiled riskText cannot be certified against the unchanged real source', () => {
     const node = top(base.stock, 'riskText'), spoof = replace(base.stock, node, "function riskText(){return ['SPOOFED','safe']}");
@@ -191,4 +193,83 @@ test('contract, lock and module inputs must be regular owned files before reads'
  }
  const parent = join(cwd, 'linked-parent'); symlinkSync(cwd, parent, 'dir');
  await assert.rejects(() => buildDriverArtifact({ sourceRoot: join(cwd, 'src'), contractPath: join(parent, 'driver-contract.json') }), /owned directory/);
+}));
+
+test('the shared TypeScript input retains raw and erased hashes and exact compiler inputs', async () => changed(async (cwd, build) => {
+ const digest = value => createHash('sha256').update(value).digest('hex');
+ const path = join(cwd, 'lib/event-outbox.ts'), bytes = readFileSync(path);
+ assert.deepEqual(base.provenance.sharedInputs, [{ path: 'lib/event-outbox.ts', rawSha256: digest(bytes), erasedSha256: digest(stripTypeScriptTypes(bytes.toString('utf8'), { mode: 'strip' })) }]);
+ assert.deepEqual(base.provenance.compilerInputs, ['lib/event-outbox.ts', ...contract.modules.map(name => 'src/' + name)].sort());
+ assert.equal(base.provenance.sourceInputs['../lib/event-outbox.ts'], digest(bytes));
+ assert.deepEqual(base.provenance.typeScriptErasure, { implementation: 'node:module.stripTypeScriptTypes', mode: 'strip', nodeVersion: process.versions.node });
+ // Same-width type-only edits erase identically; actual values must reach the
+ // real compiler instead of a copied or pre-erased implementation.
+ const text = bytes.toString('utf8'); assert.ok(text.includes('ownerId: string'));
+ writeFileSync(path, text.replace('ownerId: string', 'ownerId: number'));
+ const typeOnly = await build();
+ assert.equal(typeOnly.code, base.code);
+ assert.notEqual(typeOnly.provenance.sharedInputs[0].rawSha256, base.provenance.sharedInputs[0].rawSha256);
+ assert.equal(typeOnly.provenance.sharedInputs[0].erasedSha256, base.provenance.sharedInputs[0].erasedSha256);
+ assert.ok(text.includes('15 * 60_000'));
+ writeFileSync(path, text.replace('15 * 60_000', '14 * 60_000'));
+ const changedValue = await build();
+ assert.notEqual(changedValue.code, base.code);
+ assert.notEqual(changedValue.provenance.sharedInputs[0].erasedSha256, base.provenance.sharedInputs[0].erasedSha256);
+ assert.ok(changedValue.code.includes('EVENT_OUTBOX_TTL_MS=14*6e4') || changedValue.code.includes('EVENT_OUTBOX_TTL_MS=14*60000'));
+}));
+
+test('a counterfeit compiled shared TypeScript function fails the original source identity proof', () => {
+ const node = top(base.stock, 'createEventOutbox'); assert.ok(node);
+ assert.throws(() => formatDriverBundle(replace(base.stock, node, 'function createEventOutbox(){return null}'), graph, contract), /Source function identity changed: createEventOutbox/);
+});
+
+for (const [label, input] of [['another shared path', ['lib/other.ts']], ['parent escape', ['../lib/event-outbox.ts']], ['duplicate input', ['lib/event-outbox.ts', 'lib/event-outbox.ts']], ['unregistered input', []]])
+ test(label + ' cannot expand the shared input allowlist', async () => changed(async (cwd, build) => {
+  writeFileSync(join(cwd, 'driver-contract.json'), JSON.stringify({ ...contract, sharedInputs: input }));
+  await assert.rejects(build, /Only the reviewed lib\/event-outbox.ts/);
+ }));
+
+for (const [label, declaration, expected] of [
+ ['alternate spelling', "import { createEventOutbox } from '../lib/./event-outbox.ts';", /imports must be explicit/],
+ ['another shared path', "import { createEventOutbox } from '../lib/other.ts';", /imports must be explicit/],
+ ['aliased shared binding', "import { createEventOutbox as otherOutbox } from '../lib/event-outbox.ts';", /aliases/],
+ ['default shared binding', "import createEventOutbox from '../lib/event-outbox.ts';", /aliases/],
+ ['namespace shared binding', "import * as sharedOutbox from '../lib/event-outbox.ts';", /aliases/],
+ ['side effect shared edge', "import '../lib/event-outbox.ts';", /requires named imports/],
+ ['dynamic input', "void import('../lib/event-outbox.ts');", /dynamic\/CommonJS/],
+ ['CommonJS input', "require('../lib/event-outbox.ts');", /dynamic\/CommonJS/],
+ ['outside re-export', "export { externalValue } from '../lib/untracked.ts';", /re-export dependencies/]
+]) test(label + ' is rejected before shared compilation', async () => changed(async (cwd, build) => {
+ const path = join(cwd, 'src/event-outbox-adapter.js');
+ const text = readFileSync(path, 'utf8');
+ writeFileSync(path, declaration + '\n' + text.replace(/^import[^;]+;\s*/m, ''));
+ await assert.rejects(build, expected);
+}));
+
+for (const dependency of ["import type { Hidden } from './untracked.ts';", "export type { Hidden } from './untracked.ts';", "type Hidden = import('./untracked.ts').Hidden;", "void import('./untracked.ts');"])
+ test('shared raw dependency is rejected even if erasure hides it: ' + dependency, async () => changed(async (cwd, build) => {
+  const path = join(cwd, 'lib/event-outbox.ts'); writeFileSync(path, readFileSync(path, 'utf8') + '\n' + dependency);
+  await assert.rejects(build, /shared input dependencies/);
+ }));
+
+test('nonerasable TypeScript and invalid shared UTF-8 fail before compiler output', async () => changed(async (cwd, build) => {
+ const path = join(cwd, 'lib/event-outbox.ts'), original = readFileSync(path);
+ writeFileSync(path, Buffer.concat([original, Buffer.from('\nenum UnsupportedSharedRuntime { Present }\n')]));
+ await assert.rejects(build, /not supported in strip-only mode/);
+ writeFileSync(path, Buffer.concat([original, Buffer.from([0xed, 0xa0, 0x80])]));
+ await assert.rejects(build, /shared input must be valid UTF-8/);
+}));
+
+test('shared input and its lib and parent directories reject links including dangling links', async () => changed(async (cwd, build) => {
+ const path = join(cwd, 'lib/event-outbox.ts'), original = readFileSync(path), outside = join(cwd, 'outside-shared.ts');
+ writeFileSync(outside, original);
+ for (const target of [outside, join(cwd, 'missing-shared.ts')]) {
+  rmSync(path); symlinkSync(target, path); await assert.rejects(build, /regular owned file/);
+  rmSync(path); writeFileSync(path, original);
+ }
+ rmSync(join(cwd, 'lib'), { recursive: true }); mkdirSync(join(cwd, 'outside-lib')); writeFileSync(join(cwd, 'outside-lib/event-outbox.ts'), original);
+ symlinkSync(join(cwd, 'outside-lib'), join(cwd, 'lib'), 'dir'); await assert.rejects(build, /owned directory/);
+ rmSync(join(cwd, 'lib')); mkdirSync(join(cwd, 'lib')); writeFileSync(path, original);
+ const linked = join(cwd, 'linked-root'); symlinkSync(cwd, linked, 'dir');
+ assert.throws(() => inspectSourceGraph(join(linked, 'src'), contract), /shared input parent must be an owned directory/);
 }));

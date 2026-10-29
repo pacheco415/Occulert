@@ -77,9 +77,9 @@ export function auditSourceAssets(root = process.cwd()) {
     if (integrity[entry.active] !== entry.sha256) throw new Error(`Source output integrity mismatch: ${entry.active}`);
   }
   const exclusions = new Set(readFileSync(join(root, '.vercelignore'), 'utf8').split(/\r?\n/).map(line => line.trim()));
-  for (const name of ['src/', 'build/', SOURCE_REGISTRY, ...(entries.some(entry => entry.mode === 'bundle') ? ['source-driver-contract.json', 'jsconfig.json', 'eslint.config.mjs'] : [])]) if (!exclusions.has(name)) throw new Error(`.vercelignore must exclude ${name}`);
+  for (const name of ['src/', 'build/', SOURCE_REGISTRY, ...(entries.some(entry => entry.mode === 'bundle') ? ['lib/', 'source-driver-contract.json', 'jsconfig.json', 'eslint.config.mjs'] : [])]) if (!exclusions.has(name)) throw new Error(`.vercelignore must exclude ${name}`);
   const worker = readFileSync(join(root, 'sw.js'), 'utf8');
-  if (/["'`]\/?(?:src\/|build\/|source-assets\.json|source-driver-contract\.json|jsconfig\.json|eslint\.config\.mjs)/.test(worker)) throw new Error('Development source must not enter the offline cache');
+  if (/["'`]\/?(?:src\/|lib\/|build\/|source-assets\.json|source-driver-contract\.json|jsconfig\.json|eslint\.config\.mjs)|["'`][^"'`]*\.tsx?(?:[?#][^"'`]*)?["'`]/.test(worker)) throw new Error('Development source must not enter the offline cache');
   return entries.map(({ logical, source, mode, active, sha256 }) => ({ logical, source, mode, active, sha256 }));
 }
 
@@ -141,6 +141,9 @@ export function synchronizeSourceEntry(root, entry, expected, beforeManifest, af
   const output = parse(bytes.toString('utf8'), { ecmaVersion: 2022, sourceType: 'script' });
   const pin = output.body.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === 'EXPERIMENT_HELPER_INTEGRITY')?.init;
   const changes = new Map(), overrides = {};
+  // Shared TypeScript stays in lib/ and is never rewritten as an importer.
+  // The override builder validates and copies its current raw bytes alongside
+  // staged src/ modules, then recompiles the complete graph for this equality.
   for (const name of contract.modules) {
     const path = 'src/' + name, original = readFileSync(ownedFile(root, path), 'utf8');
     let updated = pattern ? original.replace(pattern, value => replacements.get(value)) : original;
