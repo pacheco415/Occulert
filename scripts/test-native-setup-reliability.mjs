@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -225,7 +226,8 @@ test('session history groups sorted records by local calendar day without losing
 });
 
 test('native screens wire setup preview and recovery without changing detection inputs', () => {
-  const monitor = read('native-app/app/monitor.tsx');
+  const monitorOwners = readNativeMonitorSourceOwners();
+  const monitor = monitorOwners.screen;
   const home = read('native-app/app/index.tsx');
   const historyOwners = readHistorySourceOwners(read);
   const history = historyOwners.screen;
@@ -233,18 +235,18 @@ test('native screens wire setup preview and recovery without changing detection 
   const recovery = read('native-app/lib/sessionRecoveryModel.ts');
   const recoveryStorage = read('native-app/lib/sessionRecovery.ts');
 
-  assert.match(monitor, /isActive=\{isRunning \|\| setupPreviewActive\}/);
-  assert.match(monitor, /setupPreviewActiveRef\.current && !isRunningRef\.current/);
-  assert.match(monitor, /return;\s*}\s*\/\/ A frame already crossing/);
-  assert.match(monitor, /SESSION_CHECKPOINT_INTERVAL_MS = 15_000/);
+  assert.match(monitorOwners.view, /isActive=\{isRunning \|\| setupPreviewActive\}/);
+  assert.match(monitorOwners.analysis, /setupPreviewActiveRef\.current && !isRunningRef\.current/);
+  assert.match(monitorOwners.analysis, /return;\s*}\s*\/\/ A frame already crossing/);
+  assert.match(monitorOwners.checkpoint, /SESSION_CHECKPOINT_INTERVAL_MS = 15_000/);
   assert.match(monitor, /clearCheckpoint: clearActiveSessionCheckpoint/);
   const completion = readFileSync(new URL('../native-app/lib/sessionCompletion.ts', import.meta.url), 'utf8');
   assert.match(completion, /services\.clearCheckpoint\(snapshot\.activeSessionId\)/);
   assert.match(monitor, /await saveActiveSessionCheckpoint\(\{/,
     'monitoring must reserve recovery storage before camera startup');
   assert.match(monitor, /ActiveSessionCheckpointConflictError/);
-  assert.match(monitor, /RECOVERY REQUIRED/);
-  assert.match(monitor, /accessibilityLabel="Return Home to recover the previous drive"/);
+  assert.match(monitorOwners.view, /RECOVERY REQUIRED/);
+  assert.match(monitorOwners.view, /accessibilityLabel="Return Home to recover the previous drive"/);
   assert.match(monitor, /router\.replace\('\/'\)/,
     'blocked direct navigation must provide a clear route back through recovery');
   assert.match(monitor, /reservedSessionId && !monitoringStarted/,
@@ -372,7 +374,8 @@ test('system accessibility preferences disable decorative glass and motion only'
   const hook = read('native-app/hooks/useAccessibilityPreferences.ts');
   const glass = read('native-app/components/GlassSurface.tsx');
   const alerts = read('native-app/components/AlertSystem.tsx');
-  const monitor = read('native-app/app/monitor.tsx');
+  const monitorOwners = readNativeMonitorSourceOwners();
+  const monitor = monitorOwners.screen;
   assert.match(hook, /isReduceMotionEnabled\(\)/);
   assert.match(hook, /isReduceTransparencyEnabled\(\)/);
   assert.match(hook, /motionRevision === initialMotionRevision/);
@@ -386,7 +389,7 @@ test('system accessibility preferences disable decorative glass and motion only'
   assert.match(alerts, /const deliveryPlan = alertDeliveryPlan\(lv\)/);
   assert.match(alerts, /preferences\.hapticEnabled/);
   assert.match(alerts, /preferences\.audioEnabled/);
-  assert.match(monitor, /animationType=\{modalAnimationType\(reduceMotion\)\}/);
+  assert.match(monitorOwners.view, /animationType=\{modalAnimationType\(reduceMotion\)\}/);
 });
 
 test('reusable setup controls expose labels, states, hints, and large-text layouts', () => {
@@ -420,12 +423,13 @@ test('reusable setup controls expose labels, states, hints, and large-text layou
 });
 
 test('safe-stop choices remain readable and accessible at larger text sizes', () => {
-  const monitor = read('native-app/app/monitor.tsx');
-  assert.match(monitor, /accessibilityLabel="Safe stop options"/);
-  assert.match(monitor, /accessibilityViewIsModal/);
-  assert.match(monitor, /accessibilityHint=\{`\$\{option\.detail\}/);
-  assert.match(monitor, /safeStopOption: \{\s*minHeight: 64/);
-  assert.match(monitor, /safeStopCancel: \{ minHeight: 44/);
+  const monitorOwners = readNativeMonitorSourceOwners();
+  const monitor = monitorOwners.screen;
+  assert.match(monitorOwners.view, /accessibilityLabel="Safe stop options"/);
+  assert.match(monitorOwners.view, /accessibilityViewIsModal/);
+  assert.match(monitorOwners.view, /accessibilityHint=\{`\$\{option\.detail\}/);
+  assert.match(monitorOwners.styles, /safeStopOption: \{\s*minHeight: 64/);
+  assert.match(monitorOwners.styles, /safeStopCancel: \{ minHeight: 44/);
 });
 
 test('connected-device readiness refresh remains single-flight', () => {
