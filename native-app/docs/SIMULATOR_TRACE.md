@@ -155,3 +155,19 @@ path and the keyed event sender therefore remain unavailable in this variant.
 Production profile behavior and generated Info.plist comparison remain separate
 checks. The original 139-input receipt above remains historical; a composed
 native graph requires its own fresh archive/export, binary and scoring proof.
+
+The [separate composed receipt](SIMULATOR_TRACE_COMPOSED_PROOF_2026-10-28.json)
+records the fresh build from clean commit
+`3d89517a76ec484534f758fff844412ab29806cf`, completed at
+`2026-10-29T05:22:13.474Z`, with **141 recorded inputs** including the canonical
+shared engine. Its source SHA-256 is
+`28df17d7ac55cc9e2a618c792d3261f51446306781f5f54243cb05fec22b9930`.
+The inspected archive admitted 176 files and only that engine outside the native
+app. The actual iOS Hermes export resolved it once with exact source bytes.
+
+The fresh binary passed real simulator scoring and the recovery/banner/Stop
+interaction proof at `2026-10-29T05:27:31.115Z`, including `3017 ms` closed with
+fatigue `97` and a critical alert before face loss. Clean native verification
+passed **153 tests** and clean root verification passed **98 groups**. The later
+API-only main `11e2c6c` passed its affected API checks; all 141 built inputs
+still matched afterward. The original 139-input receipt remains unchanged.
