@@ -6,6 +6,7 @@
 // SUPABASE_SERVICE_ROLE_KEY are configured. See BACKEND_SETUP.md.
 
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
@@ -133,7 +134,7 @@ return json(response, 200, { ok: true, session: updated[0] });
 response.setHeader("Allow", "GET, POST, PATCH");
 return json(response, 405, { ok: false, error: "method_not_allowed" });
 } catch (error) {
-return json(response, 502, { ok: false, error: "supabase_error" });
+return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });
 }
 };
 

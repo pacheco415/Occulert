@@ -3,6 +3,7 @@
 
 const crypto = require("node:crypto");
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
@@ -70,7 +71,7 @@ module.exports = async function handler(request, response) {
         : known === "invalid_invitation" ? 404 : 410;
       return json(response, status, { ok: false, error: known });
     }
-    return json(response, 502, { ok: false, error: "supabase_error" });
+    return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });
   }
 };
 

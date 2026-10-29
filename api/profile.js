@@ -3,6 +3,7 @@
 // invitation/admin flow must perform that privileged assignment.
 
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
@@ -71,8 +72,8 @@ module.exports = async function handler(request, response) {
 
     if (!rows.length) return json(response, 502, { ok: false, error: "profile_not_saved" });
     return json(response, 200, { ok: true, driver: rows[0] });
-  } catch {
-    return json(response, 502, { ok: false, error: "supabase_error" });
+  } catch (error) {
+    return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });
   }
 };
 

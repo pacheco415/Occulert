@@ -28,3 +28,6 @@ source-assets.json
 source-driver-contract.json
 jsconfig.json
 eslint.config.mjs
+
+# Standalone event-outbox prototype is not a public runtime asset.
+lib/

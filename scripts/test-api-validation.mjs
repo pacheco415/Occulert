@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createRequire} from 'node:module';
-const require=createRequire(import.meta.url),{isUuid,numberOrNull,integerOrNull,validJsonBody}=require('../api/_lib/validation.js');
+const require=createRequire(import.meta.url),{isUuid,numberOrNull,strictNumberOrNull,integerOrNull,validJsonBody}=require('../api/_lib/validation.js');
 test('UUID validation never coerces client values',()=>{
  assert.equal(isUuid('f89d1cf9-893f-4fb6-a924-6669b4568221'),true);assert.equal(isUuid('F89D1CF9-893F-4FB6-A924-6669B4568221'),true);
  for(const value of [null,undefined,{},[],1,'','not-a-uuid',' f89d1cf9-893f-4fb6-a924-6669b4568221'])assert.equal(isUuid(value),false);
@@ -18,6 +18,19 @@ test('finite metrics preserve zeros, clamp bounds and do not coerce missing valu
  for(const value of ['Infinity','NaN','not a number',1n,new Number(1)])assert.equal(numberOrNull(value,0,100),null);
  for(const [input,expected] of [[0,0],['0',0],[-0.5,0],[0.49,0],[0.5,1],[9999.49,9999],[9999.5,10000],[10000,10000]])assert.equal(integerOrNull(input),expected);
  for(const value of [null,undefined,true,false,{},[],Infinity,NaN,' '])assert.equal(integerOrNull(value),null);
+});
+test('coordinates preserve finite in-range numbers and numeric strings without clamping',()=>{
+ for(const [min,max] of [[-90,90],[-180,180]]){
+  for(const value of [min,max,0,-0,12.5,-12.5])assert.equal(strictNumberOrNull(value,min,max),value);
+  for(const [value,expected] of [[String(min),min],[String(max),max],['0',0],['-0',-0],[' 12.5 ',12.5],['1e1',10],['0x10',16]])assert.equal(strictNumberOrNull(value,min,max),expected);
+  for(const value of [min-0.0001,max+0.0001,min-100,max+100,String(min-1),String(max+1),Number.MIN_SAFE_INTEGER,Number.MAX_SAFE_INTEGER])assert.equal(strictNumberOrNull(value,min,max),null);
+ }
+});
+test('coordinates do not turn missing, nonfinite or nonnumeric input into a location',()=>{
+ for(const value of [null,undefined,true,false,{},[],Infinity,-Infinity,NaN,'',' ','\t\n','Infinity','-Infinity','NaN','1e309','not a coordinate',1n,Symbol('invalid'),new Number(1),new String('1')]){
+  assert.equal(strictNumberOrNull(value,-90,90),null);
+  assert.equal(strictNumberOrNull(value,-180,180),null);
+ }
 });
 test('JSON requests require an exact media type, an object and a bounded serializable body',()=>{
  const request=(body,type='application/json')=>({body,headers:{'content-type':type}});

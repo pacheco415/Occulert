@@ -1,6 +1,7 @@
 // GET /api/fleet-period-report?days=7|30. Complete aggregate from the
 // server-owned fleet; no individual session, driver, or media data is returned.
 const { pgFetch, verifyAccessToken, bearerToken } = require('../supabase');
+const { supabaseErrorStatus } = require('../supabase-errors');
 const { isUuid, validTimestamp } = require('../fleet-history-cursor');
 
 const { json: sendJson } = require("../responses");
@@ -88,7 +89,7 @@ module.exports = async function handler(request, response) {
     if (['42883', 'PGRST202', 'PGRST205'].includes(code)) {
       return json(response, 503, { ok: false, error: 'period_report_not_enabled' });
     }
-    return json(response, 502, { ok: false, error: 'period_report_unavailable' });
+    return json(response, supabaseErrorStatus(error), { ok: false, error: 'period_report_unavailable' });
   }
 };
 

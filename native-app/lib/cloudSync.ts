@@ -590,8 +590,14 @@ export async function beginCloudSession(): Promise<string | null> {
 
 // occurredAt is captured when the alert is detected, before any queue wait.
 export async function logCloudAlert(sessionId: string, fatigueScore: number, occurredAt?: string): Promise<boolean> {
+  // A delayed alert belongs to the sharing choice and owner that started its
+  // session. Re-enabling sharing must not authorize an old queued alert.
+  const sessionScope = cloudSessionScopes.get(sessionId);
+  if (!sessionScope) return false;
   const syncContext = await currentSyncContext();
   if (!syncContext) return false;
+  if (sessionScope.ownerId !== syncContext.ownerId
+    || sessionScope.consentVersion !== syncContext.consentVersion) return false;
   const event = {
     session_id: sessionId,
     type: 'drowsy',
@@ -601,7 +607,8 @@ export async function logCloudAlert(sessionId: string, fatigueScore: number, occ
   let result = await backendApi<{ error?: string }>('POST', '/api/events', timed, true, syncContext);
   // The server bounds occurred_at by its own clock and the session's start. If
   // this phone's clock disagrees, send once more and let the server stamp it.
-  if (timed !== event && result.status === 400 && result.body?.error === 'invalid_occurred_at') {
+  if (timed !== event && result.status === 400 && result.body?.error === 'invalid_occurred_at'
+    && cloudSessionScopes.get(sessionId) === sessionScope) {
     result = await backendApi('POST', '/api/events', event, true, syncContext);
   }
   return result.ok;

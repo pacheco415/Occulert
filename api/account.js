@@ -4,6 +4,7 @@
 
 const { hasRecentAuthentication } = require("./_lib/recent-auth");
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const deleteAuthUser = supabaseLib.deleteAuthUser;
 const bearerToken = supabaseLib.bearerToken;
@@ -16,9 +17,11 @@ function validBody(request) {
   return validJsonBody(request, 256) && request.body.confirm === "DELETE";
 }
 
-function billingCleanupUnavailable() {
+function billingCleanupUnavailable(cause) {
   const error = new Error("billing_cleanup_unavailable");
   error.code = "billing_cleanup_unavailable";
+  error.status = cause && (cause.provider === "supabase" || cause.status === 504)
+    ? supabaseErrorStatus(cause) : 503;
   return error;
 }
 
@@ -40,7 +43,7 @@ async function deleteBillingCustomer(userId) {
   } catch (error) {
     // Databases without the test-billing migration have no billing rows.
     if (["42P01", "PGRST205"].includes(error && error.details && error.details.code)) return;
-    throw billingCleanupUnavailable();
+    throw billingCleanupUnavailable(error);
   }
   if (!row || !row.stripe_customer_id) return;
   try {
@@ -74,9 +77,9 @@ module.exports = async function handler(request, response) {
     return json(response, 200, { ok: true, deleted: true });
   } catch (error) {
     if (error && error.code === "billing_cleanup_unavailable") {
-      return json(response, 503, { ok: false, error: "billing_cleanup_unavailable" });
+      return json(response, error.status, { ok: false, error: "billing_cleanup_unavailable" });
     }
-    return json(response, 502, { ok: false, error: "account_deletion_failed" });
+    return json(response, supabaseErrorStatus(error), { ok: false, error: "account_deletion_failed" });
   }
 };
 

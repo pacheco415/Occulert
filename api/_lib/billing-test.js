@@ -1,4 +1,5 @@
 const { pgFetch, verifyAccessToken, bearerToken } = require("./supabase");
+const { supabaseErrorStatus } = require("./supabase-errors");
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CUSTOMER_RE = /^cus_[A-Za-z0-9]+$/;
@@ -84,7 +85,8 @@ function replyError(response, error) {
     "billing_not_started", "invalid_signature", "webhook_too_large",
   ]);
   const code = safe.has(error && error.message) ? error.message : "billing_unavailable";
-  const status = error && Number.isInteger(error.status) ? error.status : 502;
+  const status = error && error.provider === "supabase" ? supabaseErrorStatus(error)
+    : error && Number.isInteger(error.status) ? error.status : 502;
   return json(response, status, { ok: false, error: code });
 }
 
