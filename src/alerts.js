@@ -112,6 +112,8 @@ export function requestAlertPlaybackSession() {
 export function beginAlertAudioScope() {
     cancelStrongAlert();
     const owner = ++_alertAudioOwner;
+    if (experimentFlags.observer)
+        return owner;
     _alertAudioRequested = true;
     primeAlertAudio(true);
     return owner;
@@ -246,6 +248,8 @@ export function playFallbackAlert(dur, gain, repeat = false) {
 }
 /** @param {number} freq @param {number} dur @param {number} gain */
 export function tone(freq, dur, gain) {
+    if (experimentFlags.observer)
+        return;
     if (!_alertAudioRequested || document.hidden)
         return;
     try {
@@ -303,6 +307,9 @@ export function trigger(reason, eligibility) {
         escalationLevel = 0;
     escalationLevel = Math.min(4, escalationLevel + 1);
     lastEscalation = now;
+    // Parked independent labeling retains the decision and its timestamp but
+    // withholds detector cues from the observer.
+    if (!experimentFlags.observer) {
     const titles = ['DROWSY ALERT', 'LOUD ALERT', 'STRONG ALERT', 'PULL OVER NOW'];
     alertTitle.textContent = titles[Math.max(0, escalationLevel - 1)] || 'DROWSY ALERT';
     alertSub.textContent = escalationLevel >= 3 ? 'Pull over safely and rest' : 'Pull over safely';
@@ -373,13 +380,14 @@ export function trigger(reason, eligibility) {
         playStrongAlert(escalationLevel);
     else
         tone(escalationLevel >= 3 ? 1100 : 880, escalationLevel >= 3 ? 900 : 450, escalationLevel >= 3 ? .35 : .2);
+    }
     log((reason || 'Drowsy') + ' alert triggered - escalation ' + escalationLevel);
     pushFleet(true);
     if (typeof acceptedAlertHook === 'function')
         acceptedAlertHook(reason);
 }
 export function demoAlert() {
-    if (!startupAllowsMonitoring() || running || starting)
+    if (experimentFlags.observer || !startupAllowsMonitoring() || running || starting)
         return;
     const result = document.getElementById('alertCheckResult');
     const audioOwner = beginAlertAudioScope();
@@ -416,7 +424,7 @@ function readVoicePreference() {
 export const VOICE_MSGS = ['Pull over safely', 'Take a break, you are tired', 'Drowsiness detected, rest now', 'Danger! Pull over immediately'];
 /** @param {string} msg */
 export function speak(msg) {
-    if (!readVoicePreference() || !window.speechSynthesis)
+    if (experimentFlags.observer || !readVoicePreference() || !window.speechSynthesis)
         return;
     try {
         if (window.speechSynthesis.paused)
