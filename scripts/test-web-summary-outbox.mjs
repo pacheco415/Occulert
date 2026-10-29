@@ -132,12 +132,13 @@ function eventHarness() {
     beginBackendSession();`);
   return h;
 }
-for (const [label, change] of [
+const eventScopeChanges = [
   ['consent off', 'cloudConsent.checked = false; cloudConsentRevision++;'],
   ['consent off/on', 'cloudConsent.checked = false; cloudConsentRevision++; cloudConsent.checked = true; cloudConsentRevision++;'],
   ['account switch', "eventOwner = 'owner-b'; eventAuthRevision++;"],
   ['same-owner logout/login', "eventOwner = null; eventAuthRevision++; eventOwner = 'owner-a'; eventAuthRevision++;"],
-]) test(`queued event is discarded after ${label} while session is pending`, async () => {
+];
+for (const [label, change] of eventScopeChanges) test(`queued event is discarded after ${label} while session is pending`, async () => {
   const h = eventHarness();
   h.run(`queueBackendEvent('fatigue'); ${change} releaseSession();`);
   await h.get('backendEventQueue');
@@ -222,29 +223,58 @@ test('cloud readiness refresh does not hide an invalidated active-session notice
   assert.equal(h.get("logEl.children.filter(entry => entry.textContent.includes('Cloud alerts paused')).length"), 1);
 });
 
-for (const wait of ['session', 'event queue']) test(`event snapshots metrics before waiting for ${wait}`, async () => {
+for (const wait of ['session', 'event queue']) test(`event snapshots detection time and metrics before waiting for ${wait}`, async () => {
   const h = eventHarness();
   if (wait === 'event queue') {
     h.run('releaseSession();'); await h.get('backendSessionPromise');
     h.run('let releasePrevious; backendEventQueue = new Promise(resolve => { releasePrevious = resolve; });');
   }
+  const detectedAt = h.clock.now;
   h.run("fatigue = 61.4; confidence = 82.6; queueBackendEvent('drowsy');");
   h.clock.advance(30000);
   h.run('fatigue = 2; confidence = 3;');
   h.run(wait === 'session' ? 'releaseSession();' : 'releasePrevious();');
   await h.get('backendEventQueue');
   assert.equal(h.get('sentEvents.length'), 1);
-  assert.equal(h.get("Object.hasOwn(sentEvents[0].extra, 'occurred_at')"), false, 'preserve server receipt time for pre-session or skewed-clock detections');
   assert.deepEqual(JSON.parse(h.get('JSON.stringify(sentEvents[0].extra)')), {
-    fatigue_score: 61, confidence: 83,
+    occurred_at: new Date(detectedAt).toISOString(), fatigue_score: 61, confidence: 83,
   });
 });
-for (const status of [400, 409, 503]) test(`event failure ${status} is never automatically resent`, async () => {
+for (const [status, error] of [[400, 'invalid_event'], [409, 'invalid_occurred_at'], [503, 'invalid_occurred_at']]) test(`event failure ${status} ${error} is never automatically resent`, async () => {
   const h = eventHarness();
   h.run(`window.OcculertBackend.logEvent = async (id, type, extra, isCurrent) => {
     if (isCurrent()) sentEvents.push({ id, type, extra });
-    return { status: ${status}, body: { error: 'invalid_occurred_at' } };
+    return { status: ${status}, body: { error: '${error}' } };
   }; queueBackendEvent('drowsy'); releaseSession();`);
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 1);
+});
+
+for (const fallbackStatus of [200, 400]) test(`a rejected event time permits only one untimed fallback ending in ${fallbackStatus}`, async () => {
+  const h = eventHarness();
+  h.run(`window.OcculertBackend.logEvent = async (id, type, extra, isCurrent) => {
+    if (isCurrent()) sentEvents.push({ id, type, extra });
+    return { status: sentEvents.length === 1 ? 400 : ${fallbackStatus}, body: { error: 'invalid_occurred_at' } };
+  }; fatigue = 61.4; confidence = 82.6; queueBackendEvent('drowsy'); releaseSession();`);
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 2);
+  const events = JSON.parse(h.get('JSON.stringify(sentEvents)'));
+  assert.deepEqual(events[0].extra, { occurred_at: new Date(h.clock.now).toISOString(), fatigue_score: 61, confidence: 83 });
+  assert.deepEqual(events[1], { id: events[0].id, type: events[0].type, extra: { fatigue_score: 61, confidence: 83 } });
+});
+
+for (const [label, change] of eventScopeChanges) test(`timestamp fallback is discarded after ${label}`, async () => {
+  const h = eventHarness();
+  h.run(`let releaseEvent;
+    window.OcculertBackend.logEvent = async (id, type, extra, isCurrent) => {
+      if (isCurrent()) sentEvents.push({ id, type, extra });
+      await new Promise(resolve => { releaseEvent = resolve; });
+      return { status: 400, body: { error: 'invalid_occurred_at' } };
+    };
+    queueBackendEvent('drowsy'); releaseSession();`);
+  for (let index = 0; index < 20; index++) await Promise.resolve();
+  assert.equal(h.get('typeof releaseEvent'), 'function');
+  h.run(`${change} releaseEvent();`);
   await h.get('backendEventQueue');
   assert.equal(h.get('sentEvents.length'), 1);
 });
