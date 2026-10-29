@@ -12,9 +12,9 @@ export const EXPERIMENT_HELPER_INTEGRITY = "sha256-sdM0FjqpPurMBCny+jS4NGVE6udey
 export const experimentFlags = (() => {
     try {
         const q = new URLSearchParams(window.location?.search || ''), yes = (k, v) => q.getAll(k).length === 1 && q.get(k) === v;
-        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable'), observer: yes('observer', '1') };
+        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable'), observer: yes('observer', '1'), calibrationMin: yes('calibration-min', '12') };
         const names = Object.keys(f).filter(k => f[k]).sort();
-        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => !['tasks', 'distractionConfidence', 'observer'].includes(k)), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin'].includes(k)), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
     }
     catch (_) {
         return Object.freeze({ any: false, primary: false, names: Object.freeze([]) });

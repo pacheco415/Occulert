@@ -11,10 +11,10 @@
     const selected = { elapsed: matches('fatigue-timing', 'elapsed'), pixels: matches('ear-units', 'pixels'),
       tasks: matches('detector', 'tasks'), noface: matches('noface-escalation', '1'),
       timePerclos: matches('perclos', 'time'), pitch: matches('pitch-gate', '1'),
-      distractionConfidence: matches('distraction-confidence', 'stable'), observer: matches('observer', '1') };
+      distractionConfidence: matches('distraction-confidence', 'stable'), observer: matches('observer', '1'), calibrationMin: matches('calibration-min', '12') };
     const names = Object.keys(selected).filter(key => selected[key]).sort();
     return Object.freeze({ ...selected, names: Object.freeze(names), any: names.length > 0,
-      primary: names.some(name => !['tasks', 'distractionConfidence', 'observer'].includes(name)), delegate: matches('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+      primary: names.some(name => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin'].includes(name)), delegate: matches('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
   }
 
   function eyeEAR(landmarks, indices, width, height) {
