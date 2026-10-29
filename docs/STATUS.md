@@ -2,8 +2,8 @@
 
 These are dated snapshots. Source, deployment, build availability and device tests are separate.
 
-- Inspected source (origin/main): `8b95f116fc3d2087cc03c351168ff813cf882864`.
-- Source commit date: 2026-10-28T19:59:38-07:00.
+- Inspected source (origin/main): `282aba3258a8e5a8386a0cffd5affc1d4dab2b86`.
+- Source commit date: 2026-10-28T20:08:00-07:00.
 
 - Production website: Deployment receipts are kept private; no current receipt is published here.
 
@@ -20,7 +20,7 @@ These are dated snapshots. Source, deployment, build availability and device tes
   - native-app/components/AlertSystem.tsx
   - 62 more; inspect the source comparison before preparing a binary.
 
-- Open PRs (2026-10-29T03:02:57Z): 15 total; 7 Codex, 7 Dependabot, 1 other; 3 draft.
+- Open PRs (2026-10-29T03:09:24Z): 13 total; 6 Codex, 6 Dependabot, 1 other; 3 draft.
 - Production migrations: Operational receipts are kept private; no ledger or access-control details are published here.
 
 Next steps:

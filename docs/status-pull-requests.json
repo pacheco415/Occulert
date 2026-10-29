@@ -1,15 +1,10 @@
 {
-  "observedAt": "2026-10-29T03:02:57Z",
+  "observedAt": "2026-10-29T03:09:24Z",
   "complete": true,
   "pullRequests": [
     {
       "number": 339,
       "headRefName": "codex/fleet-summary-tidy",
-      "isDraft": false
-    },
-    {
-      "number": 338,
-      "headRefName": "codex/event-outbox-transport",
       "isDraft": false
     },
     {
@@ -40,11 +35,6 @@
     {
       "number": 298,
       "headRefName": "dependabot/npm_and_yarn/electric-sql/pglite-0.5.11",
-      "isDraft": false
-    },
-    {
-      "number": 297,
-      "headRefName": "dependabot/npm_and_yarn/native-app/react-test-renderer-19.3.1",
       "isDraft": false
     },
     {
