@@ -13,9 +13,14 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
-  smoke:
+  browser:
+    name: browser (${{ matrix.browser }})
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
     # Match package-lock.json; preinstalled browsers avoid slow apt mirrors.
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
@@ -48,29 +53,60 @@ jobs:
           for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK);
           NODE
       - name: Check native form controls on Linux WebKit
-        run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit
-      - run: npm run test:browser
+        if: ${{ matrix.browser == 'webkit' }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-report/onboarding.json
+        run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit --reporter=line,json --output=test-results/onboarding
+      - name: Run this browser's full suite
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-report/browser.json
+        run: npm run test:browser -- --project=${{ matrix.browser }} --reporter=line,json --output=test-results/browser
+      - name: List browser tests that passed after retry
+        if: ${{ !cancelled() }}
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: |
+          if [ "$BROWSER" = webkit ]; then
+            node scripts/report-browser-retries.mjs playwright-report/onboarding.json playwright-report/browser.json
+          else
+            node scripts/report-browser-retries.mjs playwright-report/browser.json
+          fi
       - name: Preserve browser failure and retry diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: browser-test-diagnostics
-          path: test-results/
+          name: browser-test-diagnostics-${{ matrix.browser }}-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
           if-no-files-found: ignore
           retention-days: 7
 
       - name: Save source and environment verification evidence
         if: ${{ !cancelled() }}
-        run: node scripts/write-verification-receipt.mjs browser '${{ job.status }}'
+        run: node scripts/write-verification-receipt.mjs browser-${{ matrix.browser }} '${{ job.status }}'
       - name: Preserve verification receipt
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: verification-browser-${{ github.sha }}
+          name: verification-browser-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
           path: .verification-receipts/
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
+
+  # Preserve the required check name and fail it if either browser did not pass.
+  smoke:
+    name: smoke
+    if: ${{ always() }}
+    needs: browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require both browser jobs to pass
+        env:
+          BROWSER_RESULT: ${{ needs.browser.result }}
+        run: test "$BROWSER_RESULT" = success
 
   offline-runtime-repeat:
     runs-on: ubuntu-24.04
@@ -117,9 +153,22 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: offline-runtime-repeat-diagnostics
+          name: offline-runtime-repeat-diagnostics-${{ github.run_attempt }}
           path: |
             offline-browser-process.log
             test-results/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Save repeated offline verification evidence
+        if: ${{ !cancelled() }}
+        run: node scripts/write-verification-receipt.mjs browser-webkit-offline-repeat '${{ job.status }}'
+      - name: Preserve repeated offline verification receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: verification-browser-webkit-offline-repeat-${{ github.sha }}-${{ github.run_attempt }}
+          path: .verification-receipts/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
