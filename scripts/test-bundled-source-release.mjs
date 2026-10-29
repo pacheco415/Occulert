@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { auditSourceAssets } from './lib/source-assets.mjs';
+import { auditSourceAssets, synchronizeSourceEntry } from './lib/source-assets.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const read = (cwd, name) => readFileSync(join(cwd, name), 'utf8');
 const json = (cwd, name) => JSON.parse(read(cwd, name));
@@ -25,6 +25,9 @@ function fixture(body) {
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
     // Include new reviewable source and release outputs before Git staging.
     for (const entry of Object.values(json(root, 'source-assets.json').assets)) paths.add(entry.source);
+    const contract = json(root, 'source-driver-contract.json');
+    for (const module of contract.modules) paths.add('src/' + module);
+    for (const input of contract.sharedInputs) paths.add(input);
     for (const name of Object.values(json(root, 'asset-versions.json'))) paths.add(name);
     for (const name of paths) { mkdirSync(dirname(join(cwd, name)), { recursive: true }); cpSync(join(root, name), join(cwd, name)); }
     symlinkSync(join(root, 'node_modules'), join(cwd, 'node_modules'), 'dir');
@@ -132,13 +135,27 @@ test('actual builder rejects a linked contract in normal and override-staging mo
   }
 }));
 
+test('actual builder rejects shared file links before normal or staged override output', () => fixture(cwd => {
+  const path = join(cwd, 'lib/event-outbox.ts'), original = readFileSync(path), outside = join(cwd, 'external-shared.ts');
+  writeFileSync(outside, original);
+  for (const target of [outside, join(cwd, 'missing-shared.ts')]) {
+    rmSync(path); symlinkSync(target, path);
+    for (const args of [['--stdout'], ['--stdout', '--overrides']]) {
+      let failure;
+      try { execFileSync(process.execPath, [join(cwd, 'scripts/build-driver.mjs'), ...args], { cwd, input: '{}', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }); } catch (error) { failure = error; }
+      assert.ok(failure); assert.equal(String(failure.stdout), ''); assert.match(String(failure.stderr), /regular owned file: event-outbox.ts/);
+    }
+    rmSync(path); writeFileSync(path, original);
+  }
+}));
+
 test('prebuilt Vercel deployments skip the excluded compiler while CI verifies committed output', () => {
   const config = json(root, 'vercel.json');
   assert.equal(config.buildCommand, '', 'An explicit empty deployment command must override the root package build script');
   assert.equal(json(root, 'package.json').scripts.build, 'node scripts/build-driver.mjs');
   assert.ok(json(root, 'scripts/verify-steps.json').steps.includes('build'), 'Root verification must still compile the actual source');
   const exclusions = new Set(read(root, '.vercelignore').split(/\r?\n/).map(line => line.trim()));
-  for (const path of ['src/', 'build/', 'scripts/', 'source-assets.json', 'source-driver-contract.json', 'jsconfig.json', 'eslint.config.mjs'])
+  for (const path of ['src/', 'lib/', 'build/', 'scripts/', 'source-assets.json', 'source-driver-contract.json', 'jsconfig.json', 'eslint.config.mjs'])
     assert.ok(exclusions.has(path), 'Development input must stay excluded from deployment: ' + path);
   const manifest = json(root, 'asset-versions.json'), pins = json(root, 'asset-integrity.json');
   for (const logical of ['driver-app.js', 'driver-startup-guard.js', 'detection-experiments.js']) {
@@ -147,3 +164,52 @@ test('prebuilt Vercel deployments skip the excluded compiler while CI verifies c
     assert.equal(hash(readFileSync(join(root, active))), pins[active], 'The prebuilt runtime must retain its committed integrity pin');
   }
 });
+
+test('normal and staged override builds compile identical real shared TypeScript bytes', () => fixture(cwd => {
+  const compile = overrides => execFileSync(process.execPath, [join(cwd, 'scripts/build-driver.mjs'), '--stdout', ...(overrides ? ['--overrides'] : [])], { cwd, input: overrides ? JSON.stringify(overrides) : undefined, timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] });
+  const before = snapshot(cwd), initial = compile();
+  assert.deepEqual(compile({}), initial);
+  const sharedPath = join(cwd, 'lib/event-outbox.ts'), shared = readFileSync(sharedPath);
+  assert.ok(shared.toString('utf8').includes('15 * 60_000'));
+  writeFileSync(sharedPath, shared.toString('utf8').replace('15 * 60_000', '14 * 60_000'));
+  const changedShared = readFileSync(sharedPath), changedOutput = compile();
+  assert.notDeepEqual(changedOutput, initial);
+  assert.deepEqual(compile({}), changedOutput, 'override staging must copy the current shared input');
+  const metrics = read(cwd, 'src/metrics.js'), override = metrics.replace("'SAFE'", "'SHARED-READY'");
+  const staged = compile({ 'metrics.js': override });
+  writeFileSync(join(cwd, 'src/metrics.js'), override);
+  assert.deepEqual(compile(), staged, 'normal compile and JS override compile must share the same TS engine');
+  assert.deepEqual(readFileSync(sharedPath), changedShared);
+  writeFileSync(join(cwd, 'src/metrics.js'), metrics);
+  assert.throws(() => compile({ 'lib/event-outbox.ts': shared.toString('utf8') }), error => /Unknown source override/.test(String(error.stderr)));
+  assert.deepEqual(readFileSync(sharedPath), changedShared);
+  writeFileSync(sharedPath, shared); assert.deepEqual(snapshot(cwd), before);
+}));
+
+test('importer synchronization recompiles current shared input without rewriting it', () => fixture(cwd => {
+  const compile = () => execFileSync(process.execPath, [join(cwd, 'scripts/build-driver.mjs'), '--stdout'], { cwd, timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] });
+  const manifest = json(cwd, 'asset-versions.json'), before = compile(), path = join(cwd, 'lib/event-outbox.ts');
+  const shared = read(cwd, 'lib/event-outbox.ts').replace('15 * 60_000', '14 * 60_000'); writeFileSync(path, shared);
+  const current = compile(), helper = manifest['detection-experiments.js'], nextHelper = helper.replace(/\.v\d+\.js$/, '.v999999.js');
+  const ui = read(cwd, 'src/ui.js'), updatedUi = ui.replaceAll(helper, nextHelper);
+  assert.notEqual(ui, updatedUi); writeFileSync(join(cwd, 'src/ui.js'), updatedUi);
+  const expected = compile(); writeFileSync(join(cwd, 'src/ui.js'), ui);
+  const changes = synchronizeSourceEntry(cwd, { mode: 'bundle', bytes: before }, expected, manifest, { ...manifest, 'detection-experiments.js': nextHelper });
+  assert.equal(changes.get('src/ui.js'), updatedUi); assert.ok(!changes.has('lib/event-outbox.ts'));
+  assert.equal(read(cwd, 'lib/event-outbox.ts'), shared);
+  assert.notDeepEqual(current, before);
+}));
+
+test('shared source must stay excluded from deployments and every offline cache path', () => fixture(cwd => {
+  // Use exact compiled output for the audit so this test isolates exposure.
+  const manifest = json(cwd, 'asset-versions.json'), active = manifest['driver-app.js'];
+  const compiled = execFileSync(process.execPath, [join(cwd, 'scripts/build-driver.mjs'), '--stdout'], { cwd, timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] });
+  writeFileSync(join(cwd, active), compiled); const pins = json(cwd, 'asset-integrity.json'); pins[active] = hash(compiled); writeFileSync(join(cwd, 'asset-integrity.json'), JSON.stringify(pins));
+  const exclusions = read(cwd, '.vercelignore'), worker = read(cwd, 'sw.js');
+  writeFileSync(join(cwd, '.vercelignore'), exclusions.replace(/^lib\/\r?\n/m, ''));
+  assert.throws(() => auditSourceAssets(cwd), /exclude lib\//); writeFileSync(join(cwd, '.vercelignore'), exclusions);
+  for (const path of ['/lib/event-outbox.ts', '/arbitrary/raw.ts', '/arbitrary/raw.ts?version=1']) {
+    writeFileSync(join(cwd, 'sw.js'), worker + '\nconst forbiddenSharedSource=' + JSON.stringify(path) + ';\n');
+    assert.throws(() => auditSourceAssets(cwd), /Development source must not enter/);
+  }
+}));

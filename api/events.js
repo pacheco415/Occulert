@@ -1,7 +1,7 @@
 // POST /api/events -> log a single drowsiness/distraction event tied to a session.
 // Requires a Supabase Auth access token in the Authorization: Bearer header.
-// This endpoint is scaffolding: it returns 501 until SUPABASE_URL and
-// SUPABASE_SERVICE_ROLE_KEY are configured. See BACKEND_SETUP.md.
+// Validates session ownership and occurrence time before storing client-reported telemetry.
+// Storage requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY; see BACKEND_SETUP.md.
 
 const supabaseLib = require("./_lib/supabase");
 const { supabaseErrorStatus } = require("./_lib/supabase-errors");

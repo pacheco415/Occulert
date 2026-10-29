@@ -4,14 +4,57 @@ import "./calibration.js";
 import { fleetPayload } from "./metrics.js";
 import "./alerts.js";
 import { browserHistoryStore } from "./storage-history.js";
+import { createWebEventOutboxAdapter, webEventRetryEnabled } from "./event-outbox-adapter.js";
 import { experimentFlags, startupAllowsMonitoring, syncEl, gpsConsent, cloudConsent, running, fatigue, confidence, sessionStart, lastFleetPush, cloudReady, backendSessionId, backendSessionPromise, backendEventQueue, backendSessionGeneration, backendSessionScope, cloudConsentRevision, cloudSummaryOutbox, lastPosition, FLEET_PUSH_INTERVAL, log, localSessionId, set_lastFleetPush, set_cloudReady, set_backendSessionId, set_backendSessionPromise, set_backendEventQueue, set_backendSessionGeneration, set_backendSessionScope, set_cloudSummaryOutbox } from "./ui.js";
 // Event authorization is captured at session creation, not at upload time.
 // Detaching a stopped session may drain its queue without reviving revoked work.
 let backendEventScope = null;
+let webEventDelivery = null;
+let webEventFreshConsent = false;
+export function initializeWebEventConsent() {
+    // Some browsers restore dynamic checkbox state across navigation. A fresh
+    // retry-capable document always requires an explicit new consent grant.
+    if (!experimentFlags.any && webEventRetryEnabled(window.location?.search)) cloudConsent.checked = false;
+}
+function webEventSharingCurrent(scope) {
+    return Boolean(scope && cloudConsent.checked && scope.revision === cloudConsentRevision
+        && window.OcculertBackend === scope.backend
+        && scope.backend.currentUser()?.id === scope.auth.ownerId);
+}
+function getWebEventDelivery() {
+    if (experimentFlags.any || !webEventRetryEnabled(window.location?.search)) return null;
+    if (!webEventDelivery) try { webEventDelivery = createWebEventOutboxAdapter({
+        enabled: true, backend: window.OcculertBackend, storage: localStorage, locks: navigator.locks, target: window,
+        randomUUID: typeof crypto?.randomUUID === 'function' ? () => crypto.randomUUID() : null,
+        isSharingCurrent: webEventSharingCurrent,
+        onStatus: status => {
+            const element = document.getElementById('cloudEventStatus');
+            if (!element) return;
+            element.hidden = false;
+            const local = (status.capacityRejected || 0) + (status.expired || 0) + (status.permanentRejected || 0) + (status.exhausted || 0) + (status.stopped || 0);
+            element.textContent = status.unavailable ? 'Cloud alert retries are unavailable. Local monitoring continues.'
+                : status.cleared ? 'Pending cloud alerts cleared.'
+                : `Cloud alerts pending: ${status.pending || 0}.${local ? ` ${local} removed without confirmed delivery.` : ''}`;
+        },
+    }); } catch (_) { return null; }
+    if (webEventDelivery.available && webEventFreshConsent) {
+        webEventFreshConsent = false;
+        void webEventDelivery.beginConsentPeriod();
+    }
+    return webEventDelivery.available ? webEventDelivery : null;
+}
+export function changeWebEventConsent() {
+    if (experimentFlags.any || !webEventRetryEnabled(window.location?.search)) return;
+    // Remember the explicit grant even if accessing browser APIs prevents
+    // construction today; recovery must still clear the earlier consent epoch.
+    webEventFreshConsent = cloudConsent.checked;
+    const delivery = getWebEventDelivery();
+    if (delivery && !cloudConsent.checked) void delivery.revoke();
+}
 function eventScopeCurrent(scope) {
     const current = Boolean(scope && cloudConsent.checked && scope.revision === cloudConsentRevision
         && window.OcculertBackend === scope.backend
-        && scope.backend.isAuthLifecycleCurrent(scope.auth));
+        && (scope.backend.isAuthLifecycleCurrent(scope.auth) || webEventDelivery?.isScopeCurrent(scope)));
     if (!current && scope && scope === backendEventScope && running) {
         syncEl.textContent = 'LOCAL';
         if (!scope.notified) log('Cloud alerts paused after an account or sharing change. Local monitoring continues; cloud alerts can resume with your next session.');
@@ -59,6 +102,7 @@ export function beginBackendSession() {
         }
         return null;
     }));
+    getWebEventDelivery()?.trackSession(scope, backendSessionPromise);
     return backendSessionPromise;
 }
 export function queueBackendEvent(type) {
@@ -74,7 +118,8 @@ export function queueBackendEvent(type) {
     const details = { fatigue_score: Math.round(fatigue), confidence: Math.round(confidence) };
     const location = gpsConsent.checked && lastPosition ? { latitude: lastPosition.lat, longitude: lastPosition.lng } : {}, sessionReference = backendSessionPromise || backendSessionId;
     Object.assign(details, location);
-    set_backendEventQueue(backendEventQueue.then(() => sessionReference).then(async id => {
+    const previous = backendEventQueue;
+    const legacy = () => previous.then(() => sessionReference).then(async id => {
         if (!id || !eventScopeCurrent(scope))
             return null;
         const result = await scope.backend.logEvent(id, type, Object.assign({ occurred_at: occurredAt }, details), () => eventScopeCurrent(scope));
@@ -84,9 +129,12 @@ export function queueBackendEvent(type) {
         if (result && result.status === 400 && result.body && result.body.error === 'invalid_occurred_at' && eventScopeCurrent(scope))
             return scope.backend.logEvent(id, type, details, () => eventScopeCurrent(scope));
         return result;
-    }).catch(() => null));
+    }).catch(() => null);
+    const delivery = getWebEventDelivery();
+    const queued = delivery?.queue(scope, sessionReference, type, details, occurredAt, legacy);
+    set_backendEventQueue(queued ? Promise.all([previous, queued]).then(() => null).catch(() => null) : legacy());
 }
-export function detachBackendSession() { const state = { id: backendSessionId, promise: backendSessionPromise, eventQueue: backendEventQueue, consented: cloudConsent.checked, scope: backendSessionScope, endedAt: new Date().toISOString(), localSessionId }; set_backendSessionScope(null); (set_backendSessionGeneration(backendSessionGeneration + 1) - 1); set_backendSessionId(null); set_backendSessionPromise(null); set_backendEventQueue(Promise.resolve()); return state; }
+export function detachBackendSession() { const state = { id: backendSessionId, promise: backendSessionPromise, eventQueue: backendEventQueue, consented: cloudConsent.checked, scope: backendSessionScope, endedAt: new Date().toISOString(), localSessionId }; webEventDelivery?.stopSession(backendSessionPromise || backendSessionId); set_backendSessionScope(null); (set_backendSessionGeneration(backendSessionGeneration + 1) - 1); set_backendSessionId(null); set_backendSessionPromise(null); set_backendEventQueue(Promise.resolve()); return state; }
 export function cloudSummaryScope() {
     if (experimentFlags.any)
         return null;
