@@ -116,7 +116,7 @@
     "test:scoring-replay": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-scoring-core.mjs scripts/test-scoring-replay.mjs scripts/test-calibration-flag.mjs"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.13.0",
+    "@axe-core/playwright": "4.14.0",
     "@electric-sql/pglite": "0.5.11",
     "@playwright/test": "^1.63.0",
     "acorn": "8.19.0",
