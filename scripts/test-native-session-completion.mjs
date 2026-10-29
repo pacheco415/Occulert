@@ -93,6 +93,7 @@ test('the actual monitor preserves unobserved metrics, disarms before saving and
   cameraInterruptionGenerationRef:ref(0),cameraCallbackOwnerRef:ref(0),
   startAttemptRef:ref(0),stoppingRef:ref(false),isRunningRef:ref(true),sessionStartedAtRef:ref(1000),alertCountRef:ref(2),activeSessionIdRef:ref('local'),fatigueSamplesRef:ref(sampleCount),fatigueSumRef:ref(sampleCount?40:0),maxFatigueRef:ref(40),cloudSessionRef:ref(Promise.resolve('cloud')),cloudEventQueueRef:ref(Promise.resolve()),performanceTrackerRef:ref({snapshot:()=>({bounded:true})}),monitoringActiveRef:ref(true),cameraRecoveringRef:ref(false),
   setIsStopping:value=>order.push('stopping:'+value),setSessionEndedAt:()=>{},setIsRunning:()=>{},setCameraRecovering:()=>{},reset:()=>order.push('reset'),stopHeadphoneMotion:()=>Promise.resolve(),
+  stopNativeCloudEvents:session=>{assert.equal(session,context.cloudSessionRef.current);order.push('retry-stop')},
   saveSession:async(id,duration,alerts)=>{assert.equal(context.monitoringActiveRef.current,false);assert.equal(context.isRunningRef.current,false);assert.equal(context.cloudSessionRef.current,null);assert.equal(duration,11);assert.equal(alerts,2);order.push('save:'+id);await pendingSave.promise;return id},
   clearActiveSessionCheckpoint:async()=>order.push('cleared'),finishCloudSession:async(id,stats)=>{assert.equal(stats.averageFatigue,sampleCount?20:null);assert.equal(stats.maxFatigue,sampleCount?40:null);assert.equal(stats.safetyScore,sampleCount?58:null);order.push('cloud');return true},markSessionSynced:async()=>order.push('badge'),
  };
@@ -102,7 +103,7 @@ test('the actual monitor preserves unobserved metrics, disarms before saving and
  assert.equal(captureTransition.shouldDefer(12000,10000),false,'stopping clears the previous capture-transition grace before persistence');
  assert.equal(order.filter(item=>item==='save:local').length,1);assert.equal(order.includes('cloud'),false);
  pendingSave.resolve();await first;
- assert.deepEqual(order,['stopping:true','reset','save:local','cleared','cloud','badge','stopping:false']);
+ assert.deepEqual(order,['stopping:true','retry-stop','reset','save:local','cleared','cloud','badge','stopping:false']);
  assert.equal(context.activeSessionIdRef.current,null);assert.equal(context.stoppingRef.current,false);
  }
 });
