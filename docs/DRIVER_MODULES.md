@@ -1,9 +1,11 @@
 # Driver module source and release
 
-`src/driver-app.js` is the composition entry for eight domain modules:
+`src/driver-app.js` is the composition entry for nine domain modules:
 `camera`, `detector`, `calibration`, `metrics`, `alerts`, `storage-history`,
-`cloud-sync`, and `ui`. Edit these readable modules. Published versioned files
-remain immutable. No detector experiment or threshold changes with this split.
+`cloud-sync`, `event-outbox-adapter`, and `ui`. The adapter imports the sole shared
+delivery engine at `lib/event-outbox.ts`. Edit these readable sources. Published
+versioned files remain immutable. No detector experiment or threshold changes
+with this integration.
 
 The modules own their mutable state and expose explicit setters. The coordinator
 runs local start/stop and cloud hooks in their existing order; accepted-alert
@@ -32,6 +34,17 @@ function declarations, while startup effects retain their source order. Unsuppor
 fail instead of silently altering behavior. No old driver implementation is a
 build input, and no source map is emitted.
 
+The exact shared-input allowlist contains only `lib/event-outbox.ts`, imported as
+named, non-aliased exports through `../lib/event-outbox.ts`. No arbitrary external
+input, dynamic import, CommonJS dependency, re-export or erased type-only dependency
+is accepted. Node 24 strips only erasable TypeScript for the Acorn binding and
+effect proofs; esbuild compiles the actual raw TypeScript bytes. Provenance records
+both raw and erased digests, the stripping implementation/version and the exact
+compiler input list. Shared source must be a regular owned file. Staged overrides
+retain sibling `src/` and `lib/` directories, copy the validated shared bytes, and
+prove the same output before a release mutates files. Development `lib/` content
+and TypeScript must remain outside deployed and cached assets.
+
 Run `npm run asset:release -- --dry-run`, inspect the plan, then run
 `npm run asset:release`. This recompiles source in memory, copies changed outputs
 and immutable importers, updates guard/worker integrity and chooses fresh URLs and
@@ -41,9 +54,10 @@ before committing any checkout files. The entry is never replaced with a bundle.
 A no-op writes nothing. Local build files, sources, compiler configuration and
 provenance are excluded from deployment and offline caching.
 
-`lint:source` checks the nine sources for undefined globals, reassignment and other
+`lint:source` checks the ten JavaScript sources for undefined globals, reassignment and other
 ownership mistakes. `typecheck:source` checks detector and alerts with strict
-JSDoc/nullability. Other modules remain JavaScript without a full typecheck claim.
+JSDoc/nullability. `test:event-outbox` separately typechecks the shared TypeScript
+engine. Other modules remain JavaScript without a full typecheck claim.
 `test:driver-build` exercises actual compiler/release invariants and rejected
 mutations. Existing behavioral tests continue reading the real active output
 selected by `asset-versions.json`; their files and harnesses are unchanged.

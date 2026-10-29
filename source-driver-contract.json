@@ -8,9 +8,11 @@
     "alerts.js",
     "storage-history.js",
     "cloud-sync.js",
+    "event-outbox-adapter.js",
     "ui.js",
     "driver-app.js"
   ],
+  "sharedInputs": ["lib/event-outbox.ts"],
   "entry": "driver-app.js",
   "partialCutoffBinding": "recalBtn",
   "partialPrefixFunctions": [
