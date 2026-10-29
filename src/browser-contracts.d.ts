@@ -26,6 +26,7 @@ interface DriverExperimentFlags {
   readonly timePerclos?: boolean;
   readonly pitch?: boolean;
   readonly distractionConfidence?: boolean;
+  readonly observer?: boolean;
 }
 interface CapturedExperimentFrame {
   readonly image: HTMLVideoElement | HTMLCanvasElement;

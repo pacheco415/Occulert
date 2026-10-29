@@ -446,6 +446,7 @@ function monitorCameraStartFixture(stage, { simulator = false, autorun = false }
     ...h.React, React: h.React, ...frontCameraPolicy, ...monitorPerformance, ...monitorLifecycle,
     ...cameraSetup, ...cameraResilience, ...captureLoadPolicy, ...monitorThresholds, ...eyeBaselineModel,
     ...sensorFusion, ...sessionCompletion, ...monitorAlertPolicy, HeadNodDetector,
+    stopNativeCloudEvents() {}, queueNativeCloudAlert: () => null,
     EYE_BASELINE_EXPERIMENT: !simulator, SIMULATOR_TRACE: simulator, useSimulatorTrace,
     Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
     useRouter: () => router, useLocalSearchParams: () => autorun ? { 'trace-run': '1' } : {}, useAccessibilityPreferences: () => ({ reduceMotion: true }),

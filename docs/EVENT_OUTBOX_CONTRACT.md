@@ -2,7 +2,8 @@
 
 `lib/event-outbox.ts` is the sole transport-free delivery engine. The web bundle
 imports that actual TypeScript file through a bounded compiler input; it does not
-maintain a second implementation. Native adoption is separate. Local alerts never
+maintain a second implementation. The native adapter imports that same file.
+Local alerts never
 wait for storage, configuration, a session response or event delivery.
 
 ## Gates and unchanged default
@@ -136,9 +137,72 @@ real offline/online behavior, 429, replayed acknowledgement, two tabs, reload,
 revocation, Stop, immutable types/metrics/time and lost untimed response restoration.
 Compiler tests prove the actual shared input, exact import boundary, source bindings,
 effect order and staged release equivalence; development TypeScript stays out of
-deployment/offline assets. These are automated local checks, not phone, operational
-rollout or native acceptance. Native packaging, device evidence and any rollout
-require their separate reviewed gates.
+deployment/offline assets. These are automated local checks, not phone or operational
+rollout acceptance. Device evidence and any rollout require separate reviewed gates.
+
+## Native adapter and process boundaries
+
+Native adoption requires `EXPO_PUBLIC_EVENT_OUTBOX` to be exactly `1`, current
+native sharing consent, a valid owner/login identity and the same exact server
+protocol above. No EAS profile enables this flag. With the client flag off, the
+monitor uses its existing best-effort request and no event queue, UUID, capability
+request or AppState listener is added. The current native detector emits `drowsy`;
+the shared engine and minimal native sender preserve the other supported types
+without relabeling them.
+
+`native-app/lib/nativeEventOutbox.ts` imports the canonical repository engine;
+`cloudSync.ts` owns one lazy service for the current Expo JavaScript runtime. It
+uses AsyncStorage and the existing `expo-modules-core` UUID implementation. No
+background task or second delivery runtime is registered. Foreground AppState
+resumption may flush eligible work; backgrounding aborts active attempts and
+pauses retry timers. Local detector transitions allocate the UUID and snapshot
+metrics/time immediately, without awaiting session creation or an earlier event.
+
+The existing persisted sharing preference is preserved. On the first flagged
+adoption in a new process, the service removes unknown previous-process session
+rows and advances its persisted generation before accepting new events. It does
+**not** replay a killed process's unknown session. Recreating a screen/controller
+within the same live service retains queued IDs, attempts, backoff and persisted
+server-stamp intent. This conservative process policy limits delivery continuity
+deliberately; it does not claim a durable background uploader.
+
+Native lifecycle metadata at `occulert.native-event-outbox.lifecycle.v1` contains
+only owner ID, the locally decoded non-secret login `session_id`, monotonic retry
+generation and bounded stopped-session tombstones. Credentials remain in the
+existing protected auth store. The login identifier is never sent as event
+authority or added to event payloads. Routine same-login refresh preserves retries;
+explicit sign-in, logout, account/login change or any consent change invalidates
+guards immediately, aborts active attempts and clears pending rows before a new
+epoch can adopt. Stop immediately invalidates its original session promise and
+discards that session's pending rows, including a late session response.
+
+Each native event POST uses the dedicated one-attempt sender, never the legacy
+401 replay path. The same five-send/15-minute/50-record limits, durable matching
+acknowledgement, Retry-After rules and persisted timed-to-server-stamped fallback
+apply. Cancellation, interrupted responses and malformed acknowledgements remain
+uncertain under the same UUID. An adopted event never becomes an unkeyed request.
+
+Native storage calls have an eight-second caller deadline. An interrupted or
+timed-out write can still complete in the native bridge, so an actual-promise
+barrier keeps cleanup ordered after that write; a new epoch cannot overtake it.
+Unconfirmed cleanup disables retry adoption until explicit cleanup succeeds.
+Opt-out is persisted independently of queue deletion failure. Eligibility expires
+at detection plus 15 minutes; stored bytes are removed lazily by an active operation
+or successful cleanup. A terminated/inactive process cannot execute deletion.
+Revocation retains the null-owner generation only; cold adoption and successful
+scope cleanup remove older alert payloads. Settings show a local status snapshot
+on the existing account refresh, including capacity, expiry, rejection, exhaustion
+and Stop counts, without claiming cloud synchronization.
+
+`npm run test:native-event-outbox` executes the actual native cloud module and
+monitor transition against substituted native bridges, plus the real shared engine:
+delayed session startup, immutable intent, one-attempt 401, retry/fallback/replayed
+acknowledgements, refresh/login/consent boundaries, Stop, foreground lifecycle,
+capacity/expiry and failed/late native writes. Native `npm run test:event-outbox`
+also renders the actual settings TSX diagnostics. See
+[NATIVE_SHARED_ENGINE_PACKAGING.md](NATIVE_SHARED_ENGINE_PACKAGING.md) for the
+bounded Metro input and archive-to-iOS-export proof. Export does not enable the
+flag or replace device, signing, native build, submission or rollout acceptance.
 
 ## Browser transport contract
 

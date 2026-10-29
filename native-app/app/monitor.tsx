@@ -56,6 +56,8 @@ import {
   beginCloudSession,
   finishCloudSession,
   logCloudAlert,
+  queueNativeCloudAlert,
+  stopNativeCloudEvents,
 } from '../lib/cloudSync';
 import { consumePreDriveSafety } from '../lib/preDriveGate';
 import { currentAppBuildInfo } from '../lib/appBuildInfo';
@@ -729,6 +731,7 @@ export default function MonitorScreen() {
     const maxFatigue = fatigueSamplesRef.current > 0 ? maxFatigueRef.current : null;
     const cloudSession = cloudSessionRef.current;
     const pendingEvents = cloudEventQueueRef.current;
+    stopNativeCloudEvents(cloudSession);
     const monitorPerformance = performanceTrackerRef.current.snapshot(stoppedAt);
 
     monitoringActiveRef.current = false;
@@ -1176,7 +1179,9 @@ export default function MonitorScreen() {
       const cloudSession = cloudSessionRef.current;
       if (cloudSession) {
         const occurredAt = new Date(now).toISOString();
-        cloudEventQueueRef.current = cloudEventQueueRef.current
+        const retryWork = queueNativeCloudAlert(cloudSession, result.fatigueScore, occurredAt);
+        if (retryWork) cloudEventQueueRef.current = Promise.all([cloudEventQueueRef.current, retryWork]).then(() => {}).catch(() => {});
+        else cloudEventQueueRef.current = cloudEventQueueRef.current
           .then(async () => {
             const sessionId = await cloudSession;
             if (sessionId) await logCloudAlert(sessionId, result.fatigueScore, occurredAt);
