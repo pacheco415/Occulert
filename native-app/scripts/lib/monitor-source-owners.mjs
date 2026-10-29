@@ -27,6 +27,21 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
     assert.equal(file.parseDiagnostics.length, 0, `Parse the actual ${owner} owner`);
     return [owner, file];
   }));
+  const screens = ast.screen.statements.filter(node => ts.isFunctionDeclaration(node) && node.name?.text === 'MonitorScreen');
+  assert.equal(screens.length, 1, 'One actual MonitorScreen function');
+  assert.ok(screens[0].body && screens[0].modifiers?.some(node => node.kind === ts.SyntaxKind.ExportKeyword)
+    && screens[0].modifiers.some(node => node.kind === ts.SyntaxKind.DefaultKeyword), 'The owner is the exported screen');
+  const declarations = screens[0].body.statements.filter(ts.isVariableStatement).flatMap(node => node.declarationList.declarations);
+  const names = binding => ts.isIdentifier(binding) ? [binding.text] : binding.elements.flatMap(element => ts.isBindingElement(element) ? names(element.name) : []);
+  function declaration(expected) {
+    const matches = declarations.filter(node => names(node.name).some(name => expected.includes(name)));
+    assert.equal(matches.length, 1, 'One direct top-level screen binding for ' + expected.join('/'));
+    assert.deepEqual(names(matches[0].name).sort(), [...expected].sort(), 'Use the exact expected screen binding');
+    if (!ts.isIdentifier(matches[0].name)) for (const element of matches[0].name.elements) {
+      assert.ok(ts.isBindingElement(element) && !element.propertyName && !element.initializer && !element.dotDotDotToken, 'Hook outputs remain unaliased');
+    }
+    return matches[0];
+  }
   function imported(owner, name, specifier, local = name) {
     const matches = ast[owner].statements.filter(node => ts.isImportDeclaration(node) && !node.importClause?.isTypeOnly && node.moduleSpecifier.text === specifier)
       .flatMap(node => node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings) ? node.importClause.namedBindings.elements : [])
@@ -38,6 +53,18 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
     visit(ast[owner], node => { if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name) found.push(node); });
     assert.equal(found.length, 1, `One unambiguous ${owner} call to ${name}`);
     return found[0];
+  }
+  function screenHook(name, binding) {
+    const value = declaration(binding).initializer;
+    assert.ok(value && ts.isCallExpression(value) && ts.isIdentifier(value.expression) && value.expression.text === name,
+      name + ' must be the direct live screen initializer');
+    assert.equal(calls('screen', name), value, 'No dead or nested hook can satisfy live screen ownership');
+    visit(ast.screen, node => {
+      if (ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) {
+        if (node.name) assert.ok(!names(node.name).includes(name), 'Imported hook cannot be shadowed: ' + name);
+      }
+    });
+    return value;
   }
   function rendered(owner, name) {
     const found = [];
@@ -63,7 +90,9 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
     assert.equal(functions.length, 1, `One exported implementation of ${name}`);
     assert.ok(functions[0].modifiers?.some(node => node.kind === ts.SyntaxKind.ExportKeyword));
     assert.ok(functions[0].body && !functions[0].modifiers?.some(node => node.kind === ts.SyntaxKind.DeclareKeyword), `${name} must have a runtime implementation`);
-    calls('screen', name);
+    const binding = { cloud: ['recordCloudAlertTransition'], checkpoint: ['checkpointActiveSession'], identity: ['toggleSetupPreview'],
+      camera: ['handleCaptureConfiguration', 'handleCameraError'], analysis: ['analysis'] }[owner];
+    screenHook(name, binding);
     assert.doesNotMatch(sources[owner], /from\s+['"](?:.*cloudSync|.*eyeBaselineStorage|.*sessionRecovery|@react-native-async-storage\/async-storage)['"]/,
       'Protected cloud/storage actions stay injected by the screen');
   }
@@ -73,6 +102,11 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
     'startingRef', 'stoppingRef', 'baselineBusyRef', 'cameraInterruptionGenerationRef', 'cameraCallbackOwnerRef', 'setSetupPreviewActive']);
   wired(calls('screen', HOOKS.camera), ['handleStopRef', 'cameraEpochRef', 'cameraDeviceIdRef', 'cameraCallbackOwnerRef', 'deliverMonitoringPausedCue']);
   wired(calls('screen', HOOKS.analysis), ['saveDeviceEyeBaseline', 'processEyeOpenness', 'processNoFace', 'recordCloudAlertTransition', 'isRunningRef']);
+  for (const name of ['onEyeState', 'frameProcessor']) {
+    const value = declaration([name]).initializer;
+    assert.ok(value && ts.isPropertyAccessExpression(value) && value.expression.getText(ast.screen) === 'analysis' && value.name.text === name,
+      'The live screen uses actual analysis.' + name);
+  }
   for (const name of ['MonitorPresentation', 'MonitorPermissionState', 'MonitorCameraUnavailable']) {
     imported('screen', name, '../components/monitor/MonitorPresentation');
     rendered('screen', name);
