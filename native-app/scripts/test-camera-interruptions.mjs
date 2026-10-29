@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from './lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
@@ -116,7 +117,7 @@ test('a fresh sample or a replacement session invalidates pending watchdog/error
 });
 
 test('actual screen interruption subscription rejects disposed callbacks and invalidates pending reads', () => {
-  const monitor = readFileSync(new URL('../app/monitor.tsx', import.meta.url), 'utf8');
+  const monitor = readNativeMonitorSourceOwners().camera;
   const start = monitor.indexOf('  useEffect(() => {\n    if (!cameraIdentityActive', monitor.indexOf('  const handleCameraInterruption'));
   const end = monitor.indexOf('\n  const checkCameraInterruption', start);
   assert.ok(start >= 0 && end > start);
