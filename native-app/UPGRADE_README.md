@@ -104,6 +104,11 @@ and an unsigned iPhone SDK compile are separate evidence from simulator launch,
 camera behavior or physical-device acceptance. No Duo support or accuracy claim
 follows from prebuild or unit tests.
 
+For arm64 simulator layout and scoring checks, use the separate
+[Simulator Trace profile](docs/SIMULATOR_TRACE.md). It omits ML Kit, displays a
+synthetic-input banner and feeds the real scoring path with a bundled trace.
+It does not establish simulator camera or physical-device detection support.
+
 Use one planned `codex/` branch for each SDK upgrade. Review the target SDK's
 release notes and the camera, face detector, worklets and custom Watch module
 compatibility before changing dependencies. Move one SDK version at a time.

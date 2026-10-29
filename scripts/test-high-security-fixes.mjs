@@ -208,6 +208,12 @@ test('native monitoring requires a fresh one-time pre-drive safety confirmation'
   assert.match(home, /router\.push\('\/pre-drive'\)/);
   assert.match(preDrive, /checked\.every\(Boolean\)/);
   assert.match(preDrive, /confirmPreDriveSafety\(\)/);
-  assert.match(monitor, /if \(!consumePreDriveSafety\(\)\)/);
-  assert.match(monitor, /router\.replace\('\/pre-drive'\)/);
+  const safetyGuard = monitor.match(/if \(([^\n]*consumePreDriveSafety\(\)[^\n]*)\) \{\s*router\.replace\('\/pre-drive'\);\s*return;/)?.[1];
+  assert.ok(safetyGuard, 'the actual Start guard must redirect and return before monitoring');
+  for (const simulator of [false, true]) for (const confirmed of [false, true]) {
+    let consumes = 0;
+    const redirects = runInNewContext(safetyGuard, { SIMULATOR_TRACE: simulator, consumePreDriveSafety: () => { consumes++; return confirmed; } });
+    assert.equal(redirects, !simulator && !confirmed);
+    assert.equal(consumes, simulator ? 0 : 1, 'ordinary Start must always consume its fresh one-time confirmation');
+  }
 });
