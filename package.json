@@ -7,6 +7,7 @@
     "test:api": "node scripts/test-api-security.mjs",
     "test:client": "node scripts/test-backend-client.mjs",
     "test:native-cloud": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-native-cloud-sync.mjs",
+    "test:native-event-outbox": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test native-app/scripts/test-event-outbox.mjs",
     "test:session-history-data": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-session-history-data.mjs",
     "test:high-fixes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-high-security-fixes.mjs",
     "test:remaining-fixes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-remaining-security-fixes.mjs",

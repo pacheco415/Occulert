@@ -11,7 +11,7 @@
     "postinstall": "node ./scripts/patch-watch-connectivity.mjs && node ./scripts/patch-query-decoder.mjs && node ./scripts/patch-sdk58-camera.mjs && node ./scripts/patch-camera-multitasking.mjs",
     "check:dependencies": "expo install --check",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run check:dependencies && npm run typecheck && npm run test:dependencies && npm run test:camera-runtime && npm run test:audio-lifecycle && npm run test:history-interactions && npm run test:monitor-layout && npm run test:front-camera-identity && npm run test:front-camera-switch && npm run test:capture-load && npm run test:camera-interruptions",
+    "verify": "npm run check:dependencies && npm run typecheck && npm run test:dependencies && npm run test:camera-runtime && npm run test:audio-lifecycle && npm run test:history-interactions && npm run test:monitor-layout && npm run test:front-camera-identity && npm run test:front-camera-switch && npm run test:capture-load && npm run test:camera-interruptions && npm run test:event-outbox && npm run test:packaging",
     "build:dev": "eas build --profile development --platform ios",
     "build:ios": "eas build --platform ios",
     "build:android": "eas build --platform android",
@@ -24,7 +24,9 @@
     "test:front-camera-identity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-front-camera-identity.mjs",
     "test:front-camera-switch": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-front-camera-switch.mjs",
     "test:capture-load": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-capture-load.mjs",
-    "test:camera-interruptions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-camera-interruptions.mjs"
+    "test:camera-interruptions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-camera-interruptions.mjs",
+    "test:event-outbox": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-event-outbox.mjs scripts/test-event-retry-status.mjs",
+    "test:packaging": "node --test scripts/test-native-packaging.mjs"
   },
   "dependencies": {
     "@bacons/apple-targets": "5.0.0",

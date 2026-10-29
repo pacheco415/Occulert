@@ -1,17 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
+import { uuid } from 'expo-modules-core';
 import { createAsyncMutationQueue } from './asyncMutationQueue';
 import { createCachedBooleanPreference } from './cachedBooleanPreference';
 import { currentAppBuildInfo, formatAppBuildLabel } from './appBuildInfo';
 import { updateSessionHistory } from './sessionHistory';
 import { createSessionSummaryOutbox, type PendingSessionSummary, type SummaryScope } from './sessionSummaryOutbox';
 import { pinnedSupabaseConfig, type PinnedSupabaseConfig } from './supabaseHost';
+import { createNativeEventOutbox } from './nativeEventOutbox';
+import type { NativeEventAuthority, NativeEventResult } from './nativeEventOutbox';
+import type { PendingEvent, EventDelivery } from '../../lib/event-outbox.ts';
 
 const API_BASE = 'https://www.occulert.com';
 const AUTH_KEY = 'occulert.cloud.auth.v1';
 const CONSENT_KEY = 'occulert-cloud-sync-enabled';
 const REQUEST_TIMEOUT_MS = 8_000;
+const NATIVE_EVENT_RETRY_ENABLED = typeof process !== 'undefined' && process.env.EXPO_PUBLIC_EVENT_OUTBOX === '1';
 const SECURE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainService: 'com.occulert.app.cloud-auth',
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
@@ -71,6 +76,10 @@ export interface CloudSignInResult {
 }
 
 let configPromise: Promise<PublicConfig | null> | null = null;
+const nativeEventProtocols = new WeakMap<PublicConfig, boolean>();
+let nativeEventAuthVersion = 0;
+let nativeEventOutbox: ReturnType<typeof createNativeEventOutbox> | null = null;
+const nativeEventSessionScopes = new Map<string, NativeEventAuthority>();
 let consentRuntimeOverride: boolean | null = null;
 let consentMutationVersion = 0;
 let authCache: StoredAuth | null | undefined;
@@ -143,16 +152,161 @@ async function readJson<T>(response: Response): Promise<T> {
 
 async function loadConfig(): Promise<PublicConfig | null> {
   if (!configPromise) {
-    configPromise = fetchJsonWithTimeout<{ supabase?: unknown }>(`${API_BASE}/api/public-config`, {
+    configPromise = fetchJsonWithTimeout<{ ok?: unknown; supabase?: unknown; capabilities?: { event_idempotency_protocol?: unknown } }>(`${API_BASE}/api/public-config`, {
       headers: { Accept: 'application/json' },
     })
       // Credentials go only to the pinned project, whatever the response names.
-      .then(({ response, body }) => (response.ok ? pinnedSupabaseConfig(body.supabase) : null))
+      .then(({ response, body }) => {
+        const config = response.ok ? pinnedSupabaseConfig(body.supabase) : null;
+        if (config && NATIVE_EVENT_RETRY_ENABLED) nativeEventProtocols.set(config,
+          response.ok === true && body.ok === true && body.capabilities?.event_idempotency_protocol === 'client_event_uuid_v1');
+        return config;
+      })
       .catch(() => null);
   }
   const config = await configPromise;
   if (!config) configPromise = null;
   return config;
+}
+
+function nativeEventLogin(auth = authCache): { ownerId: string; loginId: string } | null {
+  try {
+    if (!auth) return null;
+    const encoded = auth.access_token.split('.')[1];
+    if (!encoded || encoded.length > 16_384 || encoded.length % 4 === 1 || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
+    // Hermes does not promise browser atob. Decode bounded base64url/UTF-8
+    // with builtins; these local hints never replace server token validation.
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    let buffer = 0, bits = 0, escaped = '';
+    for (const character of encoded) {
+      buffer = (buffer << 6) | alphabet.indexOf(character); bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        escaped += '%' + ((buffer >> bits) & 255).toString(16).padStart(2, '0');
+        buffer &= (1 << bits) - 1;
+      }
+    }
+    if (buffer !== 0) return null;
+    const claims = JSON.parse(decodeURIComponent(escaped)) as { sub?: unknown; session_id?: unknown };
+    const validUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return typeof claims.session_id === 'string' && validUuid.test(claims.session_id) && validUuid.test(auth.user.id)
+      && claims.sub === auth.user.id ? { ownerId: auth.user.id, loginId: claims.session_id } : null;
+  } catch { return null; }
+}
+
+async function nativeEventCapability(): Promise<boolean> {
+  if (!NATIVE_EVENT_RETRY_ENABLED) return false;
+  const config = await loadConfig();
+  return Boolean(config && nativeEventProtocols.get(config) === true);
+}
+
+function nativeEventAuthorityCurrent(authority: NativeEventAuthority): boolean {
+  const login = nativeEventLogin();
+  return Boolean(login && login.ownerId === authority.ownerId && login.loginId === authority.loginId
+    && consentRuntimeOverride !== false && authority.lifecycle.consentVersion === consentMutationVersion
+    && authority.lifecycle.authVersion === nativeEventAuthVersion);
+}
+
+function getNativeEventOutbox() {
+  if (!NATIVE_EVENT_RETRY_ENABLED) return null;
+  if (!nativeEventOutbox) {
+    nativeEventOutbox = createNativeEventOutbox({
+      enabled: true, storage: AsyncStorage, randomUUID: () => uuid.v4(),
+      lifecycle: () => ({ authVersion: nativeEventAuthVersion, consentVersion: consentMutationVersion }),
+      sessionScope: id => nativeEventSessionScopes.get(id) ?? null,
+      isCurrent: nativeEventAuthorityCurrent, capability: nativeEventCapability,
+      foreground: () => AppState.currentState === 'active', send: sendQueuedNativeEvent,
+      now: () => Date.now(), setTimeout, clearTimeout,
+    });
+    AppState.addEventListener('change', () => nativeEventOutbox?.foregroundChanged());
+  }
+  return nativeEventOutbox;
+}
+
+function invalidateNativeEventRetry(): Promise<void> {
+  if (!NATIVE_EVENT_RETRY_ENABLED) return Promise.resolve();
+  nativeEventAuthVersion++;
+  nativeEventSessionScopes.clear();
+  const outbox = getNativeEventOutbox()!;
+  return outbox.revoke().then(() => {
+    if (outbox.status().cleanupFailed) throw Error('Pending alert removal could not be confirmed.');
+  });
+}
+
+function nativeEventRetryAfter(response: Response): number | undefined {
+  if (response.status !== 429) return undefined;
+  let raw: string | null;
+  try { raw = response.headers?.get('Retry-After'); } catch { return undefined; }
+  if (typeof raw !== 'string' || raw.length > 128) return undefined;
+  raw = raw.trim();
+  let delay: number;
+  if (/^\d+$/.test(raw)) delay = Number(raw) * 1000;
+  else {
+    const at = Date.parse(raw);
+    if (!Number.isFinite(at) || new Date(at).toUTCString() !== raw) return undefined;
+    delay = at - Date.now();
+  }
+  return Number.isFinite(delay) ? Math.min(900_000, Math.max(0, Math.ceil(delay))) : undefined;
+}
+
+/** Exactly one keyed POST. The adapter owns retries and the whole-operation deadline. */
+async function sendQueuedNativeEvent(event: PendingEvent, delivery: EventDelivery, isCurrent: () => boolean, signal: AbortSignal): Promise<NativeEventResult> {
+  const lifecycle = nativeEventAuthVersion, consent = consentMutationVersion;
+  const current = () => !signal.aborted && lifecycle === nativeEventAuthVersion && consent === consentMutationVersion && isCurrent() === true;
+  const unavailable = (): NativeEventResult => ({ status: 503, body: { error: 'event_retry_unavailable' } });
+  try {
+    if (!current()) return unavailable();
+    const initial = await loadAuth(), login = nativeEventLogin(initial);
+    if (!current() || !login || !await nativeEventCapability() || !current()) return unavailable();
+    const auth = await refreshIfNeeded();
+    if (!auth || !current()) return unavailable();
+    const refreshedLogin = nativeEventLogin(auth), requestVersion = authMutationVersion;
+    if (!refreshedLogin || refreshedLogin.ownerId !== login.ownerId || refreshedLogin.loginId !== login.loginId
+      || !await consentEnabled() || !current() || !authIsCurrent(auth, requestVersion)) return unavailable();
+    const body: Record<string, unknown> = { session_id: event.session_id, type: event.type === 'drowsiness' ? 'drowsy' : event.type,
+      client_event_id: event.event_id, fatigue_score: event.fatigue, confidence: event.confidence };
+    if (delivery.timestampMode === 'detected') body.occurred_at = event.detected_at;
+    const controller = new AbortController(), abort = () => controller.abort();
+    signal.addEventListener('abort', abort, { once: true });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<NativeEventResult>(resolve => {
+      timer = setTimeout(() => { controller.abort(); resolve(unavailable()); }, REQUEST_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([
+        Promise.resolve().then(async () => {
+          // The final fetch microtask is a separate authorization boundary.
+          if (!current() || controller.signal.aborted || !authIsCurrent(auth, requestVersion)) return unavailable();
+          const response = await fetch(`${API_BASE}/api/events`, { method: 'POST', headers: {
+            Accept: 'application/json', Authorization: `Bearer ${auth.access_token}`, 'Content-Type': 'application/json',
+          }, body: JSON.stringify(body), signal: controller.signal });
+          const resultBody = await readJson<NonNullable<NativeEventResult['body']>>(response);
+          if (!current() || !authIsCurrent(auth, requestVersion)) return unavailable();
+          const retryAfterMs = nativeEventRetryAfter(response);
+          return { status: response.status, body: resultBody, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) };
+        }), deadline,
+      ]);
+    } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
+  } catch { return unavailable(); }
+}
+
+/** Called at detection, before the session promise or earlier event work settles. */
+export function queueNativeCloudAlert(session: Promise<string | null>, fatigueScore: number, occurredAt: string): Promise<void> | null {
+  const outbox = getNativeEventOutbox();
+  if (!outbox) return null;
+  const fatigue = Number.isFinite(fatigueScore) ? Math.max(0, Math.min(100, Math.round(fatigueScore))) : null;
+  return outbox.queue(session, 'drowsy', fatigue, null, occurredAt, id => logCloudAlert(id, fatigueScore, occurredAt));
+}
+
+export function stopNativeCloudEvents(session: Promise<string | null> | string | null): void {
+  if (session) {
+    getNativeEventOutbox()?.stopSession(session);
+    if (NATIVE_EVENT_RETRY_ENABLED) void Promise.resolve(session).then(id => { if (id) nativeEventSessionScopes.delete(id); }).catch(() => {});
+  }
+}
+
+export function nativeCloudEventRetryStatus() {
+  return NATIVE_EVENT_RETRY_ENABLED ? nativeEventOutbox?.status() ?? null : null;
 }
 
 async function secureStoreAvailable(): Promise<boolean> {
@@ -240,6 +394,15 @@ async function saveAuth(
     authMutationVersion += 1;
     authCache = auth;
     authRefreshPromise = null;
+    if (NATIVE_EVENT_RETRY_ENABLED && previous) {
+      const before = nativeEventLogin(previous), after = nativeEventLogin(auth);
+      const sameLegacyOwner = !before && !after && previous.user.id === auth.user.id && nativeEventSessionScopes.size === 0;
+      if (!sameLegacyOwner && (!before || !after || before.ownerId !== after.ownerId || before.loginId !== after.loginId)) {
+        // Even an unexpected login change during refresh cannot leave the old
+        // retry epoch active. Ordinary same-login token rotation keeps it.
+        void invalidateNativeEventRetry().catch(() => {});
+      }
+    }
     return auth;
   });
 }
@@ -255,6 +418,7 @@ async function clearAuth(): Promise<void> {
     authStorageQueue.run(() => SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS)),
     cloudSyncPreference.set(false),
     sessionOutbox.clear(),
+    invalidateNativeEventRetry(),
   ]);
 }
 
@@ -468,6 +632,8 @@ export async function getCloudState(): Promise<CloudState> {
 
 export async function signInToCloud(email: string, password: string): Promise<CloudSignInResult> {
   const signInVersion = authMutationVersion;
+  const pendingAlertRemoval = invalidateNativeEventRetry();
+  void pendingAlertRemoval.catch(() => {});
   const normalizedEmail = email.trim().toLowerCase();
   if (!await secureStoreAvailable()) {
     return { ok: false, message: 'Secure sign-in storage is unavailable on this device.' };
@@ -489,6 +655,7 @@ export async function signInToCloud(email: string, password: string): Promise<Cl
     try {
       await cloudSyncPreference.set(false);
       await sessionOutbox.clear();
+      await pendingAlertRemoval;
     } catch {
       return { ok: false, message: 'Cloud sharing could not be switched off. Sign-in was not saved. Please try again.' };
     }
@@ -550,13 +717,18 @@ async function revokeCapturedSignOutAuth(auth: StoredAuth | null): Promise<void>
 export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
   const consentRevision = ++consentMutationVersion;
   if (!enabled) consentRuntimeOverride = false;
+  const pendingAlertRemoval = invalidateNativeEventRetry();
+  void pendingAlertRemoval.catch(() => {});
   const auth = enabled ? await refreshIfNeeded() : null;
   if (consentRevision !== consentMutationVersion) return false;
   if (enabled && !auth) return false;
   const consentVersion = authMutationVersion;
   try {
+    // Persist native opt-out independently of retry-queue removal failures.
+    if (NATIVE_EVENT_RETRY_ENABLED && !enabled) await cloudSyncPreference.set(false);
     if (!enabled || !await consentEnabled()) await sessionOutbox.clear();
-    await cloudSyncPreference.set(enabled);
+    await pendingAlertRemoval;
+    if (!NATIVE_EVENT_RETRY_ENABLED || enabled) await cloudSyncPreference.set(enabled);
     if (consentRevision !== consentMutationVersion) return false;
     if (enabled && (!auth || !authIsCurrent(auth, consentVersion))) return false;
     consentRuntimeOverride = enabled;
@@ -569,8 +741,10 @@ export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
 }
 
 export async function beginCloudSession(): Promise<string | null> {
+  const eventAuthVersion = nativeEventAuthVersion;
   void retryPendingCloudSessions();
   const syncContext = await currentSyncContext();
+  const eventLogin = NATIVE_EVENT_RETRY_ENABLED ? nativeEventLogin() : null;
   if (!syncContext || !await ensureDriverProfile(syncContext)) return null;
   const platform = Platform.OS;
   const detectorPipeline = platform === 'ios'
@@ -584,7 +758,14 @@ export async function beginCloudSession(): Promise<string | null> {
     app_version: formatAppBuildLabel(currentAppBuildInfo()),
   }, true, syncContext);
   const sessionId = result.ok ? result.body.session?.id || null : null;
-  if (sessionId) cloudSessionScopes.set(sessionId, syncContext);
+  if (sessionId) {
+    cloudSessionScopes.set(sessionId, syncContext);
+    const currentLogin = NATIVE_EVENT_RETRY_ENABLED ? nativeEventLogin() : null;
+    if (NATIVE_EVENT_RETRY_ENABLED && eventLogin && currentLogin?.ownerId === eventLogin.ownerId && currentLogin.loginId === eventLogin.loginId
+      && eventAuthVersion === nativeEventAuthVersion && syncContext.consentVersion === consentMutationVersion) {
+      nativeEventSessionScopes.set(sessionId, { ...eventLogin, lifecycle: { authVersion: eventAuthVersion, consentVersion: syncContext.consentVersion } });
+    }
+  }
   return sessionId;
 }
 
@@ -672,6 +853,7 @@ export async function finishCloudSession(
   endedAt = new Date().toISOString(),
   localSessionId?: string,
 ): Promise<boolean> {
+  stopNativeCloudEvents(sessionId);
   const sessionScope = cloudSessionScopes.get(sessionId);
   if (!sessionScope) return false;
   const syncContext = await currentSyncContext();
@@ -692,5 +874,5 @@ export async function finishCloudSession(
     if (!await sessionOutbox.enqueue(syncContext, entry)) return false;
     return (await sessionOutbox.flush(syncContext, item => sendPendingSummary(syncContext, item))).has(sessionId);
   } catch { return false; }
-  finally { cloudSessionScopes.delete(sessionId); }
+  finally { cloudSessionScopes.delete(sessionId); nativeEventSessionScopes.delete(sessionId); }
 }
