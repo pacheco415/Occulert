@@ -434,7 +434,39 @@
     "productionAppJson": "Unchanged",
     "productionInfoPlist": "Actual default prebuild byte comparison passed",
     "productionInfoPlistSha256": "6a6ea81cb682575398b81fb141e8e8a7fe9c33747d9818e5432e5a3e9221ff83",
-    "productionProfileBlockSha256": "ed2a4315be1ea502fc77b559e0f0dfef43855c984f3696f833de267eb086c678"
+    "productionProfileBlockSha256": "ed2a4315be1ea502fc77b559e0f0dfef43855c984f3696f833de267eb086c678",
+    "rootCleanInstall": {
+      "command": "npm ci --include=dev",
+      "passed": true,
+      "rootLockSha256": "964398ea70ff35393c6b6f6483b61d64c5394c153fc88ae3b660ebdc19ef8269"
+    },
+    "rootVerify": {
+      "command": "npm run verify",
+      "sourceHead": "9e849ed365bbf5337ba6b1b231759d826bd12f18",
+      "mainBase": "515a3cc4d623a502eac9924650d34b0b9212b6c8",
+      "observedAtUtc": "2026-10-29T04:41:32.113Z",
+      "groupsPassed": 97,
+      "groupsFailed": 0,
+      "groupsRun": 97
+    },
+    "finalProfileRegressions": {
+      "command": "npm run test:simulator-trace",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "testSourceSha256": "e99130ca5ad3dbfa1bc7ec9c5fa89ee7790ae2354048a0f093f70211c06cc8c6",
+      "coverage": [
+        "Production resolver keeps real ML Kit entry",
+        "Simulator-only resolver and build/runtime gates",
+        "Metro/source tampering changes recorded build identity",
+        "Actual default/simulator prebuild and production Info.plist byte comparison"
+      ]
+    },
+    "nativeSafetyAndCloudFixtures": {
+      "command": "node --test scripts/test-high-security-fixes.mjs scripts/test-native-eye-baseline.mjs",
+      "passed": 15,
+      "failed": 0
+    }
   },
   "limitations": [
     "Synthetic input exercises existing pseudo-EAR/PERCLOS/scoring; no camera or ML Kit accuracy evidence.",
@@ -442,8 +474,9 @@
     "No cloud EAS build, production build, submission, remote counter operation, experiment activation, or dependency version change."
   ],
   "sourceComposition": {
-    "currentMain": "34f57fd3324cd72f7502b9150c79cff4e8079f41",
+    "currentMain": "515a3cc4d623a502eac9924650d34b0b9212b6c8",
     "application139InputsUnchangedFromObservedBuild": true,
-    "historicalBuildSourceReferencePreserved": true
+    "historicalBuildSourceReferencePreserved": true,
+    "composedSourceVerifiedBeforeFinalDocumentation": "9e849ed365bbf5337ba6b1b231759d826bd12f18"
   }
 }

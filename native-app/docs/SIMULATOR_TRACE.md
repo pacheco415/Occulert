@@ -131,3 +131,9 @@ production phone Info.plist bytes (SHA-256
 ordinary autolinking retained the real ML Kit detector. Production profile
 bytes, dependency versions, build counters and experiment defaults did not
 change.
+
+After integrating test-only main `515a3cc4d623a502eac9924650d34b0b9212b6c8`,
+clean root installation and all **97 root verification groups** passed. The
+focused production-resolver/Metro-tamper/profile checks also passed, and every
+one of the original 139 built inputs still matched. This later source
+composition does not rewrite the historical build or simulator-proof dates.
