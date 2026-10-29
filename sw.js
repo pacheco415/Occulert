@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v145';
+const CACHE = 'occulert-v146';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -275,6 +275,8 @@ self.addEventListener('fetch', event => {
 
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  // Let the browser handle foreign requests without consulting the app cache.
+  if (url.origin !== self.location.origin) return;
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
   if(url.origin===self.location.origin&&OPTIONAL_PATHS.has(url.pathname)){event.respondWith(verifiedOptionalResponse(req,url.pathname));return}
   if (url.origin === self.location.origin && NETWORK_ONLY_DOCUMENTS.has(url.pathname)) {
@@ -308,7 +310,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (req.mode === 'navigate' || req.url.endsWith('.html')) {
+  if (url.origin === self.location.origin && (req.mode === 'navigate' || req.url.endsWith('.html'))) {
     const networkAttempt = fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
     const cacheUpdate = networkAttempt
       .then(response => response && response.ok ? cacheResponseBestEffort(req, response) : null)
@@ -328,7 +330,7 @@ self.addEventListener('fetch', event => {
       if (match) return match;
       const integrity = url.origin === self.location.origin && RUNTIME_INTEGRITY.get(url.pathname);
       return fetch(integrity ? new Request(req, { integrity }) : req).then(res => {
-        if (res && res.ok && req.url.startsWith(self.location.origin)) {
+        if (res && res.ok && url.origin === self.location.origin) {
           const copy = res.clone();
           caches.open(CACHE).then(cache => cache.put(req, copy));
         }
