@@ -5,8 +5,9 @@
 import "./camera.js";
 import "./detector.js";
 import "./calibration.js";
-import "./metrics.js";
+import { scoringReadWallClock } from "./metrics.js";
 import "./storage-history.js";
+import { scoringTriggerEligible } from "./scoring-core.js";
 import { pushFleet } from "./cloud-sync.js";
 import { getPreference, setPreference, experimentFlags, experimentController, startupAllowsMonitoring, alertsEl, alertScreen, alertTitle, alertSub, nightOpacity, running, starting, confidence, sessionStart, calibrating, log, _lastBreakPrompt, set__lastBreakPrompt } from "./ui.js";
 export let acceptedAlertHook = /** @type {((reason:string)=>void)|null} */ (null);
@@ -296,9 +297,9 @@ document.addEventListener('pointerdown', () => {
 }, { passive: true });
 /** @param {string} reason @param {unknown} [eligibility] */
 export function trigger(reason, eligibility) {
-    let now = Date.now();
+    let now = scoringReadWallClock('trigger');
     const qualified = experimentFlags.noface && running && reason === 'Face lost after fatigue' && experimentController?.qualifiedLoss(eligibility);
-    if (now - lastAlert < 12000 || calibrating || confidence < 45 && !qualified)
+    if (!scoringTriggerEligible({ lastAlert, calibrating, confidence }, now, Boolean(qualified)))
         return;
     lastAlert = now;
     alerts++;
