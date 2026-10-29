@@ -78,11 +78,13 @@ SDK 58 generates the UIKit scene lifecycle during prebuild. The current camera
 stack still requires a physical-device build: Google ML Kit 8 excludes arm64
 simulators, while the iPhone Duo simulator runs only arm64. Do not clear that
 exclusion to claim simulator support. See [upgrade details](UPGRADE_README.md).
+The separate [Simulator Trace variant](docs/SIMULATOR_TRACE.md) omits ML Kit
+and feeds the real scoring path with synthetic input for layout/flow checks.
 
 ### Run
 ```bash
-# iOS simulator
-npx expo start --ios
+# iOS Simulator layout/scoring variant, with synthetic input
+npm run ios:simulator-trace -- --device SIMULATOR_UUID
 
 # Android emulator  
 npx expo start --android
