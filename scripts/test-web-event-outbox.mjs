@@ -15,7 +15,7 @@ function clock() {
   return { now: () => time, setTimeout: (work, delay) => { timers.set(++next, { work, at: time + delay }); return next; }, clearTimeout: id => timers.delete(id),
     async advance(ms) { time += ms; for (const [id, timer] of [...timers]) if (timer.at <= time && timers.delete(id)) timer.work(); await settle(); }, timers };
 }
-function locks() {
+function locks({ beforeRelease = () => {} } = {}) {
   const held = new Set(), waiting = new Map();
   return { held, request(name, options, work) {
     return new Promise((resolve, reject) => {
@@ -26,7 +26,8 @@ function locks() {
           const rows = waiting.get(name) || []; rows.push(run); waiting.set(name, rows); return;
         }
         held.add(name);
-        Promise.resolve().then(() => work({ name })).then(resolve, reject).finally(() => {
+        Promise.resolve().then(() => work({ name })).then(resolve, reject).finally(async () => {
+          await beforeRelease(name);
           held.delete(name); const rows = waiting.get(name) || []; const following = rows.shift(); if (following) following();
         });
       };
@@ -129,6 +130,25 @@ test('a formerly contending consent period clears the previous tab queue before 
   assert.equal(second.rows().length, 1); assert.notEqual(second.rows()[0].event.event_id, originalId);
   second.online(true); await second.adapter.flush();
   assert.equal(second.calls.filter(row => !row.legacy).length, 1); assert.equal(second.calls.at(-1).type, 'head_nod'); second.close();
+});
+test('delayed document lease release permits legacy contention before a fresh keyed takeover', async () => {
+  const released = deferred(), name = 'occulert.event-outbox.live-tab.v1';
+  const mutex = locks({ beforeRelease: lock => lock === name ? released.promise : undefined });
+  const first = fixture({ mutex }); first.online(false); await first.queue();
+  const bytes = first.values.get(EVENT_OUTBOX_KEY), metadata = first.values.get(META), originalId = first.rows()[0].event.event_id;
+  const second = fixture({ values: first.values, time: first.time, mutex }); second.online(false);
+  await second.adapter.beginConsentPeriod(); second.adapter.trackSession(second.original, second.reference); await second.queue('yawn');
+  first.close(); await settle(); assert.equal(mutex.held.has(name), true, 'document close does not imply browser lock release');
+  await second.queue('head_nod');
+  assert.deepEqual(second.calls, [{ legacy: true }, { legacy: true }]);
+  assert.equal(first.values.get(EVENT_OUTBOX_KEY), bytes); assert.equal(first.values.get(META), metadata);
+  released.resolve(); await settle(); assert.equal(mutex.held.has(name), false);
+  await second.queue('head_nod'); assert.equal(second.rows().length, 1); assert.notEqual(second.rows()[0].event.event_id, originalId);
+  assert.ok(JSON.parse(second.values.get(META)).version > JSON.parse(metadata).version);
+  second.online(true); await second.adapter.flush();
+  assert.equal(second.calls.length, 3); assert.equal(second.calls.filter(row => !row.legacy).length, 1);
+  assert.equal(second.calls.at(-1).type, 'head_nod'); assert.notEqual(second.calls.at(-1).details.client_event_id, originalId);
+  assert.equal(second.rows().length, 0); assert.equal(first.calls.length, 0); second.close();
 });
 test('a stale capability wait cannot release ownership acquired for a newer consent grant', async () => {
   const first = fixture(), capability = deferred(); first.backend.eventOutboxCapability = () => capability.promise;
