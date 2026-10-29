@@ -1,5 +1,22 @@
 // Pure released scoring rules. Clocks, signals, calibration and sensitivity are
 // explicit inputs; rendering, alert delivery and persistence stay with callers.
+export function scoringSmooth(history, value) {
+    const samples = [...history, value];
+    if (samples.length > 6) samples.shift();
+    return { samples, ear: samples.reduce((a, b) => a + b, 0) / samples.length };
+}
+
+export function scoringNodHistory(history, y, nowMs) {
+    const samples = [...history, { y, t: nowMs }];
+    if (samples.length > 10) samples.shift();
+    return samples;
+}
+
+export function scoringNodDetected(history, lastNodMs, nowMs) {
+    if (history.length < 8) return false;
+    const middle = history[Math.floor(history.length / 2)], first = history[0], last = history[history.length - 1];
+    return middle.y - first.y > .04 && middle.y - last.y > .018 && nowMs - lastNodMs > 1800;
+}
 export function scoringCalibrationThresholds(samples, minimumSamples) {
     if (samples.length < minimumSamples)
         return null;
@@ -11,15 +28,21 @@ export function scoringCalibrationThresholds(samples, minimumSamples) {
         baseWatchThreshold: Math.max(closedThreshold + .025, Math.min(.28, baseline * .82)) };
 }
 
+export function scoringCalibrationSamples(samples, ear) {
+    return ear > .16 && ear < .45 ? [...samples, ear] : [...samples];
+}
+
 export function scoringSensitivityThresholds(baseClosedThreshold, baseWatchThreshold, offset, factor = 1) {
     const closedThreshold = Math.max(.10 * factor, Math.min(.25 * factor, baseClosedThreshold + offset * factor));
     return { eyeClosedThreshold: closedThreshold,
         eyeWatchThreshold: Math.max(closedThreshold + .025 * factor, Math.min(.31 * factor, baseWatchThreshold + offset * factor)) };
 }
 
+
+
 export function scoringResetContinuity(state) {
     return { ...state, totalDistractionMs: state.totalDistractionMs + (state.turnedSince ? Math.max(0, state.lastFaceSeen - state.turnedSince) : 0),
-        turnedSince: 0, eyesClosedSince: 0 };
+        turnedSince: 0, eyesClosedSince: 0, earHistory: [], noseYHistory: [] };
 }
 
 export function scoringNoFace(state, nowMs) {
@@ -36,7 +59,7 @@ export function scoringConfidence(state, turned, stableDistraction = false) {
     return Math.min(100, state.confidence + (state.calibrated || stableDistraction && turned ? 5 : 3));
 }
 
-export function scoringEyeMetrics(state, ear, turned, nowMs, liveNowMs = nowMs) {
+export function scoringEyeMetrics(state, ear, turned, nowMs) {
     const next = { ...state }, closed = ear < state.eyeClosedThreshold;
     next.perclosWindow = [...state.perclosWindow, { t: nowMs, closed }].filter(row => nowMs - row.t < 60000);
     const perclos = next.perclosWindow.length ? Math.round(next.perclosWindow.filter(row => row.closed).length / next.perclosWindow.length * 100) : 0;
@@ -55,8 +78,7 @@ export function scoringEyeMetrics(state, ear, turned, nowMs, liveNowMs = nowMs) 
         next.totalDistractionMs += nowMs - next.turnedSince;
         next.turnedSince = 0;
     }
-    return { state: next, perclos, microsleep,
-        distractionSeconds: scoringDistractionSeconds(next, liveNowMs) };
+    return { state: next, perclos, microsleep };
 }
 
 export function scoringDistractionSeconds(state, nowMs) {
@@ -112,41 +134,10 @@ export function scoringDistractionMatured(state, nowMs) {
     return nowMs - state.turnedSince > 6500;
 }
 
-export function scoringAlertReason(state, nowMs) {
-    const candidate = scoringAlertCandidate(state);
-    return candidate === 'Fatigue' || candidate === 'Distraction' && scoringDistractionMatured(state, nowMs) ? candidate : null;
-}
+
 
 /** @param {{lastAlert:number,calibrating:boolean,confidence:number}} state
  * @param {number} nowMs @param {boolean} [qualifiedLoss] */
 export function scoringTriggerEligible(state, nowMs, qualifiedLoss = false) {
     return !(nowMs - state.lastAlert < 12000 || state.calibrating || state.confidence < 45 && !qualifiedLoss);
-}
-
-// Replay composes the same pure phases used by the live adapters. This does not
-// derive face/turn/nod, smooth EAR, invent calibration, or create ground truth.
-export function scoringReplayFrame(state, frame, nowMs, options) {
-    let next = { ...state, calibrationSamples: [...state.calibrationSamples] };
-    if (!frame.hasFace)
-        return scoringNoFace(scoringResetContinuity(next), nowMs);
-    next.noFaceSince = 0;
-    next.lastFaceSeen = nowMs;
-    if (next.calibrating) {
-        if (frame.ear > .16 && frame.ear < .45)
-            next.calibrationSamples.push(frame.ear);
-        if (Math.max(0, next.calibrationUntil - nowMs) <= 0) {
-            const thresholds = scoringCalibrationThresholds(next.calibrationSamples, options.minimumSamples);
-            if (thresholds) {
-                next.calibrationSamples.sort((a, b) => a - b);
-                Object.assign(next, thresholds);
-            }
-            next.calibrating = false;
-            next.calibrated = thresholds !== null;
-            Object.assign(next, scoringSensitivityThresholds(next.baseClosedThreshold, next.baseWatchThreshold, options.sensitivityOffset));
-        }
-        return scoringCalibrationFrame(next);
-    }
-    next.confidence = scoringConfidence(next, frame.turned, options.stableDistraction);
-    const metrics = scoringEyeMetrics(next, frame.ear, frame.turned, nowMs);
-    return scoringTrackedFrame(metrics.state, { ...frame, perclos: metrics.perclos }, nowMs);
 }

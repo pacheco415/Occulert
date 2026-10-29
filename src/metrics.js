@@ -1,7 +1,7 @@
 import "./camera.js";
 import { signalDetectionResult } from "./detector.js";
 import { updateCalibration } from "./calibration.js";
-import { scoringResetContinuity, scoringNoFace, scoringCalibrationFrame, scoringConfidence, scoringEyeMetrics, scoringTrackedFrame, scoringDistractionSeconds, scoringAlertCandidate, scoringDistractionMatured } from "./scoring-core.js";
+import { scoringSmooth, scoringNodHistory, scoringNodDetected, scoringResetContinuity, scoringNoFace, scoringCalibrationFrame, scoringConfidence, scoringEyeMetrics, scoringTrackedFrame, scoringDistractionSeconds, scoringAlertCandidate, scoringDistractionMatured } from "./scoring-core.js";
 import { alerts, escalationLevel, tone, trigger, speak, triggerBreakCheck } from "./alerts.js";
 import "./storage-history.js";
 import { queueBackendEvent } from "./cloud-sync.js";
@@ -14,24 +14,18 @@ export function calcEAR(lm, idx) {
     return h < .001 ? .28 : (dist(p2, p6) + dist(p3, p5)) / (2 * h);
 }
 export function smooth(v) {
-    earHistory.push(v);
-    if (earHistory.length > 6)
-        earHistory.shift();
-    return earHistory.reduce((a, b) => a + b, 0) / earHistory.length;
+    const result = scoringSmooth(earHistory, v);
+    set_earHistory(result.samples);
+    return result.ear;
 }
 export function headTurn(lm) { let n = lm[4], l = lm[234], r = lm[454], w = Math.abs(r.x - l.x); return w < .05 ? true : Math.abs((n.x - (l.x + r.x) / 2) / w) > .34; }
 export function detectHeadNod(lm) {
     let y = lm[4].y;
-    noseYHistory.push({ y, t: Date.now() });
-    if (noseYHistory.length > 10)
-        noseYHistory.shift();
+    set_noseYHistory(scoringNodHistory(noseYHistory, y, scoringReadWallClock('nodSample')));
     if (noseYHistory.length < 6)
         return false;
-    let now = Date.now();
-    if (noseYHistory.length < 8)
-        return false;
-    let midPt = noseYHistory[Math.floor(noseYHistory.length / 2)], earliest = noseYHistory[0], latest = noseYHistory[noseYHistory.length - 1], dip = midPt.y - earliest.y, recover = midPt.y - latest.y;
-    if (dip > .04 && recover > .018 && now - lastNod > 1800) {
+    let now = scoringReadWallClock('nodDecision');
+    if (scoringNodDetected(noseYHistory, lastNod, now)) {
         set_lastNod(now);
         (set_headNods(headNods + 1) - 1);
         nodsEl.textContent = headNods;
@@ -82,7 +76,12 @@ export function scoringMetricState() {
     return { fatigue, confidence, maxFatigue, fatigueSampleSum, fatigueSampleCount,
         perclosWindow, eyesClosedSince, microsleeps, lastMicro, turnedSince,
         totalDistractionMs, noFaceSince, lastFaceSeen, calibrating, calibrated,
-        eyeClosedThreshold, eyeWatchThreshold };
+        eyeClosedThreshold, eyeWatchThreshold, earHistory, noseYHistory, lastNod, headNods };
+}
+export function scoringReadWallClock(phase) {
+    const value = Date.now();
+    experimentController?.recordScoringClock?.(phase, value);
+    return value;
 }
 export function scoringApplyMetricState(next) {
     set_fatigue(next.fatigue); set_confidence(next.confidence); set_maxFatigue(next.maxFatigue);
@@ -104,7 +103,7 @@ export function resetContinuousObservations() {
     distractionEl.textContent = Math.round(totalDistractionMs / 1000) + 's';
 }
 export function updateEyeMetrics(ear, turned) {
-    const result = scoringEyeMetrics(scoringMetricState(), ear, turned, Date.now());
+    const result = scoringEyeMetrics(scoringMetricState(), ear, turned, scoringReadWallClock('eye'));
     scoringApplyMetricState(result.state);
     perclosEl.textContent = result.perclos + '%';
     if (result.microsleep) {
@@ -112,13 +111,14 @@ export function updateEyeMetrics(ear, turned) {
         log('Microsleep pattern detected');
     }
     // Retain the original second wall-clock sample after eye/turn updates.
-    distractionEl.textContent = scoringDistractionSeconds(scoringMetricState(), turnedSince ? Date.now() : 0) + 's';
+    distractionEl.textContent = scoringDistractionSeconds(scoringMetricState(), turnedSince ? scoringReadWallClock('distraction') : 0) + 's';
     return result.perclos;
 }
-export function updateScore(ear, turned, nod, hasFace) {
+export function updateScore(ear, turned, nod, hasFace, rawEar = ear, noseY = null) {
     if (experimentFlags.primary)
         return experimentController.score(ear, turned, nod, hasFace);
-    const now = Date.now();
+    const now = scoringReadWallClock('score');
+    experimentController?.recordScoringInput?.({ ear, rawEar, turned, nod, hasFace, noseY, wall: now, faceMissing: !hasFace });
     if (!hasFace) {
         resetContinuousObservations();
         scoringApplyMetricState(scoringNoFace(scoringMetricState(), now));
@@ -171,7 +171,7 @@ export function onResults(res) {
         return;
     }
     let lm = res.multiFaceLandmarks[0], raw = (calcEAR(lm, LEFT) + calcEAR(lm, RIGHT)) / 2, ear = smooth(raw), turned = headTurn(lm), nod = calibrating ? false : detectHeadNod(lm);
-    updateScore(ear, turned, nod, true);
+    updateScore(ear, turned, nod, true, raw, lm[4].y);
     // ── New: MAR/Yawn, Light, Tracking ──
     if (!calibrating && typeof detectYawn === 'function')
         detectYawn(lm);
@@ -187,7 +187,7 @@ export function onResults(res) {
     if (scoringAlertCandidate({ calibrating, confidence, fatigue, turnedSince }) === 'Fatigue')
         trigger('Fatigue');
     else if (scoringAlertCandidate({ calibrating, confidence, fatigue, turnedSince }) === 'Distraction'
-        && scoringDistractionMatured({ turnedSince }, Date.now()))
+        && scoringDistractionMatured({ turnedSince }, scoringReadWallClock('eligibility')))
         trigger('Distraction');
     experimentController?.recordResults(res, raw, ear, turned);
 }

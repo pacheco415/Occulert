@@ -331,10 +331,34 @@
     let pitchDown = false, pitchUnknownLast = false, lossEpisode = null, lossRequested = false, calibrationDeadline = null;
     let distractionAt = null, previousDistracted = false, frame = null, frameSequence = 0, collector = null;
     let trace = models.createTraceStore(), lastTrace = null, invalidatedFrames = 0, skippedRepeatedFrames = 0;
+    let scoringReplay = null, scoringWallStart = 0, scoringOrder = 0;
     const observer = flags.observer ? models.createObserverEpisodes() : null;
     let lastObserverCsv = null;
     const units = value => flags.pixels ? value * 4 / 3 : value;
     const now = () => b.now();
+    function scoringSnapshot() {
+      const source = b.scoringState(), result = {};
+      const keys = ['fatigue','confidence','maxFatigue','fatigueSampleSum','fatigueSampleCount','perclosWindow','eyesClosedSince','microsleeps','lastMicro','turnedSince','totalDistractionMs','noFaceSince','lastFaceSeen','calibrating','calibrated','calibrationUntil','calibrationSamples','baselineEAR','baseClosedThreshold','baseWatchThreshold','eyeClosedThreshold','eyeWatchThreshold','lastAlert','earHistory','noseYHistory','lastNod','headNods'];
+      for (const key of keys) result[key] = source[key];
+      const snapshot = JSON.parse(JSON.stringify(result)), stamp = value => value === 0 ? 0 : 1700000000000 + value - scoringWallStart;
+      for (const key of ['eyesClosedSince','lastMicro','turnedSince','noFaceSince','lastFaceSeen','calibrationUntil','lastAlert','lastNod']) snapshot[key] = stamp(snapshot[key]);
+      snapshot.perclosWindow = snapshot.perclosWindow.map(row => ({ t: stamp(row.t), closed: row.closed }));
+      snapshot.noseYHistory = snapshot.noseYHistory.map(row => ({ y: row.y, t: stamp(row.t) }));
+      return snapshot;
+    }
+    function recordScoringInput(input) {
+      if (!active || !scoringReplay || !frame || frame.recorded || frame.generation !== generation) return;
+      frame.scoringInput = { order: ++scoringOrder, frameId: frame.frameId, atMs: now() - startedAt,
+        wallMs: input.wall - scoringWallStart, rawEar: input.hasFace ? input.rawEar : null,
+        ear: input.hasFace ? input.ear : null, hasFace: input.hasFace === true, faceMissing: input.faceMissing === true,
+        turned: input.turned === true, nod: input.nod === true, noseY: input.hasFace ? input.noseY : null,
+        sensitivity: b.scoringSettings().sensitivity, clocks: frame.scoringClocks ??= {} };
+    }
+    function recordScoringClock(phase, wall) {
+      if (!active || !scoringReplay || !frame || frame.recorded || frame.generation !== generation
+          || !['score','calibration','eye','distraction','nodSample','nodDecision','eligibility','trigger'].includes(phase)) return;
+      (frame.scoringClocks ??= {})[phase] = { wallMs: wall - scoringWallStart, atMs: now() - startedAt };
+    }
     function resetContinuity() {
       b.resetContinuous(); rates.reset(); evidence.reset(); previousNose = null; pitchUnknownLast = false;
       distractionAt = null; previousDistracted = false; lossEpisode = null; lossRequested = false;
@@ -368,6 +392,12 @@
       pitchBaseline = calibration = null; pitchDown = pitchUnknownLast = false; calibrationDeadline = null;
       previousNose = distractionAt = null; previousDistracted = false; lossEpisode = null; lossRequested = false;
       if (flags.pixels || flags.pitch) resetCalibration();
+      scoringReplay = null; scoringOrder = 0;
+      if ((flags.tasks || flags.observer) && typeof b.scoringState === 'function' && typeof b.scoringSettings === 'function') {
+        scoringWallStart = b.wallNow();
+        scoringReplay = { version: 1, epochMs: 1700000000000, initialState: scoringSnapshot(),
+          initialSettings: { ...b.scoringSettings() }, frames: [], controls: [], droppedFrames: 0, droppedControls: 0 };
+      }
       observeGeometry();
       b.ui.observer?.();
       if (flags.tasks && typeof b.createTasks === 'function') {
@@ -404,12 +434,12 @@
       }
       baseline.add(time, ear, ratio, !turned && Number.isFinite(ear) && ear > Math.max(units(.16), s.eyeWatchThreshold) && ear < units(.45) &&
         (!flags.pitch || ratio !== null));
-      const remaining = Math.max(0, s.calibrationUntil - b.wallNow()), progress = Math.min(100, Math.round((1 - remaining / b.calibrationMs) * 100));
+      const remaining = Math.max(0, s.calibrationUntil - b.wallNow('calibration')), progress = Math.min(100, Math.round((1 - remaining / b.calibrationMs) * 100));
       b.ui.calibration(progress + '%', 'Keep eyes open and face centered while parked… ' + progress + '%');
       if (!remaining) finishCalibration();
     }
     function eyeMetrics(ear, turned, down, time, unknown = false) {
-      const s = b.read(), wall = b.wallNow(), usable = Number.isFinite(ear) && !turned && !down && !unknown;
+      const s = b.read(), wall = b.wallNow('eye'), usable = Number.isFinite(ear) && !turned && !down && !unknown;
       const closed = usable && ear < s.eyeClosedThreshold;
       let percent;
       if (flags.timePerclos) percent = perclos.update(time, usable ? closed : null);
@@ -452,7 +482,8 @@
       }
     }
     function score(ear, turned, nod, hasFace, ratio = null, noseY = null, faceMissing = true, prepared = false) {
-      const time = now(), wall = b.wallNow();
+      const time = now(), wall = b.wallNow('score');
+      recordScoringInput({ ear, rawEar: frame?.scoringRawEar ?? ear, turned, nod, hasFace, noseY, wall, faceMissing });
       if (!prepared) prepareObservation(time, hasFace, faceMissing);
       previousFrameAt = time;
       const scale = flags.elapsed ? rates.scale(time, hasFace) : 1;
@@ -519,6 +550,7 @@
       const has = Array.isArray(lm) && [4, 234, 454].every(i => lm[i] && Number.isFinite(lm[i].x) && Number.isFinite(lm[i].y));
       prepareObservation(now(), has, !res.multiFaceLandmarks?.length);
       if (has) raw = (b.calcEAR(lm, b.left) + b.calcEAR(lm, b.right)) / 2;
+      if (frame) frame.scoringRawEar = raw;
       if (!has || !Number.isFinite(raw) || raw <= 0 || raw > 1) {
         b.clearEyes(); score(0, false, false, false, null, null, !res.multiFaceLandmarks?.length, true); b.tracking(false, false); b.render();
         recordResults(res, null, null, false); return;
@@ -534,7 +566,7 @@
       if (flags.pitch && (pitchDown || ratio === null && pitchBaseline !== null)) b.resetMouth(); else b.otherFaceMetrics(lm); b.tracking(true, ear > .05 && ear < .65); b.draw(lm); b.render(ear);
       const after = b.read();
       if (!after.calibrating && after.confidence >= 45 && after.fatigue >= 80) b.alert('Fatigue');
-      else if (!after.calibrating && after.confidence >= 45 && after.turnedSince && b.wallNow() - after.turnedSince > 6500) b.alert('Distraction');
+      else if (!after.calibrating && after.confidence >= 45 && after.turnedSince && b.wallNow('eligibility') - after.turnedSince > 6500) b.alert('Distraction');
       recordResults(res, raw, ear, turned);
     }
     function capture(video) {
@@ -566,9 +598,21 @@
         combinedFrameMs: Math.max(0, end - frame.at), perclos: support?.perclos ?? null,
         observedMs: support?.observedMs ?? null, closedMs: support?.closedMs ?? null,
         fatigue: s.fatigue, confidence: s.confidence, calibrating: frame.calibrating || s.calibrating, pitchDown });
+      if (scoringReplay && frame.scoringInput) {
+        if (scoringReplay.frames.length === 2400) { scoringReplay.frames.shift(); scoringReplay.droppedFrames++; }
+        scoringReplay.frames.push(frame.scoringInput);
+      }
       frame.recorded = true;
     }
-    function recalibrate() { if (!active) return; if (flags.pixels || flags.pitch) resetCalibration(); else { resetContinuity(); perclos.reset(); calibrationRevision++; } }
+    function recalibrate() {
+      if (!active) return;
+      if (flags.pixels || flags.pitch) resetCalibration(); else { resetContinuity(); perclos.reset(); calibrationRevision++; }
+      if (scoringReplay) {
+        if (scoringReplay.controls.length === 256) { scoringReplay.controls.shift(); scoringReplay.droppedControls++; }
+        scoringReplay.controls.push({ order: ++scoringOrder, atMs: now() - startedAt,
+          wallMs: b.wallNow() - scoringWallStart, kind: 'recalibrate', state: scoringSnapshot(), settings: { ...b.scoringSettings() } });
+      }
+    }
     function qualifiedLoss(context) { return active && flags.noface && context === lossEpisode && context?.qualified && !b.read().calibrating; }
     function legacyResult() { if (active && frame && frame.generation === generation) frame.legacyEndedAt = now(); }
     function recordAlert(reason) { if (active && (flags.tasks || flags.observer)) trace.recordAlert(now() - startedAt, reason); }
@@ -605,10 +649,11 @@
             ? 'session_id,start_ms,end_ms,label\n' + observer.entries().map(row =>
               [s.localSessionId, row.start_ms, row.end_ms, row.label].join(',')).join('\n') + '\n' : null;
         }
-        lastTrace = { schema: 'occulert.parked-detection-trace', version: 1,
+        lastTrace = { schema: 'occulert.parked-detection-trace', version: scoringReplay ? 2 : 1,
           session: { sessionId: s.localSessionId, durationMs, platform: 'web',
             detectorVersion: b.detectorVersion(), ...b.provenance(), ...summary() },
-          samples: trace.samples(), legacyAlerts: trace.alerts() };
+          samples: trace.samples(), legacyAlerts: trace.alerts(),
+          ...(scoringReplay ? { scoringReplay: { ...scoringReplay, invalidatedFrames } } : {}) };
       }
       active = false; generation++; frame = null; pitchDown = pitchUnknownLast = false; lossEpisode = null; lossRequested = false;
       b.ui.observer?.();
@@ -617,7 +662,7 @@
       return lastTrace?.session ?? null;
     }
     return Object.freeze({ begin, stop, score, results, observeGeometry, finishCalibration, capture, recordResults,
-      qualifiedLoss, recordAlert, summary, exportData, units, legacyResult, recalibrate,
+      qualifiedLoss, recordAlert, summary, exportData, units, legacyResult, recalibrate, recordScoringInput, recordScoringClock, prepareObservation,
       markObserver, observerState, exportObserverEpisodes });
   }
   const api = Object.freeze({ ...models, createController });
@@ -685,7 +730,7 @@ if(typeof module==='object'&&module.exports)module.exports=api;else root.Occuler
   faceStateEl, perclosEl, microsleepsEl, distractionEl, calibrationEl, calibrationFill,
   applySensitivity, resetContinuousObservations, updateCalibration, updateEyeMetrics,
   calcEAR, smooth, headTurn, detectHeadNod, log, updateTrackingState, drawEyes,
-  render, trigger, detectYawn, calcMAR, checkLightLevel */
+  render, trigger, detectYawn, calcMAR, checkLightLevel, scoringMetricState, scoringReadWallClock, lastAlert, calibrationMinimumSamples */
 /* global calibrating: writable, calibrated: writable, calibrationUntil: writable,
   sensitivityLevel: readonly, calibrationSamples: writable, baselineEAR: writable, baseClosedThreshold: writable,
   baseWatchThreshold: writable, eyeClosedThreshold: writable, eyeWatchThreshold: writable,
@@ -698,9 +743,11 @@ if(typeof module==='object'&&module.exports)module.exports=api;else root.Occuler
 function createMountedController(flags){
  const api=window.OcculertDetectionExperiments;let capturedCanvas=null;
  const controller=api.createController({
+ scoringState:()=>({...scoringMetricState(),lastAlert,calibrationUntil,calibrationSamples,baselineEAR,baseClosedThreshold,baseWatchThreshold}),
+ scoringSettings:()=>({sensitivity:sensitivityLevel,minimumSamples:calibrationMinimumSamples}),
  read:()=>({running,localSessionId,calibrating,calibrated,calibrationUntil,calibrationSamples,baselineEAR,baseClosedThreshold,baseWatchThreshold,eyeClosedThreshold,eyeWatchThreshold,fatigue,maxFatigue,confidence,fatigueSampleSum,fatigueSampleCount,noFaceSince,lastFaceSeen,perclosWindow,eyesClosedSince,lastMicro,microsleeps,turnedSince,totalDistractionMs}),
  write:s=>{({calibrating,calibrated,calibrationUntil,calibrationSamples,baselineEAR,baseClosedThreshold,baseWatchThreshold,eyeClosedThreshold,eyeWatchThreshold,fatigue,maxFatigue,confidence,fatigueSampleSum,fatigueSampleCount,noFaceSince,lastFaceSeen,perclosWindow,eyesClosedSince,lastMicro,microsleeps,turnedSince,totalDistractionMs}=s)},
- now:()=>typeof performance!=='undefined'&&typeof performance.now==='function'?performance.now():Date.now(),wallNow:()=>Date.now(),calibrationMs:CALIBRATION_MS,left:LEFT,right:RIGHT,
+ now:()=>typeof performance!=='undefined'&&typeof performance.now==='function'?performance.now():Date.now(),wallNow:phase=>scoringReadWallClock(phase),calibrationMs:CALIBRATION_MS,left:LEFT,right:RIGHT,
  dimensions:()=>({width:video.videoWidth,height:video.videoHeight}),applySensitivity:()=>applySensitivity(sensitivityLevel),
  resetContinuous:resetContinuousObservations,resetMouth:()=>{_mouthOpenSince=0;_marHist=[]},defaultCalibration:updateCalibration,defaultEyeMetrics:updateEyeMetrics,
  calcEAR,smooth,headTurn,detectNod:detectHeadNod,log,tracking:updateTrackingState,clearEyes:()=>ctx.clearRect(0,0,canvas.width,canvas.height),

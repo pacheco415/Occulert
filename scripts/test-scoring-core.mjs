@@ -1,25 +1,49 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { scoringReplayFrame, scoringAlertReason, scoringTriggerEligible, scoringCalibrationThresholds } from '../src/scoring-core.js';
+import { scoringTriggerEligible, scoringCalibrationThresholds } from '../src/scoring-core.js';
+import { scoringReplayFrame, scoringAlertReason } from '../benchmark/scoring-step.mjs';
 import { createReleasedScoringOracle, initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../benchmark/released-scoring-oracle.mjs';
 import { buildDriverArtifact } from './lib/driver-build.mjs';
 import { fileURLToPath } from 'node:url';
+import { mkdtempSync, mkdirSync, cpSync, writeFileSync, rmSync, symlinkSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const compiled = await buildDriverArtifact({ sourceRoot: fileURLToPath(new URL('../src', import.meta.url)),
     contractPath: fileURLToPath(new URL('../source-driver-contract.json', import.meta.url)) });
 
+test('the pinned independent oracle survives normal retirement of the public v97 URL and integrity entry', () => {
+    const directory=mkdtempSync(join(tmpdir(),'occulert-scoring-oracle-'));
+    try {
+        mkdirSync(join(directory,'benchmark/fixtures'),{recursive:true});
+        cpSync(new URL('../benchmark/released-scoring-oracle.mjs',import.meta.url),join(directory,'benchmark/released-scoring-oracle.mjs'));
+        cpSync(new URL('../benchmark/fixtures/driver-app-v97.js',import.meta.url),join(directory,'benchmark/fixtures/driver-app-v97.js'));
+        symlinkSync(fileURLToPath(new URL('../node_modules',import.meta.url)),join(directory,'node_modules'),'dir');
+        cpSync(new URL('../benchmark/fixtures/driver-app-v97.js',import.meta.url),join(directory,'driver-app.v97.js'));
+        writeFileSync(join(directory,'asset-integrity.json'),JSON.stringify({'driver-app.v97.js':'retired-entry'}));
+        rmSync(join(directory,'driver-app.v97.js'));writeFileSync(join(directory,'asset-integrity.json'),'{}');
+        execFileSync(process.execPath,['--input-type=module','-e',"import{createReleasedScoringOracle}from'./benchmark/released-scoring-oracle.mjs';const o=createReleasedScoringOracle();o.step({atMs:4000,hasFace:true,ear:.3,turned:false,nod:false});"],{cwd:directory,stdio:'pipe'});
+        assert.match(readFileSync(new URL('../.vercelignore',import.meta.url),'utf8'),/^benchmark\/$/m);
+        assert.doesNotMatch(readFileSync(new URL('../sw.js',import.meta.url),'utf8'),/benchmark\/fixtures/);
+    } finally {rmSync(directory,{recursive:true,force:true});}
+});
+
 function pureParity(frames, { state = initialScoringState(), minimumSamples = 1, sensitivity = 'medium' } = {}) {
     const original = createReleasedScoringOracle({ state, minimumSamples, sensitivity });
+    const composed = createReleasedScoringOracle({ source: compiled.code, state, minimumSamples, sensitivity });
     let actual = structuredClone(state);
     const alerts = [], options = { minimumSamples, sensitivityOffset: { low: -.03, medium: 0, high: .03 }[sensitivity] };
     for (const frame of frames) {
         const expected = original.step(frame), now = SCORING_EPOCH + frame.atMs;
+        assert.deepEqual(composed.step(frame), expected, 'composed edge frame at ' + frame.atMs);
         actual = scoringReplayFrame(actual, frame, now, options);
         const reason = frame.hasFace && scoringAlertReason(actual, now);
         if (reason && scoringTriggerEligible(actual, now)) { actual.lastAlert = now; alerts.push({ atMs: frame.atMs, reason }); }
         assert.deepEqual(actual, expected, 'frame at ' + frame.atMs);
     }
     assert.deepEqual(alerts, original.alerts);
+    assert.deepEqual(composed.alerts, original.alerts);
     return { actual, alerts };
 }
 
@@ -36,6 +60,15 @@ for (const fps of [3, 7, 15]) for (const sensitivity of ['low', 'medium', 'high'
     }
     assert.ok(original.alerts.length >= 3, 'Golden traces must actually exercise alerts and cooldown');
     assert.deepEqual(actualAlerts, original.alerts);
+});
+
+for (const fps of [3, 7, 15]) test(`actual composed EAR smoothing and nod inputs preserve v97 at ${fps}fps`, () => {
+    const original = createReleasedScoringOracle(), composed = createReleasedScoringOracle({ source: compiled.code });
+    for (const frame of syntheticScoringTrace(fps)) {
+        const input = { ...frame, rawEar: frame.ear, noseY: .5 + (frame.atMs % 3000 < 1000 ? 0 : frame.atMs % 3000 < 2000 ? .06 : .01) };
+        assert.deepEqual(composed.step(input), original.step(input), 'raw input at ' + frame.atMs);
+    }
+    assert.deepEqual(composed.alerts, original.alerts);
 });
 
 test('pure calibration preserves one-sample released behavior and the separate parked minimum', () => {

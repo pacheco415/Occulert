@@ -22,7 +22,7 @@ export const traceContract=Object.freeze({detectorPrefix:corePrefix,runtimeVersi
  runtimePins:Object.freeze(runtime.files.map(({url,integrity})=>Object.freeze({url,integrity}))),
  modelIntegrity:runtime.files.find(pin=>pin.file==='face_landmarker.task').integrity});
 const knownFlags=new Set(['calibrationMin','distractionConfidence','elapsed','noface','observer','pitch','pixels','tasks','timePerclos']);
-function validateProvenance(s){
+export function validateProvenance(s){
  const flags=s.experimentFlags;
  if(!Array.isArray(flags)||(!flags.includes('tasks')&&!flags.includes('observer'))||flags.some(flag=>!knownFlags.has(flag))||new Set(flags).size!==flags.length||
    flags.join('+')!==[...flags].sort().join('+')||s.detectorVersion!==traceContract.detectorPrefix+flags.join('+')||
@@ -39,7 +39,7 @@ export function adaptTrace(trace,{participant,split,episodes}={}){
  if(split!=='train'&&split!=='test')throw Error('Supply an explicit participant-level train/test split');
  if(!Array.isArray(episodes))throw Error('Supply independently labeled episodes (an explicit empty list is permitted)');
  const s=trace?.session;
- if(trace?.schema!=='occulert.parked-detection-trace'||trace.version!==1||!s||s.platform!=='web'||
+ if(trace?.schema!=='occulert.parked-detection-trace'||![1,2].includes(trace.version)||!s||s.platform!=='web'||
    typeof s.sessionId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(s.sessionId)||typeof s.detectorVersion!=='string'||!s.detectorVersion||
    !finite(s.durationMs)||s.durationMs<=0||!Array.isArray(trace.samples)||trace.samples.length>20000||!Array.isArray(trace.legacyAlerts)||trace.legacyAlerts.length>4096)throw Error('Invalid parked trace');
  validateProvenance(s);

@@ -1,11 +1,11 @@
 import "./camera.js";
 import "./detector.js";
-import "./metrics.js";
+import { scoringReadWallClock } from "./metrics.js";
 import "./alerts.js";
 import "./storage-history.js";
 import "./cloud-sync.js";
-import { scoringCalibrationThresholds, scoringSensitivityThresholds } from "./scoring-core.js";
-import { setPreference, calibrationMinimumSamples, experimentFlags, calibrationEl, calibrationFill, calHint, calibrating, calibrationUntil, calibrationSamples, baselineEAR, baseClosedThreshold, baseWatchThreshold, eyeClosedThreshold, CALIBRATION_MS, log, SENSITIVITY_PRESETS, set_calibrating, set_calibrated, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold } from "./ui.js";
+import { scoringCalibrationSamples, scoringCalibrationThresholds, scoringSensitivityThresholds } from "./scoring-core.js";
+import { setPreference, calibrationMinimumSamples, experimentFlags, calibrationEl, calibrationFill, calHint, calibrating, calibrationUntil, calibrationSamples, baselineEAR, baseClosedThreshold, baseWatchThreshold, eyeClosedThreshold, CALIBRATION_MS, log, SENSITIVITY_PRESETS, set_calibrationSamples, set_calibrating, set_calibrated, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold } from "./ui.js";
 // Keep the selected setting for this page even when persistence is unavailable.
 export let sensitivityLevel = 'medium';
 export function finishCalibration() {
@@ -45,9 +45,8 @@ export function finishCalibration() {
 export function updateCalibration(ear) {
     if (!calibrating)
         return;
-    if (ear > .16 && ear < .45)
-        calibrationSamples.push(ear);
-    let left = Math.max(0, calibrationUntil - Date.now()), pct = Math.min(100, Math.round((1 - left / CALIBRATION_MS) * 100));
+    set_calibrationSamples(scoringCalibrationSamples(calibrationSamples, ear));
+    let left = Math.max(0, calibrationUntil - scoringReadWallClock('calibration')), pct = Math.min(100, Math.round((1 - left / CALIBRATION_MS) * 100));
     calibrationEl.textContent = pct + '%';
     calibrationFill.style.width = pct + '%';
     if (calHint)

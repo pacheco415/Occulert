@@ -5,7 +5,7 @@
 import "./camera.js";
 import "./detector.js";
 import "./calibration.js";
-import "./metrics.js";
+import { scoringReadWallClock } from "./metrics.js";
 import "./storage-history.js";
 import { scoringTriggerEligible } from "./scoring-core.js";
 import { pushFleet } from "./cloud-sync.js";
@@ -297,7 +297,7 @@ document.addEventListener('pointerdown', () => {
 }, { passive: true });
 /** @param {string} reason @param {unknown} [eligibility] */
 export function trigger(reason, eligibility) {
-    let now = Date.now();
+    let now = scoringReadWallClock('trigger');
     const qualified = experimentFlags.noface && running && reason === 'Face lost after fatigue' && experimentController?.qualifiedLoss(eligibility);
     if (!scoringTriggerEligible({ lastAlert, calibrating, confidence }, now, Boolean(qualified)))
         return;
