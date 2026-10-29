@@ -1,10 +1,10 @@
 # Remote branch inventory
 
-Observed: 2026-10-29T00:08:58.772Z. Base: `09930515b86cb62fe232e044822a07378cea45ed` (fetched origin/main).
+Observed: 2026-10-29T04:35:56.271Z. Base: `515a3cc4d623a502eac9924650d34b0b9212b6c8` (fetched origin/main).
 
-Remote branches other than main: **145**. Commented review proposals: **8**.
+Remote branches other than main: **149**. Commented review proposals: **9**.
 
-Open PR snapshot: 2026-10-29T00:08:54.788Z; 16 open PRs, complete pagination. See [snapshot](open-pull-requests.json).
+Open PR snapshot: 2026-10-29T04:35:49.568Z; 15 open PRs, complete pagination. See [snapshot](open-pull-requests.json).
 
 `merged ancestry` means every branch commit is reachable from captured main, even if main later edited its files. `matching change snapshot` means the branch's net changed paths equal main (including modes and deletions); unique history may remain, so it gets no deletion proposal. `not proven` includes divergent files, ambiguous ancestry and Git errors.
 
@@ -53,21 +53,21 @@ node scripts/list-stale-branches.mjs --github --github-snapshot=docs/branch-inve
 | agent/settings-persistence-20260815 | [9ce5c35339ae](https://github.com/pacheco415/Occulert/commit/9ce5c35339aeb39fca5f7d21ce972f7c17192cc7) | 2026-08-15T09:58:17-07:00 | not proven | none | keep / inspect |
 | agent/site-liquid-glass-20260815 | [cc1eb71181c5](https://github.com/pacheco415/Occulert/commit/cc1eb71181c51ac43b84ff14b48d14f88a1e1b7b) | 2026-08-15T12:53:58-07:00 | not proven | none | keep / inspect |
 | audit/github-bug-fixes | [f50559ccfc54](https://github.com/pacheco415/Occulert/commit/f50559ccfc54600a1bc0c57af444749152952a77) | 2026-09-26T11:44:14-07:00 | not proven | none | keep / inspect |
+| claude/vision-roadmap | [374bed28f7d5](https://github.com/pacheco415/Occulert/commit/374bed28f7d5ccf627cc03c5b9e8cfb80a13cb32) | 2026-10-28T19:44:39-07:00 | not proven | [#337](https://github.com/pacheco415/Occulert/pull/337) | keep: open PR |
 | codex/account-deletion-release-20260912 | [acc7a8cd9fbd](https://github.com/pacheco415/Occulert/commit/acc7a8cd9fbd00738a8b3e46fda416e58b7e90c4) | 2026-09-12T10:08:09-07:00 | not proven | none | keep / inspect |
 | codex/agent-development-rules | [590579131f0c](https://github.com/pacheco415/Occulert/commit/590579131f0c23cd74d239bad43da1cb26d28cfd) | 2026-10-03T12:11:17-07:00 | not proven | none | keep / inspect |
 | codex/android-camera-minimum | [49f0c1c8b78f](https://github.com/pacheco415/Occulert/commit/49f0c1c8b78f2f6a6706bdb607277aaaeedfa824) | 2026-10-03T13:25:52-07:00 | not proven | none | keep / inspect |
 | codex/android-watch-linking | [1b5272e61114](https://github.com/pacheco415/Occulert/commit/1b5272e61114f626adbd7dfe1bb9df82c19c53be) | 2026-10-03T12:34:18-07:00 | not proven | none | keep / inspect |
-| codex/api-comment-refresh | [3f66dd0a471c](https://github.com/pacheco415/Occulert/commit/3f66dd0a471cefccf9118d37669c9eea8a169f70) | 2026-10-25T10:17:32-07:00 | not proven | [#312](https://github.com/pacheco415/Occulert/pull/312) | keep: open PR |
 | codex/approved-upgrades-2026-09-27 | [3f5bc5895645](https://github.com/pacheco415/Occulert/commit/3f5bc589564540ed890552f81063531215ac017f) | 2026-09-29T19:52:23-07:00 | merged ancestry | none | review merged branch |
-| codex/atomic-event-quotas | [0ac0ab771acc](https://github.com/pacheco415/Occulert/commit/0ac0ab771acc25265acf5eadf4177f33b7bfcb5a) | 2026-10-03T12:27:35-07:00 | not proven | [#192](https://github.com/pacheco415/Occulert/pull/192) | keep: open PR |
+| codex/atomic-event-quotas | [0ac0ab771acc](https://github.com/pacheco415/Occulert/commit/0ac0ab771acc25265acf5eadf4177f33b7bfcb5a) | 2026-10-03T12:27:35-07:00 | not proven | none | keep / inspect |
 | codex/automate-asset-releases | [d23ee9288593](https://github.com/pacheco415/Occulert/commit/d23ee9288593b049e36575feb7556715a5c0c17e) | 2026-10-03T12:03:21-07:00 | not proven | none | keep / inspect |
 | codex/billing-customer-idempotency | [87820dd8aebf](https://github.com/pacheco415/Occulert/commit/87820dd8aebfe127044d5dadb937c49819fe6cad) | 2026-09-29T21:04:14-07:00 | merged ancestry | none | review merged branch |
 | codex/billing-webhook-permanent-errors | [74c429561e0d](https://github.com/pacheco415/Occulert/commit/74c429561e0d6ef08166f101a0c2e178548675eb) | 2026-09-29T20:56:12-07:00 | merged ancestry | none | review merged branch |
 | codex/bounded-fatigue-summary | [64c30a764625](https://github.com/pacheco415/Occulert/commit/64c30a7646255939e4d0dec60c69b86b34221bf8) | 2026-10-03T11:32:58-07:00 | not proven | none | keep / inspect |
 | codex/bounded-pinned-ci | [40b113711fdb](https://github.com/pacheco415/Occulert/commit/40b113711fdb6bb630723070994718eb0f30edf4) | 2026-10-03T09:38:48-07:00 | not proven | none | keep / inspect |
+| codex/branch-inventory | [6f68bb976daa](https://github.com/pacheco415/Occulert/commit/6f68bb976daaf0e7bac04a00646308614db8e6dc) | 2026-10-28T17:10:12-07:00 | not proven | [#331](https://github.com/pacheco415/Occulert/pull/331) | keep: open PR |
 | codex/browser-summary-values | [f480d891af45](https://github.com/pacheco415/Occulert/commit/f480d891af4519074c3a34eb65361db8c23e2aeb) | 2026-10-03T15:06:55-07:00 | not proven | none | keep / inspect |
 | codex/build-30-performance-20260830 | [9ac85d1a7530](https://github.com/pacheco415/Occulert/commit/9ac85d1a7530bd2ac492a23d435033b7b37b9519) | 2026-08-30T15:26:06-07:00 | not proven | none | keep / inspect |
-| codex/build-output-plan | [d176cf130bd8](https://github.com/pacheco415/Occulert/commit/d176cf130bd8088e409fe2f1441b9bed0d7d6699) | 2026-10-28T16:56:03-07:00 | not proven | [#330](https://github.com/pacheco415/Occulert/pull/330) | keep: open PR |
 | codex/complete-ci-skip-guard | [bae5efa30615](https://github.com/pacheco415/Occulert/commit/bae5efa30615901a212fc3ee4ca47b8c3a22b111) | 2026-10-03T12:55:44-07:00 | not proven | none | keep / inspect |
 | codex/controlled-startup-evidence | [a9c92b421795](https://github.com/pacheco415/Occulert/commit/a9c92b421795c17378fd68d9780191b86f00fdbc) | 2026-10-03T16:20:34-07:00 | not proven | none | keep / inspect |
 | codex/current-development-docs | [f7451a75a998](https://github.com/pacheco415/Occulert/commit/f7451a75a9982da54539b896e4140bb034c48c5f) | 2026-10-03T13:57:57-07:00 | not proven | none | keep / inspect |
@@ -78,12 +78,13 @@ node scripts/list-stale-branches.mjs --github --github-snapshot=docs/branch-inve
 | codex/durable-web-session-summary | [7c04f235294b](https://github.com/pacheco415/Occulert/commit/7c04f235294b83c3998560e8b7a12718d444eb03) | 2026-10-03T12:16:49-07:00 | not proven | none | keep / inspect |
 | codex/dynamic-asset-tests-20260929 | [2e100a27ac15](https://github.com/pacheco415/Occulert/commit/2e100a27ac15f575abbfb314a8bb07cc0789ca3c) | 2026-09-29T20:40:00-07:00 | merged ancestry | none | review merged branch |
 | codex/elapsed-fatigue-experiment | [3c4b148e2f32](https://github.com/pacheco415/Occulert/commit/3c4b148e2f324106b8c79f35a336954a670a9ca3) | 2026-10-03T13:07:01-07:00 | not proven | none | keep / inspect |
-| codex/event-occurred-at | [7c2029a7970f](https://github.com/pacheco415/Occulert/commit/7c2029a7970f3c7a21bb6429fb5144b335ac4079) | 2026-10-25T11:31:37-07:00 | not proven | [#315](https://github.com/pacheco415/Occulert/pull/315) | keep: open PR |
+| codex/event-occurred-at | [a6aa1bf49c5b](https://github.com/pacheco415/Occulert/commit/a6aa1bf49c5b589ea7ed3585ce33473d8e0c70b5) | 2026-10-28T19:03:41-07:00 | not proven | none | keep / inspect |
 | codex/exclude-development-files | [70263555de1f](https://github.com/pacheco415/Occulert/commit/70263555de1f7ddb608a9f143216c929e49b8b80) | 2026-10-03T09:15:25-07:00 | not proven | none | keep / inspect |
 | codex/extract-driver-app-script-20260829 | [e6ed4b65d29e](https://github.com/pacheco415/Occulert/commit/e6ed4b65d29ef943251c49de86f815c91b7d4518) | 2026-08-29T10:51:43-07:00 | not proven | none | keep / inspect |
 | codex/fix-watch-transfer-crash-20260901 | [6d156099d3e5](https://github.com/pacheco415/Occulert/commit/6d156099d3e5649ca23f484bf033c0b56b0cc022) | 2026-09-01T21:31:29-07:00 | not proven | none | keep / inspect |
 | codex/fleet-dashboard-commercial-value-20260828 | [beeeda78413b](https://github.com/pacheco415/Occulert/commit/beeeda78413ba6eef0cc4df307002f8a07c904ee) | 2026-08-28T20:57:09-07:00 | not proven | none | keep / inspect |
 | codex/fleet-offboarding | [95c0acd36e8c](https://github.com/pacheco415/Occulert/commit/95c0acd36e8c2b11856e9dc5ff28c4f32403cfbf) | 2026-10-03T12:34:46-07:00 | not proven | [#206](https://github.com/pacheco415/Occulert/pull/206) | keep: open PR |
+| codex/fleet-summary-tidy | [a32de5dc0eac](https://github.com/pacheco415/Occulert/commit/a32de5dc0eac7d69acd91ee753934d34ffc47526) | 2026-10-28T20:02:12-07:00 | not proven | [#339](https://github.com/pacheco415/Occulert/pull/339) | keep: open PR |
 | codex/full-bug-fix-20260830 | [3b56c85cf67e](https://github.com/pacheco415/Occulert/commit/3b56c85cf67ec118b2374ad74142851f0b179264) | 2026-08-30T09:46:59-07:00 | not proven | none | keep / inspect |
 | codex/full-migration-replay | [343f07800b89](https://github.com/pacheco415/Occulert/commit/343f07800b89836b304c0baa35a486bf5ebeec8d) | 2026-10-03T14:23:52-07:00 | not proven | none | keep / inspect |
 | codex/history-record-identity | [a48f44c627ab](https://github.com/pacheco415/Occulert/commit/a48f44c627abc20e3cf823856e6fb29de76bc9df) | 2026-10-03T11:39:13-07:00 | not proven | none | keep / inspect |
@@ -95,12 +96,15 @@ node scripts/list-stale-branches.mjs --github --github-snapshot=docs/branch-inve
 | codex/native-parked-baseline | [746df43e52ae](https://github.com/pacheco415/Occulert/commit/746df43e52aeb7c373d9e6556deb37a047a00adb) | 2026-10-03T14:05:46-07:00 | not proven | none | keep / inspect |
 | codex/native-session-completion | [912663e1d08a](https://github.com/pacheco415/Occulert/commit/912663e1d08a13a1ff7a3b9b56dfb736a1c56075) | 2026-10-03T15:06:18-07:00 | not proven | none | keep / inspect |
 | codex/native-setup-reliability-upgrade-20260901 | [6f7995e18a6f](https://github.com/pacheco415/Occulert/commit/6f7995e18a6fbb825d6284a9855a5715db3f738f) | 2026-09-01T16:08:55-07:00 | not proven | none | keep / inspect |
+| codex/outbox-ownership-handoff-test | [bec6c1137db2](https://github.com/pacheco415/Occulert/commit/bec6c1137db2a476cfe46db1e2a4f8f6f933be84) | 2026-10-28T21:27:23-07:00 | merged ancestry | none | review merged branch |
+| codex/parked-observer-labels | [4a5e5cda7622](https://github.com/pacheco415/Occulert/commit/4a5e5cda7622296248906c368e0b89af5e0707cc) | 2026-10-28T21:32:53-07:00 | not proven | [#344](https://github.com/pacheco415/Occulert/pull/344) | keep: open PR |
 | codex/passkey-profile-signup | [7e1557f17d63](https://github.com/pacheco415/Occulert/commit/7e1557f17d63155e0be1306c19a1a8ba66da5aa8) | 2026-09-14T22:03:11-07:00 | not proven | none | keep / inspect |
 | codex/performance-upgrades-20260829 | [096762bef6ab](https://github.com/pacheco415/Occulert/commit/096762bef6ab1737afdb2e40f6d7fbafd2bac36c) | 2026-08-30T15:09:32-07:00 | not proven | none | keep / inspect |
 | codex/pixel-ear-experiment | [c5ae3d254047](https://github.com/pacheco415/Occulert/commit/c5ae3d2540471c0640e40188b13f65abb95d2c62) | 2026-10-03T13:19:28-07:00 | not proven | none | keep / inspect |
-| codex/playwright-runtime-upgrade | [1a14deee56bf](https://github.com/pacheco415/Occulert/commit/1a14deee56bf07a9eb833fcf4b1221ec9401f24d) | 2026-10-26T13:28:36-07:00 | not proven | [#324](https://github.com/pacheco415/Occulert/pull/324) | keep: open PR |
+| codex/playwright-runtime-upgrade | [4c01c327bf00](https://github.com/pacheco415/Occulert/commit/4c01c327bf00c0b1f7c99d5e36512b48909471d8) | 2026-10-28T19:05:53-07:00 | not proven | [#324](https://github.com/pacheco415/Occulert/pull/324) | keep: open PR |
 | codex/preserve-driver-profile | [9fbfd34f018f](https://github.com/pacheco415/Occulert/commit/9fbfd34f018f1a8ab0984f54df81660662090c6a) | 2026-10-03T09:21:55-07:00 | not proven | none | keep / inspect |
 | codex/private-static-files | [73cf51737b6a](https://github.com/pacheco415/Occulert/commit/73cf51737b6a28111786c45a15885330c161d753) | 2026-10-03T13:04:57-07:00 | matching change snapshot | none | keep / inspect |
+| codex/release-intent-next-build | [4913111ae032](https://github.com/pacheco415/Occulert/commit/4913111ae03206219c30bcc4cdbe2b0866f52e51) | 2026-10-28T20:09:54-07:00 | not proven | [#340](https://github.com/pacheco415/Occulert/pull/340) | keep: open PR |
 | codex/release-process-guide | [5dd7a3942274](https://github.com/pacheco415/Occulert/commit/5dd7a39422745f563726a0852e2dc39a5c2d0aca) | 2026-09-29T21:25:22-07:00 | merged ancestry | none | review merged branch |
 | codex/reliable-sync-reporting-20260912 | [81e9f5ef2e63](https://github.com/pacheco415/Occulert/commit/81e9f5ef2e6345b9e74f2b9e947b0de58320306a) | 2026-09-13T23:48:13-07:00 | not proven | none | keep / inspect |
 | codex/remove-obsolete-xss-header | [5d1902fec21d](https://github.com/pacheco415/Occulert/commit/5d1902fec21d8dabc7614c342db5b6e654682c91) | 2026-10-03T13:29:30-07:00 | not proven | none | keep / inspect |
@@ -116,10 +120,11 @@ node scripts/list-stale-branches.mjs --github --github-snapshot=docs/branch-inve
 | codex/stable-local-session-ids | [18b47f217d4c](https://github.com/pacheco415/Occulert/commit/18b47f217d4ca94a8d7a99d89605127deb430bfa) | 2026-10-03T13:50:20-07:00 | not proven | none | keep / inspect |
 | codex/stale-branch-inventory | [9945eb231d04](https://github.com/pacheco415/Occulert/commit/9945eb231d04c8a6ec92ae3320e23041c60bea46) | 2026-10-03T14:15:25-07:00 | matching change snapshot | none | keep / inspect |
 | codex/static-asset-size-budgets | [aeef38671bdf](https://github.com/pacheco415/Occulert/commit/aeef38671bdfa0e684aeddaaeb87e3eae6b0e180) | 2026-10-03T15:41:25-07:00 | not proven | none | keep / inspect |
-| codex/sw-exact-origin | [6ac31a19d35e](https://github.com/pacheco415/Occulert/commit/6ac31a19d35e7e305bc6be35d1ad454a0adfd1d5) | 2026-10-25T10:24:15-07:00 | not proven | [#313](https://github.com/pacheco415/Occulert/pull/313) | keep: open PR |
-| codex/sw-same-origin-cache | [fb426f4dc392](https://github.com/pacheco415/Occulert/commit/fb426f4dc392ed9263c30f0145cd6abca3b7c49e) | 2026-10-25T10:21:39-07:00 | not proven | [#314](https://github.com/pacheco415/Occulert/pull/314) | keep: open PR |
+| codex/sw-exact-origin | [6ac31a19d35e](https://github.com/pacheco415/Occulert/commit/6ac31a19d35e7e305bc6be35d1ad454a0adfd1d5) | 2026-10-25T10:24:15-07:00 | not proven | none | keep / inspect |
+| codex/sw-same-origin-cache | [fb426f4dc392](https://github.com/pacheco415/Occulert/commit/fb426f4dc392ed9263c30f0145cd6abca3b7c49e) | 2026-10-25T10:21:39-07:00 | not proven | none | keep / inspect |
 | codex/tasks-vision-comparison | [4c71a7329da4](https://github.com/pacheco415/Occulert/commit/4c71a7329da42174e631d93909814c47c786c0ac) | 2026-10-03T13:54:42-07:00 | not proven | none | keep / inspect |
 | codex/truthful-native-summaries | [e5bd74b25a26](https://github.com/pacheco415/Occulert/commit/e5bd74b25a26e5e1912018c47be6a0e02e80cbe7) | 2026-10-03T14:45:51-07:00 | not proven | none | keep / inspect |
+| codex/typescript-7-eval | [8b00da4f1cbf](https://github.com/pacheco415/Occulert/commit/8b00da4f1cbf7fb2ff58a4213e518869bb49e69c) | 2026-10-28T20:19:23-07:00 | not proven | [#341](https://github.com/pacheco415/Occulert/pull/341) | keep: open PR |
 | codex/unobserved-native-telemetry | [4dd6b6d9746d](https://github.com/pacheco415/Occulert/commit/4dd6b6d9746da6fcbb9addfed3b4bbd11d7b0b52) | 2026-10-03T16:04:19-07:00 | not proven | none | keep / inspect |
 | codex/unskippable-ci-2026-09-29 | [d73ddaae81ef](https://github.com/pacheco415/Occulert/commit/d73ddaae81efb283ee88688b58b06bafafe537bf) | 2026-09-29T20:32:46-07:00 | merged ancestry | none | review merged branch |
 | codex/validate-session-event-input | [42efc3d3356e](https://github.com/pacheco415/Occulert/commit/42efc3d3356ea2a11b5ac2230b44fb398a13beec) | 2026-10-03T11:56:20-07:00 | not proven | none | keep / inspect |
@@ -133,11 +138,10 @@ node scripts/list-stale-branches.mjs --github --github-snapshot=docs/branch-inve
 | codex/web-detector-release-20260914 | [e335eb40f909](https://github.com/pacheco415/Occulert/commit/e335eb40f90945f6630881ecb54de669358dec18) | 2026-09-14T16:15:32-07:00 | not proven | none | keep / inspect |
 | codex/web-fleet-affordability-20260830 | [829b3665df05](https://github.com/pacheco415/Occulert/commit/829b3665df05511caabf96f6c77b59d40320aaf4) | 2026-08-30T12:14:44-07:00 | not proven | none | keep / inspect |
 | dependabot/github_actions/actions/github-script-9.0.0 | [a1a54babd8ef](https://github.com/pacheco415/Occulert/commit/a1a54babd8efa86cd3bb11f5b34fb5380a8a817b) | 2026-10-03T23:50:36-07:00 | matching change snapshot | none | keep / inspect |
-| dependabot/github_actions/weekly-actions-dc4f8b6e13 | [6a1f5648f95a](https://github.com/pacheco415/Occulert/commit/6a1f5648f95a8c69a2eb391cc94a25949d46b9ea) | 2026-10-27T00:56:19Z | not proven | [#276](https://github.com/pacheco415/Occulert/pull/276) | keep: open PR |
-| dependabot/npm_and_yarn/acorn-8.19.0 | [075a614361c4](https://github.com/pacheco415/Occulert/commit/075a614361c4a87487d9d7dea03209aa22de7942) | 2026-10-26T16:24:35Z | not proven | [#262](https://github.com/pacheco415/Occulert/pull/262) | keep: open PR |
-| dependabot/npm_and_yarn/axe-core/playwright-4.14.0 | [f41ad0a7524b](https://github.com/pacheco415/Occulert/commit/f41ad0a7524b3d7771f11bc9314db36a78d11cd0) | 2026-10-26T16:24:38Z | not proven | [#299](https://github.com/pacheco415/Occulert/pull/299) | keep: open PR |
-| dependabot/npm_and_yarn/electric-sql/pglite-0.5.11 | [677369d2b68c](https://github.com/pacheco415/Occulert/commit/677369d2b68ccec30523c035e1faf29365580b00) | 2026-10-26T16:24:44Z | not proven | [#298](https://github.com/pacheco415/Occulert/pull/298) | keep: open PR |
-| dependabot/npm_and_yarn/native-app/react-test-renderer-19.3.1 | [714afd7da915](https://github.com/pacheco415/Occulert/commit/714afd7da915b02eeee7e01ad97ebff3008d639c) | 2026-10-27T20:21:11Z | not proven | [#297](https://github.com/pacheco415/Occulert/pull/297) | keep: open PR |
+| dependabot/github_actions/weekly-actions-dc4f8b6e13 | [8278352beb50](https://github.com/pacheco415/Occulert/commit/8278352beb50a3a552318419a1dcdbbaa786752a) | 2026-10-28T20:36:43-07:00 | not proven | [#276](https://github.com/pacheco415/Occulert/pull/276) | keep: open PR |
+| dependabot/npm_and_yarn/acorn-8.19.0 | [f5739033b167](https://github.com/pacheco415/Occulert/commit/f5739033b16744a7240381226041dcf824c1940c) | 2026-10-28T20:06:30-07:00 | not proven | [#262](https://github.com/pacheco415/Occulert/pull/262) | keep: open PR |
+| dependabot/npm_and_yarn/axe-core/playwright-4.14.0 | [eb3d3917d6c3](https://github.com/pacheco415/Occulert/commit/eb3d3917d6c36d4b297301feba3bafdf2999eca8) | 2026-10-28T20:30:36-07:00 | not proven | [#299](https://github.com/pacheco415/Occulert/pull/299) | keep: open PR |
+| dependabot/npm_and_yarn/electric-sql/pglite-0.5.11 | [d303e83f609e](https://github.com/pacheco415/Occulert/commit/d303e83f609e56c4bf83b9c4d590efb07f3fa0a2) | 2026-10-28T20:22:47-07:00 | not proven | [#298](https://github.com/pacheco415/Occulert/pull/298) | keep: open PR |
 | dependabot/npm_and_yarn/playwright/test-1.64.1 | [a0ae7b170484](https://github.com/pacheco415/Occulert/commit/a0ae7b17048465ea265e5c8e09650afa85579eed) | 2026-10-26T16:24:44Z | not proven | [#273](https://github.com/pacheco415/Occulert/pull/273) | keep: open PR |
 | dependabot/npm_and_yarn/typescript-7.0.2 | [32be6310b6d0](https://github.com/pacheco415/Occulert/commit/32be6310b6d04e28d66d44e17dd1780599aaf77d) | 2026-10-26T16:24:40Z | not proven | [#263](https://github.com/pacheco415/Occulert/pull/263) | keep: open PR |
 | development-readiness-2026-10-03 | [1dd2a2b403d5](https://github.com/pacheco415/Occulert/commit/1dd2a2b403d58e26148d8e0a0e972975ec7aa19d) | 2026-10-03T08:39:08-07:00 | not proven | none | keep / inspect |

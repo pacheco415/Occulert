@@ -1,105 +1,105 @@
 {
   "schemaVersion": 1,
   "repository": "pacheco415/Occulert",
-  "capturedAt": "2026-10-29T00:08:54.788Z",
-  "source": "https://api.github.com/repos/pacheco415/Occulert/pulls?state=open&per_page=100",
+  "capturedAt": "2026-10-29T04:35:49.568Z",
+  "source": "GitHub connector REST open pull requests; final page has fewer than 100 records",
   "complete": true,
   "pullRequests": [
     {
-      "number": 330,
-      "title": "Plan staged relocation of immutable web build outputs",
-      "url": "https://github.com/pacheco415/Occulert/pull/330",
+      "number": 344,
+      "title": "Add parked observer episode labeling and paired exports",
       "state": "open",
-      "headRefName": "codex/build-output-plan",
+      "url": "https://github.com/pacheco415/Occulert/pull/344",
+      "headRefName": "codex/parked-observer-labels",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "d176cf130bd8088e409fe2f1441b9bed0d7d6699"
+      "headSha": "4a5e5cda7622296248906c368e0b89af5e0707cc"
+    },
+    {
+      "number": 341,
+      "title": "Document TypeScript 7.0.2 compatibility evaluation",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/341",
+      "headRefName": "codex/typescript-7-eval",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "8b00da4f1cbf7fb2ff58a4213e518869bb49e69c"
+    },
+    {
+      "number": 340,
+      "title": "Prepare the next native release intent and private status markers",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/340",
+      "headRefName": "codex/release-intent-next-build",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "4913111ae03206219c30bcc4cdbe2b0866f52e51"
+    },
+    {
+      "number": 339,
+      "title": "Bound and stabilize fleet summary queries",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/339",
+      "headRefName": "codex/fleet-summary-tidy",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "a32de5dc0eac7d69acd91ee753934d34ffc47526"
+    },
+    {
+      "number": 337,
+      "title": "Add Occulert vision roadmap for Codex",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/337",
+      "headRefName": "claude/vision-roadmap",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "374bed28f7d5ccf627cc03c5b9e8cfb80a13cb32"
+    },
+    {
+      "number": 331,
+      "title": "Inventory stale branches and protect open pull requests",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/331",
+      "headRefName": "codex/branch-inventory",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "6f68bb976daaf0e7bac04a00646308614db8e6dc"
     },
     {
       "number": 324,
       "title": "Coordinate Playwright 1.64.1 runtime and repeated offline validation",
-      "url": "https://github.com/pacheco415/Occulert/pull/324",
       "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/324",
       "headRefName": "codex/playwright-runtime-upgrade",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "1a14deee56bf07a9eb833fcf4b1221ec9401f24d"
-    },
-    {
-      "number": 315,
-      "title": "Send alert events with their detection time",
-      "url": "https://github.com/pacheco415/Occulert/pull/315",
-      "state": "open",
-      "headRefName": "codex/event-occurred-at",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "7c2029a7970f3c7a21bb6429fb5144b335ac4079"
-    },
-    {
-      "number": 314,
-      "title": "Cache only exact same-origin responses in the service worker",
-      "url": "https://github.com/pacheco415/Occulert/pull/314",
-      "state": "open",
-      "headRefName": "codex/sw-same-origin-cache",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "fb426f4dc392ed9263c30f0145cd6abca3b7c49e"
-    },
-    {
-      "number": 313,
-      "title": "Require an exact origin before caching runtime responses",
-      "url": "https://github.com/pacheco415/Occulert/pull/313",
-      "state": "open",
-      "headRefName": "codex/sw-exact-origin",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "6ac31a19d35e7e305bc6be35d1ad454a0adfd1d5"
-    },
-    {
-      "number": 312,
-      "title": "Refresh stale session and event API header comments",
-      "url": "https://github.com/pacheco415/Occulert/pull/312",
-      "state": "open",
-      "headRefName": "codex/api-comment-refresh",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "3f66dd0a471cefccf9118d37669c9eea8a169f70"
+      "headSha": "4c01c327bf00c0b1f7c99d5e36512b48909471d8"
     },
     {
       "number": 299,
       "title": "Bump @axe-core/playwright from 4.13.0 to 4.14.0",
-      "url": "https://github.com/pacheco415/Occulert/pull/299",
       "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/299",
       "headRefName": "dependabot/npm_and_yarn/axe-core/playwright-4.14.0",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "f41ad0a7524b3d7771f11bc9314db36a78d11cd0"
+      "headSha": "eb3d3917d6c36d4b297301feba3bafdf2999eca8"
     },
     {
       "number": 298,
       "title": "Bump @electric-sql/pglite from 0.5.8 to 0.5.11",
-      "url": "https://github.com/pacheco415/Occulert/pull/298",
       "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/298",
       "headRefName": "dependabot/npm_and_yarn/electric-sql/pglite-0.5.11",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "677369d2b68ccec30523c035e1faf29365580b00"
-    },
-    {
-      "number": 297,
-      "title": "Bump react-test-renderer from 19.3.0 to 19.3.1 in /native-app",
-      "url": "https://github.com/pacheco415/Occulert/pull/297",
-      "state": "open",
-      "headRefName": "dependabot/npm_and_yarn/native-app/react-test-renderer-19.3.1",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "714afd7da915b02eeee7e01ad97ebff3008d639c"
+      "headSha": "d303e83f609e56c4bf83b9c4d590efb07f3fa0a2"
     },
     {
       "number": 276,
-      "title": "Bump the weekly-actions group across 1 directory with 4 updates",
-      "url": "https://github.com/pacheco415/Occulert/pull/276",
+      "title": "Update pinned Node setup, artifact and CodeQL actions",
       "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/276",
       "headRefName": "dependabot/github_actions/weekly-actions-dc4f8b6e13",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "6a1f5648f95a8c69a2eb391cc94a25949d46b9ea"
+      "headSha": "8278352beb50a3a552318419a1dcdbbaa786752a"
     },
     {
       "number": 273,
       "title": "Bump @playwright/test from 1.63.0 to 1.64.1",
-      "url": "https://github.com/pacheco415/Occulert/pull/273",
       "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/273",
       "headRefName": "dependabot/npm_and_yarn/playwright/test-1.64.1",
       "headRepository": "pacheco415/Occulert",
       "headSha": "a0ae7b17048465ea265e5c8e09650afa85579eed"
@@ -107,8 +107,8 @@
     {
       "number": 267,
       "title": "Retire expired site assets and align Expo SDK 57 dependencies",
-      "url": "https://github.com/pacheco415/Occulert/pull/267",
       "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/267",
       "headRefName": "codex/retire-assets-2026-10-10",
       "headRepository": "pacheco415/Occulert",
       "headSha": "fe047bebf503fea12d6bd430cd71353ef1c847e8"
@@ -116,8 +116,8 @@
     {
       "number": 263,
       "title": "Bump typescript from 6.0.3 to 7.0.2",
-      "url": "https://github.com/pacheco415/Occulert/pull/263",
       "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/263",
       "headRefName": "dependabot/npm_and_yarn/typescript-7.0.2",
       "headRepository": "pacheco415/Occulert",
       "headSha": "32be6310b6d04e28d66d44e17dd1780599aaf77d"
@@ -125,29 +125,20 @@
     {
       "number": 262,
       "title": "Bump acorn from 8.18.0 to 8.19.0",
-      "url": "https://github.com/pacheco415/Occulert/pull/262",
       "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/262",
       "headRefName": "dependabot/npm_and_yarn/acorn-8.19.0",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "075a614361c4a87487d9d7dea03209aa22de7942"
+      "headSha": "f5739033b16744a7240381226041dcf824c1940c"
     },
     {
       "number": 206,
       "title": "Prepare confirmed fleet removal and leave actions behind a migration gate",
-      "url": "https://github.com/pacheco415/Occulert/pull/206",
       "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/206",
       "headRefName": "codex/fleet-offboarding",
       "headRepository": "pacheco415/Occulert",
       "headSha": "95c0acd36e8c2b11856e9dc5ff28c4f32403cfbf"
-    },
-    {
-      "number": 192,
-      "title": "Prepare atomic per-user and per-session event limits behind a migration gate",
-      "url": "https://github.com/pacheco415/Occulert/pull/192",
-      "state": "open",
-      "headRefName": "codex/atomic-event-quotas",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "0ac0ab771acc25265acf5eadf4177f33b7bfcb5a"
     }
   ]
 }
