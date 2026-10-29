@@ -112,7 +112,8 @@
     "test:event-outbox": "tsc --noEmit --strict --target ES2022 --module nodenext --moduleResolution nodenext lib/event-outbox.ts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-event-outbox.mjs scripts/test-web-event-outbox.mjs",
     "test:event-idempotency": "node --test scripts/test-event-idempotency.mjs",
     "test:event-outbox-transport": "node --test scripts/test-event-outbox-transport.mjs",
-    "test:offline-cache-diagnostics": "node --test scripts/test-offline-cache-diagnostics.mjs"
+    "test:offline-cache-diagnostics": "node --test scripts/test-offline-cache-diagnostics.mjs",
+    "test:scoring-replay": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-scoring-core.mjs scripts/test-scoring-replay.mjs scripts/test-calibration-flag.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

@@ -93,6 +93,7 @@
     "lint:source",
     "typecheck:source",
     "test:driver-build",
+    "test:scoring-replay",
     "test:asset-retirement",
     "test:event-outbox",
     "test:event-idempotency",

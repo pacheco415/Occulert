@@ -445,7 +445,8 @@ const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
   return total + statSync(join(root, file)).size;
 }, 0);
 // Shared event delivery adds 26,426 bytes to selected static install assets:
-// 341,629 -> 368,055. The reviewed 125 KB driver ceiling fits this 375 KB bound.
+// 341,629 -> 368,055. Observer/replay now total 373,884; the reviewed 126 KB
+// driver ceiling retains this 375 KB bound without preloading the helper.
 if (staticAssetBytes > 375_000) fail(`service worker install cache must remain at or below 375 KB (found ${staticAssetBytes} bytes)`);
 if (staticAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the experimental passkey client must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the passkey client must be listed as a network-only asset");
