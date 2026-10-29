@@ -189,6 +189,60 @@ assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must no
   assert.equal(storageCalls, 0, "malformed event types must never query or mutate storage");
 }
 
+// A detection can precede an asynchronously created server session even with
+// synchronized clocks. Omitted timestamps have a separate server-assigned meaning.
+{
+  const RealDate = Date;
+  let now = RealDate.parse("2026-10-27T12:00:00.000Z");
+  globalThis.Date = class extends RealDate {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+    static now() { return now; }
+  };
+  try {
+    let releaseDriver, signalDriverLookup;
+    const driverLookupStarted = new Promise(resolve => { signalDriverLookup = resolve; });
+    const driverReady = new Promise(resolve => { releaseDriver = resolve; });
+    let storedSession;
+    const delayedStart = loadHandler("../api/sessions.js", async (table, options = {}) => {
+      if (table === "drivers") { signalDriverLookup(); await driverReady; return [{ id: "driver-1" }]; }
+      assert.equal(table, "sessions");
+      assert.equal(options.method, "POST");
+      storedSession = { ...options.body, id: eventBody.session_id, ended_at: null };
+      return [storedSession];
+    });
+    const starting = invoke(delayedStart, request("POST", {}));
+    await driverLookupStarted;
+    const detectedAt = new Date().toISOString();
+    now += 30000;
+    releaseDriver();
+    assert.equal((await starting).status, 200);
+    assert.equal(storedSession.started_at, new Date().toISOString());
+    assert.ok(detectedAt < storedSession.started_at);
+    let writes = 0, saved;
+    const delayedEvents = loadHandler("../api/events.js", async (table, options = {}) => {
+      if (table === "drivers") return [{ id: "driver-1" }];
+      if (table === "sessions") return [storedSession];
+      assert.equal(table, "events");
+      writes++;
+      saved = options.body;
+      return [{ id: "event-1", ...saved }];
+    });
+    for (const occurred_at of [detectedAt, new Date(now + 5000).toISOString()]) {
+      const rejected = await invoke(delayedEvents, request("POST", { ...eventBody, occurred_at }));
+      assert.equal(rejected.status, 400);
+      assert.equal(rejected.body.error, "invalid_occurred_at");
+    }
+    assert.equal(writes, 0, "pre-session and ahead-clock timestamps cannot write");
+    assert.equal((await invoke(delayedEvents, request("POST", eventBody))).status, 200);
+    assert.equal(saved.created_at, new Date(now).toISOString(), "omission uses server processing time, not detection time");
+    storedSession.ended_at = new Date(now).toISOString();
+    now += 30000;
+    assert.equal((await invoke(delayedEvents, request("POST", eventBody))).status, 200);
+    assert.equal(saved.created_at, storedSession.ended_at, "during grace omission uses session end, not receipt or detection time");
+    assert.equal(writes, 2, "each successful invocation writes once; the API does not resend rejected calls");
+  } finally { globalThis.Date = RealDate; }
+}
+
 // Client event time must stay inside the owned session; finished sessions have a short delivery grace.
 {
   const now = Date.now();

@@ -205,6 +205,21 @@ for (const status of [200, 401]) {
   });
 }
 
+// This contract is only for callers that omit time. Timed alerts have a
+// separately tested, owner/consent-scoped fallback on invalid_occurred_at.
+for (const status of [200, 400, 409, 503]) {
+  test(`native untimed alert stays untimed and sends once on ${status}`, async () => {
+    const f = cloudFixture(auth('old', 4000000000), { consent: true });
+    f.transport = () => response(status, status === 200 ? {} : { error: 'invalid_occurred_at' });
+    assert.equal(await f.api.logCloudAlert('session', 61.4), status === 200);
+    const events = f.requests.filter(r => r.url.endsWith('/api/events'));
+    assert.equal(events.length, 1, 'an untimed request must not trigger a timestamp-stripping resend');
+    assert.deepEqual(JSON.parse(events[0].init.body), {
+      session_id: 'session', type: 'drowsy', fatigue_score: 61,
+    });
+  });
+}
+
 test('native alert scopes do not revive after sharing is disabled and re-enabled', async () => {
   const f = cloudFixture(auth('old', 4000000000), { consent: true });
   const oldSession = await f.api.beginCloudSession();
