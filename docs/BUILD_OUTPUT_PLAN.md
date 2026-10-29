@@ -5,7 +5,18 @@ October 28, 2026. This document implements task 5.9 from the October 25 list.
 It authorizes no asset migration by itself. This PR adds only this plan; it
 does not move, edit, delete or publish any runtime asset.
 
-## Current layout and constraints
+## Implementation status — October 28, 2026
+
+Stage 1 landed in [PR #332](https://github.com/pacheco415/Occulert/pull/332):
+bounded runtime paths, basename-based current-asset lookup and source-output
+validation now share a tested contract. That change moved no assets.
+
+The first remaining implementation is stage 2, `codex/asset-directory-release`:
+directory-aware release, audit and retirement tooling with safe staging and
+rollback. No live output should move before the later compatibility and pilot
+stages. The counts below describe the original planning baseline.
+
+## Baseline layout and constraints
 
 The baseline has **127 root versioned JS/CSS files: 98 JavaScript and 29 CSS**.
 `asset-versions.json` contains 74 logical entries pointing to 59 distinct
