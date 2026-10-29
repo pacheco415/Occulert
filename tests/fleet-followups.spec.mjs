@@ -23,13 +23,40 @@ async function openFollowups(page, { fail = false } = {}) {
   await expect(page.locator('#followupNotice')).toContainText(fail ? 'not enabled yet' : 'sessions loaded (up to 50)');
 }
 
-async function setup(page, { fail = false, conflict = false, sessions = null } = {}) {
+async function setup(page, { fail = false, conflict = false, sessions = null, delayedModule = null, observePilotUpdates = false } = {}) {
   const state = { followup: { session_id: id, status: 'open', version: 0, updated_at: null }, posts: 0, nextLoad: null };
   const session = { id, driver_id: 'driver', started_at: new Date().toISOString(), ended_at: new Date().toISOString(), alert_count: 2, safety_score: 65 };
   const records = sessions || [session];
+  if (delayedModule) {
+    await page.route(`**/${assetByStem(delayedModule)}`, async route => {
+      // Reproduce a slow module download, without delaying dashboard requests.
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      await route.continue();
+    });
+  }
+  if (observePilotUpdates) {
+    await page.addInitScript(() => {
+      let report;
+      window.fixturePilotUpdates = [];
+      Object.defineProperty(window, 'OcculertPilotReport', {
+        configurable: true,
+        get: () => report,
+        set: api => {
+          const update = api.update;
+          api.update = function (...args) {
+            const snapshot = window.getProtectedPilotSnapshot?.();
+            window.fixturePilotUpdates.push({ userId: snapshot?.userId, fleetId: snapshot?.fleetId });
+            return update.apply(this, args);
+          };
+          report = api;
+        },
+      });
+    });
+  }
   await page.route(`**/${assetByStem('occulert-backend.js')}`, route => route.fulfill({ contentType: 'application/javascript', body: `
     window.fixtureUser = { id: '${owner}' };
     window.fixtureFollowupBodiesSettled = 0;
+    window.fixtureSummaryCalls = 0;
     window.addEventListener('message', event => {
       if (event.source === window && event.origin === location.origin && event.data === 'fixture-followup-body-consumed') {
         window.fixtureFollowupBodiesSettled += 1;
@@ -60,7 +87,10 @@ async function setup(page, { fail = false, conflict = false, sessions = null } =
         }
         return response;
       },
-      getFleetSummary: async () => ({ok:true,body:{fleet:{id:'fleet',company_name:'Example fleet'},drivers:[{id:'driver',name:'Avery Example',active:true}],sessions:${JSON.stringify(records)},events:[]}}),
+      getFleetSummary: async () => {
+        window.fixtureSummaryCalls += 1;
+        return {ok:true,body:{fleet:{id:'fleet',company_name:'Example fleet'},drivers:[{id:'driver',name:'Avery Example',active:true}],sessions:${JSON.stringify(records)},events:[]}};
+      },
       signOut: () => {window.fixtureUser=null;}
     };` }));
   await page.route('**/api/fleet-followups', async route => {
@@ -86,6 +116,19 @@ async function setup(page, { fail = false, conflict = false, sessions = null } =
   await openFollowups(page, { fail });
   return state;
 }
+
+test('a follow-ups script delayed by 1500 ms shows the panel on the first protected load', async ({ page }) => {
+  await setup(page, { delayedModule: 'fleet-followups.js' });
+  await expect(page.locator('.followup-item')).toHaveCount(1);
+  expect(await page.evaluate(() => window.fixtureSummaryCalls)).toBe(1);
+});
+
+test('a pilot-report script delayed by 1500 ms receives the initial protected dashboard state', async ({ page }) => {
+  await setup(page, { delayedModule: 'fleet-pilot-report.js', observePilotUpdates: true });
+  await expect.poll(() => page.evaluate(owner => window.fixturePilotUpdates.some(snapshot =>
+    snapshot.userId === owner && snapshot.fleetId === 'fleet'), owner)).toBe(true);
+  expect(await page.evaluate(() => window.fixtureSummaryCalls)).toBe(1);
+});
 
 test('saved follow-up survives refresh and page reload; names are plain text', async ({ page }) => {
   const state = await setup(page);

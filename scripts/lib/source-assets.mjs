@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse } from 'acorn';
+import { parseRuntimeAssetPath, resolveRuntimeAssetPath } from './asset-paths.mjs';
 
 export const SOURCE_REGISTRY = 'source-assets.json';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -35,11 +36,12 @@ export function loadSourceAssets(root, manifest, { required = false } = {}) {
     if (usedSources.has(entry.source)) throw new Error(`Source registered twice: ${entry.source}`);
     usedSources.add(entry.source);
     const active = manifest[logical];
-    if (typeof active !== 'string' || !/^[\w-]+\.v\d+\.(js|css)$/.test(active)) throw new Error(`Invalid active source asset: ${logical}`);
+    try { parseRuntimeAssetPath(active); }
+    catch (cause) { throw new Error(`Invalid active source asset: ${logical}`, { cause }); }
     if (entry.mode === 'bundle' && (logical !== 'driver-app.js' || entry.source !== 'src/driver-app.js')) throw new Error(`Unsupported bundled source entry: ${logical}`);
     const bytes = entry.mode === 'bundle' ? renderDriverBundle(root) : readFileSync(ownedFile(root, entry.source));
     if (!Buffer.from(bytes.toString('utf8')).equals(bytes)) throw new Error(`Source must be UTF-8: ${entry.source}`);
-    const published = readFileSync(ownedFile(root, active));
+    const published = readFileSync(resolveRuntimeAssetPath(root, active));
     return { logical, ...entry, active, bytes, changed: !bytes.equals(published), sha256: sha(bytes) };
   });
   if (!entries.length) throw new Error('Register at least one source asset');
