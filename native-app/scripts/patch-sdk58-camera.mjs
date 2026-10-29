@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 // RN 0.87 removed RCTCxxBridge. Keep the released camera/worklet APIs, using
 // RN's public JSI initialization hook instead of recovering private bridge state.
 // Embedded upstream source notices are in CAMERA_PATCH_NOTICES.md.
-// https://github.com/facebook/react-native/blob/v0.88.0/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModuleWithJSIBindings.h
+// https://github.com/facebook/react-native/blob/v0.88.1/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModuleWithJSIBindings.h
 const nativeAppRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const originalWorkletsSource = `#import "Worklets.h"
@@ -323,7 +323,7 @@ const patches = [
 export function planSDK58CameraPatches(appRoot = nativeAppRoot) {
   const modules = join(appRoot, 'node_modules');
   const reactNative = JSON.parse(readFileSync(join(modules, 'react-native/package.json'), 'utf8'));
-  if (reactNative.version !== '0.88.0') throw Error('Review the camera compatibility patch before changing React Native 0.88.0.');
+  if (reactNative.version !== '0.88.1') throw Error('Review the camera compatibility patch before changing React Native 0.88.1.');
   const publicHook = readFileSync(join(modules, 'react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModuleWithJSIBindings.h'), 'utf8');
   if (!publicHook.includes('installJSIBindingsWithRuntime:') || !publicHook.includes('callInvoker:')) {
     throw Error('React Native does not expose the expected runtime and CallInvoker initialization hook.');
