@@ -28,9 +28,9 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
     return [owner, file];
   }));
   function imported(owner, name, specifier, local = name) {
-    const matches = ast[owner].statements.filter(node => ts.isImportDeclaration(node) && node.moduleSpecifier.text === specifier)
+    const matches = ast[owner].statements.filter(node => ts.isImportDeclaration(node) && !node.importClause?.isTypeOnly && node.moduleSpecifier.text === specifier)
       .flatMap(node => node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings) ? node.importClause.namedBindings.elements : [])
-      .filter(node => (node.propertyName?.text ?? node.name.text) === name && node.name.text === local);
+      .filter(node => !node.isTypeOnly && (node.propertyName?.text ?? node.name.text) === name && node.name.text === local);
     assert.equal(matches.length, 1, `One real ${owner} import for ${local}`);
   }
   function calls(owner, name) {
@@ -62,6 +62,7 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
     const functions = ast[owner].statements.filter(node => ts.isFunctionDeclaration(node) && node.name?.text === name);
     assert.equal(functions.length, 1, `One exported implementation of ${name}`);
     assert.ok(functions[0].modifiers?.some(node => node.kind === ts.SyntaxKind.ExportKeyword));
+    assert.ok(functions[0].body && !functions[0].modifiers?.some(node => node.kind === ts.SyntaxKind.DeclareKeyword), `${name} must have a runtime implementation`);
     calls('screen', name);
     assert.doesNotMatch(sources[owner], /from\s+['"](?:.*cloudSync|.*eyeBaselineStorage|.*sessionRecovery|@react-native-async-storage\/async-storage)['"]/,
       'Protected cloud/storage actions stay injected by the screen');
@@ -98,7 +99,7 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
   for (const name of ['handleCaptureConfiguration', 'handleCameraInterruption', 'checkCameraInterruption', 'attemptCameraRecovery', 'handleCameraError']) {
     assert.equal(callbacks.get(name), 'camera', `Camera callback ${name} has its real owner`);
   }
-  return { ...sources, cameraCallbacks: ['screen', 'camera'].map(owner => ({ filename: new URL(MONITOR_SOURCE_PATHS[owner], root).pathname, source: sources[owner] })) };
+  return { ...sources, runtimeOwners: Object.entries(MONITOR_SOURCE_PATHS).map(([owner, path]) => ({ owner, path, source: sources[owner] })), cameraCallbacks: ['screen', 'camera'].map(owner => ({ filename: new URL(MONITOR_SOURCE_PATHS[owner], root).pathname, source: sources[owner] })) };
 }
 
 /** Run the actual moved hooks in an existing bridge-substituted React fixture. */

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
 import { createMonitorHookFixture, deferred } from './lib/monitor-hook-test-harness.mjs';
 import { readNativeMonitorSourceOwners, MONITOR_SOURCE_PATHS } from './lib/monitor-source-owners.mjs';
 
@@ -151,14 +154,72 @@ test('fixed source-owner proof rejects detached hooks, duplicate owners and subs
   const byPath = Object.fromEntries(Object.entries(MONITOR_SOURCE_PATHS).map(([owner, path]) => [path, original[owner]]));
   const mutations = [
     ['app/monitor.tsx', source => source.replace("import { useMonitorCloudAlerts } from '../hooks/useMonitorCloudAlerts';", '')],
+    ['app/monitor.tsx', source => source.replace("import { useMonitorCloudAlerts }", "import type { useMonitorCloudAlerts }")],
+    ['app/monitor.tsx', source => source.replace("import { useMonitorCloudAlerts }", "import { type useMonitorCloudAlerts }")],
     ['app/monitor.tsx', source => source.replace('const recordCloudAlertTransition = useMonitorCloudAlerts(', 'const recordCloudAlertTransition = detachedCloudHook(')],
     ['app/monitor.tsx', source => source.replace('cloudEventQueueRef, logCloudAlert', 'cloudEventQueueRef, logCloudAlert: anotherLogger')],
     ['app/monitor.tsx', source => source.replace('frameProcessor={frameProcessor}', 'frameProcessor={anotherProcessor}')],
     ['hooks/useMonitorCloudAlerts.ts', source => source + '\nexport function useMonitorCloudAlerts() {}\n'],
+    ['hooks/useMonitorCloudAlerts.ts', source => source.replace('export function useMonitorCloudAlerts(', 'export declare function useMonitorCloudAlerts(')],
     ['components/monitor/MonitorPresentation.tsx', source => source.replace("import { monitorStyles as s } from './monitorStyles';", '')],
   ];
   for (const [path, change] of mutations) {
     assert.notEqual(change(byPath[path]), byPath[path], 'Mutation must alter the actual owner');
     assert.throws(() => readNativeMonitorSourceOwners(name => name === path ? change(byPath[name]) : byPath[name]));
+  }
+});
+
+test('site audit resolves monitor ownership from its selected repository reader', () => {
+  const source = readFileSync(new URL('../../scripts/audit-site.mjs', import.meta.url), 'utf8');
+  const file = ts.createSourceFile('audit-site.mjs', source, ts.ScriptTarget.Latest, true);
+  const calls = [];
+  function visit(node) {
+    if (ts.isCallExpression(node) && node.expression.getText(file) === 'readNativeMonitorSourceOwners') calls.push(node);
+    ts.forEachChild(node, visit);
+  }
+  visit(file); assert.equal(calls.length, 1); assert.equal(calls[0].arguments.length, 1);
+  const owners = readNativeMonitorSourceOwners(), selected = Object.fromEntries(owners.runtimeOwners.map(owner => ['native-app/' + owner.path, owner.source]));
+  selected['native-app/components/monitor/monitorStyles.ts'] += '\n// selected-repository-only\n';
+  const reads = [];
+  const read = vm.runInNewContext('(' + calls[0].arguments[0].getText(file) + ')', { read: path => {
+    assert.ok(Object.hasOwn(selected, path), 'The audit must select a native file in its repository'); reads.push(path); return selected[path];
+  } });
+  const actual = readNativeMonitorSourceOwners(read);
+  assert.equal(reads.length, Object.keys(MONITOR_SOURCE_PATHS).length); assert.match(actual.styles, /selected-repository-only/);
+});
+
+test('actual whole-monitor negative guards reject forbidden code in every fixed extracted runtime owner', () => {
+  const files = ['test-performance-contracts.mjs', 'test-remaining-security-fixes.mjs', 'test-monitor-lifecycle.mjs', 'audit-site.mjs'];
+  const markers = ['setSessionTime', 'await startHeadphoneMotion()', "Alert.alert('Monitoring stopped'", "sensorFault: { position: 'absolute'",
+    'setIsAudioActiveAsync', 'const wasRunning = isRunning;', 'export default function MonitorScreen() { useKeepAwake(',
+    'Worklets.createRunOnJS', "metrics: {\n    position: 'absolute'"];
+  const constraints = [];
+  for (const name of files) {
+    const source = readFileSync(new URL('../../scripts/' + name, import.meta.url), 'utf8');
+    const file = ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true);
+    const negative = file.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'assertNotIncludes')?.getText(file);
+    function visit(node) {
+      if (ts.isForOfStatement(node) && /^(?:owners|monitorOwners)\.runtimeOwners$/.test(node.expression.getText(file))) {
+        const statement = ts.isExpressionStatement(node.statement) ? node.statement.expression : null;
+        assert.ok(statement && ts.isCallExpression(statement));
+        const argument = statement.arguments[1], pattern = argument.getText(file);
+        const marker = ts.isStringLiteral(argument) ? argument.text : markers.find(value => vm.runInNewContext(pattern).test(value));
+        assert.ok(marker, 'Every real exclusion guard has a matching forbidden-code probe');
+        constraints.push({ code: node.getText(file), marker, negative });
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(file);
+  }
+  assert.equal(constraints.length, 11, 'Retain every original whole-monitor exclusion');
+  const original = readNativeMonitorSourceOwners();
+  for (const constraint of constraints) for (const target of original.runtimeOwners) {
+    const selected = Object.fromEntries(original.runtimeOwners.map(owner => [owner.path, owner.source]));
+    selected[target.path] += '\n/* forbidden-code probe: ' + constraint.marker + ' */\n';
+    const owners = readNativeMonitorSourceOwners(path => selected[path]);
+    const context = { owners, monitorOwners: owners, assert,
+      assertionSource: path => selected[path.replace(/^native-app\//, '')], fail: message => { throw Error(message); } };
+    const code = (constraint.negative ?? '') + '\n' + constraint.code;
+    assert.throws(() => vm.runInNewContext(code, context), 'A moved exclusion must reject its original forbidden code in ' + target.path);
   }
 });
