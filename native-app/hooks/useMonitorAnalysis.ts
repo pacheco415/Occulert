@@ -8,6 +8,8 @@ import { HeadNodDetector } from '../lib/headNodDetector';
 import { elapsedSessionSeconds, shouldRefreshMonitorMetrics } from '../lib/monitorPerformance';
 import { confirmedEyeStateForAlert, deriveAlertLevel, type AlertLevel } from '../lib/alertPolicy';
 import { assessCameraSetup, type CameraSetupAssessment } from '../lib/cameraSetup';
+import { useSimulatorTrace } from './useSimulatorTrace';
+import { SIMULATOR_TRACE } from '../lib/simulatorTrace';
 
 const CAMERA_SETUP_UI_INTERVAL_MS = 250;
 
@@ -52,6 +54,9 @@ interface Options {
   cameraLoadPolicy: import("../lib/cameraResilience").CameraLoadPolicy;
   detectFaces: (frame: import("react-native-vision-camera").Frame) => import("react-native-vision-camera-face-detector").Face[];
   recordCloudAlertTransition: (result: EyeMetrics, now: number) => void;
+  simulatorProofRef: React.RefObject<string>;
+  isRunning: boolean;
+  setupPreviewActive: boolean;
 }
 
 export function useMonitorAnalysis({
@@ -68,7 +73,7 @@ export function useMonitorAnalysis({
   displayedMetricsStateRef, displayedAlertLevelRef, lastMetricsUiAtRef,
   setMetrics, fatigueSumRef, fatigueSamplesRef,
   maxFatigueRef, cameraLoadPolicy, detectFaces,
-  recordCloudAlertTransition,
+  recordCloudAlertTransition, simulatorProofRef, isRunning, setupPreviewActive,
 }: Options) {
   const onEyeState = useCallback((
     leftProb: number,
@@ -198,6 +203,15 @@ export function useMonitorAnalysis({
       criticalPerclosThreshold: PERCLOS_ALERT_THRESHOLD,
       criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
     });
+    if (SIMULATOR_TRACE) {
+      const key = result.state + ':' + (closedDurationMs >= 3_000);
+      if (simulatorProofRef.current !== key) {
+        simulatorProofRef.current = key;
+        console.info('OCCULERT_SIMULATOR_SCORING ' + JSON.stringify({ elapsedMs: now - (sessionStartedAtRef.current || now),
+          state: result.state, ear: result.ear, perclos: result.perclos, fatigueScore: result.fatigueScore,
+          closedDurationMs, alertLevel }));
+      }
+    }
     const shouldRefreshDisplay = shouldRefreshMonitorMetrics({
       previousState: displayedMetricsStateRef.current,
       nextState: result.state,
@@ -225,6 +239,7 @@ export function useMonitorAnalysis({
   // These native worklet values must outlive ordinary React renders so the
   // frame-processor bridge stays stable throughout a drive.
   const onEyeStateJS = useRunOnJS(onEyeState, [onEyeState]);
+  const simulatorPhase = useSimulatorTrace(SIMULATOR_TRACE && (isRunning || setupPreviewActive), onEyeState);
   const lastSample = useSharedValue(0);
   const analysisIntervalMs = useSharedValue(cameraLoadPolicy.analysisIntervalMs);
 
@@ -272,5 +287,5 @@ export function useMonitorAnalysis({
     );
   }, [analysisIntervalMs, detectFaces, lastSample, onEyeStateJS]);
 
-  return { onEyeState, frameProcessor };
+  return { onEyeState, frameProcessor, simulatorPhase };
 }

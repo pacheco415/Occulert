@@ -6,12 +6,13 @@
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
+    "ios:simulator-trace": "node scripts/build-simulator-trace.mjs",
     "android": "expo run:android",
     "web": "expo start --web",
     "postinstall": "node ./scripts/patch-watch-connectivity.mjs && node ./scripts/patch-query-decoder.mjs && node ./scripts/patch-sdk58-camera.mjs && node ./scripts/patch-camera-multitasking.mjs",
     "check:dependencies": "expo install --check",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run check:dependencies && npm run typecheck && npm run test:dependencies && npm run test:camera-runtime && npm run test:audio-lifecycle && npm run test:history-interactions && npm run test:monitor-layout && npm run test:front-camera-identity && npm run test:front-camera-switch && npm run test:capture-load && npm run test:camera-interruptions && npm run test:event-outbox && npm run test:packaging && npm run test:monitor-hooks",
+    "verify": "npm run check:dependencies && npm run typecheck && npm run test:dependencies && npm run test:camera-runtime && npm run test:audio-lifecycle && npm run test:history-interactions && npm run test:monitor-layout && npm run test:front-camera-identity && npm run test:front-camera-switch && npm run test:capture-load && npm run test:camera-interruptions && npm run test:event-outbox && npm run test:packaging && npm run test:simulator-trace && npm run test:monitor-hooks",
     "build:dev": "eas build --profile development --platform ios",
     "build:ios": "eas build --platform ios",
     "build:android": "eas build --platform android",
@@ -27,6 +28,7 @@
     "test:camera-interruptions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-camera-interruptions.mjs",
     "test:event-outbox": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-event-outbox.mjs scripts/test-event-retry-status.mjs",
     "test:packaging": "node --test scripts/test-native-packaging.mjs",
+    "test:simulator-trace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-simulator-trace.mjs",
     "test:monitor-hooks": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-monitor-hook-interactions.mjs scripts/test-monitor-models.mjs scripts/test-monitor-presentation.mjs"
   },
   "dependencies": {

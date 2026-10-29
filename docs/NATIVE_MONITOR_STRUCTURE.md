@@ -59,3 +59,11 @@ These are source and React checks; they do not establish installed iPhone/Watch,
 physical camera, Silent-mode, Bluetooth or thermal acceptance. Those remain in
 [DEVICE_ACCEPTANCE.md](DEVICE_ACCEPTANCE.md) for the eventual reviewed build.
 Operational receipts stay local.
+
+The isolated simulator profile still enters the actual analysis callback through
+`useSimulatorTrace`; its proof ref and one-time deep-link Start grant stay owned
+by the screen. The view shows the existing synthetic preview without requiring a
+camera. Simulator permission/pre-drive gates and cloud suppression retain their
+profile checks; ordinary app permission, Start and Stop behavior is unchanged.
+Mounted React coverage also checks trace interval disposal on Stop and the
+camera-free view's explicit controls.

@@ -362,6 +362,7 @@ function signOutFixture(initial = cloudAuth()) {
     deleteItemAsync: async key => { events.push('auth-delete'); secure.delete(key); },
   };
   const bindings = {
+    SIMULATOR_TRACE: false,
     SecureStore: fixture.secureStore,
     AsyncStorage: {
       getItem: async key => storage.get(key) ?? null,

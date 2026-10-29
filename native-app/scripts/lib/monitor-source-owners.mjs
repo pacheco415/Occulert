@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as checkpointModel from '../../lib/monitorCheckpointModel.ts';
+import * as simulatorTraceModel from '../../lib/simulatorTraceModel.ts';
 
 export const MONITOR_SOURCE_PATHS = Object.freeze({
   screen: 'app/monitor.tsx',
@@ -101,8 +102,12 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
   wired(calls('screen', HOOKS.identity), ['clearDeviceEyeBaseline', 'loadDeviceEyeBaseline', 'loadSavedSensitivity', 'eyeBaselineRef', 'setEyeBaseline',
     'startingRef', 'stoppingRef', 'baselineBusyRef', 'cameraInterruptionGenerationRef', 'cameraCallbackOwnerRef', 'setSetupPreviewActive']);
   wired(calls('screen', HOOKS.camera), ['handleStopRef', 'cameraEpochRef', 'cameraDeviceIdRef', 'cameraCallbackOwnerRef', 'deliverMonitoringPausedCue']);
-  wired(calls('screen', HOOKS.analysis), ['saveDeviceEyeBaseline', 'processEyeOpenness', 'processNoFace', 'recordCloudAlertTransition', 'isRunningRef']);
-  for (const name of ['onEyeState', 'frameProcessor']) {
+  wired(calls('screen', HOOKS.analysis), ['saveDeviceEyeBaseline', 'processEyeOpenness', 'processNoFace', 'recordCloudAlertTransition', 'isRunningRef', 'simulatorProofRef', 'isRunning', 'setupPreviewActive']);
+  imported('analysis', 'useSimulatorTrace', './useSimulatorTrace');
+  const trace = calls('analysis', 'useSimulatorTrace');
+  assert.equal(trace.arguments[0]?.getText(ast.analysis), 'SIMULATOR_TRACE && (isRunning || setupPreviewActive)');
+  assert.equal(trace.arguments[1]?.getText(ast.analysis), 'onEyeState', 'Trace feeds the actual analysis callback');
+  for (const name of ['onEyeState', 'frameProcessor', 'simulatorPhase']) {
     const value = declaration([name]).initializer;
     assert.ok(value && ts.isPropertyAccessExpression(value) && value.expression.getText(ast.screen) === 'analysis' && value.name.text === name,
       'The live screen uses actual analysis.' + name);
@@ -112,7 +117,7 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
     rendered('screen', name);
   }
   const view = rendered('screen', 'MonitorPresentation');
-  for (const name of ['device', 'frameProcessor', 'handleCaptureConfiguration', 'handleCameraError', 'handleStart', 'handleStop', 'recordAlertTiming']) {
+  for (const name of ['device', 'frameProcessor', 'simulatorPhase', 'handleCaptureConfiguration', 'handleCameraError', 'handleStart', 'handleStop', 'recordAlertTiming']) {
     const matches = view.attributes.properties.filter(node => ts.isJsxAttribute(node) && node.name.text === name);
     assert.equal(matches.length, 1, `One presentation binding for ${name}`);
     assert.equal(matches[0].initializer?.expression?.getText(ast.screen), name, `Use the actual screen ${name}`);
@@ -139,7 +144,8 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
 /** Run the actual moved hooks in an existing bridge-substituted React fixture. */
 export function withNativeMonitorHookBindings(bindings, load) {
   const owners = readNativeMonitorSourceOwners();
-  const scope = { ...bindings, ...checkpointModel };
+  const scope = { SIMULATOR_TRACE: false, ...bindings, ...checkpointModel, ...simulatorTraceModel };
+  Object.assign(scope, load(readFileSync(new URL('hooks/useSimulatorTrace.ts', root), 'utf8'), ['useSimulatorTrace'], scope));
   for (const [owner, name] of Object.entries(HOOKS)) Object.assign(scope, load(owners[owner], [name], scope));
   return scope;
 }

@@ -29,3 +29,19 @@ test('actual presentation retains stopped/recovery guidance, busy safe-stop cont
     assert.equal(f.events.at(-1).name, 'handleSafeStopChoice'); assert.equal(f.events.at(-1).args[0], 'rest-area');
   } finally { await f.close(); }
 });
+
+test('simulator presentation needs no camera and keeps explicit Start/Stop controls around the current trace phase', async () => {
+  const f = await createMonitorPresentationFixture({ simulator: true });
+  try {
+    await f.update({ device: undefined });
+    assert.match(JSON.stringify(f.tree), /SIMULATOR TRACE/);
+    assert.match(JSON.stringify(f.tree), /Tap Start to run the scripted trace/);
+    await f.press('Start fatigue monitoring'); assert.equal(f.events.at(-1).name, 'handleStart');
+    await f.update({ isRunning: true, simulatorPhase: 'closed for 3 seconds' });
+    assert.match(JSON.stringify(f.tree), /closed for 3 seconds/);
+    assert.equal(f.calls.cameraMounts, 0); assert.equal(f.calls.wakeStarts, 1);
+    await f.press('Stop monitoring and save this drive'); assert.equal(f.events.at(-1).name, 'handleStop');
+    await f.update({ isRunning: false }); assert.equal(f.calls.wakeStops, 1);
+    assert.match(JSON.stringify(f.tree), /Tap Start to run the scripted trace/);
+  } finally { await f.close(); }
+});

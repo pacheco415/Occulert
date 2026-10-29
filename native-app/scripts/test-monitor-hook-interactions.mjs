@@ -149,6 +149,33 @@ test('parked preview hook shares the screen start/stop guards and invalidates on
   } finally { await f.unmount(); }
 });
 
+test('mounted simulator trace feeds the actual analysis callback and screen proof ref, then Stop disposes its interval', async () => {
+  const f = createMonitorHookFixture({ simulator: true, running: true });
+  f.owner.cloudSessionRef.current = null;
+  f.owner.processEyeOpenness = probability => ({ ...eye(probability < .1 ? 'closed' : 'open'), ear: probability * .3 });
+  await f.mount();
+  try {
+    const proof = f.owner.simulatorProofRef;
+    assert.equal([...f.intervals.values()].filter(timer => timer.delay === 100).length, 1);
+    for (let elapsed = 100; elapsed <= 7_000; elapsed += 100) {
+      await f.at(1_000 + elapsed, () => {
+        for (const timer of [...f.intervals.values()]) if (timer.delay === 100) timer.work();
+      });
+    }
+    assert.equal(f.api.analysis.simulatorPhase, 'closed for 3 seconds');
+    assert.equal(f.events.metrics.at(-1).state, 'closed');
+    assert.equal(f.events.metrics.at(-1).closedDurationMs, 3_000);
+    assert.deepEqual(f.events.counts, [1]); assert.deepEqual(f.events.logs, []);
+    assert.equal(f.owner.simulatorProofRef, proof); assert.equal(proof.current, 'closed:true');
+    assert.ok(f.events.proofs.some(value => value.includes('"closedDurationMs":3000')));
+    f.owner.isRunningRef.current = false; await f.update({ isRunning: false });
+    assert.equal([...f.intervals.values()].filter(timer => timer.delay === 100).length, 0);
+    const samples = f.events.metrics.length; await f.at(9_000, () => f.api.analysis.onEyeState(.05, .05, true, 0, 0, 0, 0, 0, 0, 10, 10, 100, 100));
+    assert.equal(f.events.metrics.length, samples);
+  } finally { await f.unmount(); }
+  assert.equal(f.intervals.size, 0);
+});
+
 test('fixed source-owner proof rejects detached hooks, duplicate owners and substituted screen actions', () => {
   const original = readNativeMonitorSourceOwners();
   const byPath = Object.fromEntries(Object.entries(MONITOR_SOURCE_PATHS).map(([owner, path]) => [path, original[owner]]));
@@ -169,6 +196,9 @@ test('fixed source-owner proof rejects detached hooks, duplicate owners and subs
     ['app/monitor.tsx', source => source.replace('cloudEventQueueRef, logCloudAlert', 'cloudEventQueueRef, logCloudAlert: anotherLogger')],
     ['app/monitor.tsx', source => source.replace('frameProcessor={frameProcessor}', 'frameProcessor={anotherProcessor}')],
     ['app/monitor.tsx', source => source.replace('const frameProcessor = analysis.frameProcessor;', 'const frameProcessor = false ? analysis.frameProcessor : undefined;')],
+    ['app/monitor.tsx', source => source.replace('recordCloudAlertTransition, simulatorProofRef', 'recordCloudAlertTransition, simulatorProofRef: anotherProofRef')],
+    ['app/monitor.tsx', source => source.replace('const simulatorPhase = analysis.simulatorPhase;', "const simulatorPhase = 'open';")],
+    ['hooks/useMonitorAnalysis.ts', source => source.replace('setupPreviewActive), onEyeState)', 'setupPreviewActive), anotherCallback)')],
     ['hooks/useMonitorCloudAlerts.ts', source => source + '\nexport function useMonitorCloudAlerts() {}\n'],
     ['hooks/useMonitorCloudAlerts.ts', source => source.replace('export function useMonitorCloudAlerts(', 'export declare function useMonitorCloudAlerts(')],
     ['components/monitor/MonitorPresentation.tsx', source => source.replace("import { monitorStyles as s } from './monitorStyles';", '')],

@@ -16,6 +16,7 @@ import type { CameraSetupAssessment } from '../../lib/cameraSetup';
 import type { FrontCameraIdentity } from '../../lib/deviceCondition';
 import { INNER_CAMERA_SETUP_MESSAGE, INNER_CAMERA_MONITOR_MESSAGE } from '../../lib/frontCameraSwitch';
 import { EYE_BASELINE_EXPERIMENT } from '../../lib/eyeBaselineModel';
+import { SIMULATOR_TRACE } from '../../lib/simulatorTrace';
 import { SAFE_STOP_OPTIONS, type SafeStopKind } from '../../lib/safeStopLinks';
 import { modalAnimationType } from '../../lib/accessibilityPreferencesModel';
 import { deriveMonitorPresentation } from '../../lib/monitorPresentationModel';
@@ -24,7 +25,8 @@ import { monitorStyles as s } from './monitorStyles';
 
 type CaptureProps = React.ComponentProps<typeof MonitorCaptureCamera>;
 interface Props {
-  device: NonNullable<CaptureProps['device']>; frameProcessor: CaptureProps['frameProcessor'];
+  device: CaptureProps['device'] | undefined; frameProcessor: CaptureProps['frameProcessor'];
+  simulatorPhase: string;
   cameraLoadPolicy: ReturnType<typeof deriveCameraLoadPolicy>; cameraEpoch: number; cameraCallbackOwner: number;
   handleCaptureConfiguration(change: CaptureConfigurationChange): void;
   handleCameraError(error: CameraRuntimeError, epoch: number, owner: number): Promise<void>;
@@ -82,7 +84,7 @@ export function MonitorCameraUnavailable() {
 }
 
 export function MonitorPresentation({
-  device, frameProcessor, cameraLoadPolicy, cameraEpoch, cameraCallbackOwner, handleCaptureConfiguration, handleCameraError, metrics, alertCount, frontCameraIdentity, isRunning, isStarting, isStopping, sensitivityLoaded, baselineLoaded, baselineBusy, cameraRecovering, setupPreviewActive, cameraSetup, sensorFault, sessionStartedAt, sessionEndedAt, baselineMessage, reduceMotion, visibleAlertLevel, setVisibleAlertLevel, recordAlertTiming, safeStopOpen, safeStopBusy, setSafeStopOpen, handleSafeStopChoice, handleStart, handleStop, toggleSetupPreview, onHome, onSettings, onRecoveryHome
+  device, frameProcessor, simulatorPhase, cameraLoadPolicy, cameraEpoch, cameraCallbackOwner, handleCaptureConfiguration, handleCameraError, metrics, alertCount, frontCameraIdentity, isRunning, isStarting, isStopping, sensitivityLoaded, baselineLoaded, baselineBusy, cameraRecovering, setupPreviewActive, cameraSetup, sensorFault, sessionStartedAt, sessionEndedAt, baselineMessage, reduceMotion, visibleAlertLevel, setVisibleAlertLevel, recordAlertTiming, safeStopOpen, safeStopBusy, setSafeStopOpen, handleSafeStopChoice, handleStart, handleStop, toggleSetupPreview, onHome, onSettings, onRecoveryHome
 }: Props) {
   const { recoveryRequired, monitorStatusLabel, monitorStatusColor } = deriveMonitorPresentation({ metrics, sensorFault, isStopping, isStarting, cameraRecovering, isRunning, setupPreviewActive, cameraSetup });
   return (
@@ -168,7 +170,12 @@ export function MonitorPresentation({
         reduceMotion={reduceMotion}
         attentionKey={sensorFault || (cameraRecovering ? 'camera-recovering' : isRunning ? `${metrics.state}:${visibleAlertLevel}:${frontCameraIdentity?.streamingType ?? 'unknown'}` : `parked:${frontCameraIdentity?.streamingType ?? 'unknown'}`)}
         camera={
-          (isRunning || setupPreviewActive) ? (
+          SIMULATOR_TRACE ? (
+            <View style={[StyleSheet.absoluteFill, s.camOff]}>
+              <Text style={[s.camOffTxt, { color: '#fbbf24', fontSize: 20 }]}>SIMULATOR TRACE</Text>
+              <Text style={s.camOffTxt}>{isRunning || setupPreviewActive ? simulatorPhase : 'Tap Start to run the scripted trace'}</Text>
+            </View>
+          ) : (isRunning || setupPreviewActive) && device ? (
             <MonitorCaptureCamera
               key={`front-camera-${cameraEpoch}`}
               loadMode={cameraLoadPolicy.mode}

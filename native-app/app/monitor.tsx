@@ -6,7 +6,7 @@ import { useMonitorAnalysis } from '../hooks/useMonitorAnalysis';
 import { MonitorPresentation, MonitorPermissionState, MonitorCameraUnavailable } from '../components/monitor/MonitorPresentation';
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Alert, AppState, BackHandler, Linking, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { useFaceDetector, type FrameFaceDetectionOptions } from 'react-native-vision-camera-face-detector';
@@ -18,6 +18,7 @@ import * as Battery from 'expo-battery';
 import { EYE_BASELINE_EXPERIMENT, ParkedEyeBaseline } from '../lib/eyeBaselineModel';
 import { clearDeviceEyeBaseline, loadDeviceEyeBaseline, saveDeviceEyeBaseline } from '../lib/eyeBaselineStorage';
 import { useEyeTracking } from '../hooks/useEyeTracking';
+import { SIMULATOR_TRACE } from '../lib/simulatorTrace';
 import { deliverCueIfCurrent } from '../lib/alertDelivery';
 import { type AlertTimingEvent } from '../components/AlertSystem';
 
@@ -77,6 +78,9 @@ type StopOptions = { deferCloudFinalization?: boolean };
 
 export default function MonitorScreen() {
   const router = useRouter();
+  const simulatorRunRequested = useLocalSearchParams()['trace-run'] === '1';
+  const simulatorAutostartedRef = useRef(false);
+  const simulatorProofRef = useRef('');
   const { reduceMotion } = useAccessibilityPreferences();
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -316,7 +320,7 @@ export default function MonitorScreen() {
     startingRef.current = true;
     setIsStarting(true);
     try {
-      if (!hasPermission) {
+      if (!hasPermission && !SIMULATOR_TRACE) {
         let granted = false;
         requestingCameraPermissionRef.current = true;
         try {
@@ -330,7 +334,7 @@ export default function MonitorScreen() {
         startAttempt !== startAttemptRef.current,
         AppState.currentState,
       )) return;
-      if (!consumePreDriveSafety()) {
+      if (!SIMULATOR_TRACE && !consumePreDriveSafety()) {
         router.replace('/pre-drive');
         return;
       }
@@ -384,6 +388,7 @@ export default function MonitorScreen() {
       }
 
       reset();
+      simulatorProofRef.current = '';
       sessionEyeBaselineRef.current = eyeBaselineRef.current;
       if(EYE_BASELINE_EXPERIMENT)setBaselineMessage(sessionEyeBaselineRef.current===null?'Experimental local session uses current presets; no personal baseline was saved.':'Experimental local session uses the saved parked baseline.');
       baselineGenerationRef.current += 1;
@@ -418,7 +423,7 @@ export default function MonitorScreen() {
       // delaying core camera monitoring, and discard any late result after the
       // session is cancelled or replaced.
       const headphoneStart = startHeadphoneMotion();
-      cloudSessionRef.current = EYE_BASELINE_EXPERIMENT ? Promise.resolve(null) : beginCloudSession();
+      cloudSessionRef.current = EYE_BASELINE_EXPERIMENT || SIMULATOR_TRACE ? Promise.resolve(null) : beginCloudSession();
       setAlertCount(0);
       alertCountRef.current = 0;
       hasCameraSampleRef.current = false;
@@ -473,6 +478,14 @@ export default function MonitorScreen() {
       setIsStarting(false);
     }
   };
+
+  // This simulator-only deep link makes local scoring proof repeatable. The
+  // ordinary app still requires its real pre-drive acknowledgement and Start.
+  useEffect(() => {
+    if (!SIMULATOR_TRACE || !simulatorRunRequested || !sensitivityLoaded || !baselineLoaded || simulatorAutostartedRef.current) return;
+    simulatorAutostartedRef.current = true;
+    void handleStart();
+  }, [simulatorRunRequested, sensitivityLoaded, baselineLoaded, handleStart]);
 
   const saveSession = useCallback(async (
     sessionId: string,
@@ -682,21 +695,23 @@ export default function MonitorScreen() {
     displayedMetricsStateRef, displayedAlertLevelRef, lastMetricsUiAtRef,
     setMetrics, fatigueSumRef, fatigueSamplesRef,
     maxFatigueRef, cameraLoadPolicy, detectFaces,
-    recordCloudAlertTransition,
+    recordCloudAlertTransition, simulatorProofRef, isRunning, setupPreviewActive,
   });
 
   const onEyeState = analysis.onEyeState;
   const frameProcessor = analysis.frameProcessor;
+  const simulatorPhase = analysis.simulatorPhase;
 
-  if (!hasPermission) {
+  if (!hasPermission && !SIMULATOR_TRACE) {
     return <MonitorPermissionState onRequestAccess={async () => {
       const granted = await requestPermission();
       if (!granted) Linking.openSettings();
     }} />;
   }
-  if (device == null) return <MonitorCameraUnavailable />;
+  if (device == null && !SIMULATOR_TRACE) return <MonitorCameraUnavailable />;
   return <MonitorPresentation
       device={device}
+      simulatorPhase={simulatorPhase}
       frameProcessor={frameProcessor}
       cameraLoadPolicy={cameraLoadPolicy}
       cameraEpoch={cameraEpoch}

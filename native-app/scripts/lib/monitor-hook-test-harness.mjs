@@ -11,9 +11,9 @@ export const deferred = () => { let resolve, reject; const promise = new Promise
 const nativeRoot = new URL('../../', import.meta.url).pathname;
 
 /** Real React and actual hook/model sources. Only native bridges/actions are substituted. */
-export function createMonitorHookFixture({ experiment = false, running = false, preview = false } = {}) {
+export function createMonitorHookFixture({ experiment = false, running = false, preview = false, simulator = false } = {}) {
   const intervals = new Map(), cache = new Map();
-  const events = { counts: [], logs: [], checkpoints: [], faults: [], cues: 0, stops: [], identities: [], messages: [], metrics: [], clears: 0 };
+  const events = { counts: [], logs: [], checkpoints: [], faults: [], cues: 0, stops: [], identities: [], messages: [], metrics: [], proofs: [], clears: 0 };
   const observations = { camera: [], identity: [] };
   let clock = 1_000, timer = 0, renderer, latest;
   const ref = current => ({ current });
@@ -22,10 +22,10 @@ export function createMonitorHookFixture({ experiment = false, running = false, 
   class Clock extends Date { static now() { return clock; } }
   const bridges = {
     react: React,
-    'react-native': { Alert: { alert: (...args) => events.faults.push(args) } },
+    'react-native': { Alert: { alert: (...args) => events.faults.push(args) }, Platform: { OS: 'ios' } },
     'react-native-vision-camera': { useFrameProcessor: (callback, dependencies) => React.useCallback(callback, dependencies) },
     'react-native-worklets-core': { useRunOnJS: (callback, dependencies) => React.useMemo(() => callback, dependencies), useSharedValue: value => React.useRef({ value }).current },
-    'expo-constants': { __esModule: true, default: { expoConfig: { version: 'fixture', ios: { buildNumber: 'fixture' } } } },
+    'expo-constants': { __esModule: true, default: { expoConfig: { version: 'fixture', extra: { simulatorTrace: simulator }, ios: { buildNumber: 'fixture', bundleIdentifier: simulator ? 'com.occulert.app.simulatortrace' : 'com.occulert.app' } } } },
   };
   const observe = (kind, id, listener) => {
     const entry = { id, listener, removed: false }; observations[kind].push(entry);
@@ -46,7 +46,7 @@ export function createMonitorHookFixture({ experiment = false, running = false, 
     const source = readFileSync(filename, 'utf8');
     const code = ts.transpileModule(source, { fileName: filename,
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
-    vm.runInNewContext(code, { module, exports: module.exports, Date: Clock, performance: { now: () => clock },
+    vm.runInNewContext(code, { module, exports: module.exports, Date: Clock, performance: { now: () => clock }, console: { info: value => events.proofs.push(value) },
       process: { env: { EXPO_PUBLIC_EYE_BASELINE_EXPERIMENT: experiment ? '1' : undefined } },
       setInterval: (work, delay) => { intervals.set(++timer, { work, delay }); return timer; }, clearInterval: id => intervals.delete(id),
       require: name => {
@@ -81,7 +81,7 @@ export function createMonitorHookFixture({ experiment = false, running = false, 
     fatigueSamplesRef: ref(0), fatigueSumRef: ref(0), maxFatigueRef: ref(0), closedSinceRef: ref(null),
     displayedMetricsStateRef: ref('noFace'), displayedAlertLevelRef: ref('none'), lastMetricsUiAtRef: ref(0),
     performanceTrackerRef: ref(createMonitorPerformanceTracker()), sensorFusionTrackerRef: ref(createSensorFusionObservationTracker()),
-    activeSessionIdRef: ref('local-original'), sessionStartedAtRef: ref(clock), sessionSensitivityRef: ref('medium'),
+    activeSessionIdRef: ref('local-original'), sessionStartedAtRef: ref(clock), sessionSensitivityRef: ref('medium'), simulatorProofRef: ref(''),
     alertCountRef: ref(0), prevAlertingRef: ref(false), cloudSessionRef: ref(Promise.resolve('cloud-original')), cloudEventQueueRef: ref(Promise.resolve()),
     headphoneHeadNodObservationsRef: ref(0), headphoneMotionSamplesRef: ref(0), headphoneMotionStatusRef: ref('unavailable'),
     setThermalState() {}, setSetupPreviewActive() {}, setCameraSetup() {}, setSensorFault: value => events.faults.push(value),

@@ -8,7 +8,7 @@ import ts from 'typescript';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const root = new URL('../../', import.meta.url).pathname;
-export async function createMonitorPresentationFixture({ sourceOverride = null } = {}) {
+export async function createMonitorPresentationFixture({ sourceOverride = null, simulator = false } = {}) {
   const events = [], cache = new Map(), calls = { cameraMounts: 0, cameraUnmounts: 0, wakeStarts: 0, wakeStops: 0 };
   function CameraProbe(props) {
     const identity = React.useRef({});
@@ -17,7 +17,8 @@ export async function createMonitorPresentationFixture({ sourceOverride = null }
   }
   const bridges = {
     react: React,
-    'react-native': { View: 'View', Text: 'Text', TouchableOpacity: 'TouchableOpacity', Modal: 'Modal', ScrollView: 'ScrollView', StyleSheet: { create: value => value, absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } } },
+    'react-native': { View: 'View', Text: 'Text', TouchableOpacity: 'TouchableOpacity', Modal: 'Modal', ScrollView: 'ScrollView', Platform: { OS: 'ios' }, StyleSheet: { create: value => value, absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } } },
+    'expo-constants': { __esModule: true, default: { expoConfig: { extra: { simulatorTrace: simulator }, ios: { bundleIdentifier: simulator ? 'com.occulert.app.simulatortrace' : 'com.occulert.app' } } } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@expo/vector-icons': { Ionicons: 'Ionicons' },
     'expo-keep-awake': { useKeepAwake: tag => React.useEffect(() => { calls.wakeStarts++; events.push(tag); return () => { calls.wakeStops++; }; }, [tag]) },
   };
@@ -40,7 +41,7 @@ export async function createMonitorPresentationFixture({ sourceOverride = null }
     return module.exports;
   }
   const { MonitorPresentation } = load('components/monitor/MonitorPresentation.tsx');
-  let props = { device: { id: 'front' }, frameProcessor() {}, cameraLoadPolicy: { mode: 'normal', analysisIntervalMs: 100 }, cameraEpoch: 0, cameraCallbackOwner: 0,
+  let props = { device: { id: 'front' }, frameProcessor() {}, simulatorPhase: 'open', cameraLoadPolicy: { mode: 'normal', analysisIntervalMs: 100 }, cameraEpoch: 0, cameraCallbackOwner: 0,
     metrics: { state: 'open', fatigueScore: 0 }, alertCount: 0, frontCameraIdentity: null, isRunning: false, isStarting: false, isStopping: false,
     sensitivityLoaded: true, baselineLoaded: true, baselineBusy: false, cameraRecovering: false, setupPreviewActive: false,
     cameraSetup: { ready: false }, sensorFault: null, sessionStartedAt: null, sessionEndedAt: null, baselineMessage: '', reduceMotion: true,
