@@ -1,8 +1,8 @@
 # Driver module source and release
 
-`src/driver-app.js` is the composition entry for nine domain modules:
+`src/driver-app.js` is the composition entry for ten domain modules:
 `camera`, `detector`, `calibration`, `metrics`, `alerts`, `storage-history`,
-`cloud-sync`, `event-outbox-adapter`, and `ui`. The adapter imports the sole shared
+`cloud-sync`, `event-outbox-adapter`, `scoring-core`, and `ui`. The adapter imports the sole shared
 delivery engine at `lib/event-outbox.ts`. Edit these readable sources. Published
 versioned files remain immutable. No detector experiment or threshold changes
 with this integration.
@@ -54,10 +54,17 @@ before committing any checkout files. The entry is never replaced with a bundle.
 A no-op writes nothing. Local build files, sources, compiler configuration and
 provenance are excluded from deployment and offline caching.
 
-`lint:source` checks the ten JavaScript sources for undefined globals, reassignment and other
+`lint:source` checks the eleven JavaScript sources for undefined globals, reassignment and other
 ownership mistakes. `typecheck:source` checks detector and alerts with strict
 JSDoc/nullability. `test:event-outbox` separately typechecks the shared TypeScript
 engine. Other modules remain JavaScript without a full typecheck claim.
 `test:driver-build` exercises actual compiler/release invariants and rejected
 mutations. Existing behavioral tests continue reading the real active output
 selected by `asset-versions.json`; their files and harnesses are unchanged.
+
+Released scoring/calibration phases, EAR smoothing, nod history and alert eligibility
+are pure functions in `scoring-core.js`. The UI adapters retain their separate
+wall-clock reads, DOM effects and alert delivery. Offline orchestration stays in
+`benchmark/scoring-step.mjs`; it is not a compiler input or deployment asset.
+See [SCORING_REPLAY.md](SCORING_REPLAY.md) for the independent immutable-release
+oracle, versioned trace inputs, timing limits and named counterfactual variants.

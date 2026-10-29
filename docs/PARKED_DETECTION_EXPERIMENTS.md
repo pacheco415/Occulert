@@ -9,6 +9,7 @@ These opt-in web experiments are for stationary software evaluation. The empty-q
 | `noface-escalation=1` | Request the existing full alert once when face loss follows closed eyes, WATCH fatigue (35), or a downward nose estimate within 3 seconds; freeze fatigue decay for that qualified loss episode. |
 | `perclos=time` | Compute closed / usable observed milliseconds in a 60-second window, rather than a fraction of frames. |
 | `pitch-gate=1` | Calibrate a dimensionless neutral nose/eye/chin ratio while parked; pause eye/microsleep evidence while down or while calibrated pitch geometry is unknown. |
+| `calibration-min=12` | Keep the released calibration formula but require at least 12 samples; local-only and non-primary, identified as `calibrationMin`. |
 | `distraction-confidence=stable` | Use the calibrated confidence rule during a tracked head turn even after calibration falls back to defaults. |
 | `detector=tasks` | Collect the owned Tasks detector's bilateral blink, jaw and matrix measurements alongside the legacy detector on the same captured frame. Tasks does not control alerts. |
 | `observer=1` | An independent observer marks parked episodes; detector indicators and cues are withheld while scoring and decision timestamps continue. |
@@ -159,3 +160,12 @@ Web Audio; the unavailable/interrupted-context fallback repeats the existing
 880 Hz WAV. The red screen has the same duration, and Stop or foreground loss
 cancels all owned strong output immediately. These software paths do not establish
 physical alert perception or support changing the default pattern.
+
+## Offline scoring replay
+
+New observer/Tasks exports use trace version 2 with bounded explicit scoring inputs,
+initial state and phase clocks. The measurement/episode adapter continues to accept
+versions 1 and 2 under its existing exact owned-source provenance checks. Version 1
+lacks the inputs required for replay and never becomes a fabricated zero-alert run.
+See [SCORING_REPLAY.md](SCORING_REPLAY.md) for commands, variant outputs, unsupported
+capabilities, timing limits and synthetic parity evidence.

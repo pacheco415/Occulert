@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from './lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -7,7 +8,7 @@ import { frontCameraTransition, initialFrontCameraSwitchState, createFrontCamera
 import { createMonitorPerformanceTracker } from '../lib/monitorPerformance.ts';
 import { isActiveSessionCheckpoint } from '../lib/sessionRecoveryModel.ts';
 
-const monitor = readFileSync(new URL('../app/monitor.tsx', import.meta.url), 'utf8');
+const monitor = readNativeMonitorSourceOwners().identity;
 const identity = (kind, id = kind) => ({
   state: 'available', deviceId: 'virtual-front', deviceType: 'virtual', isVirtual: true,
   constituentDeviceTypes: ['outer', 'inner'], streamingDeviceType: kind === 'unknown' ? null : kind,

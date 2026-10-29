@@ -5,8 +5,13 @@ import test from 'node:test';
 import vm from 'node:vm';
 import { assetByStem } from './lib/current-assets.mjs';
 import { browserAlertBytes } from './generate-browser-alert.mjs';
+import { parse } from 'acorn';
 
 const driver = readFileSync(assetByStem('driver-app.js'), 'utf8');
+const triggerDependencies = parse(driver,{ecmaVersion:2022,sourceType:'script'}).body.filter(node => node.type==='FunctionDeclaration'
+  && ['scoringReadWallClock','scoringTriggerEligible'].includes(node.id.name));
+assert.equal(triggerDependencies.length,2,'Execute both real extracted eligibility/clock dependencies');
+const triggerDependencyCode = triggerDependencies.map(node=>driver.slice(node.start,node.end)).join('\n');
 const audioCode = driver.slice(driver.indexOf('let _ac=null,'), driver.indexOf('function trigger(reason'));
 assert.ok(audioCode.includes('function tone('), 'Test the active driver audio implementation');
 assert.ok(audioCode.includes('function playStrongAlert('), 'Emit the strong-alert source before testing the active driver');
@@ -53,6 +58,7 @@ function harness({ state = 'running', noContext = false, noMedia = false, runnin
   });
   vm.runInContext(driver.slice(driver.indexOf('function setTextIfChanged('), driver.indexOf('function render(')), context);
   vm.runInContext(audioCode, context);
+  vm.runInContext(triggerDependencyCode, context);
   vm.runInContext('let cameraViewport={width:800,height:800};' + driver.slice(driver.indexOf('function endCameraViewportObservation('), driver.indexOf('function handleCameraViewportChange(')), context);
   return {
     context, document, contexts, media, oscillators, gains, pendingPlays, timers, session,

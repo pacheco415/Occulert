@@ -1,3 +1,4 @@
+import { withNativeMonitorHookBindings } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -22,6 +23,7 @@ import * as sessionCompletion from '../native-app/lib/sessionCompletion.ts';
 import * as monitorAlertPolicy from '../native-app/lib/alertPolicy.ts';
 import { RollingClosedFraction } from '../native-app/lib/rollingClosedFraction.ts';
 import { HeadNodDetector } from '../native-app/lib/headNodDetector.ts';
+import * as simulatorTraceModel from '../native-app/lib/simulatorTraceModel.ts';
 
 // Execute the production TS logic with native bridges replaced. Removing imports
 // and JSX presentation avoids requiring a device, Expo, or a TS compiler in CI.
@@ -46,7 +48,7 @@ const auth = (owner, expires_at = 0) => ({ access_token: `${owner}-access`, refr
 const token = owner => ({ ...auth(owner), expires_in: 3600 });
 const AUTH_KEY = 'occulert.cloud.auth.v1';
 const CONSENT_KEY = 'occulert-cloud-sync-enabled';
-function cloudFixture(initial, { consent = false } = {}) {
+function cloudFixture(initial, { consent = false, simulatorTrace = false, eventOutboxFlag = false } = {}) {
   const secure = new Map(initial ? [[AUTH_KEY, JSON.stringify(initial)]] : []);
   const storage = new Map([[CONSENT_KEY, String(consent)]]), requests = [], timers = new Map();
   let nextTimer = 0;
@@ -75,8 +77,11 @@ function cloudFixture(initial, { consent = false } = {}) {
   fixture.api = load(read('native-app/lib/cloudSync.ts'), [
     'getCloudState', 'signInToCloud', 'signOutOfCloud', 'setCloudSyncEnabled',
     'beginCloudSession', 'logCloudAlert', 'finishCloudSession', 'cloudSessionScopes', 'retryPendingCloudSessions', 'getPendingCloudSummaryState', 'pendingCloudSummaryStateIsCurrent',
+    'queueNativeCloudAlert', 'nativeCloudEventRetryStatus',
   ], {
-    SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage,
+    SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage, SIMULATOR_TRACE: simulatorTrace,
+    process: { env: { EXPO_PUBLIC_EVENT_OUTBOX: eventOutboxFlag ? '1' : undefined } },
+    createNativeEventOutbox: () => { assert.fail('simulator transport must not construct the retry adapter'); },
     updateSessionHistory: async update => { fixture.history = update(fixture.history || []); },
     createSessionSummaryOutbox, pinnedSupabaseConfig, Platform: { OS: 'ios', Version: '26' }, createAsyncMutationQueue, createCachedBooleanPreference,
     currentAppBuildInfo: () => ({ appVersion: '1.0.0', appBuildNumber: 'test' }),
@@ -413,13 +418,18 @@ function hookFixture() {
   }, unmount() { effects.forEach(effect => effect?.cleanup?.()); } };
 }
 
-function monitorCameraStartFixture(stage) {
+function monitorCameraStartFixture(stage, { simulator = false, autorun = false } = {}) {
   const h = hookFixture(), entered = deferred(), pending = deferred();
   const f = { entered, pending, history: [], checkpoints: [], hookBaselines: [], baselineSaves: [], cameraClears: 0,
-    clock: 1_000_000, cameraListener: null, held: false };
+    clock: 1_000_000, cameraListener: null, held: false, intervals: new Map(), nextInterval: 0 };
   class Clock extends Date { static now() { return f.clock; } }
   const { useEyeTracking: realEyeTracking } = load(read('native-app/hooks/useEyeTracking.ts'), ['useEyeTracking'], {
     ...h.React, ...monitorThresholds, baselinePreset: eyeBaselineModel.baselinePreset, RollingClosedFraction, Date: Clock,
+  });
+  const setInterval = (fn, delay) => { const id = ++f.nextInterval; f.intervals.set(id, { fn, delay }); return id; };
+  const clearInterval = id => f.intervals.delete(id);
+  const { useSimulatorTrace } = load(read('native-app/hooks/useSimulatorTrace.ts'), ['useSimulatorTrace'], {
+    ...h.React, ...simulatorTraceModel, Date: Clock, setInterval, clearInterval,
   });
   const identity = kind => ({ state: 'available', deviceId: 'virtual-front', deviceType: 'virtual', isVirtual: true,
     constituentDeviceTypes: ['outer', 'inner'], streamingDeviceType: kind, streamingUniqueId: kind, streamingType: kind });
@@ -432,18 +442,19 @@ function monitorCameraStartFixture(stage) {
   const player = { pause() {}, seekTo: async () => {}, play() {} }, isCurrent = () => true;
   const device = { id: 'virtual-front' }, router = { replace() {}, back() {}, push() {} };
   const source = read('native-app/app/monitor.tsx');
-  const cutoff = source.indexOf('\n  if (!hasPermission) {');
+  const cutoff = source.indexOf('\n  if (!hasPermission && !SIMULATOR_TRACE) {');
   assert.ok(cutoff > source.indexOf('  const frameProcessor ='));
   const component = source.slice(0, cutoff)
-    + '\nreturn {handleStart,handleStop,toggleSetupPreview,onEyeState,eyeBaseline,isRunning,baselineMessage};\n}';
-  const api = load(component, ['MonitorScreen'], {
+    + '\nreturn {handleStart,handleStop,toggleSetupPreview,onEyeState,eyeBaseline,isRunning,baselineMessage,metrics,alertCount,simulatorPhase};\n}';
+  const bindings = {
     ...h.React, React: h.React, ...frontCameraPolicy, ...monitorPerformance, ...monitorLifecycle,
     ...cameraSetup, ...cameraResilience, ...captureLoadPolicy, ...monitorThresholds, ...eyeBaselineModel,
     ...sensorFusion, ...sessionCompletion, ...monitorAlertPolicy, HeadNodDetector,
     stopNativeCloudEvents() {}, queueNativeCloudAlert: () => null,
-    EYE_BASELINE_EXPERIMENT: true, Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
-    useRouter: () => router, useAccessibilityPreferences: () => ({ reduceMotion: true }),
-    useCameraDevice: () => device, useCameraPermission: () => ({ hasPermission: true, requestPermission: async () => true }),
+    EYE_BASELINE_EXPERIMENT: !simulator, SIMULATOR_TRACE: simulator, useSimulatorTrace,
+    Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
+    useRouter: () => router, useLocalSearchParams: () => autorun ? { 'trace-run': '1' } : {}, useAccessibilityPreferences: () => ({ reduceMotion: true }),
+    useCameraDevice: () => simulator ? null : device, useCameraPermission: () => ({ hasPermission: !simulator, requestPermission: async () => true }),
     useFaceDetector: () => ({ detectFaces: () => [] }), useFrameProcessor: callback => callback,
     useRunOnJS: callback => callback, useSharedValue: value => h.React.useRef({ value }).current,
     useAlertAudioPlayer: () => ({ player, isCurrent }),
@@ -472,14 +483,59 @@ function monitorCameraStartFixture(stage) {
     clearActiveSessionCheckpoint: async () => {},
     updateSessionHistory: async update => { f.history = update(f.history); },
     finishCloudSession: async () => { assert.fail('experimental camera sessions must remain local'); },
-    Alert: { alert() {} }, setInterval: () => 1, clearInterval() {},
-  });
+    beginCloudSession: () => { assert.fail('simulator and experimental camera sessions must remain local'); },
+    logCloudAlert: async () => { assert.fail('experimental camera sessions must remain local'); },
+    Alert: { alert() {} }, setInterval, clearInterval,
+  };
+  const api = load(component, ['MonitorScreen'], withNativeMonitorHookBindings(bindings, load));
   f.render = () => h.render(() => api.MonitorScreen());
   f.switchToInner = () => { assert.equal(typeof f.cameraListener, 'function'); f.cameraListener(identity('inner')); };
   f.unmount = () => h.unmount();
+  f.advanceTrace = milliseconds => { for (let elapsed = 0; elapsed < milliseconds; elapsed += 100) {
+    f.clock += 100;
+    for (const interval of [...f.intervals.values()]) if (interval.delay === 100) interval.fn();
+    f.render();
+  } };
   f.render();
   return f;
 }
+
+test('simulator trace uses the actual monitor and eye scoring without a camera, then Stop cancels it', async () => {
+  const f = monitorCameraStartFixture(null, { simulator: true });
+  await flush(); let screen = f.render(); await screen.handleStart(); f.render(); screen = f.render();
+  assert.equal(screen.isRunning, true); assert.equal(screen.metrics.ear, .3); assert.equal(screen.metrics.state, 'open');
+  f.advanceTrace(2_700); screen = f.render(); assert.equal(screen.alertCount, 0, 'slow blink must not trigger an alert');
+  f.advanceTrace(4_300); screen = f.render();
+  assert.equal(screen.simulatorPhase, 'closed for 3 seconds'); assert.equal(screen.metrics.state, 'closed');
+  assert.equal(screen.metrics.closedDurationMs, 3_000); assert.equal(screen.alertCount, 1); assert.ok(screen.metrics.fatigueScore > 0);
+  f.advanceTrace(1_000); screen = f.render(); assert.equal(screen.metrics.state, 'noFace');
+  await screen.handleStop(); screen = f.render(); assert.equal(screen.isRunning, false);
+  assert.equal([...f.intervals.values()].filter(value => value.delay === 100).length, 0);
+  const stopped = JSON.stringify(screen.metrics); f.advanceTrace(2_000); assert.equal(JSON.stringify(f.render().metrics), stopped);
+  f.unmount();
+});
+
+test('simulator cloud transport stays unavailable even when stored consent and auth exist', async () => {
+  for (const eventOutboxFlag of [false, true]) {
+    const f = cloudFixture(auth('owner', 4_000_000_000), { consent: true, simulatorTrace: true, eventOutboxFlag });
+    assert.equal((await f.api.getCloudState()).available, false);
+    assert.equal(await f.api.beginCloudSession(), null);
+    assert.equal(f.api.queueNativeCloudAlert(Promise.resolve('session'), 90, new Date().toISOString()), null);
+    assert.equal(f.api.nativeCloudEventRetryStatus(), null);
+    await f.api.retryPendingCloudSessions();
+    assert.equal(f.requests.length, 0); assert.equal(f.timers.size, 0);
+  }
+});
+
+test('trace deep link can start only the simulator variant and cannot restart after Stop', async () => {
+  for (const simulator of [false, true]) {
+    const f = monitorCameraStartFixture(null, { simulator, autorun: true });
+    await flush(); f.render(); await flush(); let screen = f.render();
+    assert.equal(screen.isRunning, simulator);
+    if (simulator) { await screen.handleStop(); f.render(); await flush(); assert.equal(f.render().isRunning, false); }
+    f.unmount();
+  }
+});
 
 for (const stage of ['preferences', 'checkpoint']) {
   test(`camera switch during awaited ${stage} cannot restore an invalidated baseline in the running session or saved provenance`, async () => {
