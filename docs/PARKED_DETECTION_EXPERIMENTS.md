@@ -11,9 +11,46 @@ These opt-in web experiments are for stationary software evaluation. The empty-q
 | `pitch-gate=1` | Calibrate a dimensionless neutral nose/eye/chin ratio while parked; pause eye/microsleep evidence while down or while calibrated pitch geometry is unknown. |
 | `distraction-confidence=stable` | Use the calibrated confidence rule during a tracked head turn even after calibration falls back to defaults. |
 | `detector=tasks` | Collect the owned Tasks detector's bilateral blink, jaw and matrix measurements alongside the legacy detector on the same captured frame. Tasks does not control alerts. |
+| `observer=1` | An independent observer marks parked episodes; detector indicators and cues are withheld while scoring and decision timestamps continue. |
 | `tasks-delegate=cpu` | Explicitly request CPU for the optional Tasks runtime; its default is GPU. No silent fallback. |
 
 Flags require unique, exact values; duplicate or differently cased values do not enable a mode. Combinations are supported and their sorted names become part of `detectorVersion`. Every enabled experiment disables all protected cloud session, event, live-summary and retry entry points. Existing ordinary pending outboxes are retained unchanged. Experimental reports and small summaries stay in this browser.
+
+## Parked observer labels
+
+Use `/app.html?observer=1` with a consenting participant and an independent
+observer while safely parked. It combines with the other flags. The sorted
+`observer` name is included in `detectorVersion`, and all cloud entry points
+remain disabled, including when `event-outbox=1` is also present.
+
+Start monitoring, then use the large **Drowsy** / **High fatigue** buttons or
+Space / H on a keyboard or clicker. Press the same control again to end an
+episode; selecting the other label closes the first episode before starting
+the next. Held-key repeats are ignored. Typing in a field and native keyboard
+activation of Stop remain available. Only the observer's input creates labels.
+
+Fatigue, confidence, PERCLOS, alert counts, calibration values, colored eye
+overlays and detector logs are hidden. Detector sounds, vibration,
+notifications and speech are suppressed in this parked labeling mode so they
+cannot cue the observer. The calculations, accepted decisions and their trace
+timestamps continue unchanged. Neutral monitoring status, Stop, tracking-loss
+and stopped/failure guidance remain visible. The empty-query monitor retains
+its existing display and alert delivery.
+
+Stop closes any open episode and offers **Export observer episodes**, a CSV
+with `session_id,start_ms,end_ms,label`. Export the matching **parked detection
+comparison** JSON too. Both use the same monotonic session-relative clock and
+local session ID. Observer-only recording uses the legacy pipeline and does
+not load Tasks or invent its measurements. A new session clears both in-memory
+exports; a reload loses them. Labels are not sent to cloud or saved in History;
+only the existing small experiment summary gains aggregate episode/rejection
+counts. The bounded model retains up to 256 episodes and visibly rejects more
+instead of overwriting labels. Trace retention limits still apply.
+
+Pass the two exported files to the conversion command below with a separately
+chosen pseudonymous participant and train/test split. Software tests use
+synthetic observations; this tool produces no independently labeled real data
+until an observer records it.
 
 ## Observation and calibration boundaries
 
@@ -33,7 +70,7 @@ One bounded reusable canvas captures each distinct processed video frame before 
 
 The Tasks runtime is `1.0.1-occulert.1`, copied byte-for-byte from the prior pinned experiment with its telemetry-removal patch, model, Apache/Emscripten licenses and NOTICE. Its six exact pins are in `vendor/mediapipe/tasks-vision-1.0.1-occulert.1/runtime-manifest.json`. It loads only on demand through owned integrity pins and the current integrity worker. Offline cached optional bytes are checked before use; corrupt model bytes fail closed. Default offline installation does not preload the optional runtime.
 
-A stopped Tasks session exposes **Export parked detection comparison**. Its JSON retains at most 2400 distinct captured-frame scalar rows and 256 legacy alert observations, with explicit dropped counts and retained ranges. The full trace stays in memory; local history receives only a small aggregate. Rows include session-relative/camera timestamps, raw/smoothed EAR, blink/jaw coefficients, pitch/yaw degrees, separate inference times and total frame cost. Unsupported signals are `null`; per-pipeline usability and calibration are explicit. A pitch-unknown or calibration-completion frame cannot acquire legacy tracking support merely because EAR is finite.
+A stopped Tasks or observer session exposes **Export parked detection comparison**. Its JSON retains at most 2400 distinct captured-frame scalar rows and 256 legacy alert observations, with explicit dropped counts and retained ranges. The full trace stays in memory; local history receives only a small aggregate. Rows include session-relative/camera timestamps, raw/smoothed EAR, blink/jaw coefficients, pitch/yaw degrees, separate inference times and total frame cost. Unsupported signals are `null`; per-pipeline usability and calibration are explicit. An observer-only export has no Tasks measurements. A pitch-unknown or calibration-completion frame cannot acquire legacy tracking support merely because EAR is finite.
 
 The export records flag names, geometry units, helper integrity, exact model/runtime pins, requested/usable delegate and failure state. MatrixData's documented default column-major layout plus the pinned JS packed-data copy support the declared normalized `Rz(roll) Ry(yaw) Rx(pitch)` decomposition; synthetic known rotations verify the math. That inference is not exact-version C++/physical pose validation. Degenerate, reflected, sheared, non-finite or singular-pitch matrices remain unknown. See [MatrixData](https://raw.githubusercontent.com/google-ai-edge/mediapipe/master/mediapipe/framework/formats/matrix_data.proto) and [upstream geometry writer](https://raw.githubusercontent.com/google-ai-edge/mediapipe/master/mediapipe/tasks/cc/vision/face_geometry/libs/geometry_pipeline.cc).
 
