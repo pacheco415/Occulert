@@ -99,6 +99,7 @@
     "asset:release": "node scripts/bump-asset.mjs --release",
     "audit:source-assets": "node scripts/audit-source-assets.mjs",
     "test:source-release": "node --test scripts/test-source-release.mjs",
+    "test:asset-paths": "node --test scripts/test-asset-paths.mjs scripts/test-current-assets.mjs",
     "test:history-model": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-history-model.mjs",
     "build": "node scripts/build-driver.mjs",
     "lint:source": "eslint src",
@@ -108,6 +109,7 @@
     "test:asset-retirement": "node --test scripts/test-retire-assets.mjs",
     "test:event-outbox": "tsc --noEmit --strict --target ES2022 --module nodenext --moduleResolution nodenext lib/event-outbox.ts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-event-outbox.mjs",
     "test:event-idempotency": "node --test scripts/test-event-idempotency.mjs",
+    "test:event-outbox-transport": "node --test scripts/test-event-outbox-transport.mjs",
     "test:offline-cache-diagnostics": "node --test scripts/test-offline-cache-diagnostics.mjs"
   },
   "devDependencies": {
