@@ -222,28 +222,65 @@ test('cloud readiness refresh does not hide an invalidated active-session notice
   assert.equal(h.get("logEl.children.filter(entry => entry.textContent.includes('Cloud alerts paused')).length"), 1);
 });
 
-for (const wait of ['session', 'event queue']) test(`event snapshots metrics before waiting for ${wait}`, async () => {
+for (const wait of ['session', 'event queue']) test(`event snapshots metrics and detection time before waiting for ${wait}`, async () => {
   const h = eventHarness();
   if (wait === 'event queue') {
     h.run('releaseSession();'); await h.get('backendSessionPromise');
     h.run('let releasePrevious; backendEventQueue = new Promise(resolve => { releasePrevious = resolve; });');
   }
+  const detectedAt = new Date(h.clock.now).toISOString();
   h.run("fatigue = 61.4; confidence = 82.6; queueBackendEvent('drowsy');");
   h.clock.advance(30000);
   h.run('fatigue = 2; confidence = 3;');
   h.run(wait === 'session' ? 'releaseSession();' : 'releasePrevious();');
   await h.get('backendEventQueue');
   assert.equal(h.get('sentEvents.length'), 1);
-  assert.equal(h.get("Object.hasOwn(sentEvents[0].extra, 'occurred_at')"), false, 'preserve server receipt time for pre-session or skewed-clock detections');
   assert.deepEqual(JSON.parse(h.get('JSON.stringify(sentEvents[0].extra)')), {
-    fatigue_score: 61, confidence: 83,
-  });
+    occurred_at: detectedAt, fatigue_score: 61, confidence: 83,
+  }, 'the detection time, not the delivery time, is sent');
 });
-for (const status of [400, 409, 503]) test(`event failure ${status} is never automatically resent`, async () => {
+// The server rejects a detection time before its own session start (an alert
+// raised while the session was still being created) or ahead of its clock.
+// Only that rejection is resent, once, without the time, so the server stamps
+// arrival as it did before; every other failure is sent exactly once.
+function rejectingTimes(h, statusForUntimed = 200) {
+  h.run(`window.OcculertBackend.logEvent = async (id, type, extra, isCurrent) => {
+    if (isCurrent && !isCurrent()) return { status: 0, body: { error: 'auth_session_changed' } };
+    sentEvents.push({ id, type, extra });
+    return Object.hasOwn(extra, 'occurred_at')
+      ? { status: 400, body: { error: 'invalid_occurred_at' } }
+      : { status: ${statusForUntimed}, body: ${statusForUntimed === 200 ? '{ ok: true }' : "{ error: 'invalid_occurred_at' }"} };
+  };`);
+}
+test('a rejected detection time is resent once without it', async () => {
+  const h = eventHarness(); rejectingTimes(h);
+  h.run("fatigue = 61.4; confidence = 82.6; queueBackendEvent('drowsy'); releaseSession();");
+  await h.get('backendEventQueue');
+  assert.deepEqual(JSON.parse(h.get('JSON.stringify(sentEvents.map(event => [event.type, event.extra]))')).map(([type, extra]) => [type, Object.keys(extra).sort()]), [
+    ['drowsy', ['confidence', 'fatigue_score', 'occurred_at']],
+    ['drowsy', ['confidence', 'fatigue_score']],
+  ]);
+  assert.deepEqual(JSON.parse(h.get('JSON.stringify(sentEvents[1].extra)')), { fatigue_score: 61, confidence: 83 });
+});
+test('the untimed resend is never repeated, even if it is rejected too', async () => {
+  const h = eventHarness(); rejectingTimes(h, 400);
+  h.run("queueBackendEvent('drowsy'); releaseSession();");
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 2);
+});
+test('the untimed resend is dropped when sharing is turned off first', async () => {
+  const h = eventHarness(); rejectingTimes(h);
+  h.run(`const reject = window.OcculertBackend.logEvent;
+    window.OcculertBackend.logEvent = async (...args) => { const result = await reject(...args); cloudConsentRevision += 2; return result; };
+    queueBackendEvent('drowsy'); releaseSession();`);
+  await h.get('backendEventQueue');
+  assert.equal(h.get('sentEvents.length'), 1);
+});
+for (const [status, error] of [[400, 'invalid_event'], [409, 'invalid_occurred_at'], [503, 'invalid_occurred_at']]) test(`event failure ${status} ${error} is never automatically resent`, async () => {
   const h = eventHarness();
   h.run(`window.OcculertBackend.logEvent = async (id, type, extra, isCurrent) => {
     if (isCurrent()) sentEvents.push({ id, type, extra });
-    return { status: ${status}, body: { error: 'invalid_occurred_at' } };
+    return { status: ${status}, body: { error: '${error}' } };
   }; queueBackendEvent('drowsy'); releaseSession();`);
   await h.get('backendEventQueue');
   assert.equal(h.get('sentEvents.length'), 1);

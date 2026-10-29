@@ -1,7 +1,7 @@
 import { SUPABASE_HOST } from '../scripts/lib/csp-policy.mjs';
 import { test, expect } from '@playwright/test';
 
-async function openSignedInDriver(page, eventResponse) {
+async function openSignedInDriver(page, eventResponse, sessionDelayMs = 0) {
   const events = [];
   await page.addInitScript(() => {
     localStorage.setItem('occulert-auth', JSON.stringify({
@@ -10,7 +10,10 @@ async function openSignedInDriver(page, eventResponse) {
     }));
   });
   await page.route('**/api/public-config', route => route.fulfill({ json: { ok: true, supabase: { configured: true, url: `https://${SUPABASE_HOST}`, anonKey: 'public-test-key' } } }));
-  await page.route('**/api/sessions', route => route.fulfill({ json: { ok: true, session: { id: 'session-1', ended_at: new Date().toISOString() } } }));
+  await page.route('**/api/sessions', async route => {
+    await new Promise(resolve => setTimeout(resolve, sessionDelayMs));
+    await route.fulfill({ json: { ok: true, session: { id: 'session-1' } } });
+  });
   await page.route('**/api/events', async route => {
     const body = route.request().postDataJSON();
     events.push(body);
@@ -25,24 +28,23 @@ async function openSignedInDriver(page, eventResponse) {
 }
 
 test('an alert carries the time it was detected, even when the session starts later', async ({ page }) => {
-  const events = await openSignedInDriver(page, () => [200, { ok: true, event: { id: 'event-1' } }]);
+  const events = await openSignedInDriver(page, () => [200, { ok: true, event: { id: 'event-1' } }], 300);
   const times = await page.evaluate(async () => {
-    let release;
-    backendSessionPromise = new Promise(resolve => { release = resolve; });
+    beginBackendSession();
     const detected = Date.now();
     queueBackendEvent('drowsy');
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const released = Date.now();
-    release('session-1');
+    await backendSessionPromise;
+    const started = Date.now();
     await backendEventQueue;
-    return { detected, released };
+    return { detected, started };
   });
+  expect(times.started - times.detected).toBeGreaterThanOrEqual(250);
   expect(events).toHaveLength(1);
   expect(events[0].type).toBe('drowsy');
   const occurred = Date.parse(events[0].occurred_at);
   expect(new Date(occurred).toISOString()).toBe(events[0].occurred_at);
   expect(occurred).toBeGreaterThanOrEqual(times.detected);
-  expect(occurred).toBeLessThan(times.released);
+  expect(occurred).toBeLessThan(times.started);
 });
 
 test('a detection time the server rejects is resent once without it', async ({ page }) => {
@@ -50,7 +52,7 @@ test('a detection time the server rejects is resent once without it', async ({ p
     ? [400, { ok: false, error: 'invalid_occurred_at' }]
     : [200, { ok: true, event: { id: 'event-1' } }]);
   await page.evaluate(async () => {
-    backendSessionPromise = Promise.resolve('session-1');
+    beginBackendSession();
     queueBackendEvent('yawn');
     await backendEventQueue;
   });
@@ -60,7 +62,7 @@ test('a detection time the server rejects is resent once without it', async ({ p
 test('other event failures are not resent', async ({ page }) => {
   const events = await openSignedInDriver(page, () => [409, { ok: false, error: 'session_ended' }]);
   await page.evaluate(async () => {
-    backendSessionPromise = Promise.resolve('session-1');
+    beginBackendSession();
     queueBackendEvent('drowsy');
     await backendEventQueue;
   });

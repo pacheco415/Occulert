@@ -889,6 +889,15 @@ test('a rejected detection time is resent once for the server to stamp', async (
   assert.equal(await f.api.logCloudAlert('session', 40, '2030-01-01T00:00:00.000Z'), true);
   assert.deepEqual(eventBodies(f).map(body => body.occurred_at ?? null), ['2030-01-01T00:00:00.000Z', null]);
 });
+test('the untimed resend is dropped once its session is no longer current', async () => {
+  const f = cloudFixture(auth('driver', 4000000000), { consent: true });
+  f.transport = async url => {
+    if (url.endsWith('/api/events')) { f.api.cloudSessionScopes.delete('session'); return response(400, { ok: false, error: 'invalid_occurred_at' }); }
+    return response(200, { ok: true });
+  };
+  assert.equal(await f.api.logCloudAlert('session', 40, '2030-01-01T00:00:00.000Z'), false);
+  assert.equal(eventBodies(f).length, 1);
+});
 test('other event failures and untimed alerts are not resent', async () => {
   const f = cloudFixture(auth('driver', 4000000000), { consent: true });
   f.transport = async url => url.endsWith('/api/events') ? response(409, { ok: false, error: 'session_ended' }) : response(200, { ok: true });
