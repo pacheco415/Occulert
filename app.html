@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
 
-<script id="driver-startup-guard" src="/driver-startup-guard.v19.js" integrity="sha256-dJ14YBpsImxDI8h3od5hMer0yTkIJA3gjVwQdwGP064=" crossorigin="anonymous" defer></script>
+<script id="driver-startup-guard" src="/driver-startup-guard.v21.js" integrity="sha256-tvFCcyRTKCgU90er9jDcCLoYpjTwOtqgVJjlY2ANbXs=" crossorigin="anonymous" defer></script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 
@@ -77,6 +77,16 @@
 
     <div id="monitoringEssentials">
     <button class="btn primary" id="startBtn" disabled>Loading app…</button>
+    <section id="observerLabels" class="card" tabindex="0" aria-label="Parked observer labeling" hidden style="display:none">
+      <h2 style="font-size:18px">Parked observer labeling</h2>
+      <p class="small">Remain safely parked. An independent observer marks episodes without detector indicators or cues. Space: drowsy. H: high fatigue. Press again to end.</p>
+      <p id="observerLabelStatus" role="status" aria-live="polite">Start a parked session to label.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="observerDrowsy" type="button" class="btn" aria-pressed="false" disabled style="min-height:64px;flex:1">Drowsy · Space</button>
+        <button id="observerHighFatigue" type="button" class="btn" aria-pressed="false" disabled style="min-height:64px;flex:1">High fatigue · H</button>
+      </div>
+      <button id="exportObserverEpisodes" type="button" class="btn" hidden>Export observer episodes</button>
+    </section>
     <div id="monitoringMessages" role="region" aria-label="Monitoring status and guidance" tabindex="0">
     <div class="screen-warning" id="screenWarning" style="display:none">
       ⚠️ <strong>Monitoring stopped after screen lock or leaving this tab.</strong> Return to Occulert and restart only while safely parked.
@@ -139,7 +149,7 @@
 
 
     <div class="night-row"><label for="nightOpacity">&#127761; Night Alert Brightness<span style="font-size:10px;color:var(--text3);margin-left:6px;font-weight:400;font-style:italic">Alert screen opacity</span></label><div class="night-slider"><input type="range" id="nightOpacity" min="30" max="95" value="72" step="1"><span class="night-val" id="nightVal">72%</span></div></div>
-    <div class="card privacy-card"><div class="label">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b>Enable GPS for this session</b><br><span class="small">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b>Enable cloud session sync</b><br><span class="small">Requires sign-in and saves session totals plus alerts. Camera images are never uploaded. Otherwise data stays local.</span></span></label></div>
+    <div class="card privacy-card"><div class="label">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b>Enable GPS for this session</b><br><span class="small">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b>Enable cloud session sync</b><br><span class="small">Requires sign-in and saves session totals plus alerts. Camera images are never uploaded. Otherwise data stays local.</span></span></label><p id="cloudEventStatus" class="small" role="status" aria-live="polite" hidden></p></div>
     <div class="card"><div class="label">Calibration</div><div class="value" id="calibration">NOT STARTED</div><div class="cal-bar-wrap"><div class="cal-bar-fill" id="calibrationFill"></div></div><p class="metric-note" id="calHint">Keep your face centered and eyes open during calibration.</p></div>
     <div class="grid">
       <div class="card"><div class="label">Fatigue</div><div class="value" id="fatigue">0</div><div class="bar"><div class="fill" id="fatigueFill"></div></div></div>
@@ -220,7 +230,7 @@
 <script src="/occulert-backend.v90.js" defer></script>
 <script src="/security-utils.v47.js" defer></script>
 <script src="/local-history.v2.js" defer></script>
-<script src="/driver-app.v98.js" defer></script>
+<script src="/driver-app.v100.js" defer></script>
 <script src="/driver-overview.v1.js" defer></script>
 <script src="/lang.v47.js" defer></script>
 

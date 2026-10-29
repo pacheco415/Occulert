@@ -226,6 +226,9 @@ test('a changed real driver source produces an audited guard release without cha
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
     // Include reviewable registered source and active assets before Git staging.
     for (const entry of Object.values(json(root, 'source-assets.json').assets)) paths.add(entry.source);
+    const contract = json(root, 'source-driver-contract.json');
+    for (const module of contract.modules) paths.add('src/' + module);
+    for (const input of contract.sharedInputs) paths.add(input);
     for (const name of Object.values(json(root, 'asset-versions.json'))) paths.add(name);
     for (const name of paths) { mkdirSync(dirname(join(cwd, name)), { recursive: true }); cpSync(join(root, name), join(cwd, name)); }
     symlinkSync(join(root, 'node_modules'), join(cwd, 'node_modules'), 'dir');

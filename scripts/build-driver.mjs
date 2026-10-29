@@ -18,10 +18,14 @@ try {
     if (Buffer.byteLength(text) > 2_000_000) throw new Error('Source overrides exceed staging limit');
     const overrides = JSON.parse(text);
     if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides) || Object.entries(overrides).some(([name, source]) => !contract.modules.includes(name) || typeof source !== 'string')) throw new Error('Unknown source override');
-    inspectSourceGraph(sourceRoot, contract);
+    const graph = inspectSourceGraph(sourceRoot, contract);
     temporary = mkdtempSync(join(tmpdir(), 'occulert-driver-build-'));
-    for (const name of contract.modules) writeFileSync(join(temporary, name), overrides[name] ?? readFileSync(join(sourceRoot, name)));
-    sourceRoot = temporary;
+    const stagedSource = join(temporary, 'src');
+    mkdirSync(stagedSource);
+    mkdirSync(join(temporary, 'lib'));
+    for (const name of contract.modules) writeFileSync(join(stagedSource, name), overrides[name] ?? readFileSync(join(sourceRoot, name)));
+    for (const { path, bytes } of graph.sharedInputs) writeFileSync(join(temporary, path), bytes);
+    sourceRoot = stagedSource;
   }
   const result = await buildDriverArtifact({ sourceRoot, contractPath });
   if (args.includes('--stdout')) process.stdout.write(result.code);

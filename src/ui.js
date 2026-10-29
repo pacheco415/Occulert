@@ -7,14 +7,14 @@ import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistor
 import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
 export const start = startMonitoring;
 export const stop = stopMonitoring;
-export const EXPERIMENT_HELPER_INTEGRITY = "sha256-M8psrrb+lz//+iJ/tcz/r2OIpnKXgAXmdE89dbS5BSY=";
+export const EXPERIMENT_HELPER_INTEGRITY = "sha256-sdM0FjqpPurMBCny+jS4NGVE6udeyYjv4TmotGPi3gk=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
     try {
         const q = new URLSearchParams(window.location?.search || ''), yes = (k, v) => q.getAll(k).length === 1 && q.get(k) === v;
-        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable') };
+        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable'), observer: yes('observer', '1') };
         const names = Object.keys(f).filter(k => f[k]).sort();
-        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => k !== 'tasks' && k !== 'distractionConfidence'), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => !['tasks', 'distractionConfidence', 'observer'].includes(k)), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
     }
     catch (_) {
         return Object.freeze({ any: false, primary: false, names: Object.freeze([]) });
@@ -193,9 +193,11 @@ export function render(ear) {
     }
     else {
         const trackingUnavailable = noFaceSince > 0;
-        const label = trackingUnavailable ? 'TRACKING UNAVAILABLE' : risk[0] === 'SAFE' ? 'TRACKING ACTIVE' : risk[0];
+        const label = trackingUnavailable ? 'TRACKING UNAVAILABLE' : experimentFlags.observer ? 'PARKED OBSERVER SESSION' : risk[0] === 'SAFE' ? 'TRACKING ACTIVE' : risk[0];
         const hint = trackingUnavailable
             ? 'Camera tracking is unavailable. Alerts may be missed. Pull over safely before adjusting the phone.'
+            : experimentFlags.observer
+                ? 'Independent labeling. Detector feedback is hidden. Remain safely parked.'
             : risk[0] === 'CALIBRATING'
                 ? 'Camera is starting. Keep your face centered while parked.'
                 : risk[0] === 'ALERT' || risk[0] === 'HIGH'
@@ -206,8 +208,8 @@ export function render(ear) {
         setTextIfChanged(driveStateEl, label);
         setTextIfChanged(driveHintEl, hint);
         setTextIfChanged(statusEl, label);
-        stateCard.className = 'card state-card ' + (trackingUnavailable ? 'noface' : risk[1]);
-        statusEl.className = 'status ' + (trackingUnavailable || ['ALERT', 'HIGH'].includes(risk[0]) ? 'alert' : 'on');
+        stateCard.className = 'card state-card ' + (trackingUnavailable ? 'noface' : experimentFlags.observer ? 'observer' : risk[1]);
+        statusEl.className = 'status ' + (trackingUnavailable || !experimentFlags.observer && ['ALERT', 'HIGH'].includes(risk[0]) ? 'alert' : 'on');
     }
     pushFleet();
 }
@@ -220,7 +222,7 @@ export function showStoppedReason(message) {
     stateCard.focus?.({ preventScroll: true });
     stateCard.scrollIntoView?.({ block: 'nearest' });
 }
-export function drawEyes(lm, color) { ctx.clearRect(0, 0, canvas.width, canvas.height); [LEFT, RIGHT].forEach(idx => { ctx.beginPath(); idx.forEach((i, k) => { let p = lm[i], x = p.x * canvas.width, y = p.y * canvas.height; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke(); }); }
+export function drawEyes(lm, color) { ctx.clearRect(0, 0, canvas.width, canvas.height); if (experimentFlags.observer) return; [LEFT, RIGHT].forEach(idx => { ctx.beginPath(); idx.forEach((i, k) => { let p = lm[i], x = p.x * canvas.width, y = p.y * canvas.height; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke(); }); }
 export function requireForegroundStart() {
     if (!startCancelled && !document.hidden)
         return;
@@ -578,7 +580,7 @@ export function loadExperimentController() {
     }
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/detection-experiments.v3.js';
+        script.src = '/detection-experiments.v4.js';
         script.integrity = EXPERIMENT_HELPER_INTEGRITY;
         script.crossOrigin = 'anonymous';
         const timer = setTimeout(() => { script.remove(); reject(Error('Parked helper timed out')); }, 7000);
