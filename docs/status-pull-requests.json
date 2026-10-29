@@ -1,16 +1,81 @@
 {
-  "observedAt": "2026-10-04T21:52:06Z",
+  "observedAt": "2026-10-29T03:02:57Z",
   "complete": true,
   "pullRequests": [
+    {
+      "number": 339,
+      "headRefName": "codex/fleet-summary-tidy",
+      "isDraft": false
+    },
+    {
+      "number": 338,
+      "headRefName": "codex/event-outbox-transport",
+      "isDraft": false
+    },
+    {
+      "number": 337,
+      "headRefName": "claude/vision-roadmap",
+      "isDraft": false
+    },
+    {
+      "number": 331,
+      "headRefName": "codex/branch-inventory",
+      "isDraft": false
+    },
+    {
+      "number": 324,
+      "headRefName": "codex/playwright-runtime-upgrade",
+      "isDraft": true
+    },
+    {
+      "number": 312,
+      "headRefName": "codex/api-comment-refresh",
+      "isDraft": false
+    },
+    {
+      "number": 299,
+      "headRefName": "dependabot/npm_and_yarn/axe-core/playwright-4.14.0",
+      "isDraft": false
+    },
+    {
+      "number": 298,
+      "headRefName": "dependabot/npm_and_yarn/electric-sql/pglite-0.5.11",
+      "isDraft": false
+    },
+    {
+      "number": 297,
+      "headRefName": "dependabot/npm_and_yarn/native-app/react-test-renderer-19.3.1",
+      "isDraft": false
+    },
+    {
+      "number": 276,
+      "headRefName": "dependabot/github_actions/weekly-actions-dc4f8b6e13",
+      "isDraft": false
+    },
+    {
+      "number": 273,
+      "headRefName": "dependabot/npm_and_yarn/playwright/test-1.64.1",
+      "isDraft": false
+    },
+    {
+      "number": 267,
+      "headRefName": "codex/retire-assets-2026-10-10",
+      "isDraft": true
+    },
+    {
+      "number": 263,
+      "headRefName": "dependabot/npm_and_yarn/typescript-7.0.2",
+      "isDraft": false
+    },
+    {
+      "number": 262,
+      "headRefName": "dependabot/npm_and_yarn/acorn-8.19.0",
+      "isDraft": false
+    },
     {
       "number": 206,
       "headRefName": "codex/fleet-offboarding",
       "isDraft": true
-    },
-    {
-      "number": 192,
-      "headRefName": "codex/atomic-event-quotas",
-      "isDraft": false
     }
   ]
 }
