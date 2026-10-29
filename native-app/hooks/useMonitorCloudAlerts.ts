@@ -7,12 +7,13 @@ interface Options {
   setAlertCount: React.Dispatch<React.SetStateAction<number>>;
   cloudSessionRef: React.RefObject<Promise<string | null> | null>;
   cloudEventQueueRef: React.RefObject<Promise<void>>;
+  queueNativeCloudAlert: (session: Promise<string | null>, fatigueScore: number, occurredAt: string) => Promise<void> | null;
   logCloudAlert: (sessionId: string, fatigueScore: number, occurredAt?: string) => Promise<boolean>;
 }
 
 export function useMonitorCloudAlerts({
   prevAlertingRef, alertCountRef, setAlertCount,
-  cloudSessionRef, cloudEventQueueRef, logCloudAlert,
+  cloudSessionRef, cloudEventQueueRef, logCloudAlert, queueNativeCloudAlert,
 }: Options) {
   const recordCloudAlertTransition = useCallback((result: EyeMetrics, now: number) => {
     const alerting = result.state === 'closed';
@@ -22,7 +23,9 @@ export function useMonitorCloudAlerts({
       const cloudSession = cloudSessionRef.current;
       if (cloudSession) {
         const occurredAt = new Date(now).toISOString();
-        cloudEventQueueRef.current = cloudEventQueueRef.current
+        const retryWork = queueNativeCloudAlert(cloudSession, result.fatigueScore, occurredAt);
+        if (retryWork) cloudEventQueueRef.current = Promise.all([cloudEventQueueRef.current, retryWork]).then(() => {}).catch(() => {});
+        else cloudEventQueueRef.current = cloudEventQueueRef.current
           .then(async () => {
             const sessionId = await cloudSession;
             if (sessionId) await logCloudAlert(sessionId, result.fatigueScore, occurredAt);
@@ -31,7 +34,7 @@ export function useMonitorCloudAlerts({
       }
     }
     prevAlertingRef.current = alerting;
-  }, [logCloudAlert]);
+  }, [logCloudAlert, queueNativeCloudAlert]);
 
   return recordCloudAlertTransition;
 }

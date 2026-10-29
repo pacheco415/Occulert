@@ -26,7 +26,13 @@ import type { EyeMetrics } from '../hooks/useEyeTracking';
 import { type SensitivityLevel } from '../constants/thresholds';
 import { updateSessionHistory } from '../lib/sessionHistory';
 import { saveCompletedNativeSession, markCompletedNativeSessionSynced, finalizeCompletedNativeSession, completeNativeSessionStop } from '../lib/sessionCompletion';
-import { beginCloudSession, finishCloudSession, logCloudAlert } from '../lib/cloudSync';
+import {
+  beginCloudSession,
+  finishCloudSession,
+  logCloudAlert,
+  queueNativeCloudAlert,
+  stopNativeCloudEvents,
+} from '../lib/cloudSync';
 import { consumePreDriveSafety } from '../lib/preDriveGate';
 import { currentAppBuildInfo } from '../lib/appBuildInfo';
 import { HeadNodDetector } from '../lib/headNodDetector';
@@ -271,7 +277,7 @@ export default function MonitorScreen() {
 
   const recordCloudAlertTransition = useMonitorCloudAlerts({
     prevAlertingRef, alertCountRef, setAlertCount,
-    cloudSessionRef, cloudEventQueueRef, logCloudAlert,
+    cloudSessionRef, cloudEventQueueRef, logCloudAlert, queueNativeCloudAlert,
   });
 
   const cameraIdentityActive = isRunning || setupPreviewActive;
@@ -527,6 +533,7 @@ export default function MonitorScreen() {
     const maxFatigue = fatigueSamplesRef.current > 0 ? maxFatigueRef.current : null;
     const cloudSession = cloudSessionRef.current;
     const pendingEvents = cloudEventQueueRef.current;
+    stopNativeCloudEvents(cloudSession);
     const monitorPerformance = performanceTrackerRef.current.snapshot(stoppedAt);
 
     monitoringActiveRef.current = false;

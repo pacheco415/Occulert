@@ -34,6 +34,23 @@ test('late cloud completion uses the original guarded action and cannot replace 
   assert.deepEqual(f.events.logs, []); assert.equal(f.owner.cloudEventQueueRef.current, replacement); assert.deepEqual(f.events.counts, [1]);
 });
 
+test('mounted cloud hook adopts native retries at detection and joins earlier work without delaying local counts', async () => {
+  const f = createMonitorHookFixture(), pending = deferred(), earlier = deferred(), adopted = [];
+  f.owner.cloudEventQueueRef.current = earlier.promise;
+  f.owner.queueNativeCloudAlert = (session, score, occurredAt) => { adopted.push({ session, score, occurredAt }); return pending.promise; };
+  f.owner.logCloudAlert = async () => assert.fail('adopted work cannot become an unkeyed event');
+  await f.mount();
+  try {
+    await f.run(() => f.api.cloud(eye('closed', 61), 1_234));
+    assert.deepEqual(f.events.counts, [1]); assert.equal(adopted.length, 1);
+    assert.equal(adopted[0].session, f.owner.cloudSessionRef.current); assert.equal(adopted[0].score, 61);
+    assert.equal(adopted[0].occurredAt, '1970-01-01T00:00:01.234Z');
+    let settled = false; const work = f.owner.cloudEventQueueRef.current.then(() => { settled = true; });
+    pending.resolve(); await f.run(() => {}); assert.equal(settled, false);
+    earlier.resolve(); await work; assert.equal(settled, true); assert.deepEqual(f.events.logs, []);
+  } finally { await f.unmount(); }
+});
+
 test('mounted checkpoint hook snapshots current owner refs, keeps 15-second cadence and cleans inactive intervals', async () => {
   const f = createMonitorHookFixture({ running: true }), wait = deferred(); f.checkpointWait = wait.promise; await f.mount();
   try {

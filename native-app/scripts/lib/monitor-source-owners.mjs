@@ -66,7 +66,7 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
     assert.doesNotMatch(sources[owner], /from\s+['"](?:.*cloudSync|.*eyeBaselineStorage|.*sessionRecovery|@react-native-async-storage\/async-storage)['"]/,
       'Protected cloud/storage actions stay injected by the screen');
   }
-  wired(calls('screen', HOOKS.cloud), ['cloudSessionRef', 'cloudEventQueueRef', 'logCloudAlert', 'alertCountRef', 'prevAlertingRef', 'setAlertCount']);
+  wired(calls('screen', HOOKS.cloud), ['cloudSessionRef', 'cloudEventQueueRef', 'logCloudAlert', 'queueNativeCloudAlert', 'alertCountRef', 'prevAlertingRef', 'setAlertCount']);
   wired(calls('screen', HOOKS.checkpoint), ['activeSessionIdRef', 'sessionStartedAtRef', 'isRunningRef', 'saveActiveSessionCheckpoint']);
   wired(calls('screen', HOOKS.identity), ['clearDeviceEyeBaseline', 'loadDeviceEyeBaseline', 'loadSavedSensitivity', 'eyeBaselineRef', 'setEyeBaseline',
     'startingRef', 'stoppingRef', 'baselineBusyRef', 'cameraInterruptionGenerationRef', 'cameraCallbackOwnerRef', 'setSetupPreviewActive']);
