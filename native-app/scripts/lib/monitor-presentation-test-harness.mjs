@@ -57,4 +57,3 @@ export async function createMonitorPresentationFixture({ sourceOverride = null, 
     async close() { await act(async () => renderer.unmount()); },
   };
 }
-
