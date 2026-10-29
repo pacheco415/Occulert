@@ -70,9 +70,21 @@ export function queueBackendEvent(type) {
     if (!eventScopeCurrent(scope))
         return;
     // Snapshot detection data before waiting for session creation or earlier events.
+    const occurredAt = new Date().toISOString();
     const details = { fatigue_score: Math.round(fatigue), confidence: Math.round(confidence) };
     const location = gpsConsent.checked && lastPosition ? { latitude: lastPosition.lat, longitude: lastPosition.lng } : {}, sessionReference = backendSessionPromise || backendSessionId;
-    set_backendEventQueue(backendEventQueue.then(() => sessionReference).then(id => id && eventScopeCurrent(scope) ? scope.backend.logEvent(id, type, Object.assign(details, location), () => eventScopeCurrent(scope)) : null).catch(() => null));
+    Object.assign(details, location);
+    set_backendEventQueue(backendEventQueue.then(() => sessionReference).then(async id => {
+        if (!id || !eventScopeCurrent(scope))
+            return null;
+        const result = await scope.backend.logEvent(id, type, Object.assign({ occurred_at: occurredAt }, details), () => eventScopeCurrent(scope));
+        // A rejected occurrence time has not been stored. If the device clock
+        // disagrees with the server or session bounds, let the server stamp it
+        // on one final attempt under the original owner and sharing scope.
+        if (result && result.status === 400 && result.body && result.body.error === 'invalid_occurred_at' && eventScopeCurrent(scope))
+            return scope.backend.logEvent(id, type, details, () => eventScopeCurrent(scope));
+        return result;
+    }).catch(() => null));
 }
 export function detachBackendSession() { const state = { id: backendSessionId, promise: backendSessionPromise, eventQueue: backendEventQueue, consented: cloudConsent.checked, scope: backendSessionScope, endedAt: new Date().toISOString(), localSessionId }; set_backendSessionScope(null); (set_backendSessionGeneration(backendSessionGeneration + 1) - 1); set_backendSessionId(null); set_backendSessionPromise(null); set_backendEventQueue(Promise.resolve()); return state; }
 export function cloudSummaryScope() {
