@@ -8,6 +8,7 @@ import { currentAppBuildInfo, formatAppBuildLabel } from './appBuildInfo';
 import { updateSessionHistory } from './sessionHistory';
 import { createSessionSummaryOutbox, type PendingSessionSummary, type SummaryScope } from './sessionSummaryOutbox';
 import { pinnedSupabaseConfig, type PinnedSupabaseConfig } from './supabaseHost';
+import { SIMULATOR_TRACE } from './simulatorTrace';
 import { createNativeEventOutbox } from './nativeEventOutbox';
 import type { NativeEventAuthority, NativeEventResult } from './nativeEventOutbox';
 import type { PendingEvent, EventDelivery } from '../../lib/event-outbox.ts';
@@ -16,7 +17,7 @@ const API_BASE = 'https://www.occulert.com';
 const AUTH_KEY = 'occulert.cloud.auth.v1';
 const CONSENT_KEY = 'occulert-cloud-sync-enabled';
 const REQUEST_TIMEOUT_MS = 8_000;
-const NATIVE_EVENT_RETRY_ENABLED = typeof process !== 'undefined' && process.env.EXPO_PUBLIC_EVENT_OUTBOX === '1';
+const NATIVE_EVENT_RETRY_ENABLED = !SIMULATOR_TRACE && typeof process !== 'undefined' && process.env.EXPO_PUBLIC_EVENT_OUTBOX === '1';
 const SECURE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainService: 'com.occulert.app.cloud-auth',
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
@@ -119,6 +120,7 @@ async function fetchJsonWithTimeout<T>(
   url: string,
   init?: RequestInit,
 ): Promise<{ response: Response; body: T }> {
+  if (SIMULATOR_TRACE) throw new Error('Cloud transport is disabled for synthetic simulator input.');
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_resolve, reject) => {
@@ -589,6 +591,7 @@ async function currentSyncContext(): Promise<{ ownerId: string; consentVersion: 
 }
 
 export async function getCloudState(): Promise<CloudState> {
+  if (SIMULATOR_TRACE) return { readStatus: 'confirmed', available: false, signedIn: false, email: null, syncEnabled: false };
   const unavailable = (): CloudState => ({
     readStatus: 'unavailable', available: false, signedIn: false, email: null, syncEnabled: false,
   });

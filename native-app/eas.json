@@ -14,6 +14,19 @@
     "preview": {
       "distribution": "internal"
     },
+    "simulator-trace": {
+      "distribution": "internal",
+      "env": {
+        "OCCULERT_SIMULATOR_TRACE": "1",
+        "OCCULERT_SIMULATOR_PROFILE": "simulator-trace",
+        "OCCULERT_SIMULATOR_PLATFORM": "ios"
+      },
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release",
+        "image": "sdk-58"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "ios": {
