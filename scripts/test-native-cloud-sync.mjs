@@ -293,24 +293,16 @@ assert.match(cloud, /response\.ok \? pinnedSupabaseConfig\(body\.supabase\) : nu
 
 // Run the real loadConfig and authFetch: a config naming another host must not
 // receive the email and password.
-// Remove the few TypeScript annotations so the shipped source runs unchanged.
-const sliceSource = (start, end, annotations) => {
+// Erase types while exercising the actual pinned configuration/auth functions.
+const sliceSource = (start, end) => {
   const from = cloud.indexOf(start), to = cloud.indexOf(end, from);
   assert.ok(from >= 0 && to > from, `${start} must remain directly testable`);
-  return annotations.reduce((source, [typed, plain]) => {
-    assert.ok(source.includes(typed), `expected ${typed}`);
-    return source.replace(typed, plain);
-  }, cloud.slice(from, to));
+  return stripTypeScriptTypes(cloud.slice(from, to));
 };
-const configAndAuthSource = sliceSource('async function loadConfig', 'async function secureStoreAvailable', [
-  ['loadConfig(): Promise<PublicConfig | null>', 'loadConfig()'],
-  ['fetchJsonWithTimeout<{ supabase?: unknown }>(', 'fetchJsonWithTimeout('],
-]) + sliceSource('async function authFetch', 'function authErrorText', [
-  ['authFetch(path: string, body: Record<string, unknown>): Promise<ApiResult<AuthResponse>>', 'authFetch(path, body)'],
-  ['fetchJsonWithTimeout<AuthResponse>(', 'fetchJsonWithTimeout('],
-]);
+const configAndAuthSource = sliceSource('async function loadConfig', 'function nativeEventLogin')
+  + sliceSource('async function authFetch', 'function authErrorText');
 const makeAuthFetch = new Function('API_BASE', 'pinnedSupabaseConfig', 'fetchJsonWithTimeout',
-  `let configPromise = null;\n${configAndAuthSource}\nreturn authFetch;`);
+  `let configPromise = null;const NATIVE_EVENT_RETRY_ENABLED=false;\n${configAndAuthSource}\nreturn authFetch;`);
 const credentialRequests = [];
 const fakeTransport = publicConfig => async (url, init = {}) => {
   if (url === 'https://www.occulert.com/api/public-config') return { response: { ok: true }, body: { ok: true, supabase: publicConfig } };
@@ -422,7 +414,7 @@ for (const wait of ['session creation', 'an earlier event']) {
       Date, now: detectedAt, result: { state: 'closed', fatigueScore: 61.4 },
       prevAlertingRef: { current: false }, alertCountRef: { current: 0 }, setAlertCount() {},
       cloudSessionRef: { current: wait === 'session creation' ? pending.promise : Promise.resolve('old-session') },
-      cloudEventQueueRef: queue, logCloudAlert: f.api.logCloudAlert,
+      cloudEventQueueRef: queue, logCloudAlert: f.api.logCloudAlert, queueNativeCloudAlert: () => null,
     });
     await flushCloud();
     assert.equal(eventRequests(f).length, 0, 'local alert handling must not wait for cloud work');
