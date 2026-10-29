@@ -637,12 +637,15 @@ const fleetSummaryResult = await invoke(fleetSummary, request("GET"));
 assert.equal(fleetSummaryResult.status, 200);
 assert.equal(fleetSummaryCalls[0].options.params.owner_user_id, "eq.user-1");
 assert.equal(fleetSummaryCalls[1].options.params.fleet_id, "eq.fleet-1");
+assert.equal(fleetSummaryCalls[1].options.params.limit, "500");
+assert.equal(fleetSummaryCalls[1].options.params.order, "id.asc");
 assert.equal(fleetSummaryCalls[2].options.params.fleet_id, "eq.fleet-1");
 assert.equal(fleetSummaryCalls[3].table, "events");
 assert.equal(fleetSummaryCalls[3].options.params.session_id, `in.(${fleetSessionId})`);
 assert.doesNotMatch(fleetSummaryCalls[3].options.params.select, /latitude|longitude/i);
 assert.equal(fleetSummaryResult.body.telemetry_trust, "unverified_client_report");
 assert.equal(fleetSummaryResult.body.events_included, true);
+assert.equal(fleetSummaryResult.body.roster_limit, 500);
 assert.match(fleetSummaryResult.headers["server-timing"], /fleet;dur=\d+, roster;dur=\d+, events;dur=\d+/);
 assert.deepEqual(fleetSummaryResult.body.privacy, {
   includes_location: false,
@@ -668,8 +671,8 @@ assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions"]);
 assert.equal(lightweightResult.body.events_included, false);
 assert.deepEqual(lightweightResult.body.events, []);
 
-// Exercise the query's real ordering at the latest-50 boundary. Equal start
-// times must select the same sessions as follow-ups, independent of row order.
+// Exercise real bounded query results in different insertion orders: the
+// roster's 500 rows, the latest 50 sessions and the latest 200 tied events.
 const orderingDb = new PGlite();
 try {
   await orderingDb.exec(`
@@ -678,11 +681,20 @@ try {
       max_fatigue numeric, safety_score numeric, alert_count integer, head_nod_count integer,
       detector_pipeline text, detector_version text, app_version text);
     create index sessions_fleet_started_id_idx on sessions (fleet_id, started_at desc, id desc);
+    create table drivers (id uuid primary key, fleet_id uuid, name text, active boolean, vehicle_id text);
+    create table events (id uuid primary key, session_id uuid, type text,
+      fatigue_score numeric, confidence numeric, created_at timestamptz);
   `);
   const sessionId = n => `11111111-1111-4111-8111-${n.toString(16).padStart(12, "0")}`;
+  const rosterId = n => `44444444-4444-4444-8444-${n.toString(16).padStart(12, "0")}`;
+  const eventId = n => `55555555-5555-4555-8555-${n.toString(16).padStart(12, "0")}`;
   const ownedFleetId = "22222222-2222-4222-8222-222222222222";
   const otherFleetId = "33333333-3333-4333-8333-333333333333";
-  const driverId = "44444444-4444-4444-8444-444444444444";
+  const driverId = rosterId(1);
+  const ownedDrivers = Array.from({ length: 501 }, (_, i) => ({
+    id: rosterId(i + 1), fleet_id: ownedFleetId, name: `Synthetic driver ${i + 1}`, active: true,
+  }));
+  const foreignDrivers = [{ id: rosterId(0), fleet_id: otherFleetId, name: "Excluded driver", active: true }];
   const ownedRows = Array.from({ length: 66 }, (_, i) => ({
     id: sessionId(i + 1), fleet_id: ownedFleetId, driver_id: driverId,
     started_at: i < 3 ? "2026-09-26T12:00:00Z" : i < 63 ? "2026-09-25T12:00:00Z" : "2026-09-24T12:00:00Z",
@@ -692,6 +704,22 @@ try {
     started_at: "2026-09-27T12:00:00Z",
   }));
   const expectedIds = [3, 2, 1, ...Array.from({ length: 47 }, (_, i) => 63 - i)].map(sessionId);
+  const expectedDriverIds = Array.from({ length: 500 }, (_, i) => rosterId(i + 1));
+  const ownedEvents = Array.from({ length: 209 }, (_, i) => ({
+    id: eventId(i + 1), session_id: sessionId(3), type: "drowsy", fatigue_score: 40, confidence: 90,
+    created_at: i < 2 ? "2026-09-26T12:00:00Z" : i < 207 ? "2026-09-25T12:00:00Z" : "2026-09-24T12:00:00Z",
+  }));
+  const foreignEvents = [{ id: eventId(999), session_id: sessionId(101), type: "drowsy", created_at: "2026-09-27T12:00:00Z" }];
+  const expectedEventIds = [2, 1, ...Array.from({ length: 198 }, (_, i) => 207 - i)].map(eventId);
+  function sqlOrder(order, allowed, direction) {
+    if (!order) return "";
+    return " order by " + order.split(",").map(term => {
+      const [column, suppliedDirection] = term.split(".");
+      assert.ok(allowed.includes(column));
+      assert.equal(suppliedDirection, direction);
+      return `${column} ${direction}`;
+    }).join(",");
+  }
   const eventScopes = [], followupScopes = [];
   const fetchOrderedRows = async (table, { params }) => {
     if (table === "fleets") {
@@ -700,7 +728,9 @@ try {
     }
     if (table === "drivers") {
       assert.equal(params.fleet_id, "eq." + ownedFleetId);
-      return [{ id: driverId, name: "Driver", active: true }];
+      assert.doesNotMatch(params.select, /email|latitude|longitude|location|raw_motion/i);
+      return (await orderingDb.query(`select ${params.select} from drivers where fleet_id=$1${sqlOrder(params.order, ["id"], "asc")} limit $2`,
+        [ownedFleetId, params.limit ? Number(params.limit) : 1000])).rows;
     }
     if (table === "sessions") {
       assert.equal(params.fleet_id, "eq." + ownedFleetId);
@@ -720,6 +750,8 @@ try {
         assert.equal(params.limit, "200");
         assert.doesNotMatch(params.select, /latitude|longitude/i);
         eventScopes.push(params.session_id);
+        return (await orderingDb.query(`select ${params.select} from events where session_id=any($1::uuid[])${sqlOrder(params.order, ["created_at", "id"], "desc")} limit $2`,
+          [params.session_id.slice(4, -1).split(","), Number(params.limit)])).rows;
       } else followupScopes.push(params.session_id);
       return [];
     }
@@ -727,16 +759,26 @@ try {
   };
   const orderedSummary = loadHandler("../api/fleet-summary.js", fetchOrderedRows);
   const orderedFollowups = loadHandler("../api/fleet-followups.js", fetchOrderedRows);
-  for (const rows of [[...ownedRows, ...foreignRows], [...foreignRows, ...ownedRows].reverse()]) {
-    await orderingDb.exec("truncate sessions");
+  for (const reverse of [false, true]) {
+    const ordered = rows => reverse ? [...rows].reverse() : rows;
+    await orderingDb.exec("truncate sessions,drivers,events");
     await orderingDb.query(`insert into sessions (id,fleet_id,driver_id,started_at)
       select id,fleet_id,driver_id,started_at from jsonb_to_recordset($1::jsonb)
-      as fixture(id uuid,fleet_id uuid,driver_id uuid,started_at timestamptz)`, [JSON.stringify(rows)]);
+      as fixture(id uuid,fleet_id uuid,driver_id uuid,started_at timestamptz)`, [JSON.stringify(ordered([...ownedRows, ...foreignRows]))]);
+    await orderingDb.query(`insert into drivers (id,fleet_id,name,active)
+      select id,fleet_id,name,active from jsonb_to_recordset($1::jsonb)
+      as fixture(id uuid,fleet_id uuid,name text,active boolean)`, [JSON.stringify(ordered([...ownedDrivers, ...foreignDrivers]))]);
+    await orderingDb.query(`insert into events (id,session_id,type,fatigue_score,confidence,created_at)
+      select id,session_id,type,fatigue_score,confidence,created_at from jsonb_to_recordset($1::jsonb)
+      as fixture(id uuid,session_id uuid,type text,fatigue_score numeric,confidence numeric,created_at timestamptz)`, [JSON.stringify(ordered([...ownedEvents, ...foreignEvents]))]);
     const summary = await invoke(orderedSummary, request("GET"));
     const followups = await invoke(orderedFollowups, request("GET"));
     assert.equal(summary.status, 200);
     assert.equal(followups.status, 200);
     assert.deepEqual(summary.body.sessions.map(row => row.id), expectedIds);
+    assert.deepEqual(summary.body.drivers.map(row => row.id), expectedDriverIds, "a stable page of at most 500 owned drivers is returned");
+    assert.deepEqual(summary.body.events.map(row => row.id), expectedEventIds, "tied events keep a stable latest 200 selection");
+    assert.equal(summary.body.roster_limit, 500, "the response states its bound without claiming truncation or completeness");
     assert.deepEqual(followups.body.sessions.map(row => row.id), expectedIds);
     assert.equal(summary.body.telemetry_trust, "unverified_client_report");
     assert.deepEqual(summary.body.privacy, fleetSummaryResult.body.privacy);
