@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
 
-<script id="driver-startup-guard" src="/driver-startup-guard.v20.js" integrity="sha256-72eonq36upAYHgTxKVqFU0nypMdk0kg1XIDBzsoZvQ4=" crossorigin="anonymous" defer></script>
+<script id="driver-startup-guard" src="/driver-startup-guard.v21.js" integrity="sha256-tvFCcyRTKCgU90er9jDcCLoYpjTwOtqgVJjlY2ANbXs=" crossorigin="anonymous" defer></script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 
@@ -77,6 +77,16 @@
 
     <div id="monitoringEssentials">
     <button class="btn primary" id="startBtn" disabled>Loading app…</button>
+    <section id="observerLabels" class="card" tabindex="0" aria-label="Parked observer labeling" hidden style="display:none">
+      <h2 style="font-size:18px">Parked observer labeling</h2>
+      <p class="small">Remain safely parked. An independent observer marks episodes without detector indicators or cues. Space: drowsy. H: high fatigue. Press again to end.</p>
+      <p id="observerLabelStatus" role="status" aria-live="polite">Start a parked session to label.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="observerDrowsy" type="button" class="btn" aria-pressed="false" disabled style="min-height:64px;flex:1">Drowsy · Space</button>
+        <button id="observerHighFatigue" type="button" class="btn" aria-pressed="false" disabled style="min-height:64px;flex:1">High fatigue · H</button>
+      </div>
+      <button id="exportObserverEpisodes" type="button" class="btn" hidden>Export observer episodes</button>
+    </section>
     <div id="monitoringMessages" role="region" aria-label="Monitoring status and guidance" tabindex="0">
     <div class="screen-warning" id="screenWarning" style="display:none">
       ⚠️ <strong>Monitoring stopped after screen lock or leaving this tab.</strong> Return to Occulert and restart only while safely parked.
@@ -220,7 +230,7 @@
 <script src="/occulert-backend.v90.js" defer></script>
 <script src="/security-utils.v47.js" defer></script>
 <script src="/local-history.v2.js" defer></script>
-<script src="/driver-app.v99.js" defer></script>
+<script src="/driver-app.v100.js" defer></script>
 <script src="/driver-overview.v1.js" defer></script>
 <script src="/lang.v47.js" defer></script>
 

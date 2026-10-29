@@ -17,6 +17,15 @@ function fixture(){const trace=models.createTraceStore();
  trace.recordAlert(135,'Fatigue');return {schema:'occulert.parked-detection-trace',version:1,session:{sessionId:'local-test',durationMs:2500,platform:'web',detectorVersion:traceContract.detectorPrefix+'tasks',experimentFlags:['tasks'],geometryUnits:'normalized',runtimeVersion:traceContract.runtimeVersion,runtimePins:models.tasksPins,helperIntegrity:traceContract.helperIntegrity,modelIntegrity:traceContract.modelIntegrity,...trace.summary()},samples:trace.samples(),legacyAlerts:trace.alerts()};
 }
 const labels=[{session_id:'local-test',start_ms:0,end_ms:270,label:'drowsy'}];
+test('observer-only trace and independent episodes are accepted without claiming Tasks coverage',()=>{
+ const trace=fixture();trace.session.experimentFlags=['observer'];trace.session.detectorVersion=traceContract.detectorPrefix+'observer';
+ for(const sample of trace.samples){sample.tasksUsable=false;for(const name of ['eyeBlinkLeft','eyeBlinkRight','jawOpen','pitchDeg','yawDeg','tasksInferenceMs'])sample[name]=null}
+ const result=adaptTrace(trace,{participant:'P001',split:'test',episodes:labels});
+ assert.equal(result.episodes.length,1);assert.deepEqual(result.summary.experimentFlags,['observer']);
+ assert.equal(result.summary.tasksEventMetricsAvailable,false);
+ trace.samples[0].tasksUsable=true;
+ assert.throws(()=>adaptTrace(trace,{participant:'P001',split:'test',episodes:labels}),/Observer-only trace/);
+});
 test('stable-distraction Tasks exports retain distinct accepted provenance',()=>{
  const trace=fixture();trace.session.experimentFlags=['distractionConfidence','tasks'];
  trace.session.detectorVersion=traceContract.detectorPrefix+'distractionConfidence+tasks';
