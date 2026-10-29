@@ -21,4 +21,14 @@ The additional local-action generation preserves a newer sign-in or sign-out
 while an older refresh waits for its Web Lock, while allowing queued callers
 to reuse an internal token rotation.
 
+The keyed event transport prerequisite publishes `occulert-backend.v90.js` at
+46,733 raw / 11,163 gzip / 9,621 Brotli bytes, compared with
+40,714 / 9,819 / 8,468 for v89. Its 6,019 raw / 1,344 gzip / 1,153 Brotli byte
+increase adds the exact public capability gate, validated immutable event
+payload, one-attempt guarded sender, bounded Retry-After metadata and local Auth
+lifecycle signal. The reviewed raw ceiling moves from 41,000 to 48,000 bytes.
+Both versions remain network-only, the existing event sender is unchanged and
+the outbox adapter remains disabled. These are local compressed measurements;
+they do not establish network latency or real-device startup performance.
+
 The selected set covers frequently loaded first-party entry assets. It does not represent the complete request waterfall, MediaPipe/WASM/model sizes, real-device heat or battery use. Existing startup and browser checks test behavior; physical-device startup measurements remain separate evidence.

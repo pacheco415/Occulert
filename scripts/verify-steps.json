@@ -94,6 +94,7 @@
     "test:asset-retirement",
     "test:event-outbox",
     "test:event-idempotency",
+    "test:event-outbox-transport",
     "test:offline-cache-diagnostics",
     "test:stale-branches"
   ],
