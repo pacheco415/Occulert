@@ -64,6 +64,15 @@ password, then register a new passkey from Account Settings. Email/password and
 the privacy-safe reset-link flow remain available for recovery. If the
 experimental provider is disabled, those existing methods continue to work.
 
+### Event identity and quotas (disabled)
+
+The optional `OCCULERT_EVENT_IDEMPOTENCY_ENABLED=true` route requires the
+reviewed migration and rollout gates in [docs/EVENT_IDEMPOTENCY.md](docs/EVENT_IDEMPOTENCY.md).
+Leave it off until schema/permission and multi-connection acceptance are verified.
+Turning it on also enables 60 accepted events/minute/user and 500/session quotas
+for legacy clients. It does not enable the web/native retry outbox. Do not also
+apply the overlapping unmerged PR #192 quota migration.
+
 ## 2. Collect your keys
 
 From Project Settings -> API, copy:
@@ -163,7 +172,12 @@ fresh token, and is limited to reduce abuse without adding a paid provider.
 
 The endpoints expect an `Authorization: Bearer <access_token>`
 header, where `access_token` comes from Supabase Auth running in the
-browser. `api/public-config.js` exposes only the public project URL and anon
+browser. The browser client refreshes the access token 60 seconds before it
+expires. Concurrent calls in a tab share one refresh, and tabs take turns through
+the `occulert-auth-refresh` Web Lock, reusing a session another tab just stored.
+Local sign-in and sign-out actions invalidate an older refresh even while it
+waits for that lock; cross-tab storage updates can still supply a rotated token.
+If an early refresh cannot reach Supabase, the still-valid token keeps working. `api/public-config.js` exposes only the public project URL and anon
 key at runtime; it must never expose the service-role key. Email/password
 login creates or updates the authenticated user's driver profile, and
 `app.html` writes opted-in session summaries and alert events through the
@@ -215,6 +229,17 @@ canonical ledger. See `docs/MIGRATION_READINESS.md` for the present evidence.
 Every API entry point creates one monotonic 12-second provider allowance, isolated per request. Nested consolidated routes reuse that allowance. Supabase authentication, REST/admin operations, Stripe test requests and the pilot-lead fallback webhook use the smaller of their existing per-call timeout and the remaining allowance. Optional stored-lead notification also uses the smaller of three seconds and the remaining allowance, and is skipped after exhaustion without failing a stored lead. A later provider mutation is not sent after exhaustion. Supabase and Stripe deadlines cover response bodies and ignore late completion; the fallback webhook also settles by its deadline when fetch ignores abort. Mutations are never retried automatically. This bounds provider waiting, not arbitrary application CPU work or the complete Vercel invocation. Existing response shapes remain unchanged.
 
 Responses include a generated `X-Occulert-Request-ID`. Failed server responses and unhandled exceptions emit a small JSON diagnostic with that ID, bounded status, elapsed milliseconds and an unhandled flag. Diagnostics omit request URLs, headers, bodies, identity, provider response details and exception messages. Use the response ID to locate a failure without collecting driver information. A timeout may follow a committed provider mutation; use the existing idempotent finalization behavior before retrying.
+
+Supabase requests bound complete response bodies to 2 MiB for PostgREST and
+64 KiB for Auth user/admin responses; JWKS retains its existing 64 KiB limit.
+The reader cancels a stream as soon as it exceeds the byte limit and rejects
+an oversized advertised Content-Length before reading. Oversized responses
+fail explicitly rather than returning partial fleet records. Successful
+malformed or oversized responses return 502. Known deadlines return 504;
+Supabase network failures and other upstream 5xx return 503, including HTML
+gateway pages. Existing validation, permission and migration-specific errors
+keep their documented responses, and provider pages are never sent to clients.
+These statuses do not authorize automatic mutation retries.
 
 ### Repeat-safe session starts
 

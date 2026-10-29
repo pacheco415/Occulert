@@ -1,4 +1,5 @@
 const { pgFetch, verifyAccessToken, bearerToken } = require('./_lib/supabase');
+const { supabaseErrorStatus } = require('./_lib/supabase-errors');
 const { isUuid, validJsonBody } = require('./_lib/validation');
 const STATUSES = new Set(['open', 'in_progress', 'reviewed']);
 const { json } = require("./_lib/responses");
@@ -57,7 +58,7 @@ module.exports = async function handler(req, res) {
     if (['42P01', '42883', 'PGRST202', 'PGRST205'].includes(code)) {
       return json(res, 503, { ok: false, error: 'followups_not_enabled' });
     }
-    return json(res, 502, { ok: false, error: 'followups_unavailable' });
+    return json(res, supabaseErrorStatus(error), { ok: false, error: 'followups_unavailable' });
   }
 };
 

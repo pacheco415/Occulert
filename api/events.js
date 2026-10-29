@@ -4,11 +4,12 @@
 // Storage requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY; see BACKEND_SETUP.md.
 
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const { validTimestamp, compareTimestamps } = require("./_lib/fleet-history-cursor");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const { isUuid, numberOrNull, validJsonBody } = require("./_lib/validation");
+const { isUuid, numberOrNull, strictNumberOrNull, validJsonBody } = require("./_lib/validation");
 
 const { json } = require("./_lib/responses");
 
@@ -45,6 +46,55 @@ module.exports = async function handler(request, response) {
       return json(response, 400, { ok: false, error: "invalid_event" });
     }
     if (!isUuid(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
+    // Do not silently ignore an idempotency key while the migration gate is off:
+    // that would let a retry-capable client create duplicates through legacy POST.
+    const keyed = Object.hasOwn(body, "client_event_id");
+    if (keyed && !isUuid(body.client_event_id)) {
+      return json(response, 400, { ok: false, error: "invalid_client_event_id" });
+    }
+    if (keyed && process.env.OCCULERT_EVENT_IDEMPOTENCY_ENABLED !== "true") {
+      return json(response, 503, { ok: false, error: "event_idempotency_not_enabled" });
+    }
+    if (process.env.OCCULERT_EVENT_IDEMPOTENCY_ENABLED === "true") {
+      // Preserve timezone/microsecond precision; PostgreSQL canonicalizes the
+      // accepted instant. Omitted time is a stable null intent, not retry time.
+      const occurredAt = Object.hasOwn(body, "occurred_at") ? body.occurred_at : null;
+      if (Object.hasOwn(body, "occurred_at") && !validTimestamp(occurredAt)) {
+        return json(response, 400, { ok: false, error: "invalid_occurred_at" });
+      }
+      const result = await pgFetch("rpc/record_idempotent_event", {
+        method: "POST",
+        body: {
+          p_user_id: user.id, p_session_id: body.session_id,
+          p_client_event_id: keyed ? body.client_event_id : null,
+          p_type: type, p_fatigue_score: numberOrNull(body.fatigue_score, 0, 100),
+          p_confidence: numberOrNull(body.confidence, 0, 100),
+          p_latitude: strictNumberOrNull(body.latitude, -90, 90),
+          p_longitude: strictNumberOrNull(body.longitude, -180, 180),
+          p_occurred_at: occurredAt,
+        },
+      });
+      const statuses = { invalid_event: 400, invalid_occurred_at: 400,
+        session_not_found: 404, session_ended: 409, event_id_conflict: 409,
+        event_rate_limited: 429, session_event_limit: 429 };
+      if (result && Object.hasOwn(statuses, result.error)) {
+        if (result.error === "event_rate_limited") {
+          response.setHeader("Retry-After", String(Math.max(1, Math.min(60, Number(result.retry_after) || 60))));
+        }
+        return json(response, statuses[result.error], { ok: false, error: result.error });
+      }
+      if (!result || !isUuid(result.event?.id)
+        || result.event.session_id?.toLowerCase() !== body.session_id.toLowerCase()
+        || typeof result.replayed !== "boolean"
+        || (keyed ? result.client_event_id?.toLowerCase() !== body.client_event_id.toLowerCase() : result.client_event_id !== null)) {
+        return json(response, 502, { ok: false, error: "event_not_saved" });
+      }
+      return json(response, 200, { ok: true, event: result.event,
+        client_event_id: result.client_event_id, replayed: result.replayed,
+        telemetry_trust: "unverified_client_report",
+        message: "Client-reported telemetry is not independently measured or attested.",
+      });
+    }
     const drivers = await pgFetch("drivers", {
       params: { select: "id", user_id: "eq." + user.id, limit: "1" },
     });
@@ -95,8 +145,8 @@ module.exports = async function handler(request, response) {
         confidence: numberOrNull(body.confidence, 0, 100),
         // GPS is opt-in only; omit lat/lng entirely unless the driver has
         // explicitly enabled location sharing on the client.
-        latitude: numberOrNull(body.latitude, -90, 90),
-        longitude: numberOrNull(body.longitude, -180, 180),
+        latitude: strictNumberOrNull(body.latitude, -90, 90),
+        longitude: strictNumberOrNull(body.longitude, -180, 180),
         created_at: occurredAt,
       },
     });
@@ -107,7 +157,7 @@ module.exports = async function handler(request, response) {
       message: "Client-reported telemetry is not independently measured or attested.",
     });
   } catch (error) {
-    return json(response, 502, { ok: false, error: "supabase_error" });
+    return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });
   }
 };
 

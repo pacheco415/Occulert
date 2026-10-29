@@ -143,8 +143,25 @@ assert.equal(allowedEvent.status, 200, "events for the authenticated driver's se
 assert.equal(allowedEvent.body.telemetry_trust, "unverified_client_report");
 assert.equal(insertedEvent.fatigue_score, 100);
 assert.equal(insertedEvent.confidence, 0);
-assert.equal(insertedEvent.latitude, 90);
-assert.equal(insertedEvent.longitude, -180);
+assert.equal(insertedEvent.latitude, null, "invalid latitude must not invent a pole coordinate");
+assert.equal(insertedEvent.longitude, null, "invalid longitude must not invent a date-line coordinate");
+
+for (const [latitude, longitude, expectedLatitude, expectedLongitude] of [
+  [200, 45, null, 45], [45, -500, 45, null],
+  [-90, -180, -90, -180], [90, 180, 90, 180],
+  [-90.0001, 180.0001, null, null], [90.0001, -180.0001, null, null],
+  [0, 0, 0, 0], ['0', '0', 0, 0],
+  ['-90', '180', -90, 180], [' 37.7749 ', '-122.4194', 37.7749, -122.4194],
+  ['200', '-500', null, null], [true, false, null, null],
+  [[], {}, null, null], ['Infinity', 'not a coordinate', null, null],
+]) {
+  const result = await invoke(events, request('POST', { ...eventBody, latitude, longitude }));
+  assert.equal(result.status, 200, 'an invalid optional coordinate must not discard the alert');
+  assert.equal(insertedEvent.latitude, expectedLatitude);
+  assert.equal(insertedEvent.longitude, expectedLongitude);
+  assert.equal(insertedEvent.fatigue_score, 100, 'score clamping retains its existing contract');
+  assert.equal(insertedEvent.confidence, 0, 'confidence clamping retains its existing contract');
+}
 
 const eventWithoutLocation = await invoke(events, request("POST", {
   session_id: "00000000-0000-4000-8000-000000000001",
@@ -902,7 +919,7 @@ for (const [index, invalidFields] of [
 
 const unavailableRateLimit = loadHandler("../api/pilot-leads.js", async (table) => {
   assert.equal(table, "rpc/check_pilot_lead_rate_limit");
-  throw new Error("rate store offline");
+  throw Object.assign(new Error("supabase_unavailable"), { provider: "supabase", status: 503 });
 });
 const unavailableRateResult = await invoke(unavailableRateLimit, request("POST", validLead, "203.0.113.23"));
 assert.equal(unavailableRateResult.status, 503, "pilot contact writes must fail closed if durable throttling is unavailable");
@@ -1182,7 +1199,7 @@ try {
  const writesBeforeTimeout = writes;
  lostReply = true;
  const uncertain = await invoke(persistedStarts, request("POST", { session_id: uncertainId }));
- assert.equal(uncertain.status, 502, "a lost insert reply remains an upstream failure");
+ assert.equal(uncertain.status, 504, "a lost insert reply reports its known deadline");
  assert.equal(writes, writesBeforeTimeout + 1, "an uncertain write must never trigger an automatic insert retry");
  const recovered = await invoke(persistedStarts, { ...request("GET"), query: { session_id: uncertainId } });
  assert.equal(recovered.status, 200);assert.equal(recovered.body.session.id, uncertainId);

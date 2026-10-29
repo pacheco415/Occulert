@@ -190,7 +190,7 @@ for (const status of [200, 401]) {
       if (url.endsWith('/api/events')) { started.resolve(); return result.promise; }
       return response(200, token('new'));
     };
-    const pending = f.api.logCloudAlert('old-session', 40);
+    const pending = f.api.logCloudAlert('session', 40);
     await started.promise;
     assert.equal((await f.api.signInToCloud('new@example.com', 'password')).ok, true);
     result.resolve(response(status, {}));
@@ -199,6 +199,46 @@ for (const status of [200, 401]) {
     assert.equal(f.requests.some(r => r.url.includes('grant_type=refresh_token')), false);
   });
 }
+
+test('native alert scopes do not revive after sharing is disabled and re-enabled', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  const oldSession = await f.api.beginCloudSession();
+  assert.equal(oldSession, 'session');
+  assert.equal(await f.api.setCloudSyncEnabled(false), true);
+  assert.equal(await f.api.setCloudSyncEnabled(true), true);
+  assert.equal(await f.api.logCloudAlert(oldSession, 40), false);
+  assert.equal(f.requests.filter(r => r.url.endsWith('/api/events')).length, 0);
+  // A newly started session under the renewed consent can still send.
+  const transport = f.transport;
+  f.transport = (url, options) => url.endsWith('/api/sessions') && options.method === 'POST'
+    ? response(200, { session: { id: 'new-session' } }) : transport(url, options);
+  const newSession = await f.api.beginCloudSession();
+  assert.equal(newSession, 'new-session');
+  assert.equal(await f.api.logCloudAlert(oldSession, 40), false);
+  assert.equal(await f.api.logCloudAlert(newSession, 50), true);
+  assert.equal(f.requests.filter(r => r.url.endsWith('/api/events')).length, 1);
+});
+
+test('native alerts reject unknown and previous-account session identities', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  assert.equal(await f.api.logCloudAlert('unknown-session', 40), false);
+  assert.equal((await f.api.signInToCloud('new@example.com', 'password')).ok, true);
+  assert.equal(await f.api.setCloudSyncEnabled(true), true);
+  assert.equal(await f.api.logCloudAlert('session', 40), false);
+  assert.equal(f.requests.filter(r => r.url.endsWith('/api/events')).length, 0);
+});
+
+test('signing back into the same account cannot authorize its prior session alerts', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  await f.api.signOutOfCloud();
+  const transport = f.transport;
+  f.transport = (url, options) => url.includes('grant_type=password')
+    ? response(200, token('old')) : transport(url, options);
+  assert.equal((await f.api.signInToCloud('old@example.com', 'password')).ok, true);
+  assert.equal(await f.api.setCloudSyncEnabled(true), true);
+  assert.equal(await f.api.logCloudAlert('session', 40), false);
+  assert.equal(f.requests.filter(r => r.url.endsWith('/api/events')).length, 0);
+});
 
 test('stalled session-finalization body returns failure within its deadline', async () => {
   const f = cloudFixture(auth('old', 4000000000), { consent: true }), started = deferred(), late = deferred();

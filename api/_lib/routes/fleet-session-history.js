@@ -2,6 +2,7 @@
 // Cursors exclude newer ordering tuples but are not transactional snapshots:
 // concurrent edits/deletions can still change the visible history.
 const { pgFetch, verifyAccessToken, bearerToken } = require('../supabase');
+const { supabaseErrorStatus } = require('../supabase-errors');
 const { requestHistoryQuery, encodeCursor, validTimestamp, validTuple, compareTuples, compareTimestamps, isUuid } = require('../fleet-history-cursor');
 const PAGE_SIZE = 50;
 const SESSION_SELECT = 'id,driver_id,started_at,ended_at,average_fatigue,max_fatigue,safety_score,alert_count,head_nod_count,detector_pipeline,detector_version,app_version';
@@ -94,9 +95,12 @@ module.exports = async function handler(request, response) {
         roster.some(driver => !driver || !isUuid(driver.id) || typeof driver.name !== 'string')) throw invalidResponse();
     let driverFilterComplete = roster.length <= 1000;
     const driverOptions = roster.slice(0, 1000).map(driver => ({ id: driver.id, name: driver.name.slice(0, 80) }));
-    if (filters.driver_id && !roster.some(driver => driver.id.toLowerCase() === filters.driver_id.toLowerCase())) {
+    if (filters.driver_id && !driverOptions.some(driver => driver.id.toLowerCase() === filters.driver_id.toLowerCase())) {
       // A capped selector is not proof that a driver is outside this fleet.
-      const exact = await pgFetch('drivers', { params: { select: 'id,name', fleet_id: 'eq.' + fleet.id,
+      // The 1,001st roster row is only a truncation look-ahead, but may be
+      // the selected driver after roster ordering changes between requests.
+      const knownDriver = roster.find(driver => driver.id.toLowerCase() === filters.driver_id.toLowerCase());
+      const exact = knownDriver ? [knownDriver] : await pgFetch('drivers', { params: { select: 'id,name', fleet_id: 'eq.' + fleet.id,
         id: 'eq.' + filters.driver_id, limit: '1' } });
       if (!Array.isArray(exact) || exact.length > 1) throw invalidResponse();
       if (!exact.length) return json(response, 400, { ok: false, error: 'invalid_driver' });
@@ -200,7 +204,7 @@ module.exports = async function handler(request, response) {
     if (error && ['invalid_query', 'invalid_cursor'].includes(error.code)) {
       return json(response, 400, { ok: false, error: error.code });
     }
-    return json(response, 502, { ok: false,
+    return json(response, supabaseErrorStatus(error), { ok: false,
       error: error && error.code === 'fleet_history_invalid_response'
         ? 'fleet_history_invalid_response' : 'fleet_history_unavailable' });
   }

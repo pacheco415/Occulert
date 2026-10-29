@@ -49,6 +49,7 @@
     "test:static-server",
     "test:auth-races",
     "test:auth-link-confirmation",
+    "test:single-flight-refresh",
     "test:supabase-transport",
     "test:native-async-reliability",
     "test:fleet-invitations",
@@ -69,6 +70,7 @@
     "test:migration-grants",
     "test:asset-lineage",
     "test:workflow-policy",
+    "test:browser-retry-report",
     "test:deployment-ignore",
     "audit:sitemap",
     "test:sitemap",
@@ -83,12 +85,16 @@
     "test:db-baseline",
     "audit:source-assets",
     "test:source-release",
+    "test:asset-paths",
     "test:history-model",
     "build",
     "lint:source",
     "typecheck:source",
     "test:driver-build",
-    "test:asset-retirement"
+    "test:asset-retirement",
+    "test:event-outbox",
+    "test:event-idempotency",
+    "test:offline-cache-diagnostics"
   ],
   "additionalChecks": [
     "test:verify-runner"

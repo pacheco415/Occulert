@@ -50,7 +50,7 @@ test('actual session route stops before a mutation after earlier provider work e
  });
  const response=b.response();response.end=value=>{response.body=JSON.parse(value)};
  await route.exports({method:'POST',headers:{authorization:'Bearer '+legacyToken(),'content-type':'application/json'},body:{driver_id:'attacker-driver',fleet_id:'attacker-fleet'}},response);
- assert.equal(response.statusCode,502);assert.deepEqual(response.body,{ok:false,error:'supabase_error'});
+ assert.equal(response.statusCode,504);assert.deepEqual(response.body,{ok:false,error:'supabase_error'});
  assert.equal(response.headers['Cache-Control'],'no-store');assert.equal(response.headers['X-Occulert-Request-ID'],'fixture-request-1');
  assert.equal(calls.length,2);assert.ok(calls.every(call=>call.options.method===undefined||call.options.method==='GET'));
  assert.equal(b.logs.length,1);assert.equal(JSON.parse(b.logs[0]).requestId,response.headers['X-Occulert-Request-ID']);

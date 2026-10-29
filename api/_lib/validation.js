@@ -8,6 +8,13 @@ function numberOrNull(value, min, max) {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : null;
 }
+// Coordinates outside their real range are unknown, never a clamped location.
+function strictNumberOrNull(value, min, max) {
+  if (!['number','string'].includes(typeof value)) return null;
+  if (typeof value === 'string' && !value.trim()) return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= min && number <= max ? number : null;
+}
 function integerOrNull(value) {
   const count = numberOrNull(value, 0, 10000);
   return count === null ? null : Math.round(count);
@@ -29,4 +36,4 @@ function jsonObjectWithinLimit(body, maxLength) {
 function validJsonBody(request, maxLength = 4096) {
   return isJsonMediaType(request) && jsonObjectWithinLimit(request.body, maxLength);
 }
-module.exports = { isUuid, numberOrNull, integerOrNull, isJsonMediaType, isJsonObject, jsonObjectWithinLimit, validJsonBody };
+module.exports = { isUuid, numberOrNull, strictNumberOrNull, integerOrNull, isJsonMediaType, isJsonObject, jsonObjectWithinLimit, validJsonBody };

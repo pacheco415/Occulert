@@ -3,6 +3,7 @@
 // Returns 501 when the required Supabase environment is not configured.
 
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
@@ -116,7 +117,7 @@ includes_raw_motion: false,
 },
 });
 } catch (error) {
-return json(response, 502, { ok: false, error: "supabase_error" });
+return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });
 }
 };
 
