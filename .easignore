@@ -1,0 +1,103 @@
+# Archive only the native project and its single canonical shared engine.
+/*
+!/native-app
+!/lib
+/lib/*
+!/lib/event-outbox.ts
+
+# EAS replaces .gitignore. Keep every original exclusion after the inclusions.
+# Local environment files
+.env
+.env.local
+
+# Dependencies
+node_modules/
+native-app/node_modules/
+
+# Downloaded browser binaries (Playwright installs to its own cache, not here)
+chromedriver/
+.cache/ms-playwright/
+
+# Expo / React Native build artifacts
+.expo/
+native-app/.expo/
+native-app/ios/
+native-app/android/
+native-app/targets/occulert-watch/Assets.xcassets/
+native-app/targets/occulert-watch/Info.plist
+dist/
+web-build/
+playwright-report/
+test-results/
+*.jks
+*.p8
+*.p12
+credentials.json
+*.key
+*.mobileprovision
+*.orig.*
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Benchmark data derived from licensed datasets. The example config is tracked;
+# the real one names a dataset and licence and must never be committed, and
+# neither may any prepared EAR table, manifest, or result file.
+benchmark/dataset-config.json
+benchmark/*-ear.csv
+benchmark/*-manifest.json
+benchmark/results*.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Generated dependency audit evidence.
+dependency-reports/
+.verification-receipts/
+.asset-release-*/
+build/
+
+# Also exclude the shallow Git copy and all local secret/cache variants.
+.git
+**/.env
+**/.env.*
+**/.npmrc
+**/.eas/
+**/.cache/
+**/node_modules/
+
+# EAS checks directory entries without a trailing slash before descending.
+# Keep these bare forms too, so ignored directories themselves are not copied.
+node_modules
+native-app/node_modules
+chromedriver
+.cache/ms-playwright
+.expo
+native-app/.expo
+native-app/ios
+native-app/android
+native-app/targets/occulert-watch/Assets.xcassets
+dist
+web-build
+playwright-report
+test-results
+.idea
+.vscode
+dependency-reports
+.verification-receipts
+.asset-release-*
+build
+**/.eas
+**/.cache

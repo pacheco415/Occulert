@@ -5,3 +5,9 @@ module.exports = {
     'react-native-watch-connectivity': { platforms: { android: null } },
   },
 };
+
+if (require('./scripts/lib/simulator-trace-profile.cjs').simulatorTraceProfile()) {
+  module.exports.dependencies['react-native-vision-camera-face-detector'] = {
+    platforms: { ios: null, android: null },
+  };
+}

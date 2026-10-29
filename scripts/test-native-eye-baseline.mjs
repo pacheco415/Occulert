@@ -46,7 +46,7 @@ test('actual monitor callback discards a late baseline save after preview cancel
 });
 test('actual monitor cloud initialization remains disabled in experimental builds',()=>{
  const monitor=readFileSync(new URL('../native-app/app/monitor.tsx',import.meta.url),'utf8');const assignment=monitor.match(/cloudSessionRef\.current = EYE_BASELINE_EXPERIMENT[^;]*;/)?.[0];assert.ok(assignment);
- for(const enabled of [true,false]){let calls=0;const context={cloudSessionRef:{current:null},EYE_BASELINE_EXPERIMENT:enabled,beginCloudSession:()=>{calls++;return Promise.resolve('normal-session')}};vm.runInNewContext(assignment,context);assert.equal(calls,enabled?0:1)}
+ for(const enabled of [true,false])for(const simulator of [true,false]){let calls=0;const context={cloudSessionRef:{current:null},EYE_BASELINE_EXPERIMENT:enabled,SIMULATOR_TRACE:simulator,beginCloudSession:()=>{calls++;return Promise.resolve('normal-session')}};vm.runInNewContext(assignment,context);assert.equal(calls,enabled||simulator?0:1)}
 });
 
 test('actual completed records identify only experimental sessions and their frozen baseline',async()=>{
