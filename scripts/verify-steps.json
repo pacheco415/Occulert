@@ -85,6 +85,7 @@
     "test:db-baseline",
     "audit:source-assets",
     "test:source-release",
+    "test:asset-paths",
     "test:history-model",
     "build",
     "lint:source",
