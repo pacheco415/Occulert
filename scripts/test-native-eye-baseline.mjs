@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
@@ -38,19 +39,19 @@ test('device storage validates saved versions and never stores raw eye samples',
 });
 
 test('actual monitor callback discards a late baseline save after preview cancellation',async()=>{
- const monitor=readFileSync(new URL('../native-app/app/monitor.tsx',import.meta.url),'utf8');const start=monitor.indexOf('  const onEyeState = useCallback('),end=monitor.indexOf('\n  const onEyeStateJS',start);assert.ok(start>=0&&end>start);
- let now=0,release;const pending=new Promise(resolve=>{release=resolve});const applied=[],messages=[],busy=[];const generation={current:0};const context={saveCompletedNativeSession,useCallback:fn=>fn,EYE_BASELINE_EXPERIMENT:true,baselineLoaded:true,eyeBaseline:null,baselineCanSaveRef:{current:true},baselineFinishedRef:{current:false},baselineCollectorRef:{current:new ParkedEyeBaseline()},baselineGenerationRef:generation,baselineBusyRef:{current:false},baselineMountedRef:{current:true},setupPreviewActiveRef:{current:true},isRunningRef:{current:false},lastCameraSetupUiAtRef:{current:0},CAMERA_SETUP_UI_INTERVAL_MS:0,assessCameraSetup:()=>({ready:true,state:'ready'}),performance:{now:()=>now},setBaselineMessage:value=>messages.push(value),setBaselineBusy:value=>busy.push(value),setEyeBaseline:value=>applied.push(value),setCameraSetup:()=>{},saveDeviceEyeBaseline:()=>pending,processEyeOpenness:()=>{},processNoFace:()=>{},Date:{now:()=>now}};
+ const monitor=readNativeMonitorSourceOwners().analysis;const start=monitor.indexOf('  const onEyeState = useCallback('),end=monitor.indexOf('\n  const onEyeStateJS',start);assert.ok(start>=0&&end>start);
+ let now=0,release;const pending=new Promise(resolve=>{release=resolve});const applied=[],messages=[],busy=[];const generation={current:0};const context={recordCloudAlertTransition:()=>assert.fail('parked baseline samples cannot emit cloud alerts'),saveCompletedNativeSession,useCallback:fn=>fn,EYE_BASELINE_EXPERIMENT:true,baselineLoaded:true,eyeBaseline:null,baselineCanSaveRef:{current:true},baselineFinishedRef:{current:false},baselineCollectorRef:{current:new ParkedEyeBaseline()},baselineGenerationRef:generation,baselineBusyRef:{current:false},baselineMountedRef:{current:true},setupPreviewActiveRef:{current:true},isRunningRef:{current:false},lastCameraSetupUiAtRef:{current:0},CAMERA_SETUP_UI_INTERVAL_MS:0,assessCameraSetup:()=>({ready:true,state:'ready'}),performance:{now:()=>now},setBaselineMessage:value=>messages.push(value),setBaselineBusy:value=>busy.push(value),setEyeBaseline:value=>applied.push(value),setCameraSetup:()=>{},saveDeviceEyeBaseline:()=>pending,processEyeOpenness:()=>{},processNoFace:()=>{},Date:{now:()=>now}};
  vm.runInNewContext(stripTypeScriptTypes(monitor.slice(start,end))+'\nglobalThis.onSample=onEyeState;',context);
  for(let i=0;i<=21;i++){now=i*3000/21;context.onSample(.9,.9,true,0,0,0,1,1,1,10,10,100,100)}
  assert.equal(context.baselineBusyRef.current,true);generation.current+=1;context.setupPreviewActiveRef.current=false;context.isRunningRef.current=true;release();await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(applied,[]);assert.equal(context.baselineBusyRef.current,false);assert.deepEqual(busy,[true,false]);
 });
 test('actual monitor cloud initialization remains disabled in experimental builds',()=>{
- const monitor=readFileSync(new URL('../native-app/app/monitor.tsx',import.meta.url),'utf8');const assignment=monitor.match(/cloudSessionRef\.current = EYE_BASELINE_EXPERIMENT[^;]*;/)?.[0];assert.ok(assignment);
+ const monitor=readNativeMonitorSourceOwners().screen;const assignment=monitor.match(/cloudSessionRef\.current = EYE_BASELINE_EXPERIMENT[^;]*;/)?.[0];assert.ok(assignment);
  for(const enabled of [true,false]){let calls=0;const context={cloudSessionRef:{current:null},EYE_BASELINE_EXPERIMENT:enabled,beginCloudSession:()=>{calls++;return Promise.resolve('normal-session')}};vm.runInNewContext(assignment,context);assert.equal(calls,enabled?0:1)}
 });
 
 test('actual completed records identify only experimental sessions and their frozen baseline',async()=>{
- const source=readFileSync(new URL('../native-app/app/monitor.tsx',import.meta.url),'utf8'),start=source.indexOf('  const saveSession = useCallback('),end=source.indexOf('  const markSessionSynced',start);assert.ok(start>=0&&end>start);
+ const source=readNativeMonitorSourceOwners().screen,start=source.indexOf('  const saveSession = useCallback('),end=source.indexOf('  const markSessionSynced',start);assert.ok(start>=0&&end>start);
  for(const enabled of [false,true]){let saved;const context={saveCompletedNativeSession,useCallback:fn=>fn,EYE_BASELINE_EXPERIMENT:enabled,sessionEyeBaselineRef:{current:.9},fatigueSamplesRef:{current:2},fatigueSumRef:{current:20},headNodObservationsRef:{current:0},headphoneHeadNodObservationsRef:{current:0},headphoneMotionSamplesRef:{current:0},headphoneMotionStatusRef:{current:'not-built'},sensorFusionTrackerRef:{current:{snapshot:()=>({})}},sessionSensitivityRef:{current:'medium'},currentAppBuildInfo:()=>({appVersion:'fixture'}),updateSessionHistory:async update=>{saved=update([])[0]}};
  vm.runInNewContext(stripTypeScriptTypes(source.slice(start,end))+'\nglobalThis.save=saveSession;',context);await context.save('local',60,0,{},3000);
  if(enabled)assert.deepEqual(JSON.parse(JSON.stringify(saved.eyeBaselineExperiment)),{version:1,baseline:.9});else assert.equal(Object.hasOwn(saved,'eyeBaselineExperiment'),false);

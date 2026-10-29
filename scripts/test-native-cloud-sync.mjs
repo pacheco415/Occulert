@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 
 const cloud = read('native-app/lib/cloudSync.ts');
-const monitor = read('native-app/app/monitor.tsx');
+const monitorOwners = readNativeMonitorSourceOwners();
+const monitor = monitorOwners.screen;
 const settings = read('native-app/app/settings.tsx');
 const historyOwners = readHistorySourceOwners(read);
   const history = historyOwners.screen;
@@ -182,18 +184,18 @@ assert.doesNotMatch(
 );
 
 assert.match(monitor, /beginCloudSession\(\)/);
-assert.match(monitor, /logCloudAlert\(sessionId, result\.fatigueScore, occurredAt\)/);
+assert.match(monitorOwners.cloud, /logCloudAlert\(sessionId, result\.fatigueScore, occurredAt\)/);
 const completion = read('native-app/lib/sessionCompletion.ts');
 assert.match(monitor, /finalizeCompletedNativeSession/);
 assert.match(monitor, /finish: finishCloudSession/);
 assert.match(completion, /services\.finish\(cloudId/);
 assert.match(completion, /cloudSynced: true/);
 assert.match(
-  monitor,
+  monitorOwners.analysis,
   /if \(!isRunningRef\.current \|\| stoppingRef\.current\) return;/,
   'late frame callbacks must not mutate a stopped monitoring session',
 );
-assert.match(monitor, /headNodObservationsRef\.current \+= 1/);
+assert.match(monitorOwners.analysis, /headNodObservationsRef\.current \+= 1/);
 assert.match(cloud, /Candidate head-nod observations remain local until device validation/);
 assert.match(settings, /<CloudSyncCard \/>/);
 assert.match(historyOwners.review, /This alert rating stays only on this iPhone/);
@@ -415,6 +417,7 @@ for (const wait of ['session creation', 'an earlier event']) {
     const f = signOutFixture(), pending = deferred();
     const detectedAt = Date.parse('2026-10-28T20:00:00.000Z');
     const queue = { current: wait === 'an earlier event' ? pending.promise : Promise.resolve() };
+    const monitor = monitorOwners.cloud;
     const from = monitor.indexOf("    const alerting = result.state === 'closed';");
     const to = monitor.indexOf('    prevAlertingRef.current = alerting;', from);
     assert.ok(from >= 0 && to > from, 'exercise the production monitor alert transition');

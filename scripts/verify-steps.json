@@ -6,6 +6,7 @@
     "test:api",
     "test:client",
     "test:native-cloud",
+  "test:native-monitor-models",
     "test:session-history-data",
     "test:high-fixes",
     "test:remaining-fixes",
