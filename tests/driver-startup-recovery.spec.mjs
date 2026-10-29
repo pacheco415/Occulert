@@ -4,6 +4,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse, serialize } from 'parse5';
+import { observePageLoads } from './helpers/page-load-diagnostics.mjs';
+import { recordOfflineCacheSnapshot } from './helpers/offline-cache-diagnostics.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
 const assets = JSON.parse(readFileSync(resolve(root, 'asset-versions.json'), 'utf8'));
@@ -361,9 +363,10 @@ test('busy core initialization cannot bypass the startup deadline before the tim
 
 test.describe('cached complete driver startup', () => {
   test.use({ serviceWorkers: 'allow' });
-  test('the verified offline shell still initializes without camera or cloud access', async ({ page }) => {
+  test('the verified offline shell still initializes without camera or cloud access', async ({ page }, testInfo) => {
     test.setTimeout(45_000);
     await installPrivacyProbe(page);
+    const diagnostics = await observePageLoads(page);
     const state = { offline: false, guardTampered: false };
     const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json' };
     const server = createServer((request, response) => {
@@ -375,6 +378,7 @@ test.describe('cached complete driver startup', () => {
       response.setHeader('Content-Type', types[extname(file)] || 'application/octet-stream');
       response.end(state.guardTampered && path === '/'+assets['driver-startup-guard.js'] ? 'window.__tamperedNetworkGuardExecuted=true;' : readFileSync(file));
     });
+    diagnostics.observeServer(server, () => ({ offline: state.offline, guardTampered: state.guardTampered }));
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const origin = `http://127.0.0.1:${server.address().port}`;
     try {
@@ -389,17 +393,27 @@ test.describe('cached complete driver startup', () => {
       await expect(page.locator('#startBtn')).toBeEnabled();
       expect(await page.evaluate(()=>window.__tamperedNetworkGuardExecuted)).toBeUndefined();
       expect(await page.evaluate(async path=>(await caches.match(path)).text(),'/'+assets['driver-startup-guard.js'])).toBe(guardSource);
+      await recordOfflineCacheSnapshot(page, diagnostics, 'before-offline');
+      diagnostics.record('offline-transition');
       state.offline = true;
       await page.goto(origin + '/app.html', { waitUntil: 'domcontentloaded' });
       await expect(page.locator('#startBtn')).toBeEnabled();
       await expect(page.locator('#startBtn')).toHaveText(/START MONITORING/i);
       expect(await page.evaluate(() => typeof initModel)).toBe('function');
       await expectNoPermissionedWork(page);
-    } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+    } catch (error) {
+      await recordOfflineCacheSnapshot(page, diagnostics, 'after-failure');
+      await diagnostics.attach(testInfo, 'offline-startup-diagnostics');
+      throw error;
+    } finally {
+      diagnostics.stop();
+      server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+    }
   });
-  test('a corrupted offline guard cannot enable the cached complete driver', async ({ page }) => {
+  test('a corrupted offline guard cannot enable the cached complete driver', async ({ page }, testInfo) => {
     test.setTimeout(45_000);
     await installPrivacyProbe(page);
+    const diagnostics = await observePageLoads(page);
     const state = { offline: false };
     const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json' };
     const server = createServer((request, response) => {
@@ -411,6 +425,7 @@ test.describe('cached complete driver startup', () => {
       response.setHeader('Content-Type', types[extname(file)] || 'application/octet-stream');
       response.end(readFileSync(file));
     });
+    diagnostics.observeServer(server, () => ({ offline: state.offline }));
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const origin = `http://127.0.0.1:${server.address().port}`;
     try {
@@ -425,12 +440,21 @@ test.describe('cached complete driver startup', () => {
         const cache=await caches.open(cacheName);
         await cache.put(guardPath,new Response('window.__corruptedGuardExecuted=true;',{headers:{'Content-Type':'text/javascript'}}));
       },'/'+assets['driver-startup-guard.js']);
+      await recordOfflineCacheSnapshot(page, diagnostics, 'before-offline-corrupted-guard');
+      diagnostics.record('offline-transition');
       state.offline = true;
       await page.goto(origin + '/app.html', { waitUntil: 'domcontentloaded' });
       await expect(page.locator('#startupRetryLink')).toBeVisible();
       await expectCoreGuards(page);
       expect(await page.evaluate(()=>({guard:typeof window.OcculertStartup,corrupted:window.__corruptedGuardExecuted,core:Object.isFrozen(window.OcculertDriverCore)}))).toEqual({guard:'undefined',corrupted:undefined,core:true});
       await expectNoPermissionedWork(page);
-    } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+    } catch (error) {
+      await recordOfflineCacheSnapshot(page, diagnostics, 'after-failure');
+      await diagnostics.attach(testInfo, 'offline-corrupted-guard-diagnostics');
+      throw error;
+    } finally {
+      diagnostics.stop();
+      server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+    }
   });
 });
