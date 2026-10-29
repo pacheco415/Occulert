@@ -93,7 +93,8 @@
     "test:asset-retirement",
     "test:event-outbox",
     "test:event-idempotency",
-    "test:offline-cache-diagnostics"
+    "test:offline-cache-diagnostics",
+    "test:stale-branches"
   ],
   "additionalChecks": [
     "test:verify-runner"

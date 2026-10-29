@@ -1,34 +1,158 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 
-const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }).trim();
-const outputDir = resolve(process.argv.find(arg => arg.startsWith('--output='))?.slice(9) || resolve(tmpdir(), 'occulert-branch-review'));
-const base = 'origin/main';
-git('rev-parse', '--verify', base);
-const prs = new Map();
-if (process.argv.includes('--github')) {
-  const repo = process.env.GITHUB_REPOSITORY || 'pacheco415/Occulert';
-  const rows = JSON.parse(execFileSync(process.env.GH_BIN || 'gh', ['pr', 'list', '--repo', repo, '--state', 'closed', '--limit', '1000', '--json', 'number,headRefName'], { encoding: 'utf8', timeout: 30000, maxBuffer: 4 * 1024 * 1024 }));
-  for (const row of rows) if (!prs.has(row.headRefName)) prs.set(row.headRefName, row.number);
-}
-const refs = git('for-each-ref', '--format=%(refname)', 'refs/remotes/origin').split('\n').filter(ref => ref && ref !== 'refs/remotes/origin/main' && ref !== 'refs/remotes/origin/HEAD').map(ref => ref.replace('refs/remotes/', ''));
-const records = refs.map(ref => {
-  const branch = ref.slice('origin/'.length);
-  const ancestor = git('merge-base', base, ref);
-  const paths = execFileSync('git', ['diff', '--name-only', '-z', ancestor, ref], { encoding: 'utf8' }).split('\0').filter(Boolean);
-  // Compare every changed path, including deletion and binary blobs. Main's
-  // later edits may produce conservative false negatives; never infer deletion
-  // eligibility from PR closure or commit messages alone.
-  const contained = paths.every(path => git('ls-tree', ref, '--', path) === git('ls-tree', base, '--', path));
-  return { branch, contained, date: git('show', '-s', '--format=%cI', ref), pr: prs.get(branch) };
+const defaultRepository = 'pacheco415/Occulert';
+const git = (cwd, ...args) => execFileSync('git', args, {
+  cwd, encoding: 'utf8', timeout: 30000, maxBuffer: 8 * 1024 * 1024,
+  stdio: ['ignore', 'pipe', 'pipe'],
 });
-const escape = value => String(value).replaceAll('|', '\\|').replaceAll('\n', ' ');
-const table = ['# Remote branch inventory', '', `Base commit: ${git('rev-parse', base)}`, '', 'Containment compares changed paths with main. Review before using the proposal. Remote refs are read as fetched; this script does not fetch or delete.', '', '| Branch | Changes contained | Last commit | Closed PR |', '| --- | --- | --- | --- |', ...records.map(row => `| ${escape(row.branch)} | ${row.contained ? 'yes' : 'not proven'} | ${row.date} | ${row.pr ? '#' + row.pr : 'unknown'} |`)].join('\n') + '\n';
+const markdown = value => String(value).replaceAll('|', '\\|').replaceAll('\n', ' ').replaceAll('\r', ' ');
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
-const proposal = ['#!/bin/sh', '# Review-only proposal. This script was generated but has not been executed.', '# Refetch and recheck containment before deleting remote branches.', 'set -eu', ...records.filter(row => row.contained).map(row => `git push origin --delete ${quote(row.branch)}`)].join('\n') + '\n';
-mkdirSync(outputDir, { recursive: true });
-writeFileSync(resolve(outputDir, 'stale-branches.md'), table);
-writeFileSync(resolve(outputDir, 'proposed-branch-deletions.sh'), proposal);
-console.log(`Reviewed ${records.length} remote branches; ${records.filter(row => row.contained).length} conservatively contained. Wrote inventory and an unexecuted proposal to ${outputDir}.`);
+
+export function validatePullRequestSnapshot(snapshot, repository) {
+  if (snapshot?.schemaVersion !== 1 || snapshot.complete !== true
+    || snapshot.repository?.toLowerCase() !== repository.toLowerCase()
+    || !Number.isFinite(Date.parse(snapshot.capturedAt)) || !Array.isArray(snapshot.pullRequests)) {
+    throw new Error('A complete, dated open-pull-request snapshot for this repository is required.');
+  }
+  const numbers = new Set();
+  for (const pr of snapshot.pullRequests) {
+    if (!Number.isSafeInteger(pr.number) || pr.number <= 0 || numbers.has(pr.number)
+      || pr.state !== 'open' || typeof pr.headRefName !== 'string' || !pr.headRefName
+      || !(pr.headRepository === null || typeof pr.headRepository === 'string')
+      || !/^[a-f0-9]{40}$/.test(pr.headSha) || typeof pr.url !== 'string'
+      || pr.url !== `https://github.com/${repository}/pull/${pr.number}`) {
+      throw new Error('Malformed or duplicate open-pull-request record.');
+    }
+    numbers.add(pr.number);
+  }
+  return snapshot;
+}
+
+export function loadGithubSnapshot(repository, snapshotPath) {
+  if (snapshotPath) return validatePullRequestSnapshot(JSON.parse(readFileSync(snapshotPath, 'utf8')), repository);
+  // API pagination has no fixed PR-count ceiling. --slurp preserves pages.
+  const pages = JSON.parse(execFileSync(process.env.GH_BIN || 'gh', [
+    'api', '--paginate', '--slurp', `repos/${repository}/pulls?state=open&per_page=100`,
+  ], { encoding: 'utf8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 }));
+  if (!Array.isArray(pages) || !pages.length || pages.some(page => !Array.isArray(page))) {
+    throw new Error('GitHub did not return paginated open-pull-request data.');
+  }
+  return validatePullRequestSnapshot({
+    schemaVersion: 1, repository, capturedAt: new Date().toISOString(),
+    source: 'GitHub CLI paginated REST open pull requests', complete: true,
+    pullRequests: pages.flat().map(pr => ({
+      number: pr.number, title: pr.title, state: pr.state, url: pr.html_url,
+      headRefName: pr.head?.ref, headRepository: pr.head?.repo?.full_name ?? null,
+      headSha: pr.head?.sha,
+    })),
+  }, repository);
+}
+
+function containment(cwd, head, main) {
+  try {
+    try {
+      git(cwd, 'merge-base', '--is-ancestor', head, main);
+      return 'merged ancestry';
+    } catch (error) { if (error.status !== 1) throw error; }
+    const bases = git(cwd, 'merge-base', '--all', main, head).trim().split('\n').filter(Boolean);
+    if (bases.length !== 1) return 'not proven';
+    const paths = git(cwd, 'diff', '--no-renames', '--name-only', '-z', bases[0], head, '--').split('\0').filter(Boolean);
+    if (!paths.length) return 'matching change snapshot';
+    // Literal NUL-delimited tree entries compare modes, binary/symlink blobs,
+    // additions and absence, including both sides of a rename.
+    const pathspecs = paths.map(path => `:(literal)${path}`);
+    return git(cwd, 'ls-tree', '-rz', '--full-tree', head, '--', ...pathspecs)
+      === git(cwd, 'ls-tree', '-rz', '--full-tree', main, '--', ...pathspecs)
+      ? 'matching change snapshot' : 'not proven';
+  } catch {
+    return 'not proven';
+  }
+}
+
+export function collectInventory({ cwd = process.cwd(), repository = defaultRepository,
+  prSnapshot = null, observedAt = new Date().toISOString() } = {}) {
+  if (prSnapshot) validatePullRequestSnapshot(prSnapshot, repository);
+  // Analyze captured immutable SHAs even if a concurrent fetch moves a ref.
+  const main = git(cwd, 'rev-parse', '--verify', 'refs/remotes/origin/main^{commit}').trim();
+  const refs = git(cwd, 'for-each-ref', '--format=%(refname)%00%(objectname)%00%(committerdate:iso-strict)',
+    'refs/remotes/origin').trim().split('\n').filter(Boolean);
+  const records = refs.map(line => line.split('\0')).filter(([ref]) =>
+    ref !== 'refs/remotes/origin/main' && ref !== 'refs/remotes/origin/HEAD')
+    .map(([ref, head, date]) => {
+      const branch = ref.slice('refs/remotes/origin/'.length);
+      const openPrs = (prSnapshot?.pullRequests || []).filter(pr =>
+        (pr.headRepository === null || pr.headRepository.toLowerCase() === repository.toLowerCase())
+          && pr.headRefName === branch);
+      const evidence = containment(cwd, head, main);
+      return { branch, head, date, evidence, openPrs,
+        // Snapshot equivalence may still hide unique commits. Only proven
+        // ancestry with complete open-PR metadata gets a review proposal.
+        proposed: Boolean(prSnapshot) && !openPrs.length && evidence === 'merged ancestry' };
+    }).sort((a, b) => a.branch.localeCompare(b.branch, 'en'));
+  return { repository, main, observedAt, prSnapshot, records };
+}
+
+export function renderInventory({ repository, main, observedAt, prSnapshot, records }) {
+  const proposed = records.filter(row => row.proposed);
+  const table = [
+    '# Remote branch inventory', '',
+    `Observed: ${observedAt}. Base: \`${main}\` (fetched origin/main).`, '',
+    `Remote branches other than main: **${records.length}**. Commented review proposals: **${proposed.length}**.`, '',
+    prSnapshot ? `Open PR snapshot: ${prSnapshot.capturedAt}; ${prSnapshot.pullRequests.length} open PRs, complete pagination. See [snapshot](open-pull-requests.json).`
+      : 'Open PR membership is unavailable. No deletion proposals are generated.', '',
+    '`merged ancestry` means every branch commit is reachable from captured main, even if main later edited its files. '
+      + '`matching change snapshot` means the branch\'s net changed paths equal main (including modes and deletions); unique history may remain, so it gets no deletion proposal. '
+      + '`not proven` includes divergent files, ambiguous ancestry and Git errors.', '',
+    'Every same-repository open-PR branch is protected regardless of containment. '
+      + 'These observations are not live deletion approval. Refetch, refresh the complete open-PR snapshot and review again before any manual deletion. '
+      + 'A head lease detects branch movement but cannot detect a newly opened PR.', '',
+    'The generator reads fetched refs and never fetches or deletes branches. '
+      + 'The companion [proposal](proposed-branch-deletions.sh) contains only comments and performs no actions if run.', '',
+    'Regenerate after `git fetch --prune origin` using Node 24:', '',
+    '```sh',
+    'node scripts/list-stale-branches.mjs --github --output=docs/branch-inventory',
+    '# Without GitHub CLI: supply a fresh complete connector snapshot explicitly.',
+    'node scripts/list-stale-branches.mjs --github --github-snapshot=docs/branch-inventory/open-pull-requests.json --output=docs/branch-inventory',
+    '```', '',
+    '| Branch | Captured head | Last commit | Containment evidence | Open PRs | Review proposal |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...records.map(row => `| ${markdown(row.branch)} | [${row.head.slice(0, 12)}](https://github.com/${repository}/commit/${row.head}) | ${row.date} | ${row.evidence} | ${row.openPrs.map(pr => `[#${pr.number}](${pr.url})`).join(', ') || (prSnapshot ? 'none' : 'unknown')} | ${row.openPrs.length ? 'keep: open PR' : row.proposed ? 'review merged branch' : 'keep / inspect'} |`), '',
+  ].join('\n');
+  const proposal = [
+    '#!/bin/sh', '# REVIEW ONLY: every command is commented; running this file does nothing.',
+    `# Repository: ${repository}`, `# Observed: ${observedAt}`, `# Captured main: ${main}`,
+    '# No branches have been deleted by this generator or this proposal.',
+    '# Before any manual deletion: fetch, refresh all open PRs, rerun inventory,',
+    '# and inspect the branch. A lease alone does not protect a newly opened PR.',
+    '# Snapshot-equivalent branches with unique history are not proposed.', '',
+    ...proposed.map(row => `# git push ${quote(`--force-with-lease=refs/heads/${row.branch}:${row.head}`)} origin ${quote(`:refs/heads/${row.branch}`)}`), '',
+  ].join('\n');
+  return { table, proposal };
+}
+
+export function main(args = process.argv.slice(2)) {
+  const allowed = /^(?:--github|--output=.+|--github-snapshot=.+)$/;
+  if (args.some(arg => !allowed.test(arg))
+    || ['--output=', '--github-snapshot='].some(prefix => args.filter(arg => arg.startsWith(prefix)).length > 1)
+    || (args.some(arg => arg.startsWith('--github-snapshot=')) && !args.includes('--github'))) {
+    throw new Error('Usage: list-stale-branches.mjs [--github [--github-snapshot=path]] [--output=directory]');
+  }
+  const repository = process.env.GITHUB_REPOSITORY || defaultRepository;
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error('Invalid GitHub repository.');
+  const output = resolve(args.find(arg => arg.startsWith('--output='))?.slice(9) || resolve(tmpdir(), 'occulert-branch-review'));
+  const prSnapshot = args.includes('--github')
+    ? loadGithubSnapshot(repository, args.find(arg => arg.startsWith('--github-snapshot='))?.slice(18)) : null;
+  const inventory = collectInventory({ repository, prSnapshot });
+  const { table, proposal } = renderInventory(inventory);
+  mkdirSync(output, { recursive: true });
+  writeFileSync(resolve(output, 'stale-branches.md'), table);
+  writeFileSync(resolve(output, 'proposed-branch-deletions.sh'), proposal);
+  if (prSnapshot) writeFileSync(resolve(output, 'open-pull-requests.json'), JSON.stringify(prSnapshot, null, 2) + '\n');
+  console.log(`Reviewed ${inventory.records.length} remote branches; ${inventory.records.filter(row => row.proposed).length} merged branches proposed as comments only. Wrote ${output}.`);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main();

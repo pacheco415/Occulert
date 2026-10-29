@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "repository": "pacheco415/Occulert",
+  "capturedAt": "2026-10-29T00:08:54.788Z",
+  "source": "https://api.github.com/repos/pacheco415/Occulert/pulls?state=open&per_page=100",
+  "complete": true,
+  "pullRequests": [
+    {
+      "number": 330,
+      "title": "Plan staged relocation of immutable web build outputs",
+      "url": "https://github.com/pacheco415/Occulert/pull/330",
+      "state": "open",
+      "headRefName": "codex/build-output-plan",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "d176cf130bd8088e409fe2f1441b9bed0d7d6699"
+    },
+    {
+      "number": 324,
+      "title": "Coordinate Playwright 1.64.1 runtime and repeated offline validation",
+      "url": "https://github.com/pacheco415/Occulert/pull/324",
+      "state": "open",
+      "headRefName": "codex/playwright-runtime-upgrade",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "1a14deee56bf07a9eb833fcf4b1221ec9401f24d"
+    },
+    {
+      "number": 315,
+      "title": "Send alert events with their detection time",
+      "url": "https://github.com/pacheco415/Occulert/pull/315",
+      "state": "open",
+      "headRefName": "codex/event-occurred-at",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "7c2029a7970f3c7a21bb6429fb5144b335ac4079"
+    },
+    {
+      "number": 314,
+      "title": "Cache only exact same-origin responses in the service worker",
+      "url": "https://github.com/pacheco415/Occulert/pull/314",
+      "state": "open",
+      "headRefName": "codex/sw-same-origin-cache",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "fb426f4dc392ed9263c30f0145cd6abca3b7c49e"
+    },
+    {
+      "number": 313,
+      "title": "Require an exact origin before caching runtime responses",
+      "url": "https://github.com/pacheco415/Occulert/pull/313",
+      "state": "open",
+      "headRefName": "codex/sw-exact-origin",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "6ac31a19d35e7e305bc6be35d1ad454a0adfd1d5"
+    },
+    {
+      "number": 312,
+      "title": "Refresh stale session and event API header comments",
+      "url": "https://github.com/pacheco415/Occulert/pull/312",
+      "state": "open",
+      "headRefName": "codex/api-comment-refresh",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "3f66dd0a471cefccf9118d37669c9eea8a169f70"
+    },
+    {
+      "number": 299,
+      "title": "Bump @axe-core/playwright from 4.13.0 to 4.14.0",
+      "url": "https://github.com/pacheco415/Occulert/pull/299",
+      "state": "open",
+      "headRefName": "dependabot/npm_and_yarn/axe-core/playwright-4.14.0",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "f41ad0a7524b3d7771f11bc9314db36a78d11cd0"
+    },
+    {
+      "number": 298,
+      "title": "Bump @electric-sql/pglite from 0.5.8 to 0.5.11",
+      "url": "https://github.com/pacheco415/Occulert/pull/298",
+      "state": "open",
+      "headRefName": "dependabot/npm_and_yarn/electric-sql/pglite-0.5.11",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "677369d2b68ccec30523c035e1faf29365580b00"
+    },
+    {
+      "number": 297,
+      "title": "Bump react-test-renderer from 19.3.0 to 19.3.1 in /native-app",
+      "url": "https://github.com/pacheco415/Occulert/pull/297",
+      "state": "open",
+      "headRefName": "dependabot/npm_and_yarn/native-app/react-test-renderer-19.3.1",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "714afd7da915b02eeee7e01ad97ebff3008d639c"
+    },
+    {
+      "number": 276,
+      "title": "Bump the weekly-actions group across 1 directory with 4 updates",
+      "url": "https://github.com/pacheco415/Occulert/pull/276",
+      "state": "open",
+      "headRefName": "dependabot/github_actions/weekly-actions-dc4f8b6e13",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "6a1f5648f95a8c69a2eb391cc94a25949d46b9ea"
+    },
+    {
+      "number": 273,
+      "title": "Bump @playwright/test from 1.63.0 to 1.64.1",
+      "url": "https://github.com/pacheco415/Occulert/pull/273",
+      "state": "open",
+      "headRefName": "dependabot/npm_and_yarn/playwright/test-1.64.1",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "a0ae7b17048465ea265e5c8e09650afa85579eed"
+    },
+    {
+      "number": 267,
+      "title": "Retire expired site assets and align Expo SDK 57 dependencies",
+      "url": "https://github.com/pacheco415/Occulert/pull/267",
+      "state": "open",
+      "headRefName": "codex/retire-assets-2026-10-10",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "fe047bebf503fea12d6bd430cd71353ef1c847e8"
+    },
+    {
+      "number": 263,
+      "title": "Bump typescript from 6.0.3 to 7.0.2",
+      "url": "https://github.com/pacheco415/Occulert/pull/263",
+      "state": "open",
+      "headRefName": "dependabot/npm_and_yarn/typescript-7.0.2",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "32be6310b6d04e28d66d44e17dd1780599aaf77d"
+    },
+    {
+      "number": 262,
+      "title": "Bump acorn from 8.18.0 to 8.19.0",
+      "url": "https://github.com/pacheco415/Occulert/pull/262",
+      "state": "open",
+      "headRefName": "dependabot/npm_and_yarn/acorn-8.19.0",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "075a614361c4a87487d9d7dea03209aa22de7942"
+    },
+    {
+      "number": 206,
+      "title": "Prepare confirmed fleet removal and leave actions behind a migration gate",
+      "url": "https://github.com/pacheco415/Occulert/pull/206",
+      "state": "open",
+      "headRefName": "codex/fleet-offboarding",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "95c0acd36e8c2b11856e9dc5ff28c4f32403cfbf"
+    },
+    {
+      "number": 192,
+      "title": "Prepare atomic per-user and per-session event limits behind a migration gate",
+      "url": "https://github.com/pacheco415/Occulert/pull/192",
+      "state": "open",
+      "headRefName": "codex/atomic-event-quotas",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "0ac0ab771acc25265acf5eadf4177f33b7bfcb5a"
+    }
+  ]
+}

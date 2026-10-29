@@ -108,7 +108,8 @@
     "test:asset-retirement": "node --test scripts/test-retire-assets.mjs",
     "test:event-outbox": "tsc --noEmit --strict --target ES2022 --module nodenext --moduleResolution nodenext lib/event-outbox.ts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-event-outbox.mjs",
     "test:event-idempotency": "node --test scripts/test-event-idempotency.mjs",
-    "test:offline-cache-diagnostics": "node --test scripts/test-offline-cache-diagnostics.mjs"
+    "test:offline-cache-diagnostics": "node --test scripts/test-offline-cache-diagnostics.mjs",
+    "test:stale-branches": "node --test scripts/test-stale-branches.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
