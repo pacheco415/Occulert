@@ -1,3 +1,4 @@
+import { withNativeMonitorHookBindings } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -445,7 +446,7 @@ function monitorCameraStartFixture(stage, { simulator = false, autorun = false }
   assert.ok(cutoff > source.indexOf('  const frameProcessor ='));
   const component = source.slice(0, cutoff)
     + '\nreturn {handleStart,handleStop,toggleSetupPreview,onEyeState,eyeBaseline,isRunning,baselineMessage,metrics,alertCount,simulatorPhase};\n}';
-  const api = load(component, ['MonitorScreen'], {
+  const bindings = {
     ...h.React, React: h.React, ...frontCameraPolicy, ...monitorPerformance, ...monitorLifecycle,
     ...cameraSetup, ...cameraResilience, ...captureLoadPolicy, ...monitorThresholds, ...eyeBaselineModel,
     ...sensorFusion, ...sessionCompletion, ...monitorAlertPolicy, HeadNodDetector,
@@ -483,8 +484,10 @@ function monitorCameraStartFixture(stage, { simulator = false, autorun = false }
     updateSessionHistory: async update => { f.history = update(f.history); },
     finishCloudSession: async () => { assert.fail('experimental camera sessions must remain local'); },
     beginCloudSession: () => { assert.fail('simulator and experimental camera sessions must remain local'); },
+    logCloudAlert: async () => { assert.fail('experimental camera sessions must remain local'); },
     Alert: { alert() {} }, setInterval, clearInterval,
-  });
+  };
+  const api = load(component, ['MonitorScreen'], withNativeMonitorHookBindings(bindings, load));
   f.render = () => h.render(() => api.MonitorScreen());
   f.switchToInner = () => { assert.equal(typeof f.cameraListener, 'function'); f.cameraListener(identity('inner')); };
   f.unmount = () => h.unmount();

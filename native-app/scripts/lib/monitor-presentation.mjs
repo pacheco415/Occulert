@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import ts from 'typescript';
+import { readNativeMonitorSourceOwners } from './monitor-source-owners.mjs';
 
-const source = readFileSync(new URL('../../app/monitor.tsx', import.meta.url), 'utf8');
-const stylesStart = source.lastIndexOf('const s = StyleSheet.create(');
-assert.ok(stylesStart > 0, 'read the actual monitor presentation styles');
-const context = { StyleSheet: { create: styles => styles } };
-vm.runInNewContext(source.slice(stylesStart) + '\nglobalThis.styles=s;', context, { timeout: 1000 });
-export const monitorStyles = context.styles;
+const owners = readNativeMonitorSourceOwners(), source = owners.view;
+const module = { exports: {} };
+const code = ts.transpileModule(owners.styles, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+vm.runInNewContext(code, { module, exports: module.exports, require: name => {
+  assert.equal(name, 'react-native');
+  return { StyleSheet: { create: styles => styles } };
+} }, { timeout: 1000 });
+export const monitorStyles = module.exports.monitorStyles;
 
 /** Keep the real status, camera notice and alert order in the measured fixture. */
 export function monitorGuidanceSource() {
