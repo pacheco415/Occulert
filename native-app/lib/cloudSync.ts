@@ -7,6 +7,7 @@ import { currentAppBuildInfo, formatAppBuildLabel } from './appBuildInfo';
 import { updateSessionHistory } from './sessionHistory';
 import { createSessionSummaryOutbox, type PendingSessionSummary, type SummaryScope } from './sessionSummaryOutbox';
 import { pinnedSupabaseConfig, type PinnedSupabaseConfig } from './supabaseHost';
+import { SIMULATOR_TRACE } from './simulatorTrace';
 
 const API_BASE = 'https://www.occulert.com';
 const AUTH_KEY = 'occulert.cloud.auth.v1';
@@ -110,6 +111,7 @@ async function fetchJsonWithTimeout<T>(
   url: string,
   init?: RequestInit,
 ): Promise<{ response: Response; body: T }> {
+  if (SIMULATOR_TRACE) throw new Error('Cloud transport is disabled for synthetic simulator input.');
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_resolve, reject) => {
@@ -425,6 +427,7 @@ async function currentSyncContext(): Promise<{ ownerId: string; consentVersion: 
 }
 
 export async function getCloudState(): Promise<CloudState> {
+  if (SIMULATOR_TRACE) return { readStatus: 'confirmed', available: false, signedIn: false, email: null, syncEnabled: false };
   const unavailable = (): CloudState => ({
     readStatus: 'unavailable', available: false, signedIn: false, email: null, syncEnabled: false,
   });

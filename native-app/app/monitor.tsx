@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   type CameraRuntimeError,
@@ -33,6 +33,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { EYE_BASELINE_EXPERIMENT, ParkedEyeBaseline } from '../lib/eyeBaselineModel';
 import { clearDeviceEyeBaseline, loadDeviceEyeBaseline, saveDeviceEyeBaseline } from '../lib/eyeBaselineStorage';
 import { useEyeTracking } from '../hooks/useEyeTracking';
+import { useSimulatorTrace } from '../hooks/useSimulatorTrace';
+import { SIMULATOR_TRACE } from '../lib/simulatorTrace';
 import { deliverCueIfCurrent } from '../lib/alertDelivery';
 import { AlertSystem, type AlertTimingEvent } from '../components/AlertSystem';
 import { CameraSetupGuide } from '../components/CameraSetupGuide';
@@ -159,6 +161,9 @@ function MonitoringWakeLock() {
 
 export default function MonitorScreen() {
   const router = useRouter();
+  const simulatorRunRequested = useLocalSearchParams()['trace-run'] === '1';
+  const simulatorAutostartedRef = useRef(false);
+  const simulatorProofRef = useRef('');
   const { reduceMotion } = useAccessibilityPreferences();
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -498,7 +503,7 @@ export default function MonitorScreen() {
     startingRef.current = true;
     setIsStarting(true);
     try {
-      if (!hasPermission) {
+      if (!hasPermission && !SIMULATOR_TRACE) {
         let granted = false;
         requestingCameraPermissionRef.current = true;
         try {
@@ -512,7 +517,7 @@ export default function MonitorScreen() {
         startAttempt !== startAttemptRef.current,
         AppState.currentState,
       )) return;
-      if (!consumePreDriveSafety()) {
+      if (!SIMULATOR_TRACE && !consumePreDriveSafety()) {
         router.replace('/pre-drive');
         return;
       }
@@ -566,6 +571,7 @@ export default function MonitorScreen() {
       }
 
       reset();
+      simulatorProofRef.current = '';
       sessionEyeBaselineRef.current = eyeBaselineRef.current;
       if(EYE_BASELINE_EXPERIMENT)setBaselineMessage(sessionEyeBaselineRef.current===null?'Experimental local session uses current presets; no personal baseline was saved.':'Experimental local session uses the saved parked baseline.');
       baselineGenerationRef.current += 1;
@@ -600,7 +606,7 @@ export default function MonitorScreen() {
       // delaying core camera monitoring, and discard any late result after the
       // session is cancelled or replaced.
       const headphoneStart = startHeadphoneMotion();
-      cloudSessionRef.current = EYE_BASELINE_EXPERIMENT ? Promise.resolve(null) : beginCloudSession();
+      cloudSessionRef.current = EYE_BASELINE_EXPERIMENT || SIMULATOR_TRACE ? Promise.resolve(null) : beginCloudSession();
       setAlertCount(0);
       alertCountRef.current = 0;
       hasCameraSampleRef.current = false;
@@ -655,6 +661,14 @@ export default function MonitorScreen() {
       setIsStarting(false);
     }
   };
+
+  // This simulator-only deep link makes local scoring proof repeatable. The
+  // ordinary app still requires its real pre-drive acknowledgement and Start.
+  useEffect(() => {
+    if (!SIMULATOR_TRACE || !simulatorRunRequested || !sensitivityLoaded || !baselineLoaded || simulatorAutostartedRef.current) return;
+    simulatorAutostartedRef.current = true;
+    void handleStart();
+  }, [simulatorRunRequested, sensitivityLoaded, baselineLoaded, handleStart]);
 
   const saveSession = useCallback(async (
     sessionId: string,
@@ -1125,6 +1139,15 @@ export default function MonitorScreen() {
       criticalPerclosThreshold: PERCLOS_ALERT_THRESHOLD,
       criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
     });
+    if (SIMULATOR_TRACE) {
+      const key = result.state + ':' + (closedDurationMs >= 3_000);
+      if (simulatorProofRef.current !== key) {
+        simulatorProofRef.current = key;
+        console.info('OCCULERT_SIMULATOR_SCORING ' + JSON.stringify({ elapsedMs: now - (sessionStartedAtRef.current || now),
+          state: result.state, ear: result.ear, perclos: result.perclos, fatigueScore: result.fatigueScore,
+          closedDurationMs, alertLevel }));
+      }
+    }
     const shouldRefreshDisplay = shouldRefreshMonitorMetrics({
       previousState: displayedMetricsStateRef.current,
       nextState: result.state,
@@ -1167,6 +1190,7 @@ export default function MonitorScreen() {
   // These native worklet values must outlive ordinary React renders so the
   // frame-processor bridge stays stable throughout a drive.
   const onEyeStateJS = useRunOnJS(onEyeState, [onEyeState]);
+  const simulatorPhase = useSimulatorTrace(SIMULATOR_TRACE && (isRunning || setupPreviewActive), onEyeState);
   const lastSample = useSharedValue(0);
   const analysisIntervalMs = useSharedValue(cameraLoadPolicy.analysisIntervalMs);
 
@@ -1249,7 +1273,7 @@ export default function MonitorScreen() {
         ? '#30d158'
         : '#64d2ff';
 
-  if (!hasPermission) {
+  if (!hasPermission && !SIMULATOR_TRACE) {
     return (
       <SafeAreaView style={s.container}>
         <View style={s.permBox}>
@@ -1274,7 +1298,7 @@ export default function MonitorScreen() {
     );
   }
 
-  if (device == null) {
+  if (device == null && !SIMULATOR_TRACE) {
     return (
       <SafeAreaView style={s.container}>
         <View style={s.permBox}>
@@ -1369,7 +1393,12 @@ export default function MonitorScreen() {
         reduceMotion={reduceMotion}
         attentionKey={sensorFault || (cameraRecovering ? 'camera-recovering' : isRunning ? `${metrics.state}:${visibleAlertLevel}:${frontCameraIdentity?.streamingType ?? 'unknown'}` : `parked:${frontCameraIdentity?.streamingType ?? 'unknown'}`)}
         camera={
-          (isRunning || setupPreviewActive) ? (
+          SIMULATOR_TRACE ? (
+            <View style={[StyleSheet.absoluteFill, s.camOff]}>
+              <Text style={[s.camOffTxt, { color: '#fbbf24', fontSize: 20 }]}>SIMULATOR TRACE</Text>
+              <Text style={s.camOffTxt}>{isRunning || setupPreviewActive ? simulatorPhase : 'Tap Start to run the scripted trace'}</Text>
+            </View>
+          ) : (isRunning || setupPreviewActive) && device ? (
             <MonitorCaptureCamera
               key={`front-camera-${cameraEpoch}`}
               loadMode={cameraLoadPolicy.mode}
