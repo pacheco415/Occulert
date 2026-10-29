@@ -15,6 +15,8 @@ if (process.platform !== 'darwin' || !options['--device'] || !options['--build']
 const build = JSON.parse(readFileSync(join(resolve(options['--build']), 'build-receipt.json')));
 const bundle = 'com.occulert.app.simulatortrace', digest = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 assert.equal(build.bundleIdentifier, bundle); assert.equal(build.platform, 'iphonesimulator'); assert.equal(build.architecture, 'arm64');
+assert.equal(build.sharedInput, '../lib/event-outbox.ts');
+assert.equal(build.sharedInputSha256, build.authoredInputs[build.sharedInput]);
 assert.equal(build.authoredInputsSha256, simulatorInputsSha256(authoredSimulatorInputs(root)), 'Rebuild after any authored input changes');
 assert.equal(digest(join(build.appPath, 'main.jsbundle')), build.compiledJsSha256);
 assert.equal(digest(join(build.appPath, 'OcculertSimulatorTrace')), build.machOSha256);
@@ -82,6 +84,7 @@ try {
   const receipt = { kind: 'actual_ios_simulator_scoring_proof', observedAt: new Date().toISOString(), device: match.name, runtime: match.runtime,
     sourceBase: build.sourceBase, authoredInputsSha256: build.authoredInputsSha256, compiledJsSha256: build.compiledJsSha256,
     machOSha256: build.machOSha256, bundleIdentifier: bundle, platform: build.platform, architecture: build.architecture,
+    sharedInput: build.sharedInput, sharedInputSha256: build.sharedInputSha256,
     productionInfoPlistSha256: digest(join(root, 'scripts/fixtures/production-info-plist-before-simulator.plist')),
     proofRunnerSha256: digest(fileURLToPath(import.meta.url)),
     uiTestSha256: digest(join(uiProject, 'SimulatorTraceProof.swift')),

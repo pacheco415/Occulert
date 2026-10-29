@@ -3,11 +3,11 @@ import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { isSimulatorTraceConfiguration, simulatorTraceSample } from '../lib/simulatorTraceModel.ts';
-import { authoredSimulatorInputs, simulatorInputsSha256 } from './lib/simulator-build-inputs.mjs';
+import { authoredSimulatorInputs, simulatorInputsSha256, simulatorSharedInput, stageSimulatorSharedInput, SIMULATOR_SHARED_INPUT } from './lib/simulator-build-inputs.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url)), require = createRequire(import.meta.url);
 const { BUNDLE_ID, simulatorTraceProfile } = require('./lib/simulator-trace-profile.cjs');
@@ -26,9 +26,10 @@ function environment(env, work) {
   }
 }
 function stagedProject() {
-  const directory = mkdtempSync(join(tmpdir(), 'occulert-simulator-profile-'));
+  const directory = join(mkdtempSync(join(tmpdir(), 'occulert-simulator-profile-')), 'native-app');
   cpSync(root, directory, { recursive: true, filter: path => !['node_modules', 'ios', 'android', '.expo', 'build'].includes(relative(root, path).split(sep)[0]) });
   symlinkSync(join(root, 'node_modules'), join(directory, 'node_modules'), 'dir');
+  stageSimulatorSharedInput(root, directory);
   return directory;
 }
 function run(directory, env, ...args) {
@@ -85,6 +86,10 @@ test('the real Metro resolver substitutes ML Kit only for the simulator iOS prof
     delete require.cache[filename]; const config = require(filename);
     const result = config.resolver.resolveRequest({}, 'react-native-vision-camera-face-detector', 'ios');
     assert.equal(result.filePath, join(root, 'simulator/face-detector-stub.ts')); assert.equal(result.type, 'sourceFile');
+    assert.deepEqual(config.watchFolders, [join(root, '../lib')]);
+    const blocked = name => config.resolver.blockList.some(pattern => pattern.test(join(root, '../lib', name)));
+    assert.equal(blocked('event-outbox.ts'), false);
+    for (const name of ['other.ts', '.env', 'event-outbox.ts.map', 'nested/engine.ts']) assert.equal(blocked(name), true);
     assert.throws(() => config.resolver.resolveRequest({}, 'react-native-vision-camera-face-detector', 'android'), /cannot enter/);
   });
   environment({ ...simulator, EAS_BUILD_PROFILE: 'production' }, () => {
@@ -97,6 +102,12 @@ test('the copied authored-input manifest detects source edits and links while ex
   const directory = stagedProject();
   try {
     const before = simulatorInputsSha256(authoredSimulatorInputs(directory));
+    const shared = join(directory, SIMULATOR_SHARED_INPUT), sharedBytes = readFileSync(shared);
+    assert.equal(authoredSimulatorInputs(directory)[SIMULATOR_SHARED_INPUT], simulatorSharedInput(root).sha256);
+    assert.deepEqual(readdirSync(dirname(shared)), ['event-outbox.ts']);
+    writeFileSync(shared, Buffer.concat([sharedBytes, Buffer.from('\n// changed canonical engine input\n')]));
+    assert.notEqual(simulatorInputsSha256(authoredSimulatorInputs(directory)), before);
+    writeFileSync(shared, sharedBytes);
     const metroPath = join(directory, 'metro.config.js'), metro = readFileSync(metroPath);
     assert.ok(authoredSimulatorInputs(directory)['metro.config.js'], 'The stub-selecting Metro configuration is a required recorded build input');
     writeFileSync(metroPath, Buffer.concat([metro, Buffer.from('\n// changed stub resolver input\n')]));
@@ -110,7 +121,31 @@ test('the copied authored-input manifest detects source edits and links while ex
     assert.notEqual(simulatorInputsSha256(authoredSimulatorInputs(directory)), before);
     rmSync(path); symlinkSync(join(directory, 'missing-input.ts'), path);
     assert.throws(() => authoredSimulatorInputs(directory), /must not be links/);
-  } finally { rmSync(directory, { recursive: true, force: true }); }
+  } finally { rmSync(dirname(directory), { recursive: true, force: true }); }
+});
+
+test('shared snapshot staging copies only canonical UTF-8 bytes and rejects links and invalid input', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'occulert-simulator-shared-'));
+  const source = join(fixture, 'source/native-app'), target = join(fixture, 'output/project');
+  const library = join(fixture, 'source/lib'), shared = join(library, 'event-outbox.ts');
+  try {
+    mkdirSync(source, { recursive: true }); mkdirSync(library); mkdirSync(target, { recursive: true });
+    const bytes = Buffer.from('export const canonicalEngine = true;\n');
+    writeFileSync(shared, bytes); writeFileSync(join(library, 'other.ts'), 'must not be staged');
+    const hash = stageSimulatorSharedInput(source, target);
+    assert.equal(hash, simulatorSharedInput(source).sha256);
+    assert.deepEqual(readdirSync(join(fixture, 'output/lib')), ['event-outbox.ts']);
+    assert.deepEqual(readFileSync(join(fixture, 'output/lib/event-outbox.ts')), bytes);
+    writeFileSync(shared, Buffer.from([0xff])); assert.throws(() => simulatorSharedInput(source), /encoded data/);
+    rmSync(shared); symlinkSync(join(library, 'missing.ts'), shared);
+    assert.throws(() => simulatorSharedInput(source), /never a link/);
+    rmSync(shared); writeFileSync(shared, bytes);
+    const linkedSource = join(fixture, 'source-linked'); symlinkSync(join(fixture, 'source'), linkedSource, 'dir');
+    assert.throws(() => simulatorSharedInput(join(linkedSource, 'native-app')), /owned directory/);
+    const otherTarget = join(fixture, 'linked-output/project'); mkdirSync(otherTarget, { recursive: true });
+    symlinkSync(library, join(fixture, 'linked-output/lib'), 'dir');
+    assert.throws(() => stageSimulatorSharedInput(source, otherTarget), /owned directory/);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
 });
 
 test('actual production prebuild preserves phone Info.plist bytes; simulator excludes ML Kit and cannot target iPhone SDK', () => {
@@ -133,6 +168,6 @@ test('actual production prebuild preserves phone Info.plist bytes; simulator exc
         assert.ok(!existsSync(join(directory, 'ios', 'OcculertWatch')));
       }
       assert.ok(readdirSync(join(directory, 'ios')).length > 0);
-    } finally { rmSync(directory, { recursive: true, force: true }); }
+    } finally { rmSync(dirname(directory), { recursive: true, force: true }); }
   }
 });

@@ -47,7 +47,7 @@ const auth = (owner, expires_at = 0) => ({ access_token: `${owner}-access`, refr
 const token = owner => ({ ...auth(owner), expires_in: 3600 });
 const AUTH_KEY = 'occulert.cloud.auth.v1';
 const CONSENT_KEY = 'occulert-cloud-sync-enabled';
-function cloudFixture(initial, { consent = false, simulatorTrace = false } = {}) {
+function cloudFixture(initial, { consent = false, simulatorTrace = false, eventOutboxFlag = false } = {}) {
   const secure = new Map(initial ? [[AUTH_KEY, JSON.stringify(initial)]] : []);
   const storage = new Map([[CONSENT_KEY, String(consent)]]), requests = [], timers = new Map();
   let nextTimer = 0;
@@ -76,8 +76,11 @@ function cloudFixture(initial, { consent = false, simulatorTrace = false } = {})
   fixture.api = load(read('native-app/lib/cloudSync.ts'), [
     'getCloudState', 'signInToCloud', 'signOutOfCloud', 'setCloudSyncEnabled',
     'beginCloudSession', 'logCloudAlert', 'finishCloudSession', 'cloudSessionScopes', 'retryPendingCloudSessions', 'getPendingCloudSummaryState', 'pendingCloudSummaryStateIsCurrent',
+    'queueNativeCloudAlert', 'nativeCloudEventRetryStatus',
   ], {
     SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage, SIMULATOR_TRACE: simulatorTrace,
+    process: { env: { EXPO_PUBLIC_EVENT_OUTBOX: eventOutboxFlag ? '1' : undefined } },
+    createNativeEventOutbox: () => { assert.fail('simulator transport must not construct the retry adapter'); },
     updateSessionHistory: async update => { fixture.history = update(fixture.history || []); },
     createSessionSummaryOutbox, pinnedSupabaseConfig, Platform: { OS: 'ios', Version: '26' }, createAsyncMutationQueue, createCachedBooleanPreference,
     currentAppBuildInfo: () => ({ appVersion: '1.0.0', appBuildNumber: 'test' }),
@@ -510,11 +513,15 @@ test('simulator trace uses the actual monitor and eye scoring without a camera, 
 });
 
 test('simulator cloud transport stays unavailable even when stored consent and auth exist', async () => {
-  const f = cloudFixture(auth('owner', 4_000_000_000), { consent: true, simulatorTrace: true });
-  assert.equal((await f.api.getCloudState()).available, false);
-  assert.equal(await f.api.beginCloudSession(), null);
-  await f.api.retryPendingCloudSessions();
-  assert.equal(f.requests.length, 0); assert.equal(f.timers.size, 0);
+  for (const eventOutboxFlag of [false, true]) {
+    const f = cloudFixture(auth('owner', 4_000_000_000), { consent: true, simulatorTrace: true, eventOutboxFlag });
+    assert.equal((await f.api.getCloudState()).available, false);
+    assert.equal(await f.api.beginCloudSession(), null);
+    assert.equal(f.api.queueNativeCloudAlert(Promise.resolve('session'), 90, new Date().toISOString()), null);
+    assert.equal(f.api.nativeCloudEventRetryStatus(), null);
+    await f.api.retryPendingCloudSessions();
+    assert.equal(f.requests.length, 0); assert.equal(f.timers.size, 0);
+  }
 });
 
 test('trace deep link can start only the simulator variant and cannot restart after Stop', async () => {

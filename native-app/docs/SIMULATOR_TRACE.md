@@ -55,8 +55,9 @@ xcrun simctl list devices available
 npm run ios:simulator-trace -- --device SIMULATOR_UUID
 ```
 
-The helper creates a fresh temporary project, copies installed dependencies,
-runs iOS prebuild and CocoaPods, then compiles an unsigned Release simulator
+The helper creates a fresh temporary project, copies installed dependencies and
+stages only the canonical `../lib/event-outbox.ts` sibling at
+`output/lib/event-outbox.ts`. It runs iOS prebuild and CocoaPods, then compiles an unsigned Release simulator
 app with Xcode. It verifies the resulting Mach-O architecture and platform.
 It does not change the authored checkout's generated native directories.
 Use `--output NEW_DIRECTORY` to select a different staging directory outside
@@ -108,13 +109,14 @@ physical Duo behavior, phone/Watch delivery, audio routes, battery or heat.
 Exact-build physical acceptance and any production/TestFlight build remain
 separate actions.
 
-## Observed local proof — October 28, 2026
+## Original local proof — October 28, 2026
 
 The [dated source/artifact receipt](SIMULATOR_TRACE_PROOF_2026-10-28.json) records
 an actual unsigned Release build completed at `2026-10-29T04:05:54.625Z` (October
 28 locally), on Xcode 27.1, for the arm64 iPhone Duo simulator running iOS 27.1.
 The build used base commit `282aba3258a8e5a8386a0cffd5affc1d4dab2b86` plus the
-recorded 139 authored input hashes; those inputs still match the final source.
+recorded 139 authored input hashes, which matched the original source published
+at `d49ffbbe6dee3f67905b09452b1c046f0de6f7f6`.
 The later UI-proof tooling has its own hashes and is not part of that original
 application manifest.
 
@@ -137,3 +139,19 @@ clean root installation and all **97 root verification groups** passed. The
 focused production-resolver/Metro-tamper/profile checks also passed, and every
 one of the original 139 built inputs still matched. This later source
 composition does not rewrite the historical build or simulator-proof dates.
+
+## Shared-engine composition
+
+The native engine was composed through main `b1c8f3a`. Metro retains its bounded
+shared watch folder and block-list exclusions while the simulator-only resolver
+continues to replace only the ML Kit import. The snapshot helper reads only the
+canonical sibling engine, rejects linked parents/files and invalid UTF-8, copies
+its exact bytes into the matching sibling layout, and records its raw hash with
+the new authored inputs. Other repository library files are never copied.
+
+Native event retry initialization is explicitly disabled for simulator input,
+including when `EXPO_PUBLIC_EVENT_OUTBOX=1` is supplied. Both the original HTTP
+path and the keyed event sender therefore remain unavailable in this variant.
+Production profile behavior and generated Info.plist comparison remain separate
+checks. The original 139-input receipt above remains historical; a composed
+native graph requires its own fresh archive/export, binary and scoring proof.

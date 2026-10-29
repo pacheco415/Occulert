@@ -4,7 +4,7 @@ import { cpSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFi
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { authoredSimulatorInputs, simulatorInputsSha256 } from './lib/simulator-build-inputs.mjs';
+import { authoredSimulatorInputs, simulatorInputsSha256, stageSimulatorSharedInput, SIMULATOR_SHARED_INPUT } from './lib/simulator-build-inputs.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const args = process.argv.slice(2), options = {};
@@ -20,6 +20,7 @@ if (options['--output']) { if (existsSync(output)) throw Error('Build output mus
 const project = join(output, 'project');
 cpSync(root, project, { recursive: true, filter: path => !['node_modules', 'ios', 'android', '.expo', 'build'].includes(relative(root, path).split(sep)[0])
   && !relative(root, path).split(sep).some(name => name === '.DS_Store' || name === '.env' || name.startsWith('.env.')) });
+stageSimulatorSharedInput(root, project);
 // Dependency build scripts compile inside their own package directories. A
 // symlink would leak those writes back into the authored checkout (and inherit
 // Finder metadata in File Provider folders), so stage actual dependency bytes.
@@ -60,6 +61,7 @@ const receipt = {
   sourceBase: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   workingTreeChanges: Boolean(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()),
   nativeLockSha256: digest(join(root, 'package-lock.json')), platform: 'iphonesimulator', architecture,
+  sharedInput: SIMULATOR_SHARED_INPUT, sharedInputSha256: authoredInputs[SIMULATOR_SHARED_INPUT],
   bundleIdentifier: 'com.occulert.app.simulatortrace', signingAllowed: false,
   appInfoPlistSha256: digest(join(app, 'Info.plist')), appPath: app,
   authoredInputs, authoredInputsSha256: simulatorInputsSha256(authoredInputs),

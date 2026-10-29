@@ -17,7 +17,7 @@ const API_BASE = 'https://www.occulert.com';
 const AUTH_KEY = 'occulert.cloud.auth.v1';
 const CONSENT_KEY = 'occulert-cloud-sync-enabled';
 const REQUEST_TIMEOUT_MS = 8_000;
-const NATIVE_EVENT_RETRY_ENABLED = typeof process !== 'undefined' && process.env.EXPO_PUBLIC_EVENT_OUTBOX === '1';
+const NATIVE_EVENT_RETRY_ENABLED = !SIMULATOR_TRACE && typeof process !== 'undefined' && process.env.EXPO_PUBLIC_EVENT_OUTBOX === '1';
 const SECURE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainService: 'com.occulert.app.cloud-auth',
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
