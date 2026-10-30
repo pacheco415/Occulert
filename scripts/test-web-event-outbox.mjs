@@ -242,3 +242,22 @@ test('event expiry during transport auth preparation fails the final dispatch gu
   await started.promise; await f.time.advance(1_001); assert.equal(f.calls[0].current(), false); response.resolve(); await work;
   assert.equal(posts, 0); assert.equal(f.rows().length, 0); assert.equal(f.statuses.at(-1).expired, 1); f.close();
 });
+
+test('web concurrent detection preserves the final upload and its acknowledgement', async () => {
+  const f = fixture(), response = deferred(), started = deferred();
+  f.transport(async () => ({ status: 503, body: {} }));
+  await f.queue();
+  for (const delay of [1000, 2000, 4000]) { await f.time.advance(delay); await f.adapter.flush(); }
+  assert.equal(f.calls.length, 4);
+  const original = f.rows()[0].event.event_id;
+  f.transport(async (id, _type, details) => {
+    if (details.client_event_id === original) { started.resolve(); await response.promise; }
+    return { status: 200, ok: true, body: { ok: true, client_event_id: details.client_event_id, event: { session_id: id } } };
+  });
+  await f.time.advance(8000); await started.promise;
+  const concurrent = f.queue('yawn'); await settle();
+  assert.equal(f.rows().find(row => row.event.event_id === original)?.attempts, 5);
+  response.resolve(); await concurrent; await f.adapter.flush();
+  assert.equal(f.calls.length, 6); assert.equal(f.rows().length, 0);
+  assert.equal(f.statuses.at(-1).exhausted, 0); f.close();
+});

@@ -112,6 +112,13 @@ restart. Unknown outcomes, 401, 408, 429 and 5xx retain the same UUID and stop t
 flush. A later send must still pass the original owner, login, consent, session,
 deadline and capability checks. Auth refresh never permits another owner to send.
 
+The live engine keeps an unresolved attempt visible in pending status, including
+the fifth send. Concurrent reads or enqueues cannot classify that row as exhausted
+before its response settles. This is a scope/generation-bound, memory-only guard,
+not another retry: persisted attempt five is exhausted after restart or an
+uncertain final outcome. Expiry, Stop and consent/account cleanup still remove
+pending rows immediately when processed, and late responses cannot restore them.
+
 A 2xx acknowledgement must contain `ok: true`, the matching `client_event_id` and
 matching `event.session_id`; durable duplicate acknowledgements (`replayed: true`)
 are accepted identically. Other malformed successes remain uncertain. Permanent

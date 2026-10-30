@@ -210,3 +210,60 @@ test('experimental source is excluded from the public deployment', () => {
   const ignored = readFileSync(new URL('../.vercelignore', import.meta.url), 'utf8').split(/\r?\n/).map(line => line.trim());
   assert.ok(ignored.includes('lib/'));
 });
+
+async function finalAttemptFixture() {
+  const f = fixture();
+  await f.outbox.enqueue(scope, event());
+  await f.outbox.flush(scope, async () => ({ status: 503 }));
+  for (const delay of [1000, 2000, 4000]) { f.advance(delay); await f.outbox.flush(scope, async () => ({ status: 503 })); }
+  f.advance(8000);
+  return f;
+}
+for (const outcome of ['success', 'permanent', 'retryable', 'throw', 'timestamp']) test(`unresolved fifth attempt survives reads and enqueue until ${outcome}`, async () => {
+  const f = await finalAttemptFixture(), started = deferred(), response = deferred();
+  let calls = 0;
+  const flushing = f.outbox.flush(scope, async row => {
+    calls++; if (row.event_id !== 'event-1') return { status: 200 };
+    started.resolve(); await response.promise;
+    if (outcome === 'throw') throw Error('lost response');
+    return outcome === 'success' ? { status: 200 } : outcome === 'permanent' ? { status: 403 }
+      : outcome === 'timestamp' ? { status: 400, error: 'invalid_occurred_at' } : { status: 503 };
+  });
+  await started.promise;
+  assert.equal(JSON.parse(f.raw()).rows[0].attempts, 5);
+  assert.deepEqual(await f.outbox.pendingEntries(scope), [event()]);
+  assert.equal((await f.outbox.status(scope)).pending, 1);
+  assert.equal((await f.outbox.status(scope)).exhausted, 0);
+  assert.equal(await f.outbox.enqueue(scope, event()), true);
+  assert.equal(await f.outbox.enqueue(scope, { ...event(), fatigue: 1 }), false);
+  assert.equal(await f.outbox.enqueue(scope, event('event-2')), true);
+  assert.equal(JSON.parse(f.raw()).rows.find(row => row.event.event_id === 'event-1').attempts, 5);
+  response.resolve(); await flushing;
+  const status = await f.outbox.status(scope);
+  assert.equal(status.exhausted, ['retryable', 'throw', 'timestamp'].includes(outcome) ? 1 : 0);
+  assert.equal(status.permanentRejected, outcome === 'permanent' ? 1 : 0);
+  await f.outbox.flush(scope, async row => { calls++; assert.equal(row.event_id, 'event-2'); return { status: 200 }; });
+  assert.equal(calls, 2, 'no sixth send for the exhausted identity');
+});
+for (const boundary of ['clear', 'stop', 'expiry']) test(`fifth-attempt protection cannot override ${boundary}`, async () => {
+  const f = await finalAttemptFixture(), started = deferred(), response = deferred();
+  const flushing = f.outbox.flush(scope, async () => { started.resolve(); await response.promise; return { status: 200 }; });
+  await started.promise;
+  if (boundary === 'clear') await f.outbox.clear();
+  if (boundary === 'stop') await f.outbox.invalidateSession(scope, 'session-1');
+  if (boundary === 'expiry') f.advance(60_000);
+  assert.deepEqual(await f.outbox.pendingEntries(scope), []);
+  const before = await f.outbox.status(scope);
+  assert.equal(before.pending, 0); assert.equal(before.exhausted, 0);
+  response.resolve(); await flushing;
+  assert.deepEqual(await f.outbox.status(scope), before);
+  if (boundary === 'clear') assert.equal(f.raw(), null);
+});
+test('a restarted core has no in-flight exemption for persisted attempt five', async () => {
+  const f = await finalAttemptFixture();
+  await f.outbox.flush(scope, async () => { throw Error('process response lost'); });
+  const restarted = createEventOutbox(f.storage, f.current, f.config);
+  assert.deepEqual(await restarted.pendingEntries(scope), []);
+  await restarted.flush(scope, async () => assert.fail('must not send a sixth attempt'));
+  assert.equal((await restarted.status(scope)).exhausted, 1);
+});
