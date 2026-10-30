@@ -116,6 +116,19 @@ test('atomic event idempotency SQL/API contract',async t=>{
   const first=await rpc();assert.equal(first.replayed,false);assert.equal((await rpc()).replayed,true);
   assert.equal((await rpc({p_occurred_at:first.event.created_at})).error,'event_id_conflict','explicit timestamp differs from omitted intent');
  });
+ await t.test('omitted-time storage is server bounded, including session-end grace',async()=>{
+  await reset();
+  const before=(await db.query('select clock_timestamp()::text as now')).rows[0].now;
+  const first=await rpc();
+  const after=(await db.query('select clock_timestamp()::text as now')).rows[0].now;
+  const inRange=(await db.query('select $1::timestamptz between $2::timestamptz and $3::timestamptz as ok',[first.event.created_at,before,after])).rows[0].ok;
+  assert.equal(inRange,true,'active-session omission uses server processing time');
+  await db.exec(`update sessions set ended_at=clock_timestamp()-interval '30 seconds' where id='${session}'`);
+  const grace=await rpc({p_client_event_id:second});
+  const matchesEnd=(await db.query('select ended_at=$1::timestamptz as ok from sessions where id=$2',[grace.event.created_at,session])).rows[0].ok;
+  assert.equal(matchesEnd,true,'grace fallback is session end, not receipt or detected time');
+  assert.equal(await count('events'),2);assert.equal(await quota(),2);
+ });
  await t.test('user burst budget shared across sessions and keyed/unkeyed writes; duplicates free at quota',async()=>{
   await reset();const first=await rpc();
   for(let n=1;n<60;n++)assert.ok((await rpc({p_client_event_id:null,p_session_id:n%2?second:session})).event);
