@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from './lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -232,7 +233,7 @@ for (const waitingFor of ['session response', 'earlier event']) test(`actual mon
   const f = cloudFixture(), wait = deferred(); if (waitingFor === 'session response') f.sessionWait = wait.promise;
   const session = f.api.beginCloudSession(), detectedAt = f.time.now(), result = { state: 'closed', fatigueScore: 61.4 };
   const queue = { current: waitingFor === 'earlier event' ? wait.promise : Promise.resolve() }, count = { current: 0 };
-  const monitor = readFileSync(new URL('../app/monitor.tsx', import.meta.url), 'utf8');
+  const monitor = readNativeMonitorSourceOwners().cloud;
   const from = monitor.indexOf("    const alerting = result.state === 'closed';"), end = '    prevAlertingRef.current = alerting;';
   assert.ok(from >= 0 && monitor.indexOf(end, from) > from);
   vm.runInNewContext(monitor.slice(from, monitor.indexOf(end, from) + end.length), {
