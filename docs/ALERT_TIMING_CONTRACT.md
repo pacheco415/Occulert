@@ -1,9 +1,10 @@
 # Alert timing: stored-time semantics and regression safeguards
 
-Reviewed against main `5af2f3a` on 2026-10-29. This change adds tests and
-documentation only. It does not change timestamp acceptance, runtime behavior,
-retry policy, rollout flags, schema, or collection. Source inspection does not
-establish which flags are enabled in production or which native build is installed.
+Reviewed against main `fdc2d0b0cfc294e017d96d75b3e5ac3a89a9d369` on 2026-10-29.
+This change adds tests and documentation only. It does not change timestamp
+acceptance, runtime behavior, retry policy, rollout flags, schema, or collection.
+Source inspection does not establish which flags are enabled in production or
+which native build is installed.
 
 ## Current source, not the earlier proposal
 

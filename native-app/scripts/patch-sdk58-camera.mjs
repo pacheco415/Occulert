@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 // RN 0.87 removed RCTCxxBridge. Keep the released camera/worklet APIs, using
 // RN's public JSI initialization hook instead of recovering private bridge state.
 // Embedded upstream source notices are in CAMERA_PATCH_NOTICES.md.
-// https://github.com/facebook/react-native/blob/v0.88.1/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModuleWithJSIBindings.h
+// https://github.com/facebook/react-native/blob/v0.88.0/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModuleWithJSIBindings.h
 const nativeAppRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const originalWorkletsSource = `#import "Worklets.h"
