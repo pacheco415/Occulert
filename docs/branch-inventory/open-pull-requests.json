@@ -1,27 +1,18 @@
 {
   "schemaVersion": 1,
   "repository": "pacheco415/Occulert",
-  "capturedAt": "2026-10-29T04:35:49.568Z",
-  "source": "GitHub connector REST open pull requests; final page has fewer than 100 records",
+  "capturedAt": "2026-10-30T03:26:56Z",
+  "source": "GitHub connector paginated REST open pull requests; per_page=100, final empty page verified",
   "complete": true,
   "pullRequests": [
     {
-      "number": 344,
-      "title": "Add parked observer episode labeling and paired exports",
+      "number": 350,
+      "title": "Guard server-assigned alert timing semantics with regressions",
       "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/344",
-      "headRefName": "codex/parked-observer-labels",
+      "url": "https://github.com/pacheco415/Occulert/pull/350",
+      "headRefName": "codex/alert-timing-contract",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "4a5e5cda7622296248906c368e0b89af5e0707cc"
-    },
-    {
-      "number": 341,
-      "title": "Document TypeScript 7.0.2 compatibility evaluation",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/341",
-      "headRefName": "codex/typescript-7-eval",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "8b00da4f1cbf7fb2ff58a4213e518869bb49e69c"
+      "headSha": "6c4978126956deacb7a614a736a2767a827be0a4"
     },
     {
       "number": 340,
@@ -31,15 +22,6 @@
       "headRefName": "codex/release-intent-next-build",
       "headRepository": "pacheco415/Occulert",
       "headSha": "4913111ae03206219c30bcc4cdbe2b0866f52e51"
-    },
-    {
-      "number": 339,
-      "title": "Bound and stabilize fleet summary queries",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/339",
-      "headRefName": "codex/fleet-summary-tidy",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "a32de5dc0eac7d69acd91ee753934d34ffc47526"
     },
     {
       "number": 337,
@@ -52,12 +34,12 @@
     },
     {
       "number": 331,
-      "title": "Inventory stale branches and protect open pull requests",
+      "title": "Protect open PR branches in the remote branch inventory",
       "state": "open",
       "url": "https://github.com/pacheco415/Occulert/pull/331",
       "headRefName": "codex/branch-inventory",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "6f68bb976daaf0e7bac04a00646308614db8e6dc"
+      "headSha": "30313b25224a285f535ca76078ee5f4de4e46768"
     },
     {
       "number": 324,
@@ -69,33 +51,6 @@
       "headSha": "4c01c327bf00c0b1f7c99d5e36512b48909471d8"
     },
     {
-      "number": 299,
-      "title": "Bump @axe-core/playwright from 4.13.0 to 4.14.0",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/299",
-      "headRefName": "dependabot/npm_and_yarn/axe-core/playwright-4.14.0",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "eb3d3917d6c36d4b297301feba3bafdf2999eca8"
-    },
-    {
-      "number": 298,
-      "title": "Bump @electric-sql/pglite from 0.5.8 to 0.5.11",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/298",
-      "headRefName": "dependabot/npm_and_yarn/electric-sql/pglite-0.5.11",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "d303e83f609e56c4bf83b9c4d590efb07f3fa0a2"
-    },
-    {
-      "number": 276,
-      "title": "Update pinned Node setup, artifact and CodeQL actions",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/276",
-      "headRefName": "dependabot/github_actions/weekly-actions-dc4f8b6e13",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "8278352beb50a3a552318419a1dcdbbaa786752a"
-    },
-    {
       "number": 273,
       "title": "Bump @playwright/test from 1.63.0 to 1.64.1",
       "state": "open",
@@ -103,33 +58,6 @@
       "headRefName": "dependabot/npm_and_yarn/playwright/test-1.64.1",
       "headRepository": "pacheco415/Occulert",
       "headSha": "a0ae7b17048465ea265e5c8e09650afa85579eed"
-    },
-    {
-      "number": 267,
-      "title": "Retire expired site assets and align Expo SDK 57 dependencies",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/267",
-      "headRefName": "codex/retire-assets-2026-10-10",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "fe047bebf503fea12d6bd430cd71353ef1c847e8"
-    },
-    {
-      "number": 263,
-      "title": "Bump typescript from 6.0.3 to 7.0.2",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/263",
-      "headRefName": "dependabot/npm_and_yarn/typescript-7.0.2",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "32be6310b6d04e28d66d44e17dd1780599aaf77d"
-    },
-    {
-      "number": 262,
-      "title": "Bump acorn from 8.18.0 to 8.19.0",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/262",
-      "headRefName": "dependabot/npm_and_yarn/acorn-8.19.0",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "f5739033b16744a7240381226041dcf824c1940c"
     },
     {
       "number": 206,
