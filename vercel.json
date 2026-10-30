@@ -458,15 +458,6 @@
       ]
     },
     {
-      "source": "/(.*)\\.v91\\.(js|css)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
       "source": "/(.*)\\.v12\\.(js|css)",
       "headers": [
         {
@@ -765,6 +756,15 @@
     },
     {
       "source": "/(.*)\\.v22\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v91\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",

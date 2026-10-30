@@ -1,6 +1,7 @@
 // Explicit local-only acceptance harness. Never accepts a database URL.
 // See docs/EVENT_IDEMPOTENCY.md for the locked isolated client/runtime.
 import assert from 'node:assert/strict';
+import { exerciseFleetOffboardingConcurrency, offboardingMigration } from './lib/fleet-offboarding-concurrency.mjs';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, accessSync, constants } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -100,8 +101,10 @@ try{
  await deleter.query('commit');
  assert.equal((await afterDelete).error,'session_not_found');assert.deepEqual(await state(),{events:0,receipts:0,quota:1});
  pass('deletion contention cannot acknowledge or recreate removed session data.');
- serverVersion=(await admin.query('show server_version')).rows[0].server_version;
  assert.equal(scenarios.length,6);
+ await exerciseFleetOffboardingConcurrency({admin,worker,waitFor,pass});
+ serverVersion=(await admin.query('show server_version')).rows[0].server_version;
+ assert.equal(scenarios.length,16);
  console.log('Local PostgreSQL version:',serverVersion);
 }catch(error){
  try{console.error(readFileSync(join(root,'postgres.log'),'utf8'));}catch{}
@@ -127,6 +130,7 @@ if(receiptDirectory){
  writeFileSync(join(receiptDirectory,'event-concurrency.json'),JSON.stringify({
   status:'passed',commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
   node:process.version,postgres:serverVersion,migrationSha256:createHash('sha256').update(migration).digest('hex'),
+  offboardingMigration,offboardingMigrationSha256:createHash('sha256').update(read('../supabase/migrations/'+offboardingMigration)).digest('hex'),
   isolation:'private-unix-socket-tcp-disabled-synthetic-fixtures',scenarios,completedAt:new Date().toISOString()
  },null,2)+'\n');
 }

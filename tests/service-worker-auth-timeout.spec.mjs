@@ -7,8 +7,11 @@ import { resolve, extname } from 'node:path';
 test.use({ serviceWorkers: 'allow' });
 const currentCache = cacheName();
 const currentBackendPath = `/${assetByStem('occulert-backend.js')}`;
+const retainedBackendPath = '/' + Object.keys(JSON.parse(readFileSync('asset-integrity.json', 'utf8')))
+  .filter(name => /^occulert-backend\.v\d+\.js$/.test(name) && '/' + name !== currentBackendPath)
+  .sort((a, b) => Number(b.match(/\.v(\d+)\.js$/)[1]) - Number(a.match(/\.v(\d+)\.js$/)[1]))[0];
 
-for (const backendPath of [currentBackendPath, '/occulert-backend.v68.js', '/occulert-backend.v75.js', '/occulert-backend.v76.js', '/occulert-backend.v77.js']) {
+for (const backendPath of [currentBackendPath, retainedBackendPath, '/occulert-backend.v68.js', '/occulert-backend.v75.js', '/occulert-backend.v76.js', '/occulert-backend.v77.js']) {
 for (const partialBody of backendPath === currentBackendPath ? [false, true] : [false]) {
 test(`a ${backendPath === currentBackendPath ? 'current' : 'retained'} network-only account script ${backendPath} stalled ${partialBody ? 'mid-body' : 'before headers'} cannot block startup or use a cached account script`, async ({ page }) => {
   test.setTimeout(60_000);
