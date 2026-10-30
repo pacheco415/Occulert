@@ -6,6 +6,7 @@ scope and evidence requirements. Specialist documents below explain contracts
 and procedures; [archived roadmap records](archive/APP_ROADMAP_2026-09-28.md)
 and dated release notes preserve historical evidence.
 
+- [Future capability proposals; select each task separately](VISION_ROADMAP.md)
 - [Backend implementation and next steps](BACKEND_ROADMAP.md)
 - [Detection evidence and future upgrades](FACIAL_RECOGNITION_ROADMAP.md)
 - [Verified 2026–2028 phone, Watch, headphone and glasses roadmap](DEVICE_ROADMAP_2026_2028.md)
