@@ -55,6 +55,7 @@
     "test:supabase-transport",
     "test:native-async-reliability",
     "test:fleet-invitations",
+    "test:fleet-offboarding",
     "test:tenant-rls",
     "test:driver-observation-gaps",
     "test:dashboard-demo-storage",

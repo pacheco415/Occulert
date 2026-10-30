@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="/supabase-loader.v49.js"></script>
-<script src="/occulert-backend.v90.js"></script>
+<script src="/occulert-backend.v91.js"></script>
 <script src="/passkey-auth.v60.js"></script>
 <script src="/auth-helper.v60.js"></script>
 <link rel="stylesheet" href="/account-page-1.v49.css" />
@@ -54,6 +54,7 @@
       <button class="btn red" data-page-action="signOut">Sign Out</button>
     </div>
   </div>
+<section id="fleetMembershipPanel" class="card hidden" hidden><h2>Fleet membership</h2><p>Leaving removes you from the current roster. Past sessions and any drive already running, including its later alerts, remain in that fleet’s history. New drives use your current membership.</p><button class="btn red" id="leaveFleetBtn" type="button">Leave fleet</button><p id="fleetMembershipStatus" role="status" aria-live="polite"></p></section>
 </aside>
 <div class="account-settings">
   <div class="card">
@@ -160,5 +161,6 @@
 <script src="/account-page-2.v65.js"></script>
 
 <footer class="account-footer" style="text-align:center;padding:28px 16px 24px;border-top:1px solid #1e293b;font-size:12px;margin-top:40px"><a href="/" style="text-decoration:none;font-weight:700">Occulert</a> &nbsp;·&nbsp; <a href="/privacy.html" style="text-decoration:none">Privacy</a> &nbsp;·&nbsp; <a href="/safety.html" style="text-decoration:none">Safety</a> &nbsp;·&nbsp; <a href="/app.html" style="text-decoration:none">Driver App</a><div style="margin-top:8px">© 2026 Occulert. Prototype — not a substitute for rest or safe driving.</div></footer>
+<script src="/fleet-offboarding.v2.js" defer></script>
 </body>
 </html>

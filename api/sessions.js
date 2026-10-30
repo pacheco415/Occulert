@@ -44,6 +44,30 @@ try {
 if (request.method === "GET" && !isUuid(request.query?.session_id)) {
 return json(response, 400, { ok: false, error: "invalid_session_id" });
 }
+// The offboarding gate also enables the matching migration's atomic start.
+// Default-off requests retain the existing provider calls and session behavior.
+if (request.method === "POST" && process.env.OCCULERT_FLEET_OFFBOARDING_ENABLED === "true") {
+const body = request.body;
+const hasClientId = Object.prototype.hasOwnProperty.call(body, "session_id");
+if (hasClientId && !isUuid(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
+const result = await pgFetch("rpc/start_offboarding_aware_session", {
+method: "POST",
+body: {
+p_user_id: user.id, p_session_id: hasClientId ? body.session_id : null,
+p_device: body.device ? String(body.device).slice(0, 120) : null,
+p_browser: body.browser ? String(body.browser).slice(0, 240) : null,
+p_detector_pipeline: PIPELINES.has(body.detector_pipeline) ? body.detector_pipeline : null,
+p_detector_version: provenanceText(body.detector_version, 80),
+p_app_version: provenanceText(body.app_version, 80),
+},
+});
+const statuses = { driver_profile_not_found: 403, session_id_conflict: 409, membership_changed: 409, invalid_session: 400 };
+if (result && Object.hasOwn(statuses, result.error)) return json(response, statuses[result.error], { ok: false, error: result.error });
+if (!isUuid(result?.session?.id) || hasClientId && result.session.id.toLowerCase() !== body.session_id.toLowerCase()
+  || !isUuid(result?.session?.driver_id)) return json(response, 502, { ok: false, error: "session_not_saved" });
+return json(response, 200, { ok: true, session: result.session, session_start_protocol: "client_uuid_v1" });
+}
+
 const drivers = await pgFetch("drivers", {
 params: { select: "id,fleet_id", user_id: "eq." + user.id, limit: "1" },
 });

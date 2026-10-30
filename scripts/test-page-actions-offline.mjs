@@ -151,3 +151,21 @@ for (const failure of ['none', 'dispatcher', 'guard-missing', 'guard-integrity']
     }
   });
 }
+
+test('all retained auth and offboarding scripts ignore poisoned caches and never populate them', async () => {
+  const integrity = JSON.parse(readFileSync('asset-integrity.json', 'utf8'));
+  const protectedAssets = Object.keys(integrity).filter(name => /^(occulert-backend|fleet-offboarding)\.v\d+\.js$/.test(name));
+  assert.ok(protectedAssets.includes(assetByStem('occulert-backend.js')));
+  assert.ok(protectedAssets.includes(assetByStem('fleet-offboarding.js')));
+  for (const name of protectedAssets) {
+    const worker = workerFetchHarness(), url = 'https://www.occulert.com/' + name;
+    worker.entries.set(url, new Response('poisoned protected script'));
+    assert.equal(await (await worker.dispatch(url)).text(), 'fresh network bytes', name);
+    assert.deepEqual(worker.activity, { interceptions: 1, lifetimes: 0, fetches: 1, cacheReads: 0, cacheOpens: 0, cacheWrites: 0 }, name);
+    worker.setNetwork(async () => { throw Error('Offline'); });
+    assert.equal((await worker.dispatch(url)).type, 'error', name + ' must fail offline rather than execute cached account code');
+    assert.equal(worker.activity.cacheReads, 0, name);
+    assert.equal(worker.activity.cacheWrites, 0, name);
+    assert.equal(await worker.entries.get(url).text(), 'poisoned protected script', name);
+  }
+});
