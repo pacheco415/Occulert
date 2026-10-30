@@ -98,7 +98,8 @@
     "test:event-outbox",
     "test:event-idempotency",
     "test:event-outbox-transport",
-    "test:offline-cache-diagnostics"
+    "test:offline-cache-diagnostics",
+    "test:stale-branches"
   ],
   "additionalChecks": [
     "test:verify-runner"
