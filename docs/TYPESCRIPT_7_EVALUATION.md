@@ -2,8 +2,8 @@
 
 **Decision: no-go for directly replacing the supported TypeScript 6.0.3
 dependencies.** The requested CLI checks pass, but the native Expo dependency
-gate rejects 7.0.2 and the pending web shared-source compiler guard needs the
-legacy JavaScript compiler API. Do not merge Dependabot #263 directly.
+gate rejects 7.0.2 and the shared-source compiler guard needs the legacy
+JavaScript compiler API. Do not merge Dependabot #263 directly.
 
 ## Environment and unchanged inputs
 
@@ -58,10 +58,10 @@ The restored 6.0.3 setup passes the same online check. No package exclusion,
 override or forced compatibility flag was added. Expo documents this CI check
 as [immutable dependency validation](https://docs.expo.dev/more/expo-cli/#version-validation).
 
-## Pending web compiler API boundary
+## Shared-source compiler API boundary
 
-The pending shared-TypeScript input guard in `scripts/lib/driver-build.mjs`
-imports `typescript` and uses `createSourceFile`, `ScriptTarget`, `ScriptKind`,
+At the dated evaluation, the pending shared-TypeScript input guard in
+`scripts/lib/driver-build.mjs` imports `typescript` and uses `createSourceFile`, `ScriptTarget`, `ScriptKind`,
 `SyntaxKind`, `forEachChild` and declaration predicates to reject forbidden
 dependencies in raw input, including type-only imports. Those checks must stay
 enforced when compiling the shared event outbox.
@@ -69,7 +69,7 @@ enforced when compiling the shared event outbox.
 The exact 7.0.2 package's root export is `./lib/version.cjs`. A direct runtime
 probe returns version `7.0.2` but `undefined` for each of `createSourceFile`,
 `ScriptTarget`, `ScriptKind`, `SyntaxKind` and `forEachChild`. This call, matching
-the pending guard's API boundary, fails before parsing:
+that guard's API boundary, fails before parsing:
 
 ```js
 import ts from 'typescript';
@@ -93,11 +93,23 @@ That arrangement is not implemented or validated by this evaluation.
 
 ## Composed source follow-up
 
-PR [#342](https://github.com/pacheco415/Occulert/pull/342) subsequently merged
-the shared-source guard described above. It remains present on the integrated
-main `515a3cc4d623a502eac9924650d34b0b9212b6c8`; the supported compiler stays
-at 6.0.3. The candidate checks and 35-test results in this document describe the
-dated evaluation baseline, not a new 7.0.2 run against that later main.
+Follow-up base (October 29, 2026, Pacific): main
+`49d936bd9d959d18ca66b2dbb4da45e5cce9c1a0`. PR
+[#342](https://github.com/pacheco415/Occulert/pull/342) merged the shared-input
+compiler guard described above; PR
+[#349](https://github.com/pacheco415/Occulert/pull/349) added native monitor
+source-owner tooling that also imports the legacy TypeScript JavaScript API.
+Both `scripts/lib/driver-build.mjs` and
+`native-app/scripts/lib/monitor-source-owners.mjs` call `createSourceFile` and
+use `ScriptTarget`. The scoring hook guard added by PR
+[#348](https://github.com/pacheco415/Occulert/pull/348) uses Acorn and
+`eslint-scope`; it does not add another TypeScript API consumer.
+
+The supported root and native compiler remains 6.0.3. All four dependency
+files (`package.json` and `package-lock.json` in root and `native-app`) match
+the follow-up main byte-for-byte. The candidate CLI checks and 35-test
+results above remain evidence from the dated evaluation baseline. No new
+7.0.2 run or complete API migration against the composed source is claimed.
 
 ## Final state
 
