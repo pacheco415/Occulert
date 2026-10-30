@@ -1,0 +1,27 @@
+{
+  "source": "/Library/Developer/CoreSimulator/Profiles/DeviceTypes/iPhone Duo.simdevicetype/Contents/Resources/capabilities.plist",
+  "xcodeVersion": "27.1",
+  "xcodeBuild": "27A9275",
+  "runtimeVersion": "iOS 27.1",
+  "runtimeBuild": "24A94425",
+  "deviceType": "com.apple.CoreSimulator.SimDeviceType.iPhone-Duo",
+  "capturedAt": "2026-10-24",
+  "displays": [
+    {
+      "deviceName": "primary",
+      "screenID": 1,
+      "width": 1398,
+      "height": 2034,
+      "scale": 3.0,
+      "nativeOrientation": 0
+    },
+    {
+      "deviceName": "primary-1",
+      "screenID": 3,
+      "width": 2007,
+      "height": 2853,
+      "scale": 3.0,
+      "nativeOrientation": 270
+    }
+  ]
+}

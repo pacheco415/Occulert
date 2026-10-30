@@ -1,26 +1,29 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
+import { uuid } from 'expo-modules-core';
 import { createAsyncMutationQueue } from './asyncMutationQueue';
 import { createCachedBooleanPreference } from './cachedBooleanPreference';
 import { currentAppBuildInfo, formatAppBuildLabel } from './appBuildInfo';
 import { updateSessionHistory } from './sessionHistory';
 import { createSessionSummaryOutbox, type PendingSessionSummary, type SummaryScope } from './sessionSummaryOutbox';
+import { pinnedSupabaseConfig, type PinnedSupabaseConfig } from './supabaseHost';
+import { SIMULATOR_TRACE } from './simulatorTrace';
+import { createNativeEventOutbox } from './nativeEventOutbox';
+import type { NativeEventAuthority, NativeEventResult } from './nativeEventOutbox';
+import type { PendingEvent, EventDelivery } from '../../lib/event-outbox.ts';
 
 const API_BASE = 'https://www.occulert.com';
 const AUTH_KEY = 'occulert.cloud.auth.v1';
 const CONSENT_KEY = 'occulert-cloud-sync-enabled';
 const REQUEST_TIMEOUT_MS = 8_000;
+const NATIVE_EVENT_RETRY_ENABLED = !SIMULATOR_TRACE && typeof process !== 'undefined' && process.env.EXPO_PUBLIC_EVENT_OUTBOX === '1';
 const SECURE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainService: 'com.occulert.app.cloud-auth',
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
 
-interface PublicConfig {
-  configured: boolean;
-  url: string;
-  anonKey: string;
-}
+type PublicConfig = PinnedSupabaseConfig;
 
 interface StoredAuth {
   access_token: string;
@@ -62,9 +65,9 @@ export interface CloudState {
 }
 
 export interface CloudSessionStats {
-  averageFatigue: number;
-  maxFatigue: number;
-  safetyScore: number;
+  averageFatigue: number | null;
+  maxFatigue: number | null;
+  safetyScore: number | null;
   alertCount: number;
 }
 
@@ -74,6 +77,10 @@ export interface CloudSignInResult {
 }
 
 let configPromise: Promise<PublicConfig | null> | null = null;
+const nativeEventProtocols = new WeakMap<PublicConfig, boolean>();
+let nativeEventAuthVersion = 0;
+let nativeEventOutbox: ReturnType<typeof createNativeEventOutbox> | null = null;
+const nativeEventSessionScopes = new Map<string, NativeEventAuthority>();
 let consentRuntimeOverride: boolean | null = null;
 let consentMutationVersion = 0;
 let authCache: StoredAuth | null | undefined;
@@ -113,6 +120,7 @@ async function fetchJsonWithTimeout<T>(
   url: string,
   init?: RequestInit,
 ): Promise<{ response: Response; body: T }> {
+  if (SIMULATOR_TRACE) throw new Error('Cloud transport is disabled for synthetic simulator input.');
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_resolve, reject) => {
@@ -146,23 +154,161 @@ async function readJson<T>(response: Response): Promise<T> {
 
 async function loadConfig(): Promise<PublicConfig | null> {
   if (!configPromise) {
-    configPromise = fetchJsonWithTimeout<{ supabase?: Partial<PublicConfig> }>(`${API_BASE}/api/public-config`, {
+    configPromise = fetchJsonWithTimeout<{ ok?: unknown; supabase?: unknown; capabilities?: { event_idempotency_protocol?: unknown } }>(`${API_BASE}/api/public-config`, {
       headers: { Accept: 'application/json' },
     })
+      // Credentials go only to the pinned project, whatever the response names.
       .then(({ response, body }) => {
-        const config = body.supabase;
-        if (!response.ok || !config?.configured || !config.url || !config.anonKey) return null;
-        return {
-          configured: true,
-          url: config.url,
-          anonKey: config.anonKey,
-        };
+        const config = response.ok ? pinnedSupabaseConfig(body.supabase) : null;
+        if (config && NATIVE_EVENT_RETRY_ENABLED) nativeEventProtocols.set(config,
+          response.ok === true && body.ok === true && body.capabilities?.event_idempotency_protocol === 'client_event_uuid_v1');
+        return config;
       })
       .catch(() => null);
   }
   const config = await configPromise;
   if (!config) configPromise = null;
   return config;
+}
+
+function nativeEventLogin(auth = authCache): { ownerId: string; loginId: string } | null {
+  try {
+    if (!auth) return null;
+    const encoded = auth.access_token.split('.')[1];
+    if (!encoded || encoded.length > 16_384 || encoded.length % 4 === 1 || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
+    // Hermes does not promise browser atob. Decode bounded base64url/UTF-8
+    // with builtins; these local hints never replace server token validation.
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    let buffer = 0, bits = 0, escaped = '';
+    for (const character of encoded) {
+      buffer = (buffer << 6) | alphabet.indexOf(character); bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        escaped += '%' + ((buffer >> bits) & 255).toString(16).padStart(2, '0');
+        buffer &= (1 << bits) - 1;
+      }
+    }
+    if (buffer !== 0) return null;
+    const claims = JSON.parse(decodeURIComponent(escaped)) as { sub?: unknown; session_id?: unknown };
+    const validUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return typeof claims.session_id === 'string' && validUuid.test(claims.session_id) && validUuid.test(auth.user.id)
+      && claims.sub === auth.user.id ? { ownerId: auth.user.id, loginId: claims.session_id } : null;
+  } catch { return null; }
+}
+
+async function nativeEventCapability(): Promise<boolean> {
+  if (!NATIVE_EVENT_RETRY_ENABLED) return false;
+  const config = await loadConfig();
+  return Boolean(config && nativeEventProtocols.get(config) === true);
+}
+
+function nativeEventAuthorityCurrent(authority: NativeEventAuthority): boolean {
+  const login = nativeEventLogin();
+  return Boolean(login && login.ownerId === authority.ownerId && login.loginId === authority.loginId
+    && consentRuntimeOverride !== false && authority.lifecycle.consentVersion === consentMutationVersion
+    && authority.lifecycle.authVersion === nativeEventAuthVersion);
+}
+
+function getNativeEventOutbox() {
+  if (!NATIVE_EVENT_RETRY_ENABLED) return null;
+  if (!nativeEventOutbox) {
+    nativeEventOutbox = createNativeEventOutbox({
+      enabled: true, storage: AsyncStorage, randomUUID: () => uuid.v4(),
+      lifecycle: () => ({ authVersion: nativeEventAuthVersion, consentVersion: consentMutationVersion }),
+      sessionScope: id => nativeEventSessionScopes.get(id) ?? null,
+      isCurrent: nativeEventAuthorityCurrent, capability: nativeEventCapability,
+      foreground: () => AppState.currentState === 'active', send: sendQueuedNativeEvent,
+      now: () => Date.now(), setTimeout, clearTimeout,
+    });
+    AppState.addEventListener('change', () => nativeEventOutbox?.foregroundChanged());
+  }
+  return nativeEventOutbox;
+}
+
+function invalidateNativeEventRetry(): Promise<void> {
+  if (!NATIVE_EVENT_RETRY_ENABLED) return Promise.resolve();
+  nativeEventAuthVersion++;
+  nativeEventSessionScopes.clear();
+  const outbox = getNativeEventOutbox()!;
+  return outbox.revoke().then(() => {
+    if (outbox.status().cleanupFailed) throw Error('Pending alert removal could not be confirmed.');
+  });
+}
+
+function nativeEventRetryAfter(response: Response): number | undefined {
+  if (response.status !== 429) return undefined;
+  let raw: string | null;
+  try { raw = response.headers?.get('Retry-After'); } catch { return undefined; }
+  if (typeof raw !== 'string' || raw.length > 128) return undefined;
+  raw = raw.trim();
+  let delay: number;
+  if (/^\d+$/.test(raw)) delay = Number(raw) * 1000;
+  else {
+    const at = Date.parse(raw);
+    if (!Number.isFinite(at) || new Date(at).toUTCString() !== raw) return undefined;
+    delay = at - Date.now();
+  }
+  return Number.isFinite(delay) ? Math.min(900_000, Math.max(0, Math.ceil(delay))) : undefined;
+}
+
+/** Exactly one keyed POST. The adapter owns retries and the whole-operation deadline. */
+async function sendQueuedNativeEvent(event: PendingEvent, delivery: EventDelivery, isCurrent: () => boolean, signal: AbortSignal): Promise<NativeEventResult> {
+  const lifecycle = nativeEventAuthVersion, consent = consentMutationVersion;
+  const current = () => !signal.aborted && lifecycle === nativeEventAuthVersion && consent === consentMutationVersion && isCurrent() === true;
+  const unavailable = (): NativeEventResult => ({ status: 503, body: { error: 'event_retry_unavailable' } });
+  try {
+    if (!current()) return unavailable();
+    const initial = await loadAuth(), login = nativeEventLogin(initial);
+    if (!current() || !login || !await nativeEventCapability() || !current()) return unavailable();
+    const auth = await refreshIfNeeded();
+    if (!auth || !current()) return unavailable();
+    const refreshedLogin = nativeEventLogin(auth), requestVersion = authMutationVersion;
+    if (!refreshedLogin || refreshedLogin.ownerId !== login.ownerId || refreshedLogin.loginId !== login.loginId
+      || !await consentEnabled() || !current() || !authIsCurrent(auth, requestVersion)) return unavailable();
+    const body: Record<string, unknown> = { session_id: event.session_id, type: event.type === 'drowsiness' ? 'drowsy' : event.type,
+      client_event_id: event.event_id, fatigue_score: event.fatigue, confidence: event.confidence };
+    if (delivery.timestampMode === 'detected') body.occurred_at = event.detected_at;
+    const controller = new AbortController(), abort = () => controller.abort();
+    signal.addEventListener('abort', abort, { once: true });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<NativeEventResult>(resolve => {
+      timer = setTimeout(() => { controller.abort(); resolve(unavailable()); }, REQUEST_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([
+        Promise.resolve().then(async () => {
+          // The final fetch microtask is a separate authorization boundary.
+          if (!current() || controller.signal.aborted || !authIsCurrent(auth, requestVersion)) return unavailable();
+          const response = await fetch(`${API_BASE}/api/events`, { method: 'POST', headers: {
+            Accept: 'application/json', Authorization: `Bearer ${auth.access_token}`, 'Content-Type': 'application/json',
+          }, body: JSON.stringify(body), signal: controller.signal });
+          const resultBody = await readJson<NonNullable<NativeEventResult['body']>>(response);
+          if (!current() || !authIsCurrent(auth, requestVersion)) return unavailable();
+          const retryAfterMs = nativeEventRetryAfter(response);
+          return { status: response.status, body: resultBody, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) };
+        }), deadline,
+      ]);
+    } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
+  } catch { return unavailable(); }
+}
+
+/** Called at detection, before the session promise or earlier event work settles. */
+export function queueNativeCloudAlert(session: Promise<string | null>, fatigueScore: number, occurredAt: string): Promise<void> | null {
+  const outbox = getNativeEventOutbox();
+  if (!outbox) return null;
+  const fatigue = Number.isFinite(fatigueScore) ? Math.max(0, Math.min(100, Math.round(fatigueScore))) : null;
+  return outbox.queue(session, 'drowsy', fatigue, null, occurredAt, id => logCloudAlert(id, fatigueScore, occurredAt));
+}
+
+export function stopNativeCloudEvents(session: Promise<string | null> | string | null): void {
+  if (session) {
+    getNativeEventOutbox()?.stopSession(session);
+    if (NATIVE_EVENT_RETRY_ENABLED) void Promise.resolve(session).then(id => { if (id) nativeEventSessionScopes.delete(id); }).catch(() => {});
+  }
+}
+
+export function nativeCloudEventRetryStatus() {
+  return NATIVE_EVENT_RETRY_ENABLED ? nativeEventOutbox?.status() ?? null : null;
 }
 
 async function secureStoreAvailable(): Promise<boolean> {
@@ -250,6 +396,15 @@ async function saveAuth(
     authMutationVersion += 1;
     authCache = auth;
     authRefreshPromise = null;
+    if (NATIVE_EVENT_RETRY_ENABLED && previous) {
+      const before = nativeEventLogin(previous), after = nativeEventLogin(auth);
+      const sameLegacyOwner = !before && !after && previous.user.id === auth.user.id && nativeEventSessionScopes.size === 0;
+      if (!sameLegacyOwner && (!before || !after || before.ownerId !== after.ownerId || before.loginId !== after.loginId)) {
+        // Even an unexpected login change during refresh cannot leave the old
+        // retry epoch active. Ordinary same-login token rotation keeps it.
+        void invalidateNativeEventRetry().catch(() => {});
+      }
+    }
     return auth;
   });
 }
@@ -260,11 +415,29 @@ async function clearAuth(): Promise<void> {
   authMutationVersion += 1;
   authCache = null;
   authRefreshPromise = null;
+  cloudSessionScopes.clear();
   await Promise.allSettled([
     authStorageQueue.run(() => SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS)),
     cloudSyncPreference.set(false),
     sessionOutbox.clear(),
+    invalidateNativeEventRetry(),
   ]);
+}
+
+function captureSignOutAuth(): Promise<StoredAuth | null> {
+  if (authCache !== undefined) return Promise.resolve(authCache);
+  // A cold sign-out needs the saved session, not loadAuth's stale-read fallback
+  // (which could resolve a newer login). Queue this raw snapshot before deletion
+  // and later token writes; it never caches or restores the captured credentials.
+  return authStorageQueue.run(async () => {
+    try {
+      const raw = await withCloudReadDeadline(() => SecureStore.getItemAsync(AUTH_KEY, SECURE_OPTIONS));
+      const parsed: unknown = raw ? JSON.parse(raw) : null;
+      return validStoredAuth(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  });
 }
 
 async function authFetch(path: string, body: Record<string, unknown>): Promise<ApiResult<AuthResponse>> {
@@ -418,6 +591,7 @@ async function currentSyncContext(): Promise<{ ownerId: string; consentVersion: 
 }
 
 export async function getCloudState(): Promise<CloudState> {
+  if (SIMULATOR_TRACE) return { readStatus: 'confirmed', available: false, signedIn: false, email: null, syncEnabled: false };
   const unavailable = (): CloudState => ({
     readStatus: 'unavailable', available: false, signedIn: false, email: null, syncEnabled: false,
   });
@@ -461,6 +635,8 @@ export async function getCloudState(): Promise<CloudState> {
 
 export async function signInToCloud(email: string, password: string): Promise<CloudSignInResult> {
   const signInVersion = authMutationVersion;
+  const pendingAlertRemoval = invalidateNativeEventRetry();
+  void pendingAlertRemoval.catch(() => {});
   const normalizedEmail = email.trim().toLowerCase();
   if (!await secureStoreAvailable()) {
     return { ok: false, message: 'Secure sign-in storage is unavailable on this device.' };
@@ -482,6 +658,7 @@ export async function signInToCloud(email: string, password: string): Promise<Cl
     try {
       await cloudSyncPreference.set(false);
       await sessionOutbox.clear();
+      await pendingAlertRemoval;
     } catch {
       return { ok: false, message: 'Cloud sharing could not be switched off. Sign-in was not saved. Please try again.' };
     }
@@ -504,33 +681,57 @@ export async function signInToCloud(email: string, password: string): Promise<Cl
 
 export async function signOutOfCloud(): Promise<void> {
   // Invalidate pending login/refresh work before any native storage wait.
-  const auth = authCache ?? null;
-  await clearAuth();
-  if (!auth) return;
-  loadConfig().then(config => {
-    if (!config) return;
-    return fetchJsonWithTimeout(`${config.url}/auth/v1/logout`, {
-      method: 'POST',
-      headers: {
-        apikey: config.anonKey,
-        Authorization: `Bearer ${auth.access_token}`,
-      },
-    });
-  }).catch(() => {
-    // Local tokens and consent are already cleared even if revocation is offline.
+  const capturedAuth = captureSignOutAuth();
+  const localClearing = clearAuth();
+  void capturedAuth.then(revokeCapturedSignOutAuth).catch(() => {
+    // Runtime auth/consent are already cleared even if revocation is offline.
+  });
+  await localClearing;
+}
+
+function headerSafeAccessToken(value: unknown): value is string {
+  return typeof value === 'string' && !/\s/.test(value) && /^[A-Za-z0-9._~+/-]+=*$/.test(value);
+}
+
+async function revokeCapturedSignOutAuth(auth: StoredAuth | null): Promise<void> {
+  if (!auth?.user.id) return;
+  const config = await loadConfig();
+  if (!config) return;
+  let accessToken = auth.access_token;
+  if (!(auth.expires_at > Math.floor(Date.now() / 1000))) {
+    if (!auth.refresh_token) return;
+    // Refresh only the captured session. Normal refresh helpers persist auth and
+    // consult the current account, so they must never run on this revocation path.
+    const result = await authFetch('/token?grant_type=refresh_token', { refresh_token: auth.refresh_token });
+    if (!result.ok || result.body.user?.id !== auth.user.id || !headerSafeAccessToken(result.body.access_token)
+      || typeof result.body.expires_in !== 'number' || !Number.isFinite(result.body.expires_in) || result.body.expires_in <= 0) return;
+    accessToken = result.body.access_token;
+  }
+  if (!headerSafeAccessToken(accessToken)) return;
+  await fetchJsonWithTimeout(`${config.url}/auth/v1/logout?scope=local`, {
+    method: 'POST',
+    headers: {
+      apikey: config.anonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 }
 
 export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
   const consentRevision = ++consentMutationVersion;
   if (!enabled) consentRuntimeOverride = false;
+  const pendingAlertRemoval = invalidateNativeEventRetry();
+  void pendingAlertRemoval.catch(() => {});
   const auth = enabled ? await refreshIfNeeded() : null;
   if (consentRevision !== consentMutationVersion) return false;
   if (enabled && !auth) return false;
   const consentVersion = authMutationVersion;
   try {
+    // Persist native opt-out independently of retry-queue removal failures.
+    if (NATIVE_EVENT_RETRY_ENABLED && !enabled) await cloudSyncPreference.set(false);
     if (!enabled || !await consentEnabled()) await sessionOutbox.clear();
-    await cloudSyncPreference.set(enabled);
+    await pendingAlertRemoval;
+    if (!NATIVE_EVENT_RETRY_ENABLED || enabled) await cloudSyncPreference.set(enabled);
     if (consentRevision !== consentMutationVersion) return false;
     if (enabled && (!auth || !authIsCurrent(auth, consentVersion))) return false;
     consentRuntimeOverride = enabled;
@@ -543,8 +744,10 @@ export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
 }
 
 export async function beginCloudSession(): Promise<string | null> {
+  const eventAuthVersion = nativeEventAuthVersion;
   void retryPendingCloudSessions();
   const syncContext = await currentSyncContext();
+  const eventLogin = NATIVE_EVENT_RETRY_ENABLED ? nativeEventLogin() : null;
   if (!syncContext || !await ensureDriverProfile(syncContext)) return null;
   const platform = Platform.OS;
   const detectorPipeline = platform === 'ios'
@@ -558,34 +761,90 @@ export async function beginCloudSession(): Promise<string | null> {
     app_version: formatAppBuildLabel(currentAppBuildInfo()),
   }, true, syncContext);
   const sessionId = result.ok ? result.body.session?.id || null : null;
-  if (sessionId) cloudSessionScopes.set(sessionId, syncContext);
+  if (sessionId) {
+    cloudSessionScopes.set(sessionId, syncContext);
+    const currentLogin = NATIVE_EVENT_RETRY_ENABLED ? nativeEventLogin() : null;
+    if (NATIVE_EVENT_RETRY_ENABLED && eventLogin && currentLogin?.ownerId === eventLogin.ownerId && currentLogin.loginId === eventLogin.loginId
+      && eventAuthVersion === nativeEventAuthVersion && syncContext.consentVersion === consentMutationVersion) {
+      nativeEventSessionScopes.set(sessionId, { ...eventLogin, lifecycle: { authVersion: eventAuthVersion, consentVersion: syncContext.consentVersion } });
+    }
+  }
   return sessionId;
 }
 
-export async function logCloudAlert(sessionId: string, fatigueScore: number): Promise<boolean> {
+export async function logCloudAlert(sessionId: string, fatigueScore: number, occurredAt?: string): Promise<boolean> {
+  // A delayed alert belongs to the sharing choice and owner that started its
+  // session. Re-enabling sharing must not authorize an old queued alert.
+  const sessionScope = cloudSessionScopes.get(sessionId);
+  if (!sessionScope) return false;
   const syncContext = await currentSyncContext();
   if (!syncContext) return false;
-  const result = await backendApi('POST', '/api/events', {
+  if (sessionScope.ownerId !== syncContext.ownerId
+    || sessionScope.consentVersion !== syncContext.consentVersion) return false;
+  const event = {
     session_id: sessionId,
     type: 'drowsy',
     fatigue_score: Math.max(0, Math.min(100, Math.round(fatigueScore))),
-  }, true, syncContext);
+  };
+  const timed = typeof occurredAt === 'string' && Number.isFinite(Date.parse(occurredAt))
+    ? { ...event, occurred_at: occurredAt } : event;
+  let result = await backendApi('POST', '/api/events', timed, true, syncContext);
+  // Only a rejected occurrence time permits this one fallback. Keep the same
+  // captured context so revoked sharing or a new login cannot authorize it.
+  if (timed !== event && result.status === 400 && result.body?.error === 'invalid_occurred_at'
+    && cloudSessionScopes.get(sessionId) === sessionScope) {
+    result = await backendApi('POST', '/api/events', event, false, syncContext);
+  }
   return result.ok;
 }
 
-function sendPendingSummary(scope: SummaryScope, entry: PendingSessionSummary) {
-  return backendApi('PATCH', '/api/sessions', {
+async function sendPendingSummary(scope: SummaryScope, entry: PendingSessionSummary) {
+  const result = await backendApi<{ ok?: boolean; session?: { id?: unknown; ended_at?: unknown } }>('PATCH', '/api/sessions', {
     session_id: entry.session_id, ended_at: entry.ended_at,
     average_fatigue: entry.average_fatigue, max_fatigue: entry.max_fatigue,
     safety_score: entry.safety_score, alert_count: entry.alert_count,
     head_nod_count: entry.head_nod_count,
   }, true, scope);
+  const stored = result.body?.session;
+  const end = stored?.ended_at;
+  // PostgREST may return Z or a numeric offset and microsecond precision.
+  const ended = typeof end === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(end)
+    && Number.isFinite(Date.parse(end))
+    && new Date(end.slice(0, 10) + 'T00:00:00.000Z').toISOString().slice(0, 10) === end.slice(0, 10);
+  // An HTTP success alone does not acknowledge an immutable stored completion.
+  return { status: result.status, ok: result.ok && result.body?.ok === true
+    && stored?.id === entry.session_id && ended };
 }
 
-export async function retryPendingCloudSessions(): Promise<void> {
+export interface PendingCloudSummaryState {
+  scope: SummaryScope | null;
+  count: number;
+  localIds: string[];
+}
+
+export function pendingCloudSummaryStateIsCurrent(state: PendingCloudSummaryState): boolean {
+  return Boolean(state.scope && authCache?.user.id === state.scope.ownerId
+    && consentRuntimeOverride !== false && consentMutationVersion === state.scope.consentVersion);
+}
+
+export async function getPendingCloudSummaryState(): Promise<PendingCloudSummaryState> {
+  const unavailable = (): PendingCloudSummaryState => ({scope:null,count:0,localIds:[]});
+  try {
+    return await withCloudReadDeadline(async () => {
+      const scope = await currentSyncContext();
+      if (!scope) return unavailable();
+      const entries = await sessionOutbox.pendingEntries(scope);
+      const result = {scope,count:entries.length,localIds:entries.flatMap(entry=>entry.local_session_id?[entry.local_session_id]:[])};
+      return pendingCloudSummaryStateIsCurrent(result) ? result : unavailable();
+    });
+  } catch { return unavailable(); }
+}
+
+export async function retryPendingCloudSessions(expectedScope?: SummaryScope): Promise<void> {
   try {
     const scope = await currentSyncContext();
-    if (!scope) return;
+    if (!scope || expectedScope && (scope.ownerId !== expectedScope.ownerId || scope.consentVersion !== expectedScope.consentVersion)) return;
     await sessionOutbox.flush(scope, entry => sendPendingSummary(scope, entry));
   }
   catch { /* Preserve unreadable or unavailable storage for local recovery. */ }
@@ -597,6 +856,7 @@ export async function finishCloudSession(
   endedAt = new Date().toISOString(),
   localSessionId?: string,
 ): Promise<boolean> {
+  stopNativeCloudEvents(sessionId);
   const sessionScope = cloudSessionScopes.get(sessionId);
   if (!sessionScope) return false;
   const syncContext = await currentSyncContext();
@@ -605,17 +865,17 @@ export async function finishCloudSession(
     cloudSessionScopes.delete(sessionId);
     return false;
   }
-  const metric = (value: number, max = 100) => Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : null;
+  const metric = (value: number | null, max = 100) => typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : null;
   const entry: PendingSessionSummary = {
     session_id: sessionId, ended_at: endedAt, local_session_id: localSessionId,
     average_fatigue: metric(stats.averageFatigue), max_fatigue: metric(stats.maxFatigue),
     safety_score: metric(stats.safetyScore), alert_count: metric(stats.alertCount, 10000),
     // Candidate head-nod observations remain local until device validation.
-    head_nod_count: 0,
+    head_nod_count: null,
   };
   try {
     if (!await sessionOutbox.enqueue(syncContext, entry)) return false;
     return (await sessionOutbox.flush(syncContext, item => sendPendingSummary(syncContext, item))).has(sessionId);
   } catch { return false; }
-  finally { cloudSessionScopes.delete(sessionId); }
+  finally { cloudSessionScopes.delete(sessionId); nativeEventSessionScopes.delete(sessionId); }
 }

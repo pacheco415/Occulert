@@ -1,5 +1,6 @@
 // One Vercel Function serves these explicit API paths to fit the Hobby
 // deployment limit. Dispatch from the actual path, never a query parameter.
+const { json } = require("./_lib/responses");
 const handlers = Object.freeze({
   "/api/fleet-drivers": require("./_lib/routes/fleet-drivers"),
   "/api/fleet-membership": require("./_lib/routes/fleet-membership"),
@@ -24,10 +25,7 @@ module.exports = function handler(request, response) {
     const routeName = pathname.slice('/api/'.length);
     const query = request.query;
     if (query && Object.hasOwn(query, 'endpoint') && query.endpoint !== routeName) {
-      response.statusCode = 400;
-      response.setHeader('Content-Type', 'application/json; charset=utf-8');
-      response.setHeader('Cache-Control', 'no-store');
-      return response.end(JSON.stringify({ error: 'invalid_query' }));
+      return json(response, 400, { error: 'invalid_query' });
     }
     // Vercel adds one matching [endpoint] parameter to both request.url and
     // request.query. Remove exactly one from the forwarded URL. Extra values
@@ -51,8 +49,7 @@ module.exports = function handler(request, response) {
     });
     return handlers[pathname](forwarded, response);
   }
-  response.statusCode = 404;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify({ error: "not_found" }));
+  return json(response, 404, { error: "not_found" });
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

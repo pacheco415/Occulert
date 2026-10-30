@@ -14,10 +14,23 @@
     "preview": {
       "distribution": "internal"
     },
+    "simulator-trace": {
+      "distribution": "internal",
+      "env": {
+        "OCCULERT_SIMULATOR_TRACE": "1",
+        "OCCULERT_SIMULATOR_PROFILE": "simulator-trace",
+        "OCCULERT_SIMULATOR_PLATFORM": "ios"
+      },
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release",
+        "image": "sdk-58"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "ios": {
-        "image": "macos-tahoe-26.5-xcode-26.6"
+        "image": "sdk-58"
       }
     }
   },

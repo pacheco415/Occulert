@@ -9,79 +9,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
-<!-- Run before any stylesheet or dependency can hold up the driver page. -->
-<script id="driver-startup-guard">
-(() => {
-  const corePath = '/driver-app.v70.js';
-  let state = 'loading';
-  const byId = id => document.getElementById(id);
-  const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
-  // HTML may still be streaming when the deadline expires. Paint once all
-  // recovery controls exist, even if a later dependency still blocks parsing.
-  const failureNodes = ['startupNotice', 'startupReload', 'driverControls', 'startBtn', 'driveState', 'calibration', 'risk', 'riskDetail', 'status', 'overlay'];
-  const observer = new MutationObserver(() => {
-    if (state === 'failed' && failureNodes.every(id => byId(id))) { observer.disconnect(); refresh(); }
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  function refresh() {
-    const failed = state === 'failed', ready = state === 'ready';
-    const controls = byId('driverControls'), startButton = byId('startBtn');
-    if (controls) controls.disabled = !ready;
-    if (startButton) { startButton.disabled = !ready; startButton.textContent = ready ? 'START MONITORING' : failed ? 'APP UNAVAILABLE' : 'Loading app…'; }
-    const notice = byId('startupNotice');
-    if (notice) { notice.hidden = ready; notice.setAttribute('role', failed ? 'alert' : 'status'); notice.setAttribute('aria-live', failed ? 'assertive' : 'polite'); }
-    setText('startupTitle', failed ? 'App could not load' : 'Loading app…');
-    setText('startupMessage', failed ? 'No monitoring is active. Reload the app when safely parked.' : 'Monitoring controls will be available when the app finishes loading.');
-    const reload = byId('startupReload');
-    if (reload) { reload.hidden = !failed; reload.onclick = () => location.reload(); }
-    setText('driveState', 'NOT MONITORING');
-    setText('driveHint', ready ? 'Press Start Monitoring only when safely parked.' : 'Monitoring has not started.');
-    setText('calibration', 'NOT STARTED');
-    setText('risk', '--'); setText('riskDetail', '--');
-    setText('status', ready ? 'OFFLINE' : failed ? 'APP UNAVAILABLE' : 'LOADING');
-    const card = byId('stateCard'); if (card) card.className = 'card state-card';
-    const status = byId('status'); if (status) status.className = 'status off';
-    if (failed) {
-      setText('overlayTitle', 'Monitoring unavailable');
-      setText('overlayText', 'The app did not finish loading. No camera monitoring is active.');
-      setText('overlayHint', 'Reload the app only when safely parked.');
-      const overlay = byId('overlay'); if (overlay) overlay.classList.remove('hide');
-    }
-  }
-  function fail() {
-    if (state !== 'loading') return;
-    state = 'failed'; clearTimeout(deadline);
-    if (failureNodes.every(id => byId(id))) observer.disconnect();
-    refresh();
-  }
-  const deadline = setTimeout(fail, 8000);
-  function isCore(value) {
-    try { return new URL(value, location.href).pathname === corePath; } catch (_) { return false; }
-  }
-  window.addEventListener('error', event => {
-    if (isCore(event.filename || '') || (event.target?.tagName === 'SCRIPT' && isCore(event.target.src))) fail();
-  }, true);
-  document.addEventListener('DOMContentLoaded', () => { if (state !== 'ready') refresh(); }, { once: true });
-  window.OcculertStartup = Object.freeze({
-    isReady: () => state === 'ready',
-    refresh: () => { if (state !== 'ready') refresh(); },
-    ready: core => {
-      if (state !== 'loading') { if (state === 'failed') refresh(); return false; }
-      if (!core || core.version !== 'v68' || !Object.isFrozen(core) ||
-          !['start', 'stop', 'findCameraChoices', 'initModel'].every(key => typeof core[key] === 'function') ||
-          typeof byId('startBtn')?.onclick !== 'function') { fail(); return false; }
-      state = 'ready'; clearTimeout(deadline); observer.disconnect(); refresh(); return true;
-    }
-  });
-})();
-</script>
+
+<script id="driver-startup-guard" src="/driver-startup-guard.v22.js" integrity="sha256-9zOjI+p8geipRwd9wdaEfp/zkNzrc6CPiAp2sKmdC2w=" crossorigin="anonymous" defer></script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
-<!-- The supported cloud path uses authenticated Occulert API endpoints. -->
-<link rel="stylesheet" href="/driver-app.v68.css" />
-<link rel="stylesheet" href="/liquid-glass.v47.css" />
+
+<link rel="stylesheet" href="/driver-app.v69.css" />
+<link rel="stylesheet" href="/driver-overview.v1.css" />
+<link rel="stylesheet" href="/liquid-glass.v49.css" />
 <link rel="stylesheet" href="/accessibility.v52.css" />
 <script src="/static-page.v60.js" defer></script>
+<script src="/page-actions.v2.js" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -109,7 +47,7 @@
   <div class="camera">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
-    <div class="overlay" id="overlay"><div>
+    <div class="overlay" id="overlay" role="region" aria-labelledby="overlayTitle" tabindex="0"><div>
       <h2 id="overlayTitle" style="font-size:22px;font-weight:900;letter-spacing:-0.5px">AI Fatigue Monitoring</h2>
       <p class="small" id="overlayText">Supplemental prototype only. Keep your eyes on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.</p>
       <div class="phone-guide" id="phoneGuide">
@@ -123,30 +61,46 @@
       </div>
       <div class="hint" id="overlayHint"><strong>iPhone tip:</strong> Keep Safari open, screen unlocked, and Low Power Mode off for best reliability.</div>
     </div></div>
-    <div class="alertScreen" id="alertScreen"><div><h2 id="alertTitle" style="font-size:48px;color:#fff;margin:0">DROWSY ALERT</h2><p id="alertSub">Pull over safely</p></div></div>
+    <div class="alertScreen" id="alertScreen" role="region" aria-labelledby="alertTitle" tabindex="0"><div><h2 id="alertTitle" style="font-size:48px;color:#fff;margin:0">DROWSY ALERT</h2><p id="alertSub">Pull over safely</p></div></div>
   </div>
-  <aside class="panel" aria-label="Occulert controls and metrics">
-    <h1 style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>
+  <aside class="panel" id="driverPanel" aria-label="Occulert controls and metrics">
+    <h1 id="driverPanelTitle" style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>
 
     <div class="card notice-card" id="startupNotice" role="status" aria-live="polite">
       <h2 id="startupTitle" style="font-size:18px;margin:0 0 8px">Loading app…</h2>
       <p class="small" id="startupMessage">Monitoring controls will be available when the app finishes loading.</p>
       <button class="btn primary" type="button" id="startupReload" hidden>Reload app</button>
+      <a class="btn" id="startupRetryLink" href="/app.html">Reload when safely parked</a>
     </div>
     <fieldset id="driverControls" disabled aria-label="Monitoring controls" style="border:0;padding:0;margin:0;min-width:0">
 
-    <!-- ── Background / Screen-Lock Warning ─────────────────────────────── -->
+
+    <div id="monitoringEssentials">
+    <button class="btn primary" id="startBtn" disabled>Loading app…</button>
+    <section id="observerLabels" class="card" tabindex="0" aria-label="Parked observer labeling" hidden style="display:none">
+      <h2 style="font-size:18px">Parked observer labeling</h2>
+      <p class="small">Remain safely parked. An independent observer marks episodes without detector indicators or cues. Space: drowsy. H: high fatigue. Press again to end.</p>
+      <p id="observerLabelStatus" role="status" aria-live="polite">Start a parked session to label.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="observerDrowsy" type="button" class="btn" aria-pressed="false" disabled style="min-height:64px;flex:1">Drowsy · Space</button>
+        <button id="observerHighFatigue" type="button" class="btn" aria-pressed="false" disabled style="min-height:64px;flex:1">High fatigue · H</button>
+      </div>
+      <button id="exportObserverEpisodes" type="button" class="btn" hidden>Export observer episodes</button>
+    </section>
+    <div id="monitoringMessages" role="region" aria-label="Monitoring status and guidance" tabindex="0">
     <div class="screen-warning" id="screenWarning" style="display:none">
       ⚠️ <strong>Monitoring stopped after screen lock or leaving this tab.</strong> Return to Occulert and restart only while safely parked.
     </div>
-
-    <button class="btn primary" id="startBtn" disabled>Loading app…</button>
+    <div class="card state-card" id="stateCard" tabindex="-1" role="status" aria-live="polite" aria-atomic="true"><div class="label">Monitoring Status</div><div class="state-value" id="driveState">NOT MONITORING</div><p class="metric-note" id="driveHint">Monitoring has not started.</p></div>
+    <p class="card notice-card small" id="viewportWarning" role="status" aria-live="polite" hidden></p>
+    </div>
+    </div>
+    <div id="driverSecondary" role="region" aria-label="Session details and safety notice" tabindex="0">
     <div class="timer-card" id="timerCard"><span class="timer-label">Session Time</span><span class="timer-value" id="sessionTimer">00:00</span></div>
-    <div class="card state-card" id="stateCard" role="status" aria-live="polite" aria-atomic="true"><div class="label">Monitoring Status</div><div class="state-value" id="driveState">NOT MONITORING</div><p class="metric-note" id="driveHint">Monitoring has not started.</p></div>
-    <div class="card notice-card"><div class="label">Safety Notice</div><p class="small">Occulert is a supplemental prototype only, not a certified safety, medical, emergency, insurance, legal, employment, fleet compliance, or transportation compliance device. It may miss drowsiness and may trigger false alerts. If you feel tired or unsafe, pull over safely and rest.</p></div>
+    <div class="card notice-card" id="driverSafetyNotice"><div class="label">Safety Notice</div><p class="small">Occulert is a supplemental prototype only, not a certified safety, medical, emergency, insurance, legal, employment, fleet compliance, or transportation compliance device. It may miss drowsiness and may trigger false alerts. If you feel tired or unsafe, pull over safely and rest.</p></div>
 
     <div id="breakBanner" role="alert" style="display:none;background:rgba(255,170,0,.12);border:1px solid #ffaa00;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13px;color:#ffcc44;font-weight:700;line-height:1.5;"></div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center" aria-live="polite">
+    <div id="driverStatusBadges" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center" aria-live="polite">
       <span id="trackingBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(0,255,136,.08);border:1px solid currentColor;white-space:nowrap">Tracking status unknown</span>
       <span id="lightBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,170,0,.08);border:1px solid currentColor;white-space:nowrap">Low light</span>
       <span id="batteryBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,68,68,.08);border:1px solid currentColor;color:#ff6666;white-space:nowrap"></span>
@@ -154,6 +108,14 @@
 
     <section id="parkedControls" aria-label="Parked setup and diagnostics">
     <p class="small">Set up and review these controls only while safely parked. They are hidden during monitoring.</p>
+    <section class="card" id="driverOverview" aria-labelledby="driverOverviewTitle">
+      <div class="overview-heading"><h2 id="driverOverviewTitle">Your recent sessions</h2><button id="overviewRefresh" type="button">Refresh</button></div>
+      <p class="small" id="overviewLastSession">Loading saved sessions…</p>
+      <dl class="overview-metrics"><div><dt>Saved sessions</dt><dd id="overviewSessions">—</dd></div><div><dt>Recorded minutes</dt><dd id="overviewMinutes">—</dd></div><div><dt>Recorded alerts</dt><dd id="overviewAlerts">—</dd></div></dl>
+      <p class="small" id="overviewNextStep">Complete setup and review sessions only while parked.</p>
+      <div class="overview-actions"><a class="btn" href="/session-history.html">Review History</a><button class="btn" id="overviewAlertCheck" type="button">Check sound &amp; vibration</button></div>
+      <p class="small" id="overviewCoverage">Last 7 days · saved on this browser. Local records do not confirm cloud delivery.</p>
+    </section>
     <div class="camera-source-row" id="cameraSourceRow" hidden>
       <label for="cameraSourceSelect">Camera</label>
       <div class="camera-source-controls">
@@ -165,7 +127,7 @@
       <p class="camera-source-hint" id="cameraSourceHint" aria-live="polite">Choose your Mac camera to keep Safari from using your iPhone.</p>
     </div>
 
-    <!-- Display Intensity Controls -->
+
     <div class="intensity-row">
       <label>&#128261; Display Intensity</label>
       <div class="intensity-presets">
@@ -175,7 +137,7 @@
       </div>
     </div>
 
-    <!-- ── Sensitivity Control ──────────────────────────────────────────── -->
+
     <div class="intensity-row" id="sensitivityRow">
       <label>🎚 Alert Sensitivity</label>
       <div class="intensity-presets">
@@ -187,7 +149,7 @@
 
 
     <div class="night-row"><label for="nightOpacity">&#127761; Night Alert Brightness<span style="font-size:10px;color:var(--text3);margin-left:6px;font-weight:400;font-style:italic">Alert screen opacity</span></label><div class="night-slider"><input type="range" id="nightOpacity" min="30" max="95" value="72" step="1"><span class="night-val" id="nightVal">72%</span></div></div>
-    <div class="card privacy-card"><div class="label">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b>Enable GPS for this session</b><br><span class="small">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b>Enable cloud session sync</b><br><span class="small">Requires sign-in and saves session totals plus alerts. Camera images are never uploaded. Otherwise data stays local.</span></span></label></div>
+    <div class="card privacy-card"><div class="label">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b>Enable GPS for this session</b><br><span class="small">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b>Enable cloud session sync</b><br><span class="small">Requires sign-in and saves session totals plus alerts. Camera images are never uploaded. Otherwise data stays local.</span></span></label><p id="cloudEventStatus" class="small" role="status" aria-live="polite" hidden></p></div>
     <div class="card"><div class="label">Calibration</div><div class="value" id="calibration">NOT STARTED</div><div class="cal-bar-wrap"><div class="cal-bar-fill" id="calibrationFill"></div></div><p class="metric-note" id="calHint">Keep your face centered and eyes open during calibration.</p></div>
     <div class="grid">
       <div class="card"><div class="label">Fatigue</div><div class="value" id="fatigue">0</div><div class="bar"><div class="fill" id="fatigueFill"></div></div></div>
@@ -211,7 +173,7 @@
       <div class="card"><div class="label">Location</div><div class="value" id="location">--</div></div>
     </div>
     <details class="dev-tools"><summary>Parked diagnostics</summary><p class="small">Run the alert check while parked. It does not add an alert or change a saved session.</p><button class="btn demo" id="demoBtn" type="button">Test sound and vibration</button><p class="small" id="alertCheckResult" role="status" aria-live="polite"></p><button class="btn" id="resetBtn" type="button" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8;margin-top:8px;margin-bottom:0;font-size:12px;padding:10px">Clear on-screen diagnostics</button></details>
-    <div class="card"><div class="label">Session Report</div><div class="report" id="report"></div></div>
+    <div class="card"><div class="label">Session Report</div><p id="experimentStatus" role="status" hidden></p><button id="exportDetectionTrace" type="button" class="btn" hidden>Export parked detection comparison</button><div class="report" id="report"></div></div>
     <div class="card" id="feedbackCard" hidden>
       <div class="label">Post-drive alert feedback</div>
       <p class="small">Review this drive while parked. Your observation stays in this browser's local history unless you choose to share it.</p>
@@ -231,48 +193,51 @@
       <p id="feedbackStatus" class="small" role="status" aria-live="polite"></p>
     </div>
     <div class="card"><div class="label">Event Log</div><div id="log"></div></div>
-  
-    <!-- ── NEW FEATURE UI BLOCKS ─────────────────────────────────── -->
 
-    <!-- Yawn Card -->
+
+
+
     <div class="grid" style="margin-bottom:10px">
       <div class="card"><div class="label">Yawns</div><div class="value" id="yawnCountEl">0</div></div>
       <div class="card"><div class="label">MAR Signal</div><div class="value" style="font-size:12px;color:var(--text2)" id="marEl">--</div></div>
     </div>
 
-    <!-- Alertness Mini-Chart -->
+
     <div class="card" style="padding:10px 12px;margin-bottom:10px">
       <div class="label" style="margin-bottom:6px">Alertness Over Time</div>
       <canvas id="alertnessChart" style="width:100%;height:60px;display:block;border-radius:6px;background:rgba(0,0,0,.3)"></canvas>
     </div>
 
-    <!-- Controls: Voice, Snooze, CSV Export, PWA Install -->
+
     <div class="card" style="padding:12px 14px;margin-bottom:10px">
       <div class="label" style="margin-bottom:10px">Controls</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-        <button id="voiceToggleBtn" onclick="typeof toggleVoice==='function'&&toggleVoice()" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">🔇 Voice OFF</button>
+        <button id="voiceToggleBtn" data-page-action="toggleVoice" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">🔇 Voice OFF</button>
         <span style="font-size:11px;color:#94a3b8">Safety alerts cannot be snoozed while monitoring.</span>
       </div>
     </div>
 
-    <!-- Export + Install row -->
+
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <button onclick="typeof exportCSV==='function'&&exportCSV()" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
-      <button id="pwaInstallBtn" onclick="typeof triggerPWAInstall==='function'&&triggerPWAInstall()" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
+      <button data-page-action="exportCSV" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
+      <button id="pwaInstallBtn" data-page-action="triggerPWAInstall" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
     </div>
     </section>
+    </div>
     </fieldset>
 </aside>
 </main>
-<script src="/occulert-backend.v70.js"></script>
-<script src="/security-utils.v47.js"></script>
-<script src="/driver-app.v70.js"></script>
+<script src="/occulert-backend.v90.js" defer></script>
+<script src="/security-utils.v47.js" defer></script>
+<script src="/local-history.v2.js" defer></script>
+<script src="/driver-app.v101.js" defer></script>
+<script src="/driver-overview.v1.js" defer></script>
 <script src="/lang.v47.js" defer></script>
 
-<!-- iOS Add to Home Screen Modal -->
+
 <div id="iosInstallModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom)">
   <div style="background:#0f1e2e;border:1px solid #1a3a4a;border-radius:20px 20px 0 0;padding:28px 24px 32px;width:100%;max-width:480px;position:relative">
-    <button onclick="closeIOSInstallModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1">✕</button>
+    <button data-page-action="closeIOSInstallModal" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1">✕</button>
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
       <img src="/occulert-logo-main-192.png" width="52" height="52" loading="lazy" decoding="async" style="width:52px;height:52px;border-radius:12px" alt="Occulert">
       <div>

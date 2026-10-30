@@ -1,6 +1,7 @@
 // Stripe test-mode REST and webhook helpers. This module deliberately refuses
 // live keys; enabling real payments requires a separate review and migration.
 const crypto = require("node:crypto");
+const { remainingProviderMs } = require("./provider-budget");
 
 const API_ORIGIN = "https://api.stripe.com";
 const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -74,8 +75,16 @@ async function stripeRequest(path, options) {
   if (!/^\/v1\/[A-Za-z0-9_/?=&.%\-]+$/.test(path)) {
     throw new Error("invalid_stripe_path");
   }
+  const timeoutMs = remainingProviderMs(8000);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  let timer;
+  const expired = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error("stripe_timeout"); error.status = 504;
+      reject(error); controller.abort();
+    }, timeoutMs);
+  });
+  const operation = (async () => {
   try {
     const method = opts.method || "GET";
     const headers = { Authorization: "Bearer " + cfg.secretKey };
@@ -87,6 +96,8 @@ async function stripeRequest(path, options) {
       body: opts.fields ? new URLSearchParams(opts.fields).toString() : undefined,
       signal: controller.signal,
     });
+    // The hard deadline already settled the caller; discard late headers.
+    if (controller.signal.aborted) return;
     const responseText = await response.text();
     if (Buffer.byteLength(responseText) > MAX_RESPONSE_BYTES) throw new Error("stripe_response_too_large");
     let data;
@@ -100,7 +111,11 @@ async function stripeRequest(path, options) {
       error.stripeCode = data && data.error && data.error.code;
       throw error;
     }
-    if (!data || typeof data !== "object" || data.livemode !== false) {
+    // Stripe's deletion confirmation omits livemode. Accept it only for the
+    // exact object this test-key request deleted.
+    const deletedObject = Boolean(opts.deletedObjectId) && method === "DELETE" && data && data.deleted === true &&
+      data.id === opts.deletedObjectId && data.livemode === undefined;
+    if (!deletedObject && (!data || typeof data !== "object" || data.livemode !== false)) {
       throw new Error("stripe_live_object_rejected");
     }
     return data;
@@ -114,6 +129,25 @@ async function stripeRequest(path, options) {
   } finally {
     clearTimeout(timer);
   }
+  })();
+  return Promise.race([operation, expired]);
+}
+
+// Deleting a Stripe customer also cancels its active subscriptions. A
+// customer that is already gone is the desired end state.
+async function deleteTestCustomer(customerId) {
+  if (!/^cus_[A-Za-z0-9]+$/.test(customerId || "")) throw new Error("invalid_test_customer");
+  let deleted;
+  try {
+    deleted = await stripeRequest("/v1/customers/" + customerId, { method: "DELETE", deletedObjectId: customerId });
+  } catch (error) {
+    if (error && error.stripeCode === "resource_missing") return { deleted: true, already: true };
+    throw error;
+  }
+  if (!deleted || deleted.id !== customerId || deleted.object !== "customer" || deleted.deleted !== true) {
+    throw new Error("stripe_customer_not_deleted");
+  }
+  return { deleted: true, already: false };
 }
 
 async function requireMonthlyTestPrice(priceId) {
@@ -183,6 +217,6 @@ function verifyWebhookSignature(rawBody, signatureHeader, secret, nowMs) {
 
 module.exports = {
   config, portalConfigurationId, fixedReturnUrls, safeStripeUrl, idempotencyKey,
-  stripeRequest, requireMonthlyTestPrice, requireSafePortalConfiguration,
+  stripeRequest, deleteTestCustomer, requireMonthlyTestPrice, requireSafePortalConfiguration,
   readRawBody, verifyWebhookSignature,
 };

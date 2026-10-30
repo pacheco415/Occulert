@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+const fontCSS=JSON.parse(readFileSync('asset-versions.json','utf8'))['inter-fonts.css'];
 
 test('an immediately available font stylesheet activates on initial load and reload', async ({ page }) => {
-  await page.route('https://fonts.googleapis.com/**', route => route.fulfill({
+  await page.route('**/'+fontCSS, route => route.fulfill({
     contentType: 'text/css', body: ':root{--fixture-font-stylesheet:loaded}',
   }));
   for (const reload of [false, true]) {
@@ -16,12 +18,12 @@ test('an immediately available font stylesheet activates on initial load and rel
 });
 
 for (const outcome of ['delayed', 'failed']) {
-  test(`a ${outcome} external font stylesheet cannot block homepage layout or navigation`, async ({ page }) => {
+  test(`a ${outcome} owned font stylesheet cannot block homepage layout or navigation`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     let resolveFont;
     const held = new Promise(resolve => { resolveFont = resolve; });
     let requested = false, settled = false;
-    await page.route('https://fonts.googleapis.com/**', async route => {
+    await page.route('**/'+fontCSS, async route => {
       requested = true;
       await held;
       if (outcome === 'failed') await route.abort('failed');
@@ -31,7 +33,7 @@ for (const outcome of ['delayed', 'failed']) {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     try {
-      // The external request remains unresolved throughout initial layout and interaction.
+      // The owned request remains unresolved throughout initial layout and interaction.
       await page.goto('/', { waitUntil: 'domcontentloaded' });
       await expect.poll(() => requested).toBe(true);
       expect(settled).toBe(false);

@@ -5,26 +5,21 @@
 // owner IDs, plans, and roles are intentionally ignored.
 
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
+const { validJsonBody } = require("./_lib/validation");
 const MAX_BODY_LENGTH = 2048;
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function clean(value, max) {
   return String(value || "").replace(/\0/g, "").trim().slice(0, max);
 }
 
 function validBody(request) {
-  if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = typeof request.body === "object" && request.body ? request.body : {};
-  return !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
+  return validJsonBody(request, MAX_BODY_LENGTH);
 }
 
 function emailVerified(user) {
@@ -50,7 +45,7 @@ module.exports = async function handler(request, response) {
 
   let user;
   try {
-    user = await verifyAccessToken(bearerToken(request));
+    user = await verifyAccessToken(bearerToken(request), { freshUser: true });
     if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
     if (request.method === "POST" && !emailVerified(user)) {
       return json(response, 403, { ok: false, error: "email_not_verified" });
@@ -78,8 +73,12 @@ module.exports = async function handler(request, response) {
       try {
         const fleet = await ownedFleet(user.id);
         if (fleet) return json(response, 200, { ok: true, created: false, fleet: fleet });
-      } catch (_) {}
+      } catch (lookupError) {
+        return json(response, supabaseErrorStatus(lookupError), { ok: false, error: "supabase_error" });
+      }
     }
-    return json(response, 502, { ok: false, error: "supabase_error" });
+    return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

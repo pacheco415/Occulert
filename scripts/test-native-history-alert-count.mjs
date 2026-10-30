@@ -1,12 +1,13 @@
+import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 import vm from 'node:vm';
 import { formatSessionAlertCount } from '../native-app/lib/sessionAlertCount.ts';
-import { formatSessionFatigue } from '../native-app/lib/sessionSummaryValues.ts';
+import { formatSessionFatigue, formatSessionDuration, sessionSavedAt } from '../native-app/lib/sessionSummaryValues.ts';
 import { buildSessionHistoryExport } from '../native-app/lib/sessionHistoryExport.ts';
-import { parseSessionHistory } from '../native-app/lib/sessionHistoryData.ts';
+import { parseSessionHistory, assignMissingSessionIds, serializeSessionHistory, sessionHistoryNeedsMigration } from '../native-app/lib/sessionHistoryData.ts';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 function executeNativeModule(path, names, bindings) {
@@ -18,15 +19,17 @@ function executeNativeModule(path, names, bindings) {
 }
 
 const { feedbackUrl } = executeNativeModule('native-app/lib/feedback.ts', ['feedbackUrl'], {
-  formatSessionAlertCount, Platform: { OS: 'ios' }, Linking: {},
+  formatSessionAlertCount, formatSessionFatigue, formatSessionDuration, sessionSavedAt, Platform: { OS: 'ios' }, Linking: {},
   currentAppBuildInfo: () => ({ appVersion: 'synthetic', appBuildNumber: 'synthetic' }),
 });
 const feedbackBody = item => new URL(feedbackUrl(item)).searchParams.get('body');
 
 // Execute the actual per-record render bindings and the Alerts Text expression.
 // JSX layout and native bridges are excluded so root Node CI needs no Expo install.
-const historySource = read('native-app/app/history.tsx');
-const renderBindings = historySource.match(/group\.sessions\.map\(\(\{ item, index: i \}\) => \{([\s\S]*?)return \(/)?.[1];
+const historyOwners = readHistorySourceOwners(read);
+const historySource = historyOwners.card;
+const renderBindings = historySource.match(/(const sessionKey = [\s\S]*?)\n  return \(/)?.[1];
+assert.match(historyOwners.screen, /<HistorySessionCard[^>]*item=\{item\} index=\{i\}/);
 const alertsExpression = historySource.match(/<Text[^>]*>\{([^{}]*)\}<\/Text>\s*<Text style=\{s\.statLbl\}>Alerts<\/Text>/)?.[1];
 assert.ok(renderBindings && alertsExpression, 'the production history Alerts render must be located');
 function displayedAlerts(item) {
@@ -63,13 +66,13 @@ for (const count of [0, 1, 23, Number.MAX_SAFE_INTEGER]) {
   });
 }
 
-test('reading and presenting mixed legacy history preserves saved bytes and scoring fields', async () => {
+test('migrating and presenting mixed legacy history preserves saved fields and scores', async () => {
   const bytes = '[ {"savedAt":"legacy", "avgFatigue":31, "safetyScore":69, "unknown":{"keep":true}},'
     + '{"alertCount":0,"avgFatigue":0,"cloudSessionId":"private"},'
     + '{"alertCount":"invalid","avgFatigue":5}, {"alertCount":7,"avgFatigue":10} ]';
   let stored = bytes, writes = 0;
   const { loadSessionHistory } = executeNativeModule('native-app/lib/sessionHistory.ts', ['loadSessionHistory'], {
-    parseSessionHistory,
+    parseSessionHistory, assignMissingSessionIds, serializeSessionHistory, sessionHistoryNeedsMigration,
     AsyncStorage: {
       getItem: async () => stored,
       setItem: async (_key, value) => { writes += 1; stored = value; },
@@ -84,6 +87,27 @@ test('reading and presenting mixed legacy history preserves saved bytes and scor
   assert.equal((exported.match(/Alerts: Not recorded/g) || []).length, 2);
   assert.doesNotMatch(exported, /cloudSessionId|private|safetyScore/);
   assert.equal(JSON.stringify(records), before);
-  assert.equal(stored, bytes);
-  assert.equal(writes, 0);
+  assert.deepEqual(JSON.parse(stored).sessions.map(({sessionId,...record})=>record),JSON.parse(bytes));
+  assert.equal(writes, 1, 'only the identity migration writes');
+  await loadSessionHistory();
+  assert.equal(writes, 1, 'later reads do not rewrite migrated history');
+});
+
+
+for (const [label, value] of [['missing',undefined],['negative',-1],['boolean',false],['blank',''],['numeric string','0'],['nonfinite',Infinity],['NaN',NaN]]) {
+ test(`${label} summary values stay unknown in both feedback and export`,()=>{
+  const item={durationSec:value,avgFatigue:value,savedAt:'invalid-date',updatedAt:'invalid-too'};
+  const feedback=feedbackBody(item),exported=buildSessionHistoryExport([item]);
+  assert.match(feedback,/Saved: Unknown date/);assert.match(exported,/Unknown date/);
+  assert.match(feedback,/Duration seconds: Not recorded/);assert.match(exported,/Duration: Not recorded/);
+  assert.match(feedback,/Average fatigue: Not recorded/);assert.match(exported,/Average fatigue: Not recorded/);
+ });
+}
+test('real zeros, fallback dates and recovered partial summaries remain explicit',()=>{
+ const item={durationSec:0,avgFatigue:0,alertCount:0,savedAt:'invalid',updatedAt:'2026-10-03T12:00:00Z',recoveredFromInterruption:true,cloudSessionId:'exclude-me',location:{lat:40},rawMotion:[1]};
+ const before=JSON.stringify(item),feedback=feedbackBody(item),exported=buildSessionHistoryExport([item]);
+ assert.match(feedback,/Duration seconds: 0/);assert.match(feedback,/Average fatigue: 0/);
+ assert.match(exported,/Duration: 0m 0s/);assert.match(exported,/Average fatigue: 0/);
+ for(const text of [feedback,exported]){assert.match(text,/2026-10-03T12:00:00.000Z/);assert.match(text,/Recovered partial session/);assert.doesNotMatch(text,/exclude-me|rawMotion|lat:/)}
+ assert.equal(JSON.stringify(item),before);
 });

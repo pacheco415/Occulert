@@ -1,3 +1,4 @@
+import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,7 +30,8 @@ test('the native module is Apple-only and declares the required motion purpose s
 
 test('headphone candidates remain separate, local aggregates and never enter alert delivery', () => {
   const monitor = read('native-app/app/monitor.tsx');
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   const cloud = read('native-app/lib/cloudSync.ts');
   const alerts = read('native-app/components/AlertSystem.tsx');
 
@@ -38,9 +40,9 @@ test('headphone candidates remain separate, local aggregates and never enter ale
   assert.match(monitor, /headphoneMotionSamples/);
   assert.match(monitor, /headphoneMotionStatus/);
   assert.match(monitor, /headphone motion never changes the fatigue score or alerts/);
-  assert.match(history, /EXPERIMENTAL HEAD-MOTION DIAGNOSTICS/);
-  assert.match(history, /Saved locally as aggregate observations only and included only if you choose Send session feedback/);
-  assert.match(history, /Does not trigger alerts or change scores/);
+  assert.match(historyOwners.diagnostics, /EXPERIMENTAL HEAD-MOTION DIAGNOSTICS/);
+  assert.match(historyOwners.diagnostics, /Saved locally as aggregate observations only and included only if you choose Send session feedback/);
+  assert.match(historyOwners.diagnostics, /Does not trigger alerts or change scores/);
   assert.doesNotMatch(cloud, /headphoneHeadNodObservations|headphoneMotionSamples|headphoneMotionStatus/);
   assert.doesNotMatch(alerts, /headphoneMotion|headphoneHeadNod/);
 });

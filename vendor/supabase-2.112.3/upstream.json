@@ -1,0 +1,67 @@
+{
+  "package": "@supabase/supabase-js",
+  "version": "2.112.3",
+  "source_file": "package/dist/umd/supabase.js",
+  "npm_tarball_integrity": "sha512-Jv1bxVQmEJNkjvPEhFaKjPzsh+Ozyew6lWGD+SoYcsclDEP1z7yEvKvfUQfzy0DkxRIQnZNxmmWtAzw5XLTQoA==",
+  "npm_tarball_sha256": "f28b54178a3ab925260562e4089beb8bb3edccee1cea6391ebe20facff0aa211",
+  "sdk_sri": "sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg",
+  "packages": [
+    {
+      "name": "@supabase/auth-js",
+      "version": "2.112.3",
+      "license": "MIT"
+    },
+    {
+      "name": "@supabase/functions-js",
+      "version": "2.112.3",
+      "license": "MIT"
+    },
+    {
+      "name": "@supabase/phoenix",
+      "version": "0.4.5",
+      "license": "MIT"
+    },
+    {
+      "name": "@supabase/postgrest-js",
+      "version": "2.112.3",
+      "license": "MIT"
+    },
+    {
+      "name": "@supabase/realtime-js",
+      "version": "2.112.3",
+      "license": "MIT"
+    },
+    {
+      "name": "@supabase/storage-js",
+      "version": "2.112.3",
+      "license": "MIT"
+    },
+    {
+      "name": "@supabase/supabase-js",
+      "version": "2.112.3",
+      "license": "MIT"
+    },
+    {
+      "name": "iceberg-js",
+      "version": "0.8.1",
+      "license": "MIT"
+    },
+    {
+      "name": "tslib",
+      "version": "2.8.1",
+      "license": "0BSD"
+    }
+  ],
+  "files": {
+    "vendor/supabase-2.112.3.js": "ec004176d101aec77aeef266aa1c94411287fe2039c65ea5f6c72f5e14b3847d",
+    "vendor/supabase-2.112.3/supabase-auth-js-2.112.3-LICENSE": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936",
+    "vendor/supabase-2.112.3/supabase-functions-js-2.112.3-LICENSE": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936",
+    "vendor/supabase-2.112.3/supabase-phoenix-0.4.5-LICENSE.txt": "41a686069f0199ff369d7e5277d5267385cc54d9199f1efc960bacbe2e799255",
+    "vendor/supabase-2.112.3/supabase-postgrest-js-2.112.3-LICENSE": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936",
+    "vendor/supabase-2.112.3/supabase-realtime-js-2.112.3-LICENSE": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936",
+    "vendor/supabase-2.112.3/supabase-storage-js-2.112.3-LICENSE": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936",
+    "vendor/supabase-2.112.3/supabase-supabase-js-2.112.3-LICENSE": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936",
+    "vendor/supabase-2.112.3/iceberg-js-0.8.1-LICENSE": "e6e972dba808fb9d80863fe90ca222a47710cb850f6e6e2af95cdc0d022f79bd",
+    "vendor/supabase-2.112.3/tslib-2.8.1-LICENSE.txt": "210b19e543130388c68654b7497e967119ce17145f66ab7d85688fbd70f08751"
+  }
+}

@@ -1,3 +1,5 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
+import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -224,23 +226,27 @@ test('session history groups sorted records by local calendar day without losing
 });
 
 test('native screens wire setup preview and recovery without changing detection inputs', () => {
-  const monitor = read('native-app/app/monitor.tsx');
+  const monitorOwners = readNativeMonitorSourceOwners();
+  const monitor = monitorOwners.screen;
   const home = read('native-app/app/index.tsx');
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   const historyPreferences = read('native-app/lib/historyPreferences.ts');
   const recovery = read('native-app/lib/sessionRecoveryModel.ts');
   const recoveryStorage = read('native-app/lib/sessionRecovery.ts');
 
-  assert.match(monitor, /isActive=\{isRunning \|\| setupPreviewActive\}/);
-  assert.match(monitor, /setupPreviewActiveRef\.current && !isRunningRef\.current/);
-  assert.match(monitor, /return;\s*}\s*\/\/ A frame already crossing/);
-  assert.match(monitor, /SESSION_CHECKPOINT_INTERVAL_MS = 15_000/);
-  assert.match(monitor, /clearActiveSessionCheckpoint\(activeSessionId\)/);
+  assert.match(monitorOwners.view, /isActive=\{isRunning \|\| setupPreviewActive\}/);
+  assert.match(monitorOwners.analysis, /setupPreviewActiveRef\.current && !isRunningRef\.current/);
+  assert.match(monitorOwners.analysis, /return;\s*}\s*\/\/ A frame already crossing/);
+  assert.match(monitorOwners.checkpoint, /SESSION_CHECKPOINT_INTERVAL_MS = 15_000/);
+  assert.match(monitor, /clearCheckpoint: clearActiveSessionCheckpoint/);
+  const completion = readFileSync(new URL('../native-app/lib/sessionCompletion.ts', import.meta.url), 'utf8');
+  assert.match(completion, /services\.clearCheckpoint\(snapshot\.activeSessionId\)/);
   assert.match(monitor, /await saveActiveSessionCheckpoint\(\{/,
     'monitoring must reserve recovery storage before camera startup');
   assert.match(monitor, /ActiveSessionCheckpointConflictError/);
-  assert.match(monitor, /RECOVERY REQUIRED/);
-  assert.match(monitor, /accessibilityLabel="Return Home to recover the previous drive"/);
+  assert.match(monitorOwners.view, /RECOVERY REQUIRED/);
+  assert.match(monitorOwners.view, /accessibilityLabel="Return Home to recover the previous drive"/);
   assert.match(monitor, /router\.replace\('\/'\)/,
     'blocked direct navigation must provide a clear route back through recovery');
   assert.match(monitor, /reservedSessionId && !monitoringStarted/,
@@ -259,45 +265,45 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(home, /Checking the previous drive/);
   assert.match(home, /Retry previous drive recovery before starting another session/);
   assert.doesNotMatch(home, /recoverInterruptedDrive\(\)\.catch\(\(\) => \{\}\)/, 'recovery failures must not be silently swallowed');
-  assert.match(history, /Recovered local checkpoint/);
-  assert.match(history, /sessions\.filter\(item => !item\.recoveredFromInterruption\)/);
-  assert.match(history, /Recovered partial sessions are excluded/);
+  assert.match(historyOwners.card, /Recovered local checkpoint/);
+  assert.match(historyOwners.viewModel, /sessions\.filter\(item => !item\.recoveredFromInterruption\)/);
+  assert.match(historyOwners.pilot, /Recovered partial sessions are excluded/);
   assert.match(historyPreferences, /type HistoryFilter = 'all' \| 'needs-review' \| 'reviewed' \| 'recovered'/);
-  assert.match(history, /accessibilityState=\{\{ selected \}\}/, 'history filters must expose their selected state');
+  assert.match(historyOwners.filters, /accessibilityState=\{\{ selected \}\}/, 'history filters must expose their selected state');
   assert.match(history, /group\.sessions\.map\(\(\{ item, index: i \}\)/, 'grouped filtered edits must retain their original stored index');
   assert.match(history, /accessibilityLabel=\{`\$\{group\.label\}, \$\{group\.sessions\.length\}/, 'date groups must announce their label and session count');
-  assert.match(history, /cardNeedsReview/);
-  assert.match(history, /cardRecovered/);
-  assert.match(history, /const visibleReviewQueue = historyReviewQueue\(filteredSessions\)/);
-  assert.match(history, /const nextReviewSession = visibleReviewQueue\[0\]/);
+  assert.match(historyOwners.card, /cardNeedsReview/);
+  assert.match(historyOwners.card, /cardRecovered/);
+  assert.match(historyOwners.viewModel, /const visibleReviewQueue = historyReviewQueue\(filteredSessions\)/);
+  assert.match(historyOwners.viewModel, /const nextReviewSession = visibleReviewQueue\[0\]/);
   assert.match(history, /chooseHistoryFilter\('needs-review'\)/);
   assert.match(history, /setExpandedSessions\(current => \(\{ \.\.\.current, \[key\]: true \}\)\)/);
-  assert.match(history, /Continue reviewing the next shown unfinished session/);
-  assert.match(history, /item\.sensitivity === 'medium' && hasCompleteHistoryReview\(item\)/, 'pilot progress must count only complete Medium reviews');
-  assert.match(history, /getSessionReviewProgress\(historyReviewInput\(item\)\)/, 'each session must calculate guided review progress');
-  assert.match(history, /Finish this review/);
-  assert.match(history, /reviewProgress\.missingSummary/);
-  assert.match(history, /accessibilityLiveRegion="polite"/, 'review progress changes must be announced');
-  assert.match(history, /const unfinished = incompleteSessionReviewQueue\(/);
+  assert.match(historyOwners.filters, /Continue reviewing the next shown unfinished session/);
+  assert.match(historyOwners.viewModel, /item\.sensitivity === 'medium' && hasCompleteHistoryReview\(item\)/, 'pilot progress must count only complete Medium reviews');
+  assert.match(historyOwners.card, /getSessionReviewProgress\(historyReviewInput\(item\)\)/, 'each session must calculate guided review progress');
+  assert.match(historyOwners.card, /Finish this review/);
+  assert.match(historyOwners.card, /reviewProgress\.missingSummary/);
+  assert.match(historyOwners.card, /accessibilityLiveRegion="polite"/, 'review progress changes must be announced');
+  assert.match(historyOwners.reviewModel, /const unfinished = incompleteSessionReviewQueue\(/);
   assert.match(history, /const queue = currentReviewQueue\(index\)/);
   assert.match(history, /text: 'Review Next'/);
   assert.match(history, /chooseHistoryFilter\('needs-review'\)/);
   assert.match(history, /pendingReviewScrollRef\.current = key/);
-  assert.match(history, /accessibilityRole="alert" style=\{s\.reviewQueueMessage\}/);
+  assert.match(historyOwners.card, /accessibilityRole="alert" style=\{s\.reviewQueueMessage\}/);
   assert.match(history, /commitSucceeded = await commitSessionHistoryEdit/);
   assert.match(history, /operationCompleted && commitSucceeded && completesReview/);
-  assert.match(history, /summarizePilotCoverage\(reviewedMedium\)/);
-  assert.match(history, /Still needed: \$\{pilotCoverage\.missingLabels\.join\(', '\)\}/);
-  assert.match(history, /one session in a condition is not enough to establish accuracy/i);
-  assert.match(history, /buildPilotProgressExport\(sessions\.map\(historyReviewInput\), CHECKPOINT_TARGET\)/);
-  assert.match(history, /Share pilot progress/);
-  assert.match(history, /aggregate counts only · no session or driver identifiers/i);
-  assert.match(history, /Showing \{filteredSessions\.length\} of \{periodSessions\.length\} sessions in this period/);
+  assert.match(historyOwners.viewModel, /summarizePilotCoverage\(reviewedMedium\)/);
+  assert.match(historyOwners.pilot, /Still needed: \$\{pilotCoverage\.missingLabels\.join\(', '\)\}/);
+  assert.match(historyOwners.pilot, /one session in a condition is not enough to establish accuracy/i);
+  assert.match(historyOwners.share, /buildPilotProgressExport\(sessions\.map\(historyReviewInput\), CHECKPOINT_TARGET\)/);
+  assert.match(historyOwners.pilot, /Share pilot progress/);
+  assert.match(historyOwners.pilot, /aggregate counts only · no session or driver identifiers/i);
+  assert.match(historyOwners.filters, /Showing \{filteredSessions\.length\} of \{periodSessions\.length\} sessions in this period/);
   assert.match(history, /No sessions match these filters/);
   assert.match(history, /AsyncStorage\.setItem\(HISTORY_FILTER_KEY, filter\)/);
-  assert.match(history, /sortIndexedSessions\(sessions, historyView\.sort\)/);
+  assert.match(historyOwners.viewModel, /sortIndexedSessions\(sessions, historyView\.sort\)/);
   assert.match(history, /filterRevisionRef\.current === filterRevision/, 'a late preference load must not replace a newer filter choice');
-  assert.match(history, /filterButton: \{ minHeight: 44/);
+  assert.match(historyOwners.styles, /filterButton: \{ minHeight: 44/);
   assert.doesNotMatch(recovery, /cameraFrame|video|audio|location|gps/i);
 });
 
@@ -368,7 +374,8 @@ test('system accessibility preferences disable decorative glass and motion only'
   const hook = read('native-app/hooks/useAccessibilityPreferences.ts');
   const glass = read('native-app/components/GlassSurface.tsx');
   const alerts = read('native-app/components/AlertSystem.tsx');
-  const monitor = read('native-app/app/monitor.tsx');
+  const monitorOwners = readNativeMonitorSourceOwners();
+  const monitor = monitorOwners.screen;
   assert.match(hook, /isReduceMotionEnabled\(\)/);
   assert.match(hook, /isReduceTransparencyEnabled\(\)/);
   assert.match(hook, /motionRevision === initialMotionRevision/);
@@ -382,7 +389,7 @@ test('system accessibility preferences disable decorative glass and motion only'
   assert.match(alerts, /const deliveryPlan = alertDeliveryPlan\(lv\)/);
   assert.match(alerts, /preferences\.hapticEnabled/);
   assert.match(alerts, /preferences\.audioEnabled/);
-  assert.match(monitor, /animationType=\{modalAnimationType\(reduceMotion\)\}/);
+  assert.match(monitorOwners.view, /animationType=\{modalAnimationType\(reduceMotion\)\}/);
 });
 
 test('reusable setup controls expose labels, states, hints, and large-text layouts', () => {
@@ -416,12 +423,13 @@ test('reusable setup controls expose labels, states, hints, and large-text layou
 });
 
 test('safe-stop choices remain readable and accessible at larger text sizes', () => {
-  const monitor = read('native-app/app/monitor.tsx');
-  assert.match(monitor, /accessibilityLabel="Safe stop options"/);
-  assert.match(monitor, /accessibilityViewIsModal/);
-  assert.match(monitor, /accessibilityHint=\{`\$\{option\.detail\}/);
-  assert.match(monitor, /safeStopOption: \{\s*minHeight: 64/);
-  assert.match(monitor, /safeStopCancel: \{ minHeight: 44/);
+  const monitorOwners = readNativeMonitorSourceOwners();
+  const monitor = monitorOwners.screen;
+  assert.match(monitorOwners.view, /accessibilityLabel="Safe stop options"/);
+  assert.match(monitorOwners.view, /accessibilityViewIsModal/);
+  assert.match(monitorOwners.view, /accessibilityHint=\{`\$\{option\.detail\}/);
+  assert.match(monitorOwners.styles, /safeStopOption: \{\s*minHeight: 64/);
+  assert.match(monitorOwners.styles, /safeStopCancel: \{ minHeight: 44/);
 });
 
 test('connected-device readiness refresh remains single-flight', () => {

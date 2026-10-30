@@ -13,25 +13,97 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
-  smoke:
-    runs-on: ubuntu-latest
+  browser:
+    name: browser (${{ matrix.browser }})
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    # Match package-lock.json; preinstalled browsers avoid slow apt mirrors.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - name: Align fresh workspace ownership with the container user
+        run: |
+          test "$GITHUB_WORKSPACE" = "$PWD"
+          test -d "$GITHUB_WORKSPACE" && test ! -L "$GITHUB_WORKSPACE"
+          test "$(realpath "$GITHUB_WORKSPACE")" = "$(pwd -P)"
+          entries="$(ls -A "$GITHUB_WORKSPACE")"
+          test -z "$entries"
+          mode="$(stat -c %a "$GITHUB_WORKSPACE")"
+          owner="$(id -u):$(id -g)"
+          chown "$owner" "$GITHUB_WORKSPACE"
+          test "$(stat -c %a "$GITHUB_WORKSPACE")" = "$mode"
+          test "$(stat -c %u:%g "$GITHUB_WORKSPACE")" = "$owner"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
+      - name: Verify pinned browser runtime
+        run: |
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          const { accessSync, constants } = require('node:fs');
+          const { chromium, webkit } = require('@playwright/test');
+          assert.equal(require('@playwright/test/package.json').version, '1.63.0');
+          for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK);
+          NODE
       - name: Check native form controls on Linux WebKit
-        run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit
-      - run: npm run test:browser
+        if: ${{ matrix.browser == 'webkit' }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-report/onboarding.json
+        run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit --reporter=line,json --output=test-results/onboarding
+      - name: Run this browser's full suite
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-report/browser.json
+        run: npm run test:browser -- --project=${{ matrix.browser }} --reporter=line,json --output=test-results/browser
+      - name: List browser tests that passed after retry
+        if: ${{ !cancelled() }}
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: |
+          if [ "$BROWSER" = webkit ]; then
+            node scripts/report-browser-retries.mjs playwright-report/onboarding.json playwright-report/browser.json
+          else
+            node scripts/report-browser-retries.mjs playwright-report/browser.json
+          fi
       - name: Preserve browser failure and retry diagnostics
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: browser-test-diagnostics
-          path: test-results/
+          name: browser-test-diagnostics-${{ matrix.browser }}-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Save source and environment verification evidence
+        if: ${{ !cancelled() }}
+        run: node scripts/write-verification-receipt.mjs browser-${{ matrix.browser }} '${{ job.status }}'
+      - name: Preserve verification receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verification-browser-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: .verification-receipts/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Preserve the required check name and fail it if either browser did not pass.
+  smoke:
+    name: smoke
+    if: ${{ always() }}
+    needs: browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require both browser jobs to pass
+        env:
+          BROWSER_RESULT: ${{ needs.browser.result }}
+        run: test "$BROWSER_RESULT" = success

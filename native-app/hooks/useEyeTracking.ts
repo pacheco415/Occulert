@@ -1,8 +1,9 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import {
-  SENSITIVITY_PRESETS, DEFAULT_SENSITIVITY, PERCLOS_ALERT_THRESHOLD, PERCLOS_WINDOW_MS,
+  DEFAULT_SENSITIVITY, PERCLOS_ALERT_THRESHOLD, PERCLOS_WINDOW_MS,
   type SensitivityLevel,
 } from '../constants/thresholds';
+import { baselinePreset } from '../lib/eyeBaselineModel';
 import { RollingClosedFraction } from '../lib/rollingClosedFraction';
 
 // MediaPipe FaceMesh EAR sets, ordered [corner, top, top, corner, bottom, bottom]
@@ -31,11 +32,11 @@ function ear(lm: Array<{ x: number; y: number }>, idx: number[]): number {
   return C > 0 ? (A + B) / (2 * C) : 0.3;
 }
 
-export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY) {
+export function useEyeTracking(level: SensitivityLevel = DEFAULT_SENSITIVITY, baseline: number | null = null) {
   const win = useRef<RollingClosedFraction | null>(null);
   const perclosWindow = win.current ??= new RollingClosedFraction(PERCLOS_WINDOW_MS);
   const lastEar = useRef(0.3);
-  const preset = SENSITIVITY_PRESETS[level];
+  const preset = useMemo(() => baselinePreset(level, baseline), [level, baseline]);
 
   /** Shared scoring path: takes a pseudo/real EAR value, updates the PERCLOS
    *  rolling window, and derives the fatigue score. */

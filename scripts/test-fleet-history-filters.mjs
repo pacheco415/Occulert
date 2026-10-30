@@ -101,3 +101,19 @@ test('selected owner driver beyond first 1000 roster rows remains valid', async 
   const exactCall = app.calls.find(call => call.table === 'drivers' && call.options.params.id?.startsWith('eq.'));
   assert.equal(exactCall.options.params.fleet_id, 'eq.' + FLEET);
 });
+
+test('selected driver in the roster look-ahead row remains in the capped selector', async () => {
+  const roster = Array.from({ length: 1001 }, (_, index) => ({
+    id: `77777777-7777-4777-8777-${String(index).padStart(12, '0')}`, name: 'Driver ' + index,
+  }));
+  const selected = roster[1000];
+  const app = harness({ roster, pages: [[]] });
+  const result = await app.invoke('/api/fleet-session-history?driver_id=' + selected.id);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.driver_filter_complete, false);
+  assert.equal(result.body.drivers.length, 1000);
+  assert.deepEqual(result.body.drivers.find(driver => driver.id === selected.id), selected);
+  assert.equal(new Set(result.body.drivers.map(driver => driver.id)).size, 1000);
+  // The look-ahead row already confirms roster membership, so no extra query is needed.
+  assert.equal(app.calls.some(call => call.table === 'drivers' && call.options.params.id?.startsWith('eq.')), false);
+});

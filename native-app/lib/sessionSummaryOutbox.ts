@@ -99,5 +99,12 @@ export function createSessionSummaryOutbox(
     return pending;
   };
   const clear = () => queue.run(() => storage.removeItem(SESSION_SUMMARY_OUTBOX_KEY));
-  return { enqueue, flush, clear };
+  const pendingEntries = async (scope: SummaryScope): Promise<PendingSessionSummary[]> => {
+    if (!isCurrent(scope)) return [];
+    // Read-only snapshots must not hold the mutation queue while storage waits.
+    const owners = await read();
+    if (!isCurrent(scope)) return [];
+    return JSON.parse(JSON.stringify(owners[scope.ownerId] || []));
+  };
+  return { enqueue, flush, clear, pendingEntries };
 }

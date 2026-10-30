@@ -1,3 +1,4 @@
+import { withNativeMonitorHookBindings } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -8,6 +9,21 @@ import { createAsyncMutationQueue } from '../native-app/lib/asyncMutationQueue.t
 import { createCachedBooleanPreference } from '../native-app/lib/cachedBooleanPreference.ts';
 import { createHealthReadinessSnapshot, isHealthReadinessSnapshot } from '../native-app/lib/healthReadiness.ts';
 import { alertDeliveryPlan, deliverCueIfCurrent } from '../native-app/lib/alertDelivery.ts';
+import { SUPABASE_ORIGIN, pinnedSupabaseConfig } from '../native-app/lib/supabaseHost.ts';
+import * as frontCameraPolicy from '../native-app/lib/frontCameraSwitch.ts';
+import * as monitorPerformance from '../native-app/lib/monitorPerformance.ts';
+import * as monitorLifecycle from '../native-app/lib/monitorLifecycle.ts';
+import * as cameraSetup from '../native-app/lib/cameraSetup.ts';
+import * as cameraResilience from '../native-app/lib/cameraResilience.ts';
+import * as captureLoadPolicy from '../native-app/lib/captureLoadPolicy.ts';
+import * as monitorThresholds from '../native-app/constants/thresholds.ts';
+import * as eyeBaselineModel from '../native-app/lib/eyeBaselineModel.ts';
+import * as sensorFusion from '../native-app/lib/sensorFusionObservation.ts';
+import * as sessionCompletion from '../native-app/lib/sessionCompletion.ts';
+import * as monitorAlertPolicy from '../native-app/lib/alertPolicy.ts';
+import { RollingClosedFraction } from '../native-app/lib/rollingClosedFraction.ts';
+import { HeadNodDetector } from '../native-app/lib/headNodDetector.ts';
+import * as simulatorTraceModel from '../native-app/lib/simulatorTraceModel.ts';
 
 // Execute the production TS logic with native bridges replaced. Removing imports
 // and JSX presentation avoids requiring a device, Expo, or a TS compiler in CI.
@@ -32,16 +48,18 @@ const auth = (owner, expires_at = 0) => ({ access_token: `${owner}-access`, refr
 const token = owner => ({ ...auth(owner), expires_in: 3600 });
 const AUTH_KEY = 'occulert.cloud.auth.v1';
 const CONSENT_KEY = 'occulert-cloud-sync-enabled';
-function cloudFixture(initial, { consent = false } = {}) {
+function cloudFixture(initial, { consent = false, simulatorTrace = false, eventOutboxFlag = false } = {}) {
   const secure = new Map(initial ? [[AUTH_KEY, JSON.stringify(initial)]] : []);
   const storage = new Map([[CONSENT_KEY, String(consent)]]), requests = [], timers = new Map();
   let nextTimer = 0;
   const fixture = {
     secure, storage, requests, timers,
-    transport: async (url) => {
+    transport: async (url, options) => {
       if (url.includes('grant_type=password')) return response(200, token('new'));
       if (url.includes('grant_type=refresh_token')) return response(200, token(initial.user.id));
-      if (url.endsWith('/api/sessions')) return response(200, { session: { id: 'session' } });
+      if (url.endsWith('/api/sessions')) return options.method === 'PATCH'
+        ? response(200,{ok:true,session:{id:'session',ended_at:JSON.parse(options.body).ended_at}})
+        : response(200, { session: { id: 'session' } });
       return response(200, {});
     },
   };
@@ -58,18 +76,21 @@ function cloudFixture(initial, { consent = false } = {}) {
   };
   fixture.api = load(read('native-app/lib/cloudSync.ts'), [
     'getCloudState', 'signInToCloud', 'signOutOfCloud', 'setCloudSyncEnabled',
-    'beginCloudSession', 'logCloudAlert', 'finishCloudSession', 'cloudSessionScopes', 'retryPendingCloudSessions',
+    'beginCloudSession', 'logCloudAlert', 'finishCloudSession', 'cloudSessionScopes', 'retryPendingCloudSessions', 'getPendingCloudSummaryState', 'pendingCloudSummaryStateIsCurrent',
+    'queueNativeCloudAlert', 'nativeCloudEventRetryStatus',
   ], {
-    SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage,
+    SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage, SIMULATOR_TRACE: simulatorTrace,
+    process: { env: { EXPO_PUBLIC_EVENT_OUTBOX: eventOutboxFlag ? '1' : undefined } },
+    createNativeEventOutbox: () => { assert.fail('simulator transport must not construct the retry adapter'); },
     updateSessionHistory: async update => { fixture.history = update(fixture.history || []); },
-    createSessionSummaryOutbox, Platform: { OS: 'ios', Version: '26' }, createAsyncMutationQueue, createCachedBooleanPreference,
+    createSessionSummaryOutbox, pinnedSupabaseConfig, Platform: { OS: 'ios', Version: '26' }, createAsyncMutationQueue, createCachedBooleanPreference,
     currentAppBuildInfo: () => ({ appVersion: '1.0.0', appBuildNumber: 'test' }),
     formatAppBuildLabel: ({ appVersion, appBuildNumber }) => `v${appVersion} (${appBuildNumber})`,
     setTimeout: (fn, delay) => { timers.set(++nextTimer, { fn, delay }); return nextTimer; },
     clearTimeout: id => timers.delete(id),
     fetch: async (url, init) => {
       requests.push({ url, init });
-      if (url.endsWith('/api/public-config')) return response(200, { supabase: { configured: true, url: 'https://test.supabase.co', anonKey: 'public' } });
+      if (url.endsWith('/api/public-config')) return response(200, { supabase: { configured: true, url: SUPABASE_ORIGIN, anonKey: 'public' } });
       if (url.endsWith('/api/profile') && !fixture.profile) return response(200, { driver: { id: 'driver' } });
       if (url.endsWith('/logout')) return response(200, {});
       if (url.endsWith('/api/profile')) return fixture.profile(url, init);
@@ -153,8 +174,9 @@ for (const stage of ['headers', 'body']) {
 
 test('concurrent expired-auth operations share one refresh and keep enabled consent', async () => {
   const f = cloudFixture(auth('old'), { consent: true }), started = deferred(), result = deferred();
-  f.transport = url => {
+  f.transport = (url, options) => {
     if (url.includes('grant_type=refresh_token')) { started.resolve(); return result.promise; }
+    if (url.endsWith('/api/sessions')) return response(200,{ok:true,session:{id:'session',ended_at:JSON.parse(options.body).ended_at}});
     return response(200, {});
   };
   const first = f.api.logCloudAlert('session', 40), second = f.api.finishCloudSession('session', {});
@@ -173,7 +195,7 @@ for (const status of [200, 401]) {
       if (url.endsWith('/api/events')) { started.resolve(); return result.promise; }
       return response(200, token('new'));
     };
-    const pending = f.api.logCloudAlert('old-session', 40);
+    const pending = f.api.logCloudAlert('session', 40);
     await started.promise;
     assert.equal((await f.api.signInToCloud('new@example.com', 'password')).ok, true);
     result.resolve(response(status, {}));
@@ -182,6 +204,46 @@ for (const status of [200, 401]) {
     assert.equal(f.requests.some(r => r.url.includes('grant_type=refresh_token')), false);
   });
 }
+
+test('native alert scopes do not revive after sharing is disabled and re-enabled', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  const oldSession = await f.api.beginCloudSession();
+  assert.equal(oldSession, 'session');
+  assert.equal(await f.api.setCloudSyncEnabled(false), true);
+  assert.equal(await f.api.setCloudSyncEnabled(true), true);
+  assert.equal(await f.api.logCloudAlert(oldSession, 40), false);
+  assert.equal(f.requests.filter(r => r.url.endsWith('/api/events')).length, 0);
+  // A newly started session under the renewed consent can still send.
+  const transport = f.transport;
+  f.transport = (url, options) => url.endsWith('/api/sessions') && options.method === 'POST'
+    ? response(200, { session: { id: 'new-session' } }) : transport(url, options);
+  const newSession = await f.api.beginCloudSession();
+  assert.equal(newSession, 'new-session');
+  assert.equal(await f.api.logCloudAlert(oldSession, 40), false);
+  assert.equal(await f.api.logCloudAlert(newSession, 50), true);
+  assert.equal(f.requests.filter(r => r.url.endsWith('/api/events')).length, 1);
+});
+
+test('native alerts reject unknown and previous-account session identities', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  assert.equal(await f.api.logCloudAlert('unknown-session', 40), false);
+  assert.equal((await f.api.signInToCloud('new@example.com', 'password')).ok, true);
+  assert.equal(await f.api.setCloudSyncEnabled(true), true);
+  assert.equal(await f.api.logCloudAlert('session', 40), false);
+  assert.equal(f.requests.filter(r => r.url.endsWith('/api/events')).length, 0);
+});
+
+test('signing back into the same account cannot authorize its prior session alerts', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  await f.api.signOutOfCloud();
+  const transport = f.transport;
+  f.transport = (url, options) => url.includes('grant_type=password')
+    ? response(200, token('old')) : transport(url, options);
+  assert.equal((await f.api.signInToCloud('old@example.com', 'password')).ok, true);
+  assert.equal(await f.api.setCloudSyncEnabled(true), true);
+  assert.equal(await f.api.logCloudAlert('session', 40), false);
+  assert.equal(f.requests.filter(r => r.url.endsWith('/api/events')).length, 0);
+});
 
 test('stalled session-finalization body returns failure within its deadline', async () => {
   const f = cloudFixture(auth('old', 4000000000), { consent: true }), started = deferred(), late = deferred();
@@ -339,6 +401,9 @@ function hookFixture() {
       const changed = !previous || deps.some((dep, i) => dep !== previous.deps[i]);
       if (changed) effects[slot] = { deps, callback, cleanup: previous?.cleanup, changed: true };
     },
+    // This harness exercises Watch bridge races; real React effect-phase
+    // ordering is exercised separately by the native audio lifecycle suite.
+    useLayoutEffect(callback, deps) { React.useEffect(callback, deps); },
   };
   return { React, updates, render(callback) {
     index = 0;
@@ -352,6 +417,175 @@ function hookFixture() {
     return value;
   }, unmount() { effects.forEach(effect => effect?.cleanup?.()); } };
 }
+
+function monitorCameraStartFixture(stage, { simulator = false, autorun = false } = {}) {
+  const h = hookFixture(), entered = deferred(), pending = deferred();
+  const f = { entered, pending, history: [], checkpoints: [], hookBaselines: [], baselineSaves: [], cameraClears: 0,
+    clock: 1_000_000, cameraListener: null, held: false, intervals: new Map(), nextInterval: 0 };
+  class Clock extends Date { static now() { return f.clock; } }
+  const { useEyeTracking: realEyeTracking } = load(read('native-app/hooks/useEyeTracking.ts'), ['useEyeTracking'], {
+    ...h.React, ...monitorThresholds, baselinePreset: eyeBaselineModel.baselinePreset, RollingClosedFraction, Date: Clock,
+  });
+  const setInterval = (fn, delay) => { const id = ++f.nextInterval; f.intervals.set(id, { fn, delay }); return id; };
+  const clearInterval = id => f.intervals.delete(id);
+  const { useSimulatorTrace } = load(read('native-app/hooks/useSimulatorTrace.ts'), ['useSimulatorTrace'], {
+    ...h.React, ...simulatorTraceModel, Date: Clock, setInterval, clearInterval,
+  });
+  const identity = kind => ({ state: 'available', deviceId: 'virtual-front', deviceType: 'virtual', isVirtual: true,
+    constituentDeviceTypes: ['outer', 'inner'], streamingDeviceType: kind, streamingUniqueId: kind, streamingType: kind });
+  const boundary = async name => {
+    if (stage !== name || f.held) return;
+    f.held = true;
+    entered.resolve();
+    await pending.promise;
+  };
+  const player = { pause() {}, seekTo: async () => {}, play() {} }, isCurrent = () => true;
+  const device = { id: 'virtual-front' }, router = { replace() {}, back() {}, push() {} };
+  const source = read('native-app/app/monitor.tsx');
+  const cutoff = source.indexOf('\n  if (!hasPermission && !SIMULATOR_TRACE) {');
+  assert.ok(cutoff > source.indexOf('  const frameProcessor ='));
+  const component = source.slice(0, cutoff)
+    + '\nreturn {handleStart,handleStop,toggleSetupPreview,onEyeState,eyeBaseline,isRunning,baselineMessage,metrics,alertCount,simulatorPhase};\n}';
+  const bindings = {
+    ...h.React, React: h.React, ...frontCameraPolicy, ...monitorPerformance, ...monitorLifecycle,
+    ...cameraSetup, ...cameraResilience, ...captureLoadPolicy, ...monitorThresholds, ...eyeBaselineModel,
+    ...sensorFusion, ...sessionCompletion, ...monitorAlertPolicy, HeadNodDetector,
+    stopNativeCloudEvents() {}, queueNativeCloudAlert: () => null,
+    EYE_BASELINE_EXPERIMENT: !simulator, SIMULATOR_TRACE: simulator, useSimulatorTrace,
+    Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
+    useRouter: () => router, useLocalSearchParams: () => autorun ? { 'trace-run': '1' } : {}, useAccessibilityPreferences: () => ({ reduceMotion: true }),
+    useCameraDevice: () => simulator ? null : device, useCameraPermission: () => ({ hasPermission: !simulator, requestPermission: async () => true }),
+    useFaceDetector: () => ({ detectFaces: () => [] }), useFrameProcessor: callback => callback,
+    useRunOnJS: callback => callback, useSharedValue: value => h.React.useRef({ value }).current,
+    useAlertAudioPlayer: () => ({ player, isCurrent }),
+    useEyeTracking: (level, baseline) => { f.hookBaselines.push(baseline); return realEyeTracking(level, baseline); },
+    Battery: { usePowerState: () => ({ batteryLevel: 1, batteryState: 0, lowPowerMode: false }), BatteryState: { CHARGING: 1, FULL: 2 } },
+    AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
+    BackHandler: { addEventListener: () => ({ remove() {} }) },
+    currentAlertPreferences: () => ({ audioEnabled: false, hapticEnabled: false }),
+    deliverCueIfCurrent, loadAlertPreferences: () => boundary('preferences'), getWatchAlertsEnabled: async () => false,
+    loadSavedSensitivity: async () => 'medium', loadDeviceEyeBaseline: async () => .9,
+    clearDeviceEyeBaseline: async () => { f.cameraClears++; },
+    saveDeviceEyeBaseline: async (baseline, samples) => { f.baselineSaves.push({ baseline, samples }); },
+    getDeviceCondition: async () => ({ thermalState: 'nominal' }),
+    getCameraInterruptionState: async deviceId => ({ state: 'notAvailable', deviceId, interrupted: null, reason: 'unknown', rawReason: null, sequence: 0 }),
+    observeCameraInterruptions: () => ({ ready: Promise.resolve(null), remove() {} }),
+    observeFrontCameraIdentity: (_id, listener) => {
+      f.cameraListener = listener;
+      listener(identity('outer'));
+      return { ready: Promise.resolve(identity('outer')), remove() { if (f.cameraListener === listener) f.cameraListener = null; } };
+    },
+    addHeadphoneMotionSampleListener: () => ({ remove() {} }), addHeadphoneMotionStatusListener: () => ({ remove() {} }),
+    startHeadphoneMotion: async () => ({ state: 'unavailable' }), stopHeadphoneMotion: async () => {},
+    getWatchStatus: async () => ({ moduleAvailable: false, paired: false, appInstalled: false, reachable: false }),
+    consumePreDriveSafety: () => true, currentAppBuildInfo: () => ({ appVersion: 'fixture', appBuildNumber: 'fixture' }),
+    saveActiveSessionCheckpoint: async value => { await boundary('checkpoint'); f.checkpoints.push(value); },
+    clearActiveSessionCheckpoint: async () => {},
+    updateSessionHistory: async update => { f.history = update(f.history); },
+    finishCloudSession: async () => { assert.fail('experimental camera sessions must remain local'); },
+    beginCloudSession: () => { assert.fail('simulator and experimental camera sessions must remain local'); },
+    logCloudAlert: async () => { assert.fail('experimental camera sessions must remain local'); },
+    Alert: { alert() {} }, setInterval, clearInterval,
+  };
+  const api = load(component, ['MonitorScreen'], withNativeMonitorHookBindings(bindings, load));
+  f.render = () => h.render(() => api.MonitorScreen());
+  f.switchToInner = () => { assert.equal(typeof f.cameraListener, 'function'); f.cameraListener(identity('inner')); };
+  f.unmount = () => h.unmount();
+  f.advanceTrace = milliseconds => { for (let elapsed = 0; elapsed < milliseconds; elapsed += 100) {
+    f.clock += 100;
+    for (const interval of [...f.intervals.values()]) if (interval.delay === 100) interval.fn();
+    f.render();
+  } };
+  f.render();
+  return f;
+}
+
+test('simulator trace uses the actual monitor and eye scoring without a camera, then Stop cancels it', async () => {
+  const f = monitorCameraStartFixture(null, { simulator: true });
+  await flush(); let screen = f.render(); await screen.handleStart(); f.render(); screen = f.render();
+  assert.equal(screen.isRunning, true); assert.equal(screen.metrics.ear, .3); assert.equal(screen.metrics.state, 'open');
+  f.advanceTrace(2_700); screen = f.render(); assert.equal(screen.alertCount, 0, 'slow blink must not trigger an alert');
+  f.advanceTrace(4_300); screen = f.render();
+  assert.equal(screen.simulatorPhase, 'closed for 3 seconds'); assert.equal(screen.metrics.state, 'closed');
+  assert.equal(screen.metrics.closedDurationMs, 3_000); assert.equal(screen.alertCount, 1); assert.ok(screen.metrics.fatigueScore > 0);
+  f.advanceTrace(1_000); screen = f.render(); assert.equal(screen.metrics.state, 'noFace');
+  await screen.handleStop(); screen = f.render(); assert.equal(screen.isRunning, false);
+  assert.equal([...f.intervals.values()].filter(value => value.delay === 100).length, 0);
+  const stopped = JSON.stringify(screen.metrics); f.advanceTrace(2_000); assert.equal(JSON.stringify(f.render().metrics), stopped);
+  f.unmount();
+});
+
+test('simulator cloud transport stays unavailable even when stored consent and auth exist', async () => {
+  for (const eventOutboxFlag of [false, true]) {
+    const f = cloudFixture(auth('owner', 4_000_000_000), { consent: true, simulatorTrace: true, eventOutboxFlag });
+    assert.equal((await f.api.getCloudState()).available, false);
+    assert.equal(await f.api.beginCloudSession(), null);
+    assert.equal(f.api.queueNativeCloudAlert(Promise.resolve('session'), 90, new Date().toISOString()), null);
+    assert.equal(f.api.nativeCloudEventRetryStatus(), null);
+    await f.api.retryPendingCloudSessions();
+    assert.equal(f.requests.length, 0); assert.equal(f.timers.size, 0);
+  }
+});
+
+test('trace deep link can start only the simulator variant and cannot restart after Stop', async () => {
+  for (const simulator of [false, true]) {
+    const f = monitorCameraStartFixture(null, { simulator, autorun: true });
+    await flush(); f.render(); await flush(); let screen = f.render();
+    assert.equal(screen.isRunning, simulator);
+    if (simulator) { await screen.handleStop(); f.render(); await flush(); assert.equal(f.render().isRunning, false); }
+    f.unmount();
+  }
+});
+
+for (const stage of ['preferences', 'checkpoint']) {
+  test(`camera switch during awaited ${stage} cannot restore an invalidated baseline in the running session or saved provenance`, async () => {
+    const f = monitorCameraStartFixture(stage);
+    await flush();
+    let screen = f.render();
+    assert.equal(screen.eyeBaseline, .9);
+    screen.toggleSetupPreview();
+    screen = f.render();
+    screen = f.render();
+    await flush();
+    screen = f.render();
+    assert.equal(screen.eyeBaseline, null, 'first Duo identity must discard the old camera-unbound baseline');
+    assert.equal(f.cameraClears, 1);
+    // Establish a real fresh baseline on the now-known outer camera. Start
+    // must capture a non-null value so the later switch exercises invalidation.
+    const calibrationStartedAt = f.clock;
+    for (let index = 0; index <= 20; index++) {
+      f.clock = calibrationStartedAt + index * 150;
+      screen.onEyeState(.9, .9, true, 0, 0, 0, 1, 20, 20, 60, 60, 100, 100);
+    }
+    await flush();
+    screen = f.render();
+    assert.equal(f.baselineSaves.length, 1);
+    assert.equal(f.baselineSaves[0].samples, 21);
+    assert.ok(Math.abs(screen.eyeBaseline - .9) < 1e-12);
+    assert.ok(Math.abs(f.hookBaselines.at(-1) - .9) < 1e-12);
+    const starting = screen.handleStart();
+    await f.entered.promise;
+    f.switchToInner();
+    await flush();
+    screen = f.render();
+    assert.equal(screen.eyeBaseline, null);
+    assert.equal(f.hookBaselines.at(-1), null, 'the actual eye-tracking hook must receive the cleared baseline');
+    f.pending.resolve();
+    await starting;
+    screen = f.render();
+    assert.equal(screen.isRunning, true);
+    assert.equal(screen.eyeBaseline, null);
+    assert.equal(f.hookBaselines.at(-1), null);
+    assert.equal(f.cameraClears, 2);
+    f.clock += 10_000;
+    await screen.handleStop();
+    assert.equal(f.history.length, 1);
+    assert.equal(f.history[0].eyeBaselineExperiment.baseline, null, 'resumed Start must not copy its captured pre-switch baseline back into the saved record');
+    assert.match(screen.baselineMessage, /current presets/);
+    f.unmount();
+  });
+}
+
 function alertFixture() {
   const h = hookFixture(), preference = deferred(), delivery = deferred(), sends = [], events = [];
   const source = read('native-app/components/AlertSystem.tsx');
@@ -360,7 +594,9 @@ function alertFixture() {
     ...h.React, React: h.React, require: () => 'sound',
     Animated: { Value: class { stopAnimation() {} setValue() {} } },
     useAccessibilityPreferences: () => ({ reduceMotion: true }),
-    useAudioPlayer: () => ({ pause() {} }),
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+    useMonitorAlertDock: () => false,
+    useAlertAudioPlayer: () => ({ player: { pause() {} } }),
     loadAlertPreferences: async () => {}, configureAlertAudioMode: async () => {},
     currentAlertPreferences: () => ({ audioEnabled: false, hapticEnabled: false }),
     getWatchAlertsEnabled: () => preference.promise,
@@ -544,12 +780,12 @@ test('current unexpected parked bridge failure releases busy state for retry', a
 
 test('history mutation refuses malformed members without writing away existing bytes', async () => {
   const source = read('native-app/lib/sessionHistory.ts');
-  const { parseSessionHistory } = await import('../native-app/lib/sessionHistoryData.ts');
+  const { parseSessionHistory, assignMissingSessionIds, serializeSessionHistory, sessionHistoryNeedsMigration } = await import('../native-app/lib/sessionHistoryData.ts');
   const stored = '[{"sessionId":"recoverable"},null]';
   const writes = [];
   const api = load(source, ['loadSessionHistory', 'updateSessionHistory'], {
     AsyncStorage: { getItem: async () => stored, setItem: async (_key, value) => writes.push(value) },
-    parseSessionHistory,
+    parseSessionHistory, assignMissingSessionIds, serializeSessionHistory, sessionHistoryNeedsMigration,
   });
   await assert.rejects(api.loadSessionHistory(), /Saved session history/);
   await assert.rejects(api.updateSessionHistory(() => []), /Saved session history/);
@@ -584,7 +820,7 @@ test('failed native finalization retries its original finish time and updates lo
   f.history = [{ sessionId: 'local-one', cloudSynced: false }];
   const payloads = [];
   let available = false;
-  f.transport = (_url, options) => { payloads.push(JSON.parse(options.body)); return response(available ? 200 : 503, {}); };
+  f.transport = (_url, options) => { payloads.push(JSON.parse(options.body)); return response(available ? 200 : 503, {ok:true,session:{id:JSON.parse(options.body).session_id,ended_at:JSON.parse(options.body).ended_at}}); };
   const endedAt = '2026-10-03T12:00:00.000Z';
   assert.equal(await f.api.finishCloudSession('session', { averageFatigue: 12, maxFatigue: 40, safetyScore: 72, alertCount: 1 }, endedAt, 'local-one'), false);
   available = true;
@@ -604,4 +840,93 @@ test('an old cloud session cannot be finalized under a replacement account', asy
   assert.equal(await f.api.setCloudSyncEnabled(true), true);
   assert.equal(await f.api.finishCloudSession('session', { averageFatigue: 12, maxFatigue: 40, safetyScore: 72, alertCount: 1 }), false);
   assert.equal(f.requests.filter(row => row.init.method === 'PATCH').length, 0);
+});
+
+test('legacy history migration commits before exposing IDs and survives subsequent reads', async () => {
+  const {parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration}=await import('../native-app/lib/sessionHistoryData.ts');
+  let stored='[{"savedAt":"same"},{"savedAt":"same"}]', release;
+  const writes=[];const committed=new Promise(resolve=>{release=resolve});
+  const api=load(read('native-app/lib/sessionHistory.ts'),['loadSessionHistory','updateSessionHistory'],{
+    parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration,
+    AsyncStorage:{getItem:async()=>stored,setItem:async(_key,value)=>{writes.push(value);await committed;stored=value}},
+  });
+  let exposed=false;const first=api.loadSessionHistory().then(value=>{exposed=true;return value});
+  const second=api.loadSessionHistory();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(exposed,false);assert.equal(writes.length,1);release();
+  const a=await first,b=await second;assert.deepEqual(a,b);assert.notEqual(a[0].sessionId,a[1].sessionId);assert.equal(writes.length,1);
+  await api.updateSessionHistory(rows=>rows.slice(1));assert.equal((await api.loadSessionHistory())[0].sessionId,a[1].sessionId);
+});
+
+test('failed identity migration exposes no unstable rows and preserves stored history', async () => {
+  const {parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration}=await import('../native-app/lib/sessionHistoryData.ts');
+  const original='[{"savedAt":"legacy","unknown":42}]';let fail=true,stored=original;
+  const api=load(read('native-app/lib/sessionHistory.ts'),['loadSessionHistory'],{
+    parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration,
+    AsyncStorage:{getItem:async()=>stored,setItem:async(_key,value)=>{if(fail)throw Error('disk unavailable');stored=value}},
+  });
+  await assert.rejects(api.loadSessionHistory(),/disk unavailable/);assert.equal(stored,original);
+  fail=false;const rows=await api.loadSessionHistory();assert.ok(rows[0].sessionId);assert.equal(rows[0].unknown,42);
+});
+
+
+test('native pending-summary state is local, owner-scoped and hidden after consent revocation',async()=>{
+ const f=cloudFixture(auth('old',4000000000),{consent:true});
+ f.history=[{sessionId:'local-one'}];f.transport=()=>response(503,{});
+ await f.api.finishCloudSession('session',{averageFatigue:10,maxFatigue:20,safetyScore:70,alertCount:1},'2026-10-03T12:00:00.000Z','local-one');
+ const before=f.requests.length,state=await f.api.getPendingCloudSummaryState();
+ assert.equal(state.count,1);assert.deepEqual(Array.from(state.localIds),['local-one']);assert.equal(f.requests.length,before,'a queue snapshot must not send a provider request');
+ assert.equal(f.api.pendingCloudSummaryStateIsCurrent(state),true);
+ await f.api.setCloudSyncEnabled(false);assert.equal(f.api.pendingCloudSummaryStateIsCurrent(state),false);assert.equal((await f.api.getPendingCloudSummaryState()).count,0);
+});
+
+test('a deliberate native retry cannot switch to another owner or consent revision',async()=>{
+ const f=cloudFixture(auth('old',4000000000),{consent:true});
+ f.transport=()=>response(503,{});await f.api.finishCloudSession('session',{averageFatigue:10,maxFatigue:20,safetyScore:70,alertCount:1},'2026-10-03T12:00:00.000Z','local-one');
+ const state=await f.api.getPendingCloudSummaryState(),before=f.requests.length;
+ await f.api.retryPendingCloudSessions({...state.scope,ownerId:'another'});
+ await f.api.retryPendingCloudSessions({...state.scope,consentVersion:state.scope.consentVersion+1});
+ assert.equal(f.requests.length,before);
+});
+
+test('format migration is durable even when every legacy record already has an ID', async () => {
+ const {parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration}=await import('../native-app/lib/sessionHistoryData.ts');
+ const original='[{"sessionId":"known","unknown":{"keep":true}}]';let stored=original,fail=true,writes=0;
+ const api=load(read('native-app/lib/sessionHistory.ts'),['loadSessionHistory','updateSessionHistory'],{
+  parseSessionHistory,assignMissingSessionIds,serializeSessionHistory,sessionHistoryNeedsMigration,
+  AsyncStorage:{getItem:async()=>stored,setItem:async(_key,value)=>{writes++;if(fail)throw Error('storage denied');stored=value}},
+ });
+ await assert.rejects(api.loadSessionHistory(),/storage denied/);assert.equal(stored,original);
+ fail=false;await api.loadSessionHistory();assert.equal(JSON.parse(stored).schemaVersion,1);
+ const committedWrites=writes;await api.loadSessionHistory();assert.equal(writes,committedWrites);
+ stored=JSON.stringify({...JSON.parse(stored),extension:{keep:'metadata'}});
+ await api.updateSessionHistory(rows=>rows.map(row=>({...row,cloudSynced:true})));
+ assert.deepEqual(JSON.parse(stored).extension,{keep:'metadata'});assert.deepEqual(JSON.parse(stored).sessions[0].unknown,{keep:true});
+ stored='{"schemaVersion":99,"sessions":[{"private":"preserve"}]}';const future=stored;
+ await assert.rejects(api.loadSessionHistory(),/unsupported format version/);
+ await assert.rejects(api.updateSessionHistory(()=>[]),/unsupported format version/);assert.equal(stored,future);
+});
+
+
+test('native cloud retries preserve unknown fatigue and unvalidated nod counts, including a recorded zero alert count',async()=>{
+ const f=cloudFixture(auth('old',4000000000),{consent:true});const payloads=[];let available=false;
+ f.transport=(_url,options)=>{payloads.push(JSON.parse(options.body));return response(available?200:503,{ok:true,session:{id:JSON.parse(options.body).session_id,ended_at:JSON.parse(options.body).ended_at}})};
+ const endedAt='2026-10-03T12:00:00.000Z';
+ assert.equal(await f.api.finishCloudSession('session',{averageFatigue:null,maxFatigue:null,safetyScore:null,alertCount:0},endedAt),false);
+ available=true;await f.api.retryPendingCloudSessions();assert.equal(payloads.length,2);
+ assert.deepEqual(payloads[0],{session_id:'session',ended_at:endedAt,average_fatigue:null,max_fatigue:null,safety_score:null,alert_count:0,head_nod_count:null});assert.deepEqual(payloads[1],payloads[0]);
+});
+
+
+test('native success requires the matching stored ended row before acknowledging or dropping a summary',async()=>{
+ const endedAt='2026-10-03T12:00:00.000Z';
+ const malformed=[{},null,[],true,'success',{ok:false,session:{id:'session',ended_at:endedAt}},{ok:true,session:{id:'other',ended_at:endedAt}},{ok:true,session:{id:'session',ended_at:null}},{ok:true,session:{id:'session',ended_at:'invalid'}},{ok:true,session:{id:'session',ended_at:'2026-02-31T12:00:00.000Z'}}];
+ for (const body of malformed) {
+  const f=cloudFixture(auth('old',4000000000),{consent:true});f.history=[{sessionId:'local-one',cloudSynced:false}];
+  f.transport=()=>response(200,body);
+  assert.equal(await f.api.finishCloudSession('session',{averageFatigue:0,maxFatigue:0,safetyScore:100,alertCount:0},endedAt,'local-one'),false);
+  assert.equal(f.history[0].cloudSynced,false);assert.equal((await f.api.getPendingCloudSummaryState()).count,1);
+  f.transport=()=>response(200,{ok:true,session:{id:'session',ended_at:'2026-10-03T12:00:00.000000+00:00'}});
+  await f.api.retryPendingCloudSessions();assert.equal(f.history[0].cloudSynced,true);assert.equal(f.history[0].cloudOwnerId,'old');
+  assert.equal((await f.api.getPendingCloudSummaryState()).count,0);
+ }
 });

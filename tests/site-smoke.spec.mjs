@@ -1,4 +1,5 @@
-import { assetByStem } from '../scripts/lib/current-assets.mjs';
+import { SUPABASE_HOST } from '../scripts/lib/csp-policy.mjs';
+import { assetByStem, assetPath } from '../scripts/lib/current-assets.mjs';
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
@@ -105,6 +106,15 @@ test("public information pages share accessible mobile navigation", async ({ pag
   await page.setViewportSize({ width: 390, height: 844 });
   for (const path of ["/about.html", "/faq.html", "/features.html", "/how-it-works.html", "/install.html"]) {
     await page.goto(path, { waitUntil: "domcontentloaded" });
+    const sharedStyle = page.locator(`link[rel="stylesheet"][href="${assetPath('public-page.css')}"]`);
+    await expect(sharedStyle).toHaveCount(1);
+    await expect.poll(() => sharedStyle.evaluate(link => link.sheet?.cssRules.length ?? 0)).toBeGreaterThan(0);
+    const navigation = page.getByRole('navigation');
+    await expect(navigation).toHaveCount(1);
+    await expect(navigation).toHaveCSS('position', 'fixed');
+    // The retained mobile glass style sizes the nav around a 44px control,
+    // 8px vertical padding and 1px borders, overriding the base 72px rule.
+    await expect(navigation).toHaveCSS('height', '62px');
     await expect(page.locator(`script[src="/${assetByStem('public-page.js')}"]`)).toHaveCount(1);
     const skipLink = page.getByRole("link", { name: "Skip to main content" });
     await skipLink.focus();
@@ -257,10 +267,10 @@ test("the passkey SDK loads through the resilient pinned loader", async ({ page 
   await page.goto("/login.html", { waitUntil: "domcontentloaded" });
 
   await expect.poll(() => page.evaluate(() => window.OcculertSupabaseLoader?.state().ready)).toBe(true);
-  expect(await page.evaluate(() => window.OcculertSupabaseLoader.sources[0])).toBe("/vendor/supabase-2.112.3.min.js");
+  expect(await page.evaluate(() => window.OcculertSupabaseLoader.sources[0])).toBe("/vendor/supabase-2.112.3.js");
   expect(await page.evaluate(() => typeof window.supabase?.createClient)).toBe("function");
   const sdkResources = await page.evaluate(() => performance.getEntriesByType("resource").map((entry) => entry.name).filter((name) => name.includes("supabase")));
-  expect(sdkResources.some((name) => new URL(name).pathname === "/vendor/supabase-2.112.3.min.js")).toBe(true);
+  expect(sdkResources.some((name) => new URL(name).pathname === "/vendor/supabase-2.112.3.js")).toBe(true);
   expect(sdkResources.some((name) => name.startsWith("https://cdn.jsdelivr.net/"))).toBe(false);
 });
 
@@ -514,8 +524,8 @@ test("driver app external assets preserve layout and monitoring behavior", async
 
   expect(await page.locator(`link[href="/${assetByStem('driver-app.css')}"]`).count()).toBe(1);
   expect(await page.locator(`script[src="/${assetByStem('driver-app.js')}"]`).count()).toBe(1);
-  expect(await page.locator('script#driver-startup-guard:not([src])').count()).toBe(1);
-  expect(await page.locator('script:not([src]):not(#driver-startup-guard)').count()).toBe(0);
+  expect(await page.locator(`script#driver-startup-guard[src="/${assetByStem('driver-startup-guard.js')}"]`).count()).toBe(1);
+  expect(await page.locator('script:not([src])').count()).toBe(0);
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   await expect(page.locator(".top")).toHaveCSS("min-height", "74px");
   await expect(page.locator(".app")).toHaveCSS("display", "grid");
@@ -647,7 +657,7 @@ test("opted-in driver sessions use authenticated cloud APIs without sending GPS 
   await page.route("**/api/public-config", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
-    body: JSON.stringify({ ok: true, supabase: { configured: true, url: "https://example.supabase.co", anonKey: "public-test-key" } }),
+    body: JSON.stringify({ ok: true, supabase: { configured: true, url: `https://${SUPABASE_HOST}`, anonKey: "public-test-key" } }),
   }));
   await page.route("**/api/sessions", async (route) => {
     const request = route.request();
@@ -815,7 +825,7 @@ test("driver invitations can resend a missing signup confirmation", async ({ pag
   await page.route("**/api/public-config", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
-    body: JSON.stringify({ ok: true, supabase: { configured: true, url: "https://example.supabase.co", anonKey: "public-key" } }),
+    body: JSON.stringify({ ok: true, supabase: { configured: true, url: `https://${SUPABASE_HOST}`, anonKey: "public-key" } }),
   }));
   await page.route("**/auth/v1/signup**", (route) => route.fulfill({
     status: 200,
@@ -849,7 +859,7 @@ test("returning unconfirmed drivers can recover from invitation sign-in", async 
   await page.route("**/api/public-config", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
-    body: JSON.stringify({ ok: true, supabase: { configured: true, url: "https://example.supabase.co", anonKey: "public-key" } }),
+    body: JSON.stringify({ ok: true, supabase: { configured: true, url: `https://${SUPABASE_HOST}`, anonKey: "public-key" } }),
   }));
   await page.route("**/auth/v1/token**", (route) => route.fulfill({
     status: 400,
@@ -1015,9 +1025,10 @@ test("authenticated fleet dashboards never fall back to unrelated local driver d
   await expect(page.locator("#driverAppNav")).toBeHidden();
   await expect(page.locator("#kpiDrivers")).toHaveText("0");
   await expect(page.getByText("Unrelated Local Driver")).toHaveCount(0);
-  await page.getByRole("link", { name: "Manage drivers" }).focus();
+  await expect(page.locator("#rosterManageLink")).toHaveAttribute("href", "/fleet-onboarding.html");
+  await page.locator("#driverSearch").focus();
   await page.keyboard.press("Tab");
-  await expect(page.locator("#driverSearch")).toBeFocused();
+  await expect(page.locator("#riskFilter")).toBeFocused();
   const driverStatusTop = await page.locator(".main").evaluate((element) => element.getBoundingClientRect().top);
   const summaryMetricsTop = await page.locator(".dashboard-kpis").evaluate((element) => element.getBoundingClientRect().top);
   expect(driverStatusTop).toBeLessThan(summaryMetricsTop);
@@ -1056,7 +1067,8 @@ test("fleet dashboard clears protected data when auth changes in another tab", a
   });
 
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText("Owner A Driver")).toBeVisible();
+  await expect(page.locator(".driver .name").filter({ hasText: "Owner A Driver" })).toBeVisible();
+  await expect(page.locator("#actionQueue")).toContainText("Owner A Driver");
   const accountSwitchPage = await page.context().newPage();
   await accountSwitchPage.goto("/", { waitUntil: "domcontentloaded" });
   await accountSwitchPage.evaluate(() => {
@@ -1109,7 +1121,7 @@ test("fleet dashboard does not turn missing or inactive telemetry into active sa
   await page.goto("/fleet-dashboard.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#cloudStatus")).toContainText("Protected connection active");
   await expect(page.locator("#kpiDrivers")).toHaveText("2");
-  await expect(page.locator("#kpiDriversSub")).toHaveText("1 live");
+  await expect(page.locator("#kpiDriversSub")).toHaveText("recorded profiles; availability unknown");
   await expect(page.locator("#kpiScore")).toHaveText("64");
   await expect(page.locator("#kpiScoreSub")).toHaveText("1 below 70");
   await expect(page.locator("#valueCoverage")).toHaveText("50%");

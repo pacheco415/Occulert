@@ -13,6 +13,9 @@ import { setAudioModeAsync } from 'expo-audio';
  *  - We duck (lower) other audio instead of stopping it, so navigation and
  *    music keep playing.
  *
+ * This sets playback policy, without holding the session active. Short-cue
+ * players release it automatically after playback; background permission only
+ * lets an audible cue finish while camera monitoring stops.
  * Call this once before the first alert plays. Safe to call repeatedly.
  */
 export async function configureAlertAudioMode(): Promise<void> {

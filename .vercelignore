@@ -13,3 +13,21 @@ brand/
 playwright.config.mjs
 test-results/
 playwright-report/
+dependency-reports/
+
+.verification-receipts/
+
+asset-size-budgets.json
+
+startup-performance-budgets.json
+
+# Editable source and build configuration stay outside the public deployment.
+src/
+build/
+source-assets.json
+source-driver-contract.json
+jsconfig.json
+eslint.config.mjs
+
+# Standalone event-outbox prototype is not a public runtime asset.
+lib/

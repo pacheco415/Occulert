@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -38,20 +39,25 @@ test('other platforms use a portable web search URL', () => {
 });
 
 test('the monitor stops and saves before handing off to Maps', () => {
-  const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  const owners = readNativeMonitorSourceOwners(), monitor = owners.screen, presentation = owners.view;
   const liveMetrics = readFileSync(new URL('../native-app/components/LiveMetrics.tsx', import.meta.url), 'utf8');
-  assert.match(monitor, /alertCount > 0/);
-  assert.match(monitor, /Only use this after you are safely parked/);
+  assert.match(presentation, /alertCount > 0/);
+  assert.match(presentation, /Only use this after you are safely parked/);
   assert.match(monitor, /await handleStop\(\{ deferCloudFinalization: true \}\)/);
-  assert.match(monitor, /Optional cloud finalization never delays a safe-stop Maps handoff/);
-  assert.match(monitor, /void finalizeCloud\(localSessionId\)\.catch\(\(\) => \{\}\)/);
+  const completion = readFileSync(new URL('../native-app/lib/sessionCompletion.ts', import.meta.url), 'utf8');
+  assert.match(monitor, /await completeNativeSessionStop/);
+  assert.match(monitor, /deferCloudFinalization: Boolean\(options\.deferCloudFinalization\)/);
+  assert.match(completion, /void services\.finalize\(localId\)\.catch\(\(\) => \{\}\)/);
   assert.match(monitor, /buildSafeStopSearchUrls\(Platform\.OS, kind\)/);
   assert.match(monitor, /Linking\.openURL\(url\)/);
-  assert.match(monitor, /does not read, store, or upload your location/i);
+  assert.match(presentation, /does not read, store, or upload your location/i);
 
-  const controlsStart = monitor.indexOf('<View style={s.ctrl}>');
-  const metricsStart = monitor.indexOf('<LiveMetrics');
-  const safeStopStart = monitor.indexOf('style={s.safeStopBtn}', controlsStart);
-  assert.ok(controlsStart < metricsStart && metricsStart < safeStopStart);
+  const controlsStart = presentation.indexOf('<MonitorLayout');
+  const metricsStart = presentation.indexOf('<LiveMetrics');
+  const safeStopStart = presentation.indexOf('style={s.safeStopBtn}', controlsStart);
+  assert.ok(controlsStart >= 0 && controlsStart < metricsStart && metricsStart < safeStopStart);
+  const primaryStart = presentation.indexOf('primaryAction={', controlsStart);
+  const stopStart = presentation.indexOf('accessibilityLabel="Stop monitoring and save this drive"', primaryStart);
+  assert.ok(primaryStart > controlsStart && stopStart > primaryStart && stopStart < metricsStart);
   assert.doesNotMatch(liveMetrics, /metrics:\s*\{\s*position:\s*'absolute'/);
 });

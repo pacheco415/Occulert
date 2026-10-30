@@ -18,6 +18,8 @@ export default defineConfig({
   webServer: {
     command: "node scripts/serve-static.mjs",
     url: "http://127.0.0.1:4173",
-    reuseExistingServer: true,
+    // A server on this port may belong to another checkout. Start this source
+    // explicitly or fail rather than validating the wrong immutable assets.
+    reuseExistingServer: false,
   },
 });

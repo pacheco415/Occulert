@@ -1,4 +1,11 @@
-import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
+import { auditDriverHooks } from './lib/driver-hook-policy.mjs';
+import { readHistorySourceOwners, HISTORY_SOURCE_PATHS } from './lib/history-source-owners.mjs';
+import { auditCspPolicy, SUPABASE_HOST } from './lib/csp-policy.mjs';
+import { scriptMarkupPolicy, generatedScriptMarkupPolicy } from './lib/html-script-policy.mjs';
+import { auditWorkflowPolicy } from './lib/workflow-policy.mjs';
+import { createHash } from 'node:crypto';
+import { asset, assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
 import "./audit-assets.mjs";
 import "./audit-mediapipe.mjs";
 import "./audit-retired-assets.mjs";
@@ -6,6 +13,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 
 const root = process.cwd();
+readHistorySourceOwners(read);
+const monitorOwners = readNativeMonitorSourceOwners(relative => read('native-app/' + relative));
 const failures = [];
 const htmlFiles = [];
 
@@ -23,6 +32,14 @@ function fail(message) {
   failures.push(message);
 }
 
+// Browser assets use immutable versioned URLs; the worker itself revalidates.
+for (const entry of readdirSync(root, { withFileTypes: true })) {
+  if ((entry.isFile() || entry.isSymbolicLink()) && /\.(js|css)$/i.test(entry.name) && entry.name !== 'sw.js'
+      && !/\.v\d+\.(js|css)$/.test(entry.name)) {
+    fail(`${entry.name}: root JavaScript and CSS assets must use versioned filenames (only sw.js may be unversioned)`);
+  }
+}
+
 function read(path) {
   return readFileSync(join(root, path), "utf8");
 }
@@ -30,7 +47,9 @@ function read(path) {
 function assertionSource(path) {
   const source = read(path);
   if (!path.endsWith(".html")) return source;
-  const assets = [...source.matchAll(/(?:href|src)="\/([^"?#]+-page-[^"?#]+\.(?:js|css))"/g)];
+  const ownedAssets = new Set(Object.values(JSON.parse(read("asset-versions.json"))));
+  const sharedPublicStyle = asset('public-page.css');
+  const assets = [...source.matchAll(/(?:href|src)="\/([^"?#]+\.(?:js|css))"/g)].filter(match => ownedAssets.has(match[1]) && (match[1] === sharedPublicStyle || /-page-/.test(match[1]) || /^(?:fleet-dashboard|homepage-bootstrap)\.v/.test(match[1])));
   return source + assets.map(match => read(match[1])).join("\n");
 }
 
@@ -49,7 +68,7 @@ function assertSingleH1(path) {
 
 // Keep deployment source exclusions explicit and reviewable.
 const deploymentExclusions = new Set(read('.vercelignore').split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')));
-for (const path of ['tests/', 'docs/', 'native-app/', 'supabase/', 'db/', 'scripts/', 'benchmark/', 'brand/', '.github/', '*.md', 'playwright.config.mjs']) {
+for (const path of ['tests/', 'docs/', 'native-app/', 'supabase/', 'db/', 'scripts/', 'benchmark/', 'brand/', '.github/', '*.md', 'playwright.config.mjs', 'src/', 'build/', 'source-assets.json']) {
   if (!deploymentExclusions.has(path)) fail(`.vercelignore must exclude ${path}`);
 }
 
@@ -78,9 +97,11 @@ for (const retiredDuplicate of [
 
 for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
-  const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
-  for (const [index, match] of inlineScripts.entries()) {
-    try { new Function(match[1]); }
+  const markupPolicy = scriptMarkupPolicy(html);
+  if(markupPolicy.handlers.length)fail(`${file}: inline event handlers are forbidden`);
+  for (const [index, script] of markupPolicy.inlineScripts.entries()) {
+    fail(`${file}: inline script bodies are forbidden`);
+    try { new Function(script.body); }
     catch (error) { fail(`${file}: inline script ${index + 1} does not parse (${error.message})`); }
   }
   const refs = [...html.matchAll(/\b(?:href|src)=["']([^"'#?]+)[^"']*["']/g)].map((match) => match[1]);
@@ -103,8 +124,9 @@ assertIncludes("index.html", "class=\"journey-frame journey-frame-enter\"", "hom
 assertNotIncludes("index.html", "class=\"car-shell\"", "homepage must not render the retired flat CSS car");
 assertIncludes("index.html", `<script src=\"/${assetByStem('homepage.js')}\" defer></script>`, "homepage must load its external behavior script");
 assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
-const homepageInlineScripts = [...read("index.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
-if (homepageInlineScripts !== 1) fail(`homepage must contain only the early password-recovery handoff script (found ${homepageInlineScripts})`);
+const homepageInlineScripts = scriptMarkupPolicy(read("index.html")).inlineScripts.length;
+if (homepageInlineScripts !== 0) fail(`homepage must contain no inline scripts (found ${homepageInlineScripts})`);
+if(!read("index.html").includes(`src="/${assetByStem("homepage-bootstrap.js")}"`))fail("homepage must load its early external password-recovery handoff");
 assertIncludes("index.html", "params.get('type')==='recovery'", "homepage must detect recovery links that fall back to the site root");
 assertIncludes("index.html", "'/account.html?recovery=1'+hash", "homepage must preserve recovery tokens while handing off to Account Setup");
 assertIncludes("index.html", "id=\"safetyJourney\"", "homepage must include the illustrated safety journey");
@@ -230,20 +252,33 @@ for (const accessibilityBoundary of [
 }
 assertIncludes("app.html", `<link rel=\"stylesheet\" href=\"/${assetByStem('driver-app.css')}\" />`, "driver app must load its external stylesheet");
 assertNotIncludes("app.html", "<style>", "driver app must keep its styles out of the HTML document");
-assertIncludes("app.html", `<script src=\"/${assetByStem('driver-app.js')}\"></script>`, "driver app must load its external behavior script");
+assertIncludes("app.html", `<script src=\"/${assetByStem('driver-app.js')}\" defer></script>`, "driver app must load its external behavior script");
 for (const path of ["app.html", "session-history.html"]) {
   assertIncludes(path, 'class="skip-link" href="#main-content"', `${path} must let keyboard users skip repeated navigation`);
   assertIncludes(path, 'id="main-content" tabindex="-1"', `${path} must expose a focusable main destination`);
   assertIncludes(path, `<link rel="stylesheet" href="/${assetByStem('accessibility.css')}" />`, `${path} must use the shared keyboard-navigation layer`);
 }
-assertIncludes("app.html", '<h1 style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>', "driver app must keep its main heading visible while monitoring");
+assertIncludes("app.html", '<h1 id="driverPanelTitle" style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>', "driver app must keep its main heading visible while monitoring");
 assertIncludes("app.html", '<h2 id="overlayTitle"', "camera guidance must remain a subordinate heading");
 assertIncludes("app.html", '<h2 id="alertTitle"', "driver alert overlay must not replace the page's main heading");
 assertIncludes("app.html", '<label for="nightOpacity">', "driver app must label the night alert brightness slider");
-const driverAppInlineScripts = [...read("app.html").matchAll(/<script(?![^>]*\bsrc=)[^>]*>/gi)].length;
-if (driverAppInlineScripts !== 1 || !read("app.html").includes('<script id="driver-startup-guard">')) fail("driver page must keep only its early startup guard inline");
-if (read("app.html").indexOf('<script id="driver-startup-guard">') > read("app.html").indexOf('<link rel="stylesheet"')) fail("startup recovery must initialize before blocking styles or scripts");
+const driverGuardName = assetByStem('driver-startup-guard.js');
+const driverGuardMarkup = read('app.html').match(/<script\b(?=[^>]*\bid="driver-startup-guard")[^>]*><\/script>/)?.[0];
+const driverGuardSource = read(driverGuardName);
+const driverGuardIntegrity = 'sha256-' + createHash('sha256').update(driverGuardSource).digest('base64');
+if (!driverGuardMarkup?.includes(`src="/${driverGuardName}"`) || !driverGuardMarkup.includes(`integrity="${driverGuardIntegrity}"`) || (!/\bdefer\b/.test(driverGuardMarkup) || /\basync\b/.test(driverGuardMarkup))) fail('driver startup guard must be external, ordered and integrity-pinned');
+if (read('app.html').indexOf(driverGuardMarkup) > read('app.html').indexOf('<link rel="stylesheet"')) fail('startup guard must be requested before blocking styles');
+assertIncludes('app.html', 'id="startupRetryLink" href="/app.html"', 'parked startup recovery must remain available without a guard script');
+assertIncludes('sw.js', 'const STARTUP_GUARD_ASSETS =', 'the owned startup guard must join integrity-verified offline installation');
+assertIncludes('sw.js', driverGuardIntegrity, 'the offline startup guard integrity must match its current bytes');
+const experimentHelperName = assetByStem('detection-experiments.js');
+const experimentHelperIntegrity = 'sha256-' + createHash('sha256').update(read(experimentHelperName)).digest('base64');
+assertIncludes(assetByStem('driver-app.js'), `const EXPERIMENT_HELPER_INTEGRITY='${experimentHelperIntegrity}';`, 'the on-demand experimental helper must retain its exact owned integrity');
+assertIncludes(assetByStem('driver-app.js'), `script.src='/${experimentHelperName}'`, 'the on-demand experimental helper must use its active owned URL');
+const helperWorkerPins = read('sw.js').match(/const EXPERIMENT_HELPER_ASSETS = \[[\s\S]*?\];/)?.[0];
+if (!helperWorkerPins?.includes('/' + experimentHelperName) || !helperWorkerPins.includes(experimentHelperIntegrity)) fail('the optional offline helper must have the same exact pin as its driver importer');
 const driverAppPage = read("app.html");
+if (/<script\b(?=[^>]*\bsrc=)[^>]*>/.test(driverAppPage) && [...driverAppPage.matchAll(/<script\b(?=[^>]*\bsrc=)[^>]*>/g)].some(([tag])=> !/\bdefer\b/.test(tag) || /\basync\b/.test(tag))) fail('driver scripts must preserve ordered, nonblocking startup');
 const driverAppDependencies = [`/${assetByStem('occulert-backend.js')}`, `/${assetByStem('security-utils.js')}`, `/${assetByStem('driver-app.js')}`].map((path) => driverAppPage.indexOf(`src=\"${path}\"`));
 if (driverAppDependencies.some((index) => index < 0) || driverAppDependencies.some((index, position) => position > 0 && index <= driverAppDependencies[position - 1])) {
   fail("driver app dependencies must load before the external monitoring behavior in their original order");
@@ -259,9 +294,9 @@ assertIncludes("sw.js", `'/${assetByStem('driver-app.css')}'`, "service worker m
 assertIncludes("sw.js", `'/${assetByStem('driver-app.js')}'`, "service worker must cache the external driver app behavior");
 assertIncludes("sw.js", "const NETWORK_FIRST_ASSETS", "service worker must refresh safety-critical driver logic before using its offline copy");
 assertIncludes("vercel.json", "\"key\": \"Content-Security-Policy\"", "vercel.json must enforce its tested CSP");
-assertIncludes("vercel.json", "https://fonts.googleapis.com", "vercel.json CSP must allow Google Fonts stylesheets used by marketing pages");
-assertIncludes("vercel.json", "font-src 'self' https://fonts.gstatic.com", "vercel.json CSP must allow Google Fonts font files");
-assertIncludes("vercel.json", "https://*.supabase.co", "vercel.json CSP must allow configured Supabase Auth requests");
+assertNotIncludes("vercel.json", "https://fonts.googleapis.com", "font stylesheets must be owned static assets");
+assertNotIncludes("vercel.json", "https://fonts.gstatic.com", "fonts must be served from owned static assets");
+assertIncludes("vercel.json", `https://${SUPABASE_HOST}`, "vercel.json CSP must allow only the configured Supabase Auth project");
 assertIncludes("vercel.json", "'wasm-unsafe-eval'", "vercel.json CSP must permit MediaPipe WebAssembly compilation");
 assertIncludes("vercel.json", "webp|avif|gif", "optimized AVIF assets must receive immutable cache headers");
 assertIncludes("vercel.json", "publickey-credentials-create=(self)", "the production permissions policy must allow same-origin passkey enrollment");
@@ -289,17 +324,30 @@ assertIncludes("api/accept-invitation.js", "rpc/accept_fleet_invitation", "invit
 assertIncludes("sw.js", "url.pathname.startsWith('/api/')", "service worker must never intercept or cache API responses");
 assertIncludes("api/sessions.js", "driver_id: \"eq.\" + driver.id", "session updates must be scoped to the authenticated driver's own sessions");
 assertIncludes("api/events.js", "driver_id: \"eq.\" + driver.id", "event writes must verify the session belongs to the authenticated driver");
-assertIncludes("api/events.js", "numberOrNull(body.latitude, -90, 90)", "event GPS latitude must be range validated");
-assertIncludes("api/sessions.js", "MAX_BODY_LENGTH", "session API must reject oversized JSON bodies");
+assertIncludes("api/events.js", "strictNumberOrNull(body.latitude, -90, 90)", "event GPS latitude must reject out-of-range values");
+assertIncludes("api/events.js", "strictNumberOrNull(body.longitude, -180, 180)", "event GPS longitude must reject out-of-range values");
+assertIncludes("api/sessions.js", "validJsonBody(request)", "session API must use bounded shared JSON validation");
+assertIncludes("api/_lib/validation.js", "maxLength = 4096", "shared session JSON validation must retain the request size limit");
+assertIncludes("api/_lib/validation.js", "JSON.stringify(body).length <= maxLength", "shared JSON validation must enforce its limit");
+assertIncludes("api/profile.js", "validJsonBody(request, 2048)", "profile requests must retain their smaller size limit");
+for (const [route, limit] of [["fleets", 2048], ["fleet-invitations", 2048], ["accept-invitation", 1024]]) {
+  assertIncludes(`api/${route}.js`, `MAX_BODY_LENGTH = ${limit}`, `${route} must retain its request limit`);
+  assertIncludes(`api/${route}.js`, "validJsonBody(request, MAX_BODY_LENGTH)", `${route} must use shared bounded object validation`);
+}
+assertIncludes("api/account.js", "validJsonBody(request, 256)", "account confirmation must retain its request limit");
+assertIncludes("api/fleet-followups.js", "validJsonBody(req, 1024)", "followups must retain their request limit");
+assertIncludes("api/pilot-leads.js", "jsonObjectWithinLimit(body, MAX_BODY_LENGTH)", "pilot must retain its separately staged size check");
 assertIncludes("api/pilot-leads.js", "body.website", "pilot lead API must include honeypot spam filtering");
 assertIncludes(`${assetByStem('pilot-signup-page-2.js')}`, "startedAt: formStartedAt", "pilot signup must send form timing metadata for basic spam filtering");
 assertIncludes("api/pilot-leads.js", "rateLimitState(request)", "pilot lead API must use durable distributed rate limiting");
 assertIncludes("api/pilot-leads.js", "pgFetch(\"pilot_leads\"", "pilot lead API must support durable Supabase storage");
 assertIncludes("db/schema.sql", "create table if not exists pilot_leads", "database schema must include pilot lead storage");
 assertIncludes("pilot-signup.html", "<form class=\"card\"", "pilot signup controls must use a semantic form");
-assertIncludes(`${assetByStem('driver-app.js')}`, "trigger=_patched", "enhanced alert behavior must replace the active trigger function");
-assertIncludes(`${assetByStem('driver-app.js')}`, "if(alerts===previousAlerts)return", "enhanced alert behavior must respect alert cooldowns");
-assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.startSession()", "driver app must start protected cloud sessions when opted in");
+try { auditDriverHooks(readFileSync(assetByStem('driver-app.js'), 'utf8')); }
+catch (error) { failures.push('Driver hooks: ' + error.message); }
+assertIncludes(`${assetByStem('driver-app.js')}`, "backend.startSession()", "driver app must start protected cloud sessions when opted in");
+assertIncludes(`${assetByStem('driver-app.js')}`, "backend.captureAuthLifecycle()", "cloud sessions must capture their auth lifecycle");
+assertIncludes(`${assetByStem('driver-app.js')}`, "scope.backend.isAuthLifecycleCurrent(scope.auth)", "cloud events must check the captured auth lifecycle");
 assertIncludes(`${assetByStem('driver-app.js')}`, "window.OcculertBackend.createCloudSummaryOutbox", "driver app must finish protected cloud sessions through the durable outbox when opted in");
 assertIncludes(`${assetByStem('driver-app.js')}`, "queueBackendEvent", "driver app must queue protected alert events when opted in");
 assertIncludes(`${assetByStem('driver-app.js')}`, "function cameraRecoveryGuidance", "driver app must keep camera failure recovery guidance available");
@@ -335,9 +383,10 @@ assertIncludes(`${assetByStem('auth-helper.js')}`, "await window.OcculertBackend
 assertIncludes("login.html", `src=\"/${assetByStem('supabase-loader.js')}\"`, "login must use the resilient same-site Supabase loader");
 assertIncludes("account.html", `src=\"/${assetByStem('supabase-loader.js')}\"`, "account settings must use the same resilient Supabase loader");
 assertIncludes(`${assetByStem('supabase-loader.js')}`, "var VERSION = \"2.112.3\"", "the resilient loader must pin a passkey-capable Supabase SDK version");
-assertIncludes(`${assetByStem('supabase-loader.js')}`, "sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC", "every Supabase loader path must verify the pinned SDK integrity");
-assertIncludes(`${assetByStem('supabase-loader.js')}`, "/vendor/supabase-", "the Supabase loader must prefer the Occulert same-origin proxy");
-assertIncludes("vercel.json", "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js", "the same-origin proxy must target the pinned SDK artifact");
+assertIncludes(`${assetByStem('supabase-loader.js')}`, "sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg", "every Supabase loader path must verify the pinned SDK integrity");
+assertIncludes(`${assetByStem('supabase-loader.js')}`, "/vendor/supabase-", "the Supabase loader must use the owned pinned SDK");
+assertIncludes("vercel.json", "/vendor/supabase-2.112.3.js", "the owned pinned SDK must have an explicit cache policy");
+assertNotIncludes(assetByStem('supabase-loader.js'), "cdn.jsdelivr.net", "new SDK loaders must not request a runtime CDN fallback");
 assertIncludes("login.html", "id=\"passkeyRetryBtn\"", "login must offer recovery after a retryable Safari loader failure");
 assertIncludes("account.html", "id=\"passkeyRetryBtn\"", "account settings must offer recovery after a retryable passkey setup failure");
 assertIncludes(`${assetByStem('passkey-auth.js')}`, "sdk_load_failed", "passkey errors must distinguish an SDK delivery failure");
@@ -384,17 +433,27 @@ assertIncludes("sw.js", `'/${assetByStem('supabase-loader.js')}'`, "the service 
 const serviceWorker = read("sw.js");
 const staticAssets = serviceWorker.slice(serviceWorker.indexOf("const STATIC_ASSETS"), serviceWorker.indexOf("];", serviceWorker.indexOf("const STATIC_ASSETS")) + 2);
 const networkOnlyAssets = serviceWorker.slice(serviceWorker.indexOf("const NETWORK_ONLY_ASSETS"), serviceWorker.indexOf("]);", serviceWorker.indexOf("const NETWORK_ONLY_ASSETS")) + 3);
+// Older cached pages can still request retained credential-bearing clients.
+for (const name of readdirSync(root).filter(name => /^occulert-backend\.v\d+\.js$/.test(name))) {
+  if (!networkOnlyAssets.includes(`'/${name}'`)) fail(`retained backend client must remain network-only: ${name}`);
+  if (staticAssets.includes(`'/${name}'`)) fail(`retained backend client must not be in the offline static cache: ${name}`);
+}
 const staticAssetPaths = [...staticAssets.matchAll(/'([^']+)'/g)].map((match) => match[1]);
 const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
   const pathname = asset.split(/[?#]/, 1)[0];
   const file = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");
   return total + statSync(join(root, file)).size;
 }, 0);
-if (staticAssetBytes > 320_000) fail(`service worker install cache must remain at or below 320 KB (found ${staticAssetBytes} bytes)`);
+// Shared event delivery adds 26,426 bytes to selected static install assets:
+// 341,629 -> 368,055. Observer/replay now total 373,884; the reviewed 126 KB
+// driver ceiling retains this 375 KB bound without preloading the helper.
+if (staticAssetBytes > 375_000) fail(`service worker install cache must remain at or below 375 KB (found ${staticAssetBytes} bytes)`);
 if (staticAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the experimental passkey client must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the passkey client must be listed as a network-only asset");
 if (staticAssets.includes(`'/${assetByStem('supabase-loader.js')}'`)) fail("the resilient Supabase loader must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes(`'/${assetByStem('supabase-loader.js')}'`)) fail("the resilient Supabase loader must be listed as a network-only asset");
+if (staticAssets.includes("'/vendor/supabase-2.112.3.js'")) fail("the owned Supabase SDK must not be stored in the offline static cache");
+if (!networkOnlyAssets.includes("'/vendor/supabase-2.112.3.js'")) fail("the owned Supabase SDK must be listed as a network-only asset");
 assertIncludes("privacy.html", "passkey private key stay with your device", "privacy terms must disclose that Occulert does not receive passkey private keys or biometrics");
 assertIncludes("privacy.html", 'aria-label="Privacy and data controls"', "privacy terms must expose a clear data-controls navigation landmark");
 assertIncludes("privacy.html", 'id="local-history"', "privacy terms must explain native local history and recovery data");
@@ -410,28 +469,28 @@ assertIncludes(`${assetByStem('occulert-backend.js')}`, "/auth/v1/user", "backen
 assertIncludes(`${assetByStem('occulert-backend.js')}`, "Authorization: \"Bearer \" + auth.access_token", "account updates must be authorized with the live session token");
 assertIncludes("native-app/components/AlertSystem.tsx", "../assets/alert.wav", "native alert sound must be bundled locally");
 assertIncludes("native-app/app/monitor.tsx", "updateSessionHistory", "native monitor must serialize completed-session history writes");
-assertIncludes("native-app/app/history.tsx", "openFeedbackWithFallback(target", "native session history must offer pilot feedback tied to a completed session");
+assertIncludes(HISTORY_SOURCE_PATHS.screen, "openFeedbackWithFallback(target", "native session history must offer pilot feedback tied to a completed session");
 assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, raw motion readings, or location are attached.", "native pilot feedback must state that sensitive media, raw motion, and location are not attached");
-assertIncludes("native-app/app/history.tsx", "false_alert", "native session history must capture structured false-alert feedback");
-assertIncludes("native-app/app/history.tsx", "missed_alert", "native session history must capture structured missed-alert feedback");
-assertIncludes("native-app/app/history.tsx", "Saved only on this iPhone", "native alert assessments must disclose their local-only storage");
+assertIncludes(HISTORY_SOURCE_PATHS.reviewModel, "false_alert", "native session history must capture structured false-alert feedback");
+assertIncludes(HISTORY_SOURCE_PATHS.reviewModel, "missed_alert", "native session history must capture structured missed-alert feedback");
+assertIncludes(HISTORY_SOURCE_PATHS.review, "This alert rating stays only on this iPhone", "native alert assessments must disclose their local-only storage");
 assertIncludes("native-app/app/monitor.tsx", "sensitivity: sessionSensitivityRef.current", "native session history must preserve the sensitivity used for each session");
-assertIncludes("native-app/app/history.tsx", "CHECKPOINT_TARGET = 10", "native history must track progress toward the first 10-session accuracy checkpoint");
-assertIncludes("native-app/app/history.tsx", "item.sensitivity === 'medium'", "native accuracy checkpoint must count only reviewed Medium-sensitivity sessions");
-assertIncludes("native-app/app/history.tsx", "Ratings stay on this iPhone", "native accuracy checkpoint must disclose local-only rating storage");
+assertIncludes(HISTORY_SOURCE_PATHS.reviewModel, "CHECKPOINT_TARGET = 10", "native history must track progress toward the first 10-session accuracy checkpoint");
+assertIncludes(HISTORY_SOURCE_PATHS.viewModel, "item.sensitivity === 'medium'", "native accuracy checkpoint must count only reviewed Medium-sensitivity sessions");
+assertIncludes(HISTORY_SOURCE_PATHS.pilot, "Ratings stay on this iPhone", "native accuracy checkpoint must disclose local-only rating storage");
 assertIncludes("native-app/lib/feedback.ts", "Alert assessment:", "native session feedback must include the tester's alert assessment");
 assertIncludes("native-app/lib/feedback.ts", "Sensitivity:", "native session feedback must include the recorded sensitivity");
-assertIncludes("native-app/app/history.tsx", "Record only after you are safely parked.", "native test-condition review must prohibit in-drive interaction");
-assertIncludes("native-app/app/history.tsx", "Conditions stay on this iPhone", "native test conditions must disclose local-only storage");
-assertIncludes("native-app/app/history.tsx", "TEST CONDITION COVERAGE", "native pilot checkpoint must summarize test-condition coverage");
+assertIncludes(HISTORY_SOURCE_PATHS.review, "Record only after you are safely parked.", "native test-condition review must prohibit in-drive interaction");
+assertIncludes(HISTORY_SOURCE_PATHS.review, "Conditions stay on this iPhone", "native test conditions must disclose local-only storage");
+assertIncludes(HISTORY_SOURCE_PATHS.pilot, "TEST CONDITION COVERAGE", "native pilot checkpoint must summarize test-condition coverage");
 assertIncludes("native-app/lib/feedback.ts", "Phone position:", "native session feedback must include structured test conditions");
-assertIncludes("native-app/app/history.tsx", "tester observations, not device measurements", "native device-impact review must not misrepresent subjective observations as measurements");
-assertIncludes("native-app/app/history.tsx", "let the phone cool before another session", "native device-impact review must give safe temperature-warning guidance");
+assertIncludes(HISTORY_SOURCE_PATHS.review, "tester observations, not device measurements", "native device-impact review must not misrepresent subjective observations as measurements");
+assertIncludes(HISTORY_SOURCE_PATHS.review, "let the phone cool before another session", "native device-impact review must give safe temperature-warning guidance");
 assertIncludes("native-app/lib/feedback.ts", "Battery impact (tester-reported):", "native session feedback must label subjective battery observations");
 assertIncludes("native-app/lib/feedback.ts", "Phone heat (tester-reported):", "native session feedback must label subjective phone-heat observations");
-assertIncludes("native-app/app/history.tsx", "Review complete", "native history must identify fully reviewed sessions");
-assertIncludes("native-app/app/history.tsx", "Needs review", "native history must identify incomplete session reviews");
-assertIncludes("native-app/app/history.tsx", "expanded: isExpanded", "native session review details must expose their expanded state for accessibility");
+assertIncludes(HISTORY_SOURCE_PATHS.card, "Review complete", "native history must identify fully reviewed sessions");
+assertIncludes(HISTORY_SOURCE_PATHS.card, "Needs review", "native history must identify incomplete session reviews");
+assertIncludes(HISTORY_SOURCE_PATHS.card, "expanded: isExpanded", "native session review details must expose their expanded state for accessibility");
 assertIncludes("native-app/app/monitor.tsx", "...currentAppBuildInfo()", "native sessions must preserve their exact app version and native build");
 assertIncludes("native-app/lib/appBuildInfo.ts", "Constants.platform?.ios?.buildNumber", "native pilot metadata must use the embedded immutable iOS build number");
 assertIncludes("native-app/lib/appBuildInfo.ts", "formatAppBuildLabel", "native build metadata must expose a reusable display label");
@@ -439,18 +498,19 @@ assertIncludes("native-app/lib/feedback.ts", "Build number:", "native session fe
 assertIncludes("native-app/app/settings.tsx", "formatAppBuildLabel(currentAppBuildInfo())", "native Settings must display the installed app version and build");
 assertNotIncludes("native-app/app/settings.tsx", "Occulert™ · v1.0.0", "native Settings must not hardcode the displayed app version");
 assertNotIncludes("native-app/lib/feedback.ts", "App version: 1.0.0", "native feedback must not hardcode an app version");
-assertIncludes("native-app/app/history.tsx", "router.push('/pre-drive')", "native history must route monitoring through the pre-drive safety gate");
-assertIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native iOS builds must explain optional location access to satisfy App Store validation");
+assertIncludes(HISTORY_SOURCE_PATHS.screen, "router.push('/pre-drive')", "native history must route monitoring through the pre-drive safety gate");
+assertNotIncludes("native-app/app.json", "NSLocationWhenInUseUsageDescription", "native Maps search links must not declare an unimplemented coordinate-access feature");
+assertIncludes("native-app/app.json", "both cameras", "native camera permission text must explain the optional parked dual-camera test");
 assertIncludes("native-app/constants/thresholds.ts", "EARLY_CLOSED_ALERT_MS = 600", "native monitoring must issue a prominent warning after a prolonged blink threshold");
 assertIncludes("native-app/constants/thresholds.ts", "CRITICAL_CLOSED_ALERT_MS = 1_200", "native monitoring must retain a stronger prolonged-closure stage");
 assertIncludes("native-app/app/monitor.tsx", "monitoring-paused.wav", "native monitoring must package an audible foreground-loss warning");
-assertIncludes("native-app/app/monitor.tsx", "headNodObservationsRef.current += 1", "native monitoring must store candidate head-nod observations locally");
-assertIncludes("native-app/app/history.tsx", "Does not trigger alerts", "experimental head-nod observations must not be presented as an alert signal");
+assertIncludes("native-app/hooks/useMonitorAnalysis.ts", "headNodObservationsRef.current += 1", "native monitoring must store candidate head-nod observations locally");
+assertIncludes(HISTORY_SOURCE_PATHS.diagnostics, "Does not trigger alerts", "experimental head-nod observations must not be presented as an alert signal");
 assertNotIncludes("native-app/components/AlertSystem.tsx", "headNod", "unvalidated head-nod observations must not affect alert delivery");
 assertNotIncludes("native-app/lib/cloudSync.ts", "headNodObservations", "unvalidated head-nod observations must remain out of cloud sync");
 assertIncludes("native-app/app.json", "NSMotionUsageDescription", "native iOS builds must explain compatible-headphone motion access");
 assertIncludes("native-app/app/monitor.tsx", "headphoneHeadNodObservationsRef.current += 1", "native monitoring must keep headphone candidate observations separate");
-assertIncludes("native-app/app/history.tsx", "Saved locally as aggregate observations only", "native history must disclose aggregate-only head-motion storage");
+assertIncludes(HISTORY_SOURCE_PATHS.diagnostics, "Saved locally as aggregate observations only", "native history must disclose aggregate-only head-motion storage");
 assertNotIncludes("native-app/lib/cloudSync.ts", "headphoneMotionSamples", "raw headphone-motion diagnostics must remain out of cloud sync");
 assertNotIncludes("native-app/components/AlertSystem.tsx", "headphoneMotion", "unvalidated headphone motion must not affect alert delivery");
 assertIncludes("native-app/lib/alertPolicy.ts", "CRITICAL_WARMUP_SECONDS = 10", "native monitoring must not trigger a critical alert immediately after startup");
@@ -472,15 +532,17 @@ assertIncludes("docs/APP_ROADMAP.md", "Review the full diff and repair findings"
 assertNotIncludes("features.html", "designed to actually wake you up", "public alert copy must not imply that alerts make drowsy driving safe");
 assertIncludes("native-app/components/AlertSystem.tsx", "setTrackingLost(true)", "native monitoring must apply a grace period before warning about tracking loss");
 assertIncludes("native-app/components/AlertSystem.tsx", "TRACKING LOST", "native monitoring must warn after sustained tracking loss");
-assertIncludes("native-app/components/AlertSystem.tsx", "top:132", "native alert banners must remain below the top navigation");
-assertIncludes("native-app/app/monitor.tsx", "sensorFault: { position: 'absolute', top: 132", "native sensor-fault banners must remain below the top navigation");
-assertNotIncludes("native-app/app/monitor.tsx", "Alert.alert('Monitoring stopped'", "native sensor faults must not stack a blocking modal over the in-app warning");
-assertIncludes("native-app/app/monitor.tsx", "SENSOR_STARTUP_GRACE_MS = 10_000", "native camera startup must have a distinct first-frame grace period");
-assertIncludes("native-app/app/monitor.tsx", "hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS", "native camera watchdog must distinguish startup from an active-pipeline stall");
-assertIncludes("native-app/app/monitor.tsx", "<View style={s.ctrl}>", "native monitoring controls must stay in one layout flow");
-assertIncludes("native-app/app/monitor.tsx", "<CameraSetupGuide", "the parked camera guide must share the monitoring control layout flow");
-assertIncludes("native-app/app/monitor.tsx", "<LiveMetrics", "native metrics must share the control layout flow so alert actions cannot overlap them");
-assertNotIncludes("native-app/app/monitor.tsx", "metrics: {\n    position: 'absolute'", "native metrics must not rely on a fixed bottom offset that can overlap added controls");
+assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "          inline", "native alert banners must use the scrolling layout flow");
+for (const owner of monitorOwners.runtimeOwners) assertNotIncludes("native-app/" + owner.path, "sensorFault: { position: 'absolute'", "native sensor-fault banners must share the scrolling layout flow");
+for (const owner of monitorOwners.runtimeOwners) assertNotIncludes("native-app/" + owner.path, "Alert.alert('Monitoring stopped'", "native sensor faults must not stack a blocking modal over the in-app warning");
+assertIncludes("native-app/hooks/useMonitorCameraLifecycle.ts", "SENSOR_STARTUP_GRACE_MS = 10_000", "native camera startup must have a distinct first-frame grace period");
+assertIncludes("native-app/hooks/useMonitorCameraLifecycle.ts", "hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS", "native camera watchdog must distinguish startup from an active-pipeline stall");
+assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "<MonitorLayout", "native monitoring must use the bounded camera and controls layout");
+assertIncludes("native-app/components/MonitorLayout.tsx", 'testID="monitor-primary-action"', "Start and Stop must have a separate fixed layout slot");
+assertIncludes("native-app/components/MonitorLayout.tsx", 'testID="monitor-details"', "native guidance and metrics must have a scrolling region");
+assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "<CameraSetupGuide", "the parked camera guide must share the monitoring control layout flow");
+assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "<LiveMetrics", "native metrics must share the control layout flow so alert actions cannot overlap them");
+for (const owner of monitorOwners.runtimeOwners) assertNotIncludes("native-app/" + owner.path, "metrics: {\n    position: 'absolute'", "native metrics must not rely on a fixed bottom offset that can overlap added controls");
 assertIncludes("native-app/lib/watchBridge.ts", "getIsWatchAppInstalled", "Apple Watch controls must require the companion app, not pairing alone");
 assertIncludes("native-app/app/settings.tsx", "AUTOMATIC", "connected audio settings must describe iPhone output routing truthfully");
 assertIncludes("native-app/app/monitor.tsx", "getWatchAlertsEnabled()", "native monitoring must preload the cached Watch preference before alerts can fire");
@@ -502,7 +564,7 @@ assertIncludes("fleet-dashboard.html", "function copyDriver(id)", "fleet dashboa
 assertIncludes("fleet-dashboard.html", "getFleetSummary({includeEvents})", "signed-in fleet dashboards must use the owner-scoped backend summary");
 assertIncludes("fleet-dashboard.html", "!fleetMode&&local", "protected fleet dashboards must not fall back to unrelated local driver data");
 assertIncludes("fleet-dashboard.html", "id=\"sessionHistory\"", "fleet dashboard must render protected session history");
-assertIncludes("fleet-dashboard.html", "ontoggle=\"handleHistoryToggle(event)\"", "protected session history must render only after the manager opens it");
+assertIncludes("fleet-dashboard.html", 'data-page-action="handleHistoryToggle-event"', "protected session history must render only after the manager opens it");
 assertNotIncludes("fleet-dashboard.html", "class=\"panel-details history-details\" open", "protected session history must start collapsed");
 assertIncludes("fleet-dashboard.html", "function refreshDashboardIfNeeded()", "fleet dashboard polling must skip unchanged full-page renders");
 assertIncludes("fleet-dashboard.html", "setInterval(refreshDashboardIfNeeded,DASHBOARD_CLOCK_INTERVAL_MS)", "fleet dashboard must use the focus-stable low-frequency clock refresh path");
@@ -617,17 +679,20 @@ assertIncludes("api/pilot-leads.js", "origin_not_allowed", "pilot lead API must 
 assertIncludes("api/pilot-leads.js", "unsupported_media_type", "pilot lead API must require JSON submissions");
 assertIncludes("api/pilot-leads.js", "url.protocol === \"https:\"", "pilot lead API must only forward to HTTPS webhooks");
 if (read(".nvmrc").trim() !== "24") fail(".nvmrc must select Node 24");
-for (const workflow of [".github/workflows/browser-smoke.yml", ".github/workflows/native-app-typecheck.yml", ".github/workflows/site-audit.yml"]) {
-  for (const action of ['checkout', 'setup-node']) {
-    if (!new RegExp(`uses: actions/${action}@[a-f0-9]{40} # v6`).test(read(workflow))) fail(`${workflow} must pin the verified Node 24 ${action} action`);
+const requiredNodeWorkflows = new Set(['browser-smoke.yml', 'native-app-typecheck.yml', 'site-audit.yml']);
+const workflowFiles = readdirSync(join(root, '.github/workflows')).filter(file => /\.ya?ml$/.test(file));
+for (const file of requiredNodeWorkflows) {
+  if (!workflowFiles.includes(file)) fail(`required verification workflow ${file} is missing`);
+}
+for (const file of workflowFiles) {
+  const workflow = `.github/workflows/${file}`;
+  for (const message of auditWorkflowPolicy(read(workflow), { requireNodeSetup: requiredNodeWorkflows.has(file) })) {
+    fail(`${workflow}: ${message}`);
   }
-  assertIncludes(workflow, 'contents: read', `${workflow} must declare read-only contents permissions`);
-  assertIncludes(workflow, 'timeout-minutes:', `${workflow} must bound job execution`);
-  const source = read(workflow);
-  const setups = [...source.matchAll(/^[ \t]*- uses: actions\/setup-node@[a-f0-9]{40}[ \t]+# v6[ \t]*$/gm)].length;
-  const versionFiles = [...source.matchAll(/^[ \t]*node-version-file: \.nvmrc[ \t]*$/gm)].length;
-  if (setups !== versionFiles || /^[ \t]*node-version:/m.test(source)) {
-    fail(`${workflow} must use .nvmrc for every Node setup`);
+  if (requiredNodeWorkflows.has(file)) {
+    assertIncludes(workflow, 'contents: read', `${workflow} must declare read-only contents permissions`);
+    assertIncludes(workflow, 'timeout-minutes:', `${workflow} must bound job execution`);
+    if (/^[ \t]*node-version:/m.test(read(workflow))) fail(`${workflow} must not override .nvmrc with node-version`);
   }
 }
 assertIncludes("package.json", "\"node\": \"24.x\"", "Vercel functions and local checks must use the verified Node 24 runtime");
@@ -635,6 +700,17 @@ assertNotIncludes("how-it-works.html", "runs silently in the background", "publi
 assertIncludes("how-it-works.html", "open in the foreground", "public copy must disclose that monitoring requires the foreground");
 assertIncludes(`${assetByStem('driver-app.js')}`, "async function handleVisibilityChange", "web monitoring must handle foreground loss explicitly");
 assertIncludes(`${assetByStem('driver-app.js')}`, "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
+
+
+for (const rule of JSON.parse(read('vercel.json')).headers) for (const header of rule.headers) {
+ if (header.key === 'Content-Security-Policy') for (const message of auditCspPolicy(header.value)) fail(message);
+ if (header.key.toLowerCase() === 'x-xss-protection') fail('Deprecated X-XSS-Protection header must remain absent');
+}
+if (process.env.SUPABASE_URL && new URL(process.env.SUPABASE_URL).hostname !== SUPABASE_HOST) fail('Configured Supabase URL differs from the audited CSP project host');
+for(const filename of Object.values(JSON.parse(read('asset-versions.json'))).filter(name=>name.endsWith('.js'))){
+ const policy=generatedScriptMarkupPolicy(read(filename));
+ if(policy.handlers.length || policy.inlineScripts.length)throw Error('Generated inline script or event handler in '+filename);
+}
 
 if (failures.length) {
   console.error("Occulert site audit failed:");

@@ -101,7 +101,9 @@ test('the alert engine and Settings wire the preference without weakening urgent
 
 test('Settings can verify the current audio route and headphone-motion readiness while parked', () => {
   const settings = readFileSync(new URL('../native-app/app/settings.tsx', import.meta.url), 'utf8');
-  assert.match(settings, /audioTestPlayer = useAudioPlayer\(ALERT_SOUND\);/);
+  assert.match(settings, /player: audioTestPlayer \} = useAlertAudioPlayer\(ALERT_SOUND\);/);
+  const hook = readFileSync(new URL('../native-app/hooks/useAlertAudioPlayer.ts', import.meta.url), 'utf8');
+  assert.match(hook, /keepAudioSessionActive: false/);
   assert.doesNotMatch(
     settings,
     /audioTestPlayer = useAudioPlayer\(ALERT_SOUND,\s*\{\s*keepAudioSessionActive:\s*true/,

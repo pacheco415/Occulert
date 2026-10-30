@@ -1,3 +1,6 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
+import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
+import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -26,7 +29,7 @@ test('spreadsheet exports neutralize formula cells', () => {
     assert.equal(csvCell(`  ${prefix}SUM(1,1)`), `  '${prefix}SUM(1,1)`);
   }
   assert.equal(csvCell('Driver One'), 'Driver One');
-  assert.match(read('fleet-dashboard.html'), /OcculertSecurity\.csvCell/);
+  assert.match(fleetDashboardContract(), /OcculertSecurity\.csvCell/);
   assert.match(read(`${assetByStem('driver-app.js')}`), /OcculertSecurity\.csvCell/);
 });
 
@@ -46,17 +49,19 @@ test('native cloud writes recheck current consent', () => {
 });
 
 test('monitoring fails visibly without overlapping the navigation or showing a duplicate modal', () => {
-  const monitor = read('native-app/app/monitor.tsx');
-  assert.match(monitor, /SENSOR_STARTUP_GRACE_MS = 10_000/);
-  assert.match(monitor, /SENSOR_STALL_MS = 5_000/);
-  assert.match(monitor, /hasCameraSampleRef\.current \? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS/);
-  assert.match(monitor, /hasCameraSampleRef\.current = true/);
-  assert.match(monitor, /lastSampleAtRef\.current = Date\.now\(\)/);
-  assert.match(monitor, /Monitoring stopped: camera analysis stalled/);
-  assert.doesNotMatch(monitor, /Alert\.alert\('Monitoring stopped'/);
-  assert.match(monitor, /sensorFault: \{ position: 'absolute', top: 132/);
+  const owners = readNativeMonitorSourceOwners(), monitor = owners.screen;
+  assert.match(owners.camera, /SENSOR_STARTUP_GRACE_MS = 10_000/);
+  assert.match(owners.camera, /SENSOR_STALL_MS = 5_000/);
+  assert.match(owners.camera, /hasCameraSampleRef\.current \? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS/);
+  assert.match(owners.analysis, /hasCameraSampleRef\.current = true/);
+  assert.match(owners.camera, /lastSampleAtRef\.current = Date\.now\(\)/);
+  assert.match(owners.camera, /Monitoring stopped: camera analysis stalled/);
+  for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /Alert\.alert\('Monitoring stopped'/);
+  assert.match(owners.view, /<MonitorLayout/);
+  for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /sensorFault: \{ position: 'absolute'/);
+  assert.match(owners.view, /attentionKey=\{sensorFault \|\|/);
   assert.match(monitor, /sensitivityLoaded/);
-  assert.match(monitor, /disabled=\{isStarting \|\| isStopping \|\| !sensitivityLoaded\}/);
+  assert.match(owners.view, /disabled=\{isStarting \|\| isStopping \|\| !sensitivityLoaded \|\| !baselineLoaded \|\| baselineBusy\}/);
   assert.match(monitor, /updateSessionHistory/);
 });
 
@@ -358,7 +363,8 @@ test('a failed session review edit leaves confirmed UI state intact and permits 
 });
 
 test('History commits after persistence and ignores loads started before a newer edit', () => {
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   const storage = read('native-app/lib/sessionHistory.ts');
   assert.match(history, /loadSessionHistory<SessionRecord>\(\)/, 'history loads must wait for queued local writes');
   assert.doesNotMatch(history, /AsyncStorage\.getItem\(HISTORY_KEY\)/);
@@ -372,44 +378,47 @@ test('History commits after persistence and ignores loads started before a newer
 });
 
 test('History deletion captures the confirmed record before the alert can become stale', () => {
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   const deletion = history.slice(
     history.indexOf('const deleteSession'),
-    history.indexOf('const evidenceSessions'),
+    history.indexOf('const model = deriveHistoryView'),
   );
   assert.match(deletion, /confirmDeleteSession = \(target: SessionRecord, index: number\)/);
   assert.match(deletion, /deleteSession\(target, index\)/);
-  assert.match(history, /confirmDeleteSession\(item, i\)/);
+  assert.match(historyOwners.card, /confirmDeleteSession\(item, i\)/);
   assert.doesNotMatch(deletion, /const target = sessions\[index\]/);
 });
 
 test('History load failures stay visible without pretending saved sessions are empty', () => {
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   const loadStart = history.indexOf('const load = useCallback');
   const load = history.slice(loadStart, history.indexOf('useFocusEffect', loadStart));
   assert.match(load, /historyLoadAttemptRef\.current === loadAttempt/, 'only the latest history read may update the screen');
   assert.match(history, /return \(\) => \{\s*focusedRef\.current = false;\s*historyLoadAttemptRef\.current \+= 1;/, 'leaving History must invalidate its pending read');
   assert.match(load, /setHistoryLoadError\(true\)/);
   assert.doesNotMatch(load, /catch \{[\s\S]*setSessions\(\[\]\)/);
-  assert.match(history, /Checking local session history/);
-  assert.match(history, /Couldn’t load local history/);
-  assert.match(history, /Your saved sessions were not deleted/);
-  assert.match(history, /accessibilityLabel=\{historyLoadBusy \? 'Retrying local session history'/);
+  assert.match(historyOwners.load, /Checking local session history/);
+  assert.match(historyOwners.load, /Couldn’t load local history/);
+  assert.match(historyOwners.load, /Your saved sessions were not deleted/);
+  assert.match(historyOwners.load, /accessibilityLabel=\{historyLoadBusy \? 'Retrying local session history'/);
   assert.match(history, /!historyLoadError && sessions\.length === 0/);
 });
 
 test('History serializes each session operation and announces pending saves', () => {
-  const history = read('native-app/app/history.tsx');
+  const historyOwners = readHistorySourceOwners(read);
+  const history = historyOwners.screen;
   assert.match(history, /new Map<string, ReturnType<typeof createSingleFlightActionRunner>>\(\)/);
   assert.match(history, /runSessionOperation\([\s\S]*sessionRecordKey\(target, index\),[\s\S]*'saving'/);
   assert.match(history, /sessionRecordKey\(target, index\),[\s\S]*'deleting'/);
-  assert.match(history, /accessibilityLiveRegion="polite"/);
-  assert.match(history, /Saving changes…/);
-  assert.match(history, /Deleting session…/);
-  assert.match(history, /accessibilityState=\{\{ selected, disabled: sessionBusy, busy: sessionBusy \}\}/);
-  assert.match(history, /Wait for session changes before sharing summaries/);
-  assert.match(history, /accessibilityState=\{\{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy \}\}/);
-  assert.match(history, /disabled=\{sessionBusy\}/);
+  assert.match(historyOwners.card, /accessibilityLiveRegion="polite"/);
+  assert.match(historyOwners.card, /Saving changes…/);
+  assert.match(historyOwners.card, /Deleting session…/);
+  assert.match(historyOwners.review, /accessibilityState=\{\{ selected, disabled: sessionBusy, busy: sessionBusy \}\}/);
+  assert.match(historyOwners.filters, /Wait for session changes before sharing summaries/);
+  assert.match(historyOwners.filters, /accessibilityState=\{\{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy \}\}/);
+  assert.match(historyOwners.card, /disabled=\{sessionBusy\}/);
 });
 
 test('web critical alerts cannot be snoozed and Watch delivery is conditional', () => {
@@ -421,7 +430,7 @@ test('web critical alerts cannot be snoozed and Watch delivery is conditional', 
 
 test('fleet telemetry is explicitly labeled client-reported and unverified', () => {
   assert.match(read('api/events.js'), /telemetry_trust: "unverified_client_report"/);
-  assert.match(read('fleet-dashboard.html'), /client-reported and not independently verified/i);
+  assert.match(fleetDashboardContract(), /client-reported and not independently verified/i);
 });
 
 test('pilot contacts are server-only and disclosed accurately', () => {

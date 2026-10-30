@@ -13,6 +13,10 @@ chromedriver/
 # Expo / React Native build artifacts
 .expo/
 native-app/.expo/
+native-app/ios/
+native-app/android/
+native-app/targets/occulert-watch/Assets.xcassets/
+native-app/targets/occulert-watch/Info.plist
 dist/
 web-build/
 playwright-report/
@@ -50,3 +54,9 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Generated dependency audit evidence.
+dependency-reports/
+.verification-receipts/
+.asset-release-*/
+build/

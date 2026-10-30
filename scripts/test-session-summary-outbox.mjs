@@ -78,3 +78,19 @@ test('a failed local history acknowledgement retains the retry-safe summary', as
   await f.outbox.flush(scope, async () => ({ ok: true, status: 200 }));
   assert.equal(JSON.parse(f.values.get(KEY))[scope.ownerId].length, 0);
 });
+
+test('pending snapshots are owner-scoped, copied and invalidated by account changes',async()=>{
+ const f=fixture();await f.outbox.enqueue(scope,{...entry('one'),local_session_id:'local-one'});
+ const pending=await f.outbox.pendingEntries(scope);assert.equal(pending[0].local_session_id,'local-one');pending[0].session_id='changed';
+ assert.equal((await f.outbox.pendingEntries(scope))[0].session_id,'one');
+ f.switch({ownerId:'owner-b',consentVersion:1});assert.deepEqual(await f.outbox.pendingEntries(scope),[]);
+});
+
+test('a stalled read-only queue snapshot cannot hold subsequent outbox mutations',async()=>{
+ const waiting=deferred();let stored=null,stall=false;
+ const storage={getItem:async()=>{if(stall){stall=false;return waiting.promise}return stored},setItem:async(_key,value)=>{stored=value},removeItem:async()=>{stored=null}};
+ const outbox=createSessionSummaryOutbox(storage,()=>true);await outbox.enqueue(scope,entry('one'));
+ const before=stored;stall=true;const pending=outbox.pendingEntries(scope);
+ await outbox.enqueue(scope,entry('two'));assert.equal(JSON.parse(stored)[scope.ownerId].length,2);
+ waiting.resolve(before);assert.equal((await pending).length,1);
+});

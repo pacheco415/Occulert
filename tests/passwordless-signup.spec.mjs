@@ -10,6 +10,8 @@ async function setup(page, options = {}) {
     if (options.unconfirmed) delete user.email_confirmed_at;
     const session = { access_token: 'verified-access', refresh_token: 'verified-refresh', user, expires_at: Math.floor(Date.now() / 1000) + 3600 };
     localStorage.setItem('occulert-profile', JSON.stringify({ uid: 'old-user', name: 'Previous Driver', role: 'fleet', fleetId: 'previous-fleet' }));
+    // Model the browser that asked for the link unless a test opts out.
+    if (!options.unrequested) localStorage.setItem('occulert-auth-link-requests', JSON.stringify({ signin: { email: 'new@example.com', created_at: Date.now() } }));
     window.supabase = { createClient() { return { auth: {
       async signInWithOtp(request) { window.testAuthCalls.push(['otp', request]); return { error: options.sendFailure ? { status: 429 } : null }; },
       async signInWithPasskey() { return { data: { session, user } }; },
@@ -164,8 +166,31 @@ test('session storage failure cannot create a profile under an old session', asy
     };
   });
   await page.goto(callback);
+  // A different account is signed in here, so the link asks before switching.
+  await expect(page.locator('#linkConfirm')).toBeVisible();
+  await page.locator('#linkConfirmBtn').click();
   await expect(page.locator('#passkeySetup')).toBeHidden();
   await expect(page.locator('#status')).toContainText('session could not be saved');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('occulert-profile')).uid)).toBe('old-user');
   expect(await page.evaluate(() => window.testAuthCalls.some(call => call[0] === 'register'))).toBe(false);
+});
+
+test('an email link this browser did not request asks first; Cancel keeps it signed out and Continue signs in', async ({ page }) => {
+  await setup(page, { unrequested: true });
+  await page.goto(callback);
+  await expect(page.locator('#linkConfirm')).toBeVisible();
+  await expect(page.locator('#linkConfirmText')).toContainText('new@example.com');
+  expect(new URL(page.url()).hash).toBe('');
+  expect(await page.evaluate(() => localStorage.getItem('occulert-auth'))).toBeNull();
+  await page.locator('#linkCancelBtn').click();
+  await expect(page.locator('#linkConfirm')).toBeHidden();
+  await expect(page.locator('#completionStatus')).toContainText('not used');
+  expect(await page.evaluate(() => localStorage.getItem('occulert-auth'))).toBeNull();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('occulert-profile')).uid)).toBe('old-user');
+  // Leave the page first: a fragment-only change would not reload it.
+  await page.goto('/login.html');
+  await page.goto(callback);
+  await page.locator('#linkConfirmBtn').click();
+  await expect(page.locator('#passkeySetup')).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('occulert-auth')).user.id)).toBe('new-user');
 });

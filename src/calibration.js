@@ -1,0 +1,69 @@
+import "./camera.js";
+import "./detector.js";
+import { scoringReadWallClock } from "./metrics.js";
+import "./alerts.js";
+import "./storage-history.js";
+import "./cloud-sync.js";
+import { scoringCalibrationSamples, scoringCalibrationThresholds, scoringSensitivityThresholds } from "./scoring-core.js";
+import { setPreference, calibrationMinimumSamples, experimentFlags, calibrationEl, calibrationFill, calHint, calibrating, calibrationUntil, calibrationSamples, baselineEAR, baseClosedThreshold, baseWatchThreshold, eyeClosedThreshold, CALIBRATION_MS, log, SENSITIVITY_PRESETS, set_calibrationSamples, set_calibrating, set_calibrated, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold } from "./ui.js";
+// Keep the selected setting for this page even when persistence is unavailable.
+export let sensitivityLevel = 'medium';
+export function finishCalibration() {
+    const thresholds = scoringCalibrationThresholds(calibrationSamples, calibrationMinimumSamples);
+    if (!thresholds) {
+        set_calibrating(false);
+        set_calibrated(false);
+        calibrationEl.textContent = 'DEFAULT';
+        calibrationFill.style.width = '100%';
+        if (typeof applySensitivity === 'function')
+            applySensitivity(sensitivityLevel);
+        if (calHint)
+            calHint.textContent = 'Using default thresholds.';
+        log('Calibration used default thresholds');
+        const rb2 = document.getElementById('recalBtn');
+        if (rb2)
+            rb2.style.display = 'block';
+        return;
+    }
+    calibrationSamples.sort((a, b) => a - b);
+    set_baselineEAR(thresholds.baselineEAR);
+    set_baseClosedThreshold(thresholds.baseClosedThreshold);
+    set_baseWatchThreshold(thresholds.baseWatchThreshold);
+    if (typeof applySensitivity === 'function')
+        applySensitivity(sensitivityLevel);
+    set_calibrated(true);
+    set_calibrating(false);
+    calibrationEl.textContent = 'DONE';
+    calibrationFill.style.width = '100%';
+    if (calHint)
+        calHint.textContent = 'Personalized to your eyes. EAR baseline: ' + baselineEAR.toFixed(3);
+    log('Calibration complete');
+    const rb = document.getElementById('recalBtn');
+    if (rb)
+        rb.style.display = 'block';
+}
+export function updateCalibration(ear) {
+    if (!calibrating)
+        return;
+    set_calibrationSamples(scoringCalibrationSamples(calibrationSamples, ear));
+    let left = Math.max(0, calibrationUntil - scoringReadWallClock('calibration')), pct = Math.min(100, Math.round((1 - left / CALIBRATION_MS) * 100));
+    calibrationEl.textContent = pct + '%';
+    calibrationFill.style.width = pct + '%';
+    if (calHint)
+        calHint.textContent = 'Keep eyes open and face centered… ' + pct + '%';
+    if (left <= 0)
+        finishCalibration();
+}
+export function applySensitivity(level) {
+    level = Object.prototype.hasOwnProperty.call(SENSITIVITY_PRESETS, level) ? level : 'medium';
+    sensitivityLevel = level;
+    const preset = SENSITIVITY_PRESETS[level];
+    const factor = experimentFlags.pixels ? 4 / 3 : 1;
+    const thresholds = scoringSensitivityThresholds(baseClosedThreshold, baseWatchThreshold, preset.offset, factor);
+    set_eyeClosedThreshold(thresholds.eyeClosedThreshold);
+    set_eyeWatchThreshold(thresholds.eyeWatchThreshold);
+    setPreference('occulert-sensitivity', level);
+    document.querySelectorAll('[data-sensitivity]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.sensitivity === level);
+    });
+}

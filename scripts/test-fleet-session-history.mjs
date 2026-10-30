@@ -1,3 +1,4 @@
+import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import { assetByStem } from './lib/current-assets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -33,7 +34,7 @@ test('manager history is scoped through fleet sessions and excludes location fie
 });
 
 test('dashboard keeps protected history separate from its local fallback', () => {
-  const dashboard = read('fleet-dashboard.html');
+  const dashboard = fleetDashboardContract();
   const history = markedBlock(dashboard, 'protected-session-history');
 
   assert.match(dashboard, /id="sessionHistory"/);
@@ -50,7 +51,7 @@ test('dashboard keeps protected history separate from its local fallback', () =>
 });
 
 test('fleet projection preserves inactive and unmeasured driver states', () => {
-  const dashboard = read('fleet-dashboard.html');
+  const dashboard = fleetDashboardContract();
   const projection = markedBlock(dashboard, 'fleet-summary-projection');
   const context = {};
   vm.runInNewContext(`${projection};globalThis.rowsFromFleetForTest=rowsFromFleet`, context);
@@ -89,7 +90,7 @@ test('fleet projection preserves inactive and unmeasured driver states', () => {
 });
 
 function dashboardShareHarness(overrides = {}) {
-  const dashboard = read('fleet-dashboard.html'), downloads = [], copies = [], notices = [];
+  const dashboard = fleetDashboardContract(), downloads = [], copies = [], notices = [];
   const now = Date.parse('2026-09-26T12:00:00Z');
   class ClockDate extends Date { static now() { return now; } }
   const row = { id: 'session', driver_id: 'driver', started_at: '2026-09-25T12:00:00Z',
@@ -230,7 +231,7 @@ test('fleet/history/trial downloads contain parseable CSV rows and copies contai
   }
   app.context.copyDriver('driver');
   assert.equal(app.copies[0].split('\n').length, 3);
-  const assignment = read('fleet-dashboard.html').match(/^  lastOpsSummary=(.*);$/m);
+  const assignment = fleetDashboardContract().match(/^  lastOpsSummary=(.*);$/m);
   assert.ok(assignment);
   app.context.actions = [{ label: 'Review one', value: 'Driver one' }, { label: 'Review two', value: 'Driver two' }];
   vm.runInNewContext(`lastOpsSummary=${assignment[1]}`, app.context);

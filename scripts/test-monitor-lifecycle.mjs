@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -40,6 +41,16 @@ test('a pending start cannot finish after cancellation or foreground loss', () =
   }
 });
 
+test('unset and future native app states keep monitoring unavailable', () => {
+  for (const state of [null, undefined, 'future-system-state']) {
+    const label = String(state);
+    assert.equal(shouldAbortMonitoringStart(false, state), true, label);
+    assert.equal(shouldStopMonitoringForAppState(true, false, false, state), true, label);
+    assert.equal(shouldStopMonitoringForAppState(false, true, false, state), true, label);
+    assert.equal(shouldStopMonitoringForAppState(false, true, true, state), false, label);
+  }
+});
+
 test('navigation waits for monitoring to stop', async () => {
   const events = [];
   let finishStop = () => {};
@@ -73,7 +84,7 @@ test('a save failure is disclosed without trapping the driver', async () => {
 });
 
 test('the monitor wires app-state and Settings navigation through the lifecycle guard', () => {
-  const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  const owners = readNativeMonitorSourceOwners(), monitor = owners.screen;
   const layout = readFileSync(new URL('../native-app/app/_layout.tsx', import.meta.url), 'utf8');
   assert.match(monitor, /AppState\.addEventListener\('change'/);
   assert.match(
@@ -85,7 +96,7 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /startAttempt !== startAttemptRef\.current/);
   assert.match(monitor, /AppState\.currentState/);
   assert.match(monitor, /startAttemptRef\.current \+= 1/);
-  assert.match(monitor, /handleStopRef\.current\(\)/);
+  assert.match(owners.camera, /handleStopRef\.current\(\)/);
   assert.match(monitor, /isRunningRef\.current = true;\s*setIsRunning\(true\)/);
   assert.match(monitor, /isRunningRef\.current = false;\s*setIsRunning\(false\)/);
   assert.match(monitor, /Monitoring stopped when Occulert left the foreground/);
@@ -95,7 +106,8 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /currentAlertPreferences\(\)/);
   assert.match(monitor, /stopBeforeNavigation/);
   assert.equal(
-    [...monitor.matchAll(/handleStopRef\.current\(\{ deferCloudFinalization: true \}\)/g)].length,
+    [...monitor.slice(monitor.indexOf('  const leaveMonitor'), monitor.indexOf('  const analysis = useMonitorAnalysis'))
+      .matchAll(/handleStopRef\.current\(\{ deferCloudFinalization: true \}\)/g)].length,
     2,
     'navigation and AppState shutdown must not wait for optional cloud finalization',
   );
@@ -103,23 +115,40 @@ test('the monitor wires app-state and Settings navigation through the lifecycle 
   assert.match(monitor, /leaveMonitor\(\(\) => router\.push\('\/settings'\)\)/);
   assert.match(monitor, /BackHandler\.addEventListener\('hardwareBackPress'/);
   assert.match(monitor, /if \(stoppingRef\.current\) return Promise\.resolve\(\)/);
-  assert.match(monitor, /accessibilityLabel=\{isRunning \? 'Open settings and end monitoring' : 'Open settings'\}/);
+  assert.match(owners.view, /accessibilityLabel=\{isRunning \? 'Open settings and end monitoring' : 'Open settings'\}/);
   assert.match(layout, /name="monitor"[\s\S]*gestureEnabled: false/);
 });
 
 test('foreground loss has a packaged spoken warning and explicit visible limitation', () => {
-  const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  const owners = readNativeMonitorSourceOwners(), monitor = owners.screen;
   const pausedAudio = readFileSync(
     new URL('../native-app/assets/monitoring-paused.wav', import.meta.url),
   );
   assert.ok(pausedAudio.length > 10_000, 'the spoken monitoring-paused cue must be packaged');
-  assert.match(monitor, /Screen kept on · Keep app in foreground/);
+  assert.match(owners.view, /Screen kept on · Keep app in foreground/);
+  assert.match(monitor, /useAlertAudioPlayer\(MONITORING_PAUSED_SOUND\)/);
+  assert.match(monitor, /monitoringPausedPlayerIsCurrent/);
+  for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /setIsAudioActiveAsync|keepAudioSessionActive: true/);
+});
+
+test('permission text covers camera paths and required read-only Health disclosures without location access', () => {
+  const config = JSON.parse(readFileSync(new URL('../native-app/app.json', import.meta.url), 'utf8')).expo;
+  assert.match(config.ios.infoPlist.NSCameraUsageDescription, /front camera.*both cameras/i);
+  assert.equal(config.ios.infoPlist.NSLocationWhenInUseUsageDescription, undefined);
+  const health = config.plugins.find(plugin => Array.isArray(plugin) && plugin[0] === '@kingstinct/react-native-healthkit');
+  assert.match(health[1].NSHealthUpdateUsageDescription, /does not write or modify Apple Health data/i);
+  const hook = readFileSync(new URL('../native-app/hooks/useAlertAudioPlayer.ts', import.meta.url), 'utf8');
+  assert.match(hook, /useLayoutEffect/);
+  assert.match(hook, /keepAudioSessionActive: false/);
+  const alertSystem = readFileSync(new URL('../native-app/components/AlertSystem.tsx', import.meta.url), 'utf8');
+  assert.match(alertSystem, /useLayoutEffect\(\(\) => cancelPendingCues/);
+  assert.doesNotMatch(alertSystem, /setIsAudioActiveAsync|keepAudioSessionActive: true/);
 });
 
 test('an immediate background stop uses the running ref before React state commits', () => {
-  const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  const owners = readNativeMonitorSourceOwners(), monitor = owners.screen;
   assert.match(monitor, /const wasRunning = isRunningRef\.current;/);
-  assert.doesNotMatch(monitor, /const wasRunning = isRunning;/);
+  for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /const wasRunning = isRunning;/);
   assert.equal(
     shouldStopMonitoringForAppState(true, true, false, 'background'),
     true,
@@ -128,17 +157,17 @@ test('an immediate background stop uses the running ref before React state commi
 });
 
 test('monitor performance resources stay scoped and stable during a live session', () => {
-  const monitor = readFileSync(new URL('../native-app/app/monitor.tsx', import.meta.url), 'utf8');
+  const owners = readNativeMonitorSourceOwners(), monitor = owners.screen;
   assert.match(
-    monitor,
+    owners.view,
     /function MonitoringWakeLock\(\) \{[\s\S]*useKeepAwake\('occulert-active-monitoring'\);[\s\S]*return null;/,
   );
-  assert.match(monitor, /\{isRunning && <MonitoringWakeLock \/>\}/);
-  assert.doesNotMatch(
-    monitor,
+  assert.match(owners.view, /\{isRunning && <MonitoringWakeLock \/>\}/);
+  for (const owner of owners.runtimeOwners) assert.doesNotMatch(
+    owner.source,
     /export default function MonitorScreen\(\) \{\s*useKeepAwake\(/,
   );
-  assert.match(monitor, /const onEyeStateJS = useRunOnJS\(onEyeState, \[onEyeState\]\);/);
-  assert.match(monitor, /const lastSample = useSharedValue\(0\);/);
-  assert.doesNotMatch(monitor, /Worklets\.create(?:RunOnJS|SharedValue)/);
+  assert.match(owners.analysis, /const onEyeStateJS = useRunOnJS\(onEyeState, \[onEyeState\]\);/);
+  assert.match(owners.analysis, /const lastSample = useSharedValue\(0\);/);
+  for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /Worklets\.create(?:RunOnJS|SharedValue)/);
 });

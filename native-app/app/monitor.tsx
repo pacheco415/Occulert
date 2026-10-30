@@ -1,109 +1,59 @@
+import { useMonitorCloudAlerts } from '../hooks/useMonitorCloudAlerts';
+import { useMonitorCameraIdentity } from '../hooks/useMonitorCameraIdentity';
+import { useMonitorCameraLifecycle } from '../hooks/useMonitorCameraLifecycle';
+import { useMonitorCheckpoint } from '../hooks/useMonitorCheckpoint';
+import { useMonitorAnalysis } from '../hooks/useMonitorAnalysis';
+import { MonitorPresentation, MonitorPermissionState, MonitorCameraUnavailable } from '../components/monitor/MonitorPresentation';
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import {
-  Alert,
-  AppState,
-  BackHandler,
-  Linking,
-  Modal,
-  Platform,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import {
-  Camera,
-  type CameraRuntimeError,
-  useCameraDevice,
-  useCameraPermission,
-  useFrameProcessor,
-} from 'react-native-vision-camera';
-import {
-  useFaceDetector,
-  type FrameFaceDetectionOptions,
-} from 'react-native-vision-camera-face-detector';
-import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
-import { useKeepAwake } from 'expo-keep-awake';
-import { useAudioPlayer } from 'expo-audio';
+import { Alert, AppState, BackHandler, Linking, Platform } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+
+import { useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+import { useFaceDetector, type FrameFaceDetectionOptions } from 'react-native-vision-camera-face-detector';
+
+import { useAlertAudioPlayer } from '../hooks/useAlertAudioPlayer';
 import * as Haptics from 'expo-haptics';
 import * as Battery from 'expo-battery';
-import { Ionicons } from '@expo/vector-icons';
+
+import { EYE_BASELINE_EXPERIMENT, ParkedEyeBaseline } from '../lib/eyeBaselineModel';
+import { clearDeviceEyeBaseline, loadDeviceEyeBaseline, saveDeviceEyeBaseline } from '../lib/eyeBaselineStorage';
 import { useEyeTracking } from '../hooks/useEyeTracking';
-import { AlertSystem, type AlertTimingEvent } from '../components/AlertSystem';
-import { CameraSetupGuide } from '../components/CameraSetupGuide';
-import { LiveMetrics } from '../components/LiveMetrics';
-import { GlassSurface } from '../components/GlassSurface';
+import { SIMULATOR_TRACE } from '../lib/simulatorTrace';
+import { deliverCueIfCurrent } from '../lib/alertDelivery';
+import { type AlertTimingEvent } from '../components/AlertSystem';
+
 import { loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
-import {
-  CRITICAL_CLOSED_ALERT_MS,
-  EARLY_CLOSED_ALERT_MS,
-  PERCLOS_ALERT_THRESHOLD,
-  type SensitivityLevel,
-} from '../constants/thresholds';
+import { type SensitivityLevel } from '../constants/thresholds';
 import { updateSessionHistory } from '../lib/sessionHistory';
+import { saveCompletedNativeSession, markCompletedNativeSessionSynced, finalizeCompletedNativeSession, completeNativeSessionStop } from '../lib/sessionCompletion';
 import {
   beginCloudSession,
   finishCloudSession,
   logCloudAlert,
+  queueNativeCloudAlert,
+  stopNativeCloudEvents,
 } from '../lib/cloudSync';
 import { consumePreDriveSafety } from '../lib/preDriveGate';
 import { currentAppBuildInfo } from '../lib/appBuildInfo';
 import { HeadNodDetector } from '../lib/headNodDetector';
-import {
-  addHeadphoneMotionSampleListener,
-  addHeadphoneMotionStatusListener,
-  startHeadphoneMotion,
-  stopHeadphoneMotion,
-  type HeadphoneMotionState,
-} from '../lib/headphoneMotion';
-import {
-  SAFE_STOP_OPTIONS,
-  buildSafeStopSearchUrls,
-  safeStopSearchQuery,
-  type SafeStopKind,
-} from '../lib/safeStopLinks';
-import {
-  shouldAbortMonitoringStart,
-  shouldStopMonitoringForAppState,
-  stopBeforeNavigation,
-} from '../lib/monitorLifecycle';
-import {
-  createMonitorPerformanceTracker,
-  elapsedSessionSeconds,
-  shouldRefreshMonitorMetrics,
-  type MonitorPerformanceSnapshot,
-} from '../lib/monitorPerformance';
-import {
-  confirmedEyeStateForAlert,
-  deriveAlertLevel,
-  type AlertLevel,
-} from '../lib/alertPolicy';
+import { addHeadphoneMotionSampleListener, addHeadphoneMotionStatusListener, startHeadphoneMotion, stopHeadphoneMotion, type HeadphoneMotionState } from '../lib/headphoneMotion';
+import { buildSafeStopSearchUrls, safeStopSearchQuery, type SafeStopKind } from '../lib/safeStopLinks';
+import { shouldAbortMonitoringStart, shouldStopMonitoringForAppState, stopBeforeNavigation } from '../lib/monitorLifecycle';
+import { createMonitorPerformanceTracker, elapsedSessionSeconds, type MonitorPerformanceSnapshot } from '../lib/monitorPerformance';
+import { type AlertLevel } from '../lib/alertPolicy';
 import { currentAlertPreferences, loadAlertPreferences } from '../lib/alertPreferences';
 import { getWatchAlertsEnabled } from '../lib/watchPreferences';
 import { getWatchStatus } from '../lib/watchBridge';
-import {
-  assessCameraSetup,
-  initialCameraSetupAssessment,
-  type CameraSetupAssessment,
-} from '../lib/cameraSetup';
-import {
-  ActiveSessionCheckpointConflictError,
-  clearActiveSessionCheckpoint,
-  saveActiveSessionCheckpoint,
-} from '../lib/sessionRecovery';
-import {
-  canRestartStalledCamera,
-  deriveCameraLoadPolicy,
-  shouldRestartCamera,
-  type DeviceThermalState,
-} from '../lib/cameraResilience';
-import { getDeviceCondition } from '../lib/deviceCondition';
+import { initialCameraSetupAssessment, type CameraSetupAssessment } from '../lib/cameraSetup';
+import { ActiveSessionCheckpointConflictError, clearActiveSessionCheckpoint, saveActiveSessionCheckpoint } from '../lib/sessionRecovery';
+import { deriveCameraLoadPolicy, type DeviceThermalState } from '../lib/cameraResilience';
+import { type FrontCameraIdentity } from '../lib/deviceCondition';
+import { initialFrontCameraSwitchState } from '../lib/frontCameraSwitch';
 import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
-import { modalAnimationType } from '../lib/accessibilityPreferencesModel';
+
 import { createSensorFusionObservationTracker } from '../lib/sensorFusionObservation';
+import { createCaptureTransitionGuard } from '../lib/captureLoadPolicy';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -123,27 +73,14 @@ const FACE_DETECTOR_OPTIONS: FrameFaceDetectionOptions = {
 };
 
 const MONITORING_PAUSED_SOUND = require('../assets/monitoring-paused.wav');
-const SENSOR_STARTUP_GRACE_MS = 10_000;
-const SENSOR_STALL_MS = 5_000;
-const CAMERA_SETUP_UI_INTERVAL_MS = 250;
-const SESSION_CHECKPOINT_INTERVAL_MS = 15_000;
-const DEVICE_CONDITION_INTERVAL_MS = 15_000;
 
 type StopOptions = { deferCloudFinalization?: boolean };
 
-const SAFE_STOP_ICONS: Record<SafeStopKind, React.ComponentProps<typeof Ionicons>['name']> = {
-  'rest-area': 'bed-outline',
-  'gas-station': 'car-outline',
-  'food-coffee': 'cafe-outline',
-};
-
-function MonitoringWakeLock() {
-  useKeepAwake('occulert-active-monitoring');
-  return null;
-}
-
 export default function MonitorScreen() {
   const router = useRouter();
+  const simulatorRunRequested = useLocalSearchParams()['trace-run'] === '1';
+  const simulatorAutostartedRef = useRef(false);
+  const simulatorProofRef = useRef('');
   const { reduceMotion } = useAccessibilityPreferences();
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -152,10 +89,27 @@ export default function MonitorScreen() {
   const [isStopping, setIsStopping] = useState(false);
   const [sensitivity, setSensitivity] = useState<SensitivityLevel>('medium');
   const [sensitivityLoaded, setSensitivityLoaded] = useState(false);
+  const [eyeBaseline, setEyeBaseline] = useState<number | null>(null);
+  const eyeBaselineRef = useRef<number | null>(null);
+  const [baselineLoaded, setBaselineLoaded] = useState(!EYE_BASELINE_EXPERIMENT);
+  const [baselineBusy, setBaselineBusy] = useState(false);
+  const [baselineMessage, setBaselineMessage] = useState('Parked eye-baseline experiment · local sessions only.');
+  const baselineCollectorRef = useRef(new ParkedEyeBaseline());
+  const baselineGenerationRef = useRef(0);
+  const cameraBaselineRevisionRef = useRef(0);
+  const baselineFinishedRef = useRef(false);
+  const baselineCanSaveRef = useRef(false);
+  const baselineBusyRef = useRef(false);
+  const baselineMountedRef = useRef(true);
+  const sessionEyeBaselineRef = useRef<number | null>(null);
+  const [frontCameraIdentity, setFrontCameraIdentity] = useState<FrontCameraIdentity | null>(null);
+  const frontCameraIdentityRef = useRef<FrontCameraIdentity | null>(null);
+  const frontCameraSwitchRef = useRef(initialFrontCameraSwitchState());
   const [sensorFault, setSensorFault] = useState<string | null>(null);
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [sessionEndedAt, setSessionEndedAt] = useState<number | null>(null);
   const [alertCount, setAlertCount] = useState(0);
+  const [visibleAlertLevel, setVisibleAlertLevel] = useState<AlertLevel>('none');
   const [safeStopOpen, setSafeStopOpen] = useState(false);
   const [safeStopBusy, setSafeStopBusy] = useState(false);
   const [setupPreviewActive, setSetupPreviewActive] = useState(false);
@@ -190,9 +144,25 @@ export default function MonitorScreen() {
   const cloudSessionRef = useRef<Promise<string | null> | null>(null);
   const cloudEventQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastSampleAtRef = useRef(0);
+  const captureTransitionRef = useRef(createCaptureTransitionGuard());
   const hasCameraSampleRef = useRef(false);
   const cameraEpochRef = useRef(0);
   const cameraRestartCountRef = useRef(0);
+  const cameraDeviceIdRef = useRef(device?.id);
+  cameraDeviceIdRef.current = device?.id;
+  const cameraInterruptionGenerationRef = useRef(0);
+  const cameraCallbackOwnerRef = useRef(0);
+  const cameraCallbackOwner = cameraCallbackOwnerRef.current;
+  const cameraScreenMountedRef = useRef(true);
+  const multitaskingCameraPausedRef = useRef(false);
+
+  useEffect(() => {
+    cameraScreenMountedRef.current = true;
+    return () => {
+      cameraScreenMountedRef.current = false;
+      cameraInterruptionGenerationRef.current += 1;
+    };
+  }, []);
   const cameraRecoveringRef = useRef(false);
   const headNodDetectorRef = useRef(new HeadNodDetector());
   const headNodObservationsRef = useRef(0);
@@ -219,11 +189,12 @@ export default function MonitorScreen() {
     state: 'noFace',
   });
 
-  const monitoringPausedPlayer = useAudioPlayer(MONITORING_PAUSED_SOUND, {
-    keepAudioSessionActive: true,
-  });
+  const {
+    player: monitoringPausedPlayer,
+    isCurrent: monitoringPausedPlayerIsCurrent,
+  } = useAlertAudioPlayer(MONITORING_PAUSED_SOUND);
 
-  const { processEyeOpenness, processNoFace, reset } = useEyeTracking(sensitivity);
+  const { processEyeOpenness, processNoFace, reset } = useEyeTracking(sensitivity, EYE_BASELINE_EXPERIMENT ? eyeBaseline : null);
   const { detectFaces } = useFaceDetector(FACE_DETECTOR_OPTIONS);
 
   const deliverMonitoringPausedCue = useCallback(() => {
@@ -231,15 +202,19 @@ export default function MonitorScreen() {
     if (preferences.hapticEnabled) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     }
-    if (!preferences.audioEnabled) return;
+    if (!preferences.audioEnabled || !monitoringPausedPlayerIsCurrent()) return;
     try {
       monitoringPausedPlayer.pause();
-      void monitoringPausedPlayer.seekTo(0).then(() => {
-        monitoringPausedPlayer.volume = 1;
-        monitoringPausedPlayer.play();
-      }).catch(() => {});
+      void deliverCueIfCurrent(
+        () => monitoringPausedPlayer.seekTo(0),
+        monitoringPausedPlayerIsCurrent,
+        () => {
+          monitoringPausedPlayer.volume = 1;
+          monitoringPausedPlayer.play();
+        },
+      ).catch(() => {});
     } catch {}
-  }, [monitoringPausedPlayer]);
+  }, [monitoringPausedPlayer, monitoringPausedPlayerIsCurrent]);
 
   const recordAlertTiming = useCallback((event: AlertTimingEvent) => {
     if (event.kind === 'decision') {
@@ -251,29 +226,20 @@ export default function MonitorScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadSavedSensitivity()
-      .then(setSensitivity)
-      .finally(() => setSensitivityLoaded(true));
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    const refresh = () => {
-      void getDeviceCondition().then((condition) => {
-        if (active) setThermalState(condition.thermalState);
-      });
-    };
-    refresh();
-    if (!isRunning && !setupPreviewActive) {
-      return () => { active = false; };
-    }
-    const timer = setInterval(refresh, DEVICE_CONDITION_INTERVAL_MS);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [isRunning, setupPreviewActive]);
+  const toggleSetupPreview = useMonitorCameraIdentity({
+    isRunningRef, setupPreviewActiveRef, frontCameraSwitchRef,
+    frontCameraIdentityRef, setFrontCameraIdentity, baselineGenerationRef,
+    baselineCollectorRef, baselineFinishedRef, lastCameraSetupUiAtRef,
+    setCameraSetup, cameraBaselineRevisionRef, sessionEyeBaselineRef,
+    eyeBaselineRef, baselineCanSaveRef, setEyeBaseline,
+    setBaselineMessage, clearDeviceEyeBaseline, baselineMountedRef,
+    performanceTrackerRef, deliverMonitoringPausedCue, isRunning,
+    setupPreviewActive, device, loadDeviceEyeBaseline,
+    setBaselineLoaded, loadSavedSensitivity, setSensitivity,
+    setSensitivityLoaded, startingRef, stoppingRef,
+    baselineBusyRef, cameraInterruptionGenerationRef, cameraCallbackOwnerRef,
+    multitaskingCameraPausedRef, setSensorFault, setSetupPreviewActive,
+  });
 
   useEffect(() => {
     const sampleSubscription = addHeadphoneMotionSampleListener((sample) => {
@@ -313,53 +279,40 @@ export default function MonitorScreen() {
     if (!isRunning && !safeStopBusy) setSafeStopOpen(false);
   }, [isRunning, safeStopBusy]);
 
-  const checkpointActiveSession = useCallback((checkpointedAt = Date.now()) => {
-    const sessionId = activeSessionIdRef.current;
-    const startedAt = sessionStartedAtRef.current;
-    if (!sessionId || startedAt === null || !isRunningRef.current) return Promise.resolve();
-    const avgFatigue = fatigueSamplesRef.current
-      ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
-      : 0;
-    return saveActiveSessionCheckpoint({
-      sessionId,
-      startedAt,
-      checkpointedAt,
-      durationSec: elapsedSessionSeconds(startedAt, checkpointedAt),
-      alertCount: alertCountRef.current,
-      avgFatigue,
-      maxFatigue: maxFatigueRef.current,
-      headNodObservations: headNodObservationsRef.current,
-      cameraHeadNodObservations: headNodObservationsRef.current,
-      headphoneHeadNodObservations: headphoneHeadNodObservationsRef.current,
-      headphoneMotionSamples: headphoneMotionSamplesRef.current,
-      headphoneMotionStatus: headphoneMotionStatusRef.current,
-      monitorPerformance: performanceTrackerRef.current.snapshot(checkpointedAt),
-      sensorFusion: sensorFusionTrackerRef.current.snapshot(checkpointedAt),
-      sensitivity: sessionSensitivityRef.current,
-      ...currentAppBuildInfo(),
-    });
-  }, []);
+  const recordCloudAlertTransition = useMonitorCloudAlerts({
+    prevAlertingRef, alertCountRef, setAlertCount,
+    cloudSessionRef, cloudEventQueueRef, logCloudAlert, queueNativeCloudAlert,
+  });
 
-  useEffect(() => {
-    if (!isRunning) return;
-    const timer = setInterval(() => {
-      void checkpointActiveSession().catch(() => {});
-    }, SESSION_CHECKPOINT_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [checkpointActiveSession, isRunning]);
+  const cameraIdentityActive = isRunning || setupPreviewActive;
+  const { handleCaptureConfiguration, handleCameraError } = useMonitorCameraLifecycle({
+    setThermalState, isRunning, setupPreviewActive,
+    cameraScreenMountedRef, multitaskingCameraPausedRef, isRunningRef,
+    setupPreviewActiveRef, startingRef, stoppingRef,
+    cameraInterruptionGenerationRef, baselineGenerationRef, baselineCollectorRef,
+    setSetupPreviewActive, setCameraSetup, setSensorFault,
+    deliverMonitoringPausedCue, handleStopRef, cameraIdentityActive,
+    device, cameraCallbackOwnerRef, cameraCallbackOwner,
+    cameraDeviceIdRef, cameraEpochRef, cameraEpoch,
+    captureTransitionRef, lastSampleAtRef, hasCameraSampleRef,
+    performanceTrackerRef, cameraRestartCountRef, cameraRecoveringRef,
+    setCameraRecovering, setCameraEpoch, cameraLoadPolicy,
+  });
 
-  const toggleSetupPreview = useCallback(() => {
-    if (isRunningRef.current || startingRef.current || stoppingRef.current) return;
-    const next = !setupPreviewActiveRef.current;
-    setupPreviewActiveRef.current = next;
-    lastCameraSetupUiAtRef.current = 0;
-    setSetupPreviewActive(next);
-    setCameraSetup(initialCameraSetupAssessment());
-    setSensorFault(null);
-  }, []);
+  const checkpointActiveSession = useMonitorCheckpoint({
+    activeSessionIdRef, sessionStartedAtRef, isRunningRef,
+    fatigueSamplesRef, fatigueSumRef, saveActiveSessionCheckpoint,
+    alertCountRef, maxFatigueRef, headNodObservationsRef,
+    headphoneHeadNodObservationsRef, headphoneMotionSamplesRef, headphoneMotionStatusRef,
+    performanceTrackerRef, sensorFusionTrackerRef, sessionSensitivityRef,
+    isRunning,
+  });
 
   const handleStart = async () => {
-    if (startingRef.current || isStopping || !sensitivityLoaded) return;
+    if (startingRef.current || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusyRef.current) return;
+    cameraInterruptionGenerationRef.current += 1;
+    cameraCallbackOwnerRef.current += 1;
+    multitaskingCameraPausedRef.current = false;
     const startAttempt = startAttemptRef.current + 1;
     let reservedSessionId: string | null = null;
     let monitoringStarted = false;
@@ -367,7 +320,7 @@ export default function MonitorScreen() {
     startingRef.current = true;
     setIsStarting(true);
     try {
-      if (!hasPermission) {
+      if (!hasPermission && !SIMULATOR_TRACE) {
         let granted = false;
         requestingCameraPermissionRef.current = true;
         try {
@@ -381,7 +334,7 @@ export default function MonitorScreen() {
         startAttempt !== startAttemptRef.current,
         AppState.currentState,
       )) return;
-      if (!consumePreDriveSafety()) {
+      if (!SIMULATOR_TRACE && !consumePreDriveSafety()) {
         router.replace('/pre-drive');
         return;
       }
@@ -435,6 +388,10 @@ export default function MonitorScreen() {
       }
 
       reset();
+      simulatorProofRef.current = '';
+      sessionEyeBaselineRef.current = eyeBaselineRef.current;
+      if(EYE_BASELINE_EXPERIMENT)setBaselineMessage(sessionEyeBaselineRef.current===null?'Experimental local session uses current presets; no personal baseline was saved.':'Experimental local session uses the saved parked baseline.');
+      baselineGenerationRef.current += 1;
       setupPreviewActiveRef.current = false;
       setSetupPreviewActive(false);
       prevAlertingRef.current = false;
@@ -458,6 +415,7 @@ export default function MonitorScreen() {
       displayedMetricsStateRef.current = 'noFace';
       displayedAlertLevelRef.current = 'none';
       cameraRestartCountRef.current = 0;
+      captureTransitionRef.current.reset();
       cameraRecoveringRef.current = false;
       setCameraRecovering(false);
 
@@ -465,7 +423,7 @@ export default function MonitorScreen() {
       // delaying core camera monitoring, and discard any late result after the
       // session is cancelled or replaced.
       const headphoneStart = startHeadphoneMotion();
-      cloudSessionRef.current = beginCloudSession();
+      cloudSessionRef.current = EYE_BASELINE_EXPERIMENT || SIMULATOR_TRACE ? Promise.resolve(null) : beginCloudSession();
       setAlertCount(0);
       alertCountRef.current = 0;
       hasCameraSampleRef.current = false;
@@ -473,6 +431,9 @@ export default function MonitorScreen() {
       sessionStartedAtRef.current = nextSessionStartedAt;
       activeSessionIdRef.current = nextSessionId;
       performanceTrackerRef.current.recordSessionStart(nextSessionStartedAt);
+      if (frontCameraIdentityRef.current) {
+        performanceTrackerRef.current.recordFrontCamera(frontCameraIdentityRef.current, nextSessionStartedAt);
+      }
       setSessionStartedAt(nextSessionStartedAt);
       setSessionEndedAt(null);
       isRunningRef.current = true;
@@ -518,6 +479,14 @@ export default function MonitorScreen() {
     }
   };
 
+  // This simulator-only deep link makes local scoring proof repeatable. The
+  // ordinary app still requires its real pre-drive acknowledgement and Start.
+  useEffect(() => {
+    if (!SIMULATOR_TRACE || !simulatorRunRequested || !sensitivityLoaded || !baselineLoaded || simulatorAutostartedRef.current) return;
+    simulatorAutostartedRef.current = true;
+    void handleStart();
+  }, [simulatorRunRequested, sensitivityLoaded, baselineLoaded, handleStart]);
+
   const saveSession = useCallback(async (
     sessionId: string,
     durationSec: number,
@@ -526,44 +495,29 @@ export default function MonitorScreen() {
     endedAt: number,
   ): Promise<string | null> => {
     if (durationSec <= 0) return null;
-    const avgFatigue = fatigueSamplesRef.current
-      ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
-      : 0;
-    const record = {
-      sessionId,
-      savedAt: new Date().toISOString(),
-      durationSec,
-      alertCount: alerts,
-      avgFatigue,
+    return saveCompletedNativeSession({
+      sessionId, durationSec, alerts,
+      fatigueSum: fatigueSumRef.current,
+      fatigueSamples: fatigueSamplesRef.current,
       headNodObservations: headNodObservationsRef.current,
-      cameraHeadNodObservations: headNodObservationsRef.current,
       headphoneHeadNodObservations: headphoneHeadNodObservationsRef.current,
       headphoneMotionSamples: headphoneMotionSamplesRef.current,
       headphoneMotionStatus: headphoneMotionStatusRef.current,
       monitorPerformance,
       sensorFusion: sensorFusionTrackerRef.current.snapshot(endedAt),
       sensitivity: sessionSensitivityRef.current,
-      ...currentAppBuildInfo(),
-    };
-    await updateSessionHistory<Record<string, unknown>>((sessions) => [
-      record,
-      ...sessions.filter(item => item?.sessionId !== sessionId),
-    ].slice(0, 50));
-    return sessionId;
+      extra: {
+        ...(EYE_BASELINE_EXPERIMENT ? {eyeBaselineExperiment:{version:1,baseline:sessionEyeBaselineRef.current}} : {}),
+        ...currentAppBuildInfo(),
+      },
+    }, updateSessionHistory);
   }, []);
 
   const markSessionSynced = useCallback(async (
     localSessionId: string,
     cloudSessionId: string,
   ) => {
-    try {
-      await updateSessionHistory<Record<string, unknown>>((sessions) => sessions.map((item) =>
-        item?.sessionId === localSessionId
-          ? { ...item, cloudSynced: true, cloudSessionId }
-          : item));
-    } catch {
-      // Keep the local session intact if its cloud badge cannot update.
-    }
+    await markCompletedNativeSessionSynced(updateSessionHistory, localSessionId, cloudSessionId);
   }, []);
 
   const handleStop = useCallback(async (
@@ -572,6 +526,8 @@ export default function MonitorScreen() {
     // Invalidate any sensor start that is awaiting permission or optional
     // headphone-motion setup before it can activate monitoring.
     startAttemptRef.current += 1;
+    cameraInterruptionGenerationRef.current += 1;
+    cameraCallbackOwnerRef.current += 1;
     if (stoppingRef.current) return;
     stoppingRef.current = true;
     setIsStopping(true);
@@ -584,12 +540,13 @@ export default function MonitorScreen() {
     const durationSec = elapsedSessionSeconds(sessionStartedAtRef.current, stoppedAt);
     const alerts = alertCountRef.current;
     const activeSessionId = activeSessionIdRef.current;
-    const averageFatigue = fatigueSamplesRef.current
+    const averageFatigue = fatigueSamplesRef.current > 0
       ? Math.round(fatigueSumRef.current / fatigueSamplesRef.current)
-      : 0;
-    const maxFatigue = maxFatigueRef.current;
+      : null;
+    const maxFatigue = fatigueSamplesRef.current > 0 ? maxFatigueRef.current : null;
     const cloudSession = cloudSessionRef.current;
     const pendingEvents = cloudEventQueueRef.current;
+    stopNativeCloudEvents(cloudSession);
     const monitorPerformance = performanceTrackerRef.current.snapshot(stoppedAt);
 
     monitoringActiveRef.current = false;
@@ -598,6 +555,7 @@ export default function MonitorScreen() {
     cloudEventQueueRef.current = Promise.resolve();
     isRunningRef.current = false;
     setIsRunning(false);
+    captureTransitionRef.current.reset();
     cameraRecoveringRef.current = false;
     setCameraRecovering(false);
     reset();
@@ -607,37 +565,19 @@ export default function MonitorScreen() {
     }
 
     const cloudEndedAt = new Date(stoppedAt).toISOString();
-    const finalizeCloud = async (localSessionId: string | null) => {
-      const cloudSessionId = cloudSession ? await cloudSession.catch(() => null) : null;
-      if (!cloudSessionId) return;
-      await pendingEvents.catch(() => {});
-      const safetyScore = Math.max(0, 100 - Math.round(maxFatigue * 0.65) - alerts * 8);
-      const synced = await finishCloudSession(cloudSessionId, {
-        averageFatigue,
-        maxFatigue,
-        safetyScore,
-        alertCount: alerts,
-      }, cloudEndedAt, localSessionId || undefined);
-      if (synced && localSessionId) {
-        await markSessionSynced(localSessionId, cloudSessionId);
-      }
-    };
+    const finalizeCloud = (localSessionId: string | null) => finalizeCompletedNativeSession({
+      cloudSession, pendingEvents, averageFatigue, maxFatigue, alerts, endedAt: cloudEndedAt,
+    }, localSessionId, { finish: finishCloudSession, markSynced: markSessionSynced });
 
     try {
-      if (!wasRunning) return;
-      const localSessionId = activeSessionId
-        ? await saveSession(activeSessionId, durationSec, alerts, monitorPerformance, stoppedAt)
-        : null;
-      if (activeSessionId) {
-        await clearActiveSessionCheckpoint(activeSessionId).catch(() => {});
-        if (activeSessionIdRef.current === activeSessionId) activeSessionIdRef.current = null;
-      }
-      if (options.deferCloudFinalization) {
-        // Optional cloud finalization never delays a safe-stop Maps handoff.
-        void finalizeCloud(localSessionId).catch(() => {});
-        return;
-      }
-      await finalizeCloud(localSessionId);
+      await completeNativeSessionStop({
+        wasRunning, activeSessionId, deferCloudFinalization: Boolean(options.deferCloudFinalization),
+      }, {
+        save: id => saveSession(id, durationSec, alerts, monitorPerformance, stoppedAt),
+        clearCheckpoint: clearActiveSessionCheckpoint,
+        releaseIdentity: id => { if (activeSessionIdRef.current === id) activeSessionIdRef.current = null; },
+        finalize: finalizeCloud,
+      });
     } finally {
       stoppingRef.current = false;
       setIsStopping(false);
@@ -714,6 +654,7 @@ export default function MonitorScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active' && setupPreviewActiveRef.current) {
+        baselineGenerationRef.current += 1;baselineCollectorRef.current.reset();
         setupPreviewActiveRef.current = false;
         setSetupPreviewActive(false);
         setCameraSetup(initialCameraSetupAssessment());
@@ -740,721 +681,76 @@ export default function MonitorScreen() {
     return () => subscription.remove();
   }, [deliverMonitoringPausedCue]);
 
-  const attemptCameraRecovery = useCallback(() => {
-    if (
-      stoppingRef.current
-      || !isRunningRef.current
-      || !canRestartStalledCamera(cameraRestartCountRef.current)
-    ) return false;
-    cameraRestartCountRef.current += 1;
-    performanceTrackerRef.current.recordCameraRestart();
-    hasCameraSampleRef.current = false;
-    lastSampleAtRef.current = Date.now();
-    cameraRecoveringRef.current = true;
-    setCameraRecovering(true);
-    const nextEpoch = cameraEpochRef.current + 1;
-    cameraEpochRef.current = nextEpoch;
-    setCameraEpoch(nextEpoch);
-    return true;
-  }, []);
+  const analysis = useMonitorAnalysis({
+    setupPreviewActiveRef, isRunningRef, baselineLoaded,
+    eyeBaseline, baselineCanSaveRef, baselineFinishedRef,
+    baselineCollectorRef, setBaselineMessage, baselineGenerationRef,
+    baselineBusyRef, setBaselineBusy, saveDeviceEyeBaseline,
+    eyeBaselineRef, setEyeBaseline, baselineMountedRef,
+    lastCameraSetupUiAtRef, setCameraSetup, stoppingRef,
+    hasCameraSampleRef, lastSampleAtRef, cameraRecoveringRef,
+    setCameraRecovering, performanceTrackerRef, headNodDetectorRef,
+    headNodObservationsRef, sensorFusionTrackerRef, processEyeOpenness,
+    processNoFace, closedSinceRef, sessionStartedAtRef,
+    displayedMetricsStateRef, displayedAlertLevelRef, lastMetricsUiAtRef,
+    setMetrics, fatigueSumRef, fatigueSamplesRef,
+    maxFatigueRef, cameraLoadPolicy, detectFaces,
+    recordCloudAlertTransition, simulatorProofRef, isRunning, setupPreviewActive,
+  });
 
-  useEffect(() => {
-    if (!isRunning) return;
-    const watchdog = setInterval(() => {
-      const timeoutMs = hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS;
-      if (stoppingRef.current || Date.now() - lastSampleAtRef.current <= timeoutMs) return;
-      performanceTrackerRef.current.recordCameraStall();
-      if (attemptCameraRecovery()) return;
-      const message = 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.';
-      setSensorFault(message);
-      deliverMonitoringPausedCue();
-      void handleStopRef.current();
-    }, 500);
-    return () => clearInterval(watchdog);
-  }, [attemptCameraRecovery, deliverMonitoringPausedCue, isRunning]);
+  const onEyeState = analysis.onEyeState;
+  const frameProcessor = analysis.frameProcessor;
+  const simulatorPhase = analysis.simulatorPhase;
 
-  const handleCameraError = useCallback((error: CameraRuntimeError, epoch: number) => {
-    if (epoch !== cameraEpochRef.current) return;
-    if (setupPreviewActiveRef.current && !isRunningRef.current) {
-      setupPreviewActiveRef.current = false;
-      setSetupPreviewActive(false);
-      setSensorFault('Camera preview could not start. Close other camera apps and try the setup check again.');
-      return;
-    }
-    if (!isRunningRef.current || stoppingRef.current) return;
-    performanceTrackerRef.current.recordCameraStall();
-    if (
-      shouldRestartCamera(error.code, cameraRestartCountRef.current)
-      && attemptCameraRecovery()
-    ) return;
-    setSensorFault(
-      'Monitoring stopped: the camera became unavailable. Pull over safely before checking the phone or restarting.',
-    );
-    deliverMonitoringPausedCue();
-    void handleStopRef.current();
-  }, [attemptCameraRecovery, deliverMonitoringPausedCue]);
-
-  useEffect(() => {
-    if (!isRunning || cameraLoadPolicy.mode !== 'stop') return;
-    setSensorFault(
-      'Monitoring stopped because the iPhone became too hot. Pull over safely and let the phone cool before restarting.',
-    );
-    deliverMonitoringPausedCue();
-    void handleStopRef.current();
-  }, [cameraLoadPolicy.mode, deliverMonitoringPausedCue, isRunning]);
-
-  const onEyeState = useCallback((
-    leftProb: number,
-    rightProb: number,
-    faceFound: boolean,
-    pitchAngle: number,
-    yawAngle: number,
-    rollAngle: number,
-    inferenceMs: number,
-    faceX: number,
-    faceY: number,
-    faceWidth: number,
-    faceHeight: number,
-    frameWidth: number,
-    frameHeight: number,
-  ) => {
-    const now = Date.now();
-    if (setupPreviewActiveRef.current && !isRunningRef.current) {
-      if (now - lastCameraSetupUiAtRef.current >= CAMERA_SETUP_UI_INTERVAL_MS) {
-        lastCameraSetupUiAtRef.current = now;
-        const nextSetup = assessCameraSetup({
-          faceFound,
-          faceX,
-          faceY,
-          faceWidth,
-          faceHeight,
-          frameWidth,
-          frameHeight,
-          leftEyeOpenProbability: leftProb,
-          rightEyeOpenProbability: rightProb,
-          pitchAngle,
-          yawAngle,
-          rollAngle,
-        });
-        setCameraSetup(current => (
-          current.state === nextSetup.state
-          && current.title === nextSetup.title
-          && current.faceCentered === nextSetup.faceCentered
-          && current.faceSized === nextSetup.faceSized
-          && current.eyesVisible === nextSetup.eyesVisible
-          && current.facingCamera === nextSetup.facingCamera
-            ? current
-            : nextSetup
-        ));
-      }
-      return;
-    }
-    // A frame already crossing the worklet bridge can arrive after Camera is
-    // deactivated. It must not mutate a stopped or newly resetting session.
-    if (!isRunningRef.current || stoppingRef.current) return;
-    hasCameraSampleRef.current = true;
-    lastSampleAtRef.current = now;
-    if (cameraRecoveringRef.current) {
-      cameraRecoveringRef.current = false;
-      setCameraRecovering(false);
-    }
-    performanceTrackerRef.current.recordSample(now, inferenceMs);
-    const headNodResult = headNodDetectorRef.current.update({
-      at: now,
-      faceFound,
-      pitchAngle,
-      yawAngle,
-      rollAngle,
-    });
-    // Observation only: camera pose does not change scoring or alert delivery.
-    if (headNodResult.observed) {
-      headNodObservationsRef.current += 1;
-      sensorFusionTrackerRef.current.recordCameraHeadNod(now);
-    }
-
-    const rawResult = faceFound
-      ? processEyeOpenness(leftProb, rightProb)
-      : processNoFace();
-
-    if (rawResult.state === 'closed') {
-      closedSinceRef.current ??= now;
-    } else {
-      closedSinceRef.current = null;
-    }
-
-    // Do not turn a blink or one noisy frame into a driver alert.
-    const closedDurationMs = rawResult.state === 'closed'
-      && closedSinceRef.current !== null
-      ? now - closedSinceRef.current
-      : 0;
-    const result: EyeMetrics = {
-      ...rawResult,
-      closedDurationMs,
-      state: confirmedEyeStateForAlert(
-        rawResult.state,
-        closedDurationMs,
-        EARLY_CLOSED_ALERT_MS,
-      ),
-    };
-    sensorFusionTrackerRef.current.recordCameraSample({
-      at: now,
-      state: result.state,
-      fatigueScore: result.fatigueScore,
-    });
-
-    const alertLevel = deriveAlertLevel({
-      isRunning: isRunningRef.current,
-      metrics: result,
-      sessionTime: elapsedSessionSeconds(sessionStartedAtRef.current, now),
-      trackingLostForMs: 0,
-      criticalPerclosThreshold: PERCLOS_ALERT_THRESHOLD,
-      criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
-    });
-    const shouldRefreshDisplay = shouldRefreshMonitorMetrics({
-      previousState: displayedMetricsStateRef.current,
-      nextState: result.state,
-      previousAlertLevel: displayedAlertLevelRef.current,
-      nextAlertLevel: alertLevel,
-      now,
-      lastUpdatedAt: lastMetricsUiAtRef.current,
-    });
-    if (shouldRefreshDisplay) {
-      displayedMetricsStateRef.current = result.state;
-      displayedAlertLevelRef.current = alertLevel;
-      lastMetricsUiAtRef.current = now;
-      performanceTrackerRef.current.recordUiUpdate();
-      setMetrics(result);
-    }
-    if (faceFound) {
-      fatigueSumRef.current += result.fatigueScore;
-      fatigueSamplesRef.current += 1;
-      maxFatigueRef.current = Math.max(maxFatigueRef.current, result.fatigueScore);
-    }
-
-    const alerting = result.state === 'closed';
-    if (alerting && !prevAlertingRef.current) {
-      alertCountRef.current += 1;
-      setAlertCount(alertCountRef.current);
-      const cloudSession = cloudSessionRef.current;
-      if (cloudSession) {
-        cloudEventQueueRef.current = cloudEventQueueRef.current
-          .then(async () => {
-            const sessionId = await cloudSession;
-            if (sessionId) await logCloudAlert(sessionId, result.fatigueScore);
-          })
-          .catch(() => {});
-      }
-    }
-    prevAlertingRef.current = alerting;
-  }, [processEyeOpenness, processNoFace]);
-
-  // These native worklet values must outlive ordinary React renders so the
-  // frame-processor bridge stays stable throughout a drive.
-  const onEyeStateJS = useRunOnJS(onEyeState, [onEyeState]);
-  const lastSample = useSharedValue(0);
-  const analysisIntervalMs = useSharedValue(cameraLoadPolicy.analysisIntervalMs);
-
-  useEffect(() => {
-    analysisIntervalMs.value = cameraLoadPolicy.analysisIntervalMs;
-  }, [analysisIntervalMs, cameraLoadPolicy.analysisIntervalMs]);
-
-  const frameProcessor = useFrameProcessor((frame) => {
-    'worklet';
-    const now = Date.now();
-    if (now - lastSample.value < analysisIntervalMs.value) return;
-    lastSample.value = now;
-
-    const inferenceStartedAt = Date.now();
-    const faces = detectFaces(frame);
-    const inferenceMs = Date.now() - inferenceStartedAt;
-    if (faces.length === 0) {
-      onEyeStateJS(-1, -1, false, 0, 0, 0, inferenceMs, 0, 0, 0, 0, frame.width, frame.height);
-      return;
-    }
-
-    let face = faces[0];
-    for (let i = 1; i < faces.length; i += 1) {
-      const candidate = faces[i].bounds;
-      const current = face.bounds;
-      if (candidate.width * candidate.height > current.width * current.height) {
-        face = faces[i];
-      }
-    }
-
-    onEyeStateJS(
-      face.leftEyeOpenProbability ?? -1,
-      face.rightEyeOpenProbability ?? -1,
-      true,
-      face.pitchAngle,
-      face.yawAngle,
-      face.rollAngle,
-      inferenceMs,
-      face.bounds.x,
-      face.bounds.y,
-      face.bounds.width,
-      face.bounds.height,
-      frame.width,
-      frame.height,
-    );
-  }, [analysisIntervalMs, detectFaces, lastSample, onEyeStateJS]);
-
-  const stateColor = {
-    open: '#00ff88',
-    watch: '#fbbf24',
-    closed: '#ff3344',
-    noFace: '#fbbf24',
-  }[metrics.state];
-  const recoveryRequired = Boolean(sensorFault?.startsWith('Monitoring did not start'));
-  const monitorStatusLabel = sensorFault
-    ? recoveryRequired ? 'RECOVERY REQUIRED' : 'STOPPED · CHECK CAMERA'
-    : isStopping
-      ? 'SAVING DRIVE'
-      : isStarting
-        ? 'STARTING'
-        : cameraRecovering
-          ? 'RECOVERING CAMERA'
-        : isRunning
-          ? ({
-              open: 'TRACKING',
-              watch: 'CHECKING EYES',
-              closed: 'DROWSINESS ALERT',
-              noFace: 'TRACKING UNAVAILABLE',
-            } as const)[metrics.state]
-          : setupPreviewActive
-            ? cameraSetup.ready ? 'SETUP READY' : 'CHECKING SETUP'
-            : 'NOT MONITORING';
-  const monitorStatusColor = sensorFault
-    ? '#ef4444'
-    : cameraRecovering
-      ? '#fbbf24'
-    : isRunning
-      ? stateColor
-      : cameraSetup.ready
-        ? '#30d158'
-        : '#64d2ff';
-
-  if (!hasPermission) {
-    return (
-      <SafeAreaView style={s.container}>
-        <View style={s.permBox}>
-          <Text style={s.permIcon}>📷</Text>
-          <Text style={s.permTitle}>Camera Access Required</Text>
-          <Text style={s.permSub}>
-            Occulert uses your front camera to detect fatigue. No video is stored or uploaded.
-          </Text>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Grant camera access"
-            style={s.permBtn}
-            onPress={async () => {
-              const granted = await requestPermission();
-              if (!granted) Linking.openSettings();
-            }}
-          >
-            <Text style={s.permBtnText}>Grant Camera Access</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
+  if (!hasPermission && !SIMULATOR_TRACE) {
+    return <MonitorPermissionState onRequestAccess={async () => {
+      const granted = await requestPermission();
+      if (!granted) Linking.openSettings();
+    }} />;
   }
-
-  if (device == null) {
-    return (
-      <SafeAreaView style={s.container}>
-        <View style={s.permBox}>
-          <Text style={s.permIcon}>📷</Text>
-          <Text style={s.permTitle}>No Front Camera Found</Text>
-          <Text style={s.permSub}>Occulert needs a front-facing camera to monitor fatigue.</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <View style={s.container}>
-      {isRunning && <MonitoringWakeLock />}
-      {isRunning || setupPreviewActive ? (
-        <Camera
-          key={`front-camera-${cameraEpoch}`}
-          style={StyleSheet.absoluteFill}
-          device={device}
-          isActive={isRunning || setupPreviewActive}
-          frameProcessor={frameProcessor}
-          pixelFormat="yuv"
-          onError={(error) => handleCameraError(error, cameraEpoch)}
-        />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, s.camOff]}>
-          <Ionicons name="eye-off" size={64} color="#1a3a4a" />
-          <Text style={s.camOffTxt}>Tap Start to begin monitoring</Text>
-        </View>
-      )}
-
-      <Modal
-        animationType={modalAnimationType(reduceMotion)}
-        transparent
-        visible={safeStopOpen}
-        onRequestClose={() => {
-          if (!safeStopBusy) setSafeStopOpen(false);
-        }}
-      >
-        <View style={s.safeStopBackdrop}>
-          <View
-            accessibilityLabel="Safe stop options"
-            accessibilityViewIsModal
-            style={s.safeStopSheet}
-          >
-            <View style={s.safeStopHeader}>
-              <View style={s.safeStopIconWrap}>
-                <Ionicons name="navigate" size={24} color="#7dd3fc" />
-              </View>
-              <View style={s.safeStopHeadingText}>
-                <Text style={s.safeStopTitle}>Find a safe place to stop</Text>
-                <Text style={s.safeStopKicker}>DROWSINESS ALERT FOLLOW-UP</Text>
-              </View>
-            </View>
-
-            <Text style={s.safeStopWarning}>
-              Only use this after you are safely parked, or ask a passenger. Opening Maps ends monitoring and saves this drive first.
-            </Text>
-            <Text style={s.safeStopPrivacy}>
-              Occulert sends only a search phrase to Maps and does not read, store, or upload your location.
-            </Text>
-
-            <View style={s.safeStopOptions}>
-              {SAFE_STOP_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option.kind}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Find ${option.label.toLowerCase()}`}
-                  accessibilityHint={`${option.detail}. Ends monitoring, saves this drive, then opens Maps.`}
-                  accessibilityState={{ disabled: safeStopBusy, busy: safeStopBusy }}
-                  disabled={safeStopBusy}
-                  style={[s.safeStopOption, safeStopBusy && s.disabledBtn]}
-                  onPress={() => {
-                    void handleSafeStopChoice(option.kind);
-                  }}
-                >
-                  <View style={s.safeStopOptionIcon}>
-                    <Ionicons name={SAFE_STOP_ICONS[option.kind]} size={22} color="#e0f2fe" />
-                  </View>
-                  <View style={s.safeStopOptionText}>
-                    <Text style={s.safeStopOptionTitle}>{option.label}</Text>
-                    <Text style={s.safeStopOptionDetail}>{option.detail}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#4a7a8a" />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={safeStopBusy ? 'Ending and saving drive' : 'Cancel safe stop search'}
-              accessibilityState={{ disabled: safeStopBusy, busy: safeStopBusy }}
-              disabled={safeStopBusy}
-              style={s.safeStopCancel}
-              onPress={() => setSafeStopOpen(false)}
-            >
-              <Text style={s.safeStopCancelText}>
-                {safeStopBusy ? 'ENDING AND SAVING DRIVE…' : 'CANCEL'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <SafeAreaView style={s.overlay} pointerEvents="box-none">
-        <GlassSurface style={s.topBar} tintColor="rgba(5, 10, 18, 0.5)">
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={isRunning ? 'Return home and end monitoring' : 'Return home'}
-            style={s.backBtn}
-            onPress={() => {
-              void leaveMonitor(() => router.back());
-            }}
-          >
-            <Ionicons name="chevron-back" size={20} color="#c8e8f0" />
-            <Text style={s.backLbl}>Home</Text>
-          </TouchableOpacity>
-          <View
-            accessibilityLiveRegion="polite"
-            accessibilityRole="text"
-            accessibilityLabel={`Monitoring status: ${monitorStatusLabel}`}
-            style={s.pill}
-          >
-            <View style={[s.dot, { backgroundColor: monitorStatusColor }]} />
-            <Text style={s.pillTxt}>{monitorStatusLabel}</Text>
-          </View>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={isRunning ? 'Open settings and end monitoring' : 'Open settings'}
-            style={s.settingsBtn}
-            onPress={() => {
-              void leaveMonitor(() => router.push('/settings'));
-            }}
-          >
-            <Ionicons name="settings-outline" size={20} color="#c8e8f0" />
-          </TouchableOpacity>
-        </GlassSurface>
-
-        {sensorFault && (
-          <View style={s.sensorFault} accessibilityRole="alert">
-            <Text style={s.sensorFaultTitle}>
-              {recoveryRequired ? 'RECOVERY REQUIRED' : 'CAMERA ANALYSIS STOPPED'}
-            </Text>
-            <Text style={s.sensorFaultText}>{sensorFault}</Text>
-            {recoveryRequired && (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Return Home to recover the previous drive"
-                accessibilityHint="Leaves monitoring and starts the interrupted-drive recovery check"
-                onPress={() => {
-                  setupPreviewActiveRef.current = false;
-                  setSetupPreviewActive(false);
-                  router.replace('/');
-                }}
-                style={s.recoveryHomeButton}
-              >
-                <Ionicons name="arrow-back" size={16} color="#fee2e2" />
-                <Text style={s.recoveryHomeButtonText}>RETURN HOME TO RECOVER</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        <AlertSystem
-          metrics={metrics}
-          isRunning={isRunning}
-          sessionStartedAt={sessionStartedAt}
-          sessionEndedAt={sessionEndedAt}
-          onTimingEvent={recordAlertTiming}
-        />
-
-        <View style={s.ctrl}>
-          {!isRunning && (
-            <CameraSetupGuide
-              active={setupPreviewActive}
-              assessment={cameraSetup}
-              disabled={isStarting || isStopping}
-              onTogglePreview={toggleSetupPreview}
-            />
-          )}
-
-          {isRunning && (
-            <LiveMetrics
-              metrics={metrics}
-              alertCount={alertCount}
-              cameraRecovering={cameraRecovering}
-              isRunning={isRunning}
-              sessionStartedAt={sessionStartedAt}
-              sessionEndedAt={sessionEndedAt}
-            />
-          )}
-
-          {isRunning && alertCount > 0 && (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Find a safe place to stop"
-              accessibilityHint="Open parked-only rest area, gas, food, and coffee options"
-              style={s.safeStopBtn}
-              onPress={() => setSafeStopOpen(true)}
-            >
-              <Ionicons name="navigate-circle" size={23} color="#082f49" />
-              <View style={s.safeStopBtnTextWrap}>
-                <Text style={s.safeStopBtnText}>FIND A SAFE STOP</Text>
-                <Text style={s.safeStopBtnSub}>Rest area · Gas · Food or coffee</Text>
-              </View>
-            </TouchableOpacity>
-          )}
-
-          {!isRunning ? (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Start fatigue monitoring"
-              accessibilityHint="Starts on-device camera monitoring using the current setup"
-              accessibilityState={{ disabled: isStarting || isStopping || !sensitivityLoaded }}
-              disabled={isStarting || isStopping || !sensitivityLoaded}
-              style={[
-                s.startBtn,
-                (isStarting || isStopping || !sensitivityLoaded) && s.disabledBtn,
-              ]}
-              onPress={handleStart}
-            >
-              <Ionicons name="eye" size={22} color="#fff" />
-              <Text style={s.startTxt}>
-                {isStarting
-                  ? 'PREPARING SENSORS...'
-                  : isStopping
-                    ? 'SAVING SESSION...'
-                    : sensitivityLoaded
-                      ? 'START MONITORING'
-                      : 'LOADING SETTINGS...'}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Stop monitoring and save this drive"
-              accessibilityHint="Ends camera monitoring and saves the local session summary"
-              style={s.stopBtn}
-              onPress={() => {
-                void handleStop();
-              }}
-            >
-              <Ionicons name="stop-circle" size={22} color="#fff" />
-              <Text style={s.stopTxt}>STOP</Text>
-            </TouchableOpacity>
-          )}
-          {isRunning && (
-            <Text style={s.awakeNote}>
-              {cameraLoadPolicy.mode === 'reduced'
-                ? 'Battery and heat saver active · Keep app in foreground'
-                : 'Screen kept on · Keep app in foreground'}
-            </Text>
-          )}
-        </View>
-      </SafeAreaView>
-    </View>
-  );
+  if (device == null && !SIMULATOR_TRACE) return <MonitorCameraUnavailable />;
+  return <MonitorPresentation
+      device={device}
+      simulatorPhase={simulatorPhase}
+      frameProcessor={frameProcessor}
+      cameraLoadPolicy={cameraLoadPolicy}
+      cameraEpoch={cameraEpoch}
+      cameraCallbackOwner={cameraCallbackOwner}
+      handleCaptureConfiguration={handleCaptureConfiguration}
+      handleCameraError={handleCameraError}
+      metrics={metrics}
+      alertCount={alertCount}
+      frontCameraIdentity={frontCameraIdentity}
+      isRunning={isRunning}
+      isStarting={isStarting}
+      isStopping={isStopping}
+      sensitivityLoaded={sensitivityLoaded}
+      baselineLoaded={baselineLoaded}
+      baselineBusy={baselineBusy}
+      cameraRecovering={cameraRecovering}
+      setupPreviewActive={setupPreviewActive}
+      cameraSetup={cameraSetup}
+      sensorFault={sensorFault}
+      sessionStartedAt={sessionStartedAt}
+      sessionEndedAt={sessionEndedAt}
+      baselineMessage={baselineMessage}
+      reduceMotion={reduceMotion}
+      visibleAlertLevel={visibleAlertLevel}
+      setVisibleAlertLevel={setVisibleAlertLevel}
+      recordAlertTiming={recordAlertTiming}
+      safeStopOpen={safeStopOpen}
+      safeStopBusy={safeStopBusy}
+      setSafeStopOpen={setSafeStopOpen}
+      handleSafeStopChoice={handleSafeStopChoice}
+      handleStart={handleStart}
+      handleStop={handleStop}
+      toggleSetupPreview={toggleSetupPreview}
+      onHome={() => { void leaveMonitor(() => router.back()); }}
+      onSettings={() => { void leaveMonitor(() => router.push('/settings')); }}
+      onRecoveryHome={() => {
+        setupPreviewActiveRef.current = false;
+        setSetupPreviewActive(false);
+        router.replace('/');
+      }}
+    />;
 }
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  overlay: { flex: 1, justifyContent: 'space-between' },
-  camOff: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#050a0f' },
-  camOffTxt: { color: '#1a3a4a', marginTop: 12, fontSize: 14 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: 10,
-    marginTop: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 22,
-    overflow: 'hidden',
-  },
-  backBtn: { minHeight: 44, minWidth: 64, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backLbl: { color: '#c8e8f0', fontSize: 15 },
-  settingsBtn: { width: 44, height: 44, alignItems: 'flex-end', justifyContent: 'center' },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-    gap: 7,
-    backgroundColor: 'rgba(24,30,41,0.84)',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  pillTxt: { color: '#c8e8f0', flexShrink: 1, fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textAlign: 'center' },
-  sensorFault: { position: 'absolute', top: 132, left: 16, right: 16, zIndex: 4, backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
-  sensorFaultTitle: { color: '#fecaca', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
-  sensorFaultText: { color: '#fff1f2', fontSize: 12, lineHeight: 18, marginTop: 4 },
-  recoveryHomeButton: { alignSelf: 'flex-start', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, paddingRight: 14 },
-  recoveryHomeButtonText: { color: '#fee2e2', fontSize: 11, fontWeight: '900', letterSpacing: 0.45 },
-  ctrl: { padding: 20, gap: 10 },
-  startBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    backgroundColor: '#2563eb',
-    borderRadius: 16,
-    paddingVertical: 20,
-    shadowColor: '#2563eb',
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  disabledBtn: { opacity: 0.55 },
-  startTxt: { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
-  stopBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    backgroundColor: '#dc2626',
-    borderRadius: 16,
-    paddingVertical: 20,
-  },
-  stopTxt: { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
-  awakeNote: { textAlign: 'center', color: '#4a7a8a', fontSize: 11 },
-  safeStopBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#7dd3fc',
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#bae6fd',
-  },
-  safeStopBtnTextWrap: { flex: 1 },
-  safeStopBtnText: { color: '#082f49', fontSize: 14, fontWeight: '900', letterSpacing: 0.7 },
-  safeStopBtnSub: { color: '#075985', fontSize: 11, marginTop: 1 },
-  safeStopBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
-    padding: 14,
-  },
-  safeStopSheet: {
-    backgroundColor: '#07131e',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#1a3a4a',
-    padding: 20,
-    paddingBottom: 24,
-  },
-  safeStopHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  safeStopIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0c4a6e',
-  },
-  safeStopHeadingText: { flex: 1 },
-  safeStopTitle: { color: '#f0f9ff', fontSize: 20, fontWeight: '900' },
-  safeStopKicker: { color: '#38bdf8', fontSize: 10, fontWeight: '900', letterSpacing: 1, marginTop: 3 },
-  safeStopWarning: { color: '#fef3c7', fontSize: 14, lineHeight: 21, marginTop: 18 },
-  safeStopPrivacy: { color: '#7c9eab', fontSize: 12, lineHeight: 18, marginTop: 8 },
-  safeStopOptions: { gap: 9, marginTop: 18 },
-  safeStopOption: {
-    minHeight: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#0b1e2c',
-    borderWidth: 1,
-    borderColor: '#17384a',
-    borderRadius: 14,
-    padding: 14,
-  },
-  safeStopOptionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#12354a',
-  },
-  safeStopOptionText: { flex: 1 },
-  safeStopOptionTitle: { color: '#f0f9ff', fontSize: 15, fontWeight: '800' },
-  safeStopOptionDetail: { color: '#7c9eab', fontSize: 11, lineHeight: 16, marginTop: 2 },
-  safeStopCancel: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingTop: 10, paddingBottom: 2 },
-  safeStopCancelText: { color: '#7dd3fc', fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
-  permBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  permIcon: { fontSize: 48, marginBottom: 16 },
-  permTitle: { color: '#fff', fontSize: 22, fontWeight: '900', marginBottom: 12, textAlign: 'center' },
-  permSub: { color: '#94a3b8', fontSize: 14, lineHeight: 21, textAlign: 'center', marginBottom: 28 },
-  permBtn: { backgroundColor: '#2563eb', borderRadius: 14, paddingVertical: 16, paddingHorizontal: 32 },
-  permBtnText: { color: '#fff', fontSize: 16, fontWeight: '900' },
-});

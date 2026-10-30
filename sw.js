@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v64';
+const CACHE = 'occulert-v153';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -38,7 +38,13 @@ const RUNTIME_ASSETS = [
     "integrity": "sha256-VFIvolxQW/CUJC+Wm05JGRJesNrcy1aPKvFxu9ZYZfk="
   }
 ];
-const RUNTIME_INTEGRITY = new Map(RUNTIME_ASSETS.map(asset => [asset.url, asset.integrity]));
+const ALERT_AUDIO_ASSETS = [{ url: '/audio/alert.v1.wav', integrity: 'sha256-3fLbb34F09Mw3TsC1oy1Hkyg6pFnE5K5IbqP3YtPPCI=' }];
+const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v22.js","integrity":"sha256-9zOjI+p8geipRwd9wdaEfp/zkNzrc6CPiAp2sKmdC2w="}];
+const EXPERIMENT_HELPER_ASSETS = [{"url":"/detection-experiments.v5.js","integrity":"sha256-8jgSH171aEJc65cFUJU0UgAyUQpdb+LVjjyYR/NosZY="}];
+const TASKS_RUNTIME_ASSETS = [{"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/vision_bundle.js", "integrity": "sha256-pCfCa2tALe6263Th9sdo0m7AzBWWlYyenj1RibfL9ao="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.js", "integrity": "sha256-4XDuZ91OFsGm/NiECiBmh+WlmyLCDkqQK8RFsJVFTXM="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.wasm", "integrity": "sha256-jaJ3pzOSbqzQR0uHBLNnQtbsMjHFeoYMW4id/48d+IY="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.js", "integrity": "sha256-6B1xWj1CzDNzYC6y96/3ldFkk022gOMklrZdq1N/llg="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.wasm", "integrity": "sha256-ooSDzULnToVb9evba0DZtmpbSeNelQILyXZp5oIqMZI="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/face_landmarker.task", "integrity": "sha256-ZBhOIpsmMQe8K4BMZiXbE0H/K7cxh0sLzC/mVE4Lyf8="}];
+const OPTIONAL_ASSETS = [...EXPERIMENT_HELPER_ASSETS, ...TASKS_RUNTIME_ASSETS];
+const OPTIONAL_PATHS = new Set(OPTIONAL_ASSETS.map(asset=>asset.url));
+const RUNTIME_INTEGRITY = new Map([...RUNTIME_ASSETS, ...ALERT_AUDIO_ASSETS, ...STARTUP_GUARD_ASSETS, ...OPTIONAL_ASSETS].map(asset => [asset.url, asset.integrity]));
 function selectedRuntimeAssets() {
   let simd = false;
   try { simd = WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11])); } catch (_) {}
@@ -50,21 +56,30 @@ function selectedRuntimeAssets() {
 }
 const SELECTED_RUNTIME_ASSETS = selectedRuntimeAssets();
 const STATIC_ASSETS = [
+  '/driver-overview.v1.js',
+  '/driver-overview.v1.css',
+  ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
+  '/local-history.v2.js',
+  '/homepage-bootstrap.v2.js',
+  '/page-actions.v2.js',
+
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
+  ...ALERT_AUDIO_ASSETS.map(asset => asset.url),
   '/',
   '/index.html',
   '/base.v47.css',
+  '/inter-fonts.v2.css',
   '/app.html',
   '/manifest.json',
   '/favicon.ico',
   '/homepage.v51.css',
-  '/liquid-glass.v47.css',
+  '/liquid-glass.v49.css',
   '/accessibility.v52.css',
-  '/portal.v47.css',
+  '/portal.v49.css',
   '/homepage.v67.js',
   '/public-guidance.v67.css',
-  '/driver-app.v68.css',
-  '/driver-app.v70.js',
+  '/driver-app.v69.css',
+  '/driver-app.v101.js',
   '/lang.v47.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
@@ -74,12 +89,22 @@ const NETWORK_ONLY_DOCUMENTS = new Set([
   '/fleet-history.html',
 ]);
 const NETWORK_ONLY_ASSETS = new Set([
-  '/fleet-offboarding.v1.js',
+  '/occulert-backend.v82.js',
+  '/occulert-backend.v80.js',
+  '/occulert-backend.v79.js',
+  '/occulert-backend.v68.js',
+  '/occulert-backend.v75.js',
+  '/occulert-backend.v76.js',
+  '/occulert-backend.v77.js',
+  '/occulert-backend.v69.js',
   '/fleet-history-page.v64.js',
   '/fleet-history-page.v65.js',
   '/fleet-history-page.v66.js',
   '/fleet-history-page.v67.js',
   '/fleet-history-page.v68.js',
+  '/fleet-history-page.v69.js',
+  '/fleet-history-page.v70.js',
+  '/fleet-history-page.v71.js',
   '/auth-helper.v47.js',
   '/passkey-auth.v47.js',
   '/auth-helper.v49.js',
@@ -87,23 +112,42 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v47.js',
   '/occulert-backend.v58.js',
   '/occulert-backend.v60.js',
-  '/occulert-backend.v70.js',
+  '/occulert-backend.v78.js',
+  '/occulert-backend.v81.js',
+  '/occulert-backend.v83.js',
+  '/occulert-backend.v84.js',
+  '/occulert-backend.v86.js',
+  '/occulert-backend.v87.js',
+  '/occulert-backend.v88.js',
+  '/occulert-backend.v89.js',
+  '/occulert-backend.v90.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
   '/supabase-loader.v47.js',
+  '/supabase-loader.v49.js',
+  '/supabase-loader.v48.js',
+  '/vendor/supabase-2.112.3.js',
   '/passwordless-auth.v49.js',
   '/passwordless-auth.v60.js',
+  '/passwordless-auth.v61.js',
+  '/passwordless-auth.v62.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
+  '/driver-startup-guard.v22.js',
   '/driver-app.v60.js',
-  '/driver-app.v70.js',
+  '/driver-app.v101.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
+  ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
+  '/local-history.v2.js',
+  '/page-actions.v2.js',
+
   ...SELECTED_RUNTIME_ASSETS.map(asset => asset.url),
+  ...ALERT_AUDIO_ASSETS.map(asset => asset.url),
   '/base.v47.css',
   '/app.html',
-  '/driver-app.v68.css',
-  '/driver-app.v70.js',
+  '/driver-app.v69.css',
+  '/driver-app.v101.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;
@@ -216,12 +260,26 @@ self.addEventListener('notificationclick', event => {
   );
 });
 
+// Optional runtimes verify cached bytes too: a cached corrupt model is unusable.
+async function verifiedOptionalResponse(request, path) {
+ const pin=RUNTIME_INTEGRITY.get(path),cached=await caches.match(request);
+ if(cached){try{const bytes=await cached.clone().arrayBuffer(),hash=await crypto.subtle.digest('SHA-256',bytes);let binary='';for(const b of new Uint8Array(hash))binary+=String.fromCharCode(b);if('sha256-'+btoa(binary)===pin)return cached}catch(_){}const cache=await caches.open(CACHE);await cache.delete(request)}
+ const response=await fetchWithDeadline(new Request(request,{integrity:pin}),15000,undefined,completeNetworkResponse);
+ if(response?.ok)await cacheResponseBestEffort(request,response);
+ return response||Response.error();
+}
+self.addEventListener('message',event=>{
+ if(event.data?.type==='occulert.tasks.runtime'&&event.ports?.[0])event.ports[0].postMessage({type:'occulert.tasks.runtime',pins:TASKS_RUNTIME_ASSETS});
+});
 self.addEventListener('fetch', event => {
   const req = event.request;
 
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  // Let the browser handle foreign requests without consulting the app cache.
+  if (url.origin !== self.location.origin) return;
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
+  if(url.origin===self.location.origin&&OPTIONAL_PATHS.has(url.pathname)){event.respondWith(verifiedOptionalResponse(req,url.pathname));return}
   if (url.origin === self.location.origin && NETWORK_ONLY_DOCUMENTS.has(url.pathname)) {
     event.respondWith(fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, { cache: 'no-store' }, completeNetworkResponse)
       .then(response => response || new Response(
@@ -236,7 +294,9 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (url.origin === self.location.origin && NETWORK_FIRST_ASSETS.has(url.pathname)) {
-    const networkAttempt = fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
+    const integrity = RUNTIME_INTEGRITY.get(url.pathname);
+    const verifiedRequest = integrity ? new Request(req, { integrity }) : req;
+    const networkAttempt = fetchWithDeadline(verifiedRequest, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
     const cacheUpdate = networkAttempt
       .then(response => response && response.ok ? cacheResponseBestEffort(req, response) : null)
       .catch(() => null);
@@ -251,7 +311,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (req.mode === 'navigate' || req.url.endsWith('.html')) {
+  if (url.origin === self.location.origin && (req.mode === 'navigate' || req.url.endsWith('.html'))) {
     const networkAttempt = fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
     const cacheUpdate = networkAttempt
       .then(response => response && response.ok ? cacheResponseBestEffort(req, response) : null)
@@ -271,7 +331,7 @@ self.addEventListener('fetch', event => {
       if (match) return match;
       const integrity = url.origin === self.location.origin && RUNTIME_INTEGRITY.get(url.pathname);
       return fetch(integrity ? new Request(req, { integrity }) : req).then(res => {
-        if (res && res.ok && req.url.startsWith(self.location.origin)) {
+        if (res && res.ok && url.origin === self.location.origin) {
           const copy = res.clone();
           caches.open(CACHE).then(cache => cache.put(req, copy));
         }

@@ -14,7 +14,9 @@ driver data.
 ## 1. Create a Supabase project
 
 1. Go to supabase.com and create a free account and project yourself.
-2. In the SQL editor, run the contents of `db/schema.sql` from this repo.
+2. For a new empty project, apply `supabase/migrations/*.sql` in filename
+   order, starting with `20260701000000_baseline.sql`. Do not also replay
+   `db/schema.sql` or `db/migrations`; those are archived inside the baseline.
 3. Under Authentication, enable email/password (or magic link) sign-in for
 drivers and fleet managers.
 4. Under Authentication -> URL Configuration, set the Site URL to
@@ -26,10 +28,12 @@ small number of confirmation messages. Keep volume low because it can
 rate-limit confirmation messages across the project. A custom SMTP provider
 is optional if pilot volume later grows.
 
-For an existing Occulert project that already has the core tables, review and
-run only `db/migrations/20260719_secure_fleet_invitations.sql`. It adds the
-one-fleet-per-owner constraint, protected invitation table, and atomic
-service-role-only acceptance function without recreating existing policies.
+For an existing Occulert project, first inspect its ledger and deployed
+definitions using [migration readiness guidance](docs/MIGRATION_READINESS.md).
+Do not replay the new baseline: archived SQL may already be present without
+ledger entries. [db/README.md](db/README.md) explains fresh installation and
+separately authorized baseline adoption. Put future SQL only in the canonical
+Supabase migration directory.
 
 ### Passkey authentication (experimental)
 
@@ -59,6 +63,15 @@ into Supabase Auth. The account must first sign in with its confirmed email and
 password, then register a new passkey from Account Settings. Email/password and
 the privacy-safe reset-link flow remain available for recovery. If the
 experimental provider is disabled, those existing methods continue to work.
+
+### Event identity and quotas (disabled)
+
+The optional `OCCULERT_EVENT_IDEMPOTENCY_ENABLED=true` route requires the
+reviewed migration and rollout gates in [docs/EVENT_IDEMPOTENCY.md](docs/EVENT_IDEMPOTENCY.md).
+Leave it off until schema/permission and multi-connection acceptance are verified.
+Turning it on also enables 60 accepted events/minute/user and 500/session quotas
+for legacy clients. It does not enable the web/native retry outbox. Do not also
+apply the overlapping unmerged PR #192 quota migration.
 
 ## 2. Collect your keys
 
@@ -96,8 +109,9 @@ Without Supabase or `PILOT_LEADS_WEBHOOK_URL`, the API reports
 `stored: false`; the request form tells the visitor it could not confirm
 delivery and asks them to retry. It does not claim an offline submission.
 
-For this unreleased source batch, apply these migrations to an existing
-project **in order** before deploying the updated client and fleet routes:
+Review coverage of these migrations before activating the dependent features.
+Apply only migrations demonstrated to be missing, **in order**, after the
+existing-project adoption check above:
 
 1. `supabase/migrations/20260926200000_session_detector_provenance.sql` adds
    self-reported detector and app version fields to protected sessions.
@@ -107,6 +121,23 @@ project **in order** before deploying the updated client and fleet routes:
 3. `supabase/migrations/20260927030000_stripe_test_billing.sql` is only for
    the separate Stripe **test-mode** dry run described in
    `docs/BILLING_INTEGRATION.md`; it does not enable paid access.
+4. `supabase/migrations/20260929010000_billing_ignored_webhook_events.sql`
+   records ignored test webhook events for safe repeated acknowledgment.
+5. `supabase/migrations/20261022120000_revoke_direct_table_access.sql`
+   removes the browser roles' (`anon`, `authenticated`) direct table access to
+   `fleets`, `drivers`, `fleet_invitations`, `sessions`, `events` and
+   `pilot_leads`, and grants the service role explicitly. The web and native
+   apps never query these tables directly, so no route changes. Apply it any
+   time after the baseline; see [direct table access](docs/DIRECT_TABLE_ACCESS.md).
+6. `supabase/migrations/20261023010000_prune_pilot_lead_rate_limits.sql`
+   makes the pilot-form rate limiter delete up to 100 rows idle for more than
+   a day on each call, so the table stops growing forever. The function keeps
+   its signature and grants; `/api/pilot-leads` works the same before and after.
+
+The complete canonical chain also includes atomic account deletion, fleet
+follow-ups, query indexes and atomic invitation creation. Production database
+authentication failed during the October 3 read-only check; their current
+production ledger coverage remains unknown. Local replay does not verify it.
 
 The new period route reports `period_report_not_enabled` when its SQL function
 is absent. Do not present a bounded recent-session snapshot as a complete
@@ -120,8 +151,16 @@ the user's driver, sessions, events, invitations, and owned fleet in the same
 transaction. Other fleet members and their history survive with no fleet assigned.
 A database constraint or Storage ownership failure rolls everything back; never
 pre-delete data to work around such failures. No Storage uploads are currently used.
-Protected APIs verify the user through Auth, so a deleted user's unexpired JWT is
-rejected. Successful deletion clears local app state and signs out the browser SDK.
+Account deletion verifies the current user through Auth and requires recent
+authentication in the same verified token. Profile/email and sensitive fleet
+operations also use current Auth details. Selected identity-only routes can
+verify asymmetric JWTs with cached public keys; these do not check current Auth
+account or session status. They still require current owned database rows, which
+account deletion removes. See [cached verification and its revocation limits](docs/CACHED_JWKS_VERIFICATION.md).
+Successful deletion clears local app state and signs out the browser SDK.
+Password changes and passkey changes on the Account page need a sign-in from
+the last 10 minutes in the browser; see [recent sign-in](docs/ACCOUNT_RECENT_SIGN_IN.md)
+for the rule and the Supabase password settings that back it.
 Keep the service-role key on the server; it is never sent to the browser.
 
 Invitation creation returns the one-time link only to the verified manager.
@@ -133,7 +172,12 @@ fresh token, and is limited to reduce abuse without adding a paid provider.
 
 The endpoints expect an `Authorization: Bearer <access_token>`
 header, where `access_token` comes from Supabase Auth running in the
-browser. `api/public-config.js` exposes only the public project URL and anon
+browser. The browser client refreshes the access token 60 seconds before it
+expires. Concurrent calls in a tab share one refresh, and tabs take turns through
+the `occulert-auth-refresh` Web Lock, reusing a session another tab just stored.
+Local sign-in and sign-out actions invalidate an older refresh even while it
+waits for that lock; cross-tab storage updates can still supply a rotated token.
+If an early refresh cannot reach Supabase, the still-valid token keeps working. `api/public-config.js` exposes only the public project URL and anon
 key at runtime; it must never expose the service-role key. Email/password
 login creates or updates the authenticated user's driver profile, and
 `app.html` writes opted-in session summaries and alert events through the
@@ -151,17 +195,17 @@ owned by the access-token user.
 `api/profile.js` safely creates a driver row for the authenticated user with
 no fleet membership. It does not accept a caller-provided fleet ID. Only the
 atomic invitation acceptance function can assign that row to a fleet. Run the
-full current `db/schema.sql` for a new project or the dated migration above
-for the existing project before enabling fleet onboarding.
+canonical migration chain for a new project; follow the adoption and coverage
+guidance for an existing project before enabling fleet onboarding.
 
 ## Status
 
-- [x] Schema drafted (`db/schema.sql`)
+- [x] Canonical schema drafted and locally verified (`supabase/migrations`)
 - [x] API scaffolding drafted (`api/sessions.js`, `api/events.js`,
 `api/fleet-summary.js`, `api/_lib/supabase.js`)
 - [x] Pilot-lead storage path, spam checks, and per-instance rate limiting
 - [x] Supabase project and protected pilot-lead table created
-- [x] Full fleet/driver/session/event schema applied and verified
+- [ ] Current production schema and migration ledger independently verified
 - [x] `SUPABASE_ANON_KEY` environment variable set in Vercel and deployment verified
 - [x] Frontend wired with authenticated API calls and local fallback
 - [x] Passkey sign-in, enrollment, rename, and revocation implemented with a pinned Supabase SDK
@@ -169,8 +213,40 @@ for the existing project before enabling fleet onboarding.
 - [ ] First production-domain enrollment and sign-in verified on a physical Apple device
 - [x] Row Level Security and service-role invitation boundaries independently verified
 - [x] Trusted fleet invitation/administration flow implemented in code
-- [x] Secure fleet invitation migration applied and independently verified
+- [ ] Current production invitation migration coverage independently verified
 - [x] No-cost invitation sharing through the manager's mail app and copy-link fallback
 - [x] Manager-scoped session and event history excludes GPS, personal media, and raw motion
 - [ ] Protected session-history deployment and signed-in manager verification
 - [ ] Optional custom SMTP configured only if pilot volume outgrows Supabase's built-in sender
+
+Earlier setup notes reported the core schema and secure invitation migration
+as applied and verified. That historical report is retained here; it does not
+resolve the October 3 database authentication failure or confirm the current
+canonical ledger. See `docs/MIGRATION_READINESS.md` for the present evidence.
+
+### Shared provider time allowance and diagnostics
+
+Every API entry point creates one monotonic 12-second provider allowance, isolated per request. Nested consolidated routes reuse that allowance. Supabase authentication, REST/admin operations, Stripe test requests and the pilot-lead fallback webhook use the smaller of their existing per-call timeout and the remaining allowance. Optional stored-lead notification also uses the smaller of three seconds and the remaining allowance, and is skipped after exhaustion without failing a stored lead. A later provider mutation is not sent after exhaustion. Supabase and Stripe deadlines cover response bodies and ignore late completion; the fallback webhook also settles by its deadline when fetch ignores abort. Mutations are never retried automatically. This bounds provider waiting, not arbitrary application CPU work or the complete Vercel invocation. Existing response shapes remain unchanged.
+
+Responses include a generated `X-Occulert-Request-ID`. Failed server responses and unhandled exceptions emit a small JSON diagnostic with that ID, bounded status, elapsed milliseconds and an unhandled flag. Diagnostics omit request URLs, headers, bodies, identity, provider response details and exception messages. Use the response ID to locate a failure without collecting driver information. A timeout may follow a committed provider mutation; use the existing idempotent finalization behavior before retrying.
+
+Supabase requests bound complete response bodies to 2 MiB for PostgREST and
+64 KiB for Auth user/admin responses; JWKS retains its existing 64 KiB limit.
+The reader cancels a stream as soon as it exceeds the byte limit and rejects
+an oversized advertised Content-Length before reading. Oversized responses
+fail explicitly rather than returning partial fleet records. Successful
+malformed or oversized responses return 502. Known deadlines return 504;
+Supabase network failures and other upstream 5xx return 503, including HTML
+gateway pages. Existing validation, permission and migration-specific errors
+keep their documented responses, and provider pages are never sent to clients.
+These statuses do not authorize automatic mutation retries.
+
+### Repeat-safe session starts
+
+`POST /api/sessions` accepts an optional client-generated UUID in `session_id`. The server stores it as the existing session primary key and derives driver and fleet identity from the authenticated profile. Repeating that UUID returns the original owned session, including its original timestamps, provenance, historical fleet and any completed summary. A competing insert is reconciled by an owner-scoped read; a UUID occupied by another driver's session returns `409 session_id_conflict` without exposing the other row. Invalid supplied IDs return `400 invalid_session_id`. Omitting the field preserves server-generated IDs.
+
+Successful responses advertise `session_start_protocol: "client_uuid_v1"`. This server change does not enable automatic client retries or persist start intents. Clients must establish deployment support before retrying starts: older deployments ignore the supplied UUID and would create duplicates. Database exceptions other than UUID conflicts remain failures; the server never retries an insert automatically. No new migration is required.
+
+## Optional stored-lead notification
+
+Leave `LEAD_NOTIFY_WEBHOOK_URL` unset to keep notifications disabled. Configure it only with an authorized HTTPS email, Slack or Zapier webhook destination. After a successful Supabase insert the server sends only the event type, server-derived source, received timestamp and lead ID. It never forwards name, email, phone, company or message to this optional destination. The lead ID remains linkable metadata and should be treated as private. Redirects and URL credentials are rejected. Delivery is best effort, bounded to three seconds, and failure does not fail the stored lead submission. This is separate from the existing contact-data storage fallback webhook.

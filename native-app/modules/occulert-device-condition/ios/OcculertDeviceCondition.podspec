@@ -18,6 +18,7 @@ Pod::Spec.new do |s|
   s.dependency 'ExpoModulesCore'
   s.frameworks = 'AVFoundation'
   s.source_files = '**/*.{h,m,mm,swift}'
+  s.public_header_files = 'OcculertFrontCameraTypes.h'
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'SWIFT_COMPILATION_MODE' => 'wholemodule'

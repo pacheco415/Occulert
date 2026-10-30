@@ -1,53 +1,25 @@
+// GET /api/sessions   -> look up the authenticated driver's session by ID
 // POST /api/sessions  -> start a new driving session for the authenticated driver
 // PATCH /api/sessions -> end an existing session and record final scores
 //
 // Requires a Supabase Auth access token in the Authorization: Bearer header.
-// This endpoint is scaffolding: it returns 501 until SUPABASE_URL and
-// SUPABASE_SERVICE_ROLE_KEY are configured. See BACKEND_SETUP.md.
+// Reads and writes only sessions owned by the verified driver's profile.
+// Storage requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY; see BACKEND_SETUP.md.
 
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const MAX_BODY_LENGTH = 4096;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const { isUuid, numberOrNull, integerOrNull, validJsonBody } = require("./_lib/validation");
 const PIPELINES = new Set(["web_mediapipe_ear", "ios_mlkit_eye_probability", "android_mlkit_eye_probability"]);
 
-function json(response, status, body) {
-response.statusCode = status;
-response.setHeader("Content-Type", "application/json; charset=utf-8");
-response.setHeader("Cache-Control", "no-store");
-response.end(JSON.stringify(body));
-}
-
-function numberOrNull(value, min, max) {
-if (value === null || value === undefined || typeof value === "boolean" || typeof value === "object") return null;
-if (typeof value === "string" && !value.trim()) return null;
-const n = Number(value);
-if (!Number.isFinite(n)) return null;
-return Math.max(min, Math.min(max, n));
-}
-
-function integerOrNull(value) {
-const count = numberOrNull(value, 0, 10000);
-return count === null ? null : Math.round(count);
-}
+const { json } = require("./_lib/responses");
 
 function provenanceText(value, maxLength) {
 if (typeof value !== "string") return null;
 const text = value.trim();
 return text && text.length <= maxLength && /^[a-zA-Z0-9._() -]+$/.test(text) ? text : null;
-}
-
-function isJsonRequest(request) {
-return String(request.headers["content-type"] || "").toLowerCase().includes("application/json");
-}
-
-function validBody(request) {
-if (request.method === "GET") return true;
-if (!isJsonRequest(request)) return false;
-const body = request.body;
-return body !== null && typeof body === "object" && !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
 }
 
 module.exports = async function handler(request, response) {
@@ -61,14 +33,17 @@ message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to enable session stora
 
 let user;
 try {
-  user = await verifyAccessToken(bearerToken(request));
+  user = await verifyAccessToken(bearerToken(request), { cachedIdentity: true });
   if (!user) {
   return json(response, 401, { ok: false, error: "unauthorized" });
   }
 
-  if ((request.method === "POST" || request.method === "PATCH") && !validBody(request)) {
+  if ((request.method === "POST" || request.method === "PATCH") && !validJsonBody(request)) {
   return json(response, 415, { ok: false, error: "invalid_json_body" });
   }
+if (request.method === "GET" && !isUuid(request.query?.session_id)) {
+return json(response, 400, { ok: false, error: "invalid_session_id" });
+}
 const drivers = await pgFetch("drivers", {
 params: { select: "id,fleet_id", user_id: "eq." + user.id, limit: "1" },
 });
@@ -77,11 +52,29 @@ if (!driver) {
 return json(response, 403, { ok: false, error: "driver_profile_not_found" });
 }
 
+if (request.method === "GET") {
+// Recover an uncertain start by reading only. Never create a replacement.
+const stored = await pgFetch("sessions", { params: { id: "eq." + request.query.session_id, driver_id: "eq." + driver.id, select: "*", limit: "1" } });
+return json(response, 200, { ok: true, session: stored[0] || null, session_start_protocol: "client_uuid_v1", session_lookup_protocol: "client_uuid_lookup_v1" });
+}
+
 if (request.method === "POST") {
 const body = typeof request.body === "object" && request.body ? request.body : {};
-const created = await pgFetch("sessions", {
+const hasClientId = Object.prototype.hasOwnProperty.call(body, "session_id");
+if (hasClientId && !isUuid(body.session_id)) {
+return json(response, 400, { ok: false, error: "invalid_session_id" });
+}
+const ownedStartParams = hasClientId ? { id: "eq." + body.session_id, driver_id: "eq." + driver.id, select: "*", limit: "1" } : null;
+if (ownedStartParams) {
+const stored = await pgFetch("sessions", { params: ownedStartParams });
+if (stored[0]) return json(response, 200, { ok: true, session: stored[0], session_start_protocol: "client_uuid_v1" });
+}
+let created;
+try {
+created = await pgFetch("sessions", {
 method: "POST",
 body: {
+...(hasClientId ? { id: body.session_id } : {}),
 driver_id: driver.id,
 fleet_id: driver.fleet_id,
 started_at: new Date().toISOString(),
@@ -92,7 +85,15 @@ detector_version: provenanceText(body.detector_version, 80),
 app_version: provenanceText(body.app_version, 80),
 },
 });
-return json(response, 200, { ok: true, session: created[0] });
+} catch (error) {
+if (!hasClientId || error?.details?.code !== "23505") throw error;
+// A concurrent retry may have inserted the UUID after the first read. Only
+// return a row belonging to the verified driver; never upsert another owner.
+const stored = await pgFetch("sessions", { params: ownedStartParams });
+if (stored[0]) return json(response, 200, { ok: true, session: stored[0], session_start_protocol: "client_uuid_v1" });
+return json(response, 409, { ok: false, error: "session_id_conflict" });
+}
+return json(response, 200, { ok: true, session: created[0], session_start_protocol: "client_uuid_v1" });
 }
 
 if (request.method === "PATCH") {
@@ -100,7 +101,7 @@ const body = typeof request.body === "object" && request.body ? request.body : {
 if (!body.session_id) {
 return json(response, 400, { ok: false, error: "missing_session_id" });
 }
-if (typeof body.session_id !== "string" || !UUID.test(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
+if (!isUuid(body.session_id)) return json(response, 400, { ok: false, error: "invalid_session_id" });
 const ownedParams = { id: "eq." + body.session_id, driver_id: "eq." + driver.id };
 const existing = await pgFetch("sessions", { params: { ...ownedParams, select: "*", limit: "1" } });
 if (!existing.length) return json(response, 404, { ok: false, error: "session_not_found" });
@@ -131,9 +132,11 @@ return json(response, 404, { ok: false, error: "session_not_found" });
 return json(response, 200, { ok: true, session: updated[0] });
 }
 
-response.setHeader("Allow", "POST, PATCH");
+response.setHeader("Allow", "GET, POST, PATCH");
 return json(response, 405, { ok: false, error: "method_not_allowed" });
 } catch (error) {
-return json(response, 502, { ok: false, error: "supabase_error" });
+return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });
 }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

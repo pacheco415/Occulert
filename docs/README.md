@@ -1,12 +1,14 @@
 # Occulert documentation
 
-Start with the [authoritative development roadmap](APP_ROADMAP.md). It records
-shipped web behavior, the installed private-native baseline, current source,
-validation gaps, and future work. Specialist documents below explain contracts
-and procedures; dated audit/release notes are historical evidence.
+Start with [Status](STATUS.md) for dated source, deployment, TestFlight and
+migration facts, then the [development roadmap](APP_ROADMAP.md) for product
+scope and evidence requirements. Specialist documents below explain contracts
+and procedures; [archived roadmap records](archive/APP_ROADMAP_2026-09-28.md)
+and dated release notes preserve historical evidence.
 
 - [Backend implementation and next steps](BACKEND_ROADMAP.md)
 - [Detection evidence and future upgrades](FACIAL_RECOGNITION_ROADMAP.md)
+- [Verified 2026–2028 phone, Watch, headphone and glasses roadmap](DEVICE_ROADMAP_2026_2028.md)
 - [Performance targets and validation](PERFORMANCE_ROADMAP.md)
 - [Beta test and pilot evidence plan](BETA_TEST_PLAN.md)
 - [Accuracy benchmark](ACCURACY_BENCHMARK.md)

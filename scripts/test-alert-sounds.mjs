@@ -42,3 +42,6 @@ test('native pitch algorithm is selected before rate changes, including return t
   for (const sound of ['lower', 'higher', 'classic']) configureAlertSound(player, sound);
   assert.deepEqual(applied, [[0.84, false], [1.18, false], [1, true]]);
 });
+
+// Browser delivery regressions share this existing verification entry.
+import './test-browser-alert-audio.mjs';

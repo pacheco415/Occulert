@@ -11,11 +11,13 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type TextInputInstance,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import {
   getCloudState,
+  nativeCloudEventRetryStatus,
   setCloudSyncEnabled,
   signInToCloud,
   signOutOfCloud,
@@ -32,6 +34,7 @@ const ACCOUNT_LINKS = {
 
 export function CloudSyncCard() {
   const [state, setState] = useState<CloudState | null>(null);
+  const [eventRetry, setEventRetry] = useState<ReturnType<typeof nativeCloudEventRetryStatus>>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
@@ -44,7 +47,7 @@ export function CloudSyncCard() {
   const statusReadRef = useRef(0);
   const statusBusyRef = useRef(false);
   const actionBusyRef = useRef(false);
-  const passwordInputRef = useRef<TextInput | null>(null);
+  const passwordInputRef = useRef<TextInputInstance | null>(null);
   const actionRunnerRef = useRef(createSingleFlightActionRunner());
   const busy = actionBusy || statusBusy;
   const visible = useCallback(() => mountedRef.current && focusedRef.current && appActiveRef.current, []);
@@ -67,6 +70,7 @@ export function CloudSyncCard() {
     }
     stateRef.current = nextState;
     setState(nextState);
+    setEventRetry(nativeCloudEventRetryStatus());
     return true;
   }, [visible]);
 
@@ -76,6 +80,7 @@ export function CloudSyncCard() {
     stateRef.current = null;
     if (!mountedRef.current) return;
     setState(null);
+    setEventRetry(null);
     setStatusBusy(false);
     setStatusError(false);
   }, []);
@@ -368,6 +373,18 @@ export function CloudSyncCard() {
           Browser sign-in is separate from this iPhone. If you created your account with a passkey or email link, sign in on the website, open Account, and choose Change Password to set a password for native sign-in. Sharing stays off after a new native sign-in until you enable it here.
         </Text>
       </View>
+
+      {eventRetry && (
+        <View accessibilityRole="text" style={s.statusCheck}>
+          <Text style={s.label}>Alert delivery attempts</Text>
+          <Text style={s.statusDetail}>
+            {eventRetry.unavailable
+              ? 'Alert retries are paused because local delivery state could not be confirmed.'
+              : `${eventRetry.pending} pending; ${eventRetry.capacityRejected} rejected at capacity; ${eventRetry.expired} expired; ${eventRetry.permanentRejected} rejected; ${eventRetry.exhausted} exhausted; ${eventRetry.stopped} discarded at Stop.`}
+          </Text>
+          <Text style={s.statusDetail}>This local snapshot does not confirm cloud synchronization. Monitoring and local alerts continue independently.</Text>
+        </View>
+      )}
 
       <View style={s.privacy}>
         <Ionicons name="shield-checkmark-outline" size={14} color="#4a7a8a" />

@@ -7,27 +7,27 @@
 
 const crypto = require("node:crypto");
 const supabaseLib = require("./_lib/supabase");
+const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
+const { validJsonBody } = require("./_lib/validation");
 const MAX_BODY_LENGTH = 2048;
 
-function json(response, status, body) {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify(body));
-}
+const { json } = require("./_lib/responses");
 
 function validBody(request) {
-  if (!String(request.headers["content-type"] || "").toLowerCase().includes("application/json")) return false;
-  const body = typeof request.body === "object" && request.body ? request.body : {};
-  return !Array.isArray(body) && JSON.stringify(body).length <= MAX_BODY_LENGTH;
+  return validJsonBody(request, MAX_BODY_LENGTH);
 }
 
+const MAX_EMAIL_LENGTH = 240;
+
+// Reject rather than shorten or strip: either could turn the address the owner
+// typed into a different, valid one that someone else controls.
 function normalizedEmail(value) {
-  const email = String(value || "").replace(/\0/g, "").trim().toLowerCase().slice(0, 240);
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
+  const email = String(value || "").trim().toLowerCase();
+  return email.length <= MAX_EMAIL_LENGTH && !email.includes("\0") &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
 }
 
 function validUuid(value) {
@@ -56,7 +56,7 @@ module.exports = async function handler(request, response) {
   }
 
   try {
-    const user = await verifyAccessToken(bearerToken(request));
+    const user = await verifyAccessToken(bearerToken(request), { freshUser: true });
     if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
     if (!emailVerified(user)) return json(response, 403, { ok: false, error: "email_not_verified" });
     if (request.method !== "GET" && !validBody(request)) {
@@ -137,6 +137,8 @@ module.exports = async function handler(request, response) {
       if (code === "invitation_rate_limited") response.setHeader("Retry-After", "3600");
       return json(response, statuses[code], { ok: false, error: code });
     }
-    return json(response, 502, { ok: false, error: "supabase_error" });
+    return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });
   }
 };
+
+module.exports = require("./_lib/provider-budget").withProviderBudget(module.exports);

@@ -6,8 +6,9 @@ import vm from 'node:vm';
 
 const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
 const driver = readFileSync(new URL(`../${assetByStem('driver-app.js')}`, import.meta.url), 'utf8');
-const guard = html.match(/<script\b[^>]*\bid=["']driver-startup-guard["'][^>]*>([\s\S]*?)<\/script>/)?.[1];
-assert.ok(guard, 'The real startup guard must be present in app.html');
+const guardName = assetByStem('driver-startup-guard.js');
+assert.ok(html.includes(`src="/${guardName}"`), 'The real external startup guard must be linked by app.html');
+const guard = readFileSync(new URL(`../${guardName}`, import.meta.url), 'utf8');
 
 class EventTarget {
   constructor() { this.listeners = new Map(); }
@@ -63,7 +64,7 @@ class Element extends EventTarget {
   }
 }
 
-function startup({ missingDOM = false, reloadFailure = false } = {}) {
+function startup({ missingDOM = false, reloadFailure = false, deferGuard = false } = {}) {
   const elements = new Map();
   for (const match of html.matchAll(/<([a-z][a-z0-9]*)\b([^>]*\bid="([^"]+)"[^>]*)>([^<]*)/gi)) {
     const element = new Element(match[3], match[1], match[4].trim());
@@ -94,7 +95,8 @@ function startup({ missingDOM = false, reloadFailure = false } = {}) {
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, at: time + Number(delay) }); return id; },
     clearTimeout: id => timers.delete(id), console, performance: { now: () => time } });
   Object.assign(window, { document, location });
-  vm.runInContext(guard, context, { filename: 'driver-startup-guard.js' });
+  const loadGuard = () => vm.runInContext(guard, context, { filename: guardName });
+  if (!deferGuard) loadGuard();
   function advance(ms) {
     const target = time + ms;
     let iterations = 0;
@@ -115,7 +117,7 @@ function startup({ missingDOM = false, reloadFailure = false } = {}) {
     if (bindStart) elements.get('startBtn').onclick = core.start;
     return frozen ? Object.freeze(core) : core;
   }
-  return { api: window.OcculertStartup, window, document, elements, calls, timers, observers, advance, capability,
+  return { get api() { return window.OcculertStartup; }, loadGuard, window, document, elements, calls, timers, observers, advance, capability, elapseWithoutTimers: ms => { time += ms; },
     notifyDOM: () => observers.forEach(observer => observer.notify()),
     el: id => elements.get(id), showDOM: () => { domPresent = true; }, reloads: () => reloads };
 }
@@ -339,4 +341,34 @@ test('the real driver permission gate requires a present guard with explicit tru
   const context = { window: { OcculertStartup: { isReady: () => true } } };
   vm.runInNewContext(source, context);
   assert.equal(context.startupAllowsMonitoring(), true);
+});
+
+test('a complete frozen driver that finishes before the guard is accepted without starting monitoring', () => {
+  const app = startup({ deferGuard: true });
+  app.window.OcculertDriverCore = app.capability();
+  app.advance(250);
+  app.loadGuard();
+  assert.equal(app.api.isReady(), true);
+  assert.equal(app.el('startBtn').disabled, false);
+  assert.deepEqual(app.calls, []);
+});
+test('late arrival of the guard cannot revive startup after the document deadline', () => {
+  const app = startup({ deferGuard: true });
+  app.window.OcculertDriverCore = app.capability();
+  app.advance(8001);
+  app.loadGuard();
+  assertBlocked(app);
+  assert.equal(app.el('startupTitle').textContent, 'App could not load');
+  assert.deepEqual(app.calls, []);
+});
+
+
+test('busy initialization cannot accept readiness beyond the deadline before the timer task runs', () => {
+ const app=startup();
+ app.elapseWithoutTimers(8100);
+ assert.ok(app.timers.size>0,'the scheduled timer has not run');
+ assert.equal(app.api.ready(app.capability()),false);
+ assertBlocked(app);
+ assert.equal(app.el('startupTitle').textContent,'App could not load');
+ assert.deepEqual(app.calls,[]);
 });

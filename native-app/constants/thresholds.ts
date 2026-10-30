@@ -1,20 +1,18 @@
 /**
  * Occulert Sensitivity Thresholds
  *
- * These match the web app thresholds in app.html.
- * Update both files together when changing preset values.
- *
- * EAR = Eye Aspect Ratio (0.0 = fully closed, ~0.3+ = fully open)
- * Lower closed threshold = more aggressive alerting
- * Higher closed threshold = more lenient alerting
+ * Native monitoring scales ML Kit eye-open probability into a 0–0.3
+ * signal. These presets apply to that probability signal, not geometric EAR.
+ * Web EAR thresholds and calibration live in the versioned driver-app script;
+ * changes to either pipeline require its own validation evidence.
  */
 
 export type SensitivityLevel = 'low' | 'medium' | 'high';
 
 export interface SensitivityPreset {
-    /** EAR below this = eyes closed (triggers alert accumulation) */
+    /** Scaled eye-open probability below this = eyes closed (triggers alert accumulation) */
   eyeClosedThreshold: number;
-    /** EAR below this but above closed = eyes watch zone (yellow warning) */
+    /** Scaled eye-open probability below this but above closed = eyes watch zone (yellow warning) */
   eyeWatchThreshold: number;
     /** Label for UI display */
   label: string;

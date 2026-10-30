@@ -220,7 +220,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   };
   const paths = Object.fromEntries(Object.keys(REQUIRED).map(kind => [kind, arg(`--${kind}`)]));
   if (Object.values(paths).some(value => !value)) {
-    console.error('Usage: node benchmark/run-event-benchmark.mjs --sessions sessions.csv --tracking tracking.csv --episodes episodes.csv --alerts alerts.csv [--split test] [--slice-by lighting] [--dataset name@version] [--json results.json]');
+    console.error('Usage: node benchmark/run-event-benchmark.mjs --sessions sessions.csv --tracking tracking.csv --episodes episodes.csv --alerts alerts.csv [--split test] [--comparison comparison.csv] [--slice-by lighting] [--dataset name@version] [--json results.json]');
     process.exit(2);
   }
   const bytes = Object.fromEntries(await Promise.all(Object.entries(paths).map(async ([kind, path]) => [kind, await readFile(path)])));
@@ -229,9 +229,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const selected = selectSessions(parsed, split);
   if (!selected.sessions.length) throw new Error('No sessions selected');
   const detectors = scoreByDetector(selected);
+  let comparison = null;
+  if(arg('--comparison')){const raw=await readFile(arg('--comparison'));const {validateComparisonRows,comparisonByDetector}=await import('./detection-comparison.mjs');const table=parseTable(raw.toString());for(const field of ['session_id','frame_id','at_ms','legacy_usable','tasks_usable','calibrating','pitch_down'])if(!table.headers.includes(field))throw Error('Comparison CSV requires '+field);validateComparisonRows(table.rows,parsed.sessions);comparison={...comparisonByDetector(table.rows,selected.sessions),inputSha256:contentSha256(raw)};}
   const result = {
     provenance: {
-      ...sourceSnapshot(['run-event-benchmark.mjs']),
+      ...sourceSnapshot(['run-event-benchmark.mjs', ...(arg('--comparison')?['detection-comparison.mjs']:[])]),
       dataset: arg('--dataset') ?? null,
       split: split ?? 'all',
       inputs: Object.fromEntries(Object.entries(bytes).map(([kind, value]) => [kind, { path: paths[kind], sha256: contentSha256(value) }])),
@@ -241,6 +243,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     overall: Object.keys(detectors).length === 1 ? scoreEvents(selected) : null,
     detectors,
     slices: arg('--slice-by') ? scoreBySlice(selected, arg('--slice-by')) : null,
+    comparison,
   };
   console.log(JSON.stringify(result, null, 2));
   console.error('Event benchmark scores exported alert observations only. It does not establish on-road safety or causality.');

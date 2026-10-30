@@ -1,7 +1,8 @@
 import React, { useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { useAudioPlayer } from 'expo-audio';
+import { useAlertAudioPlayer } from '../hooks/useAlertAudioPlayer';
 import { sendAlertToWatch, sendMonitoringStatusToWatch } from '../lib/watchBridge';
 import { configureAlertAudioMode } from '../lib/audioSession';
 import { getWatchAlertsEnabled } from '../lib/watchPreferences';
@@ -28,6 +29,7 @@ import {
 import { alertDeliveryPlan, deliverCueIfCurrent } from '../lib/alertDelivery';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
+import { MonitorAlertPortal, useMonitorAlertDock } from './MonitorLayout';
 
 export type { AlertLevel } from '../lib/alertPolicy';
 
@@ -37,11 +39,13 @@ const ALERT_SOUND_RIGHT = require('../assets/alert-right.wav');
 const WATCH_STATUS_SYNC_INTERVAL_MS = 2_000;
 
 interface AlertSystemProps {
+  inline?: boolean;
   metrics: EyeMetrics;
   isRunning: boolean;
   sessionStartedAt: number | null;
   sessionEndedAt: number | null;
   onTimingEvent?: (event: AlertTimingEvent) => void;
+  onLevelChange?: (level: AlertLevel) => void;
 }
 
 export type AlertTimingEvent =
@@ -67,8 +71,12 @@ export function AlertSystem({
   sessionStartedAt,
   sessionEndedAt,
   onTimingEvent,
+  onLevelChange,
+  inline = false,
 }: AlertSystemProps) {
   const { reduceMotion } = useAccessibilityPreferences();
+  const insets = useSafeAreaInsets();
+  const docked = useMonitorAlertDock();
   const sessionTime = sessionStartedAt === null
     ? 0
     : Math.max(0, Math.floor(((sessionEndedAt ?? Date.now()) - sessionStartedAt) / 1_000));
@@ -110,7 +118,7 @@ export function AlertSystem({
     pendingCueTimers.current.push(timer);
   }, []);
 
-  React.useEffect(() => cancelPendingCues, [cancelPendingCues]);
+  React.useLayoutEffect(() => cancelPendingCues, [cancelPendingCues]);
 
   // Preload output preferences before Start. handleStart also awaits this same
   // deduplicated read so an alert never waits for the native storage bridge.
@@ -207,9 +215,9 @@ export function AlertSystem({
     };
   }, [isRunning]);
   const pulse = useRef(new Animated.Value(1)).current;
-  const balancedPlayer = useAudioPlayer(ALERT_SOUND, { keepAudioSessionActive: true });
-  const leftPlayer = useAudioPlayer(ALERT_SOUND_LEFT, { keepAudioSessionActive: true });
-  const rightPlayer = useAudioPlayer(ALERT_SOUND_RIGHT, { keepAudioSessionActive: true });
+  const { player: balancedPlayer } = useAlertAudioPlayer(ALERT_SOUND);
+  const { player: leftPlayer } = useAlertAudioPlayer(ALERT_SOUND_LEFT);
+  const { player: rightPlayer } = useAlertAudioPlayer(ALERT_SOUND_RIGHT);
 
   // PERCLOS is a rolling history. Never keep a red alert on screen after
   // the driver's eyes are visibly open again. Sustained tracking loss is a
@@ -222,6 +230,10 @@ export function AlertSystem({
     criticalPerclosThreshold: PERCLOS_ALERT_THRESHOLD,
     criticalClosedDurationMs: CRITICAL_CLOSED_ALERT_MS,
   });
+
+  React.useEffect(() => {
+    onLevelChange?.(level);
+  }, [level, onLevelChange]);
 
   const fire = useCallback((lv: AlertLevel) => {
     const now = Date.now();
@@ -328,8 +340,13 @@ export function AlertSystem({
   if (level === 'none') return null;
 
   const cfg = CONFIGS[level];
-  return (
-    <Animated.View style={[s.banner, { backgroundColor: cfg.bg, borderColor: cfg.border, transform: [{ scale: pulse }] }]}
+  const banner = (
+    <Animated.View style={[s.banner, !inline && (docked ? s.dockedBanner : s.floatingBanner), !inline && !docked && {
+      top: insets.top,
+      left: insets.left + 16,
+      right: insets.right + 16,
+    }, { backgroundColor: cfg.bg, borderColor: cfg.border, transform: inline || docked ? undefined : [{ scale: pulse }] }]}
+      pointerEvents={inline ? 'auto' : 'none'}
       accessibilityRole="alert" accessibilityLabel={cfg.title}>
       <Text style={s.icon}>{cfg.icon}</Text>
       <View style={s.txt}>
@@ -338,6 +355,7 @@ export function AlertSystem({
       </View>
     </Animated.View>
   );
+  return inline ? banner : <MonitorAlertPortal>{banner}</MonitorAlertPortal>;
 }
 
 const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;color:string;subColor:string;icon:string;title:string;sub:string }> = {
@@ -348,7 +366,9 @@ const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;colo
 };
 
 const s = StyleSheet.create({
-  banner: { position:'absolute', top:132, left:16, right:16, zIndex:2, flexDirection:'row', alignItems:'center', gap:14, borderWidth:1.5, borderRadius:16, padding:18 },
+  floatingBanner: { position:'absolute', zIndex:2 },
+  dockedBanner: { marginHorizontal: 16, marginBottom: 8 },
+  banner: { flexDirection:'row', alignItems:'center', gap:14, borderWidth:1.5, borderRadius:16, padding:18 },
   icon: { fontSize:28 },
   txt:  { flex:1 },
   title:{ fontSize:16, fontWeight:'900', letterSpacing:0.5 },

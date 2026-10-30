@@ -2,6 +2,7 @@ import { Alert, AppState, Linking, Platform, Share } from 'react-native';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { currentAppBuildInfo } from './appBuildInfo';
 import { formatSessionAlertCount } from './sessionAlertCount';
+import { formatSessionDuration, formatSessionFatigue, sessionSavedAt } from './sessionSummaryValues';
 
 export type AlertAssessment = 'accurate' | 'false_alert' | 'missed_alert' | 'late_alert';
 export type LightingCondition = 'daylight' | 'low_light';
@@ -25,9 +26,10 @@ export interface FeedbackSession {
   sessionId?: string;
   savedAt?: string;
   updatedAt?: string;
+  recoveredFromInterruption?: boolean;
   durationSec?: number;
   alertCount?: number;
-  avgFatigue?: number;
+  avgFatigue?: number | null;
   headNodObservations?: number;
   cameraHeadNodObservations?: number;
   headphoneHeadNodObservations?: number;
@@ -42,10 +44,6 @@ export interface FeedbackSession {
 }
 
 const FEEDBACK_EMAIL = 'hello@occulert.com';
-
-function valueOrDash(value: number | undefined): string {
-  return Number.isFinite(value) ? String(value) : '-';
-}
 
 function assessmentLabel(value?: AlertAssessment): string {
   if (value === 'accurate') return 'Alerts felt right';
@@ -80,15 +78,16 @@ function feedbackDraft(session?: FeedbackSession): { subject: string; body: stri
   if (session) {
     lines.push(
       'Session: ' + (session.sessionId || '-'),
-      'Saved: ' + (session.savedAt || session.updatedAt || '-'),
-      'Duration seconds: ' + valueOrDash(session.durationSec),
+      'Summary: ' + (session.recoveredFromInterruption === true ? 'Recovered partial session' : 'Session summary; completion not independently verified'),
+      'Saved: ' + (sessionSavedAt(session.savedAt, session.updatedAt) || 'Unknown date'),
+      'Duration seconds: ' + formatSessionDuration(session.durationSec, 'seconds'),
       'Alerts: ' + formatSessionAlertCount(session.alertCount),
-      'Average fatigue: ' + valueOrDash(session.avgFatigue),
-      'Experimental camera head-nod observations: ' + valueOrDash(
+      'Average fatigue: ' + formatSessionFatigue(session.avgFatigue),
+      'Experimental camera head-nod observations: ' + formatSessionAlertCount(
         session.cameraHeadNodObservations ?? session.headNodObservations,
       ),
-      'Experimental headphone head-nod observations: ' + valueOrDash(session.headphoneHeadNodObservations),
-      'Headphone motion samples processed: ' + valueOrDash(session.headphoneMotionSamples),
+      'Experimental headphone head-nod observations: ' + formatSessionAlertCount(session.headphoneHeadNodObservations),
+      'Headphone motion samples processed: ' + formatSessionAlertCount(session.headphoneMotionSamples),
       'Headphone motion status: ' + (session.headphoneMotionStatus || '-'),
       'Sensitivity: ' + (session.sensitivity || '-'),
       'Alert assessment: ' + assessmentLabel(session.alertAssessment),

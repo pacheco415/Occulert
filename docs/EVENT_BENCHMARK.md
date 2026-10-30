@@ -67,3 +67,7 @@ windows. Do not compare or combine their scores until each is calibrated and
 validated independently. A future export must include exact build and detector
 version, usable tracking intervals, and deliberate alert onset timestamps; the
 current production session summary is not sufficient for this benchmark.
+
+## Local parked comparison imports
+
+The [parked trace adapter](PARKED_DETECTION_EXPERIMENTS.md#independent-labels-and-reproducible-software-evidence) converts explicit scalar JSON with externally labeled episodes and a pseudonymous participant split. `--comparison comparison.csv` adds supported paired-frame/timing summaries by detector version. It does not infer labels or Tasks alerts; Tasks event recall, false alerts and delay remain `null`. Missing or truncated frames grant no tracking coverage.

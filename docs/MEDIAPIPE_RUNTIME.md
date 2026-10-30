@@ -50,7 +50,7 @@ Directly opening the monitor without first completing a homepage service-worker 
 
 ## CSP boundaries
 
-JavaScript `'unsafe-eval'` is removed from all website CSP headers. The monitor also removes the jsDelivr host from its script and connection allowances. `'wasm-unsafe-eval'` remains necessary for WebAssembly compilation. Inline event handlers still require `'unsafe-inline'`; Google Fonts keeps its current allowances. Other pages retain jsDelivr for the existing Supabase SDK fallback, independent of the detector.
+Current website scripts are external and owned, with no inline script bodies or event handlers and no script-src `'unsafe-inline'` or JavaScript `'unsafe-eval'`. The ordered startup guard and optional parked helper use exact owned SRI pins. `'wasm-unsafe-eval'` remains necessary for WebAssembly compilation. Fonts are owned files rather than Google Fonts. Connections use the exact Supabase project host declared in `scripts/lib/csp-policy.mjs`, together with the required owned services. The temporary jsDelivr compatibility grant serves retained historical Supabase SDK loaders during their 14-day retention window; current loaders use the owned SDK. Remove the historical grant only after the reference audit passes. It is independent of either detector.
 
 ## Validation
 
@@ -61,3 +61,18 @@ JavaScript `'unsafe-eval'` is removed from all website CSP headers. The monitor 
 - Existing camera selection, tracking-loss, startup failure, consent, and monitoring lifecycle tests remain required.
 
 A blank-frame inference callback exercises the real runtime/model pipeline; it does not measure face-detection accuracy. Physical Safari/iPhone checks and the authorized dataset benchmark remain separate evidence.
+
+## Optional Tasks runtime and desktop software timings
+
+The default detector above is unchanged. `detector=tasks` selects the separately pinned, local-only `@mediapipe/tasks-vision@1.0.1` runtime at `vendor/mediapipe/tasks-vision-1.0.1-occulert.1/`, with the existing telemetry-removal patch and six exact owned runtime/model pins. It records blink/jaw and matrix measurements alongside legacy EAR on the same captured frame; it cannot control alerts. The runtime and helper load on demand and stay outside default offline installation. See [parked experiments](PARKED_DETECTION_EXPERIMENTS.md) for flags, bounded export, unknown support and replay requirements.
+
+The actual Chromium/WebKit probe on October 4, 2026 used an owned blank 640×480 canvas, three warmups and 20 measured inference calls per requested delegate. CPU was requested first with the optional runtime cold; GPU followed with owned runtime bytes cached. Startup timings therefore do not isolate delegate performance. Both requested delegates succeeded without fallback and every frame had zero usable faces.
+
+| Browser | Requested/usable delegate | Startup ms | Inference median ms | Inference p95 ms | Measured calls |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Chromium | CPU / CPU | 189.4 | 2.2 | 2.6 | 20 |
+| Chromium | GPU / GPU | 73.2 | 10.2 | 10.6 | 20 |
+| WebKit | CPU / CPU | 139.0 | 3.0 | 4.0 | 20 |
+| WebKit | GPU / GPU | 93.0 | 4.0 | 4.0 | 20 |
+
+[Software evidence](evidence/parked-detection-software.json) records the exact source/runtime hashes, workload, availability and cache order. It also records the bounded time-window microbenchmark. These blank desktop results do not establish paired face accuracy, physical pitch/yaw, mobile performance or on-road alert latency. Tasks event recall, false-alert rate and delay remain unavailable until a frozen validated decision replay and independent labels exist.
