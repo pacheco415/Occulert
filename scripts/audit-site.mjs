@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import { auditDriverHooks } from './lib/driver-hook-policy.mjs';
 import { readHistorySourceOwners, HISTORY_SOURCE_PATHS } from './lib/history-source-owners.mjs';
 import { auditCspPolicy, SUPABASE_HOST } from './lib/csp-policy.mjs';
@@ -13,6 +14,7 @@ import { extname, join, normalize } from "node:path";
 
 const root = process.cwd();
 readHistorySourceOwners(read);
+const monitorOwners = readNativeMonitorSourceOwners(relative => read('native-app/' + relative));
 const failures = [];
 const htmlFiles = [];
 
@@ -502,7 +504,7 @@ assertIncludes("native-app/app.json", "both cameras", "native camera permission 
 assertIncludes("native-app/constants/thresholds.ts", "EARLY_CLOSED_ALERT_MS = 600", "native monitoring must issue a prominent warning after a prolonged blink threshold");
 assertIncludes("native-app/constants/thresholds.ts", "CRITICAL_CLOSED_ALERT_MS = 1_200", "native monitoring must retain a stronger prolonged-closure stage");
 assertIncludes("native-app/app/monitor.tsx", "monitoring-paused.wav", "native monitoring must package an audible foreground-loss warning");
-assertIncludes("native-app/app/monitor.tsx", "headNodObservationsRef.current += 1", "native monitoring must store candidate head-nod observations locally");
+assertIncludes("native-app/hooks/useMonitorAnalysis.ts", "headNodObservationsRef.current += 1", "native monitoring must store candidate head-nod observations locally");
 assertIncludes(HISTORY_SOURCE_PATHS.diagnostics, "Does not trigger alerts", "experimental head-nod observations must not be presented as an alert signal");
 assertNotIncludes("native-app/components/AlertSystem.tsx", "headNod", "unvalidated head-nod observations must not affect alert delivery");
 assertNotIncludes("native-app/lib/cloudSync.ts", "headNodObservations", "unvalidated head-nod observations must remain out of cloud sync");
@@ -530,17 +532,17 @@ assertIncludes("docs/APP_ROADMAP.md", "Review the full diff and repair findings"
 assertNotIncludes("features.html", "designed to actually wake you up", "public alert copy must not imply that alerts make drowsy driving safe");
 assertIncludes("native-app/components/AlertSystem.tsx", "setTrackingLost(true)", "native monitoring must apply a grace period before warning about tracking loss");
 assertIncludes("native-app/components/AlertSystem.tsx", "TRACKING LOST", "native monitoring must warn after sustained tracking loss");
-assertIncludes("native-app/app/monitor.tsx", "          inline", "native alert banners must use the scrolling layout flow");
-assertNotIncludes("native-app/app/monitor.tsx", "sensorFault: { position: 'absolute'", "native sensor-fault banners must share the scrolling layout flow");
-assertNotIncludes("native-app/app/monitor.tsx", "Alert.alert('Monitoring stopped'", "native sensor faults must not stack a blocking modal over the in-app warning");
-assertIncludes("native-app/app/monitor.tsx", "SENSOR_STARTUP_GRACE_MS = 10_000", "native camera startup must have a distinct first-frame grace period");
-assertIncludes("native-app/app/monitor.tsx", "hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS", "native camera watchdog must distinguish startup from an active-pipeline stall");
-assertIncludes("native-app/app/monitor.tsx", "<MonitorLayout", "native monitoring must use the bounded camera and controls layout");
+assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "          inline", "native alert banners must use the scrolling layout flow");
+for (const owner of monitorOwners.runtimeOwners) assertNotIncludes("native-app/" + owner.path, "sensorFault: { position: 'absolute'", "native sensor-fault banners must share the scrolling layout flow");
+for (const owner of monitorOwners.runtimeOwners) assertNotIncludes("native-app/" + owner.path, "Alert.alert('Monitoring stopped'", "native sensor faults must not stack a blocking modal over the in-app warning");
+assertIncludes("native-app/hooks/useMonitorCameraLifecycle.ts", "SENSOR_STARTUP_GRACE_MS = 10_000", "native camera startup must have a distinct first-frame grace period");
+assertIncludes("native-app/hooks/useMonitorCameraLifecycle.ts", "hasCameraSampleRef.current ? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS", "native camera watchdog must distinguish startup from an active-pipeline stall");
+assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "<MonitorLayout", "native monitoring must use the bounded camera and controls layout");
 assertIncludes("native-app/components/MonitorLayout.tsx", 'testID="monitor-primary-action"', "Start and Stop must have a separate fixed layout slot");
 assertIncludes("native-app/components/MonitorLayout.tsx", 'testID="monitor-details"', "native guidance and metrics must have a scrolling region");
-assertIncludes("native-app/app/monitor.tsx", "<CameraSetupGuide", "the parked camera guide must share the monitoring control layout flow");
-assertIncludes("native-app/app/monitor.tsx", "<LiveMetrics", "native metrics must share the control layout flow so alert actions cannot overlap them");
-assertNotIncludes("native-app/app/monitor.tsx", "metrics: {\n    position: 'absolute'", "native metrics must not rely on a fixed bottom offset that can overlap added controls");
+assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "<CameraSetupGuide", "the parked camera guide must share the monitoring control layout flow");
+assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "<LiveMetrics", "native metrics must share the control layout flow so alert actions cannot overlap them");
+for (const owner of monitorOwners.runtimeOwners) assertNotIncludes("native-app/" + owner.path, "metrics: {\n    position: 'absolute'", "native metrics must not rely on a fixed bottom offset that can overlap added controls");
 assertIncludes("native-app/lib/watchBridge.ts", "getIsWatchAppInstalled", "Apple Watch controls must require the companion app, not pairing alone");
 assertIncludes("native-app/app/settings.tsx", "AUTOMATIC", "connected audio settings must describe iPhone output routing truthfully");
 assertIncludes("native-app/app/monitor.tsx", "getWatchAlertsEnabled()", "native monitoring must preload the cached Watch preference before alerts can fire");
