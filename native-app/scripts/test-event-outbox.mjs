@@ -356,3 +356,24 @@ test('simulator input disables native retry construction and every cloud request
   assert.equal(f.listeners.length, 0);
   assert.equal(f.calls.length, 0);
 });
+
+test('native concurrent detection keeps the fifth upload pending until its acknowledgement', async () => {
+  const f = fixture(), response = deferred(), started = deferred();
+  f.transport(async () => ({ status: 503 }));
+  await f.queue();
+  for (const delay of [1000, 2000, 4000]) { await f.time.advance(delay); await f.adapter.flush(); }
+  assert.equal(f.calls.length, 4);
+  const original = f.rows()[0].event.event_id;
+  f.transport(async event => {
+    if (event.event_id === original) { started.resolve(); await response.promise; }
+    return { status: 200, body: { ok: true, client_event_id: event.event_id, event: { session_id: event.session_id } } };
+  });
+  await f.time.advance(8000); await started.promise;
+  const concurrent = f.queue('yawn'); await settle();
+  assert.equal(f.rows().find(row => row.event.event_id === original)?.attempts, 5);
+  assert.equal(f.adapter.status().pending, 2);
+  assert.equal(f.adapter.status().exhausted, 0);
+  response.resolve(); await concurrent; await f.adapter.flush();
+  assert.equal(f.calls.length, 6); assert.equal(f.rows().length, 0);
+  assert.equal(f.adapter.status().exhausted, 0);
+});

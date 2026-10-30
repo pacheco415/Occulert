@@ -77,6 +77,7 @@ export function createEventOutbox(storage: Storage, isCurrent: (scope: EventScop
   let epoch = 0;
   let tail: Promise<unknown> = Promise.resolve();
   let flight: Promise<void> | null = null;
+  let activeAttempt: { scope: EventScope; revision: number; eventId: string } | null = null;
   const stoppedSessions = new Map<string, number>();
   const run = <T>(operation: () => Promise<T>): Promise<T> => {
     const pending = tail.catch(() => {}).then(operation);
@@ -93,11 +94,14 @@ export function createEventOutbox(storage: Storage, isCurrent: (scope: EventScop
   const sessionKey = (scope: EventScope, sessionId: string) => JSON.stringify([scope.ownerId, scope.consentVersion, sessionId]);
   const sessionCurrent = (scope: EventScope, sessionId: string) => (stoppedSessions.get(sessionKey(scope, sessionId)) ?? 0) <= now();
   const count = (state: State, key: keyof EventCounters) => { state.counters[key] = Math.min(Number.MAX_SAFE_INTEGER, state.counters[key] + 1); };
+  const inFlight = (scope: EventScope, row: Row) => activeAttempt !== null
+    && activeAttempt.revision === epoch && sameScope(activeAttempt.scope, scope)
+    && activeAttempt.eventId === row.event.event_id;
   const prune = (state: State) => {
     state.rows = state.rows.filter(row => {
       const reason = !sessionCurrent(state.scope, row.event.session_id) ? 'stopped'
         : Date.parse(row.event.expires_at) <= now() ? 'expired'
-        : row.attempts >= EVENT_OUTBOX_MAX_ATTEMPTS ? 'exhausted' : null;
+        : row.attempts >= EVENT_OUTBOX_MAX_ATTEMPTS && !inFlight(state.scope, row) ? 'exhausted' : null;
       if (reason) count(state, reason);
       return !reason;
     });
@@ -131,53 +135,59 @@ export function createEventOutbox(storage: Storage, isCurrent: (scope: EventScop
     if (flight) return flight;
     const owner = copy(scope), revision = epoch;
     const pending = (async () => {
-      while (current(owner, revision)) {
-        // Persist attempt/backoff before sending. Storage failure must prevent network use.
-        const event = await run(async () => {
-          if (!current(owner, revision)) return null;
-          const state = await read();
-          if (!current(owner, revision) || !state || !sameScope(state.scope, owner)) return null;
-          prune(state);
-          const row = state.rows.find(item => item.nextAttemptAt <= now());
-          if (row) {
-            row.attempts++;
-            row.nextAttemptAt = now() + Math.min(60_000, 1000 * 2 ** (row.attempts - 1));
-          }
-          await write(state);
-          return row ? { event: copy(row.event), timestampMode: row.timestampMode } : null;
-        });
-        if (!event || !current(owner, revision) || !sessionCurrent(owner, event.event.session_id) || Date.parse(event.event.expires_at) <= now()) return;
-        let result: EventSendResult;
-        try { result = await send(copy(event.event), { timestampMode: event.timestampMode }); } catch { return; }
-        if (!current(owner, revision)) return;
-        const status = result.status;
-        const timestampRejected = status === 400 && result.error === 'invalid_occurred_at' && event.timestampMode === 'detected';
-        const success = Number.isInteger(status) && status >= 200 && status < 300;
-        const permanent = !timestampRejected && Number.isInteger(status) && status >= 400 && status < 500 && ![401, 408, 429].includes(status);
-        await run(async () => {
+      try {
+        while (current(owner, revision)) {
+          // Persist attempt/backoff before sending. Storage failure must prevent network use.
+          const event = await run(async () => {
+            if (!current(owner, revision)) return null;
+            const state = await read();
+            if (!current(owner, revision) || !state || !sameScope(state.scope, owner)) return null;
+            prune(state);
+            const row = state.rows.find(item => item.nextAttemptAt <= now());
+            if (row) {
+              // Persist the consumed attempt before transport, but keep its live
+              // row visible until settlement. This exemption never survives restart.
+              activeAttempt = { scope: owner, revision, eventId: row.event.event_id };
+              row.attempts++;
+              row.nextAttemptAt = now() + Math.min(60_000, 1000 * 2 ** (row.attempts - 1));
+            }
+            await write(state);
+            return row ? { event: copy(row.event), timestampMode: row.timestampMode } : null;
+          });
+          if (!event || !current(owner, revision) || !sessionCurrent(owner, event.event.session_id) || Date.parse(event.event.expires_at) <= now()) return;
+          let result: EventSendResult;
+          try { result = await send(copy(event.event), { timestampMode: event.timestampMode }); } catch { return; }
           if (!current(owner, revision)) return;
-          const state = await read();
-          if (!current(owner, revision) || !state || !sameScope(state.scope, owner)) return;
-          const row = state.rows.find(item => item.event.event_id === event.event.event_id);
-          if (row && timestampRejected && sessionCurrent(owner, row.event.session_id)) {
-            // The timed request was explicitly rejected, so changing the wire
-            // intent is safe. Persist it BEFORE the fallback; uncertain future
-            // outcomes must replay this same untimed intent after a restart.
-            row.timestampMode = 'server'; row.nextAttemptAt = now();
-          } else if (row && (success || permanent)) {
-            state.rows = state.rows.filter(item => item !== row);
-            if (permanent) count(state, 'permanentRejected');
-          } else if (row && status === 429 && typeof result.retryAfterMs === 'number' && Number.isFinite(result.retryAfterMs) && result.retryAfterMs > 0) {
-            row.nextAttemptAt = Math.min(Date.parse(row.event.expires_at), Math.max(row.nextAttemptAt, now() + result.retryAfterMs));
-          }
-          prune(state);
-          await write(state);
-        });
-        // Unknown outcomes, auth, throttling and 5xx stop this flush. A single
-        // explicit timestamp rejection switches intent and uses another of the
-        // same five-send budget; a second 400 is permanent.
-        if (!success && !permanent && !timestampRejected) return;
-      }
+          const status = result.status;
+          const timestampRejected = status === 400 && result.error === 'invalid_occurred_at' && event.timestampMode === 'detected';
+          const success = Number.isInteger(status) && status >= 200 && status < 300;
+          const permanent = !timestampRejected && Number.isInteger(status) && status >= 400 && status < 500 && ![401, 408, 429].includes(status);
+          await run(async () => {
+            if (!current(owner, revision)) return;
+            const state = await read();
+            if (!current(owner, revision) || !state || !sameScope(state.scope, owner)) return;
+            activeAttempt = null;
+            const row = state.rows.find(item => item.event.event_id === event.event.event_id);
+            if (row && timestampRejected && sessionCurrent(owner, row.event.session_id)) {
+              // The timed request was explicitly rejected, so changing the wire
+              // intent is safe. Persist it BEFORE the fallback; uncertain future
+              // outcomes must replay this same untimed intent after a restart.
+              row.timestampMode = 'server'; row.nextAttemptAt = now();
+            } else if (row && (success || permanent)) {
+              state.rows = state.rows.filter(item => item !== row);
+              if (permanent) count(state, 'permanentRejected');
+            } else if (row && status === 429 && typeof result.retryAfterMs === 'number' && Number.isFinite(result.retryAfterMs) && result.retryAfterMs > 0) {
+              row.nextAttemptAt = Math.min(Date.parse(row.event.expires_at), Math.max(row.nextAttemptAt, now() + result.retryAfterMs));
+            }
+            prune(state);
+            await write(state);
+          });
+          // Unknown outcomes, auth, throttling and 5xx stop this flush. A single
+          // explicit timestamp rejection switches intent and uses another of the
+          // same five-send budget; a second 400 is permanent.
+          if (!success && !permanent && !timestampRejected) return;
+        }
+      } finally { activeAttempt = null; }
     })();
     flight = pending;
     void pending.then(() => { flight = null; }, () => { flight = null; });
@@ -215,7 +225,7 @@ export function createEventOutbox(storage: Storage, isCurrent: (scope: EventScop
     if (!current(owner, revision)) return [];
     const state = await read();
     if (!current(owner, revision) || !state || !sameScope(state.scope, owner)) return [];
-    return copy(state.rows.filter(row => sessionCurrent(owner, row.event.session_id) && Date.parse(row.event.expires_at) > now() && row.attempts < EVENT_OUTBOX_MAX_ATTEMPTS).map(row => row.event));
+    return copy(state.rows.filter(row => sessionCurrent(owner, row.event.session_id) && Date.parse(row.event.expires_at) > now() && (row.attempts < EVENT_OUTBOX_MAX_ATTEMPTS || inFlight(state.scope, row))).map(row => row.event));
   }
   return { enqueue, flush, clear, pendingEntries, invalidateSession, status };
 }
