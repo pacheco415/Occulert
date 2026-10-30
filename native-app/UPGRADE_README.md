@@ -73,7 +73,12 @@ submission receipts before updating distribution status.
 
 ## Upgrading Expo SDK
 
-The current source targets Expo SDK 58, React Native 0.88.0 and React 19.3.0.
+The current source targets Expo SDK 58, React Native 0.88.1 and React 19.3.0.
+The October 29 compatibility review follows [Expo 58.0.21's React Native patch](https://github.com/expo/expo/releases/tag/expo@58.0.21)
+and the current SDK 58 compatibility map. The published JSI initialization hook,
+CallInvoker and TurboModule manager sources match 0.88.0; the exact camera patch
+guard was reviewed for 0.88.1. This dependency graph requires fresh native,
+archive/export and simulator evidence; earlier build proofs remain historical.
 React DOM and the test renderer stay on the same React version. The production
 EAS `sdk-58` image selects Xcode 27.1. A new TestFlight binary and the exact-build
 checks in `docs/DEVICE_ACCEPTANCE.md` are required before this source is used in
@@ -103,6 +108,11 @@ exclusions or relabel an iOS device binary as a simulator binary. Scene generati
 and an unsigned iPhone SDK compile are separate evidence from simulator launch,
 camera behavior or physical-device acceptance. No Duo support or accuracy claim
 follows from prebuild or unit tests.
+
+For arm64 simulator layout and scoring checks, use the separate
+[Simulator Trace profile](docs/SIMULATOR_TRACE.md). It omits ML Kit, displays a
+synthetic-input banner and feeds the real scoring path with a bundled trace.
+It does not establish simulator camera or physical-device detection support.
 
 Use one planned `codex/` branch for each SDK upgrade. Review the target SDK's
 release notes and the camera, face detector, worklets and custom Watch module

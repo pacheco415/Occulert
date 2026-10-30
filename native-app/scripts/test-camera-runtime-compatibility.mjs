@@ -20,7 +20,7 @@ const installerPath = 'react-native-vision-camera/ios/FrameProcessors/VisionCame
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'occulert-camera-compatibility-'));
   const put = (path, content) => { const target = join(root, 'node_modules', path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, content); return target; };
-  put('react-native/package.json', JSON.stringify({ version: '0.88.0' }));
+  put('react-native/package.json', JSON.stringify({ version: '0.88.1' }));
   put('react-native-worklets-core/package.json', JSON.stringify({ version: '1.6.3' }));
   put('react-native-vision-camera/package.json', JSON.stringify({ version: '4.7.3' }));
   put(hookPath, '- (void)installJSIBindingsWithRuntime:(Runtime&)runtime callInvoker:(Invoker&)callInvoker;');
@@ -47,7 +47,8 @@ test('the patch pins published source bytes and is atomic on unknown inputs and 
 
 test('unreviewed dependency versions and changed RN hooks fail before patching', () => {
   for (const [path, value] of [
-    ['react-native/package.json', JSON.stringify({ version: '0.88.1' })],
+    ['react-native/package.json', JSON.stringify({ version: '0.88.0' })],
+    ['react-native/package.json', JSON.stringify({ version: '0.88.2' })],
     ['react-native-worklets-core/package.json', JSON.stringify({ version: '1.6.4' })],
     ['react-native-vision-camera/package.json', JSON.stringify({ version: '5.0.0' })],
     [hookPath, '- (void)installJSIBindingsWithRuntime:(Runtime&)runtime;'],
