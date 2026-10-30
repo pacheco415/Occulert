@@ -34,16 +34,23 @@ function commit(value, name) {
 function escapeMarkdown(value) {
   return value.replace(/[\\`*_{}\[\]<>]/g, '\\$&');
 }
+function privateReceipt(value, name) {
+  if (value.visibility !== 'private') return false;
+  if (Object.keys(value).length !== 1) throw new Error(`${name} marked private cannot contain receipt details.`);
+  return true;
+}
 
 export function validateObservations(input) {
   const facts = object(input, 'Observations');
   if (facts.schemaVersion !== 1) throw new Error('Unsupported observations schemaVersion.');
   if (facts.production) {
     const p = object(facts.production, 'Production observation');
-    commit(p.sourceCommit, 'Production source');
-    date(p.createdAt, 'Production deployment date');
-    date(p.observedAt, 'Production observation date');
-    if (p.state !== 'READY' || !/^dpl_[A-Za-z0-9]+$/.test(p.deploymentId)) throw new Error('Production requires an explicit READY deployment receipt.');
+    if (!privateReceipt(p, 'Production observation')) {
+      commit(p.sourceCommit, 'Production source');
+      date(p.createdAt, 'Production deployment date');
+      date(p.observedAt, 'Production observation date');
+      if (p.state !== 'READY' || !/^dpl_[A-Za-z0-9]+$/.test(p.deploymentId)) throw new Error('Production requires an explicit READY deployment receipt.');
+    }
   }
   if (facts.testFlight) {
     const b = object(facts.testFlight, 'TestFlight observation');
@@ -57,11 +64,13 @@ export function validateObservations(input) {
   }
   if (facts.migrations) {
     const m = object(facts.migrations, 'Migration observation');
-    date(m.observedAt, 'Migration observation date');
-    if (m.state !== 'unknown' && m.state !== 'pending' && m.state !== 'ledger_verified') throw new Error('Invalid migration observation state.');
-    line(m.summary, 'Migration summary');
-    if (m.state === 'pending' && (!Array.isArray(m.pendingVersions) || !m.pendingVersions.length || m.pendingVersions.some(v => !/^\d{14}$/.test(v)))) {
-      throw new Error('Pending migrations require their recorded version strings.');
+    if (!privateReceipt(m, 'Migration observation')) {
+      date(m.observedAt, 'Migration observation date');
+      if (m.state !== 'unknown' && m.state !== 'pending' && m.state !== 'ledger_verified') throw new Error('Invalid migration observation state.');
+      line(m.summary, 'Migration summary');
+      if (m.state === 'pending' && (!Array.isArray(m.pendingVersions) || !m.pendingVersions.length || m.pendingVersions.some(v => !/^\d{14}$/.test(v)))) {
+        throw new Error('Pending migrations require their recorded version strings.');
+      }
     }
   }
   return facts;
@@ -112,14 +121,16 @@ export function renderStatus({ git, observations = { schemaVersion: 1 }, pullReq
   const lines = ['# Occulert status', '', 'These are dated snapshots. Source, deployment, build availability and device tests are separate.', '',
     `- Inspected source (${escapeMarkdown(git.ref)}): \`${commit(git.sourceCommit, 'Inspected source')}\`.`,
     `- Source commit date: ${date(git.committedAt, 'Source commit date')}.`, ''];
-  if (facts.production) {
+  if (facts.production?.visibility === 'private') {
+    lines.push('- Production website: Deployment receipts are kept private; no current receipt is published here.');
+  } else if (facts.production) {
     const p = facts.production;
     lines.push(`- Production website: \`${p.sourceCommit}\`.`, `- Deployment: ${p.deploymentId}, READY; created ${p.createdAt}.`, `- Production observation: ${p.observedAt}.`);
   } else lines.push('- Production website: Unknown; no deployment receipt supplied.');
   lines.push('');
   if (facts.testFlight) {
     const b = facts.testFlight;
-    lines.push(`- TestFlight: ${b.version} (${b.buildNumber}); Apple VALID, internal beta available.`, `- TestFlight source: \`${b.sourceCommit}\`.`, `- Build completed: ${b.completedAt}; availability observed ${b.observedAt}.`, `- Physical acceptance for build ${b.buildNumber}: Not recorded.`);
+    lines.push(`- Historical TestFlight receipt: ${b.version} (${b.buildNumber}); observed Apple VALID, internal IN_BETA_TESTING.`, `- TestFlight source: \`${b.sourceCommit}\`.`, `- Build completed: ${b.completedAt}; availability observed ${b.observedAt}.`, '- Current Apple availability, replacement upload and remote build counter: Not checked.', `- Physical acceptance for build ${b.buildNumber}: Not recorded.`);
   } else lines.push('- TestFlight: Unknown; no build receipt supplied.');
   if (git.native.state === 'unchanged') lines.push('- Native changes waiting for a build: None in the inspected source; pending PRs are separate.');
   else if (git.native.state === 'changed') {
@@ -129,19 +140,21 @@ export function renderStatus({ git, observations = { schemaVersion: 1 }, pullReq
   } else lines.push(`- Native changes waiting for a build: Unknown. ${escapeMarkdown(line(git.native.reason, 'Native comparison reason'))}`);
   lines.push('');
   lines.push(prs ? `- Open PRs (${prs.observedAt}): ${prs.total} total; ${prs.codex} Codex, ${prs.dependabot} Dependabot, ${prs.other} other; ${prs.draft} draft.` : '- Open PRs: Unknown; no complete dated snapshot supplied.');
-  if (facts.migrations) {
+  if (facts.migrations?.visibility === 'private') {
+    lines.push('- Production migrations: Operational receipts are kept private; no ledger or access-control details are published here.');
+  } else if (facts.migrations) {
     const m = facts.migrations;
     lines.push(`- Production migrations (${m.observedAt}): ${m.state.replaceAll('_', ' ')}. ${escapeMarkdown(m.summary)}`);
     if (m.state === 'pending') lines.push(`- Recorded pending versions: ${m.pendingVersions.join(', ')}.`);
   } else lines.push('- Production migrations: Unknown; Git files do not establish a deployed schema.');
   lines.push('', 'Next steps:', '',
     '1. Finish current-source checks for the remaining reviewed PRs and compose them against current main.',
-    '2. Complete native release notes and the device checklist for the inspected source; do not start a build here.',
+    '2. Review the native release intent and exact-build device checklist for the inspected source; a build remains a separate action.',
     '3. Record parked iPhone Silent-mode Safari/PWA alerts, Watch delivery and exact-build device checks.',
-    '4. Read the production migration ledger and confirm definitions before enabling PRs #192 and #206.',
+    '4. Keep production receipts private; review deployment prerequisites and the separate #206 decision before enabling dependent features.',
     '5. Review remaining security and consent changes, then benchmark parked detector flags before changing released alerts.', '',
     'Refresh the Git facts with `npm run status -- --write` in a current full-history checkout.',
-    'Supply dated service receipts in `docs/status-observations.json` and a complete PR snapshot in',
+    'Supply only approved public snapshots in `docs/status-observations.json` and a complete PR snapshot in',
     '`docs/status-pull-requests.json`; optional `--observations FILE`, `--pull-requests FILE` and `--ref REF` override them.',
     'The tool performs no network requests, deployments, builds, database changes or external writes.',
     'See [product scope and evidence rules](APP_ROADMAP.md) and [earlier records](archive/APP_ROADMAP_2026-09-28.md).');
