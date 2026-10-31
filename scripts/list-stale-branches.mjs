@@ -5,12 +5,57 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 
 const defaultRepository = 'pacheco415/Occulert';
+const abandonedAfterMs = 45 * 24 * 60 * 60 * 1000;
 const git = (cwd, ...args) => execFileSync('git', args, {
   cwd, encoding: 'utf8', timeout: 30000, maxBuffer: 8 * 1024 * 1024,
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 const markdown = value => String(value).replaceAll('|', '\\|').replaceAll('\n', ' ').replaceAll('\r', ' ');
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+
+export function olderThan45Days(lastCommitAt, observedAt) {
+  const committed = Date.parse(lastCommitAt);
+  const observed = Date.parse(observedAt);
+  return Number.isFinite(committed) && Number.isFinite(observed)
+    && observed - committed > abandonedAfterMs;
+}
+
+export function branchWorkDiff(cwd, head, main) {
+  try {
+    const bases = git(cwd, 'merge-base', '--all', main, head).trim().split('\n').filter(Boolean);
+    if (bases.length !== 1) return { available: false, reason: 'no unique merge base' };
+    // Disable rename detection so each NUL-delimited record has one literal
+    // path. Renames are counted as a deletion plus an addition, not lost.
+    const entries = git(cwd, 'diff', '--no-renames', '--numstat', '-z', bases[0], head, '--')
+      .split('\0').filter(Boolean);
+    const result = { available: true, base: bases[0], changedPaths: entries.length,
+      insertions: 0, deletions: 0, binaryPaths: 0, zeroLinePaths: 0 };
+    for (const entry of entries) {
+      const match = /^(\d+|-)\t(\d+|-)\t([\s\S]+)$/.exec(entry);
+      if (!match || (match[1] === '-') !== (match[2] === '-')) throw new Error('Malformed numstat');
+      if (match[1] === '-') result.binaryPaths++;
+      else {
+        const added = Number(match[1]);
+        const removed = Number(match[2]);
+        if (!Number.isSafeInteger(added) || !Number.isSafeInteger(removed)) throw new Error('Invalid line count');
+        result.insertions += added;
+        result.deletions += removed;
+        if (!added && !removed) result.zeroLinePaths++;
+      }
+    }
+    return result;
+  } catch {
+    return { available: false, reason: 'Git analysis failed' };
+  }
+}
+
+function renderBranchDiff(diff) {
+  if (!diff?.available) return `unavailable: ${diff?.reason || 'not analyzed'}`;
+  const paths = (count, kind) => `${count} ${kind} path${count === 1 ? '' : 's'}`;
+  return `${paths(diff.changedPaths, 'changed')}; +${diff.insertions}/-${diff.deletions} text lines`
+    + (diff.binaryPaths ? `; ${paths(diff.binaryPaths, 'binary')}` : '')
+    + (diff.zeroLinePaths ? `; ${paths(diff.zeroLinePaths, 'zero-line')}` : '');
+}
 
 export function validatePullRequestSnapshot(snapshot, repository) {
   if (snapshot?.schemaVersion !== 1 || snapshot.complete !== true
@@ -76,6 +121,7 @@ function containment(cwd, head, main) {
 export function collectInventory({ cwd = process.cwd(), repository = defaultRepository,
   prSnapshot = null, observedAt = new Date().toISOString() } = {}) {
   if (prSnapshot) validatePullRequestSnapshot(prSnapshot, repository);
+  if (!Number.isFinite(Date.parse(observedAt))) throw new Error('A valid inventory observation time is required.');
   // Analyze captured immutable SHAs even if a concurrent fetch moves a ref.
   const main = git(cwd, 'rev-parse', '--verify', 'refs/remotes/origin/main^{commit}').trim();
   const refs = git(cwd, 'for-each-ref', '--format=%(refname)%00%(objectname)%00%(committerdate:iso-strict)',
@@ -88,7 +134,9 @@ export function collectInventory({ cwd = process.cwd(), repository = defaultRepo
         (pr.headRepository === null || pr.headRepository.toLowerCase() === repository.toLowerCase())
           && pr.headRefName === branch);
       const evidence = containment(cwd, head, main);
-      return { branch, head, date, evidence, openPrs,
+      const abandoned = Boolean(prSnapshot) && !openPrs.length && olderThan45Days(date, observedAt);
+      return { branch, head, date, evidence, openPrs, abandoned,
+        netDiff: abandoned ? branchWorkDiff(cwd, head, main) : null,
         // Snapshot equivalence may still hide unique commits. Only proven
         // ancestry with complete open-PR metadata gets a review proposal.
         proposed: Boolean(prSnapshot) && !openPrs.length && evidence === 'merged ancestry' };
@@ -98,12 +146,13 @@ export function collectInventory({ cwd = process.cwd(), repository = defaultRepo
 
 export function renderInventory({ repository, main, observedAt, prSnapshot, records }) {
   const proposed = records.filter(row => row.proposed);
+  const abandoned = records.filter(row => row.abandoned);
   const table = [
     '# Remote branch inventory', '',
     `Observed: ${observedAt}. Base: \`${main}\` (fetched origin/main).`, '',
-    `Remote branches other than main: **${records.length}**. Commented review proposals: **${proposed.length}**.`, '',
+    `Remote branches other than main: **${records.length}**. Commented merged-branch review proposals: **${proposed.length}**. Abandoned review flags: **${abandoned.length}**.`, '',
     prSnapshot ? `Open PR snapshot: ${prSnapshot.capturedAt}; ${prSnapshot.pullRequests.length} open PRs, complete pagination. See [snapshot](open-pull-requests.json).`
-      : 'Open PR membership is unavailable. No deletion proposals are generated.', '',
+      : 'Open PR membership is unavailable. No deletion proposals or abandoned review flags are generated.', '',
     '`merged ancestry` means every branch commit is reachable from captured main, even if main later edited its files. '
       + '`matching change snapshot` means the branch\'s net changed paths equal main (including modes and deletions); unique history may remain, so it gets no deletion proposal. '
       + '`not proven` includes divergent files, ambiguous ancestry and Git errors.', '',
@@ -118,9 +167,25 @@ export function renderInventory({ repository, main, observedAt, prSnapshot, reco
     '# Without GitHub CLI: supply a fresh complete connector snapshot explicitly.',
     'node scripts/list-stale-branches.mjs --github --github-snapshot=docs/branch-inventory/open-pull-requests.json --output=docs/branch-inventory',
     '```', '',
+    '## Abandoned review', '',
+    'A branch is flagged when it has no open PR in the complete snapshot and its last commit is strictly more than 45 days old at the observation time. '
+      + 'Exactly 45 days, future or invalid dates, and missing PR metadata do not qualify. '
+      + 'This review category may overlap merged ancestry; age does not prove that work is merged or disposable. '
+      + 'Only proven merged ancestry can appear in the commented deletion proposal.', '',
+    'Net branch changes compare the unique merge base of captured main and head with that head, not the full difference from today\'s main. '
+      + 'An ancestor head therefore has zero net branch changes even when main later edited its files. '
+      + 'Changed-path counts include additions, deletions, binary files and mode-only changes; renames count as a deletion and addition. '
+      + 'Text-line totals exclude binary contents. Zero-line paths include mode-only changes and empty-file changes. '
+      + 'An unavailable comparison is not containment evidence.', '',
+    ...(abandoned.length ? [
+      '| Branch | Last commit | Containment evidence | Net branch changes |',
+      '| --- | --- | --- | --- |',
+      ...abandoned.map(row => `| ${markdown(row.branch)} | ${row.date} | ${row.evidence} | ${renderBranchDiff(row.netDiff)} |`),
+    ] : [prSnapshot ? 'No fetched branch meets the abandoned-review criteria.' : 'Abandoned review is unavailable without complete open-PR metadata.']), '',
+    '## All remote branches', '',
     '| Branch | Captured head | Last commit | Containment evidence | Open PRs | Review proposal |',
     '| --- | --- | --- | --- | --- | --- |',
-    ...records.map(row => `| ${markdown(row.branch)} | [${row.head.slice(0, 12)}](https://github.com/${repository}/commit/${row.head}) | ${row.date} | ${row.evidence} | ${row.openPrs.map(pr => `[#${pr.number}](${pr.url})`).join(', ') || (prSnapshot ? 'none' : 'unknown')} | ${row.openPrs.length ? 'keep: open PR' : row.proposed ? 'review merged branch' : 'keep / inspect'} |`), '',
+    ...records.map(row => `| ${markdown(row.branch)} | [${row.head.slice(0, 12)}](https://github.com/${repository}/commit/${row.head}) | ${row.date} | ${row.evidence} | ${row.openPrs.map(pr => `[#${pr.number}](${pr.url})`).join(', ') || (prSnapshot ? 'none' : 'unknown')} | ${row.openPrs.length ? 'keep: open PR' : row.proposed ? 'review merged branch' : row.abandoned ? 'inspect: abandoned' : 'keep / inspect'} |`), '',
   ].join('\n');
   const proposal = [
     '#!/bin/sh', '# REVIEW ONLY: every command is commented; running this file does nothing.',
@@ -152,7 +217,7 @@ export function main(args = process.argv.slice(2)) {
   writeFileSync(resolve(output, 'stale-branches.md'), table);
   writeFileSync(resolve(output, 'proposed-branch-deletions.sh'), proposal);
   if (prSnapshot) writeFileSync(resolve(output, 'open-pull-requests.json'), JSON.stringify(prSnapshot, null, 2) + '\n');
-  console.log(`Reviewed ${inventory.records.length} remote branches; ${inventory.records.filter(row => row.proposed).length} merged branches proposed as comments only. Wrote ${output}.`);
+  console.log(`Reviewed ${inventory.records.length} remote branches; ${inventory.records.filter(row => row.proposed).length} merged branches proposed as comments only; ${inventory.records.filter(row => row.abandoned).length} abandoned review flags. Wrote ${output}.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main();
