@@ -496,7 +496,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   const deleted = [];
   let skipped = false;
   const cache = {
-    add: async url => {
+    put: async url => {
       url = typeof url === 'string' ? url : new URL(url.url).pathname;
       if (url === `/${assetByStem('driver-app.js')}`) throw new Error('transient detector download failure');
       cached.add(url);
@@ -504,6 +504,11 @@ test('service-worker install cannot replace a usable cache without its detector'
     match: async url => cached.has(url) ? { ok: true } : null,
   };
   const context = {
+    AbortController, setTimeout, clearTimeout, Response,
+    fetch: async request => {
+      if (new URL(request.url).pathname === `/${assetByStem('driver-app.js')}`) throw new Error('transient detector download failure');
+      return new Response('verified fixture bytes');
+    },
     URL,
     Request,
     Promise,
