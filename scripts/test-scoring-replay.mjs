@@ -79,3 +79,56 @@ test('reusing a supported output for an unavailable trace fails without replacin
         assert.deepEqual(readdirSync(unsupported),['replay-manifest.json']);
     } finally {rmSync(parent,{recursive:true,force:true});}
 });
+
+// Independent coordinate specification: do not derive expectations from the
+// browser initializer or use its generator for the released oracle comparison.
+function referenceBrowserLandmarks(frame) {
+    if (!frame.hasFace) return null;
+    const points = Array.from({length:468},()=>({x:0.5,y:0.5}));
+    const h = frame.ear * 0.05;
+    const eyes = [
+        [362,.62-.05,.5],[385,.62-.02,.5-h],[387,.62+.02,.5-h],
+        [263,.62+.05,.5],[373,.62+.02,.5+h],[380,.62-.02,.5+h],
+        [33,.38-.05,.5],[160,.38-.02,.5-h],[158,.38+.02,.5-h],
+        [133,.38+.05,.5],[153,.38+.02,.5+h],[144,.38-.02,.5+h],
+    ];
+    for (const [index,x,y] of eyes) points[index]={x,y};
+    points[4]={x:frame.turned ? .8 : .5,y:frame.noseY ?? .55};
+    points[234]={x:.25,y:.6};points[454]={x:.75,y:.6};
+    return points;
+}
+
+test('compact browser scoring transport preserves every landmark at every original frame rate', async () => {
+    const {runInNewContext} = await import('node:vm');
+    const {landmarks,scoringGeometryInitScript} = await import('../tests/helpers/scoring-replay-geometry.mjs');
+    const browser={};runInNewContext(scoringGeometryInitScript,browser);
+    const {parse}=await import('acorn');
+    const source=readFileSync(new URL('../tests/scoring-replay.spec.mjs',import.meta.url),'utf8');
+    const declaration=parse(source,{ecmaVersion:2022,sourceType:'module'}).body.find(node=>node.type==='FunctionDeclaration'&&node.id.name==='runBrowserTrace');
+    assert.ok(declaration,'exercise the actual Playwright transport function');
+    const transportContext={landmarks,initialScoringState:()=>({}),fields:[],SCORING_EPOCH:0};
+    runInNewContext(source.slice(declaration.start,declaration.end),transportContext);
+    for (const fps of [3,7,15]) {
+        const frames=syntheticScoringTrace(fps);
+        const payload=await transportContext.runBrowserTrace({evaluate:(_callback,input)=>input},frames,false);
+        const transport=JSON.parse(JSON.stringify(payload.frames));
+        assert.equal(transport.length,100*fps+1);
+        assert.equal(Object.hasOwn(transport[0],'landmarks'),false,'transfer scalar frames, not expanded geometry');
+        assert.deepEqual(transport,frames,'scalar transport preserves every observation and timestamp');
+        for (const frame of transport) {
+            const expected=referenceBrowserLandmarks(frame);
+            assert.deepEqual(landmarks(frame),expected);
+            assert.deepEqual(JSON.parse(JSON.stringify(browser.__scoringReplayLandmarks(frame))),expected);
+        }
+        const expanded=frames.map(frame=>({atMs:frame.atMs,landmarks:referenceBrowserLandmarks(frame)}));
+        assert.ok(Buffer.byteLength(JSON.stringify(transport)) < Buffer.byteLength(JSON.stringify(expanded))/50,
+            'wire payload must avoid hundreds of expanded point objects per frame');
+    }
+    for (const frame of [{hasFace:false},{hasFace:true,ear:0,turned:true,noseY:0},{hasFace:true,ear:.37,noseY:.61}]) {
+        assert.deepEqual(JSON.parse(JSON.stringify(browser.__scoringReplayLandmarks(frame))),referenceBrowserLandmarks(frame));
+    }
+    const frame={hasFace:true,ear:.3},a=browser.__scoringReplayLandmarks(frame),b=browser.__scoringReplayLandmarks(frame);
+    a[0].x=99;
+    assert.equal(a[1].x,.5,'points must not alias');
+    assert.equal(b[0].x,.5,'frames must not share mutable geometry');
+});
