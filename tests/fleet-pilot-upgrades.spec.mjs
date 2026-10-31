@@ -35,29 +35,52 @@ function completePeriodReport(days) {
   };
 }
 
-test('TV windows filter protected records and retain aggregate privacy in large text', async ({ page }) => {
+test('TV separates in-progress and unfinished records across windows while retaining aggregate privacy in large text', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await ownerSession(page);
   let requests = 0;
   await page.route('**/api/fleet-summary*', route => {
     requests += 1;
     expect(new URL(route.request().url()).searchParams.get('include_events')).toBe('0');
     return route.fulfill({ json: protectedSummary([
-      session('recent', 2), session('older', 10), session('future', -1),
-      { ...session('invalid', 2), started_at: 'not-a-date' },
+      session('recent', 2), session('older', 10),
+      { ...session('fresh-open', 1 / 24), ended_at: null },
+      { ...session('older-open', 13 / 24), ended_at: null },
+      { ...session('outside-window-open', 40), ended_at: null },
+      { ...session('future', -1), ended_at: null },
+      { ...session('invalid', 2), started_at: 'not-a-date', ended_at: null },
     ]) });
   });
   await page.goto('/fleet-display.html');
   await expect(page.locator('#displayContent')).toBeVisible();
-  await expect(page.locator('#recentSessions')).toHaveText('2');
+  await expect(page.locator('#recentSessions')).toHaveText('4');
+  await expect(page.locator('#activeSessions')).toHaveText('1');
+  await expect(page.locator('#unfinishedSessions')).toHaveText('2');
+  await expect(page.locator('#pulseNow')).toHaveText('1');
+  await expect(page.locator('.live-card')).toContainText('Sessions in progress');
+  await expect(page.locator('.live-card')).toContainText('started within 12 hours');
+  await expect(page.locator('#unfinishedSessions').locator('..')).toContainText('started over 12 hours ago');
+  await expect(page.locator('#summaryScope')).toContainText('live device monitoring is not verified');
+  await expect(page.locator('.metric-card')).toHaveCount(5);
   await page.locator('#windowDays').selectOption('7');
-  await expect(page.locator('#recentSessions')).toHaveText('1');
+  await expect(page.locator('#recentSessions')).toHaveText('3');
   await expect(page.locator('#sessionWindowLabel')).toContainText('7');
+  await expect(page.locator('#activeSessions')).toHaveText('1');
+  await expect(page.locator('#unfinishedSessions')).toHaveText('2');
+  await expect(page.locator('#pulseNow')).toHaveText('1');
+  await page.locator('#windowDays').selectOption('30');
+  await expect(page.locator('#recentSessions')).toHaveText('4');
+  await expect(page.locator('#activeSessions')).toHaveText('1');
+  await expect(page.locator('#unfinishedSessions')).toHaveText('2');
   expect(requests).toBe(1);
   await page.locator('#largeTextButton').click();
   await expect(page.locator('#largeTextButton')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('html')).toHaveAttribute('data-display-size', 'large');
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  for (const [width, columns] of [[1920, 5], [960, 2], [390, 1]]) {
+    await page.setViewportSize({ width, height: 1080 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    expect(await page.locator('.metric-grid').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(columns);
+  }
   const content = await page.locator('#displayContent').innerText();
   expect(content).not.toContain('Private Driver');
   expect(content).not.toContain('Private Vehicle');
@@ -67,6 +90,9 @@ test('TV windows filter protected records and retain aggregate privacy in large 
   });
   await expect(page.locator('#displayContent')).toBeHidden();
   await expect(page.locator('#emptyTitle')).toHaveText('Fleet owner sign-in required');
+  await expect(page.locator('#activeSessions')).toHaveText('0');
+  await expect(page.locator('#unfinishedSessions')).toHaveText('0');
+  await expect(page.locator('#pulseNow')).toHaveText('0');
 });
 
 test('TV labels a full latest-50 response as limited history', async ({ page }) => {
