@@ -64,14 +64,30 @@ password, then register a new passkey from Account Settings. Email/password and
 the privacy-safe reset-link flow remain available for recovery. If the
 experimental provider is disabled, those existing methods continue to work.
 
-### Event identity and quotas (disabled)
+### Default API quotas and optional event identity
 
-The optional `OCCULERT_EVENT_IDEMPOTENCY_ENABLED=true` route requires the
-reviewed migration and rollout gates in [docs/EVENT_IDEMPOTENCY.md](docs/EVENT_IDEMPOTENCY.md).
-Leave it off until schema/permission and multi-connection acceptance are verified.
-Turning it on also enables 60 accepted events/minute/user and 500/session quotas
-for legacy clients. It does not enable the web/native retry outbox. Do not also
-apply the overlapping unmerged PR #192 quota migration.
+The default, unkeyed event route uses the existing service-only
+`record_idempotent_event` function with a null client key. It shares the keyed
+route's 60 accepted events per user per 60-second window and 500 per session
+limits without enabling idempotent delivery. New session starts have a separate
+30-accepted-start limit per user per server-timed one-hour window; owned UUID
+replays do not spend another quota unit. See [the quota contract](docs/LEGACY_API_QUOTAS.md)
+for response, concurrency and rollout details.
+
+**Apply and verify database prerequisites before deploying these routes:**
+
+1. Verify the already-canonical `20261026164040_atomic_event_idempotency.sql`
+   definitions and grants. Do not replay a migration already applied to the
+   project, or apply the overlapping unmerged PR #192 quota migration.
+2. Apply `20261031192453_session_start_quota.sql` once, with production approval,
+   and verify its service-only function, quota-table grants, RLS and cascade.
+3. Deploy only after both prerequisites are independently verified. Missing
+   functions fail closed; the API never falls back to unbounded direct inserts.
+
+`OCCULERT_EVENT_IDEMPOTENCY_ENABLED` remains off by default. Its separate
+[event identity rollout gates](docs/EVENT_IDEMPOTENCY.md) still apply; changing
+that flag does not enable the web/native retry outbox. Once the quota routes
+are deployed, keeping the flag off does not disable their unkeyed event limits.
 
 ## 2. Collect your keys
 
@@ -245,7 +261,7 @@ These statuses do not authorize automatic mutation retries.
 
 `POST /api/sessions` accepts an optional client-generated UUID in `session_id`. The server stores it as the existing session primary key and derives driver and fleet identity from the authenticated profile. Repeating that UUID returns the original owned session, including its original timestamps, provenance, historical fleet and any completed summary. A competing insert is reconciled by an owner-scoped read; a UUID occupied by another driver's session returns `409 session_id_conflict` without exposing the other row. Invalid supplied IDs return `400 invalid_session_id`. Omitting the field preserves server-generated IDs.
 
-Successful responses advertise `session_start_protocol: "client_uuid_v1"`. This server change does not enable automatic client retries or persist start intents. Clients must establish deployment support before retrying starts: older deployments ignore the supplied UUID and would create duplicates. Database exceptions other than UUID conflicts remain failures; the server never retries an insert automatically. No new migration is required.
+Successful responses advertise `session_start_protocol: "client_uuid_v1"`. This server change does not enable automatic client retries or persist start intents. Clients must establish deployment support before retrying starts: older deployments ignore the supplied UUID and would create duplicates. Database exceptions other than UUID conflicts remain failures; the server never retries an insert automatically. The atomic quota-backed start path additionally requires the session-start migration and verification described in [default API quotas](docs/LEGACY_API_QUOTAS.md).
 
 ## Optional stored-lead notification
 
