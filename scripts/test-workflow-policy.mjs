@@ -155,7 +155,9 @@ test('real event concurrency job is isolated, bounded and never uses production 
   assert.match(harness, /host:root/);
   assert.match(harness, /pg_blocking_pids/);
   assert.doesNotMatch(harness, /await sleep\(100\)|pg_sleep/);
-  assert.match(harness, /assert.equal\(scenarios.length,6\)/);
+  assert.match(harness, /assert.equal\(scenarios.length,12\)/);
+  assert.match(harness, /runSessionStartQuotaConcurrency\(\{admin,worker,connect,waitFor,pass\}\)/);
+  assert.match(harness, /sessionStartQuotaMigrationSha256/);
   assert.match(harness, /status:'passed'/);
   const manifest = JSON.parse(read('./event-concurrency-runtime/package.json'));
   const lock = JSON.parse(read('./event-concurrency-runtime/package-lock.json'));

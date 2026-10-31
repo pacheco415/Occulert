@@ -10,6 +10,14 @@ The September 27 period-report/billing migrations, September 29 webhook migratio
 
 ## Explicit grants for new tables
 
+The default API quota source additionally requires the existing
+`20261026164040_atomic_event_idempotency.sql` definitions and new
+`20261031192453_session_start_quota.sql`. Verify the former rather than replaying
+it on an existing project; the latter requires separate approval, application and
+definition/grant/RLS/foreign-key verification before dependent API deployment.
+See [the quota deployment order](LEGACY_API_QUOTAS.md#required-deployment-order).
+This source inventory does not record production application or authorize it.
+
 Supabase applies its "tables not exposed automatically" change to existing projects on 2026-10-30. From then on, a new table or sequence in `public` gets no default privileges for `anon`, `authenticated` or `service_role`. Tables that already exist keep their grants. Every table or sequence a migration after the baseline creates must therefore grant `service_role` explicitly and enable RLS. `npm run test:migration-grants` enforces both in source and checks the replayed PGlite privileges, where roles have no default grants. Reference: [Supabase changelog](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically).
 
 ## Optional read-only database observation

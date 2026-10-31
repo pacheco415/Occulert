@@ -1,8 +1,10 @@
 # Alert timing: stored-time semantics and regression safeguards
 
-Reviewed against main `fdc2d0b0cfc294e017d96d75b3e5ac3a89a9d369` on 2026-10-29.
-This change adds tests and documentation only. It does not change timestamp
-acceptance, runtime behavior, retry policy, rollout flags, schema, or collection.
+Originally reviewed against main `fdc2d0b0cfc294e017d96d75b3e5ac3a89a9d369`
+on 2026-10-29 with tests and documentation only. The October 31 quota integration
+routes unkeyed events through the existing SQL acceptance function as well and
+assigns new session start time in its atomic SQL operation. It preserves the
+timestamp bounds, mixed-time meaning, client retry policies and rollout flags.
 Source inspection does not establish which flags are enabled in production or
 which native build is installed.
 
@@ -24,11 +26,12 @@ enable the merged behavior. PR #315 is not the implementation basis here.
 
 ## What the server stores
 
-`api/sessions.js` assigns `started_at` using server time after asynchronous
-identity/profile/session work. An alert detected while that work is pending can
-precede server session start even when client and server clocks agree.
+`api/sessions.js` obtains `started_at` from the server-side atomic start function
+after asynchronous identity/profile work and database locking. An alert detected
+while that work is pending can precede server session start even when client and
+server clocks agree.
 
-Both `api/events.js` and the gated `record_idempotent_event` RPC enforce:
+`api/events.js` and the shared `record_idempotent_event` RPC enforce:
 
 ```
 started_at <= explicit occurred_at <= min(server now, ended_at when present)
