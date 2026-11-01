@@ -1,6 +1,7 @@
 interface BrowserAudioSession { type: string; }
 interface Navigator { readonly audioSession?: BrowserAudioSession; }
-interface Window { webkitAudioContext?: typeof AudioContext; }
+interface Window {
+    OcculertDriverI18n?: { get(key: string, params?: object): unknown }; webkitAudioContext?: typeof AudioContext; }
 declare const FaceMesh: {
   new(options: {locateFile: (file: string) => string}): import('./detector.js').LegacyDetector;
 } | undefined;

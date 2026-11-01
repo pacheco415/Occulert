@@ -25,8 +25,51 @@ keeps voice actions uninitialized until the entry restores their preference.
 Browser spoken cues use the shared alerts helper with explicit `en-US` language,
 independent of the device's preferred language. Existing English alert, tracking,
 camera, detector and rest-stop wording stays unchanged. Translated voice and
-safety wording requires fluent human review; this step does not expand screen
-translation coverage.
+safety wording requires fluent human review.
+
+The separately pinned copy source `src/driver-i18n.js` owns 88 ordinary keys in
+English, Spanish, French, Portuguese, German, Arabic, Chinese and Japanese. Its
+299-key English source also records 211 protected English entries, including the
+language notice. `uiText` in the core publishes explicit keys and parameters for
+current start, voice, feedback-validation and generated camera-caption states.
+It also reads the keyed optional catalog at call time, accepts only nonempty
+string results and catches missing, malformed or throwing APIs, keeping its exact
+English fallback.
+Static selectors bind ordinary headings, controls, accessible names and metric
+labels; the external overview source publishes its own current state metadata.
+The optional renderer never reverse-matches English phrases, translates device
+names, reads user data as copy, or changes input values or numeric formatting.
+In particular, PERCLOS digits and `%` remain ASCII because fleet telemetry reads
+them back. The report formatter, event selection, thresholds and all voice cues
+are unchanged.
+
+The parked eight-language picker keeps its selection in memory if storage is
+unavailable. Arabic sets page RTL; ordinary fields carry their chosen language
+and protected English text retains `lang="en" dir="ltr"`. Driver-owned markup is
+excluded from the legacy language observer, whose other-page behavior remains.
+After the base load event, a non-English selection makes the language adapter
+clone an inert HTML template
+containing the catalog's versioned URL, SHA-256 SRI and anonymous CORS attribute.
+English startup does not fetch it. Missing, corrupt or delayed catalog bytes
+leave the original English controls usable. Late arrival renders current keys;
+a direct English-only replacement invalidates any older ordinary binding. Native
+controls carry the language of their associated ordinary names without changing
+range direction or raw input values. Numeric overview recovery restores English/LTR
+ownership. The observer ignores raw frame metrics, log entries and unrelated
+English guidance instead of sweeping static bindings on each camera frame.
+Both original chart initialization calls finish before an initially stalled
+catalog fetch. The catalog joins only the integrity-verified optional worker path, outside the
+default install and critical startup lists. It is never a readiness prerequisite.
+
+Language, overview and guard now have registered copy-mode source as well. They
+were registered byte-for-byte before editing and released with the compiled
+core and new catalog in one explicit initial-copy transaction. Leading
+indentation outside JavaScript strings/template segments was removed from the
+legacy language source with parsed-program identity proof, funding the adapter
+without raising the 126,000-byte core ceiling or 375,000-byte static-list budget.
+`test:driver-startup` includes catalog parity/fallback and chart scheduling
+proofs; `tests/driver-i18n.spec.mjs` exercises Spanish/Arabic, late or failed
+loading, denied storage, raw telemetry and repeated language changes.
 
 `npm run build` compiles the actual source graph into ignored `build/driver-app.js`
 and a provenance receipt. Pinned esbuild creates a single classic-script compatible

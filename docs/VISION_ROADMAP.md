@@ -51,7 +51,7 @@ Build on these. Do not rebuild them.
 
 | Capability | Where | Recorded state |
 |---|---|---|
-| Browser/PWA monitoring in 8 languages | `src/`, `app.html`, `lang.v47.js` | Shipped web |
+| Ordinary browser/PWA driver UI in 8 languages | `src/driver-i18n.js`, `src/ui.js`, `src/alerts.js`, `app.html` | Keyed ordinary controls/statuses; safety, voice, consent and recovery guidance remain English pending fluent review |
 | Native eye probability and PERCLOS | `native-app/hooks/useEyeTracking.ts`, `native-app/hooks/useMonitorAnalysis.ts` | Implemented source; historical build-56 availability is separate |
 | Phone alert ladder (600 ms closed-eye confirmation; critical eligibility after warmup) | `native-app/constants/thresholds.ts`, `native-app/lib/alertPolicy.ts`, `native-app/lib/alertDelivery.ts` | Implemented source; critical also depends on session warmup and closure/PERCLOS rules, not a guaranteed 1.2 s alert |
 | Watch companion with bounded haptics and Time Sensitive notification path | `native-app/targets/occulert-watch/AlertReceiver.swift`, `native-app/lib/watchBridge.ts` | Implemented source; earlier build-52 user reports stay with that build |

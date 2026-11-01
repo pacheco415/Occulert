@@ -10,7 +10,7 @@ import { onResults } from "./metrics.js";
 import { tone, speak } from "./alerts.js";
 import "./storage-history.js";
 import "./cloud-sync.js";
-import { experimentFlags, experimentController, experimentGeneration, video, canvas, startBtn, running, stream, detectionResultGeneration, raf, sessionStart, performanceSamples, processedFrames, performanceSessionStart, PROCESS_INTERVAL, DETECTION_INFERENCE_TIMEOUT_MS, DETECTION_CLOSE_TIMEOUT_MS, log, setOverlay, render, showStoppedReason, stop, set_running, set_stream, set_detectionResultGeneration, set_raf, set_calibrating, set_performanceSamples, set_processedFrames, set_performanceSessionStart } from "./ui.js";
+import { uiText, experimentFlags, experimentController, experimentGeneration, video, canvas, startBtn, running, stream, detectionResultGeneration, raf, sessionStart, performanceSamples, processedFrames, performanceSessionStart, PROCESS_INTERVAL, DETECTION_INFERENCE_TIMEOUT_MS, DETECTION_CLOSE_TIMEOUT_MS, log, setOverlay, render, showStoppedReason, stop, set_running, set_stream, set_detectionResultGeneration, set_raf, set_calibrating, set_performanceSamples, set_processedFrames, set_performanceSessionStart } from "./ui.js";
 export let faceMesh = /** @type {LegacyDetector|null} */ (null), faceMeshScriptPromise = /** @type {Promise<void>|null} */ (null), detectionRuntimePromise = /** @type {Promise<boolean>|null} */ (null), processingFrame = false, detectorFailureStopping = false, consecutiveInferenceFailures = 0, lastDetectionResultAt = 0, detectionResultWaiters = /** @type {DetectionWaiter[]} */ ([]), lastFrame = 0, busyFrameSkips = 0;
 export const PERFORMANCE_WINDOW_SIZE = 120, DETECTION_STARTUP_TIMEOUT_MS = 12000, DETECTION_RESULT_TIMEOUT_MS = 6000, MAX_CONSECUTIVE_INFERENCE_FAILURES = 3, FACE_MESH_VERSION = '0.4.1633559619', FACE_MESH_ASSET_BASE = '/vendor/mediapipe/face-mesh-' + FACE_MESH_VERSION + '-occulert.1/', FACE_MESH_SCRIPT_URL = FACE_MESH_ASSET_BASE + 'face_mesh.js', FACE_MESH_GRAPH_URL = FACE_MESH_ASSET_BASE + 'face_mesh.binarypb', FACE_MESH_SCRIPT_INTEGRITY = 'sha384-nKiz5QrpRlMQLw5nrZcprT7N9vmmAcIgV8TuGuep4x91V4JIPsXa+D44Wxj0guoa';
 /** @param {number} durationMs */
@@ -219,7 +219,7 @@ export async function haltForDetectionFailure(cause) {
     consecutiveInferenceFailures = 0;
     detectorFailureStopping = false;
     startBtn.disabled = false;
-    startBtn.textContent = 'START MONITORING';
+    uiText(startBtn, 'start.start', 'START MONITORING');
 }
 /** @param {number} ts @returns {Promise<void>} */
 export async function loop(ts) {

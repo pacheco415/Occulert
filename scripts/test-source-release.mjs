@@ -57,7 +57,7 @@ function fixture(body) {
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 }
 
-function initialCopy(cwd, logical = 'driver-i18n.js', bytes = "const identity={logical:'driver-i18n.js',source:'src/driver-i18n.js'};\n") {
+function initialCopy(cwd, logical = 'fixture-catalog.js', bytes = "const identity={logical:'fixture-catalog.js',source:'src/fixture-catalog.js'};\n") {
   const registry = json(cwd, 'source-assets.json');
   registry.assets[logical] = { source: 'src/' + logical, mode: 'copy' };
   write(cwd, 'source-assets.json', JSON.stringify(registry));
@@ -70,12 +70,129 @@ function initialCopy(cwd, logical = 'driver-i18n.js', bytes = "const identity={l
   return logical;
 }
 
+function committedDriverCatalog(cwd) {
+  initialCopy(cwd, 'driver-i18n.js', 'const catalog=1;\n');
+  write(cwd, 'app.html', read(cwd, 'app.html').replace('<script src="/driver-i18n.js"', '<template id="driverCatalog"><script src="/driver-i18n.js"') + '</template>');
+  write(cwd, 'sw.js', read(cwd, 'sw.js').replace('const INITIAL_ASSETS=', 'const DRIVER_I18N_ASSETS='));
+  run(cwd, '--release', '--init-copy=driver-i18n.js'); commit(cwd);
+}
+
+test('driver catalog subsequent source release composes final owned pins and preserves old bytes', () => {
+  for (const exactFinal of [false, true]) fixture(cwd => {
+    committedDriverCatalog(cwd);
+    const prior = json(cwd, 'asset-integrity.json'), registry = read(cwd, 'source-assets.json');
+    const bytes = 'const catalog=2;\n', pin = sri(bytes), previousPin = sri(read(cwd, 'driver-i18n.v1.js'));
+    write(cwd, 'src/driver-i18n.js', bytes);
+    write(cwd, 'src/utility.js', 'const utility=2;\n');
+    if (exactFinal) {
+      write(cwd, 'app.html', read(cwd, 'app.html').replace(previousPin, pin));
+      write(cwd, 'sw.js', read(cwd, 'sw.js').replace(previousPin, pin));
+    }
+    write(cwd, 'app.html', read(cwd, 'app.html') + `<p data-unrelated-pin="${previousPin}">Unrelated</p>`);
+    write(cwd, 'sw.js', read(cwd, 'sw.js') + `const unrelatedPin=${JSON.stringify(previousPin)};\n`);
+    const pending = snapshot(cwd), plan = JSON.parse(run(cwd, '--release', '--dry-run'));
+    assert.equal(plan.copies['driver-i18n.v1.js'], 'driver-i18n.v2.js');
+    assert.deepEqual(snapshot(cwd), pending);
+    run(cwd, '--release');
+    const manifest = json(cwd, 'asset-versions.json');
+    assert.equal(manifest['driver-i18n.js'], 'driver-i18n.v2.js');
+    assert.equal(read(cwd, manifest['driver-i18n.js']), bytes);
+    assert.ok(read(cwd, 'app.html').includes(`<template id="driverCatalog"><script src="/driver-i18n.v2.js" data-source="src/driver-i18n.js" integrity="${pin}"`));
+    assert.ok(read(cwd, 'sw.js').includes(`const DRIVER_I18N_ASSETS=[{url:'/driver-i18n.v2.js',integrity:${JSON.stringify(pin)}}]`));
+    assert.ok(read(cwd, 'app.html').includes(`data-unrelated-pin="${previousPin}"`));
+    assert.ok(read(cwd, 'sw.js').includes(`const unrelatedPin=${JSON.stringify(previousPin)}`));
+    assert.equal(read(cwd, 'source-assets.json'), registry);
+    assert.match(read(cwd, manifest['driver-app.js']), /utility\.v2\.js/);
+    assert.equal(json(cwd, 'asset-integrity.json')[manifest['driver-i18n.js']], sha(bytes));
+    for (const [name, digest] of Object.entries(prior)) assert.equal(sha(readFileSync(join(cwd, name))), digest);
+    assert.equal(auditSourceAssets(cwd).length, 3);
+    commit(cwd); const finished = snapshot(cwd);
+    assert.equal(JSON.parse(run(cwd, '--release')).noOp, true);
+    assert.deepEqual(snapshot(cwd), finished);
+  });
+});
+
+test('driver catalog unpublished refresh updates owned pins and source without touching old bytes', () => fixture(cwd => {
+  committedDriverCatalog(cwd);
+  const prior = json(cwd, 'asset-integrity.json');
+  run(cwd, 'driver-i18n.js');
+  const name = json(cwd, 'asset-versions.json')['driver-i18n.js'], bytes = 'const catalog=3;\n', pin = sri(bytes);
+  write(cwd, name, bytes);
+  const pending = snapshot(cwd);
+  run(cwd, 'driver-i18n.js', '--refresh', '--dry-run');
+  assert.deepEqual(snapshot(cwd), pending);
+  run(cwd, 'driver-i18n.js', '--refresh');
+  assert.equal(read(cwd, 'src/driver-i18n.js'), bytes);
+  assert.ok(read(cwd, 'app.html').includes(`src="/${name}" data-source="src/driver-i18n.js" integrity="${pin}"`));
+  assert.ok(read(cwd, 'sw.js').includes(`url:'/${name}',integrity:${JSON.stringify(pin)}`));
+  assert.equal(json(cwd, 'asset-integrity.json')[name], sha(bytes));
+  for (const [old, digest] of Object.entries(prior)) assert.equal(sha(readFileSync(join(cwd, old))), digest);
+  assert.equal(auditSourceAssets(cwd).length, 3);
+  commit(cwd); const published = snapshot(cwd);
+  assert.throws(() => run(cwd, 'driver-i18n.js', '--refresh'), /Cannot refresh a published active asset/);
+  assert.deepEqual(snapshot(cwd), published);
+}));
+
+test('driver catalog invalid previous pins and ambiguous ownership reject before release writes', () => {
+  const mutations = [
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace(sri(read(cwd, 'driver-i18n.v1.js')), 'sha256-wrong')),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace(sri(read(cwd, 'driver-i18n.v1.js')), 'sha256-wrong')),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('<template id="driverCatalog">', '<template id="unrelatedCatalog">')),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html') + '<template id="driverCatalog"></template>'),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('<template id="driverCatalog">', '<template><template id="driverCatalog">') + '</template>'),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/driver-i18n.v1.js"', 'src="/utility.v1.js"')),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/driver-i18n.v1.js"', 'src="/driver-i18n.v1.js?extra=1"')),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/driver-i18n.v1.js"', 'src=/driver-i18n.v1.js')),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/driver-i18n.v1.js"', 'src="/driver-i18n.v1.js" src="/other.js"')),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html') + '<script src="/driver-i18n.v1.js"></script>'),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.v1.js'", "url:'/utility.v1.js'")),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.v1.js'", "['url']:'/driver-i18n.v1.js'")),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.v1.js'", "...other,url:'/driver-i18n.v1.js'")),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js') + 'const unexpected=`/driver-i18n.v1.js${suffix}`;\n'),
+  ];
+  for (const mutation of mutations) fixture(cwd => {
+    committedDriverCatalog(cwd); mutation(cwd);
+    write(cwd, 'src/driver-i18n.js', 'const catalog=2;\n');
+    const before = snapshot(cwd);
+    assert.throws(() => run(cwd, '--release'), /Driver catalog/);
+    assert.deepEqual(snapshot(cwd), before);
+  });
+});
+
+test('driver catalog unpublished refresh rejects a wrong pin before any writes', () => fixture(cwd => {
+  committedDriverCatalog(cwd); run(cwd, 'driver-i18n.js');
+  const name = json(cwd, 'asset-versions.json')['driver-i18n.js'];
+  write(cwd, name, 'const catalog=4;\n');
+  write(cwd, 'sw.js', read(cwd, 'sw.js').replace(sri(read(cwd, 'driver-i18n.v1.js')), 'sha256-wrong'));
+  const before = snapshot(cwd);
+  assert.throws(() => run(cwd, 'driver-i18n.js', '--refresh'), /previous or exact final SHA-256 pin/);
+  assert.deepEqual(snapshot(cwd), before);
+}));
+
+test('driver catalog published bytes cannot be blessed by another asset refresh', () => {
+  for (const selfConsistent of [false, true]) fixture(cwd => {
+    committedDriverCatalog(cwd); run(cwd, 'utility.js');
+    const bytes = 'const catalog=9;\n', previousPin = sri(read(cwd, 'driver-i18n.v1.js'));
+    write(cwd, 'driver-i18n.v1.js', bytes);
+    if (selfConsistent) {
+      write(cwd, 'src/driver-i18n.js', bytes);
+      const hashes = json(cwd, 'asset-integrity.json'); hashes['driver-i18n.v1.js'] = sha(bytes);
+      write(cwd, 'asset-integrity.json', JSON.stringify(hashes));
+      write(cwd, 'app.html', read(cwd, 'app.html').replace(previousPin, sri(bytes)));
+      write(cwd, 'sw.js', read(cwd, 'sw.js').replace(previousPin, sri(bytes)));
+    }
+    const before = snapshot(cwd);
+    assert.throws(() => run(cwd, 'utility.js', '--refresh'), /Cannot synchronize edited published catalog bytes/);
+    assert.deepEqual(snapshot(cwd), before);
+  });
+});
+
 test('explicit initial copy release is dry-run safe, pinned, immutable and preserves source identity', () => fixture((cwd, original) => {
   const logical = initialCopy(cwd), registry = read(cwd, 'source-assets.json'), source = read(cwd, 'src/' + logical);
   const before = snapshot(cwd);
   assert.throws(() => run(cwd, '--release'), /Unknown source-managed logical asset/);
   const plan = JSON.parse(run(cwd, '--release', '--init-copy=' + logical, '--dry-run'));
-  assert.deepEqual(plan.initializations, { [logical]: 'driver-i18n.v1.js' });
+  assert.deepEqual(plan.initializations, { [logical]: 'fixture-catalog.v1.js' });
   assert.deepEqual(plan.copies, {});
   assert.equal(plan.sources.find(entry => entry.logical === logical).initial, true);
   assert.equal(plan.sources.find(entry => entry.logical === logical).active, null);
@@ -83,7 +200,7 @@ test('explicit initial copy release is dry-run safe, pinned, immutable and prese
   assert.deepEqual(snapshot(cwd), before);
   run(cwd, '--release', '--init-copy=' + logical);
   const manifest = json(cwd, 'asset-versions.json'), filename = manifest[logical], expected = sri(source);
-  assert.equal(filename, 'driver-i18n.v1.js');
+  assert.equal(filename, 'fixture-catalog.v1.js');
   assert.equal(read(cwd, filename), source);
   assert.equal(read(cwd, 'src/' + logical), source);
   assert.equal(read(cwd, 'source-assets.json'), registry);
@@ -105,12 +222,12 @@ test('explicit initial copy release is dry-run safe, pinned, immutable and prese
 }));
 
 test('initialization composes changed sources and transitive importers without rewriting source paths or logical keys', () => fixture(cwd => {
-  const utility = "const utility=1;const metadata={source:'src/driver-i18n.js',logical:'driver-i18n.js'};\n";
+  const utility = "const utility=1;const metadata={source:'src/fixture-catalog.js',logical:'fixture-catalog.js'};\n";
   write(cwd, 'utility.v1.js', utility); write(cwd, 'src/utility.js', utility);
   const hashes = json(cwd, 'asset-integrity.json'); hashes['utility.v1.js'] = sha(utility);
   write(cwd, 'asset-integrity.json', JSON.stringify(hashes)); commit(cwd);
   const originals = Object.fromEntries(Object.values(json(cwd, 'asset-versions.json')).map(name => [name, read(cwd, name)]));
-  const logical = initialCopy(cwd, 'driver-i18n.js', "const dependency='/utility.v1.js';const identity={source:'src/driver-i18n.js',logical:'driver-i18n.js'};\n");
+  const logical = initialCopy(cwd, 'fixture-catalog.js', "const dependency='/utility.v1.js';const identity={source:'src/fixture-catalog.js',logical:'fixture-catalog.js'};\n");
   const registry = read(cwd, 'source-assets.json');
   write(cwd, 'src/driver-app.js', read(cwd, 'src/driver-app.js').replace('sample=1', 'sample=2'));
   write(cwd, 'src/utility.js', utility.replace('utility=1', 'utility=2'));
@@ -122,7 +239,7 @@ test('initialization composes changed sources and transitive importers without r
   assert.match(read(cwd, manifest['driver-app.js']), /sample=2/);
   assert.match(read(cwd, manifest['utility.js']), /utility=2/);
   assert.ok(read(cwd, manifest[logical]).includes("dependency='/utility.v2.js'"));
-  for (const name of ['utility.js', logical]) assert.ok(read(cwd, manifest[name]).includes("source:'src/driver-i18n.js',logical:'driver-i18n.js'"));
+  for (const name of ['utility.js', logical]) assert.ok(read(cwd, manifest[name]).includes("source:'src/fixture-catalog.js',logical:'fixture-catalog.js'"));
   assert.equal(read(cwd, 'source-assets.json'), registry);
   assert.ok(read(cwd, 'app.html').includes(`integrity="${sri(read(cwd, manifest[logical]))}"`));
   assert.equal(auditSourceAssets(cwd).length, 3);
@@ -150,7 +267,7 @@ test('initial copy accepts its exact pin and leaves unrelated integrity referenc
 
 test('initial copy uses its registered nested source without renaming it or its registry key', () => fixture(cwd => {
   const logical = initialCopy(cwd), source = 'src/locales/driver-words.js';
-  const bytes = "const identity={logical:'driver-i18n.js',source:'src/locales/driver-words.js'};\n";
+  const bytes = "const identity={logical:'fixture-catalog.js',source:'src/locales/driver-words.js'};\n";
   const registry = json(cwd, 'source-assets.json'); registry.assets[logical].source = source;
   write(cwd, 'source-assets.json', JSON.stringify(registry)); write(cwd, source, bytes);
   rmSync(join(cwd, 'src/' + logical));
@@ -165,32 +282,32 @@ test('initial copy uses its registered nested source without renaming it or its 
 
 test('initial copy rejects a logical stem already owned by an active manifest alias', () => fixture(cwd => {
   const manifest = json(cwd, 'asset-versions.json'), hashes = json(cwd, 'asset-integrity.json');
-  manifest['utility.js'] = 'driver-i18n.v4.js';
+  manifest['utility.js'] = 'fixture-catalog.v4.js';
   write(cwd, manifest['utility.js'], read(cwd, 'utility.v1.js'));
   hashes[manifest['utility.js']] = sha(read(cwd, manifest['utility.js']));
   write(cwd, 'asset-versions.json', JSON.stringify(manifest)); write(cwd, 'asset-integrity.json', JSON.stringify(hashes)); commit(cwd);
   initialCopy(cwd); const before = snapshot(cwd);
-  assert.throws(() => run(cwd, '--release', '--init-copy=driver-i18n.js'), /collides with an active asset alias/);
+  assert.throws(() => run(cwd, '--release', '--init-copy=fixture-catalog.js'), /collides with an active asset alias/);
   assert.deepEqual(snapshot(cwd), before);
 }));
 
 test('initial copy reserves deleted historical filenames, existing files and cache identities', () => fixture(cwd => {
   const initial = git(cwd, 'rev-parse', 'HEAD');
   git(cwd, 'checkout', '-qb', 'prepared');
-  write(cwd, 'driver-i18n.v7.js', 'const historical=7;\n');
+  write(cwd, 'fixture-catalog.v7.js', 'const historical=7;\n');
   write(cwd, 'sw.js', "const CACHE = 'occulert-v11';\n"); commit(cwd);
-  git(cwd, 'rm', 'driver-i18n.v7.js'); commit(cwd);
+  git(cwd, 'rm', 'fixture-catalog.v7.js'); commit(cwd);
   git(cwd, 'checkout', '-q', '--detach', initial);
   const logical = initialCopy(cwd);
-  write(cwd, 'driver-i18n.v9.js', 'const localReserved=9;\n');
+  write(cwd, 'fixture-catalog.v9.js', 'const localReserved=9;\n');
   const before = snapshot(cwd);
   const plan = JSON.parse(run(cwd, '--release', '--init-copy=' + logical, '--dry-run'));
-  assert.equal(plan.initializations[logical], 'driver-i18n.v10.js');
+  assert.equal(plan.initializations[logical], 'fixture-catalog.v10.js');
   assert.equal(plan.cache, 'occulert-v12');
   assert.deepEqual(snapshot(cwd), before);
   run(cwd, '--release', '--init-copy=' + logical);
-  assert.equal(read(cwd, 'driver-i18n.v9.js'), 'const localReserved=9;\n');
-  assert.equal(json(cwd, 'asset-versions.json')[logical], 'driver-i18n.v10.js');
+  assert.equal(read(cwd, 'fixture-catalog.v9.js'), 'const localReserved=9;\n');
+  assert.equal(json(cwd, 'asset-versions.json')[logical], 'fixture-catalog.v10.js');
 }));
 
 test('initial copy flags cannot bypass existing or pending release baselines', () => {
@@ -207,28 +324,28 @@ test('initial copy flags cannot bypass existing or pending release baselines', (
 
 test('initial copy rejects ambiguous CLI, unsafe sources and unrequested missing entries without writes', () => {
   const cases = [
-    { args: ['utility.js', '--init-copy=driver-i18n.js'] },
-    { args: ['--release', '--init-copy=driver-i18n.js', '--init-copy=driver-i18n.js'] },
+    { args: ['utility.js', '--init-copy=fixture-catalog.js'] },
+    { args: ['--release', '--init-copy=fixture-catalog.js', '--init-copy=fixture-catalog.js'] },
     { args: ['--release', '--init-copy=../outside.js'] },
     { args: ['--release', '--init-copy='] },
     { args: ['--release', '--init-copy=missing.js'] },
     { args: ['--release', '--init-copy=utility.js'] },
     { mutate: cwd => { const registry = json(cwd, 'source-assets.json'); registry.assets['other.js'] = { source: 'src/other.js', mode: 'copy' }; write(cwd, 'source-assets.json', JSON.stringify(registry)); write(cwd, 'src/other.js', 'const other=1;'); } },
-    { mutate: cwd => { const registry = json(cwd, 'source-assets.json'); registry.assets['driver-i18n.js'].mode = 'bundle'; write(cwd, 'source-assets.json', JSON.stringify(registry)); } },
-    { mutate: cwd => { const registry = json(cwd, 'source-assets.json'); registry.assets['driver-i18n.js'].source = '../outside.js'; write(cwd, 'source-assets.json', JSON.stringify(registry)); } },
-    { mutate: cwd => { const registry = json(cwd, 'source-assets.json'); registry.assets['driver-i18n.js'].source = 'src/utility.js'; write(cwd, 'source-assets.json', JSON.stringify(registry)); } },
-    { mutate: cwd => { rmSync(join(cwd, 'src/driver-i18n.js')); symlinkSync(join(cwd, 'utility.v1.js'), join(cwd, 'src/driver-i18n.js')); } },
-    { mutate: cwd => { rmSync(join(cwd, 'src/driver-i18n.js')); symlinkSync(join(cwd, 'missing.js'), join(cwd, 'src/driver-i18n.js')); } },
-    { mutate: cwd => { const registry = json(cwd, 'source-assets.json'); registry.assets['driver-i18n.js'].source = 'src/linked/words.js'; write(cwd, 'source-assets.json', JSON.stringify(registry)); write(cwd, 'actual/words.js', 'const words=1;'); symlinkSync(join(cwd, 'actual'), join(cwd, 'src/linked'), 'dir'); } },
-    { mutate: cwd => write(cwd, 'src/driver-i18n.js', Buffer.from([0xff])) },
-    { mutate: cwd => write(cwd, 'src/driver-i18n.js', 'const =;') },
-    { mutate: cwd => write(cwd, 'driver-i18n.js', 'const unversioned=1;') },
-    { mutate: cwd => write(cwd, 'driver-i18n.v9007199254740992.js', 'const unsafeVersion=1;') },
+    { mutate: cwd => { const registry = json(cwd, 'source-assets.json'); registry.assets['fixture-catalog.js'].mode = 'bundle'; write(cwd, 'source-assets.json', JSON.stringify(registry)); } },
+    { mutate: cwd => { const registry = json(cwd, 'source-assets.json'); registry.assets['fixture-catalog.js'].source = '../outside.js'; write(cwd, 'source-assets.json', JSON.stringify(registry)); } },
+    { mutate: cwd => { const registry = json(cwd, 'source-assets.json'); registry.assets['fixture-catalog.js'].source = 'src/utility.js'; write(cwd, 'source-assets.json', JSON.stringify(registry)); } },
+    { mutate: cwd => { rmSync(join(cwd, 'src/fixture-catalog.js')); symlinkSync(join(cwd, 'utility.v1.js'), join(cwd, 'src/fixture-catalog.js')); } },
+    { mutate: cwd => { rmSync(join(cwd, 'src/fixture-catalog.js')); symlinkSync(join(cwd, 'missing.js'), join(cwd, 'src/fixture-catalog.js')); } },
+    { mutate: cwd => { const registry = json(cwd, 'source-assets.json'); registry.assets['fixture-catalog.js'].source = 'src/linked/words.js'; write(cwd, 'source-assets.json', JSON.stringify(registry)); write(cwd, 'actual/words.js', 'const words=1;'); symlinkSync(join(cwd, 'actual'), join(cwd, 'src/linked'), 'dir'); } },
+    { mutate: cwd => write(cwd, 'src/fixture-catalog.js', Buffer.from([0xff])) },
+    { mutate: cwd => write(cwd, 'src/fixture-catalog.js', 'const =;') },
+    { mutate: cwd => write(cwd, 'fixture-catalog.js', 'const unversioned=1;') },
+    { mutate: cwd => write(cwd, 'fixture-catalog.v9007199254740992.js', 'const unsafeVersion=1;') },
     { mutate: cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace('occulert-v1', 'occulert-v9007199254740992')) },
   ];
   for (const { mutate, args } of cases) fixture(cwd => {
     initialCopy(cwd); mutate?.(cwd); const before = snapshot(cwd);
-    assert.throws(() => run(cwd, ...(args || ['--release', '--init-copy=driver-i18n.js'])));
+    assert.throws(() => run(cwd, ...(args || ['--release', '--init-copy=fixture-catalog.js'])));
     assert.deepEqual(snapshot(cwd), before);
   });
 });
@@ -237,38 +354,38 @@ test('initial copy rejects unrelated or mismatched pins and ambiguous reference 
   const mutations = [
     cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace(INITIAL_COPY_PIN, 'sha256-wrong')),
     cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace(` integrity="${INITIAL_COPY_PIN}"`, '')),
-    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/driver-i18n.js"', 'src="driver-i18n.js"')),
-    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/driver-i18n.js"', 'src=/driver-i18n.js').replace(INITIAL_COPY_PIN, sri(read(cwd, 'src/driver-i18n.js')))),
-    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/driver-i18n.js"', 'src="/other.js"')),
-    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/driver-i18n.js"', 'src="/driver-i18n.js" src="/other.js"')),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/fixture-catalog.js"', 'src="fixture-catalog.js"')),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/fixture-catalog.js"', 'src=/fixture-catalog.js').replace(INITIAL_COPY_PIN, sri(read(cwd, 'src/fixture-catalog.js')))),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/fixture-catalog.js"', 'src="/other.js"')),
+    cwd => write(cwd, 'app.html', read(cwd, 'app.html').replace('src="/fixture-catalog.js"', 'src="/fixture-catalog.js" src="/other.js"')),
     cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace(INITIAL_COPY_PIN, 'sha256-wrong')),
-    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.js'", "url:'driver-i18n.js'")),
-    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.js'", "url:'/driver-i18n.js?ambiguous=1'")),
-    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.js'", "...other,url:'/driver-i18n.js'")),
-    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.js'", "['url']:'/driver-i18n.js'")),
-    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.js'", "url:`/driver-i18n.js`").replace(INITIAL_COPY_PIN, sri(read(cwd, 'src/driver-i18n.js')))),
-    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.js'", "url:`/driver-i18n.js${suffix}`").replace(INITIAL_COPY_PIN, sri(read(cwd, 'src/driver-i18n.js')))),
-    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.js'", "url:`/driver-i18n.js-${suffix}`").replace(INITIAL_COPY_PIN, sri(read(cwd, 'src/driver-i18n.js')))),
-    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js') + "const unpaired='/driver-i18n.js';\n"),
-    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/driver-i18n.js'", "url:'/other.js'")),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/fixture-catalog.js'", "url:'fixture-catalog.js'")),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/fixture-catalog.js'", "url:'/fixture-catalog.js?ambiguous=1'")),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/fixture-catalog.js'", "...other,url:'/fixture-catalog.js'")),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/fixture-catalog.js'", "['url']:'/fixture-catalog.js'")),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/fixture-catalog.js'", "url:`/fixture-catalog.js`").replace(INITIAL_COPY_PIN, sri(read(cwd, 'src/fixture-catalog.js')))),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/fixture-catalog.js'", "url:`/fixture-catalog.js${suffix}`").replace(INITIAL_COPY_PIN, sri(read(cwd, 'src/fixture-catalog.js')))),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/fixture-catalog.js'", "url:`/fixture-catalog.js-${suffix}`").replace(INITIAL_COPY_PIN, sri(read(cwd, 'src/fixture-catalog.js')))),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js') + "const unpaired='/fixture-catalog.js';\n"),
+    cwd => write(cwd, 'sw.js', read(cwd, 'sw.js').replace("url:'/fixture-catalog.js'", "url:'/other.js'")),
   ];
   for (const mutate of mutations) fixture(cwd => {
     initialCopy(cwd); mutate(cwd); const before = snapshot(cwd);
-    assert.throws(() => run(cwd, '--release', '--init-copy=driver-i18n.js'));
+    assert.throws(() => run(cwd, '--release', '--init-copy=fixture-catalog.js'));
     assert.deepEqual(snapshot(cwd), before);
   });
 });
 
 test('initial copy rejects runtime JS-loader placeholders instead of guessing URL or pin ownership', () => {
   const loaders = [
-    "const script={};script.src='/driver-i18n.js';script.integrity='sha256-INIT-COPY';\n",
-    "const script={};script.src='/driver-i18n.js';script.integrity='sha256-already-exact';\n",
-    "const script={};script.src=`/driver-i18n.js${suffix}`;\n",
+    "const script={};script.src='/fixture-catalog.js';script.integrity='sha256-INIT-COPY';\n",
+    "const script={};script.src='/fixture-catalog.js';script.integrity='sha256-already-exact';\n",
+    "const script={};script.src=`/fixture-catalog.js${suffix}`;\n",
     "const marker='sha256-INIT-COPY';\n",
   ];
   for (const loader of loaders) fixture(cwd => {
     initialCopy(cwd); write(cwd, 'src/utility.js', loader); const before = snapshot(cwd);
-    assert.throws(() => run(cwd, '--release', '--init-copy=driver-i18n.js'), /unsupported in runtime JS\/CSS|supported only in HTML and worker pins/);
+    assert.throws(() => run(cwd, '--release', '--init-copy=fixture-catalog.js'), /unsupported in runtime JS\/CSS|supported only in HTML and worker pins/);
     assert.deepEqual(snapshot(cwd), before);
   });
 });
@@ -459,6 +576,7 @@ test('a changed real driver source produces an audited guard release without cha
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-source-site-'));
   try {
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
+    paths.add('scripts/lib/driver-catalog-assets.mjs');
     // Include reviewable registered source and active assets before Git staging.
     for (const entry of Object.values(json(root, 'source-assets.json').assets)) paths.add(entry.source);
     const contract = json(root, 'source-driver-contract.json');
@@ -479,10 +597,7 @@ test('a changed real driver source produces an audited guard release without cha
     assert.notEqual(manifest['driver-startup-guard.js'], before['driver-startup-guard.js']);
     assert.equal(manifest['detection-experiments.js'], before['detection-experiments.js']);
     assert.ok(read(cwd, manifest['driver-app.js']).includes("'READY'"));
-    assert.deepEqual(auditSourceAssets(cwd).map(({ logical, mode }) => ({ logical, mode })), [
-      { logical: 'driver-app.js', mode: 'bundle' },
-      { logical: 'detection-experiments.js', mode: 'copy' },
-    ]);
+    assert.deepEqual(auditSourceAssets(cwd).map(({logical,mode}) => ({logical,mode})), Object.entries(json(root,'source-assets.json').assets).map(([logical,{mode}]) => ({logical,mode})));
     for (const [name, hash] of Object.entries(prior)) assert.equal(sha(readFileSync(join(cwd, name))), hash);
     const output = execFileSync(process.execPath, ['scripts/audit-site.mjs'], { cwd, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
     assert.match(output, /passed/i);
@@ -494,6 +609,7 @@ test('initial copy composes actual bundled source edits without touching source 
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-source-initial-bundle-'));
   try {
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
+    paths.add('scripts/lib/driver-catalog-assets.mjs');
     paths.add('scripts/lib/initial-copy-assets.mjs');
     for (const entry of Object.values(json(root, 'source-assets.json').assets)) paths.add(entry.source);
     const contract = json(root, 'source-driver-contract.json');
@@ -504,16 +620,16 @@ test('initial copy composes actual bundled source edits without touching source 
     symlinkSync(join(root, 'node_modules'), join(cwd, 'node_modules'), 'dir');
     git(cwd, 'init', '-q'); commit(cwd); git(cwd, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
     const prior = json(cwd, 'asset-integrity.json'), logical = initialCopy(cwd), registry = read(cwd, 'source-assets.json');
-    write(cwd, 'src/ui.js', read(cwd, 'src/ui.js') + "\nexport const INITIAL_COPY_REFERENCE={source:'src/driver-i18n.js',logical:'driver-i18n.js'};\n");
+    write(cwd, 'src/ui.js', read(cwd, 'src/ui.js') + "\nexport const INITIAL_COPY_REFERENCE={source:'src/fixture-catalog.js',logical:'fixture-catalog.js'};\n");
     write(cwd, 'src/metrics.js', read(cwd, 'src/metrics.js').replace("'SAFE'", "'READY'"));
     const plan = JSON.parse(run(cwd, '--release', '--init-copy=' + logical));
     assert.equal(plan.sources.find(entry => entry.logical === 'driver-app.js').changed, true);
     const manifest = json(cwd, 'asset-versions.json');
     assert.equal(plan.initializations[logical], manifest[logical]);
     assert.ok(read(cwd, manifest['driver-app.js']).includes("'READY'"));
-    assert.ok(read(cwd, 'src/ui.js').includes("source:'src/driver-i18n.js',logical:'driver-i18n.js'"));
+    assert.ok(read(cwd, 'src/ui.js').includes("source:'src/fixture-catalog.js',logical:'fixture-catalog.js'"));
     assert.equal(read(cwd, 'source-assets.json'), registry);
-    assert.equal(auditSourceAssets(cwd).length, 3);
+    assert.deepEqual(auditSourceAssets(cwd).map(entry=>entry.logical), [...Object.keys(json(root,'source-assets.json').assets),logical]);
     for (const [name, hash] of Object.entries(prior)) assert.equal(sha(readFileSync(join(cwd, name))), hash);
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });

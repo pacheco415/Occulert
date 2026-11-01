@@ -23,6 +23,7 @@ function fixture(body) {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-bundle-release-'));
   try {
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
+    paths.add('scripts/lib/driver-catalog-assets.mjs');
     // Include new reviewable source and release outputs before Git staging.
     for (const entry of Object.values(json(root, 'source-assets.json').assets)) paths.add(entry.source);
     const contract = json(root, 'source-driver-contract.json');
@@ -44,7 +45,7 @@ test('real bundled output and both release no-op modes preserve every file', () 
   const commentOnly = snapshot(cwd);
   assert.equal(JSON.parse(run(cwd, '--release')).noOp, true);
   assert.deepEqual(snapshot(cwd), commentOnly);
-  assert.equal(auditSourceAssets(cwd).length, 2);
+  assert.deepEqual(auditSourceAssets(cwd).map(entry=>entry.logical),Object.keys(json(root,'source-assets.json').assets));
 }));
 
 test('real bundle audit supports a nested active output without changing compiled bytes', () => fixture(cwd => {
@@ -72,7 +73,7 @@ test('a real module edit releases compiled output and guard while pending work b
   const pending = snapshot(cwd); assert.throws(() => run(cwd, 'detection-experiments.js'), /Pending source edits/); assert.deepEqual(snapshot(cwd), pending);
   const plan = JSON.parse(run(cwd, '--release', '--dry-run')); assert.equal(plan.sources[0].changed, true); assert.deepEqual(snapshot(cwd), pending);
   run(cwd, '--release'); const active = json(cwd, 'asset-versions.json')['driver-app.js'];
-  assert.ok(read(cwd, active).includes("'READY'")); assert.equal(read(cwd, 'src/driver-app.js'), entry); assert.equal(auditSourceAssets(cwd).length, 2);
+  assert.ok(read(cwd, active).includes("'READY'")); assert.equal(read(cwd, 'src/driver-app.js'), entry); assert.deepEqual(auditSourceAssets(cwd).map(entry=>entry.logical),Object.keys(json(root,'source-assets.json').assets));
   for (const [name, digest] of Object.entries(prior)) assert.equal(hash(readFileSync(join(cwd, name))), digest);
 }));
 
@@ -84,7 +85,7 @@ test('real helper bump and unpublished refresh synchronize modules and exact com
     const helper = readFileSync(join(cwd, manifest['detection-experiments.js'])), pin = 'sha256-' + createHash('sha256').update(helper).digest('base64');
     assert.ok(read(cwd, 'src/ui.js').includes(manifest['detection-experiments.js'])); assert.ok(read(cwd, 'src/ui.js').includes(pin));
     assert.equal(read(cwd, 'src/driver-app.js'), entry); assert.ok(read(cwd, manifest['driver-app.js']).includes(pin));
-    assert.equal(auditSourceAssets(cwd).length, 2);
+    assert.deepEqual(auditSourceAssets(cwd).map(entry=>entry.logical),Object.keys(json(root,'source-assets.json').assets));
     const hashes = json(cwd, 'asset-integrity.json'); for (const [name, digest] of Object.entries(hashes)) assert.equal(hash(readFileSync(join(cwd, name))), digest);
   };
   assertPins(); writeFileSync(join(cwd, manifest['detection-experiments.js']), read(cwd, manifest['detection-experiments.js']) + '\n// New unpublished helper fixture.\n');
@@ -110,7 +111,7 @@ test('changed helper source and driver module release together with one guard an
   assert.ok(read(cwd,manifest['driver-app.js']).includes("'READY'"));
   assert.ok(read(cwd,manifest['driver-startup-guard.js']).includes(manifest['driver-app.js']));
   assert.ok(read(cwd,'sw.js').includes("const CACHE = 'occulert-v"+(previousCache+1)+"'"));
-  assert.equal(auditSourceAssets(cwd).length,2);
+  assert.deepEqual(auditSourceAssets(cwd).map(entry=>entry.logical),Object.keys(json(root,'source-assets.json').assets));
   for(const [name,digest]of Object.entries(prior))assert.equal(hash(readFileSync(join(cwd,name))),digest);
 }));
 

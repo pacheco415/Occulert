@@ -155,6 +155,25 @@ export function setTextIfChanged(element, value) {
     if (element.textContent !== value)
         element.textContent = value;
 }
+/** @param {HTMLElement|null} el @param {string} k @param {string} en @param {object} [p] */
+export function uiText(el, k, en, p) {
+    if (el) {
+        try {
+            const value = window.OcculertDriverI18n?.get(k, p);
+            if (typeof value === 'string' && value) en = value;
+        } catch (_) { }
+        el.textContent = en;
+        el.dataset.driverText = JSON.stringify([k, p]);
+    }
+}
+export function uiState(l, h) {
+    setTextIfChanged(driveStateEl, l);
+    setTextIfChanged(driveHintEl, h);
+    setTextIfChanged(statusEl, l);
+}
+export function pauseUi() {
+    setOverlay('Monitoring Paused', 'Monitoring did not start because Occulert left the foreground.', 'Return to Occulert and press Start Monitoring again only when safely parked.', false);
+}
 export function render(ear) {
     if (!startupAllowsMonitoring()) {
         window.OcculertStartup?.refresh?.();
@@ -181,9 +200,7 @@ export function render(ear) {
     syncEl.textContent = cloudConsent.checked ? (cloudReady ? 'ON' : 'LOCAL') : 'LOCAL';
     escalationEl.textContent = escalationLevel;
     if (!running) {
-        setTextIfChanged(driveStateEl, 'NOT MONITORING');
-        setTextIfChanged(driveHintEl, 'Press Start Monitoring only when safely parked.');
-        setTextIfChanged(statusEl, 'NOT MONITORING');
+        uiState('NOT MONITORING', 'Press Start Monitoring only when safely parked.');
         statusEl.className = 'status off';
         stateCard.className = 'card state-card';
         riskEl.textContent = '--';
@@ -205,18 +222,14 @@ export function render(ear) {
                     : risk[0] === 'WATCH'
                         ? 'Fatigue signs are building. Prepare to stop if needed.'
                         : 'Camera tracking is active. Stay alert; this does not mean it is safe to drive.';
-        setTextIfChanged(driveStateEl, label);
-        setTextIfChanged(driveHintEl, hint);
-        setTextIfChanged(statusEl, label);
+        uiState(label, hint);
         stateCard.className = 'card state-card ' + (trackingUnavailable ? 'noface' : experimentFlags.observer ? 'observer' : risk[1]);
         statusEl.className = 'status ' + (trackingUnavailable || !experimentFlags.observer && ['ALERT', 'HIGH'].includes(risk[0]) ? 'alert' : 'on');
     }
     pushFleet();
 }
 export function showStoppedReason(message) {
-    setTextIfChanged(driveStateEl, 'MONITORING STOPPED');
-    setTextIfChanged(driveHintEl, message);
-    setTextIfChanged(statusEl, 'MONITORING STOPPED');
+    uiState('MONITORING STOPPED', message);
     statusEl.className = 'status alert';
     stateCard.className = 'card state-card danger';
     stateCard.focus?.({ preventScroll: true });
@@ -260,7 +273,7 @@ export function createLocalLifecycleOperations() {
         setMonitoringUi(true);
         startCancelled = false;
         startBtn.disabled = true;
-        startBtn.textContent = 'STARTING...';
+        uiText(startBtn, 'start.starting', 'STARTING...');
         setTextIfChanged(driveStateEl, 'PREPARING MONITORING');
         setTextIfChanged(driveHintEl, 'Stay parked while the camera and on-device model are prepared. Monitoring has not started.');
         setTextIfChanged(statusEl, 'PREPARING');
@@ -352,7 +365,7 @@ export function createLocalLifecycleOperations() {
                 feedbackStatus.textContent = '';
             overlay.classList.add('hide');
             startBtn.disabled = false;
-            startBtn.textContent = 'STOP MONITORING';
+            uiText(startBtn, 'start.stop', 'STOP MONITORING');
             startBtn.className = 'btn stop';
             if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
                 Notification.requestPermission().then(p => {
@@ -379,7 +392,7 @@ export function createLocalLifecycleOperations() {
             }
             video.srcObject = null;
             if (e && e.name === 'AbortError') {
-                setOverlay('Monitoring Paused', 'Monitoring did not start because Occulert left the foreground.', 'Return to Occulert and press Start Monitoring again only when safely parked.', false);
+                pauseUi();
                 log('Monitoring start cancelled after foreground loss');
             }
             else {
@@ -389,7 +402,7 @@ export function createLocalLifecycleOperations() {
                     await discardFaceMesh();
                 log((e && e.name === 'DetectionRuntimeError' ? 'Detector' : 'Camera') + ' error: ' + (e.message || e.name || e));
             }
-            startBtn.textContent = 'START MONITORING';
+            uiText(startBtn, 'start.start', 'START MONITORING');
             startBtn.className = 'btn primary';
             setMonitoringUi(false);
         }
@@ -437,7 +450,7 @@ export function createLocalLifecycleOperations() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (!preserveOverlay)
             setOverlay('AI Fatigue Monitoring', 'Supplemental prototype only. Keep your attention on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.', '<strong>Foreground required:</strong> monitoring stops if this tab is hidden or the screen locks. Pull over safely before restarting.', true);
-        startBtn.textContent = 'START MONITORING';
+        uiText(startBtn, 'start.start', 'START MONITORING');
         startBtn.className = 'btn primary';
         setCameraControlsDisabled(false);
         void refreshCameraChoices();
@@ -485,7 +498,7 @@ export async function handleVisibilityChange(hidden = document.visibilityState =
             stream.getTracks().forEach(track => track.stop());
         stream = null;
         video.srcObject = null;
-        setOverlay('Monitoring Paused', 'Monitoring did not start because Occulert left the foreground.', 'Return to Occulert and press Start Monitoring again only when safely parked.', false);
+        pauseUi();
         return true;
     }
     await stop();

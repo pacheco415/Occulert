@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { assertReleaseBaseline, commitAssetPlan, loadSourceAssets, synchronizeSourceEntry } from './lib/source-assets.mjs';
 import { assertInitialCopyRuntimeSource, replaceInitialCopyUrl, synchronizeInitialCopyHtml, synchronizeInitialCopyWorker } from './lib/initial-copy-assets.mjs';
+import { synchronizeDriverCatalogPins } from './lib/driver-catalog-assets.mjs';
 
 const root = process.cwd();
 const read = name => readFileSync(join(root, name), 'utf8');
@@ -20,6 +21,7 @@ const logical = args.find(arg => !arg.startsWith('--'));
 const manifest = parse('asset-versions.json');
 const integrity = parse('asset-integrity.json');
 const beforeManifest = { ...manifest };
+const beforeIntegrity = { ...integrity };
 if (args.some(arg => arg.startsWith('--') && !['--dry-run', '--refresh', '--release'].includes(arg) && !arg.startsWith('--init-copy=')) || args.filter(arg => !arg.startsWith('--')).length > 1 || (release && (refresh || logical)) || initialFlags.length > 1 || (initCopy !== null && !release)) throw new Error('Use asset:release [--init-copy=<new-logical-name>] [--dry-run] or asset:bump -- <logical-name> [--dry-run | --refresh]');
 if (!release && (!logical || !manifest[logical])) throw new Error('Choose a known logical asset: asset:bump -- driver-app.js [--dry-run | --refresh]');
 const active = [...new Set(Object.values(manifest))];
@@ -99,6 +101,27 @@ function synchronizeStartupGuard(changes) {
   if (worker !== sw) changes.set('sw.js', worker);
 }
 
+function synchronizeDriverCatalog(changes) {
+  const name = manifest['driver-i18n.js'], previous = beforeManifest['driver-i18n.js'];
+  // Explicit first initialization already owns its placeholder validation/pins.
+  if (!name || !previous) return;
+  const bytes = changes.get(name) ?? sources.get(name) ?? read(name);
+  let atHead;
+  try { atHead = JSON.parse(execFileSync('git', ['show', 'HEAD:asset-versions.json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); }
+  catch { throw new Error('Driver catalog pin synchronization requires Git history'); }
+  if (Object.values(atHead).includes(name)) {
+    const hashes = JSON.parse(execFileSync('git', ['show', 'HEAD:asset-integrity.json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+    const published = execFileSync('git', ['show', `HEAD:${name}`], { stdio: ['ignore', 'pipe', 'ignore'] });
+    if (beforeIntegrity[name] !== hashes[name] || digest(bytes) !== hashes[name] || !Buffer.from(bytes).equals(published)) throw new Error('Cannot synchronize edited published catalog bytes; bump it first');
+  }
+  const app = changes.get('app.html') ?? read('app.html'), sw = changes.get('sw.js') ?? read('sw.js');
+  const updated = synchronizeDriverCatalogPins(app, sw, {
+    filename: name, bytes, previousDigest: beforeIntegrity[previous],
+  });
+  if (updated.html !== app) changes.set('app.html', updated.html);
+  if (updated.worker !== sw) changes.set('sw.js', updated.worker);
+}
+
 if (refresh) {
   const filename = manifest[logical];
   // A committed active asset is published for this tool's purposes. Refresh
@@ -112,6 +135,7 @@ if (refresh) {
   const changes = new Map();
   synchronizeExperimentHelper(changes);
   synchronizeStartupGuard(changes);
+  synchronizeDriverCatalog(changes);
   synchronizeRegisteredSources(changes);
   if (!dry) {
     for (const [name, source] of changes) writeFileSync(join(root, name), source);
@@ -189,6 +213,7 @@ if (refresh) {
   const config = parse('vercel.json');
   synchronizeExperimentHelper(changes);
   synchronizeStartupGuard(changes);
+  synchronizeDriverCatalog(changes);
   synchronizeRegisteredSources(changes);
 
   const versions = new Set([...replacements.values()].map(next => next.match(/\.v(\d+)\./)[1]));

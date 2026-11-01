@@ -9,7 +9,7 @@ import { scoringReadWallClock } from "./metrics.js";
 import "./storage-history.js";
 import { scoringTriggerEligible } from "./scoring-core.js";
 import { pushFleet } from "./cloud-sync.js";
-import { getPreference, setPreference, experimentFlags, experimentController, startupAllowsMonitoring, alertsEl, alertScreen, alertTitle, alertSub, nightOpacity, running, starting, confidence, sessionStart, calibrating, log, _lastBreakPrompt, set__lastBreakPrompt } from "./ui.js";
+import { uiText, getPreference, setPreference, experimentFlags, experimentController, startupAllowsMonitoring, alertsEl, alertScreen, alertTitle, alertSub, nightOpacity, running, starting, confidence, sessionStart, calibrating, log, _lastBreakPrompt, set__lastBreakPrompt } from "./ui.js";
 export let acceptedAlertHook = /** @type {((reason:string)=>void)|null} */ (null);
 /** @param {(reason:string)=>void} hook */
 export function registerAcceptedAlertHook(hook) { acceptedAlertHook = hook; }
@@ -443,9 +443,10 @@ export function speak(msg) {
 export function toggleVoice() {
     _voiceEnabled = !readVoicePreference();
     setPreference('occulert-voice', String(_voiceEnabled));
-    const b = document.getElementById('voiceToggleBtn');
-    if (b)
-        b.textContent = _voiceEnabled ? '🔊 Voice ON' : '🔇 Voice OFF';
+    voiceUi();
+}
+export function voiceUi() {
+    uiText(document.getElementById('voiceToggleBtn'), 'voice.' + (_voiceEnabled === true ? 'on' : 'off'), _voiceEnabled === true ? '🔊 Voice ON' : '🔇 Voice OFF');
 }
 export let _alertsSinceBreak = 0, _yawnsSinceBreak = 0;
 /** @param {'alert'|'yawn'} [kind] */

@@ -8,6 +8,22 @@
     "detection-experiments.js": {
       "source": "src/detection-experiments.js",
       "mode": "copy"
+    },
+    "lang.js": {
+      "source": "src/lang.js",
+      "mode": "copy"
+    },
+    "driver-overview.js": {
+      "source": "src/driver-overview.js",
+      "mode": "copy"
+    },
+    "driver-startup-guard.js": {
+      "source": "src/driver-startup-guard.js",
+      "mode": "copy"
+    },
+    "driver-i18n.js": {
+      "source": "src/driver-i18n.js",
+      "mode": "copy"
     }
   }
 }

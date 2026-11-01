@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v159';
+const CACHE = 'occulert-v161';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -39,10 +39,11 @@ const RUNTIME_ASSETS = [
   }
 ];
 const ALERT_AUDIO_ASSETS = [{ url: '/audio/alert.v1.wav', integrity: 'sha256-3fLbb34F09Mw3TsC1oy1Hkyg6pFnE5K5IbqP3YtPPCI=' }];
-const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v25.js","integrity":"sha256-S8uluKVXXdgoK0CsAq1fjEr5woQKuaCSDlc6Gk0Y9no="}];
+const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v26.js","integrity":"sha256-pu1bAEMCg5YWtZwyLPpAVhaV5/mmU3kubUCqClW5i7s="}];
 const EXPERIMENT_HELPER_ASSETS = [{"url":"/detection-experiments.v5.js","integrity":"sha256-8jgSH171aEJc65cFUJU0UgAyUQpdb+LVjjyYR/NosZY="}];
 const TASKS_RUNTIME_ASSETS = [{"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/vision_bundle.js", "integrity": "sha256-pCfCa2tALe6263Th9sdo0m7AzBWWlYyenj1RibfL9ao="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.js", "integrity": "sha256-4XDuZ91OFsGm/NiECiBmh+WlmyLCDkqQK8RFsJVFTXM="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.wasm", "integrity": "sha256-jaJ3pzOSbqzQR0uHBLNnQtbsMjHFeoYMW4id/48d+IY="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.js", "integrity": "sha256-6B1xWj1CzDNzYC6y96/3ldFkk022gOMklrZdq1N/llg="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.wasm", "integrity": "sha256-ooSDzULnToVb9evba0DZtmpbSeNelQILyXZp5oIqMZI="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/face_landmarker.task", "integrity": "sha256-ZBhOIpsmMQe8K4BMZiXbE0H/K7cxh0sLzC/mVE4Lyf8="}];
-const OPTIONAL_ASSETS = [...EXPERIMENT_HELPER_ASSETS, ...TASKS_RUNTIME_ASSETS];
+const DRIVER_I18N_ASSETS = [{url:'/driver-i18n.v1.js',integrity:"sha256-ZhTSOu5L3A6qve3fwfbqnT6OPkzBm2zVJa/lhSLduGg="}];
+const OPTIONAL_ASSETS = [...EXPERIMENT_HELPER_ASSETS, ...TASKS_RUNTIME_ASSETS, ...DRIVER_I18N_ASSETS];
 const OPTIONAL_PATHS = new Set(OPTIONAL_ASSETS.map(asset=>asset.url));
 const RUNTIME_INTEGRITY = new Map([...RUNTIME_ASSETS, ...ALERT_AUDIO_ASSETS, ...STARTUP_GUARD_ASSETS, ...OPTIONAL_ASSETS].map(asset => [asset.url, asset.integrity]));
 function selectedRuntimeAssets() {
@@ -56,7 +57,7 @@ function selectedRuntimeAssets() {
 }
 const SELECTED_RUNTIME_ASSETS = selectedRuntimeAssets();
 const STATIC_ASSETS = [
-  '/driver-overview.v1.js',
+  '/driver-overview.v2.js',
   '/driver-overview.v1.css',
   ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
   '/local-history.v2.js',
@@ -79,8 +80,8 @@ const STATIC_ASSETS = [
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v69.css',
-  '/driver-app.v104.js',
-  '/lang.v47.js',
+  '/driver-app.v105.js',
+  '/lang.v48.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
 ];
@@ -133,9 +134,9 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passwordless-auth.v62.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
-  '/driver-startup-guard.v25.js',
+  '/driver-startup-guard.v26.js',
   '/driver-app.v60.js',
-  '/driver-app.v104.js',
+  '/driver-app.v105.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
   ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
@@ -147,7 +148,7 @@ const CRITICAL_OFFLINE_ASSETS = [
   '/base.v47.css',
   '/app.html',
   '/driver-app.v69.css',
-  '/driver-app.v104.js',
+  '/driver-app.v105.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;

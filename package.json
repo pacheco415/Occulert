@@ -45,7 +45,7 @@
     "test:mediapipe": "node --test scripts/test-mediapipe-runtime.mjs",
     "test:fleet-followups": "node scripts/test-fleet-followups.mjs && node scripts/test-fleet-followups-db.mjs",
     "test:fleet-indexes": "node scripts/test-fleet-query-indexes.mjs",
-    "test:driver-startup": "node --test scripts/test-driver-startup.mjs",
+    "test:driver-startup": "node --test scripts/test-driver-startup.mjs scripts/test-driver-i18n.mjs",
     "test:local-pages": "node --test scripts/test-local-pages.mjs",
     "test:static-server": "node --test scripts/test-static-server.mjs",
     "test:auth-races": "node --test scripts/test-auth-races.mjs",

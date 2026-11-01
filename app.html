@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Occulert — AI Drowsiness Detection</title>
+<title lang="en" dir="ltr">Occulert — AI Drowsiness Detection</title>
 <meta name="description" content="Occulert uses on-device AI eye tracking to help detect driver fatigue. GPS and cloud fleet sync are optional and require user consent." />
 <meta name="theme-color" content="#050a0f" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
 
-<script id="driver-startup-guard" src="/driver-startup-guard.v25.js" integrity="sha256-S8uluKVXXdgoK0CsAq1fjEr5woQKuaCSDlc6Gk0Y9no=" crossorigin="anonymous" defer></script>
+<script id="driver-startup-guard" src="/driver-startup-guard.v26.js" integrity="sha256-pu1bAEMCg5YWtZwyLPpAVhaV5/mmU3kubUCqClW5i7s=" crossorigin="anonymous" defer></script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 
@@ -21,206 +21,208 @@
 <script src="/static-page.v60.js" defer></script>
 <script src="/page-actions.v2.js" defer></script>
 </head>
-<body>
-<a class="skip-link" href="#main-content">Skip to main content</a>
+<body data-driver-owned data-no-i18n lang="en">
+<a class="skip-link" href="#main-content" lang="en" dir="ltr">Skip to main content</a>
 <div class="top">
   <div class="brandrow">
-    <a class="brand" href="/" aria-label="Occulert home">
+    <a class="brand" href="/" aria-label="Occulert home" lang="en" dir="ltr">
       <span class="brand-mark"><svg width="23" height="23" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/><circle cx="12" cy="12" r="1.2" fill="#111"/></svg></span>Occulert
     </a>
     <div class="navlinks">
-      <a href="/">Home</a>
-      <a class="active" href="/app.html">Driver App</a>
-      <a href="/fleet-dashboard.html">Fleet Dashboard</a>
-      <a href="/session-history.html">History</a>
+      <a href="/" lang="en" dir="ltr">Home</a>
+      <a class="active" href="/app.html" lang="en" dir="ltr">Driver App</a>
+      <a href="/fleet-dashboard.html" lang="en" dir="ltr">Fleet Dashboard</a>
+      <a href="/session-history.html" lang="en" dir="ltr">History</a>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
-    <button class="intensity-btn" id="intensityToggle" aria-label="Change display brightness" title="Display intensity: Dim / Standard / Bright">
-      <span class="intensity-icon" id="intensityIcon">🔆</span>
-      <span class="intensity-label" id="intensityLabel">Standard</span>
+    <button class="intensity-btn" id="intensityToggle" aria-label="Change display brightness" title="Display intensity: Dim / Standard / Bright" lang="en" dir="ltr">
+      <span class="intensity-icon" id="intensityIcon" lang="en" dir="ltr">🔆</span>
+      <span class="intensity-label" id="intensityLabel" lang="en" dir="ltr">Standard</span>
     </button>
-    <div class="status" id="status">LOADING</div>
+    <div class="status" id="status" lang="en" dir="ltr">LOADING</div>
   </div>
 </div>
 <main class="app" id="main-content" tabindex="-1">
   <div class="camera">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
-    <div class="overlay" id="overlay" role="region" aria-labelledby="overlayTitle" tabindex="0"><div>
-      <h2 id="overlayTitle" style="font-size:22px;font-weight:900;letter-spacing:-0.5px">AI Fatigue Monitoring</h2>
-      <p class="small" id="overlayText">Supplemental prototype only. Keep your eyes on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.</p>
+    <div class="overlay" id="overlay" lang="en" dir="ltr" role="region" aria-labelledby="overlayTitle" tabindex="0"><div>
+      <h2 id="overlayTitle" style="font-size:22px;font-weight:900;letter-spacing:-0.5px" lang="en" dir="ltr">AI Fatigue Monitoring</h2>
+      <p class="small" id="overlayText" lang="en" dir="ltr">Supplemental prototype only. Keep your eyes on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.</p>
       <div class="phone-guide" id="phoneGuide">
-        <div class="guide-step"><div class="guide-icon">&#128241;</div><div class="guide-label">Mount on dash</div></div>
-        <div class="guide-arrow">&#8594;</div>
-        <div class="guide-step"><div class="guide-icon">&#128065;</div><div class="guide-label">Face centered</div></div>
-        <div class="guide-arrow">&#8594;</div>
-        <div class="guide-step"><div class="guide-icon">&#9728;</div><div class="guide-label">Good lighting</div></div>
-        <div class="guide-arrow">&#8594;</div>
-        <div class="guide-step"><div class="guide-icon">&#128274;</div><div class="guide-label">Screen on</div></div>
+        <div class="guide-step"><div class="guide-icon" lang="en" dir="ltr">&#128241;</div><div class="guide-label" lang="en" dir="ltr">Mount on dash</div></div>
+        <div class="guide-arrow" lang="en" dir="ltr">&#8594;</div>
+        <div class="guide-step"><div class="guide-icon" lang="en" dir="ltr">&#128065;</div><div class="guide-label" lang="en" dir="ltr">Face centered</div></div>
+        <div class="guide-arrow" lang="en" dir="ltr">&#8594;</div>
+        <div class="guide-step"><div class="guide-icon" lang="en" dir="ltr">&#9728;</div><div class="guide-label" lang="en" dir="ltr">Good lighting</div></div>
+        <div class="guide-arrow" lang="en" dir="ltr">&#8594;</div>
+        <div class="guide-step"><div class="guide-icon" lang="en" dir="ltr">&#128274;</div><div class="guide-label" lang="en" dir="ltr">Screen on</div></div>
       </div>
-      <div class="hint" id="overlayHint"><strong>iPhone tip:</strong> Keep Safari open, screen unlocked, and Low Power Mode off for best reliability.</div>
+      <div class="hint" id="overlayHint" lang="en" dir="ltr"><strong lang="en" dir="ltr">iPhone tip:</strong> Keep Safari open, screen unlocked, and Low Power Mode off for best reliability.</div>
     </div></div>
-    <div class="alertScreen" id="alertScreen" role="region" aria-labelledby="alertTitle" tabindex="0"><div><h2 id="alertTitle" style="font-size:48px;color:#fff;margin:0">DROWSY ALERT</h2><p id="alertSub">Pull over safely</p></div></div>
+    <div class="alertScreen" id="alertScreen" lang="en" dir="ltr" role="region" aria-labelledby="alertTitle" tabindex="0"><div><h2 id="alertTitle" style="font-size:48px;color:#fff;margin:0" lang="en" dir="ltr">DROWSY ALERT</h2><p id="alertSub" lang="en" dir="ltr">Pull over safely</p></div></div>
   </div>
-  <aside class="panel" id="driverPanel" aria-label="Occulert controls and metrics">
+  <aside class="panel" id="driverPanel" aria-label="Occulert controls and metrics" lang="en" dir="ltr">
     <h1 id="driverPanelTitle" style="font-size:18px;line-height:1.2;color:var(--text);margin:0 0 12px">Driver monitoring</h1>
 
     <div class="card notice-card" id="startupNotice" role="status" aria-live="polite">
-      <h2 id="startupTitle" style="font-size:18px;margin:0 0 8px">Loading app…</h2>
-      <p class="small" id="startupMessage">Monitoring controls will be available when the app finishes loading.</p>
-      <button class="btn primary" type="button" id="startupReload" hidden>Reload app</button>
-      <a class="btn" id="startupRetryLink" href="/app.html">Reload when safely parked</a>
+      <h2 id="startupTitle" data-driver-text='["start.loading"]' style="font-size:18px;margin:0 0 8px" lang="en" dir="ltr">Loading app…</h2>
+      <p class="small" id="startupMessage" lang="en" dir="ltr">Monitoring controls will be available when the app finishes loading.</p>
+      <button class="btn primary" type="button" id="startupReload" hidden lang="en" dir="ltr">Reload app</button>
+      <a class="btn" id="startupRetryLink" href="/app.html" lang="en" dir="ltr">Reload when safely parked</a>
     </div>
-    <fieldset id="driverControls" disabled aria-label="Monitoring controls" style="border:0;padding:0;margin:0;min-width:0">
+    <fieldset id="driverControls" disabled aria-label="Monitoring controls" style="border:0;padding:0;margin:0;min-width:0" lang="en" dir="ltr">
 
 
     <div id="monitoringEssentials">
-    <button class="btn primary" id="startBtn" disabled>Loading app…</button>
-    <section id="observerLabels" class="card" tabindex="0" aria-label="Parked observer labeling" hidden style="display:none">
-      <h2 style="font-size:18px">Parked observer labeling</h2>
-      <p class="small">Remain safely parked. An independent observer marks episodes without detector indicators or cues. Space: drowsy. H: high fatigue. Press again to end.</p>
-      <p id="observerLabelStatus" role="status" aria-live="polite">Start a parked session to label.</p>
+    <button class="btn primary" id="startBtn" data-driver-text='["start.loading"]' disabled lang="en" dir="ltr">Loading app…</button>
+    <section id="observerLabels" lang="en" dir="ltr" class="card" tabindex="0" aria-label="Parked observer labeling" hidden style="display:none">
+      <h2 style="font-size:18px" lang="en" dir="ltr">Parked observer labeling</h2>
+      <p class="small" lang="en" dir="ltr">Remain safely parked. An independent observer marks episodes without detector indicators or cues. Space: drowsy. H: high fatigue. Press again to end.</p>
+      <p id="observerLabelStatus" role="status" aria-live="polite" lang="en" dir="ltr">Start a parked session to label.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button id="observerDrowsy" type="button" class="btn" aria-pressed="false" disabled style="min-height:64px;flex:1">Drowsy · Space</button>
-        <button id="observerHighFatigue" type="button" class="btn" aria-pressed="false" disabled style="min-height:64px;flex:1">High fatigue · H</button>
+        <button id="observerDrowsy" type="button" class="btn" aria-pressed="false" disabled style="min-height:64px;flex:1" lang="en" dir="ltr">Drowsy · Space</button>
+        <button id="observerHighFatigue" type="button" class="btn" aria-pressed="false" disabled style="min-height:64px;flex:1" lang="en" dir="ltr">High fatigue · H</button>
       </div>
-      <button id="exportObserverEpisodes" type="button" class="btn" hidden>Export observer episodes</button>
+      <button id="exportObserverEpisodes" type="button" class="btn" hidden lang="en" dir="ltr">Export observer episodes</button>
     </section>
-    <div id="monitoringMessages" role="region" aria-label="Monitoring status and guidance" tabindex="0">
-    <div class="screen-warning" id="screenWarning" style="display:none">
-      ⚠️ <strong>Monitoring stopped after screen lock or leaving this tab.</strong> Return to Occulert and restart only while safely parked.
+    <div id="monitoringMessages" role="region" aria-label="Monitoring status and guidance" tabindex="0" lang="en" dir="ltr">
+    <div class="screen-warning" id="screenWarning" lang="en" dir="ltr" style="display:none">
+      ⚠️ <strong lang="en" dir="ltr">Monitoring stopped after screen lock or leaving this tab.</strong> Return to Occulert and restart only while safely parked.
     </div>
-    <div class="card state-card" id="stateCard" tabindex="-1" role="status" aria-live="polite" aria-atomic="true"><div class="label">Monitoring Status</div><div class="state-value" id="driveState">NOT MONITORING</div><p class="metric-note" id="driveHint">Monitoring has not started.</p></div>
-    <p class="card notice-card small" id="viewportWarning" role="status" aria-live="polite" hidden></p>
+    <div class="card state-card" id="stateCard" tabindex="-1" role="status" aria-live="polite" aria-atomic="true"><div class="label" lang="en" dir="ltr">Monitoring Status</div><div class="state-value" id="driveState" lang="en" dir="ltr">NOT MONITORING</div><p class="metric-note" id="driveHint" lang="en" dir="ltr">Monitoring has not started.</p></div>
+    <p class="card notice-card small" id="viewportWarning" lang="en" dir="ltr" role="status" aria-live="polite" hidden></p>
     </div>
     </div>
-    <div id="driverSecondary" role="region" aria-label="Session details and safety notice" tabindex="0">
-    <div class="timer-card" id="timerCard"><span class="timer-label">Session Time</span><span class="timer-value" id="sessionTimer">00:00</span></div>
-    <div class="card notice-card" id="driverSafetyNotice"><div class="label">Safety Notice</div><p class="small">Occulert is a supplemental prototype only, not a certified safety, medical, emergency, insurance, legal, employment, fleet compliance, or transportation compliance device. It may miss drowsiness and may trigger false alerts. If you feel tired or unsafe, pull over safely and rest.</p></div>
+    <div id="driverSecondary" role="region" aria-label="Session details and safety notice" tabindex="0" lang="en" dir="ltr">
+    <div class="timer-card" id="timerCard"><span class="timer-label" lang="en" dir="ltr">Session Time</span><span class="timer-value" id="sessionTimer" lang="en" dir="ltr">00:00</span></div>
+    <div class="card notice-card" id="driverSafetyNotice" lang="en" dir="ltr"><div class="label" lang="en" dir="ltr">Safety Notice</div><p class="small" lang="en" dir="ltr">Occulert is a supplemental prototype only, not a certified safety, medical, emergency, insurance, legal, employment, fleet compliance, or transportation compliance device. It may miss drowsiness and may trigger false alerts. If you feel tired or unsafe, pull over safely and rest.</p></div>
 
-    <div id="breakBanner" role="alert" style="display:none;background:rgba(255,170,0,.12);border:1px solid #ffaa00;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13px;color:#ffcc44;font-weight:700;line-height:1.5;"></div>
-    <div id="driverStatusBadges" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center" aria-live="polite">
-      <span id="trackingBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(0,255,136,.08);border:1px solid currentColor;white-space:nowrap">Tracking status unknown</span>
-      <span id="lightBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,170,0,.08);border:1px solid currentColor;white-space:nowrap">Low light</span>
+    <div id="breakBanner" lang="en" dir="ltr" role="alert" style="display:none;background:rgba(255,170,0,.12);border:1px solid #ffaa00;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13px;color:#ffcc44;font-weight:700;line-height:1.5;"></div>
+    <div id="driverStatusBadges" lang="en" dir="ltr" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center" aria-live="polite">
+      <span id="trackingBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(0,255,136,.08);border:1px solid currentColor;white-space:nowrap" lang="en" dir="ltr">Tracking status unknown</span>
+      <span id="lightBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,170,0,.08);border:1px solid currentColor;white-space:nowrap" lang="en" dir="ltr">Low light</span>
       <span id="batteryBadge" style="display:none;font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;background:rgba(255,68,68,.08);border:1px solid currentColor;color:#ff6666;white-space:nowrap"></span>
     </div>
 
-    <section id="parkedControls" aria-label="Parked setup and diagnostics">
-    <p class="small">Set up and review these controls only while safely parked. They are hidden during monitoring.</p>
+    <section id="parkedControls" aria-label="Parked setup and diagnostics" lang="en" dir="ltr">
+    <div class="intensity-row"><label id="driverLanguageLabel" for="driverLanguage" lang="en" dir="ltr">Language</label><select id="driverLanguage" style="max-width:100%;height:44px;min-height:44px;font-size:16px" aria-describedby="driverLanguageNotice"><option value="en" lang="en">English</option><option value="es" lang="es">Español</option><option value="fr" lang="fr">Français</option><option value="pt" lang="pt">Português</option><option value="de" lang="de">Deutsch</option><option value="ar" lang="ar">العربية</option><option value="zh" lang="zh">中文</option><option value="ja" lang="ja">日本語</option></select></div>
+    <p id="driverLanguageNotice" class="small" lang="en" dir="ltr">Safety guidance and voice cues remain in English.</p>
+    <p class="small" lang="en" dir="ltr">Set up and review these controls only while safely parked. They are hidden during monitoring.</p>
     <section class="card" id="driverOverview" aria-labelledby="driverOverviewTitle">
-      <div class="overview-heading"><h2 id="driverOverviewTitle">Your recent sessions</h2><button id="overviewRefresh" type="button">Refresh</button></div>
-      <p class="small" id="overviewLastSession">Loading saved sessions…</p>
-      <dl class="overview-metrics"><div><dt>Saved sessions</dt><dd id="overviewSessions">—</dd></div><div><dt>Recorded minutes</dt><dd id="overviewMinutes">—</dd></div><div><dt>Recorded alerts</dt><dd id="overviewAlerts">—</dd></div></dl>
-      <p class="small" id="overviewNextStep">Complete setup and review sessions only while parked.</p>
-      <div class="overview-actions"><a class="btn" href="/session-history.html">Review History</a><button class="btn" id="overviewAlertCheck" type="button">Check sound &amp; vibration</button></div>
-      <p class="small" id="overviewCoverage">Last 7 days · saved on this browser. Local records do not confirm cloud delivery.</p>
+      <div class="overview-heading"><h2 id="driverOverviewTitle" lang="en" dir="ltr">Your recent sessions</h2><button id="overviewRefresh" type="button" lang="en" dir="ltr">Refresh</button></div>
+      <p class="small" id="overviewLastSession" data-driver-text='["overview.loading"]' lang="en" dir="ltr">Loading saved sessions…</p>
+      <dl class="overview-metrics"><div><dt lang="en" dir="ltr">Saved sessions</dt><dd id="overviewSessions" lang="en" dir="ltr">—</dd></div><div><dt lang="en" dir="ltr">Recorded minutes</dt><dd id="overviewMinutes" lang="en" dir="ltr">—</dd></div><div><dt lang="en" dir="ltr">Recorded alerts</dt><dd id="overviewAlerts" lang="en" dir="ltr">—</dd></div></dl>
+      <p class="small" id="overviewNextStep" lang="en" dir="ltr">Complete setup and review sessions only while parked.</p>
+      <div class="overview-actions"><a class="btn" href="/session-history.html" lang="en" dir="ltr">Review History</a><button class="btn" id="overviewAlertCheck" type="button" lang="en" dir="ltr">Check sound &amp; vibration</button></div>
+      <p class="small" id="overviewCoverage" lang="en" dir="ltr">Last 7 days · saved on this browser. Local records do not confirm cloud delivery.</p>
     </section>
     <div class="camera-source-row" id="cameraSourceRow" hidden>
-      <label for="cameraSourceSelect">Camera</label>
+      <label for="cameraSourceSelect" lang="en" dir="ltr">Camera</label>
       <div class="camera-source-controls">
         <select id="cameraSourceSelect" aria-describedby="cameraSourceHint">
-          <option value="">Automatic (browser choice)</option>
+          <option value="" data-driver-text='["camera.automatic"]'>Automatic (browser choice)</option>
         </select>
-        <button type="button" id="cameraRefreshBtn">Find cameras</button>
+        <button type="button" id="cameraRefreshBtn" lang="en" dir="ltr">Find cameras</button>
       </div>
-      <p class="camera-source-hint" id="cameraSourceHint" aria-live="polite">Choose your Mac camera to keep Safari from using your iPhone.</p>
+      <p class="camera-source-hint" id="cameraSourceHint" lang="en" dir="ltr" aria-live="polite">Choose your Mac camera to keep Safari from using your iPhone.</p>
     </div>
 
 
     <div class="intensity-row">
-      <label>&#128261; Display Intensity</label>
+      <label lang="en" dir="ltr">&#128261; Display Intensity</label>
       <div class="intensity-presets">
-        <button class="preset-btn" data-intensity="dim" id="presetDim">Dim</button>
-        <button class="preset-btn active" data-intensity="standard" id="presetStandard">Standard</button>
-        <button class="preset-btn" data-intensity="bright" id="presetBright">Bright</button>
+        <button class="preset-btn" data-intensity="dim" id="presetDim" lang="en" dir="ltr">Dim</button>
+        <button class="preset-btn active" data-intensity="standard" id="presetStandard" lang="en" dir="ltr">Standard</button>
+        <button class="preset-btn" data-intensity="bright" id="presetBright" lang="en" dir="ltr">Bright</button>
       </div>
     </div>
 
 
-    <div class="intensity-row" id="sensitivityRow">
-      <label>🎚 Alert Sensitivity</label>
+    <div class="intensity-row" id="sensitivityRow" lang="en" dir="ltr">
+      <label lang="en" dir="ltr">🎚 Alert Sensitivity</label>
       <div class="intensity-presets">
-        <button class="preset-btn" data-sensitivity="low" id="sensitivityLow" title="Low: triggers only on sustained eye closure">Low</button>
-        <button class="preset-btn active" data-sensitivity="medium" id="sensitivityMedium" title="Medium: balanced detection (default)">Med</button>
-        <button class="preset-btn" data-sensitivity="high" id="sensitivityHigh" title="High: triggers earlier, more sensitive">High</button>
+        <button class="preset-btn" data-sensitivity="low" id="sensitivityLow" title="Low: triggers only on sustained eye closure" lang="en" dir="ltr">Low</button>
+        <button class="preset-btn active" data-sensitivity="medium" id="sensitivityMedium" title="Medium: balanced detection (default)" lang="en" dir="ltr">Med</button>
+        <button class="preset-btn" data-sensitivity="high" id="sensitivityHigh" title="High: triggers earlier, more sensitive" lang="en" dir="ltr">High</button>
       </div>
     </div>
 
 
-    <div class="night-row"><label for="nightOpacity">&#127761; Night Alert Brightness<span style="font-size:10px;color:var(--text3);margin-left:6px;font-weight:400;font-style:italic">Alert screen opacity</span></label><div class="night-slider"><input type="range" id="nightOpacity" min="30" max="95" value="72" step="1"><span class="night-val" id="nightVal">72%</span></div></div>
-    <div class="card privacy-card"><div class="label">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b>Enable GPS for this session</b><br><span class="small">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b>Enable cloud session sync</b><br><span class="small">Requires sign-in and saves session totals plus alerts. Camera images are never uploaded. Otherwise data stays local.</span></span></label><p id="cloudEventStatus" class="small" role="status" aria-live="polite" hidden></p></div>
-    <div class="card"><div class="label">Calibration</div><div class="value" id="calibration">NOT STARTED</div><div class="cal-bar-wrap"><div class="cal-bar-fill" id="calibrationFill"></div></div><p class="metric-note" id="calHint">Keep your face centered and eyes open during calibration.</p></div>
+    <div class="night-row"><label for="nightOpacity"><span id="nightBrightnessLabel" lang="en" dir="ltr">&#127761; Night Alert Brightness</span><span id="nightOpacityHelp" style="font-size:10px;color:var(--text3);margin-left:6px;font-weight:400;font-style:italic" lang="en" dir="ltr">Alert screen opacity</span></label><div class="night-slider"><input type="range" id="nightOpacity" min="30" max="95" value="72" step="1"><span class="night-val" id="nightVal" lang="en" dir="ltr">72%</span></div></div>
+    <div class="card privacy-card" lang="en" dir="ltr"><div class="label" lang="en" dir="ltr">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b lang="en" dir="ltr">Enable GPS for this session</b><br><span class="small" lang="en" dir="ltr">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b lang="en" dir="ltr">Enable cloud session sync</b><br><span class="small" lang="en" dir="ltr">Requires sign-in and saves session totals plus alerts. Camera images are never uploaded. Otherwise data stays local.</span></span></label><p id="cloudEventStatus" class="small" role="status" aria-live="polite" hidden></p></div>
+    <div class="card"><div class="label" lang="en" dir="ltr">Calibration</div><div class="value" id="calibration" lang="en" dir="ltr">NOT STARTED</div><div class="cal-bar-wrap"><div class="cal-bar-fill" id="calibrationFill"></div></div><p class="metric-note" id="calHint" lang="en" dir="ltr">Keep your face centered and eyes open during calibration.</p></div>
     <div class="grid">
-      <div class="card"><div class="label">Fatigue</div><div class="value" id="fatigue">0</div><div class="bar"><div class="fill" id="fatigueFill"></div></div></div>
-      <div class="card"><div class="label">Confidence</div><div class="value" id="confidence">0%</div><div class="bar"><div class="fill" id="confidenceFill"></div></div></div>
-      <div class="card"><div class="label">Face</div><div class="value" id="faceState">--</div></div>
-      <div class="card"><div class="label">EAR</div><div class="value" id="ear">--</div></div>
-      <div class="card"><div class="label">PERCLOS</div><div class="value" id="perclos">0%</div></div>
-      <div class="card"><div class="label">Risk</div><div class="value" id="risk">--</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Fatigue</div><div dir="ltr" class="value" id="fatigue" lang="en">0</div><div class="bar"><div class="fill" id="fatigueFill"></div></div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Confidence</div><div dir="ltr" class="value" id="confidence" lang="en">0%</div><div class="bar"><div class="fill" id="confidenceFill"></div></div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Face</div><div dir="ltr" class="value" id="faceState" lang="en">--</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">EAR</div><div dir="ltr" class="value" id="ear" lang="en">--</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">PERCLOS</div><div dir="ltr" class="value" id="perclos" lang="en">0%</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Risk</div><div dir="ltr" class="value" id="risk" lang="en">--</div></div>
     </div>
     <div class="grid">
-      <div class="card"><div class="label">Microsleeps</div><div class="value" id="microsleeps">0</div></div>
-      <div class="card"><div class="label">Head Nods</div><div class="value" id="nods">0</div></div>
-      <div class="card"><div class="label">Distraction</div><div class="value" id="distraction">0s</div></div>
-      <div class="card"><div class="label">GPS</div><div class="value gps" id="gps">OFF</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Microsleeps</div><div dir="ltr" class="value" id="microsleeps" lang="en">0</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Head Nods</div><div dir="ltr" class="value" id="nods" lang="en">0</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Distraction</div><div dir="ltr" class="value" id="distraction" lang="en">0s</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">GPS</div><div dir="ltr" class="value gps" id="gps" lang="en">OFF</div></div>
     </div>
-    <div class="card"><div class="label">Risk State</div><div class="value" id="riskDetail">--</div><p class="metric-note">Weighted score combines PERCLOS, microsleeps, eye closure, head movement, distraction time, confidence, and repeated alerts. GPS is optional.</p></div>
+    <div class="card"><div class="label" lang="en" dir="ltr">Risk State</div><div dir="ltr" class="value" id="riskDetail" lang="en">--</div><p class="metric-note" lang="en" dir="ltr">Weighted score combines PERCLOS, microsleeps, eye closure, head movement, distraction time, confidence, and repeated alerts. GPS is optional.</p></div>
     <div class="grid">
-      <div class="card"><div class="label">Alerts</div><div class="value" id="alerts">0</div></div>
-      <div class="card"><div class="label">Escalation</div><div class="value" id="escalation">0</div></div>
-      <div class="card"><div class="label">Cloud Sync</div><div class="value" id="sync">LOCAL</div></div>
-      <div class="card"><div class="label">Location</div><div class="value" id="location">--</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Alerts</div><div dir="ltr" class="value" id="alerts" lang="en">0</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Escalation</div><div dir="ltr" class="value" id="escalation" lang="en">0</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Cloud Sync</div><div dir="ltr" class="value" id="sync" lang="en">LOCAL</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Location</div><div dir="ltr" class="value" id="location" lang="en">--</div></div>
     </div>
-    <details class="dev-tools"><summary>Parked diagnostics</summary><p class="small">Run the alert check while parked. It does not add an alert or change a saved session.</p><button class="btn demo" id="demoBtn" type="button">Test sound and vibration</button><p class="small" id="alertCheckResult" role="status" aria-live="polite"></p><button class="btn" id="resetBtn" type="button" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8;margin-top:8px;margin-bottom:0;font-size:12px;padding:10px">Clear on-screen diagnostics</button></details>
-    <div class="card"><div class="label">Session Report</div><p id="experimentStatus" role="status" hidden></p><button id="exportDetectionTrace" type="button" class="btn" hidden>Export parked detection comparison</button><div class="report" id="report"></div></div>
+    <details class="dev-tools"><summary lang="en" dir="ltr">Parked diagnostics</summary><p class="small" lang="en" dir="ltr">Run the alert check while parked. It does not add an alert or change a saved session.</p><button class="btn demo" id="demoBtn" type="button" lang="en" dir="ltr">Test sound and vibration</button><p class="small" id="alertCheckResult" lang="en" dir="ltr" role="status" aria-live="polite"></p><button class="btn" id="resetBtn" type="button" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8;margin-top:8px;margin-bottom:0;font-size:12px;padding:10px" lang="en" dir="ltr">Clear on-screen diagnostics</button></details>
+    <div class="card"><div class="label" lang="en" dir="ltr">Session Report</div><p id="experimentStatus" lang="en" dir="ltr" role="status" hidden></p><button id="exportDetectionTrace" type="button" class="btn" hidden lang="en" dir="ltr">Export parked detection comparison</button><div class="report" id="report" lang="en" dir="ltr"></div></div>
     <div class="card" id="feedbackCard" hidden>
-      <div class="label">Post-drive alert feedback</div>
-      <p class="small">Review this drive while parked. Your observation stays in this browser's local history unless you choose to share it.</p>
+      <div class="label" lang="en" dir="ltr">Post-drive alert feedback</div>
+      <p class="small" lang="en" dir="ltr">Review this drive while parked. Your observation stays in this browser's local history unless you choose to share it.</p>
       <form id="feedbackForm">
         <fieldset style="border:0;padding:0;margin:0">
-          <legend class="small">How were the alerts on this drive?</legend>
-          <label class="small review-option"><input type="radio" name="alertReview" value="useful" required> Useful</label>
-          <label class="small review-option"><input type="radio" name="alertReview" value="unnecessary"> Unnecessary</label>
-          <label class="small review-option"><input type="radio" name="alertReview" value="missed"> Missed an alert</label>
-          <label class="small review-option"><input type="radio" name="alertReview" value="late"> Too late</label>
-          <label class="small review-option"><input type="radio" name="alertReview" value="not_assessed"> Cannot assess</label>
+          <legend class="small" lang="en" dir="ltr">How were the alerts on this drive?</legend>
+          <label class="small review-option"><input type="radio" name="alertReview" value="useful" required> <span id="review-useful" lang="en" dir="ltr">Useful</span></label>
+          <label class="small review-option"><input type="radio" name="alertReview" value="unnecessary"> <span id="review-unnecessary" lang="en" dir="ltr">Unnecessary</span></label>
+          <label class="small review-option"><input type="radio" name="alertReview" value="missed"> <span id="review-missed" lang="en" dir="ltr">Missed an alert</span></label>
+          <label class="small review-option"><input type="radio" name="alertReview" value="late"> <span id="review-late" lang="en" dir="ltr">Too late</span></label>
+          <label class="small review-option"><input type="radio" name="alertReview" value="not_assessed"> <span id="review-cannotAssess" lang="en" dir="ltr">Cannot assess</span></label>
         </fieldset>
-        <label class="small" for="feedbackNote">Optional note about when and what happened</label>
+        <label class="small" for="feedbackNote" lang="en" dir="ltr">Optional note about when and what happened</label>
         <textarea id="feedbackNote" maxlength="500" rows="3" style="width:100%;box-sizing:border-box;margin:8px 0;background:var(--bg2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px"></textarea>
-        <button class="btn" type="submit">Save review on this device</button>
+        <button class="btn" type="submit" lang="en" dir="ltr">Save review on this device</button>
       </form>
-      <p id="feedbackStatus" class="small" role="status" aria-live="polite"></p>
+      <p id="feedbackStatus" lang="en" dir="ltr" class="small" role="status" aria-live="polite"></p>
     </div>
-    <div class="card"><div class="label">Event Log</div><div id="log"></div></div>
+    <div class="card"><div class="label" lang="en" dir="ltr">Event Log</div><div id="log" lang="en" dir="ltr"></div></div>
 
 
 
 
     <div class="grid" style="margin-bottom:10px">
-      <div class="card"><div class="label">Yawns</div><div class="value" id="yawnCountEl">0</div></div>
-      <div class="card"><div class="label">MAR Signal</div><div class="value" style="font-size:12px;color:var(--text2)" id="marEl">--</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">Yawns</div><div dir="ltr" class="value" id="yawnCountEl" lang="en">0</div></div>
+      <div class="card"><div class="label" lang="en" dir="ltr">MAR Signal</div><div dir="ltr" class="value" style="font-size:12px;color:var(--text2)" id="marEl" lang="en">--</div></div>
     </div>
 
 
     <div class="card" style="padding:10px 12px;margin-bottom:10px">
-      <div class="label" style="margin-bottom:6px">Alertness Over Time</div>
+      <div class="label" style="margin-bottom:6px" lang="en" dir="ltr">Alertness Over Time</div>
       <canvas id="alertnessChart" style="width:100%;height:60px;display:block;border-radius:6px;background:rgba(0,0,0,.3)"></canvas>
     </div>
 
 
     <div class="card" style="padding:12px 14px;margin-bottom:10px">
-      <div class="label" style="margin-bottom:10px">Controls</div>
+      <div class="label" style="margin-bottom:10px" lang="en" dir="ltr">Controls</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-        <button id="voiceToggleBtn" data-page-action="toggleVoice" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">🔇 Voice OFF</button>
-        <span style="font-size:11px;color:#94a3b8">Safety alerts cannot be snoozed while monitoring.</span>
+        <button id="voiceToggleBtn" data-page-action="toggleVoice" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap" lang="en" dir="ltr">🔇 Voice OFF</button>
+        <span style="font-size:11px;color:#94a3b8" lang="en" dir="ltr">Safety alerts cannot be snoozed while monitoring.</span>
       </div>
     </div>
 
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <button data-page-action="exportCSV" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">⬇️ Export CSV</button>
-      <button id="pwaInstallBtn" data-page-action="triggerPWAInstall" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px">📲 Add to Home Screen</button>
+      <button data-page-action="exportCSV" style="flex:1;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#06b6d4;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px" lang="en" dir="ltr">⬇️ Export CSV</button>
+      <button id="pwaInstallBtn" data-page-action="triggerPWAInstall" style="display:none;flex:1;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.35);color:#60a5fa;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;min-width:120px" lang="en" dir="ltr">📲 Add to Home Screen</button>
     </div>
     </section>
     </div>
@@ -230,36 +232,37 @@
 <script src="/occulert-backend.v90.js" defer></script>
 <script src="/security-utils.v47.js" defer></script>
 <script src="/local-history.v2.js" defer></script>
-<script src="/driver-app.v104.js" defer></script>
-<script src="/driver-overview.v1.js" defer></script>
-<script src="/lang.v47.js" defer></script>
+<script src="/driver-app.v105.js" defer></script>
+<script src="/driver-overview.v2.js" defer></script>
+<template id="driverCatalog"><script src="/driver-i18n.v1.js" defer integrity="sha256-ZhTSOu5L3A6qve3fwfbqnT6OPkzBm2zVJa/lhSLduGg=" crossorigin="anonymous"></script></template>
+<script src="/lang.v48.js" defer></script>
 
 
-<div id="iosInstallModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom)">
+<div id="iosInstallModal" lang="en" dir="ltr" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom)">
   <div style="background:#0f1e2e;border:1px solid #1a3a4a;border-radius:20px 20px 0 0;padding:28px 24px 32px;width:100%;max-width:480px;position:relative">
-    <button data-page-action="closeIOSInstallModal" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1">✕</button>
+    <button data-page-action="closeIOSInstallModal" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1" lang="en" dir="ltr">✕</button>
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
       <img src="/occulert-logo-main-192.png" width="52" height="52" loading="lazy" decoding="async" style="width:52px;height:52px;border-radius:12px" alt="Occulert">
       <div>
-        <div style="font-weight:900;font-size:17px;color:#fff">Add Occulert to Home Screen</div>
-        <div style="font-size:13px;color:#94a3b8;margin-top:3px">Install for the best experience</div>
+        <div id="iosInstallTitle" style="font-weight:900;font-size:17px;color:#fff" lang="en" dir="ltr">Add Occulert to Home Screen</div>
+        <div style="font-size:13px;color:#94a3b8;margin-top:3px" lang="en" dir="ltr">Install for the best experience</div>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:22px">
       <div style="display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px 14px">
-        <span style="font-size:26px;flex-shrink:0">1️⃣</span>
-        <span style="font-size:14px;color:#c8e8f0">Tap the <strong style="color:#fff">Share</strong> button <span style="font-size:18px">⎋</span> at the bottom of Safari</span>
+        <span style="font-size:26px;flex-shrink:0" lang="en" dir="ltr">1️⃣</span>
+        <span style="font-size:14px;color:#c8e8f0" lang="en" dir="ltr">Tap the <strong style="color:#fff" lang="en" dir="ltr">Share</strong> button <span style="font-size:18px" lang="en" dir="ltr">⎋</span> at the bottom of Safari</span>
       </div>
       <div style="display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px 14px">
-        <span style="font-size:26px;flex-shrink:0">2️⃣</span>
-        <span style="font-size:14px;color:#c8e8f0">Scroll down and tap <strong style="color:#fff">Add to Home Screen</strong></span>
+        <span style="font-size:26px;flex-shrink:0" lang="en" dir="ltr">2️⃣</span>
+        <span style="font-size:14px;color:#c8e8f0" lang="en" dir="ltr">Scroll down and tap <strong style="color:#fff" lang="en" dir="ltr">Add to Home Screen</strong></span>
       </div>
       <div style="display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px 14px">
-        <span style="font-size:26px;flex-shrink:0">3️⃣</span>
-        <span style="font-size:14px;color:#c8e8f0">Tap <strong style="color:#fff">Add</strong> in the top right corner</span>
+        <span style="font-size:26px;flex-shrink:0" lang="en" dir="ltr">3️⃣</span>
+        <span style="font-size:14px;color:#c8e8f0" lang="en" dir="ltr">Tap <strong style="color:#fff" lang="en" dir="ltr">Add</strong> in the top right corner</span>
       </div>
     </div>
-    <div style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#94a3b8;text-align:center">
+    <div style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#94a3b8;text-align:center" lang="en" dir="ltr">
       ✅ Once installed, Occulert runs fullscreen with faster startup and notification support
     </div>
   </div>

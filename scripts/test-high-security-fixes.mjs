@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
+import { parse } from 'acorn';
 import {
   confirmedEyeStateForAlert,
   deriveAlertLevel,
@@ -148,7 +149,10 @@ test('web copy and runtime disclose and enforce foreground-only monitoring', asy
     ? app.slice(handlerStart, handlerEnd)
     : '';
   assert.ok(handlerSource, 'foreground-loss handler must remain directly testable');
-  const logs = [], stoppedReasons = [];
+  const pauseUi = parse(app,{ecmaVersion:2022,sourceType:'script'}).body.filter(node => node.type==='FunctionDeclaration' && node.id.name==='pauseUi');
+  assert.equal(pauseUi.length,1,'Execute the real pause-overlay dependency of the foreground handler');
+  const pauseUiSource = app.slice(pauseUi[0].start,pauseUi[0].end);
+  const logs = [], stoppedReasons = [], overlays = [];
   let stopCount = 0;
   const context = {
     document: { visibilityState: 'hidden' },
@@ -161,13 +165,13 @@ test('web copy and runtime disclose and enforce foreground-only monitoring', asy
     Date,
     log: (message) => logs.push(message),
     showStoppedReason: message => stoppedReasons.push(message),
-    setOverlay: () => {},
+    setOverlay: (...args) => overlays.push(args),
     stop: async () => {
       stopCount += 1;
       context.running = false;
     },
   };
-  runInNewContext(`${handlerSource}; globalThis.testHandler = handleVisibilityChange;`, context);
+  runInNewContext(`${pauseUiSource}\n${handlerSource}; globalThis.testHandler = handleVisibilityChange;`, context);
   assert.equal(await context.testHandler(true), true);
   assert.equal(stopCount, 1);
   assert.equal(context.running, false);
@@ -189,6 +193,7 @@ test('web copy and runtime disclose and enforce foreground-only monitoring', asy
   assert.equal(context.stream, null);
   assert.equal(context.video.srcObject, null);
   assert.equal(stoppedTracks, 1, 'foreground loss must stop a camera stream acquired during startup');
+  assert.deepEqual(overlays,[['Monitoring Paused','Monitoring did not start because Occulert left the foreground.','Return to Occulert and press Start Monitoring again only when safely parked.',false]]);
 });
 
 test('native monitoring requires a fresh one-time pre-drive safety confirmation', () => {
