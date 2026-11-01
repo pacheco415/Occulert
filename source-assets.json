@@ -24,6 +24,10 @@
     "driver-i18n.js": {
       "source": "src/driver-i18n.js",
       "mode": "copy"
+    },
+    "fleet-dashboard.js": {
+      "source": "src/fleet-dashboard.js",
+      "mode": "copy"
     }
   }
 }
