@@ -123,9 +123,9 @@ module.exports = async function handler(request, response) {
     }
     const upperBound = endedAt !== null && compareTimestamps(endedAt, nowTimestamp) < 0 ? endedAt : nowTimestamp;
     if (compareTimestamps(startedAt, upperBound) > 0) throw new Error("invalid_session_time");
-    // Legacy clients omit occurrence time. During the delivery grace, never
-    // stamp their event after the stored session end.
-    let occurredAt = upperBound;
+    // The transaction assigns omitted legacy time and clamps it to the stored
+    // session end during grace. Explicit time retains the existing precheck.
+    let occurredAt = null;
     if (Object.hasOwn(body, "occurred_at")) {
       const timestamp = body.occurred_at;
       if (!validTimestamp(timestamp) || compareTimestamps(timestamp, startedAt) < 0
@@ -136,23 +136,45 @@ module.exports = async function handler(request, response) {
       occurredAt = timestamp;
     }
 
-    const created = await pgFetch("events", {
+    // Use the same locked counter/session transaction as the keyed path, while
+    // keeping legacy requests unkeyed and their response contract unchanged.
+    const result = await pgFetch("rpc/record_idempotent_event", {
       method: "POST",
       body: {
-        session_id: body.session_id,
-        type: type,
-        fatigue_score: numberOrNull(body.fatigue_score, 0, 100),
-        confidence: numberOrNull(body.confidence, 0, 100),
+        p_user_id: user.id,
+        p_session_id: body.session_id,
+        p_client_event_id: null,
+        p_type: type,
+        p_fatigue_score: numberOrNull(body.fatigue_score, 0, 100),
+        p_confidence: numberOrNull(body.confidence, 0, 100),
         // GPS is opt-in only; omit lat/lng entirely unless the driver has
         // explicitly enabled location sharing on the client.
-        latitude: strictNumberOrNull(body.latitude, -90, 90),
-        longitude: strictNumberOrNull(body.longitude, -180, 180),
-        created_at: occurredAt,
+        p_latitude: strictNumberOrNull(body.latitude, -90, 90),
+        p_longitude: strictNumberOrNull(body.longitude, -180, 180),
+        p_occurred_at: occurredAt,
       },
     });
+    const statuses = { invalid_event: 400, invalid_occurred_at: 400,
+      session_not_found: 404, session_ended: 409,
+      event_rate_limited: 429, session_event_limit: 429 };
+    if (result && Object.hasOwn(statuses, result.error)) {
+      if (result.error === "event_rate_limited") {
+        response.setHeader("Retry-After", String(Math.max(1, Math.min(60, Math.ceil(Number(result.retry_after)) || 60))));
+      } else if (result.error === "session_event_limit") {
+        // This is a minimum backoff, not a promise that the session cap resets.
+        response.setHeader("Retry-After", "60");
+      }
+      return json(response, statuses[result.error], { ok: false, error: result.error });
+    }
+    if (!result || result.error || !isUuid(result.event?.id)
+      || typeof result.event.session_id !== "string"
+      || result.event.session_id?.toLowerCase() !== body.session_id.toLowerCase()
+      || result.client_event_id !== null || result.replayed !== false) {
+      return json(response, 502, { ok: false, error: "event_not_saved" });
+    }
     return json(response, 200, {
       ok: true,
-      event: created[0],
+      event: result.event,
       telemetry_trust: "unverified_client_report",
       message: "Client-reported telemetry is not independently measured or attested.",
     });

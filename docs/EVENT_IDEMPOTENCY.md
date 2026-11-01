@@ -16,15 +16,17 @@ records no production state.
 `POST /api/events` optionally accepts `client_event_id` (UUID). A supplied key
 while the flag is off returns `503 event_idempotency_not_enabled` rather than
 silently writing without deduplication. Invalid keys return 400. Unkeyed callers
-retain the current route when the flag is off.
+use `record_idempotent_event` with a null key even while the flag is off, keeping
+their legacy response shape. The [default API quota integration](LEGACY_API_QUOTAS.md)
+therefore shares this function's 60 accepted events per user per 60-second
+window and 500 per session limits across both paths. Turning the identity flag
+on is no longer required to limit unkeyed events. The original gated identity
+implementation introduced these quotas only on its flag-enabled path; the SQL
+and keyed path remain unchanged by the default-path integration.
 
-With the flag on, **all** event writes use `record_idempotent_event`. The existing
-60 accepted events per user per 60-second window and 500 per session quota design
-from draft PR #192 is adopted here, not invoked as an unavailable prerequisite.
-This activates those quotas for unkeyed legacy callers too. These limits were
-not active on main before this change. A returned 429 preserves bounded
-`Retry-After` for the burst limit. Unkeyed callers still create a new event for
-each call and must not infer retry safety.
+Legacy quota responses are 429 with a bounded `Retry-After`; the permanent
+500-event session cap does not reset when that backoff expires. Unkeyed callers
+still create a new event for each call and must not infer retry safety.
 
 The transaction uses one per-user bucket row lock before the owned session lock,
 serializing that owner's writes across sessions. A `(verified user UUID, client
@@ -100,16 +102,18 @@ Required order, with explicit production approval:
 1. Reconcile existing schema/ledger and #192 overlap; review migration and rollback.
 2. Apply the new migration and verify grants, closed RLS and RPC behavior on the
    intended database. Do not drop receipts while keyed delivery could still occur.
-3. Deploy API with flag off; confirm old clients unchanged. Enable the flag only
-   after DB verification and acknowledging the new quotas for all clients.
+3. Verify the additional session-start migration and deployment gates in
+   [the quota contract](LEGACY_API_QUOTAS.md) before deploying the default quota
+   routes. Keep the identity flag off; unkeyed events still have quotas. Enable
+   the identity flag only after its separate acceptance is complete.
 4. Complete consent/retention, expiry/session-end, Retry-After, cross-tab and
    native lifecycle integration. Then test lost-response-after-commit, offline/
    online, reload and sign-out flows before enabling any retry-capable client.
 
 If the flag is accidentally on before the RPC exists, API fails closed with a
 provider error; there is no fallback to unsafe direct insertion. Turning the flag
-off stops keyed writes with 503 and restores the legacy unkeyed route. Future
-retry clients must never remove their key to get around that response.
+off stops keyed writes with 503; the unkeyed route retains the shared event
+quotas. Future retry clients must never remove their key to get around that response.
 
 ## Verification
 

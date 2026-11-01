@@ -432,6 +432,7 @@ export function speak(msg) {
             window.speechSynthesis.resume();
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(msg);
+        u.lang = 'en-US';
         u.rate = 0.9;
         u.pitch = 1.0;
         u.volume = 1.0;

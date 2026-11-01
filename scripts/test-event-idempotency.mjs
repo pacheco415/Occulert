@@ -164,12 +164,16 @@ test('atomic event idempotency SQL/API contract',async t=>{
   await reset();await rpc();await db.exec(`reset role;delete from auth.users where id='${owner}';set role service_role`);
   assert.equal(await count('event_idempotency'),0);assert.equal(await count('event_rate_limits'),0);assert.equal(await count('events'),0);
  });
- await t.test('API default-off fails closed for keyed requests and preserves legacy handler',async()=>{
+ await t.test('API default-off rejects keyed requests and shares the quota without changing legacy response fields',async()=>{
   await reset();const h=harness({enabled:false});assert.equal((await h.post(event)).status,503);assert.equal(h.calls.length,0);
   const legacy=harness({enabled:false,fetcher:async(table,options)=>{
    if(table==='drivers')return[{id:driver}];if(table==='sessions')return[{id:session,started_at:new Date(Date.now()-60000).toISOString(),ended_at:null}];
-   assert.equal(table,'events');return[{id:key,...options.body}];
-  }});const {client_event_id,...body}=event;assert.equal((await legacy.post(body)).status,200);assert.equal(legacy.calls.at(-1).table,'events');
+   assert.equal(table,'rpc/record_idempotent_event');assert.equal(options.body.p_client_event_id,null);
+   assert.equal(options.body.p_user_id,owner);return rpc(options.body);
+  }});const {client_event_id,...body}=event;const accepted=await legacy.post(body);
+  assert.equal(accepted.status,200);assert.equal(legacy.calls.at(-1).table,'rpc/record_idempotent_event');
+  assert.equal(accepted.body.client_event_id,undefined);assert.equal(accepted.body.replayed,undefined);
+  assert.equal(await quota(),1);assert.equal(await count('events'),1);assert.equal(await count('event_idempotency'),0);
  });
  await t.test('API verifies owner, snapshots canonical current validation, and never automatically retries',async()=>{
   await reset();const h=harness();const first=await h.post({...event,owner_id:other,user_id:other,fatigue_score:'120',latitude:999,longitude:'12.5'});

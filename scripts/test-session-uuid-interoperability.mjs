@@ -45,14 +45,16 @@ async function pgFetch(table, options = {}) {
     assert.equal(params.fleet_id, 'eq.' + fleet);
     return rows(`select ${params.select} from drivers where fleet_id=$1`, [fleet]);
   }
+  if (table === 'rpc/start_rate_limited_session') {
+    writes++;
+    assert.equal(options.method, 'POST');
+    assert.equal(options.body.p_user_id, actor, 'the verified actor reaches the real session quota RPC');
+    const fields = ['p_user_id', 'p_session_id', 'p_device', 'p_browser', 'p_detector_pipeline', 'p_detector_version', 'p_app_version'];
+    assert.deepEqual(Object.keys(options.body), fields, 'no client driver, fleet or timestamp becomes RPC authority');
+    return (await db.query('select public.start_rate_limited_session($1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::text,$7::text) as result', fields.map(field => options.body[field]))).rows[0].result;
+  }
   if (table === 'sessions') {
-    if (options.method === 'POST') {
-      writes++;
-      const fields = Object.keys(options.body);
-      try {
-        return await rows(`insert into sessions (${fields.join(',')}) values (${fields.map((_, i) => '$' + (i + 1)).join(',')}) returning *`, Object.values(options.body));
-      } catch (error) { throw { details: { code: error.code } }; }
-    }
+    assert.notEqual(options.method, 'POST', 'the API must not bypass atomic session-start quota');
     if (options.method === 'PATCH') {
       writes++;
       assert.equal(params.ended_at, 'is.null');
@@ -127,6 +129,7 @@ try {
     insert into fleets values ('${fleet}','${owner}','Owned Fleet','trial'),('${otherFleet}','${other}','Other Fleet','trial');
     insert into drivers values ('${driver}','${owner}','${fleet}','Owned Driver',true,null),('${otherDriver}','${other}','${otherFleet}','Other Driver',true,null);`);
   await db.exec(readFileSync(new URL('../supabase/migrations/20260921040303_fleet_session_followups.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../supabase/migrations/20261031192453_session_start_quota.sql', import.meta.url), 'utf8'));
   require.cache[libPath] = { id: libPath, filename: libPath, loaded: true, exports: {
     pgFetch, bearerToken: () => 'fixture',
     verifyAccessToken: async () => ({ id: actor, email: 'fixture@example.invalid', email_confirmed_at: '2026-01-01' }),

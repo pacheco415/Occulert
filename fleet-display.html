@@ -11,10 +11,10 @@
   <link rel="apple-touch-icon" href="/occulert-logo-main-192.png">
   <link rel="stylesheet" href="/liquid-glass.v49.css" />
   <link rel="stylesheet" href="/accessibility.v52.css" />
-  <link rel="stylesheet" href="/fleet-display.v56.css" />
+  <link rel="stylesheet" href="/fleet-display.v57.css" />
   <script src="/occulert-backend.v90.js"></script>
   <script src="/static-page.v60.js" defer></script>
-  <script src="/fleet-display.v58.js" defer></script>
+  <script src="/fleet-display.v59.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -74,9 +74,14 @@
     <div id="displayContent" hidden>
       <section class="metric-grid" aria-label="Fleet-wide status">
         <article class="metric-card live-card">
-          <p>Sessions without recorded end</p>
+          <p>Sessions in progress</p>
           <strong id="activeSessions">0</strong>
-          <span>available protected records</span>
+          <span>started within 12 hours · no recorded end</span>
+        </article>
+        <article class="metric-card attention-card">
+          <p>Unfinished sessions</p>
+          <strong id="unfinishedSessions">0</strong>
+          <span>started over 12 hours ago · no recorded end</span>
         </article>
         <article class="metric-card">
           <p>Active roster</p>
@@ -116,14 +121,14 @@
             </div>
           </div>
           <div class="pulse-grid">
-            <div><span>No recorded end</span><strong id="pulseNow">0</strong></div>
+            <div><span>In progress · started within 12 hours</span><strong id="pulseNow">0</strong></div>
             <div><span>Completed in past hour</span><strong id="pulseHour">0</strong></div>
             <div><span>Completed in past 24 hours</span><strong id="pulseDay">0</strong></div>
             <div><span id="pulseWindowLabel">Earlier in 30 days</span><strong id="pulseMonth">0</strong></div>
           </div>
         </article>
       </section>
-      <p class="summary-scope" id="summaryScope">Session metrics use up to 50 recent protected sessions. The selected window is based on session start time. Sessions without a recorded end describe available record state; live device monitoring is not verified.</p>
+      <p class="summary-scope" id="summaryScope">Session metrics use up to 50 recent protected sessions. The selected window is based on session start time. In-progress records started within the past 12 hours and have no recorded end; unfinished records started earlier and have no recorded end. These counts are independent of the selected window and describe available record state; live device monitoring is not verified.</p>
     </div>
   </main>
 

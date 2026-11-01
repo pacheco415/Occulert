@@ -69,31 +69,34 @@ if (ownedStartParams) {
 const stored = await pgFetch("sessions", { params: ownedStartParams });
 if (stored[0]) return json(response, 200, { ok: true, session: stored[0], session_start_protocol: "client_uuid_v1" });
 }
-let created;
-try {
-created = await pgFetch("sessions", {
+const result = await pgFetch("rpc/start_rate_limited_session", {
 method: "POST",
 body: {
-...(hasClientId ? { id: body.session_id } : {}),
-driver_id: driver.id,
-fleet_id: driver.fleet_id,
-started_at: new Date().toISOString(),
-device: body.device ? String(body.device).slice(0, 120) : null,
-browser: body.browser ? String(body.browser).slice(0, 240) : null,
-detector_pipeline: PIPELINES.has(body.detector_pipeline) ? body.detector_pipeline : null,
-detector_version: provenanceText(body.detector_version, 80),
-app_version: provenanceText(body.app_version, 80),
+p_user_id: user.id,
+p_session_id: hasClientId ? body.session_id : null,
+p_device: body.device ? String(body.device).slice(0, 120) : null,
+p_browser: body.browser ? String(body.browser).slice(0, 240) : null,
+p_detector_pipeline: PIPELINES.has(body.detector_pipeline) ? body.detector_pipeline : null,
+p_detector_version: provenanceText(body.detector_version, 80),
+p_app_version: provenanceText(body.app_version, 80),
 },
 });
-} catch (error) {
-if (!hasClientId || error?.details?.code !== "23505") throw error;
-// A concurrent retry may have inserted the UUID after the first read. Only
-// return a row belonging to the verified driver; never upsert another owner.
-const stored = await pgFetch("sessions", { params: ownedStartParams });
-if (stored[0]) return json(response, 200, { ok: true, session: stored[0], session_start_protocol: "client_uuid_v1" });
-return json(response, 409, { ok: false, error: "session_id_conflict" });
+const statuses = { invalid_session: 400, driver_profile_not_found: 403,
+session_id_conflict: 409, membership_changed: 409, session_start_rate_limited: 429 };
+if (result && Object.hasOwn(statuses, result.error)) {
+if (result.error === "session_start_rate_limited") {
+response.setHeader("Retry-After", String(Math.max(1, Math.min(3600, Math.ceil(Number(result.retry_after)) || 3600))));
 }
-return json(response, 200, { ok: true, session: created[0], session_start_protocol: "client_uuid_v1" });
+return json(response, statuses[result.error], { ok: false, error: result.error });
+}
+if (!result || result.error || !isUuid(result.session?.id)
+  || typeof result.session.driver_id !== "string"
+  || result.session.driver_id.toLowerCase() !== driver.id?.toLowerCase()
+  || (hasClientId && result.session.id.toLowerCase() !== body.session_id.toLowerCase())
+  || typeof result.replayed !== "boolean" || (!hasClientId && result.replayed)) {
+return json(response, 502, { ok: false, error: "session_not_saved" });
+}
+return json(response, 200, { ok: true, session: result.session, session_start_protocol: "client_uuid_v1" });
 }
 
 if (request.method === "PATCH") {

@@ -45,6 +45,8 @@ function harness(entry, options = {}) {
       if (table === 'fleets' && !opts.method) return entry.route === 'fleets' ? [] : [{ id: uuid }];
       if (table === 'drivers' && !opts.method) return [{ id: uuid, fleet_id: uuid, name: 'Existing', vehicle_id: 'TRK-7' }];
       if (table === 'sessions' && !opts.method) return [{ id: uuid, started_at: new Date(Date.now() - 60000).toISOString(), ended_at: null }];
+      if (table === 'rpc/start_rate_limited_session') return { session: { id: uuid, driver_id: uuid }, replayed: false };
+      if (table === 'rpc/record_idempotent_event') return { event: { id: uuid, session_id: uuid }, client_event_id: null, replayed: false };
       if (table === 'rpc/create_fleet_invitation') return { id: uuid, email: 'driver@example.com', expires_at: '2026-11-01T00:00:00Z' };
       if (table === 'rpc/accept_fleet_invitation') return [{ fleet_id: uuid }];
       if (table === 'rpc/save_fleet_session_followup') return [{ session_id: uuid, status: 'reviewed', version: 1, updated_at: '2026-10-01T00:00:00Z' }];

@@ -1,45 +1,18 @@
 {
   "schemaVersion": 1,
   "repository": "pacheco415/Occulert",
-  "capturedAt": "2026-10-30T03:26:56Z",
-  "source": "GitHub connector paginated REST open pull requests; per_page=100, final empty page verified",
+  "capturedAt": "2026-10-31T20:14:38.909Z",
+  "source": "GitHub connector REST open pull requests, all pages",
   "complete": true,
   "pullRequests": [
     {
-      "number": 350,
-      "title": "Guard server-assigned alert timing semantics with regressions",
+      "number": 356,
+      "title": "Bound offline installation transfers and preserve usable caches",
       "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/350",
-      "headRefName": "codex/alert-timing-contract",
+      "url": "https://github.com/pacheco415/Occulert/pull/356",
+      "headRefName": "codex/offline-startup-reliability",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "6c4978126956deacb7a614a736a2767a827be0a4"
-    },
-    {
-      "number": 340,
-      "title": "Prepare the next native release intent and private status markers",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/340",
-      "headRefName": "codex/release-intent-next-build",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "4913111ae03206219c30bcc4cdbe2b0866f52e51"
-    },
-    {
-      "number": 337,
-      "title": "Add Occulert vision roadmap for Codex",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/337",
-      "headRefName": "claude/vision-roadmap",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "374bed28f7d5ccf627cc03c5b9e8cfb80a13cb32"
-    },
-    {
-      "number": 331,
-      "title": "Protect open PR branches in the remote branch inventory",
-      "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/331",
-      "headRefName": "codex/branch-inventory",
-      "headRepository": "pacheco415/Occulert",
-      "headSha": "30313b25224a285f535ca76078ee5f4de4e46768"
+      "headSha": "7933f973d91a3b6aff005a5cd851b5f098e2033e"
     },
     {
       "number": 324,
@@ -61,12 +34,12 @@
     },
     {
       "number": 206,
-      "title": "Prepare confirmed fleet removal and leave actions behind a migration gate",
+      "title": "Refresh gated fleet offboarding and serialize session starts",
       "state": "open",
       "url": "https://github.com/pacheco415/Occulert/pull/206",
       "headRefName": "codex/fleet-offboarding",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "95c0acd36e8c2b11856e9dc5ff28c4f32403cfbf"
+      "headSha": "cabb047e3de9db23c1ce6ecd6182a49e989f5021"
     }
   ]
 }

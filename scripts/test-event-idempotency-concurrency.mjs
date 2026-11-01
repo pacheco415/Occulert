@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { join, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
+import { runSessionStartQuotaConcurrency } from './lib/session-start-quota-concurrency.mjs';
 const runtime=process.env.OCCULERT_PG_TEST_RUNTIME;
 if(!runtime||!isAbsolute(runtime))throw new Error('Set OCCULERT_PG_TEST_RUNTIME to an absolute local directory containing pinned pg (and embedded PostgreSQL unless OCCULERT_PG_BIN is set). No remote database is supported.');
 const require=createRequire(join(runtime,'package.json'));
@@ -46,6 +47,7 @@ try{
  await admin.query(read('../db/schema.sql').replace('create extension if not exists "pgcrypto";',''));
  await admin.query(read('../supabase/migrations/20261022120000_revoke_direct_table_access.sql'));
  await admin.query(read('../supabase/migrations/20261026164040_atomic_event_idempotency.sql'));
+ await admin.query(read('../supabase/migrations/20261031192453_session_start_quota.sql'));
  await admin.query('grant usage on schema public to service_role');
  const worker=await Promise.all(Array.from({length:12},()=>connect(true)));
  const reset=async()=>admin.query(`truncate auth.users cascade;insert into auth.users values('${owner}'),('${other}');insert into drivers(id,user_id,name) values('${driver}','${owner}','Fixture');insert into sessions(id,driver_id,started_at) values('${session}','${driver}',clock_timestamp()-interval '1 hour'),('${second}','${driver}',clock_timestamp()-interval '1 hour');`);
@@ -68,16 +70,18 @@ try{
  pass('12 simultaneous first-key requests, real lock contention, one event/receipt/quota.');
 
  await reset();await rpc(worker[0]);await admin.query('update event_rate_limits set event_count=59');
- const atLimit=await Promise.all(worker.map((c,n)=>rpc(c,args(`aaaaaaaa-aaaa-4aaa-8aaa-${String(n+1).padStart(12,'0')}`,n%2?second:session))));
+ const atLimit=await Promise.all(worker.map((c,n)=>rpc(c,args(n%2?null:`aaaaaaaa-aaaa-4aaa-8aaa-${String(n+1).padStart(12,'0')}`,n%2?second:session))));
  assert.equal(atLimit.filter(r=>r.event).length,1);assert.equal(atLimit.filter(r=>r.error==='event_rate_limited').length,11);
- assert.deepEqual(await state(),{events:2,receipts:2,quota:60});assert.equal((await rpc(worker[0])).replayed,true);
- pass('concurrent cross-session burst boundary accepts only one remaining quota unit; replay stays free.');
+ const burstWinner=atLimit.find(result=>result.event);
+ assert.deepEqual(await state(),{events:2,receipts:1+Number(burstWinner.client_event_id!==null),quota:60});assert.equal((await rpc(worker[0])).replayed,true);
+ pass('concurrent mixed keyed/unkeyed cross-session burst accepts one shared remaining unit; replay stays free.');
 
  await reset();await admin.query(`insert into events(session_id,type) select '${session}','drowsy' from generate_series(1,499)`);
- const atCap=await Promise.all(worker.map((c,n)=>rpc(c,args(`bbbbbbbb-bbbb-4bbb-8bbb-${String(n+1).padStart(12,'0')}`))));
+ const atCap=await Promise.all(worker.map((c,n)=>rpc(c,args(n%2?null:`bbbbbbbb-bbbb-4bbb-8bbb-${String(n+1).padStart(12,'0')}`))));
  assert.equal(atCap.filter(r=>r.event).length,1);assert.equal(atCap.filter(r=>r.error==='session_event_limit').length,11);
- assert.deepEqual(await state(),{events:500,receipts:1,quota:1});
- pass('concurrent session cap accepts only the 500th event.');
+ const capWinner=atCap.find(result=>result.event);
+ assert.deepEqual(await state(),{events:500,receipts:Number(capWinner.client_event_id!==null),quota:1});
+ pass('concurrent mixed keyed/unkeyed session cap accepts only the shared 500th event.');
 
  await reset();const original=await rpc(worker[0]);
  const different=await Promise.all(worker.map((c,n)=>rpc(c,[...args().slice(0,4),n%2?31:30,80,null,null,null])));
@@ -100,8 +104,9 @@ try{
  await deleter.query('commit');
  assert.equal((await afterDelete).error,'session_not_found');assert.deepEqual(await state(),{events:0,receipts:0,quota:1});
  pass('deletion contention cannot acknowledge or recreate removed session data.');
+ await runSessionStartQuotaConcurrency({admin,worker,connect,waitFor,pass});
  serverVersion=(await admin.query('show server_version')).rows[0].server_version;
- assert.equal(scenarios.length,6);
+ assert.equal(scenarios.length,12);
  console.log('Local PostgreSQL version:',serverVersion);
 }catch(error){
  try{console.error(readFileSync(join(root,'postgres.log'),'utf8'));}catch{}
@@ -124,9 +129,11 @@ if(receiptDirectory){
  if(!isAbsolute(receiptDirectory))throw new Error('Receipt directory must be absolute');
  mkdirSync(receiptDirectory,{recursive:true});
  const migration=read('../supabase/migrations/20261026164040_atomic_event_idempotency.sql');
+ const sessionStartMigration=read('../supabase/migrations/20261031192453_session_start_quota.sql');
  writeFileSync(join(receiptDirectory,'event-concurrency.json'),JSON.stringify({
   status:'passed',commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
   node:process.version,postgres:serverVersion,migrationSha256:createHash('sha256').update(migration).digest('hex'),
+  sessionStartQuotaMigrationSha256:createHash('sha256').update(sessionStartMigration).digest('hex'),
   isolation:'private-unix-socket-tcp-disabled-synthetic-fixtures',scenarios,completedAt:new Date().toISOString()
  },null,2)+'\n');
 }
