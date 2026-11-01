@@ -132,5 +132,7 @@
   "driver-app.v103.js": "ca4661be345a8a9495ecf1b6cea66f292c32a05e72bb88e689e17ce38800eb2b",
   "driver-startup-guard.v24.js": "cec46c2b022c4bb460afe8be64c39b9e23d729f6b62ac50e2e45be8dd76a93ea",
   "fleet-display.v59.js": "dfff0221ef2af682458ab90845c474407f9c82cc6cd757293c85b67eafb974e2",
-  "fleet-display.v57.css": "85daa4f58549c5dc5a11b83cce443c5f265e7d367ac8f6d1f2aebfc7c15ae4bd"
+  "fleet-display.v57.css": "85daa4f58549c5dc5a11b83cce443c5f265e7d367ac8f6d1f2aebfc7c15ae4bd",
+  "driver-app.v104.js": "3e35c1ca52ce2377b8d04b8c21fd35c00fa7945dd4bef340f85a63a1cf573774",
+  "driver-startup-guard.v25.js": "4bcba5b8a5575dd8282b40ac02ad5f8c4af9c2840ab9a0920e573a1a4d18f67a"
 }

@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+test.use({ locale: 'es-ES' });
+
 const MINUTE = 60_000;
 
 async function ready(page) {
@@ -8,6 +10,7 @@ async function ready(page) {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
   await page.addInitScript(() => {
     localStorage.clear();
+    localStorage.setItem('occulert_lang', 'en');
     localStorage.setItem('occulert-voice', 'true');
     window.restProbe = { hardwareRequests: 0, cameraOpens: 0, speech: [] };
     const media = new EventTarget();
@@ -24,9 +27,9 @@ async function ready(page) {
       pause() { this.paused = true; }
     };
     Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
-      paused: false, resume() {}, cancel() {}, speak(utterance) { window.restProbe.speech.push(utterance.text); },
+      paused: false, resume() {}, cancel() {}, speak(utterance) { window.restProbe.speech.push({ text: utterance.text, lang: utterance.lang }); },
     } });
-    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; this.lang = navigator.language; } };
   });
   await page.goto('/app.html');
   await expect(page.locator('#startBtn')).toBeEnabled();
@@ -84,7 +87,7 @@ async function alerts(page, count) {
   }
 }
 
-const promptCount = page => page.evaluate(() => window.restProbe.speech.filter(text => text.startsWith('Rest stop recommended.')).length);
+const promptCount = page => page.evaluate(() => window.restProbe.speech.filter(cue => cue.text.startsWith('Rest stop recommended.')).length);
 
 test('three real yawns report yawns separately from accepted alerts', async ({ page }) => {
   await ready(page);
@@ -94,6 +97,8 @@ test('three real yawns report yawns separately from accepted alerts', async ({ p
   expect(await page.evaluate(() => ({ alerts, yawns: yawnCount, hardware: window.restProbe.hardwareRequests })))
     .toEqual({ alerts: 0, yawns: 3, hardware: 0 });
   expect(await promptCount(page)).toBe(1);
+  expect(await page.evaluate(() => ({ locale: navigator.language, speech: window.restProbe.speech })))
+    .toEqual({ locale: 'es-ES', speech: [{ text: 'Rest stop recommended. Please pull over safely and take a break.', lang: 'en-US' }] });
 });
 
 test('mixed accepted alerts and real yawns retain their individual counts', async ({ page }) => {
@@ -104,6 +109,11 @@ test('mixed accepted alerts and real yawns retain their individual counts', asyn
   await expect(page.locator('#breakBanner')).toContainText('2 alerts, 1 yawn');
   expect(await page.evaluate(() => ({ alerts, yawns: yawnCount }))).toEqual({ alerts: 2, yawns: 1 });
   expect(await promptCount(page)).toBe(1);
+  expect(await page.evaluate(() => window.restProbe.speech)).toEqual([
+    { text: 'Pull over safely', lang: 'en-US' },
+    { text: 'Take a break, you are tired', lang: 'en-US' },
+    { text: 'Rest stop recommended. Please pull over safely and take a break.', lang: 'en-US' },
+  ]);
 });
 
 test('a second real session resets event counts, banner and reminder cooldown', async ({ page }) => {
