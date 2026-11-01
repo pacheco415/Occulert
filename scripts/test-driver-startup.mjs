@@ -3,12 +3,80 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { parse } from 'acorn';
 
 const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
 const driver = readFileSync(new URL(`../${assetByStem('driver-app.js')}`, import.meta.url), 'utf8');
 const guardName = assetByStem('driver-startup-guard.js');
 assert.ok(html.includes(`src="/${guardName}"`), 'The real external startup guard must be linked by app.html');
 const guard = readFileSync(new URL(`../${guardName}`, import.meta.url), 'utf8');
+
+function speechSites(source, sourceType) {
+  const tree = parse(source, { ecmaVersion: 2022, sourceType });
+  const constructors = [], deliveries = [];
+  const property = node => node?.computed ? node.property?.value : node?.property?.name;
+  function visit(node, ancestors = []) {
+    if (!node || typeof node !== 'object') return;
+    const parents = [...ancestors, node];
+    if (node.type === 'NewExpression' && (node.callee.name === 'SpeechSynthesisUtterance' || property(node.callee) === 'SpeechSynthesisUtterance')) constructors.push({ node, ancestors });
+    if (node.type === 'CallExpression' && property(node.callee) === 'speak' && property(node.callee.object) === 'speechSynthesis') deliveries.push({ node, ancestors });
+    for (const child of Object.values(node)) {
+      if (Array.isArray(child)) child.forEach(value => visit(value, parents));
+      else if (child && typeof child === 'object') visit(child, parents);
+    }
+  }
+  visit(tree);
+  return { tree, constructors, deliveries, property };
+}
+
+test('every source and released driver utterance receives English language before the sole speech dispatch', () => {
+  const contract = JSON.parse(readFileSync(new URL('../source-driver-contract.json', import.meta.url), 'utf8'));
+  const sources = contract.modules.map(name => readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8'));
+  for (const [label, programs] of [['editable modules', sources.map(source => speechSites(source, 'module'))], ['released driver', [speechSites(driver, 'script')]]]) {
+    const constructors = programs.flatMap(program => program.constructors), deliveries = programs.flatMap(program => program.deliveries);
+    assert.equal(constructors.length, 1, `${label}: speech must stay in the central helper`);
+    assert.equal(deliveries.length, 1, `${label}: every delivery must use the central helper`);
+    const construction = constructors[0], delivery = deliveries[0];
+    const owner = construction.ancestors.findLast(node => node.type === 'FunctionDeclaration');
+    assert.equal(owner?.id.name, 'speak', label);
+    assert.equal(delivery.ancestors.findLast(node => node.type === 'FunctionDeclaration'), owner, label);
+    const declaration = construction.ancestors.at(-1);
+    assert.equal(declaration.type, 'VariableDeclarator');
+    const block = construction.ancestors.findLast(node => node.type === 'BlockStatement');
+    assert.equal(delivery.ancestors.findLast(node => node.type === 'BlockStatement'), block, label);
+    const language = block.body.find(statement => statement.type === 'ExpressionStatement'
+      && statement.expression.type === 'AssignmentExpression'
+      && statement.expression.operator === '='
+      && statement.expression.left.type === 'MemberExpression'
+      && statement.expression.left.object.name === declaration.id.name
+      && (statement.expression.left.computed ? statement.expression.left.property.value : statement.expression.left.property.name) === 'lang');
+    assert.equal(language?.expression.right.value, 'en-US', label);
+    assert.ok(construction.node.end < language.start && language.end < delivery.node.start, label);
+    assert.equal(delivery.node.arguments[0].name, declaration.id.name, label);
+  }
+});
+
+test('real source and released speech helpers preserve all English cues and voice guards on a non-English device', () => {
+  const alerts = readFileSync(new URL('../src/alerts.js', import.meta.url), 'utf8');
+  const messages = ['Pull over safely', 'Take a break, you are tired', 'Drowsiness detected, rest now', 'Danger! Pull over immediately',
+    'Camera monitoring stopped. Pull over safely before restarting.', 'AI monitoring stopped. Pull over safely before restarting.',
+    'Camera view lost. Pull over safely before repositioning the phone.', 'Rest stop recommended. Please pull over safely and take a break.'];
+  for (const [source, sourceType] of [[alerts, 'module'], [driver, 'script']]) {
+    const site = speechSites(source, sourceType).constructors[0];
+    const owner = site.ancestors.findLast(node => node.type === 'FunctionDeclaration');
+    const spoken = [];
+    let enabled = true;
+    const context = { experimentFlags: { observer: false }, readVoicePreference: () => enabled,
+      SpeechSynthesisUtterance: class { constructor(text) { this.text = text; this.lang = 'es-ES'; } },
+      window: { speechSynthesis: { paused: false, cancel() {}, speak: cue => spoken.push({ text: cue.text, lang: cue.lang, rate: cue.rate, pitch: cue.pitch, volume: cue.volume }) } } };
+    vm.runInNewContext(source.slice(owner.start, owner.end), context);
+    for (const message of messages) context.speak(message);
+    assert.deepEqual(spoken, messages.map(text => ({ text, lang: 'en-US', rate: .9, pitch: 1, volume: 1 })));
+    enabled = false; context.speak('muted');
+    enabled = true; context.experimentFlags.observer = true; context.speak('observer');
+    assert.equal(spoken.length, messages.length);
+  }
+});
 
 class EventTarget {
   constructor() { this.listeners = new Map(); }

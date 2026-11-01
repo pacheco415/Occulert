@@ -22,6 +22,12 @@ so a missing persisted identity does not block readiness. Session-history storag
 and its existing failure reporting remain unchanged. Partial startup still
 keeps voice actions uninitialized until the entry restores their preference.
 
+Browser spoken cues use the shared alerts helper with explicit `en-US` language,
+independent of the device's preferred language. Existing English alert, tracking,
+camera, detector and rest-stop wording stays unchanged. Translated voice and
+safety wording requires fluent human review; this step does not expand screen
+translation coverage.
+
 `npm run build` compiles the actual source graph into ignored `build/driver-app.js`
 and a provenance receipt. Pinned esbuild creates a single classic-script compatible
 output. The bounded build adapter restores real declaration kinds and runnable
