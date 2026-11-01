@@ -85,50 +85,50 @@ async function stripeRequest(path, options) {
     }, timeoutMs);
   });
   const operation = (async () => {
-  try {
-    const method = opts.method || "GET";
-    const headers = { Authorization: "Bearer " + cfg.secretKey };
-    if (opts.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
-    if (opts.fields) headers["Content-Type"] = "application/x-www-form-urlencoded";
-    const response = await fetch(API_ORIGIN + path, {
-      method,
-      headers,
-      body: opts.fields ? new URLSearchParams(opts.fields).toString() : undefined,
-      signal: controller.signal,
-    });
-    // The hard deadline already settled the caller; discard late headers.
-    if (controller.signal.aborted) return;
-    const responseText = await response.text();
-    if (Buffer.byteLength(responseText) > MAX_RESPONSE_BYTES) throw new Error("stripe_response_too_large");
-    let data;
-    try { data = JSON.parse(responseText); } catch (_) { throw new Error("stripe_invalid_response"); }
-    if (!response.ok) {
-      const error = new Error("stripe_request_failed");
-      // A Stripe rejection reflects server-side billing configuration or
-      // provider state, not the caller's bearer-token authorization.
-      error.status = 502;
-      error.providerStatus = response.status;
-      error.stripeCode = data && data.error && data.error.code;
-      throw error;
-    }
-    // Stripe's deletion confirmation omits livemode. Accept it only for the
-    // exact object this test-key request deleted.
-    const deletedObject = Boolean(opts.deletedObjectId) && method === "DELETE" && data && data.deleted === true &&
+    try {
+      const method = opts.method || "GET";
+      const headers = { Authorization: "Bearer " + cfg.secretKey };
+      if (opts.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
+      if (opts.fields) headers["Content-Type"] = "application/x-www-form-urlencoded";
+      const response = await fetch(API_ORIGIN + path, {
+        method,
+        headers,
+        body: opts.fields ? new URLSearchParams(opts.fields).toString() : undefined,
+        signal: controller.signal,
+      });
+      // The hard deadline already settled the caller; discard late headers.
+      if (controller.signal.aborted) return;
+      const responseText = await response.text();
+      if (Buffer.byteLength(responseText) > MAX_RESPONSE_BYTES) throw new Error("stripe_response_too_large");
+      let data;
+      try { data = JSON.parse(responseText); } catch (_) { throw new Error("stripe_invalid_response"); }
+      if (!response.ok) {
+        const error = new Error("stripe_request_failed");
+        // A Stripe rejection reflects server-side billing configuration or
+        // provider state, not the caller's bearer-token authorization.
+        error.status = 502;
+        error.providerStatus = response.status;
+        error.stripeCode = data && data.error && data.error.code;
+        throw error;
+      }
+      // Stripe's deletion confirmation omits livemode. Accept it only for the
+      // exact object this test-key request deleted.
+      const deletedObject = Boolean(opts.deletedObjectId) && method === "DELETE" && data && data.deleted === true &&
       data.id === opts.deletedObjectId && data.livemode === undefined;
-    if (!deletedObject && (!data || typeof data !== "object" || data.livemode !== false)) {
-      throw new Error("stripe_live_object_rejected");
+      if (!deletedObject && (!data || typeof data !== "object" || data.livemode !== false)) {
+        throw new Error("stripe_live_object_rejected");
+      }
+      return data;
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        const timeout = new Error("stripe_timeout");
+        timeout.status = 504;
+        throw timeout;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
-    return data;
-  } catch (error) {
-    if (error && error.name === "AbortError") {
-      const timeout = new Error("stripe_timeout");
-      timeout.status = 504;
-      throw timeout;
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
   })();
   return Promise.race([operation, expired]);
 }
