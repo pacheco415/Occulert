@@ -21,7 +21,11 @@ function ownedFile(root, name) {
   return path;
 }
 
-export function loadSourceAssets(root, manifest, { required = false } = {}) {
+export function loadSourceAssets(root, manifest, { required = false, initCopy = null } = {}) {
+  if (initCopy !== null && (!/^[\w-]+\.(js|css)$/.test(initCopy) || Object.hasOwn(manifest, initCopy))) throw new Error('Initialize only a new copy-mode logical asset absent from the manifest');
+  if (initCopy !== null && Object.values(manifest).some(name => {
+    try { return parseRuntimeAssetPath(name).logicalName === initCopy; } catch { return false; }
+  })) throw new Error('Initial copy logical name collides with an active asset alias');
   const path = ownedFile(root, SOURCE_REGISTRY);
   if (!existsSync(path)) {
     if (required) throw new Error(`Missing ${SOURCE_REGISTRY}`);
@@ -29,30 +33,36 @@ export function loadSourceAssets(root, manifest, { required = false } = {}) {
   }
   const registry = json(root, SOURCE_REGISTRY);
   if (registry?.schemaVersion !== 1 || !registry.assets || Array.isArray(registry.assets) || typeof registry.assets !== 'object' || Object.keys(registry).some(key => !['schemaVersion', 'assets'].includes(key))) throw new Error('Invalid source asset registry');
+  if (initCopy !== null && !Object.hasOwn(registry.assets, initCopy)) throw new Error(`Initial copy asset is not registered: ${initCopy}`);
   const usedSources = new Set();
   const entries = Object.entries(registry.assets).map(([logical, entry]) => {
-    if (!/^[\w-]+\.(js|css)$/.test(logical) || !Object.hasOwn(manifest, logical)) throw new Error(`Unknown source-managed logical asset: ${logical}`);
+    const initial = logical === initCopy;
+    if (!/^[\w-]+\.(js|css)$/.test(logical) || (!Object.hasOwn(manifest, logical) && !initial)) throw new Error(`Unknown source-managed logical asset: ${logical}`);
     if (!entry || !['copy', 'bundle'].includes(entry.mode) || Object.keys(entry).some(key => !['source', 'mode'].includes(key)) || typeof entry.source !== 'string' || !/^src\/(?:[\w-]+\/)*[\w.-]+\.(js|css)$/.test(entry.source) || !entry.source.endsWith(logical.slice(logical.lastIndexOf('.')))) throw new Error(`Unsupported source entry: ${logical}`);
+    if (initial && entry.mode !== 'copy') throw new Error('Initial assets must use copy mode');
     if (usedSources.has(entry.source)) throw new Error(`Source registered twice: ${entry.source}`);
     usedSources.add(entry.source);
-    const active = manifest[logical];
-    try { parseRuntimeAssetPath(active); }
-    catch (cause) { throw new Error(`Invalid active source asset: ${logical}`, { cause }); }
+    const active = initial ? null : manifest[logical];
+    if (!initial) {
+      try { parseRuntimeAssetPath(active); }
+      catch (cause) { throw new Error(`Invalid active source asset: ${logical}`, { cause }); }
+    }
     if (entry.mode === 'bundle' && (logical !== 'driver-app.js' || entry.source !== 'src/driver-app.js')) throw new Error(`Unsupported bundled source entry: ${logical}`);
     const bytes = entry.mode === 'bundle' ? renderDriverBundle(root) : readFileSync(ownedFile(root, entry.source));
     if (!Buffer.from(bytes.toString('utf8')).equals(bytes)) throw new Error(`Source must be UTF-8: ${entry.source}`);
-    const published = readFileSync(resolveRuntimeAssetPath(root, active));
-    return { logical, ...entry, active, bytes, changed: !bytes.equals(published), sha256: sha(bytes) };
+    const published = initial ? null : readFileSync(resolveRuntimeAssetPath(root, active));
+    return { logical, ...entry, active, ...(initial ? { initial: true } : {}), bytes, changed: initial || !bytes.equals(published), sha256: sha(bytes) };
   });
   if (!entries.length) throw new Error('Register at least one source asset');
   return entries;
 }
 
-export function assertReleaseBaseline(root, manifest, integrity) {
+export function assertReleaseBaseline(root, manifest, integrity, { initCopy = null } = {}) {
   if (git(root, 'rev-parse', '--is-shallow-repository').toString().trim() !== 'false') throw new Error('Fetch full Git history before releasing source assets');
   try { git(root, 'merge-base', '--is-ancestor', 'refs/remotes/origin/main', 'HEAD'); }
   catch { throw new Error('Fetch and integrate origin/main before releasing source assets'); }
   const atHead = JSON.parse(git(root, 'show', 'HEAD:asset-versions.json'));
+  if (initCopy !== null && Object.hasOwn(atHead, initCopy)) throw new Error(`Cannot initialize an existing HEAD logical asset: ${initCopy}`);
   if (JSON.stringify(manifest) !== JSON.stringify(atHead)) throw new Error('Finish or discard the existing unpublished asset release before releasing source');
   const headIntegrity = JSON.parse(git(root, 'show', 'HEAD:asset-integrity.json'));
   for (const [name, hash] of Object.entries(integrity)) {
