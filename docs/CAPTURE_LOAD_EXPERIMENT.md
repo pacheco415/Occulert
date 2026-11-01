@@ -54,6 +54,44 @@ requested configuration diagnostics, not proof of delivered native fps. The
 cloud completion whitelist is unchanged. Older/flag-off sessions keep their
 previous snapshot shape.
 
+## Road-stream load policy preparation — November 1, 2026
+
+[Task 3.2](VISION_ROADMAP.md#task-32--road-stream-load-policy) adds the pure
+`deriveRoadStreamLoadPolicy` helper in
+[`captureLoadPolicy.ts`](../native-app/lib/captureLoadPolicy.ts). It has no
+runtime consumer. Neither the existing capture experiment flag nor an ordinary
+drive enables road capture through this addition.
+
+The helper proposes **5 fps for evaluation only**, with an explicit
+`evaluationRequested: true` and known `nominal`/`fair` thermal and pressure
+conditions. This is a requested evaluation rate, not proof of a supported
+capture format, delivered fps or road-model performance. Absent, false or
+malformed requests return `disabled` and zero requested road fps.
+
+For a requested evaluation, `serious`/`critical` heat or
+`serious`/`critical`/`shutdown` system pressure returns `driverOnlyFallback` and
+zero requested road fps. Unknown or malformed conditions fail closed to the
+same recommendation. An explicit `fallbackLatched: true` keeps road disabled
+through subsequent cooling; malformed latch values also fail closed. The helper
+stores no state: a future session owner must retain that latch after a fallback
+and clear it only for a new parked session.
+
+`driverOnlyFallback` retains the parked diagnostic's road-first meaning. Here
+it is only a load recommendation: it does not assert that driver frames are
+healthy or authorize continued capture during critical heat. Current driver
+capture, 100/200 ms analysis, watchdog and critical-heat stop policies retain
+their existing behavior. The helper returns no driver settings and changes no
+camera props, lifecycle, flags, permissions, History or cloud fields.
+
+The [road-camera architecture decision](ROAD_CAMERA_ARCHITECTURE.md) still
+requires a separately selected integration, exact device/pair/format admission,
+reliable identity/posture evidence and fresh same-session pressure observations.
+The load helper cannot detect stale observations or establish these gates; a
+cached configuration probe or diagnostic peak-pressure label is not live
+monitoring evidence. A future owner must actually disable rear streaming on
+fallback, not only skip inference, and preserve visible driver-loss handling.
+No camera migration, road capture or physical acceptance is performed here.
+
 ## Acceptance still required
 
 Use consenting participants while parked, following the

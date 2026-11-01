@@ -1,4 +1,4 @@
-import type { CameraLoadPolicy } from './cameraResilience';
+import type { CameraLoadPolicy, DeviceThermalState } from './cameraResilience';
 
 export const CAPTURE_LOAD_EXPERIMENT = process.env.EXPO_PUBLIC_CAPTURE_LOAD_EXPERIMENT === '1';
 export const CAPTURE_TRANSITION_GRACE_MS = 2_000;
@@ -86,4 +86,57 @@ export function createCaptureTransitionGuard() {
       graceUntil = 0;
     },
   };
+}
+
+/** Evaluation candidate only; no running camera consumes this policy. */
+export const ROAD_STREAM_EVALUATION_FPS = 5;
+
+export type RoadStreamPressureLevel =
+  | 'nominal' | 'fair' | 'serious' | 'critical' | 'shutdown' | 'unknown';
+
+export interface RoadStreamLoadPolicyInput {
+  evaluationRequested?: boolean;
+  thermalState: DeviceThermalState;
+  pressureLevel: RoadStreamPressureLevel;
+  fallbackLatched?: boolean;
+}
+
+export type RoadStreamLoadPolicy =
+  | { mode: 'disabled'; requestedRoadFps: 0; reason: 'not-requested' }
+  | { mode: 'evaluation'; requestedRoadFps: 5; reason: 'none' }
+  | { mode: 'driverOnlyFallback'; requestedRoadFps: 0; reason: 'latched' | 'heat' | 'pressure' | 'unknown' };
+
+/**
+ * Pure, unused road-load recommendation, not capture admission or driver health.
+ * A future owner must first establish support, identity, consent and fresh
+ * same-session conditions. It must actually disable rear streaming on fallback,
+ * retain that fallback until the next parked session via fallbackLatched, and
+ * preserve the driver's existing cadence, watchdog and critical-heat stop.
+ */
+export function deriveRoadStreamLoadPolicy({
+  evaluationRequested = false,
+  thermalState,
+  pressureLevel,
+  fallbackLatched = false,
+}: RoadStreamLoadPolicyInput): RoadStreamLoadPolicy {
+  if (evaluationRequested !== true) {
+    return { mode: 'disabled', requestedRoadFps: 0, reason: 'not-requested' };
+  }
+  if (fallbackLatched === true) {
+    return { mode: 'driverOnlyFallback', requestedRoadFps: 0, reason: 'latched' };
+  }
+  if (fallbackLatched !== false) {
+    return { mode: 'driverOnlyFallback', requestedRoadFps: 0, reason: 'unknown' };
+  }
+  if (thermalState === 'serious' || thermalState === 'critical') {
+    return { mode: 'driverOnlyFallback', requestedRoadFps: 0, reason: 'heat' };
+  }
+  if (pressureLevel === 'serious' || pressureLevel === 'critical' || pressureLevel === 'shutdown') {
+    return { mode: 'driverOnlyFallback', requestedRoadFps: 0, reason: 'pressure' };
+  }
+  if ((thermalState !== 'nominal' && thermalState !== 'fair')
+    || (pressureLevel !== 'nominal' && pressureLevel !== 'fair')) {
+    return { mode: 'driverOnlyFallback', requestedRoadFps: 0, reason: 'unknown' };
+  }
+  return { mode: 'evaluation', requestedRoadFps: ROAD_STREAM_EVALUATION_FPS, reason: 'none' };
 }
