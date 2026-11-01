@@ -30,7 +30,9 @@ test('real modules compile deterministically with source bodies, ordered initial
     assert.equal(base.proof.compiledSha256, second.proof.compiledSha256);
     for (const key of ['initializerOrderExact', 'functionBodiesExact', 'sourceFunctionIdentityExact', 'sourceInitializersExact', 'sourceEffectOrderExact', 'serializedUtf8Exact', 'executableMarkersOwned'])
         assert.equal(base.proof[key], true);
-    assert.equal(base.proof.partialPrefixFunctions.length, 50);
+    assert.equal(base.proof.partialPrefixFunctions.length, 51);
+    assert.deepEqual([...base.proof.partialPrefixFunctions].sort(), [...contract.partialPrefixFunctions].sort());
+    assert.ok(base.proof.partialPrefixFunctions.includes('uiText'));
     assert.equal(Object.keys(base.provenance.sourceInputs).length, contract.modules.length + 1);
 });
 test('counterfeit compiled riskText cannot be certified against the unchanged real source', () => {

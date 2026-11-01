@@ -2,10 +2,10 @@ import { rememberCameraDeviceId, updateCameraSourceHint, refreshCameraChoices, f
 import { initModel } from "./detector.js";
 import { applySensitivity, sensitivityLevel } from "./calibration.js";
 import "./metrics.js";
-import { escalationLevel, demoAlert, VOICE_MSGS, _voiceEnabled, initializeVoicePreference, speak, toggleVoice, triggerBreakCheck, dismissBreak, registerAcceptedAlertHook, set_alerts, set_escalationLevel } from "./alerts.js";
+import { escalationLevel, demoAlert, VOICE_MSGS, _voiceEnabled, initializeVoicePreference, voiceUi, speak, toggleVoice, triggerBreakCheck, dismissBreak, registerAcceptedAlertHook, set_alerts, set_escalationLevel } from "./alerts.js";
 import { logEvent, exportCSV, browserHistoryStore } from "./storage-history.js";
 import { queueBackendEvent, getCloudSummaryOutbox, retryCloudSummaries, initCloud, changeWebEventConsent, initializeWebEventConsent } from "./cloud-sync.js";
-import { getPreference, experimentFlags, experimentController, startupAllowsMonitoring, demoBtn, calibrationEl, calibrationFill, alertsEl, alertScreen, logEl, reportEl, nodsEl, perclosEl, microsleepsEl, distractionEl, escalationEl, cloudConsent, cameraSourceSelect, cameraRefreshBtn, running, starting, fatigue, cloudConsentRevision, cloudSummaryClearPending, hiddenAt, CALIBRATION_MS, log, render, _sessionLog, initChart, updateChart, _isIOS, _isStandalone, triggerPWAInstall, loadExperimentController, publishDriverReadiness, initializeLocalLifecycle, handleVisibilityChange, startBtn, localSessionId, start, stop, set_unavailableCameraDeviceId, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_cloudConsentRevision, set_cloudSummaryClearPending, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_turnedSince, set_totalDistractionMs, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold, set_calibrating, set_calibrated, set_calibrationUntil, set_calibrationSamples, set_hiddenAt } from "./ui.js";
+import { uiText, getPreference, experimentFlags, experimentController, startupAllowsMonitoring, demoBtn, calibrationEl, calibrationFill, alertsEl, alertScreen, logEl, reportEl, nodsEl, perclosEl, microsleepsEl, distractionEl, escalationEl, cloudConsent, cameraSourceSelect, cameraRefreshBtn, running, starting, fatigue, cloudConsentRevision, cloudSummaryClearPending, hiddenAt, CALIBRATION_MS, log, render, _sessionLog, initChart, updateChart, _isIOS, _isStandalone, triggerPWAInstall, loadExperimentController, publishDriverReadiness, initializeLocalLifecycle, handleVisibilityChange, startBtn, localSessionId, start, stop, set_unavailableCameraDeviceId, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_cloudConsentRevision, set_cloudSummaryClearPending, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_turnedSince, set_totalDistractionMs, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold, set_calibrating, set_calibrated, set_calibrationUntil, set_calibrationSamples, set_hiddenAt } from "./ui.js";
 initializeWebEventConsent();
 initializeLocalLifecycle();
 window.OcculertViewport = Object.freeze({ snapshot: cameraViewportSnapshot });
@@ -84,7 +84,7 @@ if (feedbackForm)
         const selected = feedbackForm.querySelector('input[name="alertReview"]:checked');
         if (!selected || !localSessionId) {
             if (status)
-                status.textContent = 'Choose a review before saving.';
+                uiText(status, 'feedback.chooseReview', 'Choose a review before saving.');
             return;
         }
         try {
@@ -190,12 +190,11 @@ setInterval(() => {
         _sessionLog.splice(0, 100);
     logEvent('fatigue', fatigue, '');
 }, 5000);
-if (document.readyState === 'complete') {
-    initChart();
+function chartUi() {
+    if (document.readyState === 'complete') initChart();
+    else window.addEventListener('load', () => initChart());
 }
-else {
-    window.addEventListener('load', initChart);
-}
+chartUi();
 window.toggleVoice = toggleVoice;
 window.exportCSV = exportCSV;
 window.triggerPWAInstall = triggerPWAInstall;
@@ -241,18 +240,8 @@ initCloud();
     window.addEventListener('focus', hideWarning);
     window.addEventListener('blur', () => { });
 })();
-(function () {
-    const v = _voiceEnabled === true;
-    const btn = document.getElementById('voiceToggleBtn');
-    if (btn)
-        btn.textContent = v ? '🔊 Voice ON' : '🔇 Voice OFF';
-    // Initialize chart when DOM ready
-    if (document.readyState === 'complete') {
-        typeof initChart === 'function' && initChart();
-    }
-    else
-        window.addEventListener('load', () => { typeof initChart === 'function' && initChart(); });
-})();
+voiceUi();
+chartUi();
 registerAcceptedAlertHook(reason => { experimentController?.recordAlert(reason); speak(VOICE_MSGS[Math.max(0, Math.min(escalationLevel - 1, VOICE_MSGS.length - 1))]); triggerBreakCheck('alert'); logEvent('alert', reason || 'Fatigue', 'esc=' + escalationLevel); queueBackendEvent(reason === 'Distraction' ? 'distracted' : 'drowsy'); updateChart(fatigue); });
 const startupCore = Object.freeze({ version: 'v68', start, stop, findCameraChoices, initModel });
 if (experimentFlags.any)

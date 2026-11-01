@@ -440,3 +440,18 @@ test('busy initialization cannot accept readiness beyond the deadline before the
  assert.equal(app.el('startupTitle').textContent,'App could not load');
  assert.deepEqual(app.calls,[]);
 });
+
+test('translated loading nodes return to English metadata when startup fails', () => {
+  const harness = startup();
+  for (const id of ['startBtn','startupTitle']) {
+    const element = harness.document.getElementById(id);
+    element.lang = 'ar'; element.dir = 'rtl'; element.textContent = 'جار التحميل';
+  }
+  harness.advance(8000);
+  for (const id of ['startBtn','startupTitle']) {
+    const element = harness.document.getElementById(id);
+    assert.equal(element.lang,'en'); assert.equal(element.dir,'ltr');
+    assert.equal(element.dataset.driverText,undefined);
+  }
+  assert.equal(harness.document.getElementById('startBtn').textContent,'APP UNAVAILABLE');
+});
