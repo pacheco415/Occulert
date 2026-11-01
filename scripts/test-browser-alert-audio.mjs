@@ -189,16 +189,17 @@ test('missing or denied AudioSession/media APIs and playback rejection stay cont
 async function offlineInstall(failAudio = false) {
   const listeners = new Map(), cached = new Map(), added = [], deleted = [];
   const cache = {
-    async add(request) {
-      const url = typeof request === 'string' ? request : new URL(request.url).pathname;
-      added.push({ url, integrity: request.integrity || '' });
-      if (failAudio && url === '/audio/alert.v1.wav') throw Error('Audio integrity mismatch');
-      cached.set(url, {});
-    },
+    async put(request, response) { cached.set(new URL(request.url).pathname, response); },
     async match(url) { return cached.get(url); },
   };
   const context = vm.createContext({
-    URL, Request, WebAssembly, Uint8Array, Map, Set,
+    URL, Request, Response, AbortController, setTimeout, clearTimeout, WebAssembly, Uint8Array, Map, Set,
+    async fetch(request) {
+      const url = new URL(request.url).pathname;
+      added.push({ url, integrity: request.integrity || '' });
+      if (failAudio && url === '/audio/alert.v1.wav') throw Error('Audio integrity mismatch');
+      return new Response('verified fixture bytes');
+    },
     self: { location: { origin: 'https://occulert.test' }, addEventListener(name, callback) { listeners.set(name, callback); }, async skipWaiting() {} },
     caches: { async open() { return cache; }, async delete(name) { deleted.push(name); } },
   });

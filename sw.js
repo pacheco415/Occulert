@@ -219,15 +219,44 @@ function cacheResponseBestEffort(request, response, timeoutMs = CACHE_WRITE_TIME
   return settleWithin(update, timeoutMs);
 }
 
+// Bound the complete transfer and cache write, including the response body. A stalled
+// noncritical file must not hold an otherwise usable offline installation open.
+function cacheInstallAsset(cache, url) {
+  const controller = new AbortController();
+  const integrity = RUNTIME_INTEGRITY.get(url);
+  const request = new Request(new URL(url, self.location.origin), { signal: controller.signal, ...(integrity ? { integrity } : {}) });
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error); else resolve();
+    };
+    const timer = setTimeout(() => {
+      // Settle even if an underlying cache operation ignores cancellation.
+      finish(new Error('Offline asset installation timed out'));
+      controller.abort();
+    }, 30_000);
+    Promise.resolve().then(async () => {
+      const response = await fetch(request);
+      if (settled) return;
+      // Match cache.add's success requirements; cache.put also validates Vary.
+      if (!response.ok || response.status === 206) throw new Error('Offline asset download failed');
+      await response.clone().arrayBuffer();
+      if (settled) return;
+      // Keep this Cache object: a late write cannot reopen a discarded install.
+      await cache.put(request, response);
+    }).then(() => finish(), error => finish(error || new Error('Offline asset installation failed')));
+  });
+}
+
 self.addEventListener('install', event => {
   event.waitUntil(
     (async () => {
       try {
         const cache = await caches.open(CACHE);
-        await Promise.allSettled(STATIC_ASSETS.map(url => {
-          const integrity = RUNTIME_INTEGRITY.get(url);
-          return cache.add(integrity ? new Request(new URL(url, self.location.origin), { integrity }) : url);
-        }));
+        await Promise.allSettled(STATIC_ASSETS.map(url => cacheInstallAsset(cache, url)));
         const criticalResponses = await Promise.all(CRITICAL_OFFLINE_ASSETS.map(url => cache.match(url)));
         if (criticalResponses.some(response => !response)) throw new Error('Critical offline assets were not cached');
         await self.skipWaiting();
