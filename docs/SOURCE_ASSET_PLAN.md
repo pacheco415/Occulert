@@ -53,3 +53,16 @@ The source audit recompiles the actual tracked graph and requires exact output
 bytes and integrity. The `copy` mode and its byte-equality checks remain available
 for other assets. Bundle importer synchronization updates owned module resource
 references, compiles a staged graph and proves output equality before writes.
+
+## Fleet dashboard copy source
+
+`fleet-dashboard.js` is registered in copy mode at `src/fleet-dashboard.js`.
+Its initial source is byte-identical to the active `fleet-dashboard.v3.js`;
+registration creates no new runtime URL or cache version. Both ordinary and
+dry-run `asset:release` commands remain exact no-ops while the source matches
+the active output. Future edits use the normal composed source-release workflow.
+
+The source remains one classic script with its existing globals, page ordering,
+and behavior. Splitting it into modules belongs in later pull requests. This
+registration covers only the dashboard runtime; other fleet pages and their
+assets retain their existing release workflows.
