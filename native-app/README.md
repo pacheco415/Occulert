@@ -359,3 +359,24 @@ Each alert sends: `{ type: 'occulert-alert', level, perclos, at }` where
 The installed face detector requires Android API 26 (Android 8.0) or later.
 `expo-build-properties` sets that minimum during managed prebuild. Older Android
 versions are unsupported; do not override the detector's manifest requirement.
+
+### Android permissions
+
+The app declares `CAMERA` for foreground monitoring and parked camera setup,
+`VIBRATE` for haptic alerts, and retains the existing `WAKE_LOCK` declaration.
+The installed `expo-keep-awake` uses the activity's `FLAG_KEEP_SCREEN_ON`, which
+does not require `WAKE_LOCK`; retaining that permission is separate from the
+foreground-service removal.
+
+`FOREGROUND_SERVICE` is no longer app-declared. The `expo-audio` plugin's
+`enableBackgroundPlayback: false` also prevents its default Android media
+playback service and foreground-service permissions from being generated.
+Android recording remains disabled. The explicit iOS `UIBackgroundModes: ["audio"]`
+and runtime short-cue playback policy remain in place so the existing iOS
+foreground-loss warning can finish.
+
+The packaging tests pin the app-declared list and exercise the installed audio
+plugin's Android manifest and iOS plist changes in memory. Dependencies and the
+native template can contribute other permissions, such as audio settings or
+network access; these tests do not establish the complete Gradle-merged manifest,
+a signed Android build, or physical-device acceptance.

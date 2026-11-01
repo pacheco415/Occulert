@@ -35,8 +35,7 @@
       "permissions": [
         "CAMERA",
         "VIBRATE",
-        "WAKE_LOCK",
-        "FOREGROUND_SERVICE"
+        "WAKE_LOCK"
       ]
     },
     "plugins": [
@@ -53,7 +52,8 @@
         "expo-audio",
         {
           "microphonePermission": false,
-          "recordAudioAndroid": false
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
         }
       ],
       [
