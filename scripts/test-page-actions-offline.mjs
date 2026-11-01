@@ -105,7 +105,7 @@ test('service worker still bypasses non-GET requests', async () => {
   assert.deepEqual(worker.activity, { interceptions: 0, lifetimes: 0, fetches: 0, cacheReads: 0, cacheOpens: 0, cacheWrites: 0 });
 });
 
-for (const failure of ['none', 'dispatcher', 'guard-missing', 'guard-integrity']) {
+for (const failure of ['none', 'dispatcher', 'guard-missing', 'guard-integrity', 'http-error', 'partial-response']) {
   test(`actual service worker installation ${failure === 'none' ? 'completes' : 'fails'} for ${failure}`, async () => {
     const events = new Map(), cached = new Set(), deleted = [];
     const actionPath = '/' + assetByStem('page-actions.js');
@@ -121,15 +121,16 @@ for (const failure of ['none', 'dispatcher', 'guard-missing', 'guard-integrity']
         addEventListener: (name, handler) => events.set(name, handler),
         skipWaiting: async () => { skipWaiting += 1; },
       },
+      fetch: async request => {
+        const path = typeof request === 'string' ? request : new URL(request.url).pathname;
+        added.push({path, integrity:request.integrity});
+        if (failure === 'dispatcher' && path === actionPath) throw Error('Fixture unavailable dispatcher');
+        if (failure.startsWith('guard-') && path === guardPath) throw Error('Fixture unavailable or invalid integrity guard');
+        return new Response('fixture bytes', { status: path === actionPath && failure === 'http-error' ? 503 : path === actionPath && failure === 'partial-response' ? 206 : 200 });
+      },
       caches: {
         open: async () => ({
-          add: async request => {
-            const path = typeof request === 'string' ? request : new URL(request.url).pathname;
-            added.push({path, integrity:request.integrity});
-            if (failure === 'dispatcher' && path === actionPath) throw Error('Fixture unavailable dispatcher');
-            if (failure.startsWith('guard-') && path === guardPath) throw Error('Fixture unavailable or invalid integrity guard');
-            cached.add(path);
-          },
+          put: async request => cached.add(new URL(request.url).pathname),
           match: async path => cached.has(path) ? new Response('fixture bytes') : undefined,
         }),
         delete: async name => { deleted.push(name); return true; },
@@ -150,4 +151,98 @@ for (const failure of ['none', 'dispatcher', 'guard-missing', 'guard-integrity']
       assert.deepEqual(deleted, []);
     }
   });
+}
+
+function stalledInstall(stalledPath, phase) {
+  const events = new Map(), timers = new Map(), requests = [], currentEntries = new Set();
+  const oldEntries = new Set(['/app.html', '/known-good-driver.js']);
+  const currentName = readFileSync('sw.js', 'utf8').match(/const CACHE = '([^']+)'/)[1];
+  const stored = new Map([['occulert-old-fixture', oldEntries], [currentName, currentEntries]]);
+  let installation, skipWaitingCalled = false, claimed = false, release;
+  const context = {
+    Request, URL, Headers, Response, AbortController, Uint8Array,
+    setTimeout: (callback, delay) => { const id = {}; timers.set(id, { callback, delay }); return id; },
+    clearTimeout: id => timers.delete(id),
+    WebAssembly: { validate: () => false },
+    self: { location: { origin: 'https://fixture.invalid' },
+      addEventListener: (name, handler) => events.set(name, handler),
+      skipWaiting: async () => { skipWaitingCalled = true; },
+      clients: { claim: async () => { claimed = true; } } },
+    fetch: async request => {
+      const path = typeof request === 'string' ? request : new URL(request.url).pathname;
+      requests.push({ path, request });
+      if (path === stalledPath && phase === 'headers') await new Promise(resolve => { release = resolve; });
+      const response = new Response('verified bytes');
+      if (path === stalledPath && phase === 'body') response.clone = () => ({
+        arrayBuffer: () => new Promise(resolve => { release = resolve; }),
+      });
+      return response;
+    },
+    caches: {
+      open: async () => ({
+        // Compatibility path exercises the actual original worker in fail-before runs.
+        add: async input => {
+          const request = typeof input === 'string' ? new Request(new URL(input, context.self.location.origin)) : input;
+          const response = await context.fetch(request);
+          await response.clone().arrayBuffer();
+          const cache = await context.caches.open();
+          await cache.put(request, response);
+        },
+        put: async request => {
+          const path = new URL(request.url).pathname;
+          if (path === stalledPath && phase === 'write') await new Promise(resolve => { release = resolve; });
+          currentEntries.add(path);
+        },
+        match: async path => currentEntries.has(path) ? new Response('verified bytes') : undefined,
+      }),
+      keys: async () => [...stored.keys()],
+      delete: async name => stored.delete(name),
+    },
+  };
+  vm.runInNewContext(readFileSync('sw.js', 'utf8'), context);
+  events.get('install')({ waitUntil: promise => { installation = promise; } });
+  // Observe rejections immediately, before the manually advanced deadline.
+  const outcome = installation.then(() => 'installed', () => 'rejected');
+  return { timers, requests, stored, currentName, currentEntries, oldEntries, outcome,
+    skipWaitingCalled: () => skipWaitingCalled, release: () => release(),
+    async activate() {
+      let activation;
+      events.get('activate')({ waitUntil: promise => { activation = promise; } });
+      await activation;
+      return claimed;
+    } };
+}
+const flushInstallTasks = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+
+for (const phase of ['headers', 'body', 'write']) {
+for (const critical of [false, true]) {
+  test(`stalled ${critical ? 'critical' : 'noncritical'} install ${phase} is bounded and aborted without losing the old cache`, async () => {
+    const path = critical ? '/' + assetByStem('driver-app.js') : '/favicon.ico';
+    const worker = stalledInstall(path, phase);
+    await flushInstallTasks();
+    assert.equal(worker.skipWaitingCalled(), false);
+    assert.equal(worker.timers.size, 1, 'only the stalled transfer must retain its deadline');
+    const deadline = [...worker.timers.values()][0];
+    assert.equal(deadline.delay, 30_000);
+    deadline.callback();
+    await flushInstallTasks();
+    assert.equal(worker.requests.find(item => item.path === path).request.signal.aborted, true);
+    assert.equal(await worker.outcome, critical ? 'rejected' : 'installed');
+    assert.equal(worker.skipWaitingCalled(), !critical);
+    assert.equal(worker.stored.has(worker.currentName), !critical);
+    assert.deepEqual([...worker.oldEntries], ['/app.html', '/known-good-driver.js']);
+    assert.equal(worker.stored.get('occulert-old-fixture'), worker.oldEntries);
+    // A cancellation-ignoring operation cannot resurrect a discarded install.
+    worker.release();
+    await flushInstallTasks();
+    assert.equal(worker.currentEntries.has(path), phase === 'write', 'late headers/body must not start a write; an already-pending write stays on its original Cache object');
+    assert.equal(worker.stored.has(worker.currentName), !critical);
+    assert.equal(worker.timers.size, 0);
+    if (!critical) {
+      assert.equal(await worker.activate(), true);
+      assert.equal(worker.stored.has('occulert-old-fixture'), false);
+      assert.equal(worker.stored.has(worker.currentName), true);
+    }
+  });
+}
 }

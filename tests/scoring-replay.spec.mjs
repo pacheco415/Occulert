@@ -1,21 +1,14 @@
 import {test,expect} from '@playwright/test';
 import {prepareDetectorPage} from './helpers/detector-runtime.mjs';
 import {createReleasedScoringOracle,initialScoringState,syntheticScoringTrace,SCORING_EPOCH} from '../benchmark/released-scoring-oracle.mjs';
+import {landmarks,scoringGeometryInitScript} from './helpers/scoring-replay-geometry.mjs';
 import {replayScoring} from '../benchmark/replay-scoring.mjs';
 
-test.beforeEach(async({page})=>{await prepareDetectorPage(page);});
+test.beforeEach(async({page})=>{await prepareDetectorPage(page);await page.addInitScript({content:scoringGeometryInitScript});});
 const fields=['fatigue','confidence','maxFatigue','fatigueSampleSum','fatigueSampleCount','eyesClosedSince','microsleeps','lastMicro','turnedSince','totalDistractionMs','noFaceSince','lastFaceSeen','calibrating','calibrated','baselineEAR','baseClosedThreshold','baseWatchThreshold','eyeClosedThreshold','eyeWatchThreshold','lastAlert','lastNod','headNods'];
-function landmarks(frame) {
-    if (!frame.hasFace) return null;
-    const points=Array.from({length:468},()=>({x:.5,y:.5}));
-    for(const [indices,center]of [[[362,385,387,263,373,380],.62],[[33,160,158,133,153,144],.38]]) {
-        const h=frame.ear*.05,xy=[[center-.05,.5],[center-.02,.5-h],[center+.02,.5-h],[center+.05,.5],[center+.02,.5+h],[center-.02,.5+h]];
-        indices.forEach((index,i)=>{points[index]={x:xy[i][0],y:xy[i][1]};});
-    }
-    points[4]={x:frame.turned?.8:.5,y:frame.noseY??.55};points[234]={x:.25,y:.6};points[454]={x:.75,y:.6};
-    return points;
-}
 async function runBrowserTrace(page,frames,record) {
+    // Transfer scalar observations, not 468 nested point objects per frame.
+    // Expand fresh identical geometry in the browser; never reduce frame coverage.
     return page.evaluate(({frames,state,fields,epoch,record})=>{
         window.__replayAt=0;Date.now=()=>epoch+window.__replayAt;performance.now=()=>window.__replayAt;
         Object.assign(window,{});
@@ -30,12 +23,12 @@ async function runBrowserTrace(page,frames,record) {
         Object.defineProperty(video,'videoWidth',{configurable:true,value:360});Object.defineProperty(video,'videoHeight',{configurable:true,value:480});canvas.width=360;canvas.height=480;
         if(record)experimentController.begin();
         const result=[];
-        for(const frame of frames){window.__replayAt=frame.atMs;if(record)experimentController.capture({currentTime:frame.atMs/1000});onResults({multiFaceLandmarks:frame.landmarks?[frame.landmarks]:[]});
+        for(const frame of frames){window.__replayAt=frame.atMs;if(record)experimentController.capture({currentTime:frame.atMs/1000});const points=window.__scoringReplayLandmarks(frame);onResults({multiFaceLandmarks:points?[points]:[]});
             const current={fatigue,confidence,maxFatigue,fatigueSampleSum,fatigueSampleCount,eyesClosedSince,microsleeps,lastMicro,turnedSince,totalDistractionMs,noFaceSince,lastFaceSeen,calibrating,calibrated,baselineEAR,baseClosedThreshold,baseWatchThreshold,eyeClosedThreshold,eyeWatchThreshold,lastAlert,lastNod,headNods};
             result.push(fields.map(key=>current[key]));}
         running=false;if(record)experimentController.stop();
         return {result,alerts:_sessionLog.filter(row=>row.type==='alert').map(row=>({atMs:row.ts-epoch,reason:row.value})),trace:record?experimentController.exportData():null};
-    },{frames:frames.map(frame=>({atMs:frame.atMs,landmarks:landmarks(frame)})),state:initialScoringState(),fields,epoch:SCORING_EPOCH,record});
+    },{frames,state:initialScoringState(),fields,epoch:SCORING_EPOCH,record});
 }
 
 for(const fps of [3,7,15])test(`actual released driver matches immutable v97 scoring and alert timestamps at ${fps}fps`,async({page})=>{
