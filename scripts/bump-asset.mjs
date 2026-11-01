@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { assertReleaseBaseline, commitAssetPlan, loadSourceAssets, synchronizeSourceEntry } from './lib/source-assets.mjs';
+import { assertInitialCopyRuntimeSource, replaceInitialCopyUrl, synchronizeInitialCopyHtml, synchronizeInitialCopyWorker } from './lib/initial-copy-assets.mjs';
 
 const root = process.cwd();
 const read = name => readFileSync(join(root, name), 'utf8');
@@ -13,23 +14,33 @@ const args = process.argv.slice(2);
 const dry = args.includes('--dry-run');
 const refresh = args.includes('--refresh');
 const release = args.includes('--release');
+const initialFlags = args.filter(arg => arg.startsWith('--init-copy='));
+const initCopy = initialFlags.length ? initialFlags[0].slice('--init-copy='.length) : null;
 const logical = args.find(arg => !arg.startsWith('--'));
 const manifest = parse('asset-versions.json');
 const integrity = parse('asset-integrity.json');
 const beforeManifest = { ...manifest };
-if (args.some(arg => arg.startsWith('--') && !['--dry-run', '--refresh', '--release'].includes(arg)) || args.filter(arg => !arg.startsWith('--')).length > 1 || (release && (refresh || logical))) throw new Error('Use asset:release [--dry-run] or asset:bump -- <logical-name> [--dry-run | --refresh]');
+if (args.some(arg => arg.startsWith('--') && !['--dry-run', '--refresh', '--release'].includes(arg) && !arg.startsWith('--init-copy=')) || args.filter(arg => !arg.startsWith('--')).length > 1 || (release && (refresh || logical)) || initialFlags.length > 1 || (initCopy !== null && !release)) throw new Error('Use asset:release [--init-copy=<new-logical-name>] [--dry-run] or asset:bump -- <logical-name> [--dry-run | --refresh]');
 if (!release && (!logical || !manifest[logical])) throw new Error('Choose a known logical asset: asset:bump -- driver-app.js [--dry-run | --refresh]');
 const active = [...new Set(Object.values(manifest))];
 const sources = new Map(active.map(name => [name, read(name)]));
-const sourceEntries = loadSourceAssets(root, manifest, { required: release });
+const sourceEntries = loadSourceAssets(root, manifest, { required: release, initCopy });
+const initialEntry = sourceEntries.find(entry => entry.initial);
+if (initialEntry) {
+  if (lstatSync(join(root, initCopy), { throwIfNoEntry: false })) throw new Error('Initial copy logical URL collides with an unversioned file');
+  sources.set(initCopy, initialEntry.bytes.toString('utf8'));
+  for (const [filename, source] of sources) assertInitialCopyRuntimeSource(source, { logical: initCopy, filename });
+  for (const entry of sourceEntries) assertInitialCopyRuntimeSource(entry.bytes.toString('utf8'), { logical: initCopy, filename: entry.logical });
+}
 const releaseInputs = new Map();
 if (release) {
-  assertReleaseBaseline(root, manifest, integrity);
+  assertReleaseBaseline(root, manifest, integrity, { initCopy });
   for (const entry of sourceEntries) {
     if (entry.logical.endsWith('.js')) new Function(entry.bytes.toString('utf8'));
-    const prior = releaseInputs.get(entry.active);
+    const name = entry.initial ? entry.logical : entry.active;
+    const prior = releaseInputs.get(name);
     if (prior && !prior.equals(entry.bytes)) throw new Error(`Conflicting source aliases: ${entry.active}`);
-    releaseInputs.set(entry.active, entry.bytes);
+    releaseInputs.set(name, entry.bytes);
   }
   if (!sourceEntries.some(entry => entry.changed)) {
     console.log(JSON.stringify({ mode: 'release', sources: sourceEntries.map(({ logical, source, active, sha256 }) => ({ logical, source, active, sha256 })), copies: {}, rewrites: [], noOp: true, dryRun: dry }, null, 2));
@@ -107,12 +118,12 @@ if (refresh) {
     writeJSON('asset-integrity.json', integrity);
   }
 } else {
-  const selected = new Set(release ? sourceEntries.filter(entry => entry.changed).map(entry => entry.active) : [manifest[logical]]);
+  const selected = new Set(release ? sourceEntries.filter(entry => entry.changed).map(entry => entry.initial ? entry.logical : entry.active) : [manifest[logical]]);
   // Versioned importers must also be copied rather than rewritten in place.
   for (let changed = true; changed;) {
     changed = false;
     for (const [name, source] of sources) {
-      if (!selected.has(name) && [...selected].some(dependency => source.includes(dependency))) {
+      if (!selected.has(name) && [...selected].some(dependency => dependency !== initCopy && source.includes(dependency))) {
         selected.add(name); changed = true;
       }
     }
@@ -124,41 +135,56 @@ if (refresh) {
   const historicalAssets = new Set(execFileSync('git', ['log', '--all', '--full-history', '--diff-merges=first-parent', '--format=', '--name-only', '--', ':(top,glob)*.v*.js', ':(top,glob)*.v*.css'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 }).split(/\r?\n/).map(name => name.trim()).filter(Boolean));
   const replacements = new Map();
   for (const name of selected) {
-    if (digest(sources.get(name)) !== integrity[name]) throw new Error(`Published asset integrity mismatch: ${name}`);
-    const match = name.match(/^(.+)\.v(\d+)\.(js|css)$/);
+    if (name !== initCopy && digest(sources.get(name)) !== integrity[name]) throw new Error(`Published asset integrity mismatch: ${name}`);
+    const initialMatch = name === initCopy ? initCopy.match(/^(.+)\.(js|css)$/) : null;
+    const match = initialMatch ? [initialMatch[0], initialMatch[1], '0', initialMatch[2]] : name.match(/^(.+)\.v(\d+)\.(js|css)$/);
     if (!match) throw new Error(`Asset is not versioned: ${name}`);
     let version = Number(match[2]) + 1, next;
+    if (name === initCopy) {
+      const reserved = [...historicalAssets, ...readdirSync(root)].map(path => path.match(new RegExp('^' + match[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.v(\\d+)\\.' + match[3] + '$'))).filter(Boolean).map(value => Number(value[1]));
+      if (reserved.some(value => !Number.isSafeInteger(value) || value >= Number.MAX_SAFE_INTEGER)) throw new Error('Initial copy version history exceeds the safe version range');
+      version = Math.max(0, ...reserved) + 1;
+    }
     do { next = `${match[1]}.v${version++}.${match[3]}`; } while (existsSync(join(root, next)) || historicalAssets.has(next) || [...replacements.values()].includes(next));
+    if (lstatSync(join(root, next), { throwIfNoEntry: false })) throw new Error(`Asset destination collision: ${next}`);
     replacements.set(name, next);
   }
-  const escaped = [...replacements.keys()].map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const pattern = new RegExp(escaped.join('|'), 'g');
-  const replace = source => source.replace(pattern, name => replacements.get(name));
+  const existingReplacements = [...replacements].filter(([name]) => name !== initCopy);
+  const escaped = existingReplacements.map(([name]) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = escaped.length ? new RegExp(escaped.join('|'), 'g') : null;
+  const replace = source => pattern ? source.replace(pattern, name => replacements.get(name)) : source;
+  const replaceReferences = source => initialEntry ? replaceInitialCopyUrl(replace(source), initCopy, replacements.get(initCopy)) : replace(source);
   const changes = new Map();
   for (const [old, next] of replacements) {
     const bytes = replace(releaseInputs.get(old)?.toString('utf8') ?? sources.get(old));
+    if (initialEntry) assertInitialCopyRuntimeSource(bytes, { logical: initCopy, filename: next });
     changes.set(next, bytes); integrity[next] = digest(bytes);
   }
   for (const key of Object.keys(manifest)) manifest[key] = replacements.get(manifest[key]) || manifest[key];
+  if (initialEntry) manifest[initCopy] = replacements.get(initCopy);
+  const initialAsset = initialEntry ? { logical: initCopy, filename: manifest[initCopy], bytes: changes.get(manifest[initCopy]) } : null;
   const walkHTML = directory => {
     for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
       if (entry.name.startsWith('.') || ['node_modules', 'native-app', 'scripts', 'tests', 'docs', 'benchmark', 'src', 'build', 'test-results', 'playwright-report'].includes(entry.name)) continue;
       const name = join(directory, entry.name);
       if (entry.isDirectory()) walkHTML(name);
       else if (entry.name.endsWith('.html')) {
-        const source = read(name), updated = replace(source);
+        const source = read(name), rewritten = replaceReferences(source);
+        const updated = initialAsset ? synchronizeInitialCopyHtml(rewritten, initialAsset) : rewritten;
         if (source !== updated) changes.set(name, updated);
       }
     }
   };
   walkHTML('.');
-  let sw = replace(read('sw.js'));
+  let sw = replaceReferences(read('sw.js'));
   const cache = sw.match(/const CACHE\s*=\s*(['"])(occulert-v)(\d+)\1/);
   if (!cache) throw new Error('Cannot find versioned service worker cache');
   const cacheHistory = execFileSync('git', ['log', '--all', '--full-history', '--diff-merges=first-parent', '--format=', '-p', '--unified=0', '--', 'sw.js'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 });
   const recordedCacheVersions = [...cacheHistory.matchAll(/^\+const CACHE\s*=\s*['"]occulert-v(\d+)['"]/gm)].map(match => Number(match[1]));
   const nextCacheVersion = Math.max(Number(cache[3]), ...recordedCacheVersions) + 1;
+  if (!Number.isSafeInteger(nextCacheVersion) || nextCacheVersion < 1) throw new Error('Cannot advance an invalid cache version');
   sw = sw.replace(cache[0], `const CACHE = '${cache[2]}${nextCacheVersion}'`);
+  if (initialAsset) sw = synchronizeInitialCopyWorker(sw, initialAsset);
   changes.set('sw.js', sw);
   const config = parse('vercel.json');
   synchronizeExperimentHelper(changes);
@@ -174,7 +200,7 @@ if (refresh) {
     rule.headers.push({ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' });
     config.headers.push(rule);
   }
-  console.log(JSON.stringify({ ...(release ? { mode: 'release', sources: sourceEntries.map(({ logical, source, active, sha256, changed }) => ({ logical, source, active, sha256, changed })) } : {}), copies: Object.fromEntries(replacements), rewrites: [...changes.keys()], cache: `${cache[2]}${nextCacheVersion}`, dryRun: dry }, null, 2));
+  console.log(JSON.stringify({ ...(release ? { mode: 'release', sources: sourceEntries.map(({ logical, source, active, sha256, changed, initial }) => ({ logical, source, active, sha256, changed, ...(initial ? { initial: true } : {}) })) } : {}), copies: Object.fromEntries(existingReplacements), ...(initialEntry ? { initializations: { [initCopy]: manifest[initCopy] } } : {}), rewrites: [...changes.keys()], cache: `${cache[2]}${nextCacheVersion}`, dryRun: dry }, null, 2));
   if (!dry) {
     changes.set('asset-versions.json', JSON.stringify(manifest, null, 2) + '\n');
     changes.set('asset-integrity.json', JSON.stringify(integrity, null, 2) + '\n');
