@@ -14,6 +14,81 @@ const require = createRequire(new URL('../package.json', import.meta.url));
 const config = require('./metro.config.js');
 const baseline = require('expo/metro-config').getDefaultConfig(app);
 const shared = join(root, 'lib', 'event-outbox.ts');
+const expoConfig = JSON.parse(readFileSync(join(app, 'app.json'), 'utf8')).expo;
+const audioOptions = expoConfig.plugins.find(plugin => Array.isArray(plugin) && plugin[0] === 'expo-audio')[1];
+const withAudio = require('expo-audio/app.plugin.js').default;
+const playbackService = 'expo.modules.audio.service.AudioControlsService';
+const recordingService = 'expo.modules.audio.service.AudioRecordingService';
+const unrelatedService = { $: { 'android:name': 'fixture.UnrelatedService', 'android:exported': 'false' } };
+
+// Exercise the installed plugin's real mod chain without generating native files.
+async function audioMod(platform, modName, modResults, options = audioOptions) {
+  const audioConfig = withAudio(structuredClone(expoConfig), options);
+  const result = await audioConfig.mods[platform][modName]({
+    ...audioConfig,
+    modRequest: { projectRoot: app, platform, modName },
+    modResults: structuredClone(modResults),
+  });
+  return result.modResults;
+}
+
+function androidManifest(services = []) {
+  return { manifest: {
+    $: { 'xmlns:android': 'http://schemas.android.com/apk/res/android' },
+    application: [{ $: { 'android:name': '.MainApplication' }, service: services }],
+  } };
+}
+
+const androidPermissions = manifest => manifest.manifest['uses-permission'].map(entry => entry.$['android:name']).sort();
+const expectedAudioPermissions = ['CAMERA', 'VIBRATE', 'WAKE_LOCK', 'MODIFY_AUDIO_SETTINGS'].map(name => 'android.permission.' + name).sort();
+
+test('Android app permissions remain camera, vibration and the existing wake-lock declaration', () => {
+  assert.deepEqual(expoConfig.android.permissions, ['CAMERA', 'VIBRATE', 'WAKE_LOCK']);
+  assert.equal(audioOptions.microphonePermission, false);
+  assert.equal(audioOptions.recordAudioAndroid, false);
+  assert.equal(audioOptions.enableBackgroundPlayback, false);
+});
+
+test('installed audio plugin adds no Android recording or foreground-service capability', async () => {
+  const manifest = await audioMod('android', 'manifest', androidManifest([unrelatedService]));
+  assert.deepEqual(androidPermissions(manifest), expectedAudioPermissions);
+  assert.deepEqual(manifest.manifest.application[0].service, [unrelatedService]);
+});
+
+test('installed audio plugin removes stale audio services and preserves unrelated services', async () => {
+  const services = [
+    { $: { 'android:name': playbackService, 'android:foregroundServiceType': 'mediaPlayback' } },
+    unrelatedService,
+    { $: { 'android:name': recordingService, 'android:foregroundServiceType': 'microphone' } },
+  ];
+  const manifest = await audioMod('android', 'manifest', androidManifest(services));
+  assert.deepEqual(androidPermissions(manifest), expectedAudioPermissions);
+  assert.deepEqual(manifest.manifest.application[0].service, [unrelatedService]);
+});
+
+test('default audio playback option would restore the Android foreground-service capability', async () => {
+  const options = { ...audioOptions };
+  delete options.enableBackgroundPlayback;
+  const manifest = await audioMod('android', 'manifest', androidManifest([unrelatedService]), options);
+  assert.deepEqual(androidPermissions(manifest), [...expectedAudioPermissions,
+    'android.permission.FOREGROUND_SERVICE', 'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK'].sort());
+  const services = manifest.manifest.application[0].service;
+  assert.deepEqual(services.find(service => service.$['android:name'] === playbackService).$, {
+    'android:name': playbackService, 'android:exported': 'false', 'android:foregroundServiceType': 'mediaPlayback',
+  });
+  assert.deepEqual(services.find(service => service.$['android:name'] === unrelatedService.$['android:name']), unrelatedService);
+  assert.equal(services.some(service => service.$['android:name'] === recordingService), false);
+});
+
+test('audio plugin preserves the explicit iOS audio background mode and permission configuration', async () => {
+  assert.deepEqual(expoConfig.ios.infoPlist.UIBackgroundModes, ['audio']);
+  const options = { ...audioOptions };
+  delete options.enableBackgroundPlayback;
+  for (const configuration of [audioOptions, options]) {
+    const plist = await audioMod('ios', 'infoPlist', expoConfig.ios.infoPlist, configuration);
+    assert.deepEqual(plist, expoConfig.ios.infoPlist);
+  }
+});
 
 test('Metro adds only the canonical shared directory and retains Expo resolution defaults', () => {
   assert.equal(config.projectRoot, baseline.projectRoot);
