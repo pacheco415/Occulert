@@ -91,6 +91,7 @@
     "test:history-model",
     "build",
     "lint:source",
+    "lint:api",
     "typecheck:source",
     "test:driver-build",
     "test:scoring-replay",
