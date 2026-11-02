@@ -103,7 +103,8 @@
     "test:offline-cache-diagnostics",
     "test:stale-branches",
     "test:unanswered-alerts",
-    "test:motion-activity"
+    "test:motion-activity",
+    "test:emergency-readiness"
   ],
   "additionalChecks": [
     "test:verify-runner"

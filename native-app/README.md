@@ -89,6 +89,13 @@ vehicle movement. Both experiment flags must be enabled; ordinary sessions
 make no new activity requests. Device permission and transition acceptance
 remain open, and no messaging or alert changes are included.
 
+Settings also contains optional [Apple emergency-readiness guides](../docs/EMERGENCY_READINESS_GUIDANCE.md),
+linked from Pre-drive for review while safely parked. They explain Medical ID,
+contacts, Emergency SOS, supported Crash Detection, Ultra Siren and Watch haptics
+through Apple’s own instructions. Occulert does not inspect or change those
+settings, activate emergency features or confirm readiness. This is reference
+guidance; exact-build readability and browser-return checks remain open.
+
 SDK 58 generates the UIKit scene lifecycle during prebuild. The current camera
 stack still requires a physical-device build: Google ML Kit 8 excludes arm64
 simulators, while the iPhone Duo simulator runs only arm64. Do not clear that
