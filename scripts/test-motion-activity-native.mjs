@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { accessSync, constants, readFileSync, realpathSync, statSync, writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -75,8 +75,31 @@ function productionMethods() {
 }
 
 const swift = `
-import Foundation
-
+// All SDK dependencies are controlled stand-ins. Only Swift's standard library
+// is needed to execute the unchanged production methods below.
+struct UUID: Equatable {
+  private static var next: UInt64 = 0
+  private let value: UInt64
+  init() { Self.next += 1; value = Self.next }
+}
+final class OperationQueue {
+  static let main = OperationQueue()
+}
+enum Thread {
+  static var isMainThread = true
+}
+final class DispatchQueue {
+  static let main = DispatchQueue()
+  var syncCalls = 0
+  func sync(execute work: () -> Void) {
+    precondition(!Thread.isMainThread, "must not synchronously dispatch to the current main queue")
+    syncCalls += 1
+    let wasMainThread = Thread.isMainThread
+    Thread.isMainThread = true
+    defer { Thread.isMainThread = wasMainThread }
+    work()
+  }
+}
 public class Module {
   var events: [(String, [String: Any])] = []
   public init() {}
@@ -127,6 +150,8 @@ ${productionMethods()}
     UIApplication.shared.applicationState = .active
     ProcessInfo.processInfo.systemUptime = 10
     Date.wall = 100_000
+    Thread.isMainThread = true
+    DispatchQueue.main.syncCalls = 0
     return OcculertMotionActivityModule()
   }
   static func samples(_ module: OcculertMotionActivityModule) -> [[String: Any]] {
@@ -185,13 +210,19 @@ ${productionMethods()}
       m.manager.callbacks[2](CMMotionActivity()); precondition(samples(m).count == 2)
       print("PASS idempotent start, replacement owner, owner-scoped stop and same-token generation invalidation")
     }
-    for boundary in ["background", "lifecycle", "destroy", "denied", "restricted", "pending", "nil", "future-time", "invalid-time"] {
+    for boundary in ["background", "lifecycle", "destroy", "lifecycle-off-main", "destroy-off-main", "denied", "restricted", "pending", "nil", "future-time", "invalid-time"] {
       let m = fixture(); _ = m.startObservation(owner: "A"); let callback = m.manager.callbacks[0]
       let activity = CMMotionActivity()
       switch boundary {
       case "background": UIApplication.shared.applicationState = .background
       case "lifecycle": m.invalidateFromLifecycle(destroying: false)
       case "destroy": m.invalidateFromLifecycle(destroying: true)
+      case "lifecycle-off-main":
+        Thread.isMainThread = false
+        m.invalidateFromLifecycle(destroying: false)
+      case "destroy-off-main":
+        Thread.isMainThread = false
+        m.invalidateFromLifecycle(destroying: true)
       case "denied": CMMotionActivityManager.authorization = .denied
       case "restricted": CMMotionActivityManager.authorization = .restricted
       case "pending": CMMotionActivityManager.authorization = .notDetermined
@@ -199,11 +230,20 @@ ${productionMethods()}
       case "invalid-time": activity.timestamp = .nan
       default: break
       }
+      if boundary == "lifecycle-off-main" || boundary == "destroy-off-main" {
+        precondition(DispatchQueue.main.syncCalls == 1, boundary)
+        precondition(!Thread.isMainThread, "sync restores the calling thread")
+        precondition(!m.updating && m.activeOwner == nil, "lifecycle invalidates before returning")
+      }
       callback(boundary == "nil" ? nil : activity)
       precondition(samples(m).isEmpty, boundary)
       precondition(!m.updating, boundary)
       callback(CMMotionActivity()); precondition(samples(m).isEmpty, boundary)
       if boundary == "destroy" {
+        precondition(m.startObservation(owner: "C")["state"] as? String == "error")
+        precondition(m.manager.callbacks.count == 1)
+      }
+      if boundary == "destroy-off-main" {
         precondition(m.startObservation(owner: "C")["state"] as? String == "error")
         precondition(m.manager.callbacks.count == 1)
       }
@@ -223,21 +263,57 @@ ${productionMethods()}
 }
 `;
 
+function swiftCompilerContext() {
+  const candidates = [];
+  for (const directory of new Set((process.env.PATH ?? '/usr/bin:/bin').split(path.delimiter))) {
+    const executable = path.resolve(directory || '.', 'swiftc');
+    try {
+      accessSync(executable, constants.X_OK);
+      if (statSync(executable).isFile()) candidates.push({ path: executable, canonicalPath: realpathSync(executable) });
+    } catch { /* An absent or inaccessible PATH entry is not a compiler candidate. */ }
+  }
+  const environmentKeys = ['ImageOS', 'ImageVersion', 'RUNNER_ARCH', 'SDKROOT', 'TOOLCHAINS', 'DEVELOPER_DIR',
+    'SWIFT_PATH', 'SWIFT_EXEC', 'SWIFT_DRIVER_SWIFT_FRONTEND_EXEC'];
+  return {
+    compiler: candidates[0] ?? null,
+    candidates,
+    node: { version: process.version, executable: process.execPath },
+    npm: { userAgent: process.env.npm_config_user_agent ?? null, executable: process.env.npm_execpath ?? null },
+    environment: Object.fromEntries(environmentKeys.map(key => [key, process.env[key] ?? null])),
+  };
+}
+
+function boundedCompilerOutput(value) {
+  const output = String(value ?? ''), limit = 16_384;
+  if (output.length <= limit) return output;
+  return `${output.slice(0, limit / 2)}\n[${output.length - limit} characters omitted]\n${output.slice(-limit / 2)}`;
+}
+
 test('actual Swift motion activity methods enforce ownership, permission and foreground lifecycle', t => {
+  assert.doesNotMatch(swift, /^\s*import\s+/m, 'controlled SDK stand-ins keep the fixture independent of imported SDK modules');
   const directory = mkdtempSync(path.join(tmpdir(), 'occulert-motion-activity-'));
   try {
     const input = path.join(directory, 'MotionActivityHarness.swift'), executable = path.join(directory, 'motion-activity-harness');
     writeFileSync(input, swift);
-    const compile = spawnSync('swiftc', ['-parse-as-library', '-swift-version', '5',
-      '-module-cache-path', path.join(directory, 'module-cache'), input, '-o', executable], {
+    const context = swiftCompilerContext();
+    const argv = ['-v', '-parse-as-library', '-swift-version', '5',
+      '-module-cache-path', path.join(directory, 'module-cache'), input, '-o', executable];
+    const startedAt = performance.now();
+    const compile = spawnSync('swiftc', argv, {
       encoding: 'utf8', timeout: 30_000,
     });
+    const diagnostics = JSON.stringify({
+      ...context, command: 'swiftc', argv, elapsedMs: Math.round(performance.now() - startedAt),
+      status: compile.status, signal: compile.signal, errorCode: compile.error?.code ?? null,
+      stdout: boundedCompilerOutput(compile.stdout), stderr: boundedCompilerOutput(compile.stderr),
+    }, null, 2);
+    t.diagnostic(`Swift compile diagnostics:\n${diagnostics}`);
     if (compile.error?.code === 'ENOENT' && process.platform !== 'darwin') {
       t.skip('Swift compiler absent; the required macOS native-method job executes this harness.');
       return;
     }
-    assert.equal(compile.error, undefined, compile.error?.message);
-    assert.equal(compile.status, 0, `${compile.stdout}\n${compile.stderr}`);
+    assert.equal(compile.error, undefined, diagnostics);
+    assert.equal(compile.status, 0, diagnostics);
     const run = spawnSync(executable, [], { encoding: 'utf8', timeout: 10_000 });
     assert.equal(run.error, undefined, run.error?.message);
     assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
