@@ -117,7 +117,8 @@
     "test:offline-cache-diagnostics": "node --test scripts/test-offline-cache-diagnostics.mjs",
     "test:scoring-replay": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-scoring-core.mjs scripts/test-scoring-replay.mjs scripts/test-calibration-flag.mjs",
     "test:stale-branches": "node --test scripts/test-stale-branches.mjs",
-    "test:unanswered-alerts": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-unanswered-alert-policy.mjs"
+    "test:unanswered-alerts": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-unanswered-alert-policy.mjs",
+    "test:motion-activity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-motion-activity.mjs scripts/test-motion-activity-native.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

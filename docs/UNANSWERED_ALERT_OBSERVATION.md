@@ -58,12 +58,15 @@ was safe.
 
 ## Motion and privacy
 
-The runtime labels motion **unknown**. Task 2.2's vehicle-activity gate does not
-exist yet, and headphone head-motion availability is not evidence that a
-vehicle is moving. The pure model's other observation labels—unavailable,
-denied, stale, reported not moving and reported activity—remain separately
-counted fixture/future-input categories. None authorizes escalation, including
-reported activity; no signal here can authorize sending anything.
+The runtime labels motion **unknown** unless the separately default-off
+[phone activity experiment](MOTION_ACTIVITY_OBSERVATION.md) is also enabled.
+That experiment supplies conservative unknown, unavailable, denied, stale,
+reported stationary or reported automotive-activity context at candidate
+completion. The stored `not-moving` key means reported stationary, not verified
+speed. Headphone availability supplies no automotive evidence. No category
+authorizes escalation or sending anything; ambiguous automotive/stationary
+overlap remains unknown. This context does not alter the candidate count or
+its required six-second camera/output window.
 
 Only a versioned aggregate snapshot is saved in local History/checkpoints:
 `candidates` and six `byMotion` counters, plus observation-mode/evidence labels.
@@ -94,8 +97,10 @@ and writes no diagnostic field. When enabled, Start begins a new generation.
 Aborted Start, Stop, unmount and foreground loss invalidate pending work. Stop
 captures independent counts before asynchronous persistence; late callbacks
 cannot update a later session or its saved counts. Recovered counts never arm
-new observation. No new permissions, motion requests, background work or
-network calls are introduced.
+new observation. Task 2.1 alone requests no motion access. The separately
+selected Task 2.2 experiment requests activity updates only on an explicit
+foreground Start with both flags enabled. Neither experiment adds background
+work or network calls.
 
 ## Verification boundary
 

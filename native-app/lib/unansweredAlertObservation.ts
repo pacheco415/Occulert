@@ -2,6 +2,7 @@ import type { CriticalOutputAcceptedEvent } from '../components/AlertSystem';
 import {
   createUnansweredAlertTracker,
   UNANSWERED_ALERT_MAX_SAMPLE_GAP_MS,
+  type UnansweredAlertMotion,
   type UnansweredAlertSnapshot,
 } from './unansweredAlertPolicy.ts';
 
@@ -31,6 +32,7 @@ export function createUnansweredAlertObservation(
     now: () => typeof performance === 'undefined' ? NaN : performance.now(),
     wallNow: () => Date.now(),
   },
+  motionCategory?: () => UnansweredAlertMotion,
 ): UnansweredAlertObservation {
   const tracker = enabled ? createUnansweredAlertTracker() : null;
   let generation = 0;
@@ -98,7 +100,9 @@ export function createUnansweredAlertObservation(
       }
       sourceAnchor ??= { source: sourceAt, at };
       lastSourceAt = sourceAt;
-      tracker.sample({ generation, at, state, motion: 'unknown' });
+      let motion: UnansweredAlertMotion = 'unknown';
+      try { motion = motionCategory?.() ?? 'unknown'; } catch { /* Optional evidence cannot affect camera monitoring. */ }
+      tracker.sample({ generation, at, state, motion });
     },
     criticalOutput(owner, event) {
       if (!tracker || !active || owner !== generation || !event || event.level !== 'critical') return;

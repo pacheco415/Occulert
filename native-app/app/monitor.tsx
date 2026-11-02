@@ -57,6 +57,8 @@ import { createCaptureTransitionGuard } from '../lib/captureLoadPolicy';
 import { createUnansweredAlertObservation, UNANSWERED_ALERT_OBSERVATION_ENABLED,
   type UnansweredAlertObservation, type UnansweredEyeSample } from '../lib/unansweredAlertObservation';
 import type { UnansweredAlertSnapshot } from '../lib/unansweredAlertPolicy';
+import { createMotionActivityBridge, MOTION_ACTIVITY_OBSERVATION_ENABLED } from '../lib/motionActivity';
+import { createMotionActivityObservation, type MotionActivityObservation } from '../lib/motionActivityObservation';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -157,9 +159,16 @@ export default function MonitorScreen() {
   const cameraCallbackOwnerRef = useRef(0);
   const cameraCallbackOwner = cameraCallbackOwnerRef.current;
   const cameraScreenMountedRef = useRef(true);
+  const motionActivityObservationEnabled = UNANSWERED_ALERT_OBSERVATION_ENABLED && MOTION_ACTIVITY_OBSERVATION_ENABLED;
+  const motionActivityObservationRef = useRef<MotionActivityObservation | null>(null);
+  if (motionActivityObservationEnabled && !motionActivityObservationRef.current) {
+    motionActivityObservationRef.current = createMotionActivityObservation(true, createMotionActivityBridge());
+  }
   const unansweredObservationRef = useRef<UnansweredAlertObservation | null>(null);
   if (UNANSWERED_ALERT_OBSERVATION_ENABLED && !unansweredObservationRef.current) {
-    unansweredObservationRef.current = createUnansweredAlertObservation();
+    unansweredObservationRef.current = motionActivityObservationEnabled
+      ? createUnansweredAlertObservation(undefined, undefined, () => motionActivityObservationRef.current?.category() ?? 'unknown')
+      : createUnansweredAlertObservation();
   }
   const unansweredGeneration = unansweredObservationRef.current?.generation ?? 0;
   const getUnansweredAlertSnapshot = useCallback(() => unansweredObservationRef.current?.snapshot(), []);
@@ -185,6 +194,10 @@ export default function MonitorScreen() {
   useEffect(() => {
     if (!UNANSWERED_ALERT_OBSERVATION_ENABLED) return;
     return () => unansweredObservationRef.current?.stop();
+  }, []);
+  useEffect(() => {
+    if (!motionActivityObservationEnabled) return;
+    return () => motionActivityObservationRef.current?.stop();
   }, []);
   const cameraRecoveringRef = useRef(false);
   const headNodDetectorRef = useRef(new HeadNodDetector());
@@ -466,6 +479,8 @@ export default function MonitorScreen() {
       isRunningRef.current = true;
       setIsRunning(true);
       monitoringStarted = true;
+      // Optional activity estimates never delay camera Start or affect its alerts.
+      motionActivityObservationRef.current?.begin();
       // Watch availability is optional observation context. It never delays
       // camera monitoring and never enters scoring or alert policy.
       void getWatchStatus().then((watchStatus) => {
@@ -498,7 +513,10 @@ export default function MonitorScreen() {
       // optional headphone startup path.
       void checkpointActiveSession(nextSessionStartedAt).catch(() => {});
     } finally {
-      if (!monitoringStarted) unansweredObservationRef.current?.stop();
+      if (!monitoringStarted) {
+        motionActivityObservationRef.current?.stop();
+        unansweredObservationRef.current?.stop();
+      }
       if (reservedSessionId && !monitoringStarted) {
         await clearActiveSessionCheckpoint(reservedSessionId).catch(() => {});
       }
@@ -562,6 +580,7 @@ export default function MonitorScreen() {
     stoppingRef.current = true;
     setIsStopping(true);
     // Freeze only aggregate observations before any asynchronous stop/save work.
+    motionActivityObservationRef.current?.stop();
     unansweredObservationRef.current?.stop();
     const unansweredAlerts = unansweredObservationRef.current?.snapshot();
 

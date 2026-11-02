@@ -20,7 +20,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Occulert uses your front camera for on-device fatigue monitoring. Optional parked setup tests briefly check both cameras. No photos or video are saved or uploaded.",
-        "NSMotionUsageDescription": "Occulert reads motion from compatible connected headphones during foreground monitoring to record optional local-only head-movement observations. These observations do not change fatigue scores or alerts.",
+        "NSMotionUsageDescription": "Occulert reads motion from compatible connected headphones for optional local-only head-movement observations. An optional development experiment also reads this iPhone's activity estimates during foreground monitoring. These estimates do not prove vehicle movement. These observations do not change fatigue scores or alerts.",
         "UIBackgroundModes": [
           "audio"
         ]
