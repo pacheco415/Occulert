@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { deriveMonitorPresentation } from '../lib/monitorPresentationModel.ts';
 import { buildMonitorCheckpoint } from '../lib/monitorCheckpointModel.ts';
-import { isActiveSessionCheckpoint } from '../lib/sessionRecoveryModel.ts';
+import { isActiveSessionCheckpoint, parseActiveSessionCheckpoint, prependRecoveredSession, recoveredSessionFromCheckpoint } from '../lib/sessionRecoveryModel.ts';
 
 test('monitor status keeps lifecycle guidance ahead of detector state and preserves every existing color', () => {
   const base = { metrics: { state: 'open' }, sensorFault: null, isStopping: false, isStarting: false, cameraRecovering: false,
@@ -36,4 +36,32 @@ test('checkpoint model preserves local recovery identity, averaging and its boun
   assert.equal(isActiveSessionCheckpoint(snapshot), true);
   assert.equal(buildMonitorCheckpoint({ ...input, fatigueSum: 0, fatigueSamples: 0 }).avgFatigue, 0);
   assert.equal(buildMonitorCheckpoint({ ...input, fatigueSum: 0, fatigueSamples: 1 }).avgFatigue, 0);
+});
+
+test('optional observation counts are copied into checkpoints and recovered History without a resumable window', () => {
+  const diagnostics = { version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 1,
+    byMotion: { unknown: 1, unavailable: 0, denied: 0, stale: 0, 'not-moving': 0, 'reported-activity': 0 } };
+  const input = { sessionId: 'observed', startedAt: 1_000, checkpointedAt: 31_000, alertCount: 2,
+    fatigueSum: 20, fatigueSamples: 1, maxFatigue: 20, headNodObservations: 0, headphoneHeadNodObservations: 0,
+    headphoneMotionSamples: 0, headphoneMotionStatus: 'unavailable', monitorPerformance: { samples: 1 },
+    sensitivity: 'medium', buildInfo: {}, unansweredAlerts: diagnostics };
+  const checkpoint = buildMonitorCheckpoint(input);
+  assert.deepEqual(checkpoint.unansweredAlerts, diagnostics); assert.notEqual(checkpoint.unansweredAlerts.byMotion, diagnostics.byMotion);
+  diagnostics.byMotion.unknown = 9;
+  assert.equal(checkpoint.unansweredAlerts.byMotion.unknown, 1);
+  const parsed = parseActiveSessionCheckpoint(JSON.stringify(checkpoint));
+  const recovered = recoveredSessionFromCheckpoint(parsed, 32_000);
+  assert.deepEqual(recovered.unansweredAlerts, checkpoint.unansweredAlerts);
+  assert.notEqual(recovered.unansweredAlerts.byMotion, parsed.unansweredAlerts.byMotion);
+  const inserted = prependRecoveredSession([], recovered).sessions[0];
+  recovered.unansweredAlerts.byMotion.unknown = 9;
+  assert.equal(inserted.unansweredAlerts.byMotion.unknown, 1);
+  assert.deepEqual(Object.keys(inserted.unansweredAlerts).sort(), ['byMotion','candidates','evidence','mode','version']);
+  const { unansweredAlerts: _diagnostics, ...withoutObservation } = input;
+  assert.equal(Object.hasOwn(buildMonitorCheckpoint(withoutObservation), 'unansweredAlerts'), false);
+  for (const malformed of [null, {}, { ...checkpoint.unansweredAlerts, armedAt: 1 }, { ...checkpoint.unansweredAlerts, candidates: 2 }]) {
+    assert.equal(isActiveSessionCheckpoint({ ...checkpoint, unansweredAlerts: malformed }), false);
+    assert.throws(() => parseActiveSessionCheckpoint(JSON.stringify({ ...checkpoint, unansweredAlerts: malformed })), /checkpoint could not be read/);
+    assert.equal(recoveredSessionFromCheckpoint({ ...checkpoint, unansweredAlerts: malformed }, 32_000), null);
+  }
 });

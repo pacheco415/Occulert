@@ -83,6 +83,33 @@ test('checkpoint timer failures stay best effort while explicit checkpoint calle
   } finally { await f.unmount(); }
 });
 
+test('mounted checkpoint hook reads optional observation counts only for an active session and captures them deeply', async () => {
+  const f = createMonitorHookFixture({ running: true });
+  const diagnostics = { version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 1,
+    byMotion: { unknown: 1, unavailable: 0, denied: 0, stale: 0, 'not-moving': 0, 'reported-activity': 0 } };
+  let reads = 0; f.owner.getUnansweredAlertSnapshot = () => { reads++; return diagnostics; };
+  await f.mount();
+  try {
+    await f.api.checkpoint(2_000);
+    assert.equal(reads, 1); assert.deepEqual(structuredClone(f.events.checkpoints[0].unansweredAlerts), diagnostics);
+    diagnostics.byMotion.unknown = 9;
+    assert.equal(f.events.checkpoints[0].unansweredAlerts.byMotion.unknown, 1);
+    f.owner.isRunningRef.current = false; await f.update({ isRunning: false });
+    await f.api.checkpoint(3_000); assert.equal(reads, 1); assert.equal(f.events.checkpoints.length, 1);
+  } finally { await f.unmount(); }
+});
+
+test('mounted checkpoint hook leaves observation fields absent when the getter is absent or produces no snapshot', async () => {
+  const f = createMonitorHookFixture({ running: true }); await f.mount();
+  try {
+    await f.api.checkpoint(2_000);
+    assert.equal(Object.hasOwn(f.events.checkpoints[0], 'unansweredAlerts'), false);
+    await f.update({ getUnansweredAlertSnapshot: () => undefined });
+    await f.api.checkpoint(3_000);
+    assert.equal(Object.hasOwn(f.events.checkpoints[1], 'unansweredAlerts'), false);
+  } finally { await f.unmount(); }
+});
+
 test('mounted camera hook ignores disposed native callbacks and a late interruption read without spending restart budget', async () => {
   const f = createMonitorHookFixture({ running: true }), wait = deferred(); f.interruptionWait = wait.promise; await f.mount();
   const callback = f.observations.camera[0].listener;

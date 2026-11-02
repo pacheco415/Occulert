@@ -1,6 +1,7 @@
 /** Session completion policy, independent of React and camera state. */
 import type { CloudSessionStats } from './cloudSync';
 import type { MonitorPerformanceSnapshot } from './monitorPerformance';
+import { copyUnansweredAlertSnapshot, type UnansweredAlertSnapshot } from './unansweredAlertPolicy.ts';
 
 type HistoryUpdate = (update: (sessions: Record<string, unknown>[]) => Record<string, unknown>[]) => Promise<void>;
 
@@ -16,6 +17,7 @@ type SavedSnapshot = {
   headphoneMotionStatus: string;
   monitorPerformance: MonitorPerformanceSnapshot;
   sensorFusion: unknown;
+  unansweredAlerts?: UnansweredAlertSnapshot;
   sensitivity: string;
   extra: object;
 };
@@ -40,6 +42,7 @@ export async function saveCompletedNativeSession(snapshot: SavedSnapshot, update
     sensorFusion: snapshot.sensorFusion,
     sensitivity: snapshot.sensitivity,
     ...snapshot.extra,
+    ...(snapshot.unansweredAlerts === undefined ? {} : { unansweredAlerts: copyUnansweredAlertSnapshot(snapshot.unansweredAlerts) }),
   };
   await update(sessions => [record, ...sessions.filter(item => item?.sessionId !== snapshot.sessionId)].slice(0, 50));
   return snapshot.sessionId;

@@ -20,7 +20,7 @@ import { clearDeviceEyeBaseline, loadDeviceEyeBaseline, saveDeviceEyeBaseline } 
 import { useEyeTracking } from '../hooks/useEyeTracking';
 import { SIMULATOR_TRACE } from '../lib/simulatorTrace';
 import { deliverCueIfCurrent } from '../lib/alertDelivery';
-import { type AlertTimingEvent } from '../components/AlertSystem';
+import { type AlertTimingEvent, type CriticalOutputAcceptedEvent } from '../components/AlertSystem';
 
 import { loadSavedSensitivity } from '../components/SensitivitySlider';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
@@ -54,6 +54,9 @@ import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreference
 
 import { createSensorFusionObservationTracker } from '../lib/sensorFusionObservation';
 import { createCaptureTransitionGuard } from '../lib/captureLoadPolicy';
+import { createUnansweredAlertObservation, UNANSWERED_ALERT_OBSERVATION_ENABLED,
+  type UnansweredAlertObservation, type UnansweredEyeSample } from '../lib/unansweredAlertObservation';
+import type { UnansweredAlertSnapshot } from '../lib/unansweredAlertPolicy';
 
 /**
  * MonitorScreen — full-screen camera + real on-device eye tracking.
@@ -154,6 +157,22 @@ export default function MonitorScreen() {
   const cameraCallbackOwnerRef = useRef(0);
   const cameraCallbackOwner = cameraCallbackOwnerRef.current;
   const cameraScreenMountedRef = useRef(true);
+  const unansweredObservationRef = useRef<UnansweredAlertObservation | null>(null);
+  if (UNANSWERED_ALERT_OBSERVATION_ENABLED && !unansweredObservationRef.current) {
+    unansweredObservationRef.current = createUnansweredAlertObservation();
+  }
+  const unansweredGeneration = unansweredObservationRef.current?.generation ?? 0;
+  const getUnansweredAlertSnapshot = useCallback(() => unansweredObservationRef.current?.snapshot(), []);
+  const observeUnansweredSample = useCallback((sample: UnansweredEyeSample) => {
+    if (!cameraScreenMountedRef.current || !isRunningRef.current || stoppingRef.current) return;
+    if (AppState.currentState !== 'active') { unansweredObservationRef.current?.stop(); return; }
+    unansweredObservationRef.current?.sample(sample);
+  }, []);
+  const recordUnansweredCriticalOutput = useCallback((event: CriticalOutputAcceptedEvent) => {
+    if (!cameraScreenMountedRef.current || !isRunningRef.current || stoppingRef.current) return;
+    if (AppState.currentState !== 'active') { unansweredObservationRef.current?.stop(); return; }
+    unansweredObservationRef.current?.criticalOutput(unansweredGeneration, event);
+  }, [unansweredGeneration]);
   const multitaskingCameraPausedRef = useRef(false);
 
   useEffect(() => {
@@ -162,6 +181,10 @@ export default function MonitorScreen() {
       cameraScreenMountedRef.current = false;
       cameraInterruptionGenerationRef.current += 1;
     };
+  }, []);
+  useEffect(() => {
+    if (!UNANSWERED_ALERT_OBSERVATION_ENABLED) return;
+    return () => unansweredObservationRef.current?.stop();
   }, []);
   const cameraRecoveringRef = useRef(false);
   const headNodDetectorRef = useRef(new HeadNodDetector());
@@ -306,6 +329,7 @@ export default function MonitorScreen() {
     headphoneHeadNodObservationsRef, headphoneMotionSamplesRef, headphoneMotionStatusRef,
     performanceTrackerRef, sensorFusionTrackerRef, sessionSensitivityRef,
     isRunning,
+    ...(UNANSWERED_ALERT_OBSERVATION_ENABLED ? { getUnansweredAlertSnapshot } : {}),
   });
 
   const handleStart = async () => {
@@ -349,6 +373,8 @@ export default function MonitorScreen() {
 
       const nextSessionStartedAt = Date.now();
       const nextSessionId = `session-${nextSessionStartedAt}`;
+      unansweredObservationRef.current?.begin();
+      const initialUnansweredAlerts = unansweredObservationRef.current?.snapshot();
       performanceTrackerRef.current.reset();
       sensorFusionTrackerRef.current.reset(nextSessionStartedAt);
       sensorFusionTrackerRef.current.setHeadphoneStatus('starting');
@@ -368,6 +394,7 @@ export default function MonitorScreen() {
           headphoneMotionStatus: 'starting',
           monitorPerformance: performanceTrackerRef.current.snapshot(nextSessionStartedAt),
           sensorFusion: sensorFusionTrackerRef.current.snapshot(nextSessionStartedAt),
+          ...(initialUnansweredAlerts === undefined ? {} : { unansweredAlerts: initialUnansweredAlerts }),
           sensitivity,
           ...currentAppBuildInfo(),
         });
@@ -471,6 +498,7 @@ export default function MonitorScreen() {
       // optional headphone startup path.
       void checkpointActiveSession(nextSessionStartedAt).catch(() => {});
     } finally {
+      if (!monitoringStarted) unansweredObservationRef.current?.stop();
       if (reservedSessionId && !monitoringStarted) {
         await clearActiveSessionCheckpoint(reservedSessionId).catch(() => {});
       }
@@ -493,6 +521,7 @@ export default function MonitorScreen() {
     alerts: number,
     monitorPerformance: MonitorPerformanceSnapshot,
     endedAt: number,
+    unansweredAlerts?: UnansweredAlertSnapshot,
   ): Promise<string | null> => {
     if (durationSec <= 0) return null;
     return saveCompletedNativeSession({
@@ -505,6 +534,7 @@ export default function MonitorScreen() {
       headphoneMotionStatus: headphoneMotionStatusRef.current,
       monitorPerformance,
       sensorFusion: sensorFusionTrackerRef.current.snapshot(endedAt),
+      ...(unansweredAlerts === undefined ? {} : { unansweredAlerts }),
       sensitivity: sessionSensitivityRef.current,
       extra: {
         ...(EYE_BASELINE_EXPERIMENT ? {eyeBaselineExperiment:{version:1,baseline:sessionEyeBaselineRef.current}} : {}),
@@ -531,6 +561,9 @@ export default function MonitorScreen() {
     if (stoppingRef.current) return;
     stoppingRef.current = true;
     setIsStopping(true);
+    // Freeze only aggregate observations before any asynchronous stop/save work.
+    unansweredObservationRef.current?.stop();
+    const unansweredAlerts = unansweredObservationRef.current?.snapshot();
 
     // The ref becomes authoritative before React commits the visible running
     // state, so AppState shutdown in that gap must still save and finalize.
@@ -573,7 +606,9 @@ export default function MonitorScreen() {
       await completeNativeSessionStop({
         wasRunning, activeSessionId, deferCloudFinalization: Boolean(options.deferCloudFinalization),
       }, {
-        save: id => saveSession(id, durationSec, alerts, monitorPerformance, stoppedAt),
+        save: id => unansweredAlerts === undefined
+          ? saveSession(id, durationSec, alerts, monitorPerformance, stoppedAt)
+          : saveSession(id, durationSec, alerts, monitorPerformance, stoppedAt, unansweredAlerts),
         clearCheckpoint: clearActiveSessionCheckpoint,
         releaseIdentity: id => { if (activeSessionIdRef.current === id) activeSessionIdRef.current = null; },
         finalize: finalizeCloud,
@@ -696,6 +731,7 @@ export default function MonitorScreen() {
     setMetrics, fatigueSumRef, fatigueSamplesRef,
     maxFatigueRef, cameraLoadPolicy, detectFaces,
     recordCloudAlertTransition, simulatorProofRef, isRunning, setupPreviewActive,
+    ...(UNANSWERED_ALERT_OBSERVATION_ENABLED ? { unansweredGeneration, observeUnansweredSample } : {}),
   });
 
   const onEyeState = analysis.onEyeState;
@@ -738,6 +774,7 @@ export default function MonitorScreen() {
       visibleAlertLevel={visibleAlertLevel}
       setVisibleAlertLevel={setVisibleAlertLevel}
       recordAlertTiming={recordAlertTiming}
+      {...(UNANSWERED_ALERT_OBSERVATION_ENABLED ? { recordUnansweredCriticalOutput } : {})}
       safeStopOpen={safeStopOpen}
       safeStopBusy={safeStopBusy}
       setSafeStopOpen={setSafeStopOpen}

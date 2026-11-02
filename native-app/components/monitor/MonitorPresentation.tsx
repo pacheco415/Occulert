@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useKeepAwake } from 'expo-keep-awake';
 import type { CameraRuntimeError } from 'react-native-vision-camera';
-import { AlertSystem, type AlertTimingEvent } from '../AlertSystem';
+import { AlertSystem, type AlertTimingEvent, type CriticalOutputAcceptedEvent } from '../AlertSystem';
 import { CameraSetupGuide } from '../CameraSetupGuide';
 import { MonitorCaptureCamera, type CaptureConfigurationChange } from '../MonitorCaptureCamera';
 import { LiveMetrics } from '../LiveMetrics';
@@ -35,6 +35,7 @@ interface Props {
   cameraRecovering: boolean; setupPreviewActive: boolean; cameraSetup: CameraSetupAssessment; sensorFault: string | null;
   sessionStartedAt: number | null; sessionEndedAt: number | null; baselineMessage: string; reduceMotion: boolean;
   visibleAlertLevel: AlertLevel; setVisibleAlertLevel(level: AlertLevel): void; recordAlertTiming(event: AlertTimingEvent): void;
+  recordUnansweredCriticalOutput?: (event: CriticalOutputAcceptedEvent) => void;
   safeStopOpen: boolean; safeStopBusy: boolean; setSafeStopOpen(open: boolean): void;
   handleSafeStopChoice(kind: SafeStopKind): Promise<void>;
   handleStart(): Promise<void>; handleStop(): Promise<void>; toggleSetupPreview(): void;
@@ -84,7 +85,7 @@ export function MonitorCameraUnavailable() {
 }
 
 export function MonitorPresentation({
-  device, frameProcessor, simulatorPhase, cameraLoadPolicy, cameraEpoch, cameraCallbackOwner, handleCaptureConfiguration, handleCameraError, metrics, alertCount, frontCameraIdentity, isRunning, isStarting, isStopping, sensitivityLoaded, baselineLoaded, baselineBusy, cameraRecovering, setupPreviewActive, cameraSetup, sensorFault, sessionStartedAt, sessionEndedAt, baselineMessage, reduceMotion, visibleAlertLevel, setVisibleAlertLevel, recordAlertTiming, safeStopOpen, safeStopBusy, setSafeStopOpen, handleSafeStopChoice, handleStart, handleStop, toggleSetupPreview, onHome, onSettings, onRecoveryHome
+  device, frameProcessor, simulatorPhase, cameraLoadPolicy, cameraEpoch, cameraCallbackOwner, handleCaptureConfiguration, handleCameraError, metrics, alertCount, frontCameraIdentity, isRunning, isStarting, isStopping, sensitivityLoaded, baselineLoaded, baselineBusy, cameraRecovering, setupPreviewActive, cameraSetup, sensorFault, sessionStartedAt, sessionEndedAt, baselineMessage, reduceMotion, visibleAlertLevel, setVisibleAlertLevel, recordAlertTiming, recordUnansweredCriticalOutput, safeStopOpen, safeStopBusy, setSafeStopOpen, handleSafeStopChoice, handleStart, handleStop, toggleSetupPreview, onHome, onSettings, onRecoveryHome
 }: Props) {
   const { recoveryRequired, monitorStatusLabel, monitorStatusColor } = deriveMonitorPresentation({ metrics, sensorFault, isStopping, isStarting, cameraRecovering, isRunning, setupPreviewActive, cameraSetup });
   return (
@@ -265,6 +266,7 @@ export function MonitorPresentation({
           sessionEndedAt={sessionEndedAt}
           onTimingEvent={recordAlertTiming}
           onLevelChange={setVisibleAlertLevel}
+          {...(recordUnansweredCriticalOutput ? { onCriticalOutputAccepted: recordUnansweredCriticalOutput } : {})}
           inline
         />
 

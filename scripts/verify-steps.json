@@ -101,7 +101,8 @@
     "test:legacy-event-quota",
     "test:event-outbox-transport",
     "test:offline-cache-diagnostics",
-    "test:stale-branches"
+    "test:stale-branches",
+    "test:unanswered-alerts"
   ],
   "additionalChecks": [
     "test:verify-runner"

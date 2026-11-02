@@ -1,6 +1,7 @@
 import type { SensitivityLevel } from '../constants/thresholds';
 import type { MonitorPerformanceSnapshot } from './monitorPerformance';
 import type { SensorFusionObservationSnapshot } from './sensorFusionObservation';
+import { copyUnansweredAlertSnapshot, isUnansweredAlertSnapshot, type UnansweredAlertSnapshot } from './unansweredAlertPolicy.ts';
 
 export const SESSION_RECOVERY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 
@@ -19,6 +20,7 @@ export interface ActiveSessionCheckpoint {
   headphoneMotionStatus: string;
   monitorPerformance: MonitorPerformanceSnapshot;
   sensorFusion?: SensorFusionObservationSnapshot;
+  unansweredAlerts?: UnansweredAlertSnapshot;
   sensitivity: SensitivityLevel;
   appVersion?: string;
   appBuildNumber?: string;
@@ -79,7 +81,8 @@ export function isActiveSessionCheckpoint(value: unknown): value is ActiveSessio
       || checkpoint.sensitivity === 'medium'
       || checkpoint.sensitivity === 'high')
     && validMetricObject(checkpoint.monitorPerformance)
-    && (checkpoint.sensorFusion === undefined || validMetricObject(checkpoint.sensorFusion));
+    && (checkpoint.sensorFusion === undefined || validMetricObject(checkpoint.sensorFusion))
+    && (checkpoint.unansweredAlerts === undefined || isUnansweredAlertSnapshot(checkpoint.unansweredAlerts));
 }
 
 /** Only a missing key means no checkpoint; malformed stored data must be preserved. */
@@ -115,6 +118,7 @@ export function recoveredSessionFromCheckpoint(
   const { startedAt: _startedAt, checkpointedAt, ...record } = value;
   return {
     ...record,
+    ...(record.unansweredAlerts === undefined ? {} : { unansweredAlerts: copyUnansweredAlertSnapshot(record.unansweredAlerts) }),
     savedAt: new Date(checkpointedAt).toISOString(),
     recoveredFromInterruption: true,
     recoveryNote: 'Recovered from the last local checkpoint after monitoring ended unexpectedly.',
@@ -129,7 +133,10 @@ export function prependRecoveredSession(
   if (sessions.some(item => item?.sessionId === recovered.sessionId)) {
     return { sessions, inserted: false };
   }
-  const recoveredRecord: Record<string, unknown> = { ...recovered };
+  const recoveredRecord: Record<string, unknown> = {
+    ...recovered,
+    ...(recovered.unansweredAlerts === undefined ? {} : { unansweredAlerts: copyUnansweredAlertSnapshot(recovered.unansweredAlerts) }),
+  };
   return {
     sessions: [recoveredRecord, ...sessions].slice(0, limit),
     inserted: true,
