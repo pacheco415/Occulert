@@ -75,8 +75,31 @@ function productionMethods() {
 }
 
 const swift = `
-import Foundation
-
+// All SDK dependencies are controlled stand-ins. Only Swift's standard library
+// is needed to execute the unchanged production methods below.
+struct UUID: Equatable {
+  private static var next: UInt64 = 0
+  private let value: UInt64
+  init() { Self.next += 1; value = Self.next }
+}
+final class OperationQueue {
+  static let main = OperationQueue()
+}
+enum Thread {
+  static var isMainThread = true
+}
+final class DispatchQueue {
+  static let main = DispatchQueue()
+  var syncCalls = 0
+  func sync(execute work: () -> Void) {
+    precondition(!Thread.isMainThread, "must not synchronously dispatch to the current main queue")
+    syncCalls += 1
+    let wasMainThread = Thread.isMainThread
+    Thread.isMainThread = true
+    defer { Thread.isMainThread = wasMainThread }
+    work()
+  }
+}
 public class Module {
   var events: [(String, [String: Any])] = []
   public init() {}
@@ -127,6 +150,8 @@ ${productionMethods()}
     UIApplication.shared.applicationState = .active
     ProcessInfo.processInfo.systemUptime = 10
     Date.wall = 100_000
+    Thread.isMainThread = true
+    DispatchQueue.main.syncCalls = 0
     return OcculertMotionActivityModule()
   }
   static func samples(_ module: OcculertMotionActivityModule) -> [[String: Any]] {
@@ -185,13 +210,19 @@ ${productionMethods()}
       m.manager.callbacks[2](CMMotionActivity()); precondition(samples(m).count == 2)
       print("PASS idempotent start, replacement owner, owner-scoped stop and same-token generation invalidation")
     }
-    for boundary in ["background", "lifecycle", "destroy", "denied", "restricted", "pending", "nil", "future-time", "invalid-time"] {
+    for boundary in ["background", "lifecycle", "destroy", "lifecycle-off-main", "destroy-off-main", "denied", "restricted", "pending", "nil", "future-time", "invalid-time"] {
       let m = fixture(); _ = m.startObservation(owner: "A"); let callback = m.manager.callbacks[0]
       let activity = CMMotionActivity()
       switch boundary {
       case "background": UIApplication.shared.applicationState = .background
       case "lifecycle": m.invalidateFromLifecycle(destroying: false)
       case "destroy": m.invalidateFromLifecycle(destroying: true)
+      case "lifecycle-off-main":
+        Thread.isMainThread = false
+        m.invalidateFromLifecycle(destroying: false)
+      case "destroy-off-main":
+        Thread.isMainThread = false
+        m.invalidateFromLifecycle(destroying: true)
       case "denied": CMMotionActivityManager.authorization = .denied
       case "restricted": CMMotionActivityManager.authorization = .restricted
       case "pending": CMMotionActivityManager.authorization = .notDetermined
@@ -199,11 +230,20 @@ ${productionMethods()}
       case "invalid-time": activity.timestamp = .nan
       default: break
       }
+      if boundary == "lifecycle-off-main" || boundary == "destroy-off-main" {
+        precondition(DispatchQueue.main.syncCalls == 1, boundary)
+        precondition(!Thread.isMainThread, "sync restores the calling thread")
+        precondition(!m.updating && m.activeOwner == nil, "lifecycle invalidates before returning")
+      }
       callback(boundary == "nil" ? nil : activity)
       precondition(samples(m).isEmpty, boundary)
       precondition(!m.updating, boundary)
       callback(CMMotionActivity()); precondition(samples(m).isEmpty, boundary)
       if boundary == "destroy" {
+        precondition(m.startObservation(owner: "C")["state"] as? String == "error")
+        precondition(m.manager.callbacks.count == 1)
+      }
+      if boundary == "destroy-off-main" {
         precondition(m.startObservation(owner: "C")["state"] as? String == "error")
         precondition(m.manager.callbacks.count == 1)
       }
@@ -224,6 +264,7 @@ ${productionMethods()}
 `;
 
 test('actual Swift motion activity methods enforce ownership, permission and foreground lifecycle', t => {
+  assert.doesNotMatch(swift, /^\s*import\s+/m, 'controlled SDK stand-ins keep the fixture independent of imported SDK modules');
   const directory = mkdtempSync(path.join(tmpdir(), 'occulert-motion-activity-'));
   try {
     const input = path.join(directory, 'MotionActivityHarness.swift'), executable = path.join(directory, 'motion-activity-harness');
