@@ -101,9 +101,34 @@ evidence. No network or background processing is added.
 
 Software checks exercise the actual pure controller, optional bridge,
 monitor Start/Stop/unmount wiring and production Swift methods against controlled
-native stand-ins. Apple-only autolinking and production flag guards are also
-checked. A substituted bridge or compiled Swift fixture is not signed-binary
-or physical-device acceptance.
+native stand-ins. The required macOS lane compiles a standalone policy fixture
+within 30 seconds and runs its assertions within 10 seconds. Linux hosts execute
+the same Swift methods and assertions through Swift's interpreter. The original
+separate budgets remain: up to 30 seconds for preparation, then 10 seconds for
+the policy assertions. A nonce-tagged, unbuffered monotonic timestamp immediately
+before the assertion entry point establishes that boundary. Absolute deadline
+checks and watchdogs reject missing, duplicate, malformed or late markers,
+overruns and late success after a timeout. Work performed after the marker,
+including any lazy JIT compilation, counts against the runtime budget.
+The marker uses a generated Clang module with ordinary C declarations from
+`stdint.h`, `time.h` and `unistd.h`, rather than importing the broad Swift
+Glibc overlay. It needs no separate C compiler invocation. Module-loading
+remarks and bounded, failure-only metadata from the owned compiler process
+subtree help identify preparation failures without reading environment or
+source contents.
+
+Only the fixture's entry-point and timing scaffold differ; no policy condition
+or assertion is removed. This avoids an unrelated standalone Linux link-driver
+step while retaining compiled coverage on macOS. These host timing checks do
+not identify the internal cause of earlier link-driver stalls.
+
+Apple-only autolinking and production flag guards are also checked. On Linux a
+missing interpreter is a failure when a compiler is present; its unavailable-tool
+skip applies only when both are absent. Other hosts retain the standalone
+compiler path and existing tool-availability rules. Compiler/execution
+identities and bounded diagnostics are retained. These are controlled policy
+tests, not verification of Apple framework scheduling, iOS SDK compilation,
+a signed application binary or physical-device acceptance.
 
 Before any use decision, separately authorize an exact native build and record
 permission allow/deny/restriction, activity transitions and overlaps, unchanged
