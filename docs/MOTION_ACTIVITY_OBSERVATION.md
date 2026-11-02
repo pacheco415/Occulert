@@ -103,10 +103,18 @@ Software checks exercise the actual pure controller, optional bridge,
 monitor Start/Stop/unmount wiring and production Swift methods against controlled
 native stand-ins. The required macOS lane compiles a standalone policy fixture
 within 30 seconds and runs its assertions within 10 seconds. Linux hosts execute
-the same Swift methods and assertions through Swift's interpreter within a
-single 10-second budget. Only the fixture's entry-point scaffold differs; no
-policy condition or assertion is removed. This avoids an unrelated standalone
-Linux link-driver step while retaining compiled coverage on macOS.
+the same Swift methods and assertions through Swift's interpreter. The original
+separate budgets remain: up to 30 seconds for preparation, then 10 seconds for
+the policy assertions. A nonce-tagged, unbuffered monotonic timestamp immediately
+before the assertion entry point establishes that boundary. Absolute deadline
+checks and watchdogs reject missing, duplicate, malformed or late markers,
+overruns and late success after a timeout. Work performed after the marker,
+including any lazy JIT compilation, counts against the runtime budget.
+
+Only the fixture's entry-point and timing scaffold differ; no policy condition
+or assertion is removed. This avoids an unrelated standalone Linux link-driver
+step while retaining compiled coverage on macOS. These host timing checks do
+not identify the internal cause of earlier link-driver stalls.
 
 Apple-only autolinking and production flag guards are also checked. On Linux a
 missing interpreter is a failure when a compiler is present; its unavailable-tool
