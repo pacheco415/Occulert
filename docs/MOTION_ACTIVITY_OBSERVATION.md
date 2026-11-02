@@ -101,9 +101,20 @@ evidence. No network or background processing is added.
 
 Software checks exercise the actual pure controller, optional bridge,
 monitor Start/Stop/unmount wiring and production Swift methods against controlled
-native stand-ins. Apple-only autolinking and production flag guards are also
-checked. A substituted bridge or compiled Swift fixture is not signed-binary
-or physical-device acceptance.
+native stand-ins. The required macOS lane compiles a standalone policy fixture
+within 30 seconds and runs its assertions within 10 seconds. Linux hosts execute
+the same Swift methods and assertions through Swift's interpreter within a
+single 10-second budget. Only the fixture's entry-point scaffold differs; no
+policy condition or assertion is removed. This avoids an unrelated standalone
+Linux link-driver step while retaining compiled coverage on macOS.
+
+Apple-only autolinking and production flag guards are also checked. On Linux a
+missing interpreter is a failure when a compiler is present; its unavailable-tool
+skip applies only when both are absent. Other hosts retain the standalone
+compiler path and existing tool-availability rules. Compiler/execution
+identities and bounded diagnostics are retained. These are controlled policy
+tests, not verification of Apple framework scheduling, iOS SDK compilation,
+a signed application binary or physical-device acceptance.
 
 Before any use decision, separately authorize an exact native build and record
 permission allow/deny/restriction, activity transitions and overlaps, unchanged
