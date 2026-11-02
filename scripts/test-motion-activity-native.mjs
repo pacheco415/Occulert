@@ -27,6 +27,17 @@ test('motion activity is Apple-only, permission-described, transient and has no 
   assert.match(source, /OnAppContextDestroys \{ self\.invalidateFromLifecycle\(destroying: true\) \}/);
   assert.match(source, /startActivityUpdates\(to: OperationQueue\.main\)/);
   assert.doesNotMatch(source, /queryActivity|UserDefaults|FileManager|URLSession|CLLocation|Timer\(|sendAlert|NotificationCenter/);
+
+  // Root-only checks may lack Swift; the required macOS lane must execute the
+  // actual native methods alongside its existing Watch receiver regression.
+  const workflow = readFileSync(new URL('../.github/workflows/native-app-typecheck.yml', import.meta.url), 'utf8').split('\n');
+  const start = workflow.indexOf('  watch-notification:');
+  assert.ok(start >= 0, 'retain the required native-method verification job');
+  const next = workflow.findIndex((line, index) => index > start && /^  [\w-]+:$/.test(line));
+  const job = workflow.slice(start, next < 0 ? undefined : next).join('\n');
+  assert.match(job, /^    runs-on: macos-[\w.-]+$/m);
+  assert.match(job, /^      - run: node --test scripts\/test-watch-notification\.mjs scripts\/test-motion-activity-native\.mjs$/m);
+  assert.doesNotMatch(job, /^    (?:if|continue-on-error):/m);
 });
 
 test('actual Expo resolver includes the motion module on Apple and excludes it on Android', t => {
@@ -213,10 +224,6 @@ ${productionMethods()}
 `;
 
 test('actual Swift motion activity methods enforce ownership, permission and foreground lifecycle', t => {
-  const compiler = spawnSync('swiftc', ['--version'], { encoding: 'utf8', timeout: 10_000 });
-  if (compiler.error?.code === 'ENOENT') { t.skip('Swift compiler absent; the required macOS native-method job executes this harness.'); return; }
-  assert.equal(compiler.error, undefined, compiler.error?.message);
-  assert.equal(compiler.status, 0, compiler.stderr);
   const directory = mkdtempSync(path.join(tmpdir(), 'occulert-motion-activity-'));
   try {
     const input = path.join(directory, 'MotionActivityHarness.swift'), executable = path.join(directory, 'motion-activity-harness');
@@ -225,6 +232,10 @@ test('actual Swift motion activity methods enforce ownership, permission and for
       '-module-cache-path', path.join(directory, 'module-cache'), input, '-o', executable], {
       encoding: 'utf8', timeout: 30_000,
     });
+    if (compile.error?.code === 'ENOENT' && process.platform !== 'darwin') {
+      t.skip('Swift compiler absent; the required macOS native-method job executes this harness.');
+      return;
+    }
     assert.equal(compile.error, undefined, compile.error?.message);
     assert.equal(compile.status, 0, `${compile.stdout}\n${compile.stderr}`);
     const run = spawnSync(executable, [], { encoding: 'utf8', timeout: 10_000 });
