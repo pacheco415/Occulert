@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { accessSync, constants, readFileSync, realpathSync, statSync, writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -263,22 +263,57 @@ ${productionMethods()}
 }
 `;
 
+function swiftCompilerContext() {
+  const candidates = [];
+  for (const directory of new Set((process.env.PATH ?? '/usr/bin:/bin').split(path.delimiter))) {
+    const executable = path.resolve(directory || '.', 'swiftc');
+    try {
+      accessSync(executable, constants.X_OK);
+      if (statSync(executable).isFile()) candidates.push({ path: executable, canonicalPath: realpathSync(executable) });
+    } catch { /* An absent or inaccessible PATH entry is not a compiler candidate. */ }
+  }
+  const environmentKeys = ['ImageOS', 'ImageVersion', 'RUNNER_ARCH', 'SDKROOT', 'TOOLCHAINS', 'DEVELOPER_DIR',
+    'SWIFT_PATH', 'SWIFT_EXEC', 'SWIFT_DRIVER_SWIFT_FRONTEND_EXEC'];
+  return {
+    compiler: candidates[0] ?? null,
+    candidates,
+    node: { version: process.version, executable: process.execPath },
+    npm: { userAgent: process.env.npm_config_user_agent ?? null, executable: process.env.npm_execpath ?? null },
+    environment: Object.fromEntries(environmentKeys.map(key => [key, process.env[key] ?? null])),
+  };
+}
+
+function boundedCompilerOutput(value) {
+  const output = String(value ?? ''), limit = 16_384;
+  if (output.length <= limit) return output;
+  return `${output.slice(0, limit / 2)}\n[${output.length - limit} characters omitted]\n${output.slice(-limit / 2)}`;
+}
+
 test('actual Swift motion activity methods enforce ownership, permission and foreground lifecycle', t => {
   assert.doesNotMatch(swift, /^\s*import\s+/m, 'controlled SDK stand-ins keep the fixture independent of imported SDK modules');
   const directory = mkdtempSync(path.join(tmpdir(), 'occulert-motion-activity-'));
   try {
     const input = path.join(directory, 'MotionActivityHarness.swift'), executable = path.join(directory, 'motion-activity-harness');
     writeFileSync(input, swift);
-    const compile = spawnSync('swiftc', ['-parse-as-library', '-swift-version', '5',
-      '-module-cache-path', path.join(directory, 'module-cache'), input, '-o', executable], {
+    const context = swiftCompilerContext();
+    const argv = ['-v', '-parse-as-library', '-swift-version', '5',
+      '-module-cache-path', path.join(directory, 'module-cache'), input, '-o', executable];
+    const startedAt = performance.now();
+    const compile = spawnSync('swiftc', argv, {
       encoding: 'utf8', timeout: 30_000,
     });
+    const diagnostics = JSON.stringify({
+      ...context, command: 'swiftc', argv, elapsedMs: Math.round(performance.now() - startedAt),
+      status: compile.status, signal: compile.signal, errorCode: compile.error?.code ?? null,
+      stdout: boundedCompilerOutput(compile.stdout), stderr: boundedCompilerOutput(compile.stderr),
+    }, null, 2);
+    t.diagnostic(`Swift compile diagnostics:\n${diagnostics}`);
     if (compile.error?.code === 'ENOENT' && process.platform !== 'darwin') {
       t.skip('Swift compiler absent; the required macOS native-method job executes this harness.');
       return;
     }
-    assert.equal(compile.error, undefined, compile.error?.message);
-    assert.equal(compile.status, 0, `${compile.stdout}\n${compile.stderr}`);
+    assert.equal(compile.error, undefined, diagnostics);
+    assert.equal(compile.status, 0, diagnostics);
     const run = spawnSync(executable, [], { encoding: 'utf8', timeout: 10_000 });
     assert.equal(run.error, undefined, run.error?.message);
     assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
