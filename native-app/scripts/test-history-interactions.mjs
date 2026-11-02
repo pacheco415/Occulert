@@ -226,11 +226,11 @@ test('actual expanded History shows optional local observation counts and exclud
     assert.doesNotMatch(f.text(), /Unanswered-alert candidates/);
     await f.invoke(f.card('long').findByProps({ accessibilityLabel: 'Show session review details' }));
     assert.match(f.text(), /Unanswered-alert candidates \(experimental\)/);
-    assert.match(f.text(), /Motion context: Unknown/); assert.match(f.text(), /Reported not moving/); assert.match(f.text(), /Reported activity/);
+    assert.match(f.text(), /Motion context: Unknown/); assert.match(f.text(), /Reported stationary/); assert.match(f.text(), /Reported automotive activity/);
     assert.match(f.text(), /software acceptance of critical output/); assert.match(f.text(), /whether a person heard or felt it is unverified/);
     assert.match(f.text(), /Local observation only; no messages are sent/);
     await f.invoke(f.button('Share 3 visible session summaries'));
-    assert.doesNotMatch(f.shares[0].message, /unansweredAlerts|byMotion|software-output-accepted|Unanswered-alert candidates|Reported activity/);
+    assert.doesNotMatch(f.shares[0].message, /unansweredAlerts|byMotion|software-output-accepted|Unanswered-alert candidates|Reported stationary|Reported automotive activity/);
     assert.deepEqual(f.records().find(item => item.sessionId === 'long').unansweredAlerts, unansweredSnapshot());
   } finally { await f.unmount(); }
 });

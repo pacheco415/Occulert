@@ -68,7 +68,7 @@
     <key>NSLocalNetworkUsageDescription</key>
     <string>Expo Dev Launcher uses the local network to discover and connect to development servers running on your computer.</string>
     <key>NSMotionUsageDescription</key>
-    <string>Occulert reads motion from compatible connected headphones during foreground monitoring to record optional local-only head-movement observations. These observations do not change fatigue scores or alerts.</string>
+    <string>Occulert reads motion from compatible connected headphones for optional local-only head-movement observations. An optional development experiment also reads this iPhone's activity estimates during foreground monitoring. These estimates do not prove vehicle movement. These observations do not change fatigue scores or alerts.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

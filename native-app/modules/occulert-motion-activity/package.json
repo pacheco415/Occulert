@@ -1,0 +1,9 @@
+{
+  "name": "occulert-motion-activity",
+  "version": "1.0.0",
+  "description": "Private foreground-only Core Motion activity observations for Occulert.",
+  "private": true,
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

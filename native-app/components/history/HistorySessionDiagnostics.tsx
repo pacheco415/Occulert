@@ -82,10 +82,10 @@ export function HistorySessionDiagnostics({ item, isExpanded }: { item: SessionR
                   Motion context: Unknown {item.unansweredAlerts.byMotion.unknown} · Unavailable {item.unansweredAlerts.byMotion.unavailable} · Denied {item.unansweredAlerts.byMotion.denied} · Stale {item.unansweredAlerts.byMotion.stale}
                 </Text>
                 <Text style={s.observationInfo}>
-                  Reported not moving: {item.unansweredAlerts.byMotion['not-moving']} · Reported activity: {item.unansweredAlerts.byMotion['reported-activity']}
+                  Reported stationary: {item.unansweredAlerts.byMotion['not-moving']} · Reported automotive activity: {item.unansweredAlerts.byMotion['reported-activity']}
                 </Text>
                 <Text style={s.observationCaution}>
-                  Counts follow software acceptance of critical output; whether a person heard or felt it is unverified. Local observation only; no messages are sent. It does not change scores or alerts and is not included in cloud sync, exports, or session feedback.
+                  Counts follow software acceptance of critical output; whether a person heard or felt it is unverified. Activity estimates do not prove vehicle movement. Local observation only; no messages are sent. It does not change scores or alerts and is not included in cloud sync, exports, or session feedback.
                 </Text>
               </View>
             )}

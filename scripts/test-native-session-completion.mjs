@@ -120,6 +120,7 @@ test('the actual monitor preserves unobserved metrics, disarms before saving and
  const ref=current=>({current});
  const context={Date:FixedDate,useCallback:fn=>fn,__DEV__:false,elapsedSessionSeconds,completeNativeSessionStop,finalizeCompletedNativeSession,captureTransitionRef:ref(captureTransition),
   cameraInterruptionGenerationRef:ref(0),cameraCallbackOwnerRef:ref(0),
+  motionActivityObservationRef:ref(null),
   unansweredObservationRef:ref(observationEnabled?{
    stop:()=>{observerStops++;order.push('observer-stop');observer.stop()},
    snapshot:()=>{observerSnapshots++;order.push('observer-snapshot');return observer.snapshot()},

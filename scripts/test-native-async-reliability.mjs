@@ -25,6 +25,7 @@ import { RollingClosedFraction } from '../native-app/lib/rollingClosedFraction.t
 import { HeadNodDetector } from '../native-app/lib/headNodDetector.ts';
 import * as simulatorTraceModel from '../native-app/lib/simulatorTraceModel.ts';
 import { createUnansweredAlertObservation } from '../native-app/lib/unansweredAlertObservation.ts';
+import { createMotionActivityObservation } from '../native-app/lib/motionActivityObservation.ts';
 
 // Execute the production TS logic with native bridges replaced. Removing imports
 // and JSX presentation avoids requiring a device, Expo, or a TS compiler in CI.
@@ -434,11 +435,12 @@ function hookFixture() {
   }, unmount() { effects.forEach(effect => effect?.cleanup?.()); } };
 }
 
-function monitorCameraStartFixture(stage, { simulator = false, autorun = false, unansweredObservation = false } = {}) {
+function monitorCameraStartFixture(stage, { simulator = false, autorun = false, unansweredObservation = false, motionActivity = false } = {}) {
   const h = hookFixture(), entered = deferred(), pending = deferred();
   const f = { entered, pending, history: [], checkpoints: [], hookBaselines: [], baselineSaves: [], cameraClears: 0,
     clock: 1_000_000, cameraListener: null, held: false, intervals: new Map(), nextInterval: 0,
-    observers: [], checkpointClears: [] };
+    observers: [], checkpointClears: [], motionObservers: [], motionFactoryCalls: 0,
+    motionStarts: [], motionStops: [], motionActivities: [], motionStatuses: [], appStateListeners: [], motionStatus: {} };
   class Clock extends Date { static now() { return f.clock; } }
   const { useEyeTracking: realEyeTracking } = load(read('native-app/hooks/useEyeTracking.ts'), ['useEyeTracking'], {
     ...h.React, ...monitorThresholds, baselinePreset: eyeBaselineModel.baselinePreset, RollingClosedFraction, Date: Clock,
@@ -458,6 +460,23 @@ function monitorCameraStartFixture(stage, { simulator = false, autorun = false, 
   };
   const player = { pause() {}, seekTo: async () => {}, play() {} }, isCurrent = () => true;
   const device = { id: 'virtual-front' }, router = { replace() {}, back() {}, push() {} };
+  const appState = { currentState: 'active', addEventListener(_event, listener) {
+    const entry = { listener, removed: false }; f.appStateListeners.push(entry);
+    return { remove() { entry.removed = true; } };
+  } };
+  const addMotionListener = (kind, listener) => {
+    const entry = { listener, removed: false }; f[kind].push(entry);
+    return { remove() { entry.removed = true; } };
+  };
+  const motionBridge = {
+    async start(owner) {
+      f.motionStarts.push(owner); await boundary('motion-start');
+      return { owner, state: 'active', authorization: 'authorized', isAvailable: true, isActive: true, ...f.motionStatus };
+    },
+    async stop(owner) { f.motionStops.push(owner); },
+    addActivityListener: listener => addMotionListener('motionActivities', listener),
+    addStatusListener: listener => addMotionListener('motionStatuses', listener),
+  };
   const source = read('native-app/app/monitor.tsx');
   const cutoff = source.indexOf('\n  if (!hasPermission && !SIMULATOR_TRACE) {');
   assert.ok(cutoff > source.indexOf('  const frameProcessor ='));
@@ -470,10 +489,19 @@ function monitorCameraStartFixture(stage, { simulator = false, autorun = false, 
     stopNativeCloudEvents() {}, queueNativeCloudAlert: () => null,
     EYE_BASELINE_EXPERIMENT: !simulator, SIMULATOR_TRACE: simulator, useSimulatorTrace,
     UNANSWERED_ALERT_OBSERVATION_ENABLED: unansweredObservation,
-    createUnansweredAlertObservation: () => {
+    MOTION_ACTIVITY_OBSERVATION_ENABLED: motionActivity,
+    createUnansweredAlertObservation: (_enabled, _clocks, motionCategory) => {
       assert.equal(unansweredObservation, true, 'a disabled actual screen must not construct an observer');
-      const observer = createUnansweredAlertObservation(true, { now: () => f.clock, wallNow: () => f.clock });
+      const observer = createUnansweredAlertObservation(true, { now: () => f.clock, wallNow: () => f.clock }, motionCategory);
       f.observers.push(observer); return observer;
+    },
+    createMotionActivityBridge: () => {
+      assert.ok(unansweredObservation && motionActivity, 'both development flags are required for native motion lookup');
+      f.motionFactoryCalls++; return motionBridge;
+    },
+    createMotionActivityObservation: (enabled, bridge) => {
+      const observer = createMotionActivityObservation(enabled, bridge, { now: () => f.clock, wallNow: () => f.clock });
+      f.motionObservers.push(observer); return observer;
     },
     Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
     Platform: { OS: 'ios' },
@@ -484,7 +512,7 @@ function monitorCameraStartFixture(stage, { simulator = false, autorun = false, 
     useAlertAudioPlayer: () => ({ player, isCurrent }),
     useEyeTracking: (level, baseline) => { f.hookBaselines.push(baseline); return realEyeTracking(level, baseline); },
     Battery: { usePowerState: () => ({ batteryLevel: 1, batteryState: 0, lowPowerMode: false }), BatteryState: { CHARGING: 1, FULL: 2 } },
-    AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
+    AppState: appState,
     BackHandler: { addEventListener: () => ({ remove() {} }) },
     currentAlertPreferences: () => ({ audioEnabled: false, hapticEnabled: false }),
     deliverCueIfCurrent, loadAlertPreferences: () => boundary('preferences'), getWatchAlertsEnabled: async () => false,
@@ -515,6 +543,18 @@ function monitorCameraStartFixture(stage, { simulator = false, autorun = false, 
   f.render = () => h.render(() => api.MonitorScreen());
   f.switchToInner = () => { assert.equal(typeof f.cameraListener, 'function'); f.cameraListener(identity('inner')); };
   f.unmount = () => h.unmount();
+  f.emitMotion = (changes = {}, owner = f.motionStarts.at(-1)) => {
+    const sample = { owner, authorization: 'authorized', confidence: 'high', activityStartedAt: f.clock,
+      sourceUptimeMs: f.clock, receivedUptimeMs: f.clock, receivedAt: f.clock,
+      automotive: true, stationary: false, walking: false, running: false, cycling: false, unknown: false, ...changes };
+    for (const entry of f.motionActivities) if (!entry.removed) entry.listener(sample);
+    return sample;
+  };
+  f.setAppState = async nextState => {
+    appState.currentState = nextState;
+    for (const entry of f.appStateListeners) if (!entry.removed) entry.listener(nextState);
+    await flush();
+  };
   f.advanceTrace = milliseconds => { for (let elapsed = 0; elapsed < milliseconds; elapsed += 100) {
     f.clock += 100;
     for (const interval of [...f.intervals.values()]) if (interval.delay === 100) interval.fn();
@@ -634,6 +674,118 @@ test('actual screen cleanup invalidates enabled observation ownership and late c
       }
       if (enabled) assert.equal(observer.snapshot().candidates, 1, 'cleanup retains saved counts but no pending or late window can continue');
       assert.equal(f.history.length, 0, 'observation cleanup alone never invents a completed History record');
+    } finally { if (!unmounted) f.unmount(); }
+  }
+});
+
+function countActualUnansweredCandidate(f, screen, decisionId = 1) {
+  const generation = f.observers[0].generation;
+  screen.observeUnansweredSample({ generation, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+  screen.recordUnansweredCriticalOutput({ level: 'critical', decisionId, decisionAt: f.clock,
+    acceptedAt: f.clock, channel: 'phone-haptic' });
+  for (let index = 0; index < 12; index++) {
+    f.clock += 500;
+    screen.observeUnansweredSample({ generation, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+  }
+}
+
+test('actual motion collection requires both flags and starts only after explicit parked camera Start', async () => {
+  for (const unansweredObservation of [false, true]) for (const motionActivity of [false, true]) {
+    const enabled = unansweredObservation && motionActivity;
+    const f = monitorCameraStartFixture(null, { unansweredObservation, motionActivity });
+    try {
+      await flush(); let screen = f.render();
+      assert.equal(f.motionFactoryCalls, enabled ? 1 : 0);
+      assert.equal(f.motionStarts.length, 0, 'mounting the screen cannot request motion collection');
+      await screen.handleStart(); screen = f.render(); await flush();
+      assert.equal(screen.isRunning, true); assert.equal(f.motionStarts.length, enabled ? 1 : 0);
+      assert.equal(Object.hasOwn(f.checkpoints[0], 'unansweredAlerts'), unansweredObservation);
+      assert.equal(Object.hasOwn(f.checkpoints[0], 'motionActivity'), false);
+      f.clock += 1_000; await screen.handleStop();
+      assert.equal(Object.hasOwn(f.history[0], 'unansweredAlerts'), unansweredObservation);
+      assert.doesNotMatch(JSON.stringify(f.history[0]), /activityStartedAt|sourceUptimeMs|receivedUptimeMs|receivedAt|occulert-motion-activity-/);
+    } finally { f.unmount(); }
+  }
+});
+
+test('actual motion startup never blocks camera monitoring and all optional outcomes only label local candidates', async () => {
+  for (const [outcome, changes, sample, expected] of [
+    ['denied', { state: 'denied', authorization: 'denied' }, null, 'denied'],
+    ['restricted', { authorization: 'restricted' }, null, 'denied'],
+    ['missing', { state: 'not-built', isAvailable: false, isActive: false }, null, 'unavailable'],
+    ['unavailable', { state: 'unavailable', isAvailable: false, isActive: false }, null, 'unavailable'],
+    ['error', { state: 'error', authorization: 'unknown' }, null, 'unknown'],
+    ['stationary', {}, { automotive: false, stationary: true }, 'not-moving'],
+    ['automotive', {}, {}, 'reported-activity'],
+    ['overlap', {}, { stationary: true }, 'unknown'],
+    ['stale', {}, { stale: true }, 'stale'],
+  ]) {
+    const f = monitorCameraStartFixture('motion-start', { unansweredObservation: true, motionActivity: true }); f.motionStatus = changes;
+    try {
+      await flush(); let screen = f.render(); await screen.handleStart(); screen = f.render();
+      assert.equal(screen.isRunning, true, outcome + ': a stalled permission/result path cannot delay camera Start');
+      assert.equal(f.motionStarts.length, 1); assert.equal(f.motionObservers[0].category(), 'unknown');
+      f.pending.resolve(); await flush();
+      if (sample) f.emitMotion(sample.stale ? { activityStartedAt: f.clock - 10_001 } : sample);
+      assert.equal(f.motionObservers[0].category(), expected);
+      countActualUnansweredCandidate(f, screen);
+      assert.equal(f.observers[0].snapshot().candidates, 1, outcome + ': optional labels never suppress or accelerate the six-second observer');
+      assert.equal(f.observers[0].snapshot().byMotion[expected], 1);
+      await screen.handleStop();
+      assert.equal(f.history[0].unansweredAlerts.byMotion[expected], 1);
+      assert.doesNotMatch(JSON.stringify(f.history[0].unansweredAlerts), /activityStartedAt|receivedAt|Uptime|owner|automotive|stationary/);
+    } finally { f.pending.resolve(); f.unmount(); }
+  }
+});
+
+test('actual aborted Start before monitoring requests no motion and preserves existing camera recovery ordering', async () => {
+  for (const stage of ['preferences', 'checkpoint']) {
+    const f = monitorCameraStartFixture(stage, { unansweredObservation: true, motionActivity: true });
+    try {
+      await flush(); const screen = f.render(), starting = screen.handleStart(); await f.entered.promise;
+      assert.equal(f.motionStarts.length, 0);
+      await screen.handleStop(); f.pending.resolve(); await starting;
+      assert.equal(f.render().isRunning, false); assert.equal(f.motionStarts.length, 0); assert.equal(f.history.length, 0);
+      assert.equal(f.motionObservers[0].category(), 'unknown');
+    } finally { f.pending.resolve(); f.unmount(); }
+  }
+});
+
+test('actual Stop rejects old motion callbacks and permission completion while a newer session keeps its own source', async () => {
+  const f = monitorCameraStartFixture('motion-start', { unansweredObservation: true, motionActivity: true });
+  try {
+    await flush(); let screen = f.render(); await screen.handleStart(); screen = f.render();
+    const oldOwner = f.motionStarts[0], oldActivity = f.motionActivities[0].listener;
+    f.clock += 1_000; await screen.handleStop(); screen = f.render();
+    assert.ok(f.motionStops.includes(oldOwner)); assert.ok(f.motionActivities.every(entry => entry.removed));
+    f.clock += 1_000; await screen.handleStart(); screen = f.render(); await flush();
+    const newOwner = f.motionStarts.at(-1); assert.notEqual(newOwner, oldOwner);
+    f.emitMotion(); assert.equal(f.motionObservers[0].category(), 'reported-activity');
+    f.pending.resolve(); await flush();
+    oldActivity({ owner: oldOwner, authorization: 'denied' });
+    assert.equal(f.motionObservers[0].category(), 'reported-activity');
+    assert.equal(f.motionStops.filter(owner => owner === newOwner).length, 0, 'old completion cannot stop the newer native source');
+    countActualUnansweredCandidate(f, screen); await screen.handleStop();
+    assert.equal(f.history[0].unansweredAlerts.byMotion['reported-activity'], 1);
+    assert.equal(f.history[1].unansweredAlerts.candidates, 0);
+  } finally { f.pending.resolve(); f.unmount(); }
+});
+
+test('actual foreground loss and unmount remove motion listeners and cannot resume collection from late events', async () => {
+  for (const boundary of ['background', 'unmount']) {
+    const f = monitorCameraStartFixture(null, { unansweredObservation: true, motionActivity: true }); let unmounted = false;
+    try {
+      await flush(); let screen = f.render(); await screen.handleStart(); screen = f.render(); await flush();
+      f.emitMotion(); const owner = f.motionStarts[0], activity = f.motionActivities[0].listener;
+      f.clock += 1_000;
+      if (boundary === 'background') { await f.setAppState('background'); screen = f.render(); assert.equal(screen.isRunning, false); }
+      else { f.unmount(); unmounted = true; }
+      assert.ok(f.motionStops.includes(owner)); assert.ok(f.motionActivities.every(entry => entry.removed));
+      activity({ owner, authorization: 'authorized', confidence: 'high', activityStartedAt: f.clock,
+        sourceUptimeMs: f.clock, receivedUptimeMs: f.clock, receivedAt: f.clock,
+        automotive: true, stationary: false, walking: false, running: false, cycling: false, unknown: false });
+      assert.equal(f.motionObservers[0].category(), 'unknown');
+      assert.equal(f.motionStarts.length, 1, 'a late callback never implicitly starts the source again');
     } finally { if (!unmounted) f.unmount(); }
   }
 });

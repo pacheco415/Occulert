@@ -82,6 +82,13 @@ Ordinary sessions collect none of these diagnostics. Root verification covers
 its pure model; native verification also covers the actual output/analysis
 adapters, local recovery and privacy boundaries.
 
+The separately default-off [phone activity experiment](../docs/MOTION_ACTIVITY_OBSERVATION.md)
+can label those local counts with fresh activity estimates after an explicit
+Start. Automotive and stationary classifications can overlap and do not prove
+vehicle movement. Both experiment flags must be enabled; ordinary sessions
+make no new activity requests. Device permission and transition acceptance
+remain open, and no messaging or alert changes are included.
+
 SDK 58 generates the UIKit scene lifecycle during prebuild. The current camera
 stack still requires a physical-device build: Google ML Kit 8 excludes arm64
 simulators, while the iPhone Duo simulator runs only arm64. Do not clear that
