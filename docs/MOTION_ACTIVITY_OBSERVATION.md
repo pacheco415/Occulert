@@ -110,6 +110,12 @@ before the assertion entry point establishes that boundary. Absolute deadline
 checks and watchdogs reject missing, duplicate, malformed or late markers,
 overruns and late success after a timeout. Work performed after the marker,
 including any lazy JIT compilation, counts against the runtime budget.
+The marker uses a generated Clang module with ordinary C declarations from
+`stdint.h`, `time.h` and `unistd.h`, rather than importing the broad Swift
+Glibc overlay. It needs no separate C compiler invocation. Module-loading
+remarks and bounded, failure-only metadata from the owned compiler process
+subtree help identify preparation failures without reading environment or
+source contents.
 
 Only the fixture's entry-point and timing scaffold differ; no policy condition
 or assertion is removed. This avoids an unrelated standalone Linux link-driver

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { accessSync, constants, readFileSync, realpathSync, statSync, writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { accessSync, constants, readFileSync, openSync, readSync, closeSync, realpathSync, statSync, writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
@@ -307,12 +307,84 @@ function swiftDiagnostics(context, hostMode, command, argv, result, startedAt) {
     ...context, hostMode, command, argv, elapsedMs: Math.round(performance.now() - startedAt),
     status: result.status, signal: result.signal, errorCode: result.error?.code ?? null,
     ...(result.phases ?? {}),
+    ...(result.failureSnapshot ? { failureSnapshot: result.failureSnapshot } : {}),
     stdout: boundedCompilerOutput(result.stdout), stderr: boundedCompilerOutput(result.stderr),
   }, null, 2);
 }
 
+// Failure-only metadata from the owned compiler subtree. Each proc read is
+// capped at 2 KiB; at most 48 reads and 20 ms of collection are allowed. No
+// environment, source/cache contents or global process inventory is inspected.
+function immediateFailureSnapshot(pid) {
+  if (process.platform !== 'linux' || !Number.isInteger(pid) || pid <= 0) return null;
+  const startedAt = performance.now(), processes = [], queue = [{ pid, parent: process.pid }], seen = new Set();
+  let reads = 0, truncated = false;
+  const allowed = () => reads < 48 && performance.now() - startedAt < 20;
+  const read = filename => {
+    if (!allowed()) { truncated = true; return '[diagnostic budget exhausted]'; }
+    reads += 1;
+    let descriptor;
+    try {
+      descriptor = openSync(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const bytes = Buffer.alloc(2_048);
+      return bytes.subarray(0, readSync(descriptor, bytes, 0, bytes.length, 0)).toString('utf8').trim();
+    } catch (error) { return `[${error.code ?? 'unavailable'}]`; }
+    finally { if (descriptor !== undefined) closeSync(descriptor); }
+  };
+  while (queue.length && processes.length < 8 && allowed()) {
+    const current = queue.shift();
+    if (seen.has(current.pid)) continue;
+    seen.add(current.pid);
+    const root = `/proc/${current.pid}`, status = read(`${root}/status`);
+    if (Number(status.match(/^PPid:\s+(\d+)$/m)?.[1]) !== current.parent) {
+      processes.push({ pid: current.pid, state: 'owned process no longer present' });
+      continue;
+    }
+    processes.push({ pid: current.pid,
+      status: status.split('\n').filter(line => /^(?:Name|State|PPid|Threads|VmRSS|voluntary_ctxt_switches|nonvoluntary_ctxt_switches):/.test(line)),
+      processStat: read(`${root}/stat`), waitChannel: read(`${root}/wchan`), scheduler: read(`${root}/schedstat`),
+      command: read(`${root}/cmdline`).replaceAll('\0', ' ').slice(0, 1_024),
+    });
+    for (const child of read(`${root}/task/${current.pid}/children`).split(/\s+/)) {
+      if (/^[1-9][0-9]*$/.test(child)) queue.push({ pid: Number(child), parent: current.pid });
+    }
+  }
+  return { processes, reads, truncated: truncated || queue.length > 0, elapsedMs: performance.now() - startedAt };
+}
+
 const runtimeMarkerTag = 'OCCULERT_MOTION_RUNTIME_START:';
 const expectedPassLines = [...swift.matchAll(/print\("(PASS [^"]+)"\)/g)].map(match => match[1]);
+const immediatePOSIXHeader = `#ifndef OCCULERT_FIXTURE_POSIX_H
+#define OCCULERT_FIXTURE_POSIX_H
+#include <stdint.h>
+#include <time.h>
+#include <unistd.h>
+
+static inline int occulert_fixture_clock_nanoseconds(uint64_t *value) {
+  struct timespec stamp;
+#if defined(__APPLE__)
+  const clockid_t clock = CLOCK_MONOTONIC_RAW;
+#else
+  const clockid_t clock = CLOCK_MONOTONIC;
+#endif
+  if (!value || clock_gettime(clock, &stamp) != 0 || stamp.tv_sec < 0 ||
+      stamp.tv_nsec < 0 || stamp.tv_nsec >= 1000000000L ||
+      (uint64_t)stamp.tv_sec > (UINT64_MAX - (uint64_t)stamp.tv_nsec) / UINT64_C(1000000000)) return -1;
+  *value = (uint64_t)stamp.tv_sec * UINT64_C(1000000000) + (uint64_t)stamp.tv_nsec;
+  return 0;
+}
+
+static inline int occulert_fixture_write_marker(const void *bytes, size_t count) {
+  const ssize_t written = write(STDERR_FILENO, bytes, count);
+  return written >= 0 && (size_t)written == count ? 0 : -1;
+}
+#endif
+`;
+const immediatePOSIXModuleMap = `module OcculertFixturePOSIX {
+  header "OcculertFixturePOSIX.h"
+  export *
+}
+`;
 
 function boundedStreamCapture() {
   const half = 8_192;
@@ -358,21 +430,12 @@ function swiftLineReader(onLine) {
 function immediateSwiftSource(markerPrefix) {
   assert.equal(swift.split('@main struct Suite {').length, 2);
   return swift.replace('@main struct Suite {', 'struct Suite {') + `
-#if canImport(Glibc)
-import Glibc
-let fixtureClock = CLOCK_MONOTONIC
-#elseif canImport(Darwin)
-import Darwin
-let fixtureClock = CLOCK_MONOTONIC_RAW
-#else
-#error("The immediate fixture requires a POSIX monotonic clock and write")
-#endif
-var fixtureStamp = timespec()
-precondition(clock_gettime(fixtureClock, &fixtureStamp) == 0, "runtime clock unavailable")
-let fixtureStampNs = UInt64(fixtureStamp.tv_sec) * 1_000_000_000 + UInt64(fixtureStamp.tv_nsec)
+import OcculertFixturePOSIX
+var fixtureStampNs: UInt64 = 0
+precondition(occulert_fixture_clock_nanoseconds(&fixtureStampNs) == 0, "runtime clock unavailable")
 let fixtureMarker = Array((${JSON.stringify(markerPrefix)} + String(fixtureStampNs) + "\\n").utf8)
 fixtureMarker.withUnsafeBufferPointer { bytes in
-  precondition(write(STDERR_FILENO, bytes.baseAddress, bytes.count) == bytes.count, "runtime marker write failed")
+  precondition(occulert_fixture_write_marker(bytes.baseAddress, bytes.count) == 0, "runtime marker write failed")
 }
 Suite.main()
 `;
@@ -397,12 +460,17 @@ function runImmediateSwift(argv, markerPrefix, {
       settled = true;
       cancel(timer);
       const endedNs = now();
+      let failureSnapshot = null;
       if (error && !closed && child) {
-        killSignal = 'SIGKILL';
-        try { child.kill(killSignal); } catch { /* Preserve the original failure. */ }
-        child.stdout?.destroy(); child.stderr?.destroy(); child.unref?.();
+        try { failureSnapshot = immediateFailureSnapshot(child.pid); }
+        catch (snapshotError) { failureSnapshot = { error: snapshotError.code ?? 'unavailable' }; }
+        finally {
+          killSignal = 'SIGKILL';
+          try { child.kill(killSignal); } catch { /* Preserve the original failure. */ }
+          child.stdout?.destroy(); child.stderr?.destroy(); child.unref?.();
+        }
       }
-      resolve({ error, status, signal, stdout: stdout.value(), stderr: stderr.value(), passLines, passLineCount,
+      resolve({ error, status, signal, stdout: stdout.value(), stderr: stderr.value(), passLines, passLineCount, failureSnapshot,
         phases: { markerCount, failurePhase, killSignal,
           preparationElapsedMs: Number((runtimeNs ?? endedNs) - startedNs) / 1e6,
           runtimeElapsedMs: runtimeNs === null ? null : Number(endedNs - runtimeNs) / 1e6,
@@ -478,9 +546,13 @@ test('Linux Swift phase watchdogs enforce separate preparation and runtime deadl
   assert.equal(generated.slice(0, body.length), body, 'the immediate fixture retains every actual method and assertion');
   assert.equal((swift.match(/\bprecondition\(/g) || []).length, 36);
   assert.equal((generated.match(/\bSuite\.main\(\)/g) || []).length, 1);
+  assert.doesNotMatch(generated, /^import (?:Glibc|Darwin|Foundation)\b/m, 'the marker does not import a broad platform overlay');
+  assert.doesNotMatch(generated, /@_silgen_name/, 'POSIX calls use the normal imported C ABI');
+  assert.deepEqual([...immediatePOSIXHeader.matchAll(/^#include <([^>]+)>$/gm)].map(match => match[1]), ['stdint.h', 'time.h', 'unistd.h']);
+  assert.match(immediatePOSIXModuleMap, /header "OcculertFixturePOSIX\.h"/);
   assert.doesNotMatch(generated.slice(body.length, generated.indexOf('fixtureMarker.withUnsafeBufferPointer')), /\b(?:Suite|OcculertMotionActivityModule)\s*[.(]/,
     'entrypoint preparation does not initialize or invoke the policy suite');
-  assert.match(generated.slice(body.length), /fixtureMarker\.withUnsafeBufferPointer \{ bytes in\s*precondition\(write\(STDERR_FILENO, bytes\.baseAddress, bytes\.count\) == bytes\.count, "runtime marker write failed"\)\s*\}\s*Suite\.main\(\)\s*$/,
+  assert.match(generated.slice(body.length), /fixtureMarker\.withUnsafeBufferPointer \{ bytes in\s*precondition\(occulert_fixture_write_marker\(bytes\.baseAddress, bytes\.count\) == 0, "runtime marker write failed"\)\s*\}\s*Suite\.main\(\)\s*$/,
     'the unbuffered marker write immediately precedes the only policy-suite invocation');
   const fixture = () => {
     let clock = base, sequence = 0;
@@ -597,8 +669,11 @@ test('actual Swift motion activity methods enforce ownership, permission and for
       // Immediate mode JITs the same policy and assertions without a standalone
       // host linker job. The required macOS job still compiles an executable.
       const markerPrefix = runtimeMarkerTag + randomBytes(16).toString('hex') + ':';
+      writeFileSync(path.join(directory, 'OcculertFixturePOSIX.h'), immediatePOSIXHeader);
+      writeFileSync(path.join(directory, 'module.modulemap'), immediatePOSIXModuleMap);
       writeFileSync(input, immediateSwiftSource(markerPrefix));
-      const argv = ['-v', '-swift-version', '5', '-module-cache-path', path.join(directory, 'module-cache'), input];
+      const argv = ['-v', '-swift-version', '5', '-I', directory, '-module-cache-path', path.join(directory, 'module-cache'),
+        '-Rmodule-loading', '-Xcc', '-Rmodule-build', '-Xcc', '-Rmodule-import', input];
       const startedAt = performance.now();
       const run = await runImmediateSwift(argv, markerPrefix);
       const diagnostics = swiftDiagnostics(context, 'immediate', 'swift', argv, run, startedAt);
