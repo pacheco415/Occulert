@@ -1,3 +1,5 @@
+import { isUnansweredAlertSnapshot } from './unansweredAlertPolicy.ts';
+
 /**
  * An absent history key means there are no saved sessions. A present but
  * unreadable value must never be treated as empty: doing so would let the next
@@ -20,6 +22,9 @@ function readHistoryDocument<T extends object>(raw: string | null): HistoryDocum
   if (!Array.isArray(sessions) || sessions.some(item => (
     item === null || typeof item !== 'object' || Array.isArray(item)
   ))) throw new Error('Saved session history has an unexpected format; no changes were made.');
+  if (sessions.some(item => item.unansweredAlerts !== undefined && !isUnansweredAlertSnapshot(item.unansweredAlerts))) {
+    throw new Error('Saved session history has unreadable unanswered-alert diagnostics; no changes were made.');
+  }
   return document as HistoryDocument<T>;
 }
 

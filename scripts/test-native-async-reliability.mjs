@@ -24,6 +24,7 @@ import * as monitorAlertPolicy from '../native-app/lib/alertPolicy.ts';
 import { RollingClosedFraction } from '../native-app/lib/rollingClosedFraction.ts';
 import { HeadNodDetector } from '../native-app/lib/headNodDetector.ts';
 import * as simulatorTraceModel from '../native-app/lib/simulatorTraceModel.ts';
+import { createUnansweredAlertObservation } from '../native-app/lib/unansweredAlertObservation.ts';
 
 // Execute the production TS logic with native bridges replaced. Removing imports
 // and JSX presentation avoids requiring a device, Expo, or a TS compiler in CI.
@@ -433,10 +434,11 @@ function hookFixture() {
   }, unmount() { effects.forEach(effect => effect?.cleanup?.()); } };
 }
 
-function monitorCameraStartFixture(stage, { simulator = false, autorun = false } = {}) {
+function monitorCameraStartFixture(stage, { simulator = false, autorun = false, unansweredObservation = false } = {}) {
   const h = hookFixture(), entered = deferred(), pending = deferred();
   const f = { entered, pending, history: [], checkpoints: [], hookBaselines: [], baselineSaves: [], cameraClears: 0,
-    clock: 1_000_000, cameraListener: null, held: false, intervals: new Map(), nextInterval: 0 };
+    clock: 1_000_000, cameraListener: null, held: false, intervals: new Map(), nextInterval: 0,
+    observers: [], checkpointClears: [] };
   class Clock extends Date { static now() { return f.clock; } }
   const { useEyeTracking: realEyeTracking } = load(read('native-app/hooks/useEyeTracking.ts'), ['useEyeTracking'], {
     ...h.React, ...monitorThresholds, baselinePreset: eyeBaselineModel.baselinePreset, RollingClosedFraction, Date: Clock,
@@ -460,14 +462,21 @@ function monitorCameraStartFixture(stage, { simulator = false, autorun = false }
   const cutoff = source.indexOf('\n  if (!hasPermission && !SIMULATOR_TRACE) {');
   assert.ok(cutoff > source.indexOf('  const frameProcessor ='));
   const component = source.slice(0, cutoff)
-    + '\nreturn {handleStart,handleStop,toggleSetupPreview,onEyeState,eyeBaseline,isRunning,baselineMessage,metrics,alertCount,simulatorPhase};\n}';
+    + '\nreturn {handleStart,handleStop,toggleSetupPreview,onEyeState,eyeBaseline,isRunning,baselineMessage,metrics,alertCount,simulatorPhase,observeUnansweredSample,recordUnansweredCriticalOutput};\n}';
   const bindings = {
     ...h.React, React: h.React, ...frontCameraPolicy, ...monitorPerformance, ...monitorLifecycle,
     ...cameraSetup, ...cameraResilience, ...captureLoadPolicy, ...monitorThresholds, ...eyeBaselineModel,
     ...sensorFusion, ...sessionCompletion, ...monitorAlertPolicy, HeadNodDetector,
     stopNativeCloudEvents() {}, queueNativeCloudAlert: () => null,
     EYE_BASELINE_EXPERIMENT: !simulator, SIMULATOR_TRACE: simulator, useSimulatorTrace,
+    UNANSWERED_ALERT_OBSERVATION_ENABLED: unansweredObservation,
+    createUnansweredAlertObservation: () => {
+      assert.equal(unansweredObservation, true, 'a disabled actual screen must not construct an observer');
+      const observer = createUnansweredAlertObservation(true, { now: () => f.clock, wallNow: () => f.clock });
+      f.observers.push(observer); return observer;
+    },
     Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
+    Platform: { OS: 'ios' },
     useRouter: () => router, useLocalSearchParams: () => autorun ? { 'trace-run': '1' } : {}, useAccessibilityPreferences: () => ({ reduceMotion: true }),
     useCameraDevice: () => simulator ? null : device, useCameraPermission: () => ({ hasPermission: !simulator, requestPermission: async () => true }),
     useFaceDetector: () => ({ detectFaces: () => [] }), useFrameProcessor: callback => callback,
@@ -495,7 +504,7 @@ function monitorCameraStartFixture(stage, { simulator = false, autorun = false }
     getWatchStatus: async () => ({ moduleAvailable: false, paired: false, appInstalled: false, reachable: false }),
     consumePreDriveSafety: () => true, currentAppBuildInfo: () => ({ appVersion: 'fixture', appBuildNumber: 'fixture' }),
     saveActiveSessionCheckpoint: async value => { await boundary('checkpoint'); f.checkpoints.push(value); },
-    clearActiveSessionCheckpoint: async () => {},
+    clearActiveSessionCheckpoint: async id => { f.checkpointClears.push(id); },
     updateSessionHistory: async update => { f.history = update(f.history); },
     finishCloudSession: async () => { assert.fail('experimental camera sessions must remain local'); },
     beginCloudSession: () => { assert.fail('simulator and experimental camera sessions must remain local'); },
@@ -528,6 +537,105 @@ test('simulator trace uses the actual monitor and eye scoring without a camera, 
   assert.equal([...f.intervals.values()].filter(value => value.delay === 100).length, 0);
   const stopped = JSON.stringify(screen.metrics); f.advanceTrace(2_000); assert.equal(JSON.stringify(f.render().metrics), stopped);
   f.unmount();
+});
+
+test('the actual Start keeps disabled checkpoints absent and resets real observation counts for each enabled session', async () => {
+  for (const enabled of [false, true]) {
+    const f = monitorCameraStartFixture(null, { unansweredObservation: enabled });
+    try {
+      await flush(); let screen = f.render(); await screen.handleStart(); screen = f.render();
+      assert.equal(screen.isRunning, true);
+      assert.equal(f.observers.length, enabled ? 1 : 0);
+      assert.equal(Object.hasOwn(f.checkpoints[0], 'unansweredAlerts'), enabled);
+      if (!enabled) {
+        f.clock += 6_000; await screen.handleStop();
+        assert.equal(Object.hasOwn(f.history[0], 'unansweredAlerts'), false);
+        continue;
+      }
+      const observer = f.observers[0], oldGeneration = observer.generation;
+      assert.equal(f.checkpoints[0].unansweredAlerts.candidates, 0);
+      screen.observeUnansweredSample({ generation: oldGeneration, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+      screen.recordUnansweredCriticalOutput({ level: 'critical', decisionId: 1, decisionAt: f.clock,
+        acceptedAt: f.clock, channel: 'phone-haptic' });
+      for (let index = 0; index < 12; index++) {
+        f.clock += 500;
+        screen.observeUnansweredSample({ generation: oldGeneration, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+      }
+      assert.equal(observer.snapshot().candidates, 1);
+      assert.equal(f.checkpoints[0].unansweredAlerts.candidates, 0, 'the initial checkpoint remains its independent zero-count snapshot');
+      await screen.handleStop(); screen = f.render();
+      assert.equal(f.history[0].unansweredAlerts.candidates, 1);
+      const oldRecord = f.history[0];
+      f.clock += 1_000;
+      const nextCheckpoint = f.checkpoints.length;
+      await screen.handleStart(); screen = f.render();
+      assert.equal(screen.isRunning, true); assert.ok(observer.generation > oldGeneration);
+      assert.equal(observer.snapshot().candidates, 0);
+      assert.equal(f.checkpoints[nextCheckpoint].unansweredAlerts.candidates, 0);
+      assert.equal(oldRecord.unansweredAlerts.candidates, 1, 'a new Start cannot replace prior local counts');
+      f.clock += 1_000; await screen.handleStop();
+      assert.equal(f.history[0].unansweredAlerts.candidates, 0);
+      assert.equal(f.history[1].unansweredAlerts.candidates, 1);
+    } finally { f.unmount(); }
+  }
+});
+
+test('aborted actual Start never resumes an observation window or completes a History record', async () => {
+  for (const stage of ['preferences', 'checkpoint']) {
+    const f = monitorCameraStartFixture(stage, { unansweredObservation: true });
+    try {
+      await flush(); let screen = f.render(); const starting = screen.handleStart(); await f.entered.promise;
+      const observer = f.observers[0], oldGeneration = observer.generation;
+      assert.equal(observer.snapshot()?.candidates, stage === 'checkpoint' ? 0 : undefined);
+      await screen.handleStop(); f.pending.resolve(); await starting; screen = f.render();
+      assert.equal(screen.isRunning, false); assert.equal(f.history.length, 0);
+      assert.equal(f.checkpoints.length, stage === 'checkpoint' ? 1 : 0);
+      if (stage === 'checkpoint') {
+        assert.equal(f.checkpoints[0].unansweredAlerts.candidates, 0);
+        assert.deepEqual(f.checkpointClears, [f.checkpoints[0].sessionId]);
+      }
+      for (let index = 0; index < 14; index++) {
+        f.clock += 500;
+        observer.sample({ generation: oldGeneration, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+        observer.criticalOutput(oldGeneration, { level: 'critical', decisionId: index + 1,
+          decisionAt: f.clock, acceptedAt: f.clock, channel: 'phone-haptic' });
+      }
+      assert.equal(observer.snapshot()?.candidates, stage === 'checkpoint' ? 0 : undefined);
+      assert.equal(f.history.length, 0);
+    } finally { f.pending.resolve(); f.unmount(); }
+  }
+});
+
+test('actual screen cleanup invalidates enabled observation ownership and late callbacks cannot add candidates', async () => {
+  for (const enabled of [false, true]) {
+    const f = monitorCameraStartFixture(null, { unansweredObservation: enabled }); let unmounted = false;
+    try {
+      await flush(); let screen = f.render(); await screen.handleStart(); screen = f.render();
+      const observer = f.observers[0], generation = observer?.generation;
+      if (enabled) {
+        screen.observeUnansweredSample({ generation, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+        screen.recordUnansweredCriticalOutput({ level: 'critical', decisionId: 1, decisionAt: f.clock,
+          acceptedAt: f.clock, channel: 'phone-haptic' });
+        for (let index = 0; index < 12; index++) {
+          f.clock += 500;
+          screen.observeUnansweredSample({ generation, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+        }
+        assert.equal(observer.snapshot().candidates, 1);
+      }
+      f.unmount(); unmounted = true;
+      assert.equal(f.observers.length, enabled ? 1 : 0, 'flag-off cleanup never constructs an observer');
+      if (enabled) assert.ok(observer.generation > generation, 'the actual effect cleanup invalidates the old observer generation');
+      for (let index = 0; index < 15; index++) {
+        f.clock += 500;
+        const sample = { generation: generation ?? 0, sampledAt: f.clock, sourceAt: f.clock, state: index === 0 ? 'open' : 'closed' };
+        const output = { level: 'critical', decisionId: index + 2, decisionAt: f.clock, acceptedAt: f.clock, channel: 'phone-haptic' };
+        screen.observeUnansweredSample(sample); screen.recordUnansweredCriticalOutput(output);
+        observer?.sample(sample); observer?.criticalOutput(generation, output);
+      }
+      if (enabled) assert.equal(observer.snapshot().candidates, 1, 'cleanup retains saved counts but no pending or late window can continue');
+      assert.equal(f.history.length, 0, 'observation cleanup alone never invents a completed History record');
+    } finally { if (!unmounted) f.unmount(); }
+  }
 });
 
 test('simulator cloud transport stays unavailable even when stored consent and auth exist', async () => {
@@ -805,6 +913,62 @@ test('history mutation refuses malformed members without writing away existing b
   await assert.rejects(api.loadSessionHistory(), /Saved session history/);
   await assert.rejects(api.updateSessionHistory(() => []), /Saved session history/);
   assert.deepEqual(writes, []);
+});
+
+test('malformed observation diagnostics prevent History ID migration and callback writes across the whole array', async () => {
+  const history = await import('../native-app/lib/sessionHistoryData.ts');
+  const valid = { version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 1,
+    byMotion: { unknown: 1, unavailable: 0, denied: 0, stale: 0, 'not-moving': 0, 'reported-activity': 0 } };
+  let stored = JSON.stringify([{ savedAt: 'legacy-without-id' }, { sessionId: 'invalid', unansweredAlerts: { ...valid, candidates: 2 } }]);
+  const writes = [], original = stored;
+  const api = load(read('native-app/lib/sessionHistory.ts'), ['loadSessionHistory', 'updateSessionHistory'], {
+    ...history, AsyncStorage: { getItem: async () => stored, setItem: async (_key, value) => { writes.push(value); stored = value; } },
+  });
+  await assert.rejects(api.loadSessionHistory(), /unreadable unanswered-alert diagnostics/);
+  await assert.rejects(api.updateSessionHistory(() => []), /unreadable unanswered-alert diagnostics/);
+  assert.equal(stored, original); assert.equal(writes.length, 0);
+  stored = JSON.stringify({ schemaVersion: 1, sessions: [{ sessionId: 'valid', unansweredAlerts: valid }] });
+  const before = stored;
+  await assert.rejects(api.updateSessionHistory(rows => [{ ...rows[0], unansweredAlerts: { ...valid, rawMotion: [] } }]), /unreadable unanswered-alert diagnostics/);
+  assert.equal(stored, before); assert.equal(writes.length, 0);
+});
+
+test('checkpoint storage captures optional counts before queued work and rejects invalid counts without replacing bytes', async () => {
+  const recovery = await import('../native-app/lib/sessionRecoveryModel.ts');
+  const { copyUnansweredAlertSnapshot } = await import('../native-app/lib/unansweredAlertPolicy.ts');
+  const { buildMonitorCheckpoint } = await import('../native-app/lib/monitorCheckpointModel.ts');
+  const counts = { version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 1,
+    byMotion: { unknown: 1, unavailable: 0, denied: 0, stale: 0, 'not-moving': 0, 'reported-activity': 0 } };
+  const checkpoint = buildMonitorCheckpoint({ sessionId: 'observed', startedAt: 1_000, checkpointedAt: 2_000, alertCount: 0,
+    fatigueSum: 0, fatigueSamples: 0, maxFatigue: 0, headNodObservations: 0, headphoneHeadNodObservations: 0,
+    headphoneMotionSamples: 0, headphoneMotionStatus: 'unavailable', monitorPerformance: { samples: 0 }, sensitivity: 'medium', buildInfo: {}, unansweredAlerts: counts });
+  const gate = deferred(); let stored = null, block = true; const writes = [];
+  const api = load(read('native-app/lib/sessionRecovery.ts'), ['saveActiveSessionCheckpoint', 'loadActiveSessionCheckpoint'], {
+    ...recovery, copyUnansweredAlertSnapshot,
+    AsyncStorage: { getItem: async () => { if (block) await gate.promise; return stored; }, setItem: async (_key, value) => { writes.push(value); stored = value; } },
+  });
+  const pending = api.saveActiveSessionCheckpoint(checkpoint);
+  checkpoint.unansweredAlerts.byMotion.unknown = 9; gate.resolve(); await pending; block = false;
+  assert.equal(JSON.parse(stored).unansweredAlerts.byMotion.unknown, 1);
+  const before = stored;
+  await assert.rejects(api.saveActiveSessionCheckpoint({ ...checkpoint, unansweredAlerts: { ...counts, rawTimeline: [] } }), /Invalid unanswered-alert/);
+  assert.equal(stored, before); assert.equal(writes.length, 1);
+  stored = JSON.stringify({ ...JSON.parse(before), unansweredAlerts: null });
+  await assert.rejects(api.saveActiveSessionCheckpoint({ ...JSON.parse(before), unansweredAlerts: counts }), /checkpoint could not be read/);
+  assert.equal(JSON.parse(stored).unansweredAlerts, null); assert.equal(writes.length, 1);
+});
+
+test('native cloud finalization and its durable retry queue exclude optional unanswered-alert counts', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  const unansweredAlerts = { version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 1,
+    byMotion: { unknown: 1, unavailable: 0, denied: 0, stale: 0, 'not-moving': 0, 'reported-activity': 0 } };
+  let available = false; const payloads = [];
+  f.transport = (_url, options) => { payloads.push(JSON.parse(options.body)); return response(available ? 200 : 503, { ok: true, session: { id: 'session', ended_at: '2026-11-01T12:00:00.000Z' } }); };
+  await f.api.finishCloudSession('session', { averageFatigue: 0, maxFatigue: 0, safetyScore: 100, alertCount: 0, unansweredAlerts }, '2026-11-01T12:00:00.000Z');
+  assert.doesNotMatch(f.storage.get('occulert.cloud.session-outbox.v1'), /unansweredAlerts|byMotion|software-output-accepted/);
+  available = true; await f.api.retryPendingCloudSessions();
+  assert.equal(payloads.length, 2); assert.deepEqual(payloads[0], payloads[1]);
+  assert.doesNotMatch(JSON.stringify(payloads), /unansweredAlerts|byMotion|software-output-accepted/);
 });
 
 test('password login never inherits stored sharing consent from absent or replacement auth', async () => {

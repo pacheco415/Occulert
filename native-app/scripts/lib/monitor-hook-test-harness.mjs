@@ -11,20 +11,27 @@ export const deferred = () => { let resolve, reject; const promise = new Promise
 const nativeRoot = new URL('../../', import.meta.url).pathname;
 
 /** Real React and actual hook/model sources. Only native bridges/actions are substituted. */
-export function createMonitorHookFixture({ experiment = false, running = false, preview = false, simulator = false } = {}) {
+export function createMonitorHookFixture({ experiment = false, running = false, preview = false, simulator = false,
+  platform = 'ios', unansweredObservation = false, captureBridge = false, queueBridge = false } = {}) {
   const intervals = new Map(), cache = new Map();
   const events = { counts: [], logs: [], checkpoints: [], faults: [], cues: 0, stops: [], identities: [], messages: [], metrics: [], proofs: [], clears: 0 };
   const observations = { camera: [], identity: [] };
   let clock = 1_000, timer = 0, renderer, latest;
   const ref = current => ({ current });
   const f = { events, observations, intervals, cloudWait: null, checkpointWait: null, clearWait: null, baselineWait: null, interruptionWait: null,
-    authorized: true, faces: [], detections: 0 };
+    authorized: true, faces: [], detections: 0, bridgeCalls: [], pendingBridge: [], queueBridge };
   class Clock extends Date { static now() { return clock; } }
   const bridges = {
     react: React,
-    'react-native': { Alert: { alert: (...args) => events.faults.push(args) }, Platform: { OS: 'ios' } },
+    'react-native': { Alert: { alert: (...args) => events.faults.push(args) }, Platform: { OS: platform } },
     'react-native-vision-camera': { useFrameProcessor: (callback, dependencies) => React.useCallback(callback, dependencies) },
-    'react-native-worklets-core': { useRunOnJS: (callback, dependencies) => React.useMemo(() => callback, dependencies), useSharedValue: value => React.useRef({ value }).current },
+    'react-native-worklets-core': { useRunOnJS: (callback, dependencies) => React.useMemo(() => {
+      if (!captureBridge && !queueBridge) return callback;
+      return (...args) => {
+        f.bridgeCalls.push(args);
+        if (f.queueBridge) f.pendingBridge.push(() => callback(...args)); else callback(...args);
+      };
+    }, dependencies), useSharedValue: value => React.useRef({ value }).current },
     'expo-constants': { __esModule: true, default: { expoConfig: { version: 'fixture', extra: { simulatorTrace: simulator }, ios: { buildNumber: 'fixture', bundleIdentifier: simulator ? 'com.occulert.app.simulatortrace' : 'com.occulert.app' } } } },
   };
   const observe = (kind, id, listener) => {
@@ -47,7 +54,8 @@ export function createMonitorHookFixture({ experiment = false, running = false, 
     const code = ts.transpileModule(source, { fileName: filename,
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
     vm.runInNewContext(code, { module, exports: module.exports, Date: Clock, performance: { now: () => clock }, console: { info: value => events.proofs.push(value) },
-      process: { env: { EXPO_PUBLIC_EYE_BASELINE_EXPERIMENT: experiment ? '1' : undefined } },
+      process: { env: { EXPO_PUBLIC_EYE_BASELINE_EXPERIMENT: experiment ? '1' : undefined,
+        EXPO_PUBLIC_UNANSWERED_ALERT_OBSERVATION: unansweredObservation ? '1' : undefined } },
       setInterval: (work, delay) => { intervals.set(++timer, { work, delay }); return timer; }, clearInterval: id => intervals.delete(id),
       require: name => {
         if (Object.hasOwn(bridges, name)) return bridges[name];
@@ -118,6 +126,7 @@ export function createMonitorHookFixture({ experiment = false, running = false, 
     async mount() { await act(async () => { renderer = create(React.createElement(Probe)); }); },
     async update(values = {}) { Object.assign(owner, values); await act(async () => { renderer.update(React.createElement(Probe)); }); },
     async run(action) { await act(async () => { await action(); }); },
+    async flushBridge() { await act(async () => { for (const callback of f.pendingBridge.splice(0)) callback(); }); },
     async tick(delay) { await act(async () => { for (const interval of [...intervals.values()]) if (interval.delay === delay) await interval.work(); }); },
     async unmount() { owner.cameraScreenMountedRef.current = false; await act(async () => renderer.unmount()); },
   }), { api: { get: () => latest }, now: { get: () => clock } });

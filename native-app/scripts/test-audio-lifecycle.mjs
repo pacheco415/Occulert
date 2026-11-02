@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import test from 'node:test';
 import React from 'react';
 import { act, create } from 'react-test-renderer';
+import ts from 'typescript';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -20,7 +21,7 @@ function load(source, names, bindings) {
 // Run real React and Expo's installed shared-object/useAudioPlayer hooks. Only
 // the native AudioPlayer/AVAudioSession bridge is substituted: its inactivity
 // check follows expo-audio58's registry-wide guard, not a per-component timer.
-function fixture() {
+function fixture({ seekTo = () => Promise.resolve(), beforePlay = () => {} } = {}) {
   const log = [], players = [], pendingRelease = [];
   let sessionActive = false;
   function requestRelease() {
@@ -43,6 +44,7 @@ function fixture() {
     }
     play() {
       assert.equal(this.released, false);
+      beforePlay(this);
       sessionActive = true;
       this.playing = true;
       log.push(`play:${this.source}`);
@@ -57,7 +59,8 @@ function fixture() {
       log.push(`release:${this.source}`);
       // Expo's SharedObject teardown removes/pauses without deactivating.
     }
-    seekTo() { return Promise.resolve(); }
+    seekTo() { return seekTo(this); }
+    setPlaybackRate(rate) { this.playbackRate = rate; }
   }
   const { useReleasingSharedObjectWithLifecycle } = load(
     read('../node_modules/expo-modules-core/src/hooks/useReleasingSharedObjectWithLifecycle.ts'),
@@ -184,4 +187,217 @@ test('a pending monitoring-paused seek cannot play after unmount', async () => {
   f.settleNativeRelease();
   assert.equal(f.sessionActive, false);
   await act(() => callbackView.unmount());
+});
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+// Mount the actual AlertSystem TSX with its real policy, delivery, sound and
+// installed Expo player hooks. Only native bridges and the clock are fixtures.
+async function alertSystemFixture({
+  preferences = {}, notification = () => Promise.resolve(), seekTo,
+  beforePlay, watchEnabled = false, onOutput, observe = true, metrics = {},
+} = {}) {
+  const f = fixture({ seekTo, beforePlay });
+  const accepted = [], haptics = [], watchAlerts = [], timings = [];
+  let now = 20_000, timerId = 0;
+  const timers = new Map();
+  const timeout = (callback, delay, repeat = 0) => {
+    const id = ++timerId;
+    timers.set(id, { callback, at: now + delay, repeat });
+    return id;
+  };
+  const settings = { audioEnabled: true, hapticEnabled: true,
+    inEarPattern: 'balanced', alertSound: 'classic', ...preferences };
+  const { deriveAlertLevel, shouldDeliverAlert, SENSOR_LOSS_GRACE_MS } = load(
+    read('../lib/alertPolicy.ts'), ['deriveAlertLevel', 'shouldDeliverAlert', 'SENSOR_LOSS_GRACE_MS'], {});
+  const { alertDeliveryPlan, deliverCueIfCurrent } = load(
+    read('../lib/alertDelivery.ts'), ['alertDeliveryPlan', 'deliverCueIfCurrent'], {});
+  const { nextAlertAudioChannel } = load(read('../lib/inEarAlerts.ts'), ['nextAlertAudioChannel'], {});
+  const { configureAlertSound } = load(read('../lib/alertSound.ts'),
+    ['configureAlertSound'], {});
+  const thresholds = load(read('../constants/thresholds.ts'),
+    ['ALERT_COOLDOWN_MS', 'CRITICAL_CLOSED_ALERT_MS', 'PERCLOS_ALERT_THRESHOLD'], {});
+  class AnimatedValue { stopAnimation() {} setValue() {} }
+  const bridges = {
+    react: React,
+    'react-native': { View: 'View', Text: 'Text', StyleSheet: { create: value => value },
+      Animated: { Value: AnimatedValue, View: 'AnimatedView',
+        timing: () => ({}), sequence: () => ({ start() {} }) } },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0 }) },
+    'expo-haptics': {
+      NotificationFeedbackType: { Error: 'critical', Warning: 'warning' },
+      ImpactFeedbackStyle: { Medium: 'medium' },
+      notificationAsync: level => { haptics.push({ level, at: now }); return notification(level); },
+      impactAsync: level => { haptics.push({ level, at: now }); return Promise.resolve(); },
+    },
+    '../hooks/useAlertAudioPlayer': { useAlertAudioPlayer: f.useAlertAudioPlayer },
+    '../lib/watchBridge': {
+      sendAlertToWatch: event => { watchAlerts.push(event); return Promise.resolve({ accepted: true, acknowledged: true, roundTripMs: 1 }); },
+      sendMonitoringStatusToWatch: () => Promise.resolve(),
+    },
+    '../lib/audioSession': { configureAlertAudioMode: () => Promise.resolve() },
+    '../lib/watchPreferences': { getWatchAlertsEnabled: () => Promise.resolve(watchEnabled) },
+    '../lib/inEarAlerts': { nextAlertAudioChannel },
+    '../lib/alertPreferences': { currentAlertPreferences: () => settings, loadAlertPreferences: () => Promise.resolve() },
+    '../lib/alertSound': { configureAlertSound },
+    '../constants/thresholds': thresholds,
+    '../lib/alertPolicy': { deriveAlertLevel, shouldDeliverAlert, SENSOR_LOSS_GRACE_MS },
+    '../lib/alertDelivery': { alertDeliveryPlan, deliverCueIfCurrent },
+    '../hooks/useAccessibilityPreferences': { useAccessibilityPreferences: () => ({ reduceMotion: true }) },
+    './MonitorLayout': { MonitorAlertPortal: ({ children }) => children, useMonitorAlertDock: () => false },
+  };
+  const module = { exports: {} };
+  const code = ts.transpileModule(read('../components/AlertSystem.tsx'), {
+    fileName: 'AlertSystem.tsx', compilerOptions: { module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, esModuleInterop: true },
+  }).outputText;
+  vm.runInNewContext(code, { module, exports: module.exports, Date: { now: () => now },
+    setTimeout: (callback, delay) => timeout(callback, delay), clearTimeout: id => timers.delete(id),
+    setInterval: (callback, delay) => timeout(callback, delay, delay), clearInterval: id => timers.delete(id),
+    require: name => {
+      if (name.startsWith('../assets/')) return name;
+      assert.ok(Object.hasOwn(bridges, name), 'Unexpected AlertSystem dependency: ' + name);
+      return bridges[name];
+    },
+  }, { timeout: 1_000 });
+  const { AlertSystem } = module.exports;
+  let props = { inline: true, metrics: { state: 'closed', perclos: 0.2,
+    fatigueScore: 90, closedDurationMs: 1_500, ...metrics }, isRunning: true,
+    sessionStartedAt: 1_000, sessionEndedAt: null,
+    onTimingEvent: event => timings.push(event),
+    ...(observe ? { onCriticalOutputAccepted: event => {
+      accepted.push(JSON.parse(JSON.stringify(event)));
+      onOutput?.(event);
+    } } : {}),
+  };
+  let renderer;
+  await act(async () => { renderer = create(React.createElement(AlertSystem, props)); });
+  return {
+    ...f, accepted, haptics, watchAlerts, timings,
+    setNow(value) { now = value; },
+    async update(next) {
+      props = { ...props, ...next, metrics: { ...props.metrics, ...next.metrics } };
+      await act(async () => renderer.update(React.createElement(AlertSystem, props)));
+    },
+    async advance(to) {
+      while (true) {
+        const next = [...timers.entries()].filter(([, timer]) => timer.at <= to)
+          .sort((left, right) => left[1].at - right[1].at || left[0] - right[0])[0];
+        if (!next) break;
+        const [id, timer] = next; now = timer.at;
+        if (timer.repeat) timer.at += timer.repeat; else timers.delete(id);
+        await act(async () => { timer.callback(); });
+      }
+      now = to;
+    },
+    async unmount() { await act(async () => renderer.unmount()); },
+  };
+}
+
+test('actual critical phone outputs report successful software acceptance with one decision identity across repeats', async () => {
+  const f = await alertSystemFixture();
+  try {
+    await f.advance(21_800);
+    assert.equal(f.accepted.length, 6);
+    assert.equal(new Set(f.accepted.map(event => event.decisionId)).size, 1);
+    assert.ok(f.accepted[0].decisionId > 0);
+    assert.ok(f.accepted.every(event => event.level === 'critical' && event.decisionAt === 20_000));
+    assert.deepEqual(f.accepted.filter(event => event.channel === 'phone-haptic').map(event => event.acceptedAt), [20_000, 20_350, 20_700]);
+    assert.deepEqual(f.accepted.filter(event => event.channel === 'phone-audio').map(event => event.acceptedAt), [20_000, 20_900, 21_800]);
+    assert.equal(f.log.filter(item => item.startsWith('play:')).length, 3);
+    assert.equal(f.haptics.length, 3);
+  } finally { await f.unmount(); }
+});
+
+test('actual lower-level phone cues and Watch-only acceptance never report a critical phone output', async () => {
+  for (const metrics of [{ state: 'watch' }, { state: 'closed', perclos: 0, closedDurationMs: 600 }, { state: 'noFace' }]) {
+    const f = await alertSystemFixture({ metrics });
+    try {
+      await f.advance(23_000);
+      assert.ok(f.haptics.length > 0);
+      assert.equal(f.accepted.length, 0);
+    } finally { await f.unmount(); }
+  }
+  const f = await alertSystemFixture({ preferences: { audioEnabled: false, hapticEnabled: false }, watchEnabled: true });
+  try {
+    assert.equal(f.watchAlerts.length, 1);
+    assert.equal(f.accepted.length, 0);
+    assert.equal(f.haptics.length, 0);
+    assert.equal(f.log.some(item => item.startsWith('play:')), false);
+  } finally { await f.unmount(); }
+});
+
+test('failed haptics, seek rejection and throwing play never report accepted output', async () => {
+  for (const options of [
+    { preferences: { audioEnabled: false }, notification: () => Promise.reject(new Error('native haptic rejected')) },
+    { preferences: { hapticEnabled: false }, seekTo: () => Promise.reject(new Error('seek rejected')) },
+    { preferences: { hapticEnabled: false }, beforePlay: () => { throw new Error('native play threw'); } },
+  ]) {
+    const f = await alertSystemFixture(options);
+    try { await f.advance(21_800); assert.equal(f.accepted.length, 0); }
+    finally { await f.unmount(); }
+  }
+});
+
+test('pending critical haptic success cannot report after Stop, a new session or unmount', async () => {
+  for (const boundary of ['stop', 'session', 'unmount']) {
+    const pending = deferred();
+    const f = await alertSystemFixture({ preferences: { audioEnabled: false }, notification: () => pending.promise });
+    if (boundary === 'stop') await f.update({ isRunning: false });
+    else if (boundary === 'session') await f.update({ sessionStartedAt: 2_000 });
+    else await f.unmount();
+    pending.resolve(); await act(async () => {});
+    assert.equal(f.accepted.length, 0, boundary);
+    if (boundary !== 'unmount') await f.unmount();
+  }
+});
+
+test('pending critical audio seek cannot report after Stop, a new session or unmount', async () => {
+  for (const boundary of ['stop', 'session', 'unmount']) {
+    const pending = deferred();
+    const f = await alertSystemFixture({ preferences: { hapticEnabled: false }, seekTo: () => pending.promise });
+    if (boundary === 'stop') await f.update({ isRunning: false });
+    else if (boundary === 'session') await f.update({ sessionStartedAt: 2_000 });
+    else await f.unmount();
+    pending.resolve(); await act(async () => {});
+    assert.equal(f.accepted.length, 0, boundary);
+    if (boundary !== 'session') assert.equal(f.log.some(item => item.startsWith('play:')), false, boundary);
+    if (boundary !== 'unmount') await f.unmount();
+  }
+});
+
+test('a newer actual cue decision rejects older pending haptic and audio success', async () => {
+  const haptics = [], seeks = [];
+  const f = await alertSystemFixture({
+    notification: () => { const pending = deferred(); haptics.push(pending); return pending.promise; },
+    seekTo: () => { const pending = deferred(); seeks.push(pending); return pending.promise; },
+  });
+  try {
+    f.setNow(28_001);
+    await f.update({ metrics: { perclos: 0.21 } });
+    assert.equal(haptics.length, 2); assert.equal(seeks.length, 2);
+    haptics[0].resolve(); seeks[0].resolve(); await act(async () => {});
+    assert.equal(f.accepted.length, 0);
+    haptics[1].resolve(); seeks[1].resolve(); await act(async () => {});
+    assert.equal(f.accepted.length, 2);
+    assert.ok(f.accepted.every(event => event.decisionAt === 28_001));
+    assert.equal(new Set(f.accepted.map(event => event.decisionId)).size, 1);
+    assert.equal(f.log.filter(item => item.startsWith('play:')).length, 1);
+  } finally { await f.unmount(); }
+});
+
+test('an absent or throwing observer cannot change actual critical phone output sequencing', async () => {
+  for (const options of [{ observe: false }, { onOutput: () => { throw new Error('observer rejected'); } }]) {
+    const f = await alertSystemFixture(options);
+    try {
+      await f.advance(21_800);
+      assert.equal(f.haptics.length, 3);
+      assert.equal(f.log.filter(item => item.startsWith('play:')).length, 3);
+      assert.equal(f.accepted.length, options.observe === false ? 0 : 6);
+    } finally { await f.unmount(); }
+  }
 });

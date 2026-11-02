@@ -27,6 +27,7 @@ export function monitorGuidanceSource() {
   return `export function MonitorGuidance({alertProps}) {
     const {metrics,isRunning,sessionStartedAt,sessionEndedAt}=alertProps;
     const recordAlertTiming=alertProps.onTimingEvent,setVisibleAlertLevel=alertProps.onLevelChange;
+    const recordUnansweredCriticalOutput=alertProps.onCriticalOutputAccepted;
     const monitorStatusLabel=isRunning?'DROWSINESS ALERT':'NOT MONITORING',monitorStatusColor='#ff3344';
     const frontCameraIdentity={streamingType:'inner'},setupPreviewActive=false,sensorFault=null,recoveryRequired=false;
     return <>${guidance}</>;

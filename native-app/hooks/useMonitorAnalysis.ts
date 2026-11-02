@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect } from 'react';
+import { Platform } from 'react-native';
 import { useFrameProcessor } from 'react-native-vision-camera';
 import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
 import { EYE_BASELINE_EXPERIMENT, ParkedEyeBaseline } from '../lib/eyeBaselineModel';
@@ -10,6 +11,7 @@ import { confirmedEyeStateForAlert, deriveAlertLevel, type AlertLevel } from '..
 import { assessCameraSetup, type CameraSetupAssessment } from '../lib/cameraSetup';
 import { useSimulatorTrace } from './useSimulatorTrace';
 import { SIMULATOR_TRACE } from '../lib/simulatorTrace';
+import type { UnansweredEyeSample } from '../lib/unansweredAlertObservation';
 
 const CAMERA_SETUP_UI_INTERVAL_MS = 250;
 
@@ -57,6 +59,8 @@ interface Options {
   simulatorProofRef: React.RefObject<string>;
   isRunning: boolean;
   setupPreviewActive: boolean;
+  unansweredGeneration?: number;
+  observeUnansweredSample?: (sample: UnansweredEyeSample) => void;
 }
 
 export function useMonitorAnalysis({
@@ -74,6 +78,7 @@ export function useMonitorAnalysis({
   setMetrics, fatigueSumRef, fatigueSamplesRef,
   maxFatigueRef, cameraLoadPolicy, detectFaces,
   recordCloudAlertTransition, simulatorProofRef, isRunning, setupPreviewActive,
+  unansweredGeneration = 0, observeUnansweredSample,
 }: Options) {
   const onEyeState = useCallback((
     leftProb: number,
@@ -89,6 +94,9 @@ export function useMonitorAnalysis({
     faceHeight: number,
     frameWidth: number,
     frameHeight: number,
+    sampledAt?: number,
+    sampleGeneration?: number,
+    sourceAt?: number,
   ) => {
     const now = Date.now();
     if (setupPreviewActiveRef.current && !isRunningRef.current) {
@@ -189,6 +197,12 @@ export function useMonitorAnalysis({
         EARLY_CLOSED_ALERT_MS,
       ),
     };
+    if (observeUnansweredSample) {
+      try {
+        observeUnansweredSample({ generation: sampleGeneration ?? NaN, sampledAt: sampledAt ?? NaN,
+          sourceAt: sourceAt ?? NaN, state: result.state });
+      } catch { /* Diagnostics cannot change scoring or alert delivery. */ }
+    }
     sensorFusionTrackerRef.current.recordCameraSample({
       at: now,
       state: result.state,
@@ -234,7 +248,7 @@ export function useMonitorAnalysis({
     }
 
     recordCloudAlertTransition(result, now);
-  }, [processEyeOpenness, processNoFace, baselineLoaded, eyeBaseline, recordCloudAlertTransition]);
+  }, [processEyeOpenness, processNoFace, baselineLoaded, eyeBaseline, recordCloudAlertTransition, observeUnansweredSample]);
 
   // These native worklet values must outlive ordinary React renders so the
   // frame-processor bridge stays stable throughout a drive.
@@ -242,6 +256,9 @@ export function useMonitorAnalysis({
   const simulatorPhase = useSimulatorTrace(SIMULATOR_TRACE && (isRunning || setupPreviewActive), onEyeState);
   const lastSample = useSharedValue(0);
   const analysisIntervalMs = useSharedValue(cameraLoadPolicy.analysisIntervalMs);
+  const sampleGeneration = observeUnansweredSample ? unansweredGeneration : 0;
+  // Installed v4.7.3 Frame.m returns milliseconds; Android ImageInfo returns ns.
+  const sourceTimestampScale = Platform.OS === 'ios' ? 1 : Platform.OS === 'android' ? 1e-6 : NaN;
 
   useEffect(() => {
     analysisIntervalMs.value = cameraLoadPolicy.analysisIntervalMs;
@@ -257,7 +274,12 @@ export function useMonitorAnalysis({
     const faces = detectFaces(frame);
     const inferenceMs = Date.now() - inferenceStartedAt;
     if (faces.length === 0) {
-      onEyeStateJS(-1, -1, false, 0, 0, 0, inferenceMs, 0, 0, 0, 0, frame.width, frame.height);
+      if (sampleGeneration > 0) {
+        onEyeStateJS(-1, -1, false, 0, 0, 0, inferenceMs, 0, 0, 0, 0, frame.width, frame.height,
+          now, sampleGeneration, frame.timestamp * sourceTimestampScale);
+      } else {
+        onEyeStateJS(-1, -1, false, 0, 0, 0, inferenceMs, 0, 0, 0, 0, frame.width, frame.height);
+      }
       return;
     }
 
@@ -270,7 +292,14 @@ export function useMonitorAnalysis({
       }
     }
 
-    onEyeStateJS(
+    if (sampleGeneration > 0) {
+      onEyeStateJS(
+        face.leftEyeOpenProbability ?? -1, face.rightEyeOpenProbability ?? -1, true,
+        face.pitchAngle, face.yawAngle, face.rollAngle, inferenceMs,
+        face.bounds.x, face.bounds.y, face.bounds.width, face.bounds.height, frame.width, frame.height,
+        now, sampleGeneration, frame.timestamp * sourceTimestampScale,
+      );
+    } else onEyeStateJS(
       face.leftEyeOpenProbability ?? -1,
       face.rightEyeOpenProbability ?? -1,
       true,
@@ -285,7 +314,7 @@ export function useMonitorAnalysis({
       frame.width,
       frame.height,
     );
-  }, [analysisIntervalMs, detectFaces, lastSample, onEyeStateJS]);
+  }, [analysisIntervalMs, detectFaces, lastSample, onEyeStateJS, sampleGeneration, sourceTimestampScale]);
 
   return { onEyeState, frameProcessor, simulatorPhase };
 }

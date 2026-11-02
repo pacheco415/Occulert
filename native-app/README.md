@@ -74,6 +74,14 @@ mounted History interactions using the actual TSX components with React. The
 History fixtures substitute native storage, navigation and sharing bridges;
 they do not establish physical device or signed-binary acceptance.
 
+The [unanswered-alert observer](../docs/UNANSWERED_ALERT_OBSERVATION.md) is a
+default-off local experiment. It counts only aggregate candidates following
+accepted critical phone software output and further fresh closed-eye samples;
+it sends no messages and establishes neither perception nor vehicle movement.
+Ordinary sessions collect none of these diagnostics. Root verification covers
+its pure model; native verification also covers the actual output/analysis
+adapters, local recovery and privacy boundaries.
+
 SDK 58 generates the UIKit scene lifecycle during prebuild. The current camera
 stack still requires a physical-device build: Google ML Kit 8 excludes arm64
 simulators, while the iPhone Duo simulator runs only arm64. Do not clear that

@@ -1,6 +1,7 @@
 import type { ActiveSessionCheckpoint } from './sessionRecoveryModel';
 import type { AppBuildInfo } from './appBuildInfo';
 import { elapsedSessionSeconds } from './monitorPerformance.ts';
+import { copyUnansweredAlertSnapshot } from './unansweredAlertPolicy.ts';
 
 type Input = Omit<ActiveSessionCheckpoint, 'durationSec' | 'avgFatigue' | 'cameraHeadNodObservations' | 'appVersion' | 'appBuildNumber'> & {
   fatigueSum: number;
@@ -25,6 +26,7 @@ export function buildMonitorCheckpoint(input: Input): ActiveSessionCheckpoint {
     headphoneMotionStatus: input.headphoneMotionStatus,
     monitorPerformance: input.monitorPerformance,
     sensorFusion: input.sensorFusion,
+    ...(input.unansweredAlerts === undefined ? {} : { unansweredAlerts: copyUnansweredAlertSnapshot(input.unansweredAlerts) }),
     sensitivity: input.sensitivity,
     ...input.buildInfo,
   };

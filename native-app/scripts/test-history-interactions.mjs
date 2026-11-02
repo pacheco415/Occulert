@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHistoryFixture, mixedSessions, COMPLETE_REVIEW } from './lib/history-test-harness.mjs';
 
+const unansweredSnapshot = () => ({ version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 6,
+  byMotion: { unknown: 1, unavailable: 1, denied: 1, stale: 1, 'not-moving': 1, 'reported-activity': 1 } });
+
 test('actual History TSX distinguishes unknown/zero metrics and exposes accessible review expansion', async () => {
   const f = createHistoryFixture({ sessions: mixedSessions() });
   await f.mount();
@@ -201,6 +204,7 @@ test('feedback opens the actual local record draft and preserves its existing pr
   const sessions = mixedSessions();
   sessions[1].driverId = 'private-driver';
   sessions[1].sensorFusion = { mode: 'observation-only', secret: 'private-fusion' };
+  sessions[1].unansweredAlerts = unansweredSnapshot();
   const f = createHistoryFixture({ sessions });
   await f.mount();
   try {
@@ -210,7 +214,33 @@ test('feedback opens the actual local record draft and preserves its existing pr
     const url = new URL(f.feedback[0]);
     assert.equal(url.protocol, 'mailto:');
     assert.match(url.searchParams.get('body'), /Session: long/);
-    assert.doesNotMatch(url.searchParams.get('body'), /private-driver|private-fusion|sensorFusion/);
+    assert.doesNotMatch(url.searchParams.get('body'), /private-driver|private-fusion|sensorFusion|unansweredAlerts|byMotion|software-output-accepted|Unanswered-alert candidates/);
     assert.equal(f.records().find(item => item.sessionId === 'long').driverId, 'private-driver');
+  } finally { await f.unmount(); }
+});
+
+test('actual expanded History shows optional local observation counts and excludes them from sharing', async () => {
+  const sessions = mixedSessions(); sessions[1].unansweredAlerts = unansweredSnapshot();
+  const f = createHistoryFixture({ sessions }); await f.mount();
+  try {
+    assert.doesNotMatch(f.text(), /Unanswered-alert candidates/);
+    await f.invoke(f.card('long').findByProps({ accessibilityLabel: 'Show session review details' }));
+    assert.match(f.text(), /Unanswered-alert candidates \(experimental\)/);
+    assert.match(f.text(), /Motion context: Unknown/); assert.match(f.text(), /Reported not moving/); assert.match(f.text(), /Reported activity/);
+    assert.match(f.text(), /software acceptance of critical output/); assert.match(f.text(), /whether a person heard or felt it is unverified/);
+    assert.match(f.text(), /Local observation only; no messages are sent/);
+    await f.invoke(f.button('Share 3 visible session summaries'));
+    assert.doesNotMatch(f.shares[0].message, /unansweredAlerts|byMotion|software-output-accepted|Unanswered-alert candidates|Reported activity/);
+    assert.deepEqual(f.records().find(item => item.sessionId === 'long').unansweredAlerts, unansweredSnapshot());
+  } finally { await f.unmount(); }
+});
+
+test('malformed optional observation diagnostics fail the actual History load without rewriting legacy bytes', async () => {
+  const sessions = mixedSessions(); sessions[1].unansweredAlerts = { ...unansweredSnapshot(), rawTimeline: [] };
+  const f = createHistoryFixture({ sessions }), original = f.stored.get('occulert-session-history'); await f.mount();
+  try {
+    assert.match(f.text(), /Your saved sessions were not deleted/);
+    assert.equal(f.stored.get('occulert-session-history'), original); assert.equal(f.writes.length, 0);
+    assert.equal(f.card('long'), undefined);
   } finally { await f.unmount(); }
 });

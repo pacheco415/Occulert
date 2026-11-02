@@ -3,6 +3,7 @@ import { type SensitivityLevel } from '../constants/thresholds';
 import { currentAppBuildInfo } from '../lib/appBuildInfo';
 import { type HeadphoneMotionState } from '../lib/headphoneMotion';
 import { buildMonitorCheckpoint } from '../lib/monitorCheckpointModel';
+import type { UnansweredAlertSnapshot } from '../lib/unansweredAlertPolicy';
 
 const SESSION_CHECKPOINT_INTERVAL_MS = 15_000;
 
@@ -22,6 +23,7 @@ interface Options {
   performanceTrackerRef: React.RefObject<import("../lib/monitorPerformance").MonitorPerformanceTracker>;
   sensorFusionTrackerRef: React.RefObject<import("../lib/sensorFusionObservation").SensorFusionObservationTracker>;
   sessionSensitivityRef: React.RefObject<SensitivityLevel>;
+  getUnansweredAlertSnapshot?: () => UnansweredAlertSnapshot | undefined;
   isRunning: boolean;
 }
 
@@ -31,7 +33,7 @@ export function useMonitorCheckpoint({
   alertCountRef, maxFatigueRef, headNodObservationsRef,
   headphoneHeadNodObservationsRef, headphoneMotionSamplesRef, headphoneMotionStatusRef,
   performanceTrackerRef, sensorFusionTrackerRef, sessionSensitivityRef,
-  isRunning,
+  isRunning, getUnansweredAlertSnapshot,
 }: Options) {
   const checkpointActiveSession = useCallback((checkpointedAt = Date.now()) => {
     const sessionId = activeSessionIdRef.current;
@@ -51,10 +53,11 @@ export function useMonitorCheckpoint({
       headphoneMotionStatus: headphoneMotionStatusRef.current,
       monitorPerformance: performanceTrackerRef.current.snapshot(checkpointedAt),
       sensorFusion: sensorFusionTrackerRef.current.snapshot(checkpointedAt),
+      ...(getUnansweredAlertSnapshot === undefined ? {} : { unansweredAlerts: getUnansweredAlertSnapshot() }),
       sensitivity: sessionSensitivityRef.current,
       buildInfo: currentAppBuildInfo(),
     }));
-  }, []);
+  }, [getUnansweredAlertSnapshot]);
 
   useEffect(() => {
     if (!isRunning) return;

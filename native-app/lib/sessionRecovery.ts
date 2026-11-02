@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { copyUnansweredAlertSnapshot } from './unansweredAlertPolicy';
 import {
   ActiveSessionCheckpointUnreadableError,
   hasConflictingActiveSessionCheckpoint,
@@ -23,6 +24,15 @@ function enqueue(operation: () => Promise<void>): Promise<void> {
 }
 
 export function saveActiveSessionCheckpoint(checkpoint: ActiveSessionCheckpoint): Promise<void> {
+  // Capture only the optional observation counts before joining the write queue.
+  // Invalid new diagnostics must not replace a readable prior checkpoint.
+  if (checkpoint.unansweredAlerts !== undefined) {
+    try {
+      checkpoint = { ...checkpoint, unansweredAlerts: copyUnansweredAlertSnapshot(checkpoint.unansweredAlerts) };
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
   return enqueue(async () => {
     const raw = await AsyncStorage.getItem(ACTIVE_SESSION_KEY);
     const stored = parseActiveSessionCheckpoint(raw);
