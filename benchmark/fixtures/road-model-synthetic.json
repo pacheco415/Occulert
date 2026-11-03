@@ -1,0 +1,640 @@
+{
+  "schemaVersion": 1,
+  "kind": "synthetic-road-fixture",
+  "dataset": {
+    "id": "occulert-road-synthetic",
+    "version": "1",
+    "origin": "hand-authored-synthetic-scalars",
+    "license": "NOASSERTION"
+  },
+  "evaluation": {
+    "laneReferenceY": 0.75,
+    "laneTolerance": 0.05,
+    "leadIoUThreshold": 0.5
+  },
+  "models": [
+    {
+      "id": "lane-reference",
+      "task": "lane",
+      "version": "synthetic-v1",
+      "origin": "synthetic-predictions",
+      "license": "NOASSERTION",
+      "declaredSizeBytes": 1024
+    },
+    {
+      "id": "lane-sparse",
+      "task": "lane",
+      "version": "synthetic-v1",
+      "origin": "synthetic-predictions",
+      "license": "NOASSERTION",
+      "declaredSizeBytes": 2048
+    },
+    {
+      "id": "lead-reference",
+      "task": "lead-vehicle",
+      "version": "synthetic-v1",
+      "origin": "synthetic-predictions",
+      "license": "NOASSERTION",
+      "declaredSizeBytes": 4096
+    },
+    {
+      "id": "lead-mixed",
+      "task": "lead-vehicle",
+      "version": "synthetic-v1",
+      "origin": "synthetic-predictions",
+      "license": "NOASSERTION",
+      "declaredSizeBytes": 8192
+    }
+  ],
+  "clips": [
+    {
+      "id": "day-dry",
+      "sourceGroup": "synthetic-a",
+      "split": "test",
+      "lighting": "day",
+      "weather": "dry",
+      "durationMs": 1000,
+      "license": "NOASSERTION",
+      "frames": [
+        {
+          "id": "f1",
+          "atMs": 0,
+          "lane": {
+            "state": "present",
+            "leftX": 0.25,
+            "rightX": 0.75
+          },
+          "leadVehicle": {
+            "state": "present",
+            "box": [
+              0.25,
+              0.25,
+              0.25,
+              0.25
+            ]
+          }
+        },
+        {
+          "id": "f2",
+          "atMs": 100,
+          "lane": {
+            "state": "present",
+            "leftX": 0.2,
+            "rightX": 0.8
+          },
+          "leadVehicle": {
+            "state": "present",
+            "box": [
+              0.5,
+              0.25,
+              0.25,
+              0.25
+            ]
+          }
+        },
+        {
+          "id": "f3",
+          "atMs": 200,
+          "lane": {
+            "state": "absent"
+          },
+          "leadVehicle": {
+            "state": "absent"
+          }
+        },
+        {
+          "id": "f4",
+          "atMs": 300,
+          "lane": {
+            "state": "unlabeled"
+          },
+          "leadVehicle": {
+            "state": "unlabeled"
+          }
+        }
+      ]
+    },
+    {
+      "id": "night-rain",
+      "sourceGroup": "synthetic-b",
+      "split": "test",
+      "lighting": "night",
+      "weather": "rain",
+      "durationMs": 1000,
+      "license": "NOASSERTION",
+      "frames": [
+        {
+          "id": "f1",
+          "atMs": 0,
+          "lane": {
+            "state": "present",
+            "leftX": 0.3,
+            "rightX": 0.7
+          },
+          "leadVehicle": {
+            "state": "present",
+            "box": [
+              0.125,
+              0.125,
+              0.5,
+              0.5
+            ]
+          }
+        },
+        {
+          "id": "f2",
+          "atMs": 100,
+          "lane": {
+            "state": "absent"
+          },
+          "leadVehicle": {
+            "state": "absent"
+          }
+        },
+        {
+          "id": "f3",
+          "atMs": 200,
+          "lane": {
+            "state": "present",
+            "leftX": 0.3,
+            "rightX": 0.7
+          },
+          "leadVehicle": {
+            "state": "unlabeled"
+          }
+        },
+        {
+          "id": "f4",
+          "atMs": 300,
+          "lane": {
+            "state": "unlabeled"
+          },
+          "leadVehicle": {
+            "state": "present",
+            "box": [
+              0.25,
+              0.25,
+              0.25,
+              0.25
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dawn-fog",
+      "sourceGroup": "synthetic-c",
+      "split": "train",
+      "lighting": "dawn-dusk",
+      "weather": "fog",
+      "durationMs": 1000,
+      "license": "NOASSERTION",
+      "frames": [
+        {
+          "id": "f1",
+          "atMs": 0,
+          "lane": {
+            "state": "present",
+            "leftX": 0.25,
+            "rightX": 0.75
+          },
+          "leadVehicle": {
+            "state": "present",
+            "box": [
+              0.25,
+              0.25,
+              0.25,
+              0.25
+            ]
+          }
+        },
+        {
+          "id": "f2",
+          "atMs": 100,
+          "lane": {
+            "state": "absent"
+          },
+          "leadVehicle": {
+            "state": "absent"
+          }
+        }
+      ]
+    }
+  ],
+  "predictions": [
+    {
+      "modelId": "lane-reference",
+      "clipId": "day-dry",
+      "frameId": "f1",
+      "result": {
+        "state": "present",
+        "leftX": 0.25,
+        "rightX": 0.75
+      },
+      "simulatedLatencyMs": 0
+    },
+    {
+      "modelId": "lane-reference",
+      "clipId": "day-dry",
+      "frameId": "f2",
+      "result": {
+        "state": "present",
+        "leftX": 0.2,
+        "rightX": 0.8
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-reference",
+      "clipId": "day-dry",
+      "frameId": "f3",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-reference",
+      "clipId": "day-dry",
+      "frameId": "f4",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-reference",
+      "clipId": "night-rain",
+      "frameId": "f1",
+      "result": {
+        "state": "present",
+        "leftX": 0.3,
+        "rightX": 0.7
+      },
+      "simulatedLatencyMs": 0
+    },
+    {
+      "modelId": "lane-reference",
+      "clipId": "night-rain",
+      "frameId": "f2",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-reference",
+      "clipId": "night-rain",
+      "frameId": "f3",
+      "result": {
+        "state": "present",
+        "leftX": 0.3,
+        "rightX": 0.7
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-reference",
+      "clipId": "night-rain",
+      "frameId": "f4",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-reference",
+      "clipId": "dawn-fog",
+      "frameId": "f1",
+      "result": {
+        "state": "present",
+        "leftX": 0.25,
+        "rightX": 0.75
+      },
+      "simulatedLatencyMs": 0
+    },
+    {
+      "modelId": "lane-reference",
+      "clipId": "dawn-fog",
+      "frameId": "f2",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-sparse",
+      "clipId": "day-dry",
+      "frameId": "f1",
+      "result": {
+        "state": "present",
+        "leftX": 0.25,
+        "rightX": 0.75
+      },
+      "simulatedLatencyMs": 0
+    },
+    {
+      "modelId": "lane-sparse",
+      "clipId": "day-dry",
+      "frameId": "f2",
+      "result": {
+        "state": "present",
+        "leftX": 0.4,
+        "rightX": 0.6
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-sparse",
+      "clipId": "day-dry",
+      "frameId": "f3",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-sparse",
+      "clipId": "day-dry",
+      "frameId": "f4",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-sparse",
+      "clipId": "night-rain",
+      "frameId": "f1",
+      "result": {
+        "state": "unavailable"
+      },
+      "simulatedLatencyMs": null
+    },
+    {
+      "modelId": "lane-sparse",
+      "clipId": "night-rain",
+      "frameId": "f2",
+      "result": {
+        "state": "present",
+        "leftX": 0.25,
+        "rightX": 0.75
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-sparse",
+      "clipId": "night-rain",
+      "frameId": "f4",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lane-sparse",
+      "clipId": "dawn-fog",
+      "frameId": "f1",
+      "result": {
+        "state": "present",
+        "leftX": 0.25,
+        "rightX": 0.75
+      },
+      "simulatedLatencyMs": 0
+    },
+    {
+      "modelId": "lane-sparse",
+      "clipId": "dawn-fog",
+      "frameId": "f2",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-reference",
+      "clipId": "day-dry",
+      "frameId": "f1",
+      "result": {
+        "state": "present",
+        "box": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "simulatedLatencyMs": 0
+    },
+    {
+      "modelId": "lead-reference",
+      "clipId": "day-dry",
+      "frameId": "f2",
+      "result": {
+        "state": "present",
+        "box": [
+          0.5,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-reference",
+      "clipId": "day-dry",
+      "frameId": "f3",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-reference",
+      "clipId": "day-dry",
+      "frameId": "f4",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-reference",
+      "clipId": "night-rain",
+      "frameId": "f1",
+      "result": {
+        "state": "present",
+        "box": [
+          0.125,
+          0.125,
+          0.5,
+          0.5
+        ]
+      },
+      "simulatedLatencyMs": 0
+    },
+    {
+      "modelId": "lead-reference",
+      "clipId": "night-rain",
+      "frameId": "f2",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-reference",
+      "clipId": "night-rain",
+      "frameId": "f3",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-reference",
+      "clipId": "night-rain",
+      "frameId": "f4",
+      "result": {
+        "state": "present",
+        "box": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-reference",
+      "clipId": "dawn-fog",
+      "frameId": "f1",
+      "result": {
+        "state": "present",
+        "box": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "simulatedLatencyMs": 0
+    },
+    {
+      "modelId": "lead-reference",
+      "clipId": "dawn-fog",
+      "frameId": "f2",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-mixed",
+      "clipId": "day-dry",
+      "frameId": "f1",
+      "result": {
+        "state": "unavailable"
+      },
+      "simulatedLatencyMs": null
+    },
+    {
+      "modelId": "lead-mixed",
+      "clipId": "day-dry",
+      "frameId": "f2",
+      "result": {
+        "state": "present",
+        "box": [
+          0,
+          0,
+          0.125,
+          0.125
+        ]
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-mixed",
+      "clipId": "day-dry",
+      "frameId": "f3",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-mixed",
+      "clipId": "day-dry",
+      "frameId": "f4",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-mixed",
+      "clipId": "night-rain",
+      "frameId": "f2",
+      "result": {
+        "state": "present",
+        "box": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-mixed",
+      "clipId": "night-rain",
+      "frameId": "f3",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-mixed",
+      "clipId": "night-rain",
+      "frameId": "f4",
+      "result": {
+        "state": "present",
+        "box": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "simulatedLatencyMs": 12
+    },
+    {
+      "modelId": "lead-mixed",
+      "clipId": "dawn-fog",
+      "frameId": "f1",
+      "result": {
+        "state": "present",
+        "box": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "simulatedLatencyMs": 0
+    },
+    {
+      "modelId": "lead-mixed",
+      "clipId": "dawn-fog",
+      "frameId": "f2",
+      "result": {
+        "state": "absent"
+      },
+      "simulatedLatencyMs": 12
+    }
+  ]
+}

@@ -16,3 +16,25 @@ It depends on neither the public root URL nor its current integrity entry, so
 ordinary immutable-asset retirement can remove those after their grace period.
 The existing deployment exclusion covers `benchmark/`; no worker list references
 this fixture. It is not an application runtime/compiler input.
+
+## Synthetic road-model fixture
+
+`road-model-synthetic.json` contains hand-authored scalar lane and single-lead
+truth, synthetic predictions and fictional model metadata. It contains no road
+media, participant data or executable model. Dataset, clip and model licenses
+are `NOASSERTION`: they make no assertion of actual rights or consent approval
+and establish no repository-wide license. Declared sizes and simulated latencies
+are fictional, not measurements.
+
+The [road benchmark guide](../../docs/ROAD_MODEL_BENCHMARK.md) explains the schema,
+scoring, missing-output treatment and provenance. Run the fixture with Node 24:
+
+```bash
+node benchmark/run-road-model-benchmark.mjs \
+  --input benchmark/fixtures/road-model-synthetic.json --split test
+```
+
+These synthetic-only results check software contracts. They establish no real
+road accuracy, distance, speed, time to collision, on-device latency or safety
+result. Authorized clips/models, independent held-out labels and physical-device
+acceptance remain separate gates. Do not add real media or model binaries here.
