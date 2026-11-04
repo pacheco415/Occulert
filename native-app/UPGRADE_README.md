@@ -118,6 +118,67 @@ Use one planned `codex/` branch for each SDK upgrade. Review the target SDK's
 release notes and the camera, face detector, worklets and custom Watch module
 compatibility before changing dependencies. Move one SDK version at a time.
 
+### November 3 SDK 58 compatibility alignment
+
+Expo's live compatibility check requires the following cohort. This stays on
+SDK 58; the manifest and lockfile move together on their own maintenance branch.
+The online map can supersede a package's bundled snapshot, so retain the live
+check and its existing override/fallback regression.
+
+| Package | Previous locked version | Aligned version |
+| --- | --- | --- |
+| expo | 58.0.22 | 58.0.23 |
+| expo-asset | 58.0.19 | 58.0.20 |
+| expo-constants | 58.0.14 | 58.0.15 |
+| expo-linking | 58.0.15 | 58.0.16 |
+| expo-router | 58.0.29 | 58.0.30 |
+| expo-splash-screen | 58.0.12 | 58.0.13 |
+| react-native-safe-area-context | 5.10.1 | 5.11.1 |
+
+The [Expo release](https://github.com/expo/expo/releases/tag/expo@58.0.23)
+includes the safe-area requirement, an iOS 27 StatusBar correction and its
+required CLI/modules/configuration cohort. Safe-area
+[5.11.0](https://github.com/AppAndFlow/react-native-safe-area-context/releases/tag/v5.11.0)
+changes inset handling, and
+[5.11.1](https://github.com/AppAndFlow/react-native-safe-area-context/releases/tag/v5.11.1)
+corrects native-sheet rotation updates. Exact-build rotation, large-text and
+monitor layout acceptance therefore remain open.
+
+React Native 0.88.1, React/DOM/renderer 19.3.0, camera/detector, worklets, Nitro,
+Watch and Health dependencies retain their existing lock entries. Native patch
+guards, permissions, feature flags and EAS identities/profiles are unchanged.
+The lockfile review records 41 package-version updates and 12 removals of
+nested glob/lru-cache/path-scurry entries, with no added package entries or
+same-version metadata-only changes. The lock was generated with EAS's npm
+10.9.8 to retain its two required optional-peer TypeScript 5.9.3 entries; those
+entries match the previous baseline. Top-level TypeScript 6.0.3 and Babel core
+remain pinned; Expo's Babel preset updates with its cohort.
+
+Two configuration adjustments are explicit. Expo 58.0.23's packaged template
+changes `UIViewControllerBasedStatusBarAppearance` from `false` to `true`, the
+sole generated phone Info.plist difference in the macOS source-prebuild
+comparison. The approved baseline changes that value while retaining the full
+byte-for-byte guard. Separately, `app.config.js` consumes Expo's supplied
+`config` through its canonical callback instead of manually requiring
+`app.json`. The ordinary resolved JSON is equivalent; the callback preserves
+upstream context metadata and addresses Expo Doctor 1.21.6's config-factory
+heuristic. The generated status-bar setting change remains a real change.
+
+Clean Node 24 installations with npm 10.9.8 and npm 11.17.0 both passed,
+followed by all 251 native tests with each installer. Final source checks also
+passed 106 root groups, the eight-case simulator configuration suite and all 20
+Expo Doctor 1.21.6 checks. Compatibility, generated configuration, binding,
+layout, lifecycle and packaging checks remain enabled. Both installer CI
+checks, including npm 10.9.8, and resulting-main checks remain release gates.
+A macOS source prebuild does not establish a
+compiled native binary, signed archive, runtime behavior or physical-device
+acceptance; build and distribution remain separate actions.
+
+Point-in-time dependency audits changed from one low and 13 moderate findings
+to one low and nine moderate findings, with zero high or critical findings in
+either report. Findings remain; these counts establish neither a clean audit
+nor whether a vulnerable dependency is exposed at runtime.
+
 With Node 24 selected from the repository's `.nvmrc`, install the reviewed Expo
 version in `native-app/`, then run:
 

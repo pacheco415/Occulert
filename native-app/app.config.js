@@ -1,7 +1,6 @@
-const base = require('./app.json').expo;
 const { BUNDLE_ID, simulatorTraceProfile } = require('./scripts/lib/simulator-trace-profile.cjs');
 
-module.exports = () => {
+module.exports = ({ config: base }) => {
   if (!simulatorTraceProfile()) return base;
   return {
     ...base,

@@ -45,9 +45,9 @@ test('simulator profile requires all build gates; production cannot select the s
     { ...simulator, OCCULERT_SIMULATOR_PROFILE: undefined },
   ]) assert.throws(() => simulatorTraceProfile(env), /requires the simulator-trace profile/);
   const config = require('../app.config.js');
-  environment(production, () => assert.deepEqual(config(), base));
+  environment(production, () => assert.deepEqual(config({ config: base }), base));
   environment(simulator, () => {
-    const result = config(); assert.equal(result.ios.bundleIdentifier, BUNDLE_ID); assert.equal(result.extra.simulatorTrace, true);
+    const result = config({ config: base }); assert.equal(result.ios.bundleIdentifier, BUNDLE_ID); assert.equal(result.extra.simulatorTrace, true);
     assert.equal(result.plugins.includes('@bacons/apple-targets'), false); assert.equal(result.ios.infoPlist.OcculertSimulatorTrace, true);
   });
   const eas = JSON.parse(readFileSync(join(root, 'eas.json')));
@@ -58,9 +58,59 @@ test('simulator profile requires all build gates; production cannot select the s
   assert.deepEqual(eas.build['simulator-trace'].env, { OCCULERT_SIMULATOR_TRACE: '1', OCCULERT_SIMULATOR_PROFILE: 'simulator-trace', OCCULERT_SIMULATOR_PLATFORM: 'ios' });
   const clientEvaluation = { ...production, ...eas.build['simulator-trace'].env };
   assert.equal(simulatorTraceProfile(clientEvaluation), true, 'EAS client config evaluation has only profile env, before worker EAS_BUILD_* variables');
-  environment(clientEvaluation, () => assert.equal(config().ios.bundleIdentifier, BUNDLE_ID));
+  environment(clientEvaluation, () => assert.equal(config({ config: base }).ios.bundleIdentifier, BUNDLE_ID));
   assert.equal(isSimulatorTraceConfiguration('ios', true, BUNDLE_ID), true);
   for (const values of [['ios', true, base.ios.bundleIdentifier], ['android', true, BUNDLE_ID], ['ios', 'true', BUNDLE_ID], ['ios', false, BUNDLE_ID]]) assert.equal(isSimulatorTraceConfiguration(...values), false);
+});
+
+test('canonical Expo config and caller Symbol metadata survive both profiles without mutating the input', () => {
+  const config = require('../app.config.js');
+  const expoRequire = createRequire(require.resolve('expo/package.json'));
+  const configRoot = dirname(expoRequire.resolve('@expo/config/package.json'));
+  const { NON_STANDARD_SYMBOL } = expoRequire(join(configRoot, 'build/environment.js'));
+  const callerSymbol = Symbol('caller metadata');
+  const metadata = { owner: 'fixture caller' };
+  const input = { ...structuredClone(base), [NON_STANDARD_SYMBOL]: true, [callerSymbol]: metadata };
+  const expected = { ...structuredClone(base), [NON_STANDARD_SYMBOL]: true, [callerSymbol]: metadata };
+  function freeze(value) {
+    if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+      Object.freeze(value);
+      for (const key of Reflect.ownKeys(value)) freeze(value[key]);
+    }
+    return value;
+  }
+  freeze(input);
+  for (const env of [production, simulator]) {
+    environment(env, () => {
+      const result = config({ config: input });
+      assert.equal(result[NON_STANDARD_SYMBOL], true, 'Expo must recognize that the canonical static config was consumed');
+      assert.equal(result[callerSymbol], metadata, 'caller metadata must survive the config transform');
+      if (env === production) assert.equal(result, input, 'ordinary configuration returns the canonical object itself');
+      else {
+        assert.notEqual(result, input);
+        assert.equal(result.ios.bundleIdentifier, BUNDLE_ID);
+        assert.equal(result.extra.simulatorTrace, true);
+        assert.equal(result.plugins.includes('@bacons/apple-targets'), false);
+      }
+      assert.deepEqual(input, expected, 'neither profile may mutate the canonical input or its nested data');
+    });
+  }
+});
+
+test('the actual Expo resolver consumes static config without changing ordinary resolved values', () => {
+  const expoRequire = createRequire(require.resolve('expo/package.json'));
+  const { getConfig } = expoRequire('@expo/config');
+  environment(production, () => {
+    const result = getConfig(root, { skipPlugins: true });
+    assert.equal(result.hasUnusedStaticConfig, false);
+    assert.equal(result.dynamicConfigObjectType, 'function');
+    assert.deepEqual(result.rootConfig.expo, base);
+    // skipPlugins deliberately removes this list from exp; the unmodified list
+    // remains checked in rootConfig above and the direct callback assertions.
+    const { plugins, ...staticValues } = base;
+    assert.equal(result.exp.plugins, undefined);
+    assert.deepEqual(Object.fromEntries(Object.keys(staticValues).map(key => [key, result.exp[key]])), staticValues);
+  });
 });
 
 test('bundled trace contains open, a sub-alert blink, three closed seconds, face loss and repeat', () => {
@@ -157,6 +207,9 @@ test('actual production prebuild preserves phone Info.plist bytes; simulator exc
       const links = JSON.parse(run(directory, env, join(directory, 'node_modules/expo-modules-autolinking/bin/expo-modules-autolinking.js'), 'react-native-config', '--platform', 'ios', '--json'));
       const detector = links.dependencies['react-native-vision-camera-face-detector']?.platforms?.ios;
       if (mode === 'production') {
+        // Expo 58.0.23's reviewed bare template enables view-controller status bars.
+        // Keep the complete generated file comparison; do not normalize this key away.
+        assert.match(plist.toString(), /<key>UIViewControllerBasedStatusBarAppearance<\/key>\s*<true\/>/);
         assert.deepEqual(plist, readFileSync(join(root, 'scripts/fixtures/production-info-plist-before-simulator.plist')), 'Generated production Info.plist must remain byte-identical');
         assert.ok(detector?.podspecPath, 'ordinary builds must retain the real ML Kit module');
       } else {
