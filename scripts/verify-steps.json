@@ -73,6 +73,7 @@
     "test:asset-lineage",
     "test:workflow-policy",
     "test:browser-retry-report",
+    "test:browser-process-diagnostics",
     "test:deployment-ignore",
     "audit:sitemap",
     "test:sitemap",
