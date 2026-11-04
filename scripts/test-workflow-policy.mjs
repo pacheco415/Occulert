@@ -76,8 +76,8 @@ test('browser container is immutable and matches the locked Playwright version',
   assert.equal(image[1], lock.packages['node_modules/@playwright/test'].version);
   assert.ok(workflow.includes(`assert.equal(require('@playwright/test/package.json').version, '${image[1]}')`));
   assert.ok(workflow.includes('for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK)'));
-  assert.ok(workflow.includes('run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit'));
-  assert.match(workflow, /run: npm run test:browser -- --project=\$\{\{ matrix\.browser \}\} --reporter=line,json --output=test-results\/browser\s*\n/);
+  assert.ok(workflow.includes('run: node scripts/run-browser-check.mjs onboarding'));
+  assert.match(workflow, /run: node scripts\/run-browser-check\.mjs \$\{\{ matrix\.browser \}\}\s*\n/);
   assert.doesNotMatch(workflow, /continue-on-error|--privileged|--cap-add|--ipc=host|playwright install --with-deps/);
 });
 
@@ -102,6 +102,7 @@ test('retry report inputs match each browser and artifacts cannot collide across
   const workflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
   assert.match(workflow, /if: \$\{\{ matrix\.browser == 'webkit' \}\}/);
   assert.match(workflow, /name: browser-test-diagnostics-\$\{\{ matrix\.browser \}\}-\$\{\{ github\.run_attempt \}\}/);
+  assert.match(workflow, /\n            playwright-report\/\n/);
   assert.match(workflow, /write-verification-receipt\.mjs browser-\$\{\{ matrix\.browser \}\}/);
   assert.match(workflow, /name: verification-browser-\$\{\{ matrix\.browser \}\}-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}/);
   const step = workflow.split('      - name: List browser tests that passed after retry\n')[1].split('      - name: Preserve browser failure')[0];

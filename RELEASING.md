@@ -22,6 +22,17 @@
    Typecheck are all green on that PR; confirm they ran on the resulting `main`
    commit too.
 
+The browser workflow runs its existing onboarding probe and complete browser
+suites through `scripts/run-browser-check.mjs`. The wrapper enables only
+`DEBUG=pw:browser`, streams test output, and preserves the test process's exit
+code or signal. Its bounded stderr tail and before/after memory, cgroup and
+shared-memory observations are saved under `playwright-report/browser-process/`
+and included in the browser diagnostics artifact.
+Unavailable platform probes are recorded explicitly and do not change a test
+result. These observations help investigate process or storage loss; a passing
+retry or an empty OOM counter does not establish its cause. Keep the first
+attempt's traces and retry report when assessing an intermittent failure.
+
 Keep superseded assets for at least 14 days so cached older pages can still
 load. After that grace period, remove a file only after checking references in
 HTML, runtime JS, `sw.js`, `asset-versions.json`, `asset-integrity.json`, and

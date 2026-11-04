@@ -56,11 +56,11 @@ jobs:
         if: ${{ matrix.browser == 'webkit' }}
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-report/onboarding.json
-        run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit --reporter=line,json --output=test-results/onboarding
+        run: node scripts/run-browser-check.mjs onboarding
       - name: Run this browser's full suite
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-report/browser.json
-        run: npm run test:browser -- --project=${{ matrix.browser }} --reporter=line,json --output=test-results/browser
+        run: node scripts/run-browser-check.mjs ${{ matrix.browser }}
       - name: List browser tests that passed after retry
         if: ${{ !cancelled() }}
         env:
