@@ -333,6 +333,37 @@ stronger repeated direct haptic. Settings only enables the Watch switch when
 iOS confirms that the companion is installed and includes a direct Watch alert
 test. Expo Go remains a safe no-op because it cannot contain the Watch target.
 
+The implemented source repeats the three-tap critical pattern every four seconds
+while the Watch app is active and the latest iPhone status reports closed eyes
+and is less than twelve seconds old. Each pattern retains its 400 ms tap spacing.
+The continuous episode ends after sixty seconds and leaves a pull-over message;
+new critical messages cannot extend that cap or add extra immediate patterns.
+Late timers do not catch up with a burst. Without an eligible closed-eye status,
+a fresh critical alert retains its original single three-tap pattern.
+
+Open eyes, an explicit stop, stale or lost tracking, a lower or replayed
+replacement alert, leaving the foreground, and receiver disposal cancel pending
+critical feedback. Returning to the foreground or receiving another closed-eye
+status does not restart canceled repetition. A fresh open-eye or stopped status
+at or after the latest alert resets the episode; a later eligible critical alert
+can start a new one. Older open/stop messages cancel feedback without renewing
+the cap, and critical messages from before an accepted reset stay silent.
+Ordinary alerts retain their two taps, 450 ms apart. The two-second incoming-feedback rule
+and authorized background notification path remain unchanged.
+
+Software verification compiles the actual receiver in the target's Swift 5 mode,
+plus its policy and lifecycle in Swift 6. The strict lane omits only unchanged
+framework delegate callbacks; the full lane exercises those callbacks too.
+Both use controlled clocks and small WatchConnectivity, notification and haptic
+stand-ins. They cover repeat
+cadence, per-tap cancellation, freshness boundaries, replacement ordering, the
+nonrenewable cap, delayed callbacks, lifecycle wiring and receiver disposal,
+alongside the existing background notification cases. It does not build the
+watchOS application or establish physical haptic timing, delivery or perception.
+The four-second repetition and sixty-second cap need exact-build checks on a
+paired Watch, including wrist lowering, app switching, open/stop updates,
+notification permissions, Focus and sustained closed-eye status.
+
 Build and submit both targets together with the production EAS profile. On the
 physical devices, open the Occulert Watch app, enable background alerts, confirm
 the iPhone reports the companion as installed, opt into Watch alerts, and test
