@@ -413,6 +413,20 @@ The installed face detector requires Android API 26 (Android 8.0) or later.
 `expo-build-properties` sets that minimum during managed prebuild. Older Android
 versions are unsupported; do not override the detector's manifest requirement.
 
+### Camera location and microphone permissions
+
+The VisionCamera config plugin explicitly sets `enableLocation: false` and
+`enableMicrophonePermission: false`. Managed iOS prebuild writes
+`$VCEnableLocation=false` into the Podfile, selecting the library's disabled
+location path. On Android, these options leave location and audio-recording
+permissions out of this plugin's additions. The existing camera-purpose text
+and frame-processor defaults remain unchanged.
+
+This setting addresses the linked location code without adding location access
+or a location-purpose string. Verify the exact rebuilt signed archive and
+Apple's ingestion result before recording the location warning as resolved;
+configuration alone does not prove that every location symbol was removed.
+
 ### Android permissions
 
 The app declares `CAMERA` for foreground monitoring and parked camera setup,
