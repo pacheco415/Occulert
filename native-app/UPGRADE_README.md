@@ -147,10 +147,12 @@ monitor layout acceptance therefore remain open.
 React Native 0.88.1, React/DOM/renderer 19.3.0, camera/detector, worklets, Nitro,
 Watch and Health dependencies retain their existing lock entries. Native patch
 guards, permissions, feature flags and EAS identities/profiles are unchanged.
-The lockfile review records 41 package-version updates, eight metadata-only
-changes and 14 removals, including two orphaned TypeScript copies. Top-level
-TypeScript and Babel core remain pinned; Expo's Babel preset updates with its
-cohort.
+The lockfile review records 41 package-version updates and 12 removals of
+nested glob/lru-cache/path-scurry entries, with no added package entries or
+same-version metadata-only changes. The lock was generated with EAS's npm
+10.9.8 to retain its two required optional-peer TypeScript 5.9.3 entries; those
+entries match the previous baseline. Top-level TypeScript 6.0.3 and Babel core
+remain pinned; Expo's Babel preset updates with its cohort.
 
 Two configuration adjustments are explicit. Expo 58.0.23's packaged template
 changes `UIViewControllerBasedStatusBarAppearance` from `false` to `true`, the
@@ -162,8 +164,9 @@ byte-for-byte guard. Separately, `app.config.js` consumes Expo's supplied
 upstream context metadata and addresses Expo Doctor 1.21.6's config-factory
 heuristic. The generated status-bar setting change remains a real change.
 
-Clean Node 24 installation and final source checks passed: 106 root groups,
-251 native tests, the eight-case simulator configuration suite and all 20
+Clean Node 24 installations with npm 10.9.8 and npm 11.17.0 both passed,
+followed by all 251 native tests with each installer. Final source checks also
+passed 106 root groups, the eight-case simulator configuration suite and all 20
 Expo Doctor 1.21.6 checks. Compatibility, generated configuration, binding,
 layout, lifecycle and packaging checks remain enabled. Both installer CI
 checks, including npm 10.9.8, and resulting-main checks remain release gates.
