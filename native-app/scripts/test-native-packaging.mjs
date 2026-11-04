@@ -17,6 +17,9 @@ const shared = join(root, 'lib', 'event-outbox.ts');
 const expoConfig = JSON.parse(readFileSync(join(app, 'app.json'), 'utf8')).expo;
 const audioOptions = expoConfig.plugins.find(plugin => Array.isArray(plugin) && plugin[0] === 'expo-audio')[1];
 const withAudio = require('expo-audio/app.plugin.js').default;
+const cameraOptions = expoConfig.plugins.find(plugin => Array.isArray(plugin) && plugin[0] === 'react-native-vision-camera')?.[1];
+const withCamera = require('react-native-vision-camera/app.plugin.js').default;
+const withHealthKit = require('@kingstinct/react-native-healthkit/app.plugin.js');
 const playbackService = 'expo.modules.audio.service.AudioControlsService';
 const recordingService = 'expo.modules.audio.service.AudioRecordingService';
 const unrelatedService = { $: { 'android:name': 'fixture.UnrelatedService', 'android:exported': 'false' } };
@@ -41,6 +44,75 @@ function androidManifest(services = []) {
 
 const androidPermissions = manifest => manifest.manifest['uses-permission'].map(entry => entry.$['android:name']).sort();
 const expectedAudioPermissions = ['CAMERA', 'VIBRATE', 'WAKE_LOCK', 'MODIFY_AUDIO_SETTINGS'].map(name => 'android.permission.' + name).sort();
+
+function permissionPlugins(includeCamera) {
+  const installed = {
+    'expo-audio': withAudio,
+    '@kingstinct/react-native-healthkit': withHealthKit,
+    'react-native-vision-camera': includeCamera ? withCamera : undefined,
+  };
+  let configuration = { ...structuredClone(expoConfig), _internal: { projectRoot: app } };
+  // Preserve the selected plugins' actual app-config order as Expo does.
+  for (const entry of expoConfig.plugins) {
+    if (Array.isArray(entry) && installed[entry[0]]) configuration = installed[entry[0]](configuration, entry[1]);
+  }
+  return configuration;
+}
+
+async function permissionMod(configuration, platform, modName, modResults, projectRoot = app) {
+  return (await configuration.mods[platform][modName]({
+    ...configuration,
+    modRequest: { projectRoot, platform, modName },
+    modResults: structuredClone(modResults),
+  })).modResults;
+}
+
+test('the installed camera plugin writes its location compile opt-out in generated and stale Podfiles', async () => {
+  assert.deepEqual(cameraOptions, { enableLocation: false, enableMicrophonePermission: false });
+  const directory = mkdtempSync(join(tmpdir(), 'occulert-camera-location-'));
+  const podfile = join(directory, 'ios', 'Podfile');
+  // An independent fixture keeps frame-processor setup and unrelated Ruby
+  // declarations visible, rather than comparing a copy of the plugin output.
+  const retained = '# Synthetic Podfile\n$VCEnableFrameProcessors=true\nplatform :ios, "16.4"\ntarget "Fixture" do\nend\n';
+  try {
+    mkdirSync(dirname(podfile), { recursive: true });
+    for (const stale of ['', '$VCEnableLocation=true\n$VCEnableLocation = true\n']) {
+      writeFileSync(podfile, stale + retained);
+      await permissionMod(permissionPlugins(true), 'ios', 'dangerous', {}, directory);
+      const first = readFileSync(podfile, 'utf8');
+      assert.deepEqual(first.split('\n').filter(line => /^\$VCEnableLocation\s*=/.test(line)), ['$VCEnableLocation=false']);
+      assert.equal(first.replace(/^\$VCEnableLocation=false\n/, ''), retained,
+        'disabling location must preserve frame processors and unrelated Podfile content');
+      await permissionMod(permissionPlugins(true), 'ios', 'dangerous', {}, directory);
+      assert.equal(readFileSync(podfile, 'utf8'), first, 'reapplying the actual plugin must be byte-identical');
+    }
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('the installed camera plugin preserves generated iOS camera, audio and read-only Health declarations', async () => {
+  const beforeConfig = permissionPlugins(false), afterConfig = permissionPlugins(true);
+  const before = await permissionMod(beforeConfig, 'ios', 'infoPlist', beforeConfig.ios.infoPlist);
+  const after = await permissionMod(afterConfig, 'ios', 'infoPlist', afterConfig.ios.infoPlist);
+  assert.deepEqual(after, before);
+  assert.equal(after.NSCameraUsageDescription, expoConfig.ios.infoPlist.NSCameraUsageDescription);
+  assert.deepEqual(after.UIBackgroundModes, ['audio']);
+  assert.match(after.NSHealthShareUsageDescription, /reads.*sleep.*heart rate variability/i);
+  assert.match(after.NSHealthUpdateUsageDescription, /does not write or modify Apple Health data/i);
+  assert.equal(Object.keys(after).some(key => key.startsWith('NSLocation')), false,
+    'disabling unused SDK APIs must not add a location purpose string');
+  assert.equal('NSMicrophoneUsageDescription' in after, false);
+  const entitlements = await permissionMod(permissionPlugins(true), 'ios', 'entitlements', {});
+  assert.equal(entitlements['com.apple.developer.healthkit'], true);
+  assert.notEqual(entitlements['com.apple.developer.healthkit.background-delivery'], true);
+});
+
+test('the installed camera and audio plugin chain adds no Android location or microphone access', async () => {
+  const manifest = androidManifest([unrelatedService]);
+  manifest.manifest['uses-permission'] = [{ $: { 'android:name': 'android.permission.INTERNET' } }];
+  const result = await permissionMod(permissionPlugins(true), 'android', 'manifest', manifest);
+  assert.deepEqual(androidPermissions(result), [...expectedAudioPermissions, 'android.permission.INTERNET'].sort());
+  assert.deepEqual(result.manifest.application[0].service, [unrelatedService]);
+});
 
 test('Android app permissions remain camera, vibration and the existing wake-lock declaration', () => {
   assert.deepEqual(expoConfig.android.permissions, ['CAMERA', 'VIBRATE', 'WAKE_LOCK']);

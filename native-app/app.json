@@ -49,6 +49,13 @@
         }
       ],
       [
+        "react-native-vision-camera",
+        {
+          "enableLocation": false,
+          "enableMicrophonePermission": false
+        }
+      ],
+      [
         "expo-audio",
         {
           "microphonePermission": false,
