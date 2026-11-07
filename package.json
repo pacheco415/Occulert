@@ -122,7 +122,8 @@
     "test:motion-activity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-motion-activity.mjs scripts/test-motion-activity-native.mjs",
     "test:emergency-readiness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-emergency-readiness.mjs",
     "test:road-model-benchmark": "node --test scripts/test-road-model-benchmark.mjs",
-    "test:fleet-monthly-activity": "node --test scripts/test-fleet-monthly-activity.mjs"
+    "test:fleet-monthly-activity": "node --test scripts/test-fleet-monthly-activity.mjs",
+    "test:corroboration-replay": "node --test scripts/test-corroboration-replay.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
