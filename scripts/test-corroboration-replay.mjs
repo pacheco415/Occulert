@@ -60,6 +60,7 @@ test('checked-in synthetic fixture reproduces hand-computed test-split results',
   const report = replayCorroboration(fixture(), { split: 'test' });
   const before = report.overall.cameraOnly.overall, after = report.overall.corroborated.overall;
   assert.equal(report.kind, 'synthetic-fixture');
+  assert.equal(report.policy.continuity, 'same-usable-interval-through-cue');
   assert.equal(report.overall.sessions, 3);
   assert.equal(before.trackedHours, 0.3);
   assert.deepEqual([before.fullyTrackedEpisodes, before.insufficientTrackingEpisodes, before.detectedEpisodes, before.falseAlerts], [3, 1, 2, 2]);
@@ -107,6 +108,36 @@ test('minSources requires distinct independent sources and each candidate is use
   assert.deepEqual(cueTimes(reuse), [32_000]);
   const once = corroborateSession(session({ observations: [cam(10_000), cam(11_000), nod(12_000)] }), resolvePolicy({ refractoryMs: 0 }));
   assert.deepEqual([once.pairs, once.added.length], [1, 1], 'one nod cannot corroborate two camera candidates');
+});
+
+test('replay cues cannot bridge tracking loss or accessory disconnection', () => {
+  assert.deepEqual(cueTimes(session({ tracking: [[0, 11_000], [20_000, 100_000]],
+    observations: [cam(10_000), nod(12_000)] })), [], 'camera tracking ends before the cue');
+  assert.deepEqual(cueTimes(session({ tracking: [[0, 11_000], [12_000, 100_000]],
+    observations: [cam(10_000), nod(13_000)] })), [], 'recovery does not revive a pre-gap camera candidate');
+  assert.deepEqual(cueTimes(session({ accessories: { headphone: [[0, 9_000], [10_000, 100_000]] },
+    observations: [nod(8_000), cam(11_000)] })), [], 'reconnection does not revive a pre-gap accessory candidate');
+  assert.deepEqual(cueTimes(session({ tracking: [[0, 12_000]],
+    observations: [cam(10_000), nod(12_000)] })), [], 'tracking end is exclusive at cue time');
+  assert.deepEqual(cueTimes(session({ tracking: [[0, 11_000], [11_001, 100_000]],
+    observations: [cam(10_000), nod(12_000)] })), [], 'even a one-millisecond unknown gap breaks continuity');
+  assert.deepEqual(cueTimes(session({ accessories: { headphone: [[0, 10_000]] },
+    observations: [nod(8_000), cam(10_000)] })), [], 'accessory coverage end is exclusive at cue time');
+});
+
+test('replay finds fresh evidence after reconnect and requires every source through the final cue', () => {
+  const s = session({ accessories: { headphone: [[0, 9_000], [11_000, 100_000]], road: [[0, 100_000]] },
+    observations: [nod(8_000), cam(10_000), lane(12_000), nod(13_000)],
+    alerts: [{ atMs: 11_000, level: 'critical' }] });
+  const result = corroborateSession(s, resolvePolicy({ minSources: 2, refractoryMs: 0 }));
+  assert.deepEqual(result.added.map(cue => cue.atMs), [13_000], 'wait for fresh headphone evidence instead of pairing across its gap');
+  assert.deepEqual(result.cameraAlerts, [11_000], 'original camera alerts are preserved during sensor gaps');
+  assert.deepEqual(cueTimes(session({ accessories: { headphone: [[11_000, 100_000]] },
+    observations: [cam(10_000), nod(12_000)] })), [12_000], 'an accessory may connect after the camera observation');
+  assert.deepEqual(cueTimes(session({ tracking: [[0, 11_000], [11_000, 100_000]],
+    observations: [cam(10_000), nod(12_000)] })), [12_000], 'adjacent intervals represent continuous coverage');
+  assert.deepEqual(cueTimes(session({ tracking: [[0, 10_000], [12_000, 100_000]],
+    observations: [cam(9_000), nod(12_500), cam(14_000)] })), [14_000], 'failed continuity never consumes the nod needed by a later camera candidate');
 });
 
 test('refractory drops redundant cues but never removes or moves a camera alert', () => {

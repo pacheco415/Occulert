@@ -143,6 +143,7 @@ function merge(rows) {
   return merged;
 }
 const covers = (coverage, at) => coverage.some(([start, end]) => start <= at && at < end);
+const coverageEnd = (coverage, at) => coverage.find(([start, end]) => start <= at && at < end)?.[1];
 const containsInterval = (coverage, start, end) => coverage.some(([from, to]) => from <= start && to >= end);
 const intersectionMs = (left, right) => left.reduce((sum, [a, b]) => sum
   + right.reduce((inner, [c, d]) => inner + Math.max(0, Math.min(b, d) - Math.max(a, c)), 0), 0);
@@ -153,14 +154,17 @@ export function resolvePolicy(overrides = {}) {
   if (!Number.isSafeInteger(policy.windowMs) || policy.windowMs < 0 || policy.windowMs > 60_000) fail('windowMs must be 0-60000');
   if (!Number.isSafeInteger(policy.refractoryMs) || policy.refractoryMs < 0 || policy.refractoryMs > 300_000) fail('refractoryMs must be 0-300000');
   if (!Number.isSafeInteger(policy.minSources) || policy.minSources < 1 || policy.minSources > ACCESSORY_SOURCES.length) fail(`minSources must be 1-${ACCESSORY_SOURCES.length}`);
-  return Object.freeze({ ...policy, defaults: Object.keys(DEFAULT_POLICY).every(key => policy[key] === DEFAULT_POLICY[key]) });
+  return Object.freeze({ ...policy, continuity: 'same-usable-interval-through-cue',
+    defaults: Object.keys(DEFAULT_POLICY).every(key => policy[key] === DEFAULT_POLICY[key]) });
 }
 
 /**
  * Proposed add-only cue for one session. A camera candidate observed while the
  * camera was usable is corroborated when at least `minSources` independent
  * accessory sources each report a candidate within `windowMs` of it, while that
- * accessory was usable. The cue fires when the last required signal arrives.
+ * accessory was usable. Each selected signal must remain in the same merged
+ * usable interval through the cue time; later recovery cannot revive it.
+ * The cue fires when the last required signal arrives.
  * Each accessory candidate is used at most once. A cue within `refractoryMs`
  * after any earlier camera alert or added cue is dropped, mirroring the released
  * cooldown. Camera alerts themselves are never removed or moved.
@@ -169,10 +173,11 @@ export function corroborateSession(session, policy = resolvePolicy()) {
   const tracking = merge(session.tracking);
   const coverage = Object.fromEntries(ACCESSORY_SOURCES.map(source => [source, merge(session.accessories[source] ?? [])]));
   const byTime = (a, b) => a.atMs - b.atMs;
-  const camera = session.observations.filter(row => row.source === 'camera' && covers(tracking, row.atMs)).sort(byTime);
+  const camera = session.observations.filter(row => row.source === 'camera' && covers(tracking, row.atMs))
+    .map(row => ({ ...row, untilMs: coverageEnd(tracking, row.atMs) })).sort(byTime);
   const accessory = session.observations
     .filter(row => row.source !== 'camera' && covers(coverage[row.source], row.atMs))
-    .map((row, index) => ({ ...row, index })).sort(byTime);
+    .map((row, index) => ({ ...row, index, untilMs: coverageEnd(coverage[row.source], row.atMs) })).sort(byTime);
   const used = new Set(), candidates = [];
   let low = 0;
   for (const cameraRow of camera) {
@@ -181,12 +186,23 @@ export function corroborateSession(session, policy = resolvePolicy()) {
     const earliest = new Map();
     for (let next = low; next < accessory.length && accessory[next].atMs <= cameraRow.atMs + policy.windowMs; next += 1) {
       const row = accessory[next];
-      if (!used.has(row.index) && !earliest.has(row.source)) earliest.set(row.source, row);
+      const cueAt = Math.max(cameraRow.atMs, row.atMs);
+      // Walk possible cue times in order. Coverage ends are exclusive, and
+      // losing camera continuity invalidates this camera candidate permanently.
+      if (cueAt >= cameraRow.untilMs) break;
+      for (const [source, candidate] of earliest) {
+        if (cueAt >= candidate.untilMs) earliest.delete(source);
+      }
+      if (used.has(row.index) || cueAt >= row.untilMs) continue;
+      if (!earliest.has(row.source)) earliest.set(row.source, row);
+      if (earliest.size < policy.minSources) continue;
+      const chosen = [...earliest.values()].sort(byTime).slice(0, policy.minSources);
+      // Only a valid pair consumes evidence, so rejected signals may still
+      // corroborate a later camera candidate after tracking resumes.
+      for (const candidate of chosen) used.add(candidate.index);
+      candidates.push({ atMs: cueAt, sources: chosen.map(candidate => candidate.source).sort() });
+      break;
     }
-    if (earliest.size < policy.minSources) continue;
-    const chosen = [...earliest.values()].sort(byTime).slice(0, policy.minSources);
-    for (const row of chosen) used.add(row.index);
-    candidates.push({ atMs: Math.max(cameraRow.atMs, chosen.at(-1).atMs), sources: chosen.map(row => row.source).sort() });
   }
   const cameraAlerts = session.alerts.map(alert => alert.atMs).sort((a, b) => a - b);
   const added = [];

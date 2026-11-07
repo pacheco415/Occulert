@@ -78,6 +78,12 @@ The test suite fails if either native constant changes without this runner.
 3. A cue fires when at least `minSources` distinct accessory sources each have a
    candidate within `windowMs` of the camera candidate, before or after it. It
    fires at the later of the signals; the policy never acts before the evidence.
+   Every selected signal must remain within the same merged usable interval
+   from its observation through the cue time. An interval's end is exclusive:
+   a cue exactly at tracking loss or disconnection is rejected. Recovery never
+   revives an older candidate across a gap, including a one-millisecond gap.
+   Adjacent intervals merge and remain continuous. An accessory may connect
+   after the camera candidate if it supplies fresh evidence before the cue.
 4. Each accessory candidate corroborates at most once. Camera candidates never
    corroborate each other.
 5. A cue within `refractoryMs` after any camera alert or earlier added cue is
@@ -86,6 +92,13 @@ The test suite fails if either native constant changes without this runner.
    corroborated stream is missing any camera alert.
 
 These values are proposals for evaluation, not approved app behavior.
+The report identifies the fixed rule as
+`policy.continuity: "same-usable-interval-through-cue"`. Candidate selection
+walks possible cue times in order and replaces expired source evidence with
+fresh evidence after reconnect; invalid pairs consume no candidates. The native
+fusion observation counter shares the coincidence-window value but does not
+implement this replay continuity rule. Its aggregate counts cannot substitute
+for replay results, and no native behavior is changed by this tool.
 
 ## Report
 
