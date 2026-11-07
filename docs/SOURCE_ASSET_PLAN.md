@@ -66,3 +66,20 @@ The source remains one classic script with its existing globals, page ordering,
 and behavior. Splitting it into modules belongs in later pull requests. This
 registration covers only the dashboard runtime; other fleet pages and their
 assets retain their existing release workflows.
+
+## Fleet pilot report copy source
+
+`fleet-pilot-report.js` is registered in copy mode at
+`src/fleet-pilot-report.js`. Its initial bytes equal the active
+`fleet-pilot-report.v68.js`. Registration changes no served asset, page reference,
+integrity pin, service-worker cache or report behavior. Both release modes are
+exact no-ops until the source changes. Future edits use `asset:release`.
+
+The report remains a classic script. Its owner, freshness, telemetry and privacy
+checks, sign-out invalidation and print restrictions remain covered against the
+released output. Source registration does not permit raw motion, personal media
+or coordinates in protected reports. The release regression exercises the real
+report source, fleet page references, cache, immutable headers and retained hashes.
+
+This registration covers the report JavaScript only; its CSS retains the existing
+immutable release workflow.

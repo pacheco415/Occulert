@@ -28,6 +28,10 @@
     "fleet-dashboard.js": {
       "source": "src/fleet-dashboard.js",
       "mode": "copy"
+    },
+    "fleet-pilot-report.js": {
+      "source": "src/fleet-pilot-report.js",
+      "mode": "copy"
     }
   }
 }
