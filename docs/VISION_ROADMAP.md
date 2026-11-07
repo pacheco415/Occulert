@@ -271,7 +271,7 @@ Pricing hypothesis for owner review: retain standalone monitoring and existing s
 
 ### Task 5.1 — Active-driver count
 
-- **Selected definition (owner, November 7, 2026):** count a driver once when at least one monitoring session completes in the calendar month. The candidate uses UTC completion time and stored session fleet attribution; see [the count contract](FLEET_MONTHLY_ACTIVITY.md). Source validation and deployment remain separate.
+- **Selected definition (owner, November 7, 2026):** count a driver once when at least one monitoring session completes in the calendar month. The owner selected Pacific calendar months (`America/Los_Angeles`); the candidate uses completion time and stored session fleet attribution; see [the count contract](FLEET_MONTHLY_ACTIVITY.md). Source validation and deployment remain separate.
 
 - **Branch:** `codex/active-driver-count`
 - **Change:** a server-derived monthly active-driver count per fleet, using the owner's written definition, shown on the fleet dashboard.

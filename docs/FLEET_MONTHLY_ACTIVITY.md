@@ -3,7 +3,10 @@
 Richard selected this definition on November 7, 2026: count each driver once
 if they complete at least one monitoring session in the calendar month.
 
-The candidate uses UTC calendar months, explicitly labeled on the dashboard.
+Richard selected Pacific time on November 7, 2026 after review with Claude.
+The candidate uses `America/Los_Angeles` calendar months, labeled Pacific time
+on the dashboard. Month boundaries follow daylight saving changes, rather than
+a fixed UTC offset; the database session timezone does not affect the count.
 Completion is a stored `ended_at` that is at or after `started_at` and no later
 than the server's transaction time. The completion timestamp selects the month,
 including a session started in a prior month. The interval includes the month's
