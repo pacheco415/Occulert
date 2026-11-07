@@ -1,12 +1,7 @@
 {
-  "observedAt": "2026-11-01T05:24:36.282Z",
+  "observedAt": "2026-11-07T04:26:41.196Z",
   "complete": true,
   "pullRequests": [
-    {
-      "number": 356,
-      "headRefName": "codex/offline-startup-reliability",
-      "isDraft": true
-    },
     {
       "number": 324,
       "headRefName": "codex/playwright-runtime-upgrade",
