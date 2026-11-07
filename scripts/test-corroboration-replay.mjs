@@ -175,6 +175,14 @@ test('randomized timelines: corroboration is add-only and agrees with the event 
     const report = replayCorroboration(timeline([s]), { policy: { minSources: 1 + Math.floor(random() * 2), refractoryMs: pick([0, 8_000]) } });
     const before = report.overall.cameraOnly.overall, after = report.overall.corroborated.overall;
     assert.equal(report.cameraAlertsPreserved, true);
+    for (const cue of corroborateSession(s, report.policy).added) {
+      assert.ok(s.observations.some(camera => camera.source === 'camera' && camera.atMs <= cue.atMs
+        && tracking.some(([start, end]) => start <= camera.atMs && cue.atMs < end)
+        && cue.sources.every(source => s.observations.some(candidate => candidate.source === source
+          && candidate.atMs <= cue.atMs && Math.abs(candidate.atMs - camera.atMs) <= report.policy.windowMs
+          && accessories[source].some(([start, end]) => start <= candidate.atMs && cue.atMs < end)))),
+      'every generated cue has a continuously usable camera and independent sources through its fire time');
+    }
     totalAdded += report.overall.delta.addedCues;
     totalNewlyDetected += report.overall.delta.newlyDetectedEpisodes;
     totalDropped += report.overall.delta.droppedByRefractory;
