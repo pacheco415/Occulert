@@ -661,6 +661,7 @@ test('registered real fleet report is initially a no-op and releases through own
     const released = json(cwd, 'asset-versions.json')[logical];
     assert.notEqual(released, versions[logical]);
     assert.equal(read(cwd, released), read(cwd, 'src/' + logical));
+    assert.equal(json(cwd, 'asset-integrity.json')[released], sha(readFileSync(join(cwd, released))));
     for (const [name, hash] of Object.entries(prior)) assert.equal(sha(readFileSync(join(cwd, name))), hash);
     assert.ok(read(cwd, 'sw.js').includes(plan.cache));
     assert.notEqual(read(cwd, 'sw.js'), read(root, 'sw.js'));
