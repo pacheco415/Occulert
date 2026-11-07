@@ -132,6 +132,9 @@ test('replay finds fresh evidence after reconnect and requires every source thro
   const result = corroborateSession(s, resolvePolicy({ minSources: 2, refractoryMs: 0 }));
   assert.deepEqual(result.added.map(cue => cue.atMs), [13_000], 'wait for fresh headphone evidence instead of pairing across its gap');
   assert.deepEqual(result.cameraAlerts, [11_000], 'original camera alerts are preserved during sensor gaps');
+  assert.deepEqual(cueTimes(session({ accessories: { headphone: [[0, 12_000], [12_500, 100_000]], road: [[0, 100_000]] },
+    observations: [cam(10_000), nod(11_000), lane(13_000), nod(13_500)] }), { minSources: 2, refractoryMs: 0 }),
+  [13_500], 'a held source expires while awaiting a second source, then fresh evidence replaces it');
   assert.deepEqual(cueTimes(session({ accessories: { headphone: [[11_000, 100_000]] },
     observations: [cam(10_000), nod(12_000)] })), [12_000], 'an accessory may connect after the camera observation');
   assert.deepEqual(cueTimes(session({ tracking: [[0, 11_000], [11_000, 100_000]],

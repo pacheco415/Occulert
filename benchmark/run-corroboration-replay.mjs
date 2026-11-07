@@ -194,6 +194,8 @@ export function corroborateSession(session, policy = resolvePolicy()) {
         if (cueAt >= candidate.untilMs) earliest.delete(source);
       }
       if (used.has(row.index) || cueAt >= row.untilMs) continue;
+      // Same-source rows in one interval share its end; a later interval can
+      // contribute only after the expiry loop removes the older held row.
       if (!earliest.has(row.source)) earliest.set(row.source, row);
       if (earliest.size < policy.minSources) continue;
       const chosen = [...earliest.values()].sort(byTime).slice(0, policy.minSources);
