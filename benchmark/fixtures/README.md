@@ -38,3 +38,21 @@ These synthetic-only results check software contracts. They establish no real
 road accuracy, distance, speed, time to collision, on-device latency or safety
 result. Authorized clips/models, independent held-out labels and physical-device
 acceptance remain separate gates. Do not add real media or model binaries here.
+
+## Synthetic corroboration fixture
+
+`corroboration-synthetic.json` holds four hand-authored sessions from four
+fictional participants. It has invented tracking and accessory intervals, cue
+timestamps and labels, and contains no media, motion, heart, location or
+participant data. Its `consentVersion` is `synthetic`, which the runner refuses
+in a real export. The [corroboration replay guide](../../docs/CORROBORATION_REPLAY.md)
+explains the schema and policy. Run it with Node 24:
+
+```bash
+node benchmark/run-corroboration-replay.mjs \
+  --input benchmark/fixtures/corroboration-synthetic.json --split test
+```
+
+The expected test-split results are worked out by hand in
+`scripts/test-corroboration-replay.mjs`. They check software contracts only and
+establish no accuracy, timing or safety result.

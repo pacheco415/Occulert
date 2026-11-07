@@ -106,7 +106,8 @@
     "test:unanswered-alerts",
     "test:motion-activity",
     "test:emergency-readiness",
-    "test:road-model-benchmark"
+    "test:road-model-benchmark",
+    "test:corroboration-replay"
   ],
   "additionalChecks": [
     "test:verify-runner"

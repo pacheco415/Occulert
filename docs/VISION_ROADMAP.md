@@ -236,6 +236,7 @@ Goal: decide with evidence whether headphone nods, Watch heart data or road obse
 
 ### Task 4.1 — Corroboration replay benchmark
 
+- **State:** a fixture runner and the timeline contract are in [Corroboration replay](CORROBORATION_REPLAY.md). No labeled data has been evaluated; the owner prerequisite below remains open.
 - **Branch:** `codex/corroboration-replay`
 - **Change:** compose the existing `benchmark/replay-scoring.mjs` and event scorer to replay compatible exported session timelines under two policies: camera-only and camera plus corroborating signals. Report false alerts, missed events, latency and coverage, split by which accessories were present.
 - **Prerequisite:** define a consented, minimal, compatible observation timeline. Existing aggregate fusion/road candidate counts cannot reconstruct when corroboration occurred; do not invent event timestamps from totals or assume the browser trace contains native accessory samples.
