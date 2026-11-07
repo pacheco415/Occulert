@@ -112,17 +112,37 @@ than one detector is present.
 
 ## Limits
 
-Camera alerts come from the export as recorded. For web parked traces,
-[`benchmark/replay-scoring.mjs`](../benchmark/replay-scoring.mjs) can regenerate
-camera decisions under a scoring variant, and an adapter could write those
-onsets into `alerts`. This runner does not call it: browser traces carry no
-native accessory samples, so the accessory timeline must come from a separate
-consented native export.
+The ordinary runner uses camera alert onsets from the timeline as recorded.
+`benchmark/corroboration-scoring-adapter.mjs` also composes the existing
+`replay-scoring.mjs` released variant and parked-trace tracking adapter with
+this runner. Its exported `replayScoringCorroboration(trace, timeline, options)`
+accepts exactly one matching **web** session. Session ID, duration and detector
+version must match the trace; supply empty `alerts` and `tracking`, because the
+adapter derives both from the actual replay and retained usable intervals.
+
+```js
+import { replayScoringCorroboration } from './benchmark/corroboration-scoring-adapter.mjs';
+const report = replayScoringCorroboration(trace, timeline, { split: 'test' });
+```
+
+An unavailable or incomplete scoring prefix fails explicitly. Fractional
+millisecond offsets are rejected by the timeline contract instead of rounded.
+A generic web `alert` onset does not infer native Watch/alert/critical levels.
+The report's `cameraBaseline` records the parsed-trace hash encoding, scoring
+source hashes, helper pin, tracking convention and any clock fallbacks.
+
+The browser trace supplies **no accessory coverage or candidates**. Those must
+be supplied explicitly in the matched consented timeline on the same relative
+clock; empty accessory data remains empty. No adapter derives coincidences from
+aggregate totals, generates labels or maps native eye probabilities to web EAR.
+The tests exercise the composition against an actual synthetic web export and
+reject missing prefixes and identity mismatches. These are software fixtures,
+not independently labeled participant results.
 
 A corroborated cue in the replay was never heard by anyone. The replay cannot
 show whether an earlier cue helps a driver, how often a real accessory is
 connected, or how a cue interacts with the released cooldown on a device. It
-uses the cue timestamps in the export as given; it does not re-run detection.
+uses the cue timestamps in the export as given; the ordinary runner does not re-run detection. The explicit scoring adapter replays the released web scoring inputs only.
 Results describe one labeled sample under its stated conditions.
 
 The fixture does not establish accuracy, safety or alert delivery, and neither

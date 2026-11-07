@@ -17,6 +17,10 @@ import {
   validateTimeline,
 } from '../benchmark/run-corroboration-replay.mjs';
 import { scoreEvents } from '../benchmark/run-event-benchmark.mjs';
+import { replayScoringCorroboration } from '../benchmark/corroboration-scoring-adapter.mjs';
+import { replayScoring } from '../benchmark/replay-scoring.mjs';
+import { recordScoringFixture } from './lib/scoring-replay-fixture.mjs';
+import { syntheticScoringTrace } from '../benchmark/released-scoring-oracle.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const runner = join(root, 'benchmark/run-corroboration-replay.mjs');
@@ -234,4 +238,37 @@ test('CLI prints provenance with the input hash and refuses to overwrite a repor
     const usage = spawnSync(process.execPath, [runner], { encoding: 'utf8' });
     assert.equal(usage.status, 2);
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('actual recorded web scoring composes with the corroboration scorer without inventing accessory coverage', () => {
+  const frames = syntheticScoringTrace(3).map(frame => ({ ...frame, atMs: Math.round(frame.atMs) }));
+  const { trace } = recordScoringFixture({ frames });
+  const input = timeline([session({ sessionId: trace.session.sessionId, platform: 'web',
+    detectorVersion: trace.session.detectorVersion, durationMs: trace.session.durationMs,
+    tracking: [], accessories: {}, alerts: [], observations: [], episodes: [],
+  })]);
+  const report = replayScoringCorroboration(trace, input, { split: 'test' });
+  const released = replayScoring(trace).variants.find(row => row.name === 'released');
+  assert.ok(released.alerts.length > 0, 'fixture exercises real camera decisions');
+  assert.equal(report.overall.cameraOnly.overall.alerts, released.alerts.length);
+  assert.deepEqual(report.overall.cameraOnly, report.overall.corroborated);
+  assert.equal(report.cameraAlertsPreserved, true);
+  assert.equal(report.overall.delta.addedCues, 0);
+  assert.ok(Object.values(report.coverage).every(value => value.sessionsWithCoverage === 0));
+  assert.equal(report.cameraBaseline.source, 'released-scoring-replay');
+  assert.equal(report.cameraBaseline.labelsGenerated, false);
+  assert.match(report.cameraBaseline.traceSha256, /^[a-f0-9]{64}$/);
+  assert.ok(report.cameraBaseline.sourceHashes['benchmark/replay-scoring.mjs']);
+  assert.deepEqual(input.sessions[0].alerts, [], 'caller input is not modified');
+  const old = structuredClone(trace); old.version = 1; delete old.scoringReplay;
+  assert.throws(() => replayScoringCorroboration(old, input), /unavailable/);
+  const truncated = structuredClone(trace); truncated.scoringReplay.droppedFrames = 1;
+  assert.throws(() => replayScoringCorroboration(truncated, input), /unavailable/);
+  for (const changes of [{ platform: 'ios' }, { sessionId: 'other-session' },
+    { detectorVersion: 'different-detector' }, { durationMs: trace.session.durationMs + 1 }]) {
+    const wrong = structuredClone(input); Object.assign(wrong.sessions[0], changes);
+    assert.throws(() => replayScoringCorroboration(trace, wrong), /must match/);
+  }
+  const ambiguous = structuredClone(input); ambiguous.sessions[0].alerts = [{ atMs: 1, level: 'alert' }];
+  assert.throws(() => replayScoringCorroboration(trace, ambiguous), /Leave alerts and tracking empty/);
 });

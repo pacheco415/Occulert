@@ -77,7 +77,9 @@ export function validateTimeline(input) {
     id(session.participant, `${at}.participant`);
     choice(session.split, ['train', 'test'], `${at}.split`);
     choice(session.platform, ['web', 'ios', 'android'], `${at}.platform`);
-    id(session.detectorVersion, `${at}.detectorVersion`);
+    if (typeof session.detectorVersion !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$/.test(session.detectorVersion)) {
+      fail(`${at}.detectorVersion must be a bounded detector version`);
+    }
     // The roadmap allows parked or passenger collection only; never a drowsy driver on the road.
     choice(session.collection, ['parked', 'passenger'], `${at}.collection`);
     id(session.consentVersion, `${at}.consentVersion`);
