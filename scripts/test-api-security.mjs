@@ -733,13 +733,15 @@ const lightweightSummary = loadHandler("../api/fleet-summary.js", async (table) 
   if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
   if (table === "drivers") return [];
   if (table === "sessions") return [{ id: fleetSessionId, driver_id: "driver-1" }];
+  if (table === "rpc/fleet_monthly_activity") return null;
   throw new Error("a lightweight fleet refresh must not query events");
 });
 const lightweightRequest = request("GET");
 lightweightRequest.url = "/api/fleet-summary?include_events=0";
 const lightweightResult = await invoke(lightweightSummary, lightweightRequest);
 assert.equal(lightweightResult.status, 200);
-assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions"]);
+assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions", "rpc/fleet_monthly_activity"]);
+assert.equal(lightweightResult.body.monthly_activity, null);
 assert.equal(lightweightResult.body.events_included, false);
 assert.deepEqual(lightweightResult.body.events, []);
 
