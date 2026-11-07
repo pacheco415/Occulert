@@ -15,6 +15,7 @@ and dated release notes preserve historical evidence.
 - [Accuracy benchmark](ACCURACY_BENCHMARK.md)
 - [Event-level alert observation benchmark](EVENT_BENCHMARK.md)
 - [Road model benchmark: synthetic fixtures only](ROAD_MODEL_BENCHMARK.md)
+- [Corroboration replay: fixture runner, no results](CORROBORATION_REPLAY.md)
 - [One-page pilot overview](PILOT_OVERVIEW.md)
 - [Pilot recruitment package: qualification and unsent emails](PILOT_OUTREACH.md)
 - [30-day pilot scorecard and voluntary feedback](PILOT_SCORECARD.md)
