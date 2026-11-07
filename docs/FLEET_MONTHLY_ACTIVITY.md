@@ -30,7 +30,9 @@ for a missing migration, invalid aggregate or provider failure. Zero means a
 successful query found no qualifying recorded driver.
 
 The dashboard clears the count across sign-out/account changes, labels retained
-counts when refresh fails and shows the month and observation time. Local/demo
+counts when refresh fails and shows both the month and observation time in
+Pacific time, with PST/PDT on the observation time. Active roster drivers remain
+a separately labeled metric. Local/demo
 mode has no monthly count. Billing, entitlements and driver access are unchanged.
 
 Deployment requires the migration and independent owner-isolation/grant checks.
