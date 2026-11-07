@@ -68,10 +68,34 @@ test('owned SDK delivery failure retries only its pinned source', async ({ page,
   expect(external.filter(url => url.includes('jsdelivr') || url.includes('unpkg'))).toEqual([]);
 });
 
-test('offline driver startup works while the owned SDK never falls back to a cached copy', async ({ browser }) => {
+test('offline driver startup works while the owned SDK never falls back to a cached copy', async ({ browser }, testInfo) => {
   const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
   const config = JSON.parse(readFileSync(resolve(root, 'vercel.json'), 'utf8'));
   const state = { offline: false };
+  const versions = JSON.parse(readFileSync(resolve(root, 'asset-versions.json'), 'utf8'));
+  const integrity = JSON.parse(readFileSync(resolve(root, 'asset-integrity.json'), 'utf8'));
+  const evidencePaths = ['driver-startup-guard.js', 'driver-app.js'].map(key => '/' + versions[key]);
+  const evidence = { pageErrors: [], failedRequests: [], snapshots: [] };
+  async function snapshot(page, phase) {
+    try {
+      evidence.snapshots.push(await page.evaluate(async ({ paths, phase }) => {
+        const names = await caches.keys(), entries = [];
+        for (const name of names) {
+          const cache = await caches.open(name);
+          for (const path of paths) {
+            const response = await cache.match(path);
+            if (!response) { entries.push({ cache: name, path, present: false }); continue; }
+            const bytes = await response.arrayBuffer();
+            const digest = await crypto.subtle.digest('SHA-256', bytes);
+            entries.push({ cache: name, path, present: true, status: response.status,
+              bytes: bytes.byteLength, sha256: [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('') });
+          }
+        }
+        return { phase, controlled: !!navigator.serviceWorker.controller,
+          controllerState: navigator.serviceWorker.controller?.state ?? null, entries };
+      }, { paths: evidencePaths, phase }));
+    } catch (error) { evidence.snapshots.push({ phase, diagnosticError: String(error) }); }
+  }
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json' };
   const server = createServer((request, response) => {
     if (state.offline) { response.destroy(); return; }
@@ -91,8 +115,14 @@ test('offline driver startup works while the owned SDK never falls back to a cac
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const baseURL = `http://127.0.0.1:${server.address().port}`;
   const context = await browser.newContext({ baseURL, serviceWorkers: 'allow' });
+  let page;
   try {
-    const page = await context.newPage();
+    page = await context.newPage();
+    page.on('pageerror', error => evidence.pageErrors.push(String(error)));
+    page.on('requestfailed', request => {
+      const url = new URL(request.url());
+      if (url.origin === baseURL) evidence.failedRequests.push({ path: url.pathname, error: request.failure()?.errorText });
+    });
     await blockExternal(page, baseURL);
     await page.addInitScript(() => {
       window.__cameraCalls = 0;
@@ -112,6 +142,7 @@ test('offline driver startup works while the owned SDK never falls back to a cac
     }, SDK);
     // WebKit's offline emulation rejects requests before its worker can handle
     // them. Cut the origin connection instead, for the same behavior in both engines.
+    await snapshot(page, 'before-origin-cut');
     state.offline = true;
     await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
     await expect.poll(() => page.evaluate(() => window.OcculertStartup?.isReady())).toBe(true);
@@ -122,8 +153,16 @@ test('offline driver startup works while the owned SDK never falls back to a cac
     expect(await page.evaluate(() => window.__cameraCalls)).toBe(0);
     expect(await page.evaluate(() => Boolean(window.__cachedSDKExecuted))).toBe(false);
   } finally {
-    await context.close();
-    server.closeAllConnections();
-    await new Promise(resolve => server.close(resolve));
+    try {
+      if (page) await snapshot(page, 'before-context-close');
+    // Fixture-only cache hashes and failures distinguish missing/corrupt cached
+    // bytes from browser delivery failures without weakening startup assertions.
+    await testInfo.attach('offline-startup-evidence', { contentType: 'application/json',
+      body: JSON.stringify({ expected: Object.fromEntries(evidencePaths.map(path => [path, integrity[path.slice(1)]])), ...evidence }, null, 2) });
+    } finally {
+      await context.close();
+      server.closeAllConnections();
+      await new Promise(resolve => server.close(resolve));
+    }
   }
 });
