@@ -2,11 +2,18 @@
 
 `src/scoring-core.js` contains the actual pure functions used by the live web
 adapters: calibration samples/thresholds, sensitivity, six-frame EAR smoothing,
-nod history, confidence/fatigue accumulation, eye metrics, continuity and alert
+nod history, confidence/fatigue accumulation, accepted yawns, eye metrics, continuity and alert
 eligibility. DOM effects, delivery, cloud consent and clocks remain with their
 existing owners. The live adapters retain separate wall-clock reads for score,
 calibration, eye/distraction, nod detection and accepted alerts. Defaults,
 thresholds, calibration duration and alert cooldown are unchanged.
+
+The accepted-yawn phase adds the existing eight fatigue points, capped at 100,
+and updates `maxFatigue` immediately. The normal frame score is still sampled
+before that event: `fatigueSampleSum` and `fatigueSampleCount` are unchanged by
+the yawn. The event runs before that frame's alert eligibility, including when
+the accepted event crosses the fatigue threshold. MAR smoothing, mouth-open
+hold, accepted-yawn cooldown and the live calibration paths are unchanged.
 
 The separate opt-in correction identifies exact `calibration-min=12` as
 `calibrationMin` in both parsers and `detectorVersion`. It remains non-primary:
@@ -49,6 +56,17 @@ gaps and no-face evidence use their real models. Offline composition imports
 the same live pure phases from `scoring-core.js` but stays outside the bundle.
 Tasks remains measurement-only; there is no invented Tasks alert policy.
 
+All variants consume the recorded accepted-yawn event after their frame score
+and before alert eligibility. This event is a fixed observed input, including
+when a variant's calibration state differs from the recording policy. The
+boolean records an actual detector acceptance; it does not reconstruct raw
+MAR, five-frame mouth smoothing, hold time or cooldown under an alternative
+detector policy. Existing primary paths can observe yawns during calibration;
+the legacy live path checks its post-score calibration gate first. Replay
+preserves accepted inputs from either path and retains each variant's normal
+alert calibration gate. `acceptedYawnPolicy` records this limit in the replay
+result and manifest.
+
 Use the existing adapter to prepare sessions/tracking and the observer's
 independent episodes under the matching owned source revision:
 
@@ -69,14 +87,16 @@ Tracking and labels are still the recorded inputs, not inferred from replay.
 
 ## Trace version and capability boundary
 
-The measurement/episode adapter accepts versions 1 and 2 while keeping its
+The measurement/episode adapter accepts versions 1, 2 and 3 while keeping its
 exact owned-helper/runtime/model provenance checks. Run it with the matching
 source revision, as before. Version 1 omits face/turn/nod, starting calibration
 and phase clocks; those fields cannot be recovered from `legacyUsable`, which
 also excludes calibration, turns, pitch and unpaired frames. Replay reports
-that missing capability explicitly.
+that missing capability explicitly. Version 2 lacks accepted-yawn history;
+its scoring replay is also explicitly unavailable. Missing events cannot be
+treated as `false`, since their fatigue, peak and alert effects are unknown.
 
-Version 2 adds a bounded `scoringReplay` record to deliberate local exports:
+Version 3 uses a bounded `scoringReplay` version-2 record in deliberate local exports:
 
 - An allowlisted initial scoring state, calibration/sensitivity settings and
   nonzero normalized epoch `1700000000000`. Zero timestamps remain sentinels,
@@ -84,6 +104,9 @@ Version 2 adds a bounded `scoringReplay` record to deliberate local exports:
 - At most 2,400 explicit raw/derived scoring observations with actual face
   presence, face absence versus invalid geometry, turn/nod/nose signals,
   monotonic observation time and normalized wall time.
+- A required boolean `yawn` on every observation. It starts as `false` and is
+  set only in the real detector's accepted hold/cooldown branch for that
+  observation. An accepted event requires valid tracked-face geometry.
 - Named clock points for score, calibration, eye/distraction, nod sampling and
   decision, distraction eligibility and trigger. The live call placement stays
   unchanged. Wall-clock adjustments and monotonic frame ordering are distinct.
@@ -124,18 +147,49 @@ cases cover eye thresholds, confidence, cooldown, microsleep/distraction and
 face loss across the calibration deadline. The actual composed driver is
 compared too, including an independently advancing 1 ms `Date.now` fixture.
 
-Live version-2 export to released replay tests compare captured scoring and
+Live version-3 export to released replay tests compare captured scoring and
 decisions at all three rates with fixed and stepping wall clocks, with no
 missing phase clocks. All six policies are also checked against actual live
 helper/results paths on the same synthetic raw observations. These tests
 generate no independent labels and authorize no promotion.
 
-The released driver v101 measures 125,624 raw / 35,224 gzip / 29,318
+Yawn fixtures supply valid three-dimensional mouth landmarks to the actual
+composed detector. They cover the strict 1,200 ms hold and 8,000 ms cooldown,
+closed/missing-face frames, cap 100, same-frame alert crossing, immediate peak
+accounting, unchanged sampled averages and the calibration-ending frame.
+The immutable v97 detector remains the reference for unchanged scores,
+accepted events and alerts; its delayed peak accounting is the intentional
+difference. Missing/nonboolean yawn inputs are rejected, and the corroboration
+adapter also rejects legacy traces whose scoring replay is unavailable.
+
+### Accepted-yawn release (B4)
+
+The B4 release follows B2/B3 on main `50e92bd` and advances the cache from
+`occulert-v167` to `occulert-v168`. Measurements use Node 24.22.1 and the
+default `node:zlib` gzip/Brotli settings, in bytes:
+
+| Asset | Raw | Gzip | Brotli | Change from preceding version (raw / gzip / Brotli) |
+| --- | ---: | ---: | ---: | ---: |
+| Driver v108 | 126,762 | 35,654 | 29,736 | +230 / +42 / +23 versus v107 |
+| Optional helper v6 | 55,736 | 15,877 | 14,192 | +251 / +38 / +44 versus v5 |
+| Startup guard v29 | 5,243 | 1,944 | 1,630 | 0 / -1 / 0 versus v28 |
+
+Driver v107 measured 126,532 / 35,612 / 29,713; helper v5 measured
+55,485 / 15,839 / 14,148; guard v28 measured 5,243 / 1,945 / 1,630.
+The driver remains below the existing 127,000-byte raw ceiling, with 238 bytes
+remaining. No budget increase is required. The helper stays outside the
+default installation cache. The new driver/helper/guard pins are synchronized;
+their preceding immutable files and integrity entries remain retained.
+These byte measurements do not establish physical-device performance.
+
+### Historical scoring extraction release (v101)
+
+The earlier driver v101 release measured 125,624 raw / 35,224 gzip / 29,318
 Brotli bytes versus driver v100's 121,215 / 34,048 / 28,441: +4,409 / +1,176 /
-+877. Its reviewed raw ceiling is 126,000. The optional helper measured 55,485
++877. Its reviewed raw ceiling at that time was 126,000. The optional helper measured 55,485
 / 15,839 / 14,148 versus v4's 51,370 / 14,845 / 13,255. The quoted static-install
-audit sum is 373,884 bytes, within the unchanged 375,000 ceiling. The helper
-remains outside default loading/install. Including the unchanged model/runtime assets,
+audit sum for that release was 373,884 bytes, within its 375,000 ceiling. The helper
+remained outside default loading/install. Including the unchanged model/runtime assets,
 selected install totals are 10,955,575 → 10,959,984 bytes with SIMD and
 10,878,185 → 10,882,594 without SIMD (both +4,409; file counts unchanged).
 Physical-device performance acceptance

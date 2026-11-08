@@ -6,12 +6,14 @@ import { join } from 'node:path';
 import { recordScoringFixture } from './lib/scoring-replay-fixture.mjs';
 import { replayScoring, writeScoringReplay } from '../benchmark/replay-scoring.mjs';
 import { adaptTrace } from '../benchmark/parked-detection-trace.mjs';
-import { syntheticScoringTrace } from '../benchmark/released-scoring-oracle.mjs';
+import { initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../benchmark/released-scoring-oracle.mjs';
 import { parseFile } from '../benchmark/run-event-benchmark.mjs';
 
-for (const fps of [3,7,15]) for (const clockStepMs of [0,1]) test(`actual live v2 export replays released decisions and score state at ${fps}fps/${clockStepMs}ms clock steps`, () => {
+for (const fps of [3,7,15]) for (const clockStepMs of [0,1]) test(`actual live v3 export replays released decisions and score state at ${fps}fps/${clockStepMs}ms clock steps`, () => {
     const captured = recordScoringFixture({fps,clockStepMs});
-    assert.equal(captured.trace.version,2);
+    assert.equal(captured.trace.version,3);
+    assert.equal(captured.trace.scoringReplay.version,2);
+    assert.ok(captured.trace.scoringReplay.frames.every(row => row.yawn === false));
     const replay = replayScoring(captured.trace), released = replay.variants.find(row => row.name === 'released');
     assert.ok(replay.variants.every(row => row.status === 'available'));
     assert.deepEqual(released.samples.map(row => [row.at_ms,row.fatigue,row.confidence,row.calibrated]),
@@ -20,13 +22,14 @@ for (const fps of [3,7,15]) for (const clockStepMs of [0,1]) test(`actual live v
     assert.deepEqual(released.finalState,captured.finalState);
     assert.deepEqual(released.clockFallbacks,{});
     const adapted = adaptTrace(captured.trace,{participant:'SyntheticFixture',split:'test',episodes:[]});
-    assert.equal(adapted.comparison.length,captured.trace.samples.length,'v2 remains compatible with the existing measurement/episode adapter');
+    assert.equal(adapted.comparison.length,captured.trace.samples.length,'v3 remains compatible with the existing measurement/episode adapter');
     assert.equal(replay.labelsGenerated,false); assert.equal(replay.promotion,'none');
 });
 
-test('legacy v1 and missing/truncated/invalid signals never produce fabricated zero-alert results', () => {
+test('legacy v1/v2 and missing/truncated/invalid signals never produce fabricated zero-alert results', () => {
     const {trace} = recordScoringFixture({fps:3});
     for (const change of [copy => {copy.version=1;delete copy.scoringReplay;},
+        copy => {copy.version=2;copy.scoringReplay.version=1;for(const row of copy.scoringReplay.frames)delete row.yawn;},
         copy => {copy.scoringReplay.droppedFrames=1;}, copy => {copy.scoringReplay.frames[0].rawEar=null;},
         copy => {copy.scoringReplay.frames[0].hasFace=false;copy.scoringReplay.frames[0].faceMissing=false;}]) {
         const copy = structuredClone(trace); change(copy); const result = replayScoring(copy);
@@ -36,6 +39,92 @@ test('legacy v1 and missing/truncated/invalid signals never produce fabricated z
     assert.throws(() => replayScoring(copy),/Invalid or missing scoring frame/);
     const clocks=structuredClone(trace);delete clocks.scoringReplay.frames[0].clocks.score;
     assert.throws(()=>replayScoring(clocks),/Invalid or missing scoring frame/);
+    const missing=structuredClone(trace);delete missing.scoringReplay.frames[0].yawn;
+    assert.throws(()=>replayScoring(missing),/Invalid or missing scoring frame/);
+    for (const value of [undefined,0,1,'true',null]) {
+        const invalid=structuredClone(trace);invalid.scoringReplay.frames[0].yawn=value;
+        assert.throws(()=>replayScoring(invalid),/Invalid or missing scoring frame/);
+    }
+    const absent=structuredClone(trace),row=absent.scoringReplay.frames.find(row=>!row.hasFace);
+    row.yawn=true;
+    assert.throws(()=>replayScoring(absent),/Accepted yawn requires a tracked face/);
+    const invalidGeometry=structuredClone(trace);invalidGeometry.scoringReplay.frames[0].rawEar=null;invalidGeometry.scoringReplay.frames[0].yawn=true;
+    assert.ok(replayScoring(invalidGeometry).variants.every(row=>row.status==='unavailable'));
+    for(const version of [1,2]) {
+        const legacy=structuredClone(trace);legacy.version=version;
+        if(version===1)delete legacy.scoringReplay;
+        else {legacy.scoringReplay.version=1;for(const row of legacy.scoringReplay.frames)delete row.yawn;}
+        assert.equal(adaptTrace(legacy,{participant:'LegacyFixture',split:'test',episodes:[]}).comparison.length,trace.samples.length);
+    }
+});
+
+test('real accepted yawns replay after scoring and before same-frame alerts without resampling the frame', () => {
+    const frames=[9000,9600,10200,10201].map(atMs=>({atMs,hasFace:true,ear:.2,mar:.8,turned:false,nod:false}));
+    const state=initialScoringState({calibrating:false,calibrated:true,confidence:100,fatigue:71,maxFatigue:71});
+    const captured=recordScoringFixture({frames,state}),result=replayScoring(captured.trace);
+    assert.equal(captured.yawnCount,1);
+    assert.deepEqual(captured.trace.scoringReplay.frames.map(row=>row.yawn),[false,false,false,true],'Hold is strictly greater than 1200 ms');
+    const released=result.variants.find(row=>row.name==='released');
+    assert.deepEqual(released.alerts,[{at_ms:10201,reason:'Fatigue'}]);
+    assert.deepEqual(released.finalState,captured.finalState);
+    assert.equal(released.finalState.fatigue,87);
+    assert.equal(released.finalState.maxFatigue,87);
+    assert.equal(released.finalState.fatigueSampleSum,304);
+    assert.equal(released.finalState.fatigueSampleCount,4);
+    assert.deepEqual(released.clockFallbacks,{});
+    assert.match(result.acceptedYawnPolicy,/do not reconstruct MAR/);
+    for(const variant of result.variants){
+        const live=recordScoringFixture({frames,state,query:variant.query,minimumSamples:variant.minimumSamples??1});
+        assert.equal(live.yawnCount,1,variant.name);
+        assert.deepEqual(variant.finalState,live.finalState,variant.name);
+        assert.deepEqual(variant.alerts,live.decisions,variant.name);
+    }
+});
+
+test('recorded yawns retain cooldown and mouth smoothing with false events on closed and missing-face frames', () => {
+    const times=[9000,9600,10200,10201];
+    for(let atMs=10701;atMs<18201;atMs+=500)times.push(atMs);
+    times.push(18201,18202,18300,18400,18500,18600,18700,18800);
+    const frames=times.map(atMs=>({atMs,hasFace:atMs!==18800,ear:.3,mar:atMs<18300?.8:0,turned:false,nod:false}));
+    const captured=recordScoringFixture({frames,state:initialScoringState({calibrating:false,calibrated:true,confidence:100})});
+    assert.equal(captured.yawnCount,2);
+    assert.deepEqual(captured.trace.scoringReplay.frames.filter(row=>row.yawn).map(row=>row.atMs),[10201,18202]);
+    assert.equal(captured.trace.scoringReplay.frames.find(row=>row.atMs===18201).yawn,false,'Cooldown is strictly greater than 8000 ms');
+    assert.ok(captured.trace.scoringReplay.frames.filter(row=>row.atMs>=18300).every(row=>!row.yawn));
+    assert.deepEqual(replayScoring(captured.trace).variants.find(row=>row.name==='released').finalState,captured.finalState);
+});
+
+test('an actual accepted yawn on the calibration-ending frame precedes eligibility', () => {
+    const frames=[9000,9600,10200,10201].map(atMs=>({atMs,hasFace:true,ear:.3,mar:.8,turned:false,nod:false}));
+    // The primary path observes mouth opening during calibration, and the last
+    // frame completes calibration before the real detector accepts its yawn.
+    const captured=recordScoringFixture({frames,query:'?observer=1&perclos=time',
+        state:initialScoringState({calibrationUntil:SCORING_EPOCH+10201,confidence:100,fatigue:80,maxFatigue:80})});
+    assert.deepEqual(captured.trace.scoringReplay.frames.map(row=>row.yawn),[false,false,false,true]);
+    const released=replayScoring(captured.trace).variants.find(row=>row.name==='released');
+    assert.deepEqual(released.finalState,captured.finalState);
+    assert.equal(released.finalState.fatigue,80);
+    assert.equal(released.finalState.maxFatigue,80);
+    assert.equal(released.finalState.fatigueSampleSum,0);
+    assert.equal(released.finalState.fatigueSampleCount,0);
+    assert.equal(released.finalState.calibrating,false);
+    assert.deepEqual(released.alerts,[{at_ms:10201,reason:'Fatigue'}]);
+    assert.deepEqual(released.alerts,captured.decisions);
+});
+
+test('primary calibration accepts its existing detector events and variants reuse those fixed observed inputs', () => {
+    const frames=[9000,9600,10200,10201].map(atMs=>({atMs,hasFace:true,ear:.3,mar:.8,turned:false,nod:false}));
+    const state=initialScoringState({calibrationUntil:SCORING_EPOCH+20000,fatigue:80,maxFatigue:80,confidence:100});
+    const primary=recordScoringFixture({frames,state,query:'?observer=1&fatigue-timing=elapsed'});
+    assert.equal(primary.yawnCount,1,'Preserve the existing primary detector call during calibration');
+    assert.equal(primary.trace.samples.at(-1).calibrating,true);
+    const replay=replayScoring(primary.trace);
+    assert.deepEqual(replay.variants.find(row=>row.name==='fatigue-timing-elapsed').finalState,primary.finalState);
+    const releasedLive=recordScoringFixture({frames,state}),releasedReplay=replay.variants.find(row=>row.name==='released');
+    assert.equal(releasedLive.yawnCount,0,'The legacy live path keeps its existing calibration gate');
+    assert.equal(releasedReplay.finalState.fatigue,releasedLive.finalState.fatigue+8,'Counterfactuals consume accepted events rather than inventing detector decisions');
+    assert.equal(releasedReplay.finalState.calibrating,true);
+    assert.deepEqual(releasedReplay.alerts,[],'Normal alert calibration gating still applies');
 });
 
 test('all six replay variants match their actual live helper/results paths on the same raw observations', () => {
@@ -84,7 +173,7 @@ test('reusing a supported output for an unavailable trace fails without replacin
 // browser initializer or use its generator for the released oracle comparison.
 function referenceBrowserLandmarks(frame) {
     if (!frame.hasFace) return null;
-    const points = Array.from({length:468},()=>({x:0.5,y:0.5}));
+    const points = Array.from({length:468},()=>({x:0.5,y:0.5,z:0}));
     const h = frame.ear * 0.05;
     const eyes = [
         [362,.62-.05,.5],[385,.62-.02,.5-h],[387,.62+.02,.5-h],
@@ -92,9 +181,11 @@ function referenceBrowserLandmarks(frame) {
         [33,.38-.05,.5],[160,.38-.02,.5-h],[158,.38+.02,.5-h],
         [133,.38+.05,.5],[153,.38+.02,.5+h],[144,.38-.02,.5+h],
     ];
-    for (const [index,x,y] of eyes) points[index]={x,y};
-    points[4]={x:frame.turned ? .8 : .5,y:frame.noseY ?? .55};
-    points[234]={x:.25,y:.6};points[454]={x:.75,y:.6};
+    for (const [index,x,y] of eyes) points[index]={x,y,z:0};
+    points[4]={x:frame.turned ? .8 : .5,y:frame.noseY ?? .55,z:0};
+    points[234]={x:.25,y:.6,z:0};points[454]={x:.75,y:.6,z:0};
+    points[13]={x:.5,y:.4,z:0};points[14]={x:.5,y:.4+(frame.mar??0)*.2,z:0};
+    points[61]={x:.4,y:.5,z:0};points[291]={x:.6,y:.5,z:0};
     return points;
 }
 
@@ -124,7 +215,7 @@ test('compact browser scoring transport preserves every landmark at every origin
         assert.ok(Buffer.byteLength(JSON.stringify(transport)) < Buffer.byteLength(JSON.stringify(expanded))/50,
             'wire payload must avoid hundreds of expanded point objects per frame');
     }
-    for (const frame of [{hasFace:false},{hasFace:true,ear:0,turned:true,noseY:0},{hasFace:true,ear:.37,noseY:.61}]) {
+    for (const frame of [{hasFace:false},{hasFace:true,ear:0,turned:true,noseY:0},{hasFace:true,ear:.37,noseY:.61,mar:.8}]) {
         assert.deepEqual(JSON.parse(JSON.stringify(browser.__scoringReplayLandmarks(frame))),referenceBrowserLandmarks(frame));
     }
     const frame={hasFace:true,ear:.3},a=browser.__scoringReplayLandmarks(frame),b=browser.__scoringReplayLandmarks(frame);

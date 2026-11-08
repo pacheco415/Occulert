@@ -20,7 +20,7 @@ import { scoreEvents } from '../benchmark/run-event-benchmark.mjs';
 import { replayScoringCorroboration } from '../benchmark/corroboration-scoring-adapter.mjs';
 import { replayScoring } from '../benchmark/replay-scoring.mjs';
 import { recordScoringFixture } from './lib/scoring-replay-fixture.mjs';
-import { syntheticScoringTrace } from '../benchmark/released-scoring-oracle.mjs';
+import { initialScoringState, syntheticScoringTrace } from '../benchmark/released-scoring-oracle.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const runner = join(root, 'benchmark/run-corroboration-replay.mjs');
@@ -304,6 +304,9 @@ test('actual recorded web scoring composes with the corroboration scorer without
   assert.deepEqual(input.sessions[0].alerts, [], 'caller input is not modified');
   const old = structuredClone(trace); old.version = 1; delete old.scoringReplay;
   assert.throws(() => replayScoringCorroboration(old, input), /unavailable/);
+  const v2 = structuredClone(trace); v2.version = 2; v2.scoringReplay.version = 1;
+  for (const row of v2.scoringReplay.frames) delete row.yawn;
+  assert.throws(() => replayScoringCorroboration(v2, input), /Released scoring replay unavailable/);
   const truncated = structuredClone(trace); truncated.scoringReplay.droppedFrames = 1;
   assert.throws(() => replayScoringCorroboration(truncated, input), /unavailable/);
   for (const changes of [{ platform: 'ios' }, { sessionId: 'other-session' },
@@ -313,4 +316,18 @@ test('actual recorded web scoring composes with the corroboration scorer without
   }
   const ambiguous = structuredClone(input); ambiguous.sessions[0].alerts = [{ atMs: 1, level: 'alert' }];
   assert.throws(() => replayScoringCorroboration(trace, ambiguous), /Leave alerts and tracking empty/);
+});
+
+test('the corroboration adapter preserves a camera alert caused by an actual accepted yawn', () => {
+  const frames = [9000,9600,10200,10201].map(atMs => ({atMs,hasFace:true,ear:.2,mar:.8,turned:false,nod:false}));
+  const {trace,yawnCount} = recordScoringFixture({frames,
+    state:initialScoringState({calibrating:false,calibrated:true,confidence:100,fatigue:71,maxFatigue:71})});
+  const input = timeline([session({sessionId:trace.session.sessionId,platform:'web',
+    detectorVersion:trace.session.detectorVersion,durationMs:trace.session.durationMs,
+    tracking:[],accessories:{},alerts:[],observations:[],episodes:[]})]);
+  assert.equal(yawnCount,1);
+  const report = replayScoringCorroboration(trace,input,{split:'test'});
+  assert.equal(report.overall.cameraOnly.overall.alerts,1);
+  assert.deepEqual(report.overall.cameraOnly,report.overall.corroborated);
+  assert.equal(report.cameraAlertsPreserved,true);
 });
