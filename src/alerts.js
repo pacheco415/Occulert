@@ -312,8 +312,9 @@ export function trigger(reason, eligibility) {
     // withholds detector cues from the observer.
     if (!experimentFlags.observer) {
     const titles = ['DROWSY ALERT', 'LOUD ALERT', 'STRONG ALERT', 'PULL OVER NOW'];
-    alertTitle.textContent = titles[Math.max(0, escalationLevel - 1)] || 'DROWSY ALERT';
-    alertSub.textContent = escalationLevel >= 3 ? 'Pull over safely and rest' : 'Pull over safely';
+    const distracted = reason === 'Distraction';
+    alertTitle.textContent = distracted ? 'EYES ON THE ROAD' : titles[Math.max(0, escalationLevel - 1)] || 'DROWSY ALERT';
+    alertSub.textContent = distracted ? 'Pull over safely if you need to.' : escalationLevel >= 3 ? 'Pull over safely and rest' : 'Pull over safely';
     alertScreen.style.background = 'rgba(255,51,68,' + Number(nightOpacity.value) / 100 + ')';
     alertScreen.classList.add('show');
     if (!strongAlertPattern)
@@ -357,8 +358,8 @@ export function trigger(reason, eligibility) {
     }
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         try {
-            const _ntitle = 'Occulert ⚠️ Drowsiness Alert';
-            const _nbody = escalationLevel >= 3 ? 'Pull over safely — confirm safety now' : 'Stay alert! Drowsiness detected.';
+            const _ntitle = distracted ? 'Occulert ⚠️ Distraction Alert' : 'Occulert ⚠️ Drowsiness Alert';
+            const _nbody = distracted ? 'Eyes on the road. Pull over safely if you need to.' : escalationLevel >= 3 ? 'Pull over safely — confirm safety now' : 'Stay alert! Drowsiness detected.';
             const _nopts = { body: _nbody, icon: '/occulert-logo-main-192.png', badge: '/occulert-logo-main-96.png', tag: 'occulert-alert-' + Date.now(), silent: false, vibrate: escalationLevel >= 3 ? [700, 150, 700, 150, 700] : [500, 150, 500], requireInteraction: escalationLevel >= 3 };
             if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                 navigator.serviceWorker.ready.then(reg => reg.showNotification(_ntitle, _nopts)).catch(() => {
