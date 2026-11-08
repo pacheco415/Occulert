@@ -3,4 +3,5 @@ const browserNames = ['document','window','navigator','localStorage','performanc
 const ownedRuntimeNames = ['FaceMesh','OcculertSecurity'];
 export default [{files:['src/**/*.js'],languageOptions:{ecmaVersion:2022,sourceType:'module',globals:Object.fromEntries([...browserNames,...ownedRuntimeNames].map(name=>[name,'readonly']))},rules:{'no-undef':'error','no-func-assign':'error','no-global-assign':'error','no-redeclare':'error','no-sequences':'error','no-import-assign':'error'}},
 {files:['src/fleet-dashboard.js'],languageOptions:{globals:{CSS:'readonly'}}},
+{files:['src/fleet-pilot-report.js'],languageOptions:{globals:{requestDashboardCSVDownload:'readonly'}}},
 {files:['api/**/*.js'],languageOptions:{ecmaVersion:2022,sourceType:'commonjs'},rules:{indent:['error',2]}}];

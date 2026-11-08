@@ -36,3 +36,41 @@ change was performed. Owner decisions and device/data evidence in
 - [Service-worker fix #333](https://github.com/pacheco415/Occulert/pull/333)
 - [Official Playwright 1.65.0 release](https://github.com/microsoft/playwright/releases/tag/v1.65.0)
 - [Tagged browser manifest](https://github.com/microsoft/playwright/blob/v1.65.0/packages/playwright-core/browsers.json)
+
+
+## November 7 follow-up: current source and tooling
+
+A remote GitHub inspection on 2026-11-08T07:01:47Z (November 7 in
+America/Los_Angeles) inspected main
+`444cfd867fd68c83985ff8788d1094754c97d0bd` and all five open PRs:
+#385, #379, #324, #273 and #206. Four are drafts. This dated snapshot replaces
+the older counts in the status page; it does not complete A1–A6 above.
+
+PRs #388–#394 completed the editable report source, weekly asset cleanup,
+offline-startup evidence and tooling updates. Each merged source received
+required resulting-main checks; PR #394's final receipt records 109 passing
+verification steps and passing workflows with five WebKit tests recovering
+after retry. The intermittent offline failure cause remains unknown. The
+failed vendor execution again had matching cache bytes before origin cut and
+an empty cache-entry snapshot afterward. That observation does not establish
+eviction, a causal actor or a fix.
+
+The official Playwright latest release was rechecked as stable 1.65.0,
+published November 5. A direct read of the expected
+`mcr.microsoft.com/v2/playwright/manifests/v1.65.0-noble` endpoint returned
+HTTP 404 in this cloud session. No immutable image digest or bundled/loaded
+library evidence was obtained. This is an access/availability observation for
+that URL, not proof that every image variant is absent. Keep #324 draft and
+#273 open; a release tag alone does not satisfy their rendering, library,
+browser-matrix and offline repetition gates.
+
+The status document was rendered using the unchanged exported
+`renderStatus` function on Node 24.22.1, with GitHub commit/tree facts and a
+complete API PR snapshot. This cloud session did not run the Git-based CLI in
+a full-history Mac checkout. The recursively fetched native trees were
+untruncated; their path/hash/mode comparison yields 123 non-documentation
+changes from build 56. Main's native tree
+`404af75fd0a3f61d37c4330a50936df7884b4e11` also exactly matches the November 6
+inspected source's tree, preserving that earlier local comparison. The
+build-56 receipt remains historical; no current Apple or physical acceptance
+check was performed. Production and migration observations remain private.

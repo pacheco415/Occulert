@@ -2,8 +2,8 @@
 
 These are dated snapshots. Source, deployment, build availability and device tests are separate.
 
-- Inspected source (origin/main): `ec019c9609e353943bf995a3dcd074d3ed25a499`.
-- Source commit date: 2026-11-03T21:43:59-08:00.
+- Inspected source (GitHub main): `444cfd867fd68c83985ff8788d1094754c97d0bd`.
+- Source commit date: 2026-11-08T06:08:42Z.
 
 - Production website: Deployment receipts are kept private; no current receipt is published here.
 
@@ -20,7 +20,7 @@ These are dated snapshots. Source, deployment, build availability and device tes
   - native-app/app/monitor.tsx
   - 118 more; inspect the source comparison before preparing a binary.
 
-- Open PRs (2026-11-07T04:26:41.196Z): 3 total; 2 Codex, 1 Dependabot, 0 other; 2 draft.
+- Open PRs (2026-11-08T07:01:47Z): 5 total; 4 Codex, 1 Dependabot, 0 other; 4 draft.
 - Production migrations: Operational receipts are kept private; no ledger or access-control details are published here.
 
 Next steps:

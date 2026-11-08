@@ -121,17 +121,18 @@
     "test:unanswered-alerts": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-unanswered-alert-policy.mjs",
     "test:motion-activity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-motion-activity.mjs scripts/test-motion-activity-native.mjs",
     "test:emergency-readiness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-emergency-readiness.mjs",
-    "test:road-model-benchmark": "node --test scripts/test-road-model-benchmark.mjs"
+    "test:road-model-benchmark": "node --test scripts/test-road-model-benchmark.mjs",
+    "test:corroboration-replay": "node --test scripts/test-corroboration-replay.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
-    "@electric-sql/pglite": "0.5.13",
+    "@electric-sql/pglite": "0.5.15",
     "@playwright/test": "^1.63.0",
     "acorn": "8.19.0",
     "esbuild": "0.28.2",
-    "eslint": "10.13.0",
+    "eslint": "10.14.0",
     "eslint-scope": "9.1.2",
-    "parse5": "8.0.1",
+    "parse5": "8.1.0",
     "typescript": "6.0.3"
   },
   "engines": {

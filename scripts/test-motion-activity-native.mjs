@@ -352,6 +352,12 @@ function immediateFailureSnapshot(pid) {
   return { processes, reads, truncated: truncated || queue.length > 0, elapsedMs: performance.now() - startedAt };
 }
 
+// Swift compilation on hosted Linux runners took 10-17 s in passing runs and
+// exceeded 30 s on slower runners, so preparation gets a hang guard rather than
+// a performance budget. The runtime budget stays tight: the policy suite itself
+// finishes in well under a second once compiled.
+const SWIFT_PREPARATION_BUDGET_MS = 90_000;
+const SWIFT_RUNTIME_BUDGET_MS = 10_000;
 const runtimeMarkerTag = 'OCCULERT_MOTION_RUNTIME_START:';
 const expectedPassLines = [...swift.matchAll(/print\("(PASS [^"]+)"\)/g)].map(match => match[1]);
 const immediatePOSIXHeader = `#ifndef OCCULERT_FIXTURE_POSIX_H
@@ -447,7 +453,7 @@ Suite.main()
 function runImmediateSwift(argv, markerPrefix, {
   spawnProcess = spawn, now = () => process.hrtime.bigint(), schedule = setTimeout, cancel = clearTimeout,
 } = {}) {
-  const preparationBudget = 30_000_000_000n, runtimeBudget = 10_000_000_000n;
+  const preparationBudget = BigInt(SWIFT_PREPARATION_BUDGET_MS) * 1_000_000n, runtimeBudget = BigInt(SWIFT_RUNTIME_BUDGET_MS) * 1_000_000n;
   const startedNs = now(), preparationDeadline = startedNs + preparationBudget;
   return new Promise(resolve => {
     const stdout = boundedStreamCapture(), stderr = boundedStreamCapture();
@@ -541,6 +547,7 @@ function runImmediateSwift(argv, markerPrefix, {
 
 test('Linux Swift phase watchdogs enforce separate preparation and runtime deadlines without losing streamed evidence', async () => {
   const base = 1_000_000_000_000n, prefix = runtimeMarkerTag + 'fixture-nonce:';
+  const prep = SWIFT_PREPARATION_BUDGET_MS, run = SWIFT_RUNTIME_BUDGET_MS;
   const generated = immediateSwiftSource(prefix), entrypoint = swift.indexOf('@main struct Suite {');
   const body = swift.slice(0, entrypoint) + swift.slice(entrypoint + '@main '.length);
   assert.equal(generated.slice(0, body.length), body, 'the immediate fixture retains every actual method and assertion');
@@ -578,19 +585,19 @@ test('Linux Swift phase watchdogs enforce separate preparation and runtime deadl
     return result;
   };
   {
-    const f = fixture(); f.at(29_000);
-    const marker = prefix + String(base + 29_000_000_000n) + '\n';
+    const f = fixture(); f.at(prep - 1_000);
+    const marker = prefix + String(base + BigInt(prep - 1_000) * 1_000_000n) + '\n';
     f.child.stderr.emit('data', 'x'.repeat(50_000) + '\n' + marker.slice(0, 17));
     f.child.stderr.emit('data', marker.slice(17));
     f.child.stderr.emit('data', 'y'.repeat(50_000) + '\n');
     f.child.stdout.emit('data', 'x'.repeat(50_000) + '\n'); f.passes();
     f.child.stdout.emit('data', 'y'.repeat(50_000) + '\n');
-    f.at(38_000); f.close();
+    f.at(prep - 1_000 + run - 1_000); f.close();
     const result = await f.promise;
     assert.equal(result.error, undefined);
     assert.equal(result.phases.markerCount, 1);
-    assert.equal(result.phases.preparationElapsedMs, 29_000);
-    assert.equal(result.phases.runtimeElapsedMs, 9_000);
+    assert.equal(result.phases.preparationElapsedMs, prep - 1_000);
+    assert.equal(result.phases.runtimeElapsedMs, run - 1_000);
     assert.deepEqual(result.passLines, expectedPassLines);
     assert.equal(result.passLineCount, 5);
     assert.ok(result.stdout.length < 17_000 && result.stderr.length < 17_000);
@@ -601,10 +608,10 @@ test('Linux Swift phase watchdogs enforce separate preparation and runtime deadl
     await errorCode(f, 'EMISSINGRUNTIMEMARKER', 'preparation');
   }
   {
-    const f = fixture(); f.at(30_000); f.fire();
+    const f = fixture(); f.at(prep); f.fire();
     const result = await errorCode(f, 'ETIMEDOUT', 'preparation');
     assert.deepEqual(f.kills, ['SIGKILL']); // The promise settles even if kill produces no close event.
-    f.marker(29_000); f.passes(); f.close();
+    f.marker(prep - 1_000); f.passes(); f.close();
     assert.equal(result.phases.markerCount, 0);
     assert.equal(result.passLineCount, 0);
   }
@@ -621,22 +628,22 @@ test('Linux Swift phase watchdogs enforce separate preparation and runtime deadl
     await errorCode(f, 'EINVALIDRUNTIMECLOCK', 'preparation');
   }
   {
-    const f = fixture(); f.at(31_000); f.marker(30_001);
+    const f = fixture(); f.at(prep + 1_000); f.marker(prep + 1);
     await errorCode(f, 'ETIMEDOUT', 'preparation');
   }
   {
-    const f = fixture(); f.at(12_000); f.marker(1_000);
-    await errorCode(f, 'ETIMEDOUT', 'runtime'); // Receipt cannot grant another ten seconds.
+    const f = fixture(); f.at(1_000 + run + 1_000); f.marker(1_000);
+    await errorCode(f, 'ETIMEDOUT', 'runtime'); // Receipt cannot grant another runtime budget.
   }
   {
-    const f = fixture(); f.at(1_000); f.marker(1_000); f.at(11_000); f.fire();
+    const f = fixture(); f.at(1_000); f.marker(1_000); f.at(1_000 + run); f.fire();
     const result = await errorCode(f, 'ETIMEDOUT', 'runtime');
     f.passes(); f.close();
     assert.equal(result.passLineCount, 0);
     assert.deepEqual(f.kills, ['SIGKILL']);
   }
   {
-    const f = fixture(); f.at(1_000); f.marker(1_000); f.passes(); f.at(11_000); f.close();
+    const f = fixture(); f.at(1_000); f.marker(1_000); f.passes(); f.at(1_000 + run); f.close();
     await errorCode(f, 'ETIMEDOUT', 'runtime'); // A delayed timer cannot let an over-budget close pass.
   }
   {
@@ -695,7 +702,7 @@ test('actual Swift motion activity methods enforce ownership, permission and for
       '-module-cache-path', path.join(directory, 'module-cache'), input, '-o', executable];
     const startedAt = performance.now();
     const compile = spawnSync('swiftc', argv, {
-      encoding: 'utf8', timeout: 30_000,
+      encoding: 'utf8', timeout: SWIFT_PREPARATION_BUDGET_MS,
     });
     const diagnostics = swiftDiagnostics(context, 'standalone-compile', 'swiftc', argv, compile, startedAt);
     t.diagnostic(`Swift compile diagnostics:\n${diagnostics}`);
@@ -706,7 +713,7 @@ test('actual Swift motion activity methods enforce ownership, permission and for
     assert.equal(compile.error, undefined, diagnostics);
     assert.equal(compile.status, 0, diagnostics);
     const runStartedAt = performance.now();
-    const run = spawnSync(executable, [], { encoding: 'utf8', timeout: 10_000 });
+    const run = spawnSync(executable, [], { encoding: 'utf8', timeout: SWIFT_RUNTIME_BUDGET_MS });
     const runDiagnostics = swiftDiagnostics(context, 'standalone-execute', executable, [], run, runStartedAt);
     t.diagnostic(`Swift executable diagnostics:\n${runDiagnostics}`);
     assert.equal(run.error, undefined, runDiagnostics);
