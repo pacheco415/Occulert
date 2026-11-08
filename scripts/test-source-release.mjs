@@ -634,7 +634,7 @@ test('initial copy composes actual bundled source edits without touching source 
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
 
-for (const logical of ['fleet-pilot-report.js', 'fleet-pilot-report.css', 'fleet-followups.css', 'fleet-followups.js']) test(`registered real ${logical} is initially a no-op and releases through owned references`, () => {
+for (const logical of ['fleet-pilot-report.js', 'fleet-pilot-report.css', 'fleet-followups.css', 'fleet-followups.js', 'fleet-history-page.css']) test(`registered real ${logical} is initially a no-op and releases through owned references`, () => {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-source-report-'));
   try {
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
@@ -685,5 +685,9 @@ for (const logical of ['fleet-pilot-report.js', 'fleet-pilot-report.css', 'fleet
     const reportEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'NODE_TEST_CONTEXT'));
     const reportResults = execFileSync(process.execPath, ['--test', '--test-reporter=tap', 'scripts/test-fleet-pilot-report.mjs'], { cwd, encoding: 'utf8', timeout: 30000, env: reportEnv });
     assert.match(reportResults, /# fail 0/);
+    if (logical === 'fleet-history-page.css') {
+      const historyResults = execFileSync(process.execPath, ['--test', '--test-reporter=tap', 'scripts/test-fleet-history-page-filters.mjs'], { cwd, encoding: 'utf8', timeout: 30000, env: reportEnv });
+      assert.match(historyResults, /# fail 0/);
+    }
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });

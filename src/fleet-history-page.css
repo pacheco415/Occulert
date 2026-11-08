@@ -1,0 +1,75 @@
+.fleet-history-page{margin:0;min-width:0}
+.fleet-history-page *{box-sizing:border-box}
+.fleet-history-page [hidden]{display:none!important}
+.fleet-history-page .top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.fleet-history-page .brand{text-decoration:none}
+.fleet-history-page .nav,.fleet-history-page .history-access{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fleet-history-page .wrap{max-width:1080px;margin:0 auto;padding:28px clamp(16px,4vw,32px)}
+.fleet-history-page h1{font-size:clamp(28px,5vw,38px);line-height:1.2;margin:0 0 12px}
+.fleet-history-page h2{font-size:22px;margin:0;overflow-wrap:anywhere}
+.fleet-history-page h3{font-size:18px;margin:0;overflow-wrap:anywhere}
+.fleet-history-page .eyebrow{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--portal-accent-text)}
+.fleet-history-page .muted{color:var(--portal-muted);font-size:14px;line-height:1.6}
+.fleet-history-page .history-intro{margin-bottom:22px}
+.fleet-history-page .history-status{padding:14px 16px;border:1px solid var(--portal-border-strong);border-radius:14px;background:var(--portal-surface);overflow-wrap:anywhere;margin-bottom:16px}
+.fleet-history-page .history-access{margin-bottom:20px}
+.fleet-history-page .history-access p{flex-basis:100%;margin:0}
+.fleet-history-page .history-card{padding:20px;border:1px solid var(--portal-border);border-radius:var(--portal-radius);background:var(--portal-surface);min-width:0}
+.fleet-history-page .history-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.fleet-history-page .history-toolbar>div{min-width:0;flex:1 1 260px}
+.fleet-history-page .history-toolbar p{margin:8px 0 0;overflow-wrap:anywhere}
+.fleet-history-page .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;padding:10px 14px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:750;line-height:1.4;cursor:pointer;white-space:normal}
+.fleet-history-page .btn:focus-visible{outline:3px solid var(--portal-blue);outline-offset:3px}
+.fleet-history-page .btn:disabled{opacity:.6;cursor:wait}
+.fleet-history-page .history-privacy{font-size:14px;line-height:1.6;padding:14px;border-left:3px solid var(--portal-amber);background:var(--portal-surface-strong);border-radius:8px;color:var(--portal-muted)}
+.fleet-history-page .history-filters{min-width:0;margin:20px 0 0;padding:16px;border:1px solid var(--portal-border-strong);border-radius:12px}
+.fleet-history-page .history-filters legend{padding:0 6px;font-weight:750}
+.fleet-history-page .history-filter-fields{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.fleet-history-page .history-filter-field{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 180px}
+.fleet-history-page .history-driver-filter{flex:2 1 240px}
+.fleet-history-page .history-filter-field label{font-size:14px;font-weight:750}
+.fleet-history-page .history-filter-field input,.fleet-history-page .history-filter-field select{width:100%;min-width:0;min-height:44px;max-width:100%;padding:10px 12px;border:1px solid var(--portal-border-strong);border-radius:8px;background:var(--portal-bg);color:var(--portal-text);font:inherit;font-size:16px}
+.fleet-history-page .history-filter-field input::placeholder{color:var(--portal-muted);opacity:1}
+.fleet-history-page .history-filter-field select{padding-right:28px}
+.fleet-history-page .history-filter-field input:focus-visible,.fleet-history-page .history-filter-field select:focus-visible{outline:3px solid var(--portal-blue);outline-offset:3px}
+.fleet-history-page .history-filters:disabled .history-filter-fields{opacity:.6}
+.fleet-history-page .history-filters p{margin:12px 0 0;overflow-wrap:anywhere}
+.fleet-history-page .history-matches{font-size:14px;line-height:1.6;margin:16px 0 0;overflow-wrap:anywhere}
+.fleet-history-page .history-export{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-top:16px}
+.fleet-history-page .history-export p{flex:1 1 260px;min-width:0;margin:0;overflow-wrap:anywhere}
+.fleet-history-page .history-export-status{font-size:14px;line-height:1.6;margin:12px 0 0;overflow-wrap:anywhere}
+.fleet-history-page .history-export .btn:disabled{cursor:default}
+.fleet-history-page .history-empty{padding:16px;border:1px solid var(--portal-border);border-radius:10px;background:var(--portal-bg);line-height:1.6;overflow-wrap:anywhere}
+.fleet-history-page .history-list{display:grid;gap:14px;margin-top:20px}
+.fleet-history-page .history-session{min-width:0;padding:18px;border:1px solid var(--portal-border);border-radius:14px;background:var(--portal-bg)}
+.fleet-history-page .history-session p{margin:6px 0 14px}
+.fleet-history-page .history-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0}
+.fleet-history-page .history-metrics>div{min-width:0}
+.fleet-history-page dt{font-size:12px;color:var(--portal-muted);overflow-wrap:anywhere}
+.fleet-history-page dd{font-size:16px;font-weight:750;margin:4px 0 0;overflow-wrap:anywhere}
+.fleet-history-page .history-pagination{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:20px}
+.fleet-history-page .history-pagination p{margin:0;flex:1 1 240px}
+.fleet-history-page .history-footer{text-align:center;padding:24px 16px;color:var(--portal-muted);font-size:12px}
+@media(max-width:600px){.fleet-history-page .history-card{padding:16px}.fleet-history-page .history-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.fleet-history-page .history-toolbar .btn{width:100%}.fleet-history-page .history-pagination .btn{width:100%}.fleet-history-page .history-filter-field{flex-basis:100%}.fleet-history-page .history-filter-fields>.btn{width:100%}.fleet-history-page .history-filters{padding:12px}.fleet-history-page .history-export .btn{width:100%}}
+@media(prefers-reduced-transparency:reduce){.fleet-history-page .top{background:var(--portal-surface);-webkit-backdrop-filter:none;backdrop-filter:none}}
+.fleet-history-page .history-custom-dates{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px}
+.fleet-history-page .history-custom-dates[hidden]{display:none!important}
+.fleet-history-page .history-date-status{color:var(--portal-text);font-size:14px}
+.fleet-history-page .history-print-report{display:none}
+@media print{
+  @page{margin:16mm}
+  html,body.fleet-history-page{background:#fff!important;color:#111!important}
+  body.fleet-history-page>*{display:none!important}
+  body.fleet-history-page>.history-print-report{display:block!important;max-width:none;margin:0;padding:0;color:#111!important;background:#fff!important;font:12px/1.5 Arial,sans-serif}
+  .fleet-history-page .history-print-report h1{font-size:24px;color:#111;margin:0 0 16px}
+  .fleet-history-page .history-print-report h3{font-size:15px;color:#111}
+  .fleet-history-page .history-print-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;margin:0 0 16px}
+  .fleet-history-page .history-print-summary>div{break-inside:avoid;min-width:0}
+  .fleet-history-page .history-print-report dt{font-size:11px;color:#444!important}
+  .fleet-history-page .history-print-report dd{font-size:12px;color:#111!important}
+  .fleet-history-page .history-print-note{color:#333;line-height:1.5;margin:12px 0}
+  .fleet-history-page .history-print-report .history-list{display:block}
+  .fleet-history-page .history-print-report .history-session{break-inside:avoid;background:#fff!important;border:1px solid #bbb;border-radius:0;padding:12px;margin:0 0 12px;color:#111}
+  .fleet-history-page .history-print-report .muted{color:#444!important;font-size:11px}
+  .fleet-history-page .history-print-report .history-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+}

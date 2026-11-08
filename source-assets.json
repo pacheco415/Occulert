@@ -44,6 +44,10 @@
     "fleet-followups.js": {
       "source": "src/fleet-followups.js",
       "mode": "copy"
+    },
+    "fleet-history-page.css": {
+      "source": "src/fleet-history-page.css",
+      "mode": "copy"
     }
   }
 }
