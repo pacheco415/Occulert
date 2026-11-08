@@ -132,7 +132,7 @@
     "esbuild": "0.28.2",
     "eslint": "10.13.0",
     "eslint-scope": "9.1.2",
-    "parse5": "8.0.1",
+    "parse5": "8.1.0",
     "typescript": "6.0.3"
   },
   "engines": {
