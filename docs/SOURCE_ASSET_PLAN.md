@@ -142,3 +142,21 @@ exercise History controls and layout against the unchanged served stylesheet.
 The stylesheet stays outside the worker asset lists; its editable source stays
 excluded from deployment and offline caching. This registration changes no
 account, consent, server filter, loaded-record limit or print behavior.
+
+## Fleet History script copy source
+
+`fleet-history-page.js` is registered in copy mode at
+`src/fleet-history-page.js`, initially byte-identical to the active
+`fleet-history-page.v71.js`. The classic script keeps its existing globals and
+protected-context, preference, filtering, export and print behavior.
+Registration changes no served URL, bytes, page references, manifests or cache.
+
+The real-source release fixture exercises this script independently alongside
+History CSS and the report/follow-up assets. Unchanged ordinary and dry-run
+releases are exact no-ops. A comment edit verifies generated output and integrity,
+retained hashes, exact page rewrites, ordered immutable headers and the worker's
+exact active URL replacement plus one cache advance. The generated History
+script must remain in `NETWORK_ONLY_ASSETS`; it is not added to offline caches.
+Existing History page behavior regressions run against the fixture's active
+script after release. Source remains excluded from deployment and offline lists.
+This migration does not broaden server filters, record limits or account authority.
