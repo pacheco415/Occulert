@@ -634,7 +634,7 @@ test('initial copy composes actual bundled source edits without touching source 
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
 
-test('registered real fleet report is initially a no-op and releases through owned references', () => {
+for (const logical of ['fleet-pilot-report.js', 'fleet-pilot-report.css']) test(`registered real ${logical} is initially a no-op and releases through owned references`, () => {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-source-report-'));
   try {
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
@@ -643,7 +643,7 @@ test('registered real fleet report is initially a no-op and releases through own
     symlinkSync(join(root, 'node_modules'), join(cwd, 'node_modules'), 'dir');
     git(cwd, 'init', '-q'); commit(cwd); git(cwd, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
     const before = snapshot(cwd), prior = json(cwd, 'asset-integrity.json');
-    const versions = json(cwd, 'asset-versions.json'), logical = 'fleet-pilot-report.js';
+    const versions = json(cwd, 'asset-versions.json');
     assert.equal(read(cwd, 'src/' + logical), read(cwd, versions[logical]));
     for (const args of [['--release', '--dry-run'], ['--release']]) {
       const plan = JSON.parse(run(cwd, ...args));
@@ -653,7 +653,8 @@ test('registered real fleet report is initially a no-op and releases through own
       assert.equal(plan.cache, undefined);
       assert.deepEqual(snapshot(cwd), before);
     }
-    write(cwd, 'src/' + logical, read(cwd, 'src/' + logical) + '\n// Fixture report source release.\n');
+    const comment = logical.endsWith('.css') ? '\n/* Fixture report source release. */\n' : '\n// Fixture report source release.\n';
+    write(cwd, 'src/' + logical, read(cwd, 'src/' + logical) + comment);
     const pending = snapshot(cwd), preview = JSON.parse(run(cwd, '--release', '--dry-run'));
     assert.equal(preview.sources.find(entry => entry.logical === logical).changed, true);
     assert.deepEqual(snapshot(cwd), pending);
@@ -665,10 +666,12 @@ test('registered real fleet report is initially a no-op and releases through own
     for (const [name, hash] of Object.entries(prior)) assert.equal(sha(readFileSync(join(cwd, name))), hash);
     assert.ok(read(cwd, 'sw.js').includes(plan.cache));
     assert.notEqual(read(cwd, 'sw.js'), read(root, 'sw.js'));
+    assert.equal(read(cwd, 'sw.js'), read(root, 'sw.js').replace(/const CACHE = 'occulert-v\d+';/, `const CACHE = '${plan.cache}';`));
     const pages = [...paths].filter(name => name.endsWith('.html') && read(root, name).includes('/' + versions[logical]));
     assert.ok(pages.length > 0);
     for (const page of pages) {
       assert.ok(read(cwd, page).includes('/' + released));
+      assert.ok(read(cwd, page).includes(sri(readFileSync(join(cwd, released)))));
       assert.ok(!read(cwd, page).includes('/' + versions[logical]));
     }
     const headers = json(cwd, 'vercel.json').headers;
