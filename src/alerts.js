@@ -486,4 +486,6 @@ export function resetBreakReminder() {
 /** @param {number} value */
 export function set_alerts(value) { alerts = value; return value; }
 /** @param {number} value */
+export function set_lastAlert(value) { lastAlert = value; return value; }
+/** @param {number} value */
 export function set_escalationLevel(value) { escalationLevel = value; return value; }
