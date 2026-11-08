@@ -48,6 +48,10 @@
     "fleet-history-page.css": {
       "source": "src/fleet-history-page.css",
       "mode": "copy"
+    },
+    "fleet-history-page.js": {
+      "source": "src/fleet-history-page.js",
+      "mode": "copy"
     }
   }
 }
