@@ -81,5 +81,12 @@ released output. Source registration does not permit raw motion, personal media
 or coordinates in protected reports. The release regression exercises the real
 report source, fleet page references, cache, immutable headers and retained hashes.
 
-This registration covers the report JavaScript only; its CSS retains the existing
-immutable release workflow.
+The report stylesheet is also registered separately in copy mode at
+`src/fleet-pilot-report.css`, initially byte-identical to
+`fleet-pilot-report.v56.css`. This registration changes no served CSS, page SRI,
+manifest or cache identity; unchanged source remains an exact no-op. Future edits
+use `asset:release` to generate a fresh immutable stylesheet and synchronize owned
+HTML references and integrity-manifest entries. The report assets remain outside the default
+offline asset lists. Real-source regressions exercise JS and CSS independently,
+including no-op snapshots, retained hashes, exact page rewrites, immutable headers and the
+single cache advance without unrelated worker-list changes.
