@@ -107,3 +107,19 @@ advance without worker-list changes. The stylesheet remains outside the default
 offline lists and under existing source deployment exclusions. Existing fleet
 follow-up browser checks retain their mobile layout and protected session
 behavior assertions; source registration changes none of those contracts.
+
+## Fleet follow-up script copy source
+
+`fleet-followups.js` is also registered separately in copy mode at
+`src/fleet-followups.js`, initially byte-identical to the active
+`fleet-followups.v67.js`. Registration creates no new runtime URL, integrity
+entry or cache identity. The source remains one classic script; source edits
+use `asset:release`, and unchanged source is an exact no-op in both release modes.
+
+The real fleet-source regression exercises this script independently alongside
+report JS/CSS and follow-up CSS, retaining immutable hashes, exact page rewrites,
+ordered headers and the single cache advance without worker-list changes.
+Existing follow-up browser coverage retains its protected-context invalidation,
+conflict, reload and mobile-layout assertions. Registration changes no account,
+consent, server authority, stored follow-up or report behavior. The script stays
+outside the default offline asset lists; its source stays excluded from deployment.
