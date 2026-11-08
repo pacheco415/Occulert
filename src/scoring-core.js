@@ -122,6 +122,11 @@ export function scoringTrackedFrame(state, frame, nowMs) {
     return next;
 }
 
+export function scoringYawn(state) {
+    const nextFatigue = Math.min(100, state.fatigue + 8);
+    return { ...state, fatigue: nextFatigue, maxFatigue: Math.max(state.maxFatigue, nextFatigue) };
+}
+
 export function scoringAlertCandidate(state) {
     if (!state.calibrating && state.confidence >= 45 && state.fatigue >= 80)
         return 'Fatigue';

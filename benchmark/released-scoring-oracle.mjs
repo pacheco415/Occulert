@@ -33,9 +33,12 @@ export function createReleasedScoringOracle({ path = new URL('./fixtures/driver-
         assert.equal(createHash('sha256').update(bytes).digest('hex'), RELEASED_SCORING_BASELINE_SHA256, 'Oracle must execute the exact pinned immutable v97 fixture bytes');
     }
     const ast = parse(code, { ecmaVersion: 2022, sourceType: 'script' });
-    const names = ['updateScore', 'updateEyeMetrics', 'resetContinuousObservations', 'updateCalibration', 'finishCalibration', 'applySensitivity', 'trigger', 'smooth', 'detectHeadNod', 'calcEAR', 'dist', 'headTurn', 'onResults'];
+    const names = ['updateScore', 'updateEyeMetrics', 'resetContinuousObservations', 'updateCalibration', 'finishCalibration', 'applySensitivity', 'trigger', 'smooth', 'detectHeadNod', 'calcEAR', 'dist', 'headTurn', 'onResults', 'calcMAR', 'smoothMAR', 'detectYawn'];
     const functions = ast.body.filter(node => node.type === 'FunctionDeclaration' && (names.includes(node.id.name) || node.id.name.startsWith('scoring')));
     assert.ok(names.every(name => functions.some(node => node.id.name === name)), 'Released scoring functions must remain identifiable');
+    const yawnConstants = ast.body.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations)
+        .filter(node => ['MAR_YAWN_THRESH','YAWN_HOLD_MS','YAWN_COOLDOWN_MS'].includes(node.id.name));
+    assert.equal(yawnConstants.length, 3, 'Execute the actual detector constants from the selected driver');
     const onResults = ast.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === 'onResults');
     const eligible = onResults.body.body.find(node => node.type === 'IfStatement' && code.slice(node.start, node.end).includes("trigger('Fatigue')"));
     assert.ok(eligible, 'Execute the actual released caller eligibility expression');
@@ -45,17 +48,18 @@ export function createReleasedScoringOracle({ path = new URL('./fixtures/driver-
         Math, experimentFlags: { primary: false, distractionConfidence: false, noface: false, pixels: false }, experimentController: null,
         running: true, calibrationMinimumSamples: minimumSamples, sensitivityLevel: sensitivity, CALIBRATION_MS: 3200,
         SENSITIVITY_PRESETS: { low: { offset: -.03 }, medium: { offset: 0 }, high: { offset: .03 } },
-        _mouthOpenSince: 0, _marHist: [], alerts: 0, escalationLevel: 0, lastEscalation: 0,
+        _mouthOpenSince: 0, _marHist: [], yawnCount: 0, lastYawn: 0, alerts: 0, escalationLevel: 0, lastEscalation: 0,
         strongAlertPattern: false, nightOpacity: { value: '40' }, navigator: {}, setTimeout: noop,
         document: { getElementById: () => null, querySelectorAll: () => [], querySelector: () => null },
         signalDetectionResult: noop,ctx:{clearRect:noop},canvas:{width:360,height:480},drawEyes:noop,render:noop,
         LEFT:[362,385,387,263,373,380],RIGHT:[33,160,158,133,153,144],
-        getAC: () => null, tone: noop, pushFleet: noop, setPreference: noop, queueBackendEvent: noop,
+        getAC: () => null, tone: noop, pushFleet: noop, setPreference: noop, queueBackendEvent: noop, triggerBreakCheck: noop,
         log: value => logs.push(value), acceptedAlertHook: reason => alerts.push({ atMs: context.lastAlert - SCORING_EPOCH, reason }) };
     for (const name of ['faceStateEl', 'perclosEl', 'microsleepsEl', 'distractionEl', 'calibrationEl', 'calibrationFill', 'calHint', 'alertsEl', 'alertTitle', 'alertSub', 'alertScreen', 'nodsEl']) context[name] = element();
     for (const name of Object.keys(context)) context['set_' + name] = value => (context[name] = value);
     vm.createContext(context);
-    vm.runInContext(functions.map(node => code.slice(node.start, node.end)).join('\n') + '\nfunction runCallerEligibility(){' + code.slice(eligible.start, eligible.end) + '}', context);
+    vm.runInContext(yawnConstants.map(node => 'const ' + code.slice(node.start,node.end) + ';').join('\n') + '\n'
+        + functions.map(node => code.slice(node.start, node.end)).join('\n') + '\nfunction runCallerEligibility(){' + code.slice(eligible.start, eligible.end) + '}', context);
     const snapshot = () => Object.fromEntries(Object.keys(state).map(key => [key, structuredClone(context[key])]));
     return { alerts, logs, context, setClock(atMs) { now = SCORING_EPOCH + atMs; }, landmarks(atMs,landmarks) {
         now = SCORING_EPOCH + atMs;context.onResults({multiFaceLandmarks:landmarks?[landmarks]:[]});return snapshot();
@@ -67,6 +71,7 @@ export function createReleasedScoringOracle({ path = new URL('./fixtures/driver-
             nod = context.calibrating ? false : context.detectHeadNod({ 4: { y: frame.noseY } });
         }
         context.updateScore(ear, frame.turned, nod, frame.hasFace, frame.rawEar ?? ear, frame.noseY ?? null);
+        if (frame.hasFace && !context.calibrating && frame.mouthLandmarks) context.detectYawn(frame.mouthLandmarks);
         if (frame.hasFace) context.runCallerEligibility();
         return snapshot();
     } };

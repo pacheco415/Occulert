@@ -2,8 +2,8 @@
 
 These are dated snapshots. Source, deployment, build availability and device tests are separate.
 
-- Inspected source (origin/main): `71e67a3674cbddd5c66f768ac4907d2adfb85a66`.
-- Source commit date: 2026-10-31T13:31:13-07:00.
+- Inspected source (GitHub main): `444cfd867fd68c83985ff8788d1094754c97d0bd`.
+- Source commit date: 2026-11-08T06:08:42Z.
 
 - Production website: Deployment receipts are kept private; no current receipt is published here.
 
@@ -12,15 +12,15 @@ These are dated snapshots. Source, deployment, build availability and device tes
 - Build completed: 2026-10-03T23:44:38.728Z; availability observed 2026-10-03T23:49:49.617533+00:00.
 - Current Apple availability, replacement upload and remote build counter: Not checked.
 - Physical acceptance for build 56: Not recorded.
-- Native changes waiting for a build: 105 files differ from the TestFlight source.
+- Native changes waiting for a build: 123 files differ from the TestFlight source.
   - native-app/app.config.js
   - native-app/app.json
   - native-app/app/\_layout.tsx
   - native-app/app/history.tsx
   - native-app/app/monitor.tsx
-  - 100 more; inspect the source comparison before preparing a binary.
+  - 118 more; inspect the source comparison before preparing a binary.
 
-- Open PRs (2026-11-01T05:24:36.282Z): 4 total; 3 Codex, 1 Dependabot, 0 other; 3 draft.
+- Open PRs (2026-11-08T07:01:47Z): 5 total; 4 Codex, 1 Dependabot, 0 other; 4 draft.
 - Production migrations: Operational receipts are kept private; no ledger or access-control details are published here.
 
 Next steps:

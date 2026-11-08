@@ -66,3 +66,97 @@ The source remains one classic script with its existing globals, page ordering,
 and behavior. Splitting it into modules belongs in later pull requests. This
 registration covers only the dashboard runtime; other fleet pages and their
 assets retain their existing release workflows.
+
+## Fleet pilot report copy source
+
+`fleet-pilot-report.js` is registered in copy mode at
+`src/fleet-pilot-report.js`. Its initial bytes equal the active
+`fleet-pilot-report.v68.js`. Registration changes no served asset, page reference,
+integrity pin, service-worker cache or report behavior. Both release modes are
+exact no-ops until the source changes. Future edits use `asset:release`.
+
+The report remains a classic script. Its owner, freshness, telemetry and privacy
+checks, sign-out invalidation and print restrictions remain covered against the
+released output. Source registration does not permit raw motion, personal media
+or coordinates in protected reports. The release regression exercises the real
+report source, fleet page references, cache, immutable headers and retained hashes.
+
+The report stylesheet is also registered separately in copy mode at
+`src/fleet-pilot-report.css`, initially byte-identical to
+`fleet-pilot-report.v56.css`. This registration changes no served CSS, page SRI,
+manifest or cache identity; unchanged source remains an exact no-op. Future edits
+use `asset:release` to generate a fresh immutable stylesheet and synchronize owned
+HTML references and integrity-manifest entries. The report assets remain outside the default
+offline asset lists. Real-source regressions exercise JS and CSS independently,
+including no-op snapshots, retained hashes, exact page rewrites, immutable headers and the
+single cache advance without unrelated worker-list changes.
+
+## Fleet follow-up stylesheet copy source
+
+`fleet-followups.css` is registered separately in copy mode at
+`src/fleet-followups.css`, initially byte-identical to the active
+`fleet-followups.v67.css`. Registration changes no served stylesheet, page
+reference, integrity entry or cache identity. Both release modes remain exact
+no-ops until its source changes. Future edits use `asset:release` to choose a
+fresh immutable URL and update the fleet page and integrity manifest together.
+
+The real-source release regression covers this stylesheet independently from
+report JS/CSS: unchanged snapshots, a CSS comment edit, generated output equality,
+retained hashes, exact page rewrites, ordered immutable headers and one cache
+advance without worker-list changes. The stylesheet remains outside the default
+offline lists and under existing source deployment exclusions. Existing fleet
+follow-up browser checks retain their mobile layout and protected session
+behavior assertions; source registration changes none of those contracts.
+
+## Fleet follow-up script copy source
+
+`fleet-followups.js` is also registered separately in copy mode at
+`src/fleet-followups.js`, initially byte-identical to the active
+`fleet-followups.v67.js`. Registration creates no new runtime URL, integrity
+entry or cache identity. The source remains one classic script; source edits
+use `asset:release`, and unchanged source is an exact no-op in both release modes.
+
+The real fleet-source regression exercises this script independently alongside
+report JS/CSS and follow-up CSS, retaining immutable hashes, exact page rewrites,
+ordered headers and the single cache advance without worker-list changes.
+Existing follow-up browser coverage retains its protected-context invalidation,
+conflict, reload and mobile-layout assertions. Registration changes no account,
+consent, server authority, stored follow-up or report behavior. The script stays
+outside the default offline asset lists; its source stays excluded from deployment.
+
+## Fleet History stylesheet copy source
+
+`fleet-history-page.css` is registered in copy mode at
+`src/fleet-history-page.css`, initially byte-identical to the active
+`fleet-history-page.v67.css`. Registration changes no served stylesheet, page
+reference, integrity entry or cache identity. Unchanged source is an exact
+no-op in ordinary and dry-run release modes; future edits use `asset:release`.
+
+The real-source release fixture covers a CSS comment edit, generated output
+and integrity, retained immutable hashes, the exact History page filename
+rewrite, ordered immutable headers and one cache advance without worker-list
+changes. It also runs the existing History page regressions against the
+fixture's active assets, preserving protected-context invalidation, saved
+preferences, date recovery and export contracts. Browser checks continue to
+exercise History controls and layout against the unchanged served stylesheet.
+The stylesheet stays outside the worker asset lists; its editable source stays
+excluded from deployment and offline caching. This registration changes no
+account, consent, server filter, loaded-record limit or print behavior.
+
+## Fleet History script copy source
+
+`fleet-history-page.js` is registered in copy mode at
+`src/fleet-history-page.js`, initially byte-identical to the active
+`fleet-history-page.v71.js`. The classic script keeps its existing globals and
+protected-context, preference, filtering, export and print behavior.
+Registration changes no served URL, bytes, page references, manifests or cache.
+
+The real-source release fixture exercises this script independently alongside
+History CSS and the report/follow-up assets. Unchanged ordinary and dry-run
+releases are exact no-ops. A comment edit verifies generated output and integrity,
+retained hashes, exact page rewrites, ordered immutable headers and the worker's
+exact active URL replacement plus one cache advance. The generated History
+script must remain in `NETWORK_ONLY_ASSETS`; it is not added to offline caches.
+Existing History page behavior regressions run against the fixture's active
+script after release. Source remains excluded from deployment and offline lists.
+This migration does not broaden server filters, record limits or account authority.

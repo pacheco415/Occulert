@@ -1,7 +1,7 @@
 import "./camera.js";
 import { signalDetectionResult } from "./detector.js";
 import { updateCalibration } from "./calibration.js";
-import { scoringSmooth, scoringNodHistory, scoringNodDetected, scoringResetContinuity, scoringNoFace, scoringCalibrationFrame, scoringConfidence, scoringEyeMetrics, scoringTrackedFrame, scoringDistractionSeconds, scoringAlertCandidate, scoringDistractionMatured } from "./scoring-core.js";
+import { scoringSmooth, scoringNodHistory, scoringNodDetected, scoringResetContinuity, scoringNoFace, scoringCalibrationFrame, scoringConfidence, scoringEyeMetrics, scoringTrackedFrame, scoringYawn, scoringDistractionSeconds, scoringAlertCandidate, scoringDistractionMatured } from "./scoring-core.js";
 import { alerts, escalationLevel, tone, trigger, speak, triggerBreakCheck } from "./alerts.js";
 import "./storage-history.js";
 import { queueBackendEvent } from "./cloud-sync.js";
@@ -225,7 +225,8 @@ export function detectYawn(lm) {
             log('Yawn detected (MAR=' + mar.toFixed(2) + ')');
             queueBackendEvent('yawn');
             triggerBreakCheck('yawn');
-            set_fatigue(Math.min(100, fatigue + 8));
+            scoringApplyMetricState(scoringYawn(scoringMetricState()));
+            experimentController?.recordScoringYawn?.();
         }
     }
     else {

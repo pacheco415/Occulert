@@ -163,9 +163,13 @@ physical alert perception or support changing the default pattern.
 
 ## Offline scoring replay
 
-New observer/Tasks exports use trace version 2 with bounded explicit scoring inputs,
-initial state and phase clocks. The measurement/episode adapter continues to accept
-versions 1 and 2 under its existing exact owned-source provenance checks. Version 1
-lacks the inputs required for replay and never becomes a fabricated zero-alert run.
+New observer/Tasks exports use trace version 3 with bounded explicit scoring inputs,
+initial state, phase clocks and actual accepted-yawn events. The measurement/episode
+adapter accepts versions 1, 2 and 3 under its existing exact owned-source provenance
+checks. Version 1 lacks scoring inputs, and version 2 lacks accepted-yawn history;
+both are explicitly unavailable for scoring replay. Each variant applies the
+recorded accepted event after frame scoring and before alert eligibility. This
+fixed observed event does not reconstruct MAR or detector decisions under
+counterfactual calibration rules.
 See [SCORING_REPLAY.md](SCORING_REPLAY.md) for commands, variant outputs, unsupported
 capabilities, timing limits and synthetic parity evidence.

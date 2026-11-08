@@ -71,6 +71,9 @@ definition exists.
 | `minSources` | 1 | Camera plus one independent source: the two-sensor gate |
 
 The test suite fails if either native constant changes without this runner.
+Only headphone and road currently define candidate kinds. `minSources: 3`
+therefore produces no added cues while Watch remains coverage-only; it does
+not treat a connected Watch as a corroborating observation.
 
 1. A camera candidate counts only while camera tracking was usable.
 2. An accessory candidate counts only while that accessory was usable. Coverage
@@ -78,6 +81,12 @@ The test suite fails if either native constant changes without this runner.
 3. A cue fires when at least `minSources` distinct accessory sources each have a
    candidate within `windowMs` of the camera candidate, before or after it. It
    fires at the later of the signals; the policy never acts before the evidence.
+   Every selected signal must remain within the same merged usable interval
+   from its observation through the cue time. An interval's end is exclusive:
+   a cue exactly at tracking loss or disconnection is rejected. Recovery never
+   revives an older candidate across a gap, including a one-millisecond gap.
+   Adjacent intervals merge and remain continuous. An accessory may connect
+   after the camera candidate if it supplies fresh evidence before the cue.
 4. Each accessory candidate corroborates at most once. Camera candidates never
    corroborate each other.
 5. A cue within `refractoryMs` after any camera alert or earlier added cue is
@@ -86,6 +95,13 @@ The test suite fails if either native constant changes without this runner.
    corroborated stream is missing any camera alert.
 
 These values are proposals for evaluation, not approved app behavior.
+The report identifies the fixed rule as
+`policy.continuity: "same-usable-interval-through-cue"`. Candidate selection
+walks possible cue times in order and replaces expired source evidence with
+fresh evidence after reconnect; invalid pairs consume no candidates. The native
+fusion observation counter shares the coincidence-window value but does not
+implement this replay continuity rule. Its aggregate counts cannot substitute
+for replay results, and no native behavior is changed by this tool.
 
 ## Report
 
@@ -99,7 +115,9 @@ than one detector is present.
   defined in the [event benchmark](EVENT_BENCHMARK.md#metric-definitions-and-limits).
 - **`delta`:** corroboration pairs, added cues, cues dropped by the cooldown,
   added cues outside every labeled episode, newly detected episodes, episodes
-  detected earlier and the median time gained.
+  detected earlier and the median time gained. Pairs count continuity-valid
+  combinations only; rejected discontinuous combinations are not counted
+  separately.
 - **`coverage`:** for each accessory, the share of usable camera time it
   covered, fully tracked episodes it fully covered and candidates seen while
   usable.
