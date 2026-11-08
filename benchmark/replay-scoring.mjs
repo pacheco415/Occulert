@@ -9,7 +9,7 @@ import { toCsv } from './prepare-dataset.mjs';
 import { validateProvenance } from './parked-detection-trace.mjs';
 import { sourceSnapshot, contentSha256 } from './provenance.mjs';
 import { scoringSmooth, scoringNodHistory, scoringNodDetected, scoringResetContinuity, scoringSensitivityThresholds,
-    scoringEyeMetrics, scoringAlertCandidate, scoringDistractionMatured, scoringTriggerEligible } from '../src/scoring-core.js';
+    scoringEyeMetrics, scoringYawn, scoringAlertCandidate, scoringDistractionMatured, scoringTriggerEligible } from '../src/scoring-core.js';
 import { scoringUpdateCalibration, scoringReplayFrame } from './scoring-step.mjs';
 
 export const REPLAY_EPOCH_MS = 1700000000000;
@@ -46,16 +46,17 @@ function stateValid(state) {
 }
 function capability(trace) {
     const session = trace?.session;
-    if (trace?.schema !== 'occulert.parked-detection-trace' || ![1,2].includes(trace.version)
+    if (trace?.schema !== 'occulert.parked-detection-trace' || ![1,2,3].includes(trace.version)
         || session?.platform !== 'web' || !/^[A-Za-z0-9_-]{1,128}$/.test(session.sessionId ?? '')
         || !finite(session.durationMs) || session.durationMs <= 0 || !Array.isArray(trace.samples) || trace.samples.length > 20000) throw Error('Invalid parked trace header');
     validateProvenance(session);
     if (trace.version === 1) return { reason: 'Trace v1 omits initial scoring state and face/turn/nod/clock inputs; replay is unavailable.' };
+    if (trace.version === 2) return { reason: 'Trace v2 omits accepted-yawn inputs; scoring replay is unavailable because their score and alert effects cannot be reconstructed.' };
     if (session.geometryUnits !== 'normalized' || session.experimentFlags.includes('pixels') || session.experimentFlags.includes('pitch'))
         return { reason: 'Pixel/pitch preprocessing cannot be converted to normalized released signals without the original landmarks.' };
     const replay = trace.scoringReplay;
     if (!exactKeys(replay, ['version','epochMs','initialState','initialSettings','frames','controls','droppedFrames','droppedControls','invalidatedFrames'])
-        || replay.version !== 1 || replay.epochMs !== REPLAY_EPOCH_MS || !stateValid(replay.initialState)
+        || replay.version !== 2 || replay.epochMs !== REPLAY_EPOCH_MS || !stateValid(replay.initialState)
         || !settingsValid(replay.initialSettings) || !Array.isArray(replay.frames) || !Array.isArray(replay.controls)
         || replay.frames.length > 2400 || replay.controls.length > 256
         || !['droppedFrames','droppedControls','invalidatedFrames'].every(key => Number.isSafeInteger(replay[key]) && replay[key] >= 0)) throw Error('Invalid scoring replay metadata');
@@ -66,11 +67,11 @@ function capability(trace) {
     let previousId = 0, previousAt = -1;
     for (let index = 0; index < replay.frames.length; index++) {
         const row = replay.frames[index], sample = trace.samples[index];
-        if (!exactKeys(row, ['order','frameId','atMs','wallMs','rawEar','ear','hasFace','faceMissing','turned','nod','noseY','sensitivity','clocks'])
+        if (!exactKeys(row, ['order','frameId','atMs','wallMs','rawEar','ear','hasFace','faceMissing','turned','nod','yawn','noseY','sensitivity','clocks'])
             || row.frameId !== previousId + 1 || row.frameId !== sample?.frameId || !finite(sample.atMs) || sample.atMs < 0
             || !finite(row.atMs) || row.atMs < sample.atMs || row.atMs < previousAt || row.atMs > session.durationMs
             || !finite(row.wallMs) || Math.abs(row.wallMs) > 8e15 || !['low','medium','high'].includes(row.sensitivity)
-            || !['hasFace','faceMissing','turned','nod'].every(key => typeof row[key] === 'boolean')
+            || !['hasFace','faceMissing','turned','nod','yawn'].every(key => typeof row[key] === 'boolean')
             || !row.clocks || typeof row.clocks !== 'object' || Array.isArray(row.clocks)
             || !row.clocks.score || row.clocks.score.wallMs !== row.wallMs
             || Object.entries(row.clocks).some(([phase,point]) => !clockPhases.includes(phase)
@@ -78,6 +79,7 @@ function capability(trace) {
                 || point.atMs < sample.atMs || point.atMs > session.durationMs)) throw Error('Invalid or missing scoring frame');
         if (row.hasFace && (row.faceMissing || !finite(row.rawEar) || row.rawEar <= 0 || row.rawEar > 1 || !finite(row.ear) || !finite(row.noseY)))
             return { reason: 'A tracked observation has invalid or missing raw EAR/nose signals; no healthy/open state is invented.' };
+        if (!row.hasFace && row.yawn) throw Error('Accepted yawn requires a tracked face');
         if (!row.hasFace && (!row.faceMissing || row.rawEar !== null || row.ear !== null || row.noseY !== null || row.turned || row.nod))
             return { reason: 'Invalid tracked-face geometry is distinct from face absence and cannot be reconstructed from this trace.' };
         if (!Number.isSafeInteger(row.order) || row.order <= 0 || orders.has(row.order)) throw Error('Invalid replay ordering');
@@ -154,6 +156,7 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
             ...(row.hasFace && state.calibrating ? { calibrationNowMs: point('calibration').wall } : {}),
             ...(row.hasFace && !state.calibrating ? { eyeNowMs: point('eye').wall } : {})},wall,
             { minimumSamples, sensitivityOffset: offset(sensitivity), stableDistraction: flags.distractionConfidence });
+        if (row.yawn) state = scoringYawn(state);
         const candidate = row.hasFace && scoringAlertCandidate(state);
         const reason = candidate === 'Distraction' ? scoringDistractionMatured(state,point('eligibility').wall) && candidate : candidate;
         if (reason) accept(reason);
@@ -172,6 +175,7 @@ export function replayScoring(trace) {
     return { schema: 'occulert.scoring-replay', version: 1, sessionId: trace.session.sessionId,
         decisionClock: 'recorded named phase clocks where observed; monotonic at_ms, normalized nonzero wall-clock epoch with zero sentinels preserved',
         counterfactualTimingLimit: 'A phase absent under the recording rules uses that observation clock and is counted in clockFallbacks. Exact sub-frame timing is not known for those counterfactual decisions.',
+        acceptedYawnPolicy: 'Apply each recorded accepted-yawn event after frame scoring and before alert eligibility in every variant, even when counterfactual calibration differs. These inputs preserve observed detector decisions; they do not reconstruct MAR, smoothing, hold time or cooldown under alternative rules.',
         signalPolicy: 'raw normalized EAR and nose/turn observations; per-variant six-frame smoothing, nod history and continuity; no interpolation',
         labelsGenerated: false, promotion: 'none', helper: { path: source.path, sha256: source.sha256 }, variants };
 }
