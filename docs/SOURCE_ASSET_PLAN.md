@@ -86,7 +86,7 @@ The report stylesheet is also registered separately in copy mode at
 `fleet-pilot-report.v56.css`. This registration changes no served CSS, page SRI,
 manifest or cache identity; unchanged source remains an exact no-op. Future edits
 use `asset:release` to generate a fresh immutable stylesheet and synchronize owned
-HTML references and integrity pins. The report assets remain outside the default
+HTML references and integrity-manifest entries. The report assets remain outside the default
 offline asset lists. Real-source regressions exercise JS and CSS independently,
-including no-op snapshots, retained hashes, page pins, immutable headers and the
+including no-op snapshots, retained hashes, exact page rewrites, immutable headers and the
 single cache advance without unrelated worker-list changes.

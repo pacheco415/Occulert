@@ -671,7 +671,8 @@ for (const logical of ['fleet-pilot-report.js', 'fleet-pilot-report.css']) test(
     assert.ok(pages.length > 0);
     for (const page of pages) {
       assert.ok(read(cwd, page).includes('/' + released));
-      assert.ok(read(cwd, page).includes(sri(readFileSync(join(cwd, released)))));
+      // Report tags currently have no SRI; preserve every other page byte and attribute.
+      assert.equal(read(cwd, page), read(root, page).replaceAll(versions[logical], released));
       assert.ok(!read(cwd, page).includes('/' + versions[logical]));
     }
     const headers = json(cwd, 'vercel.json').headers;
