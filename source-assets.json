@@ -40,6 +40,10 @@
     "fleet-followups.css": {
       "source": "src/fleet-followups.css",
       "mode": "copy"
+    },
+    "fleet-followups.js": {
+      "source": "src/fleet-followups.js",
+      "mode": "copy"
     }
   }
 }

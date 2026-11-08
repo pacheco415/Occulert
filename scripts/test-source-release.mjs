@@ -634,7 +634,7 @@ test('initial copy composes actual bundled source edits without touching source 
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
 
-for (const logical of ['fleet-pilot-report.js', 'fleet-pilot-report.css', 'fleet-followups.css']) test(`registered real ${logical} is initially a no-op and releases through owned references`, () => {
+for (const logical of ['fleet-pilot-report.js', 'fleet-pilot-report.css', 'fleet-followups.css', 'fleet-followups.js']) test(`registered real ${logical} is initially a no-op and releases through owned references`, () => {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-source-report-'));
   try {
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
