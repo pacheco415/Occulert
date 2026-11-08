@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { scoringTriggerEligible, scoringCalibrationThresholds } from '../src/scoring-core.js';
+import { scoringTriggerEligible, scoringCalibrationThresholds, scoringTrackedFrame, scoringYawn, scoringAlertCandidate } from '../src/scoring-core.js';
 import { scoringReplayFrame, scoringAlertReason } from '../benchmark/scoring-step.mjs';
 import { createReleasedScoringOracle, initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../benchmark/released-scoring-oracle.mjs';
 import { buildDriverArtifact } from './lib/driver-build.mjs';
@@ -9,9 +9,81 @@ import { mkdtempSync, mkdirSync, cpSync, writeFileSync, rmSync, symlinkSync, rea
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { landmarks } from '../tests/helpers/scoring-replay-geometry.mjs';
 
 const compiled = await buildDriverArtifact({ sourceRoot: fileURLToPath(new URL('../src', import.meta.url)),
     contractPath: fileURLToPath(new URL('../source-driver-contract.json', import.meta.url)) });
+
+test('accepted yawn preserves the +8 cap, updates the peak immediately and leaves scored averages untouched', () => {
+    for (const [fatigue, maxFatigue, expected, peak] of [[0,0,8,8],[72,75,80,80],[95,97,100,100],[100,100,100,100],[50,90,58,90]]) {
+        const before = initialScoringState({ fatigue, maxFatigue, fatigueSampleSum: 216, fatigueSampleCount: 3 });
+        const saved = structuredClone(before), after = scoringYawn(before);
+        assert.notEqual(after, before);
+        assert.deepEqual(before, saved, 'The pure event cannot mutate its input');
+        assert.deepEqual(after, { ...before, fatigue: expected, maxFatigue: peak });
+    }
+});
+
+test('a yawn crossing 80 is eligible on that frame after the normal scored sample', () => {
+    const before = initialScoringState({ calibrating: false, calibrated: true, confidence: 100,
+        fatigue: 75, maxFatigue: 75, fatigueSampleSum: 30, fatigueSampleCount: 1 });
+    const scored = scoringTrackedFrame(before, { ear: .3, turned: false, nod: false, perclos: 0 }, SCORING_EPOCH);
+    assert.equal(scored.fatigue, 72);
+    assert.equal(scoringAlertCandidate(scored), null);
+    const after = scoringYawn(scored);
+    assert.equal(after.fatigue, 80);
+    assert.equal(after.maxFatigue, 80);
+    assert.equal(scoringAlertCandidate(after), 'Fatigue');
+    assert.equal(scoringTriggerEligible(after, SCORING_EPOCH), true);
+    assert.equal(after.fatigueSampleSum, 102, 'The accepted event does not resample the frame');
+    assert.equal(after.fatigueSampleCount, 2);
+});
+
+test('the real detector keeps released hold, cooldown, scores and alerts with only immediate peak accounting changed', () => {
+    const state = initialScoringState({ calibrating:false,calibrated:true,confidence:100,fatigue:71,maxFatigue:71 });
+    const previous = createReleasedScoringOracle({state}), current = createReleasedScoringOracle({source:compiled.code,state});
+    for (const atMs of [9000,9600,10200,10201]) {
+        const points = landmarks({hasFace:true,ear:.2,mar:.8});
+        const oldState = previous.landmarks(atMs,points), newState = current.landmarks(atMs,points);
+        assert.deepEqual({...newState,maxFatigue:oldState.maxFatigue},oldState);
+    }
+    assert.equal(previous.context.maxFatigue,79,'The immutable fixture retains its old delayed peak');
+    assert.equal(current.context.maxFatigue,87);
+    assert.equal(current.context.fatigue,87);
+    assert.equal(current.context.fatigueSampleSum,304);
+    assert.equal(current.context.fatigueSampleCount,4);
+    assert.deepEqual(current.alerts,[{atMs:10201,reason:'Fatigue'}]);
+    assert.deepEqual(current.alerts,previous.alerts);
+    assert.deepEqual(current.logs,previous.logs);
+    assert.equal(current.context.yawnCount,1);
+    for (const oracle of [previous,current]) {
+        const points = landmarks({hasFace:true,ear:.3,mar:.8});
+        oracle.setClock(18201);oracle.context.detectYawn(points);
+        assert.equal(oracle.context.yawnCount,1,'Exactly 8000 ms remains inside the released cooldown');
+        oracle.setClock(18202);oracle.context.detectYawn(points);
+        assert.equal(oracle.context.yawnCount,2);
+    }
+    assert.equal(current.context.fatigue,95);
+    assert.equal(current.context.maxFatigue,95);
+    assert.equal(current.context.fatigueSampleSum,304);
+    assert.equal(current.context.fatigueSampleCount,4);
+    for (const oracle of [previous,current]) {
+        const closed = landmarks({hasFace:true,ear:.3,mar:0}), open = landmarks({hasFace:true,ear:.3,mar:.8});
+        oracle.setClock(18300);oracle.context.detectYawn(closed);
+        assert.notEqual(oracle.context._mouthOpenSince,0,'One closed sample retains the five-frame MAR hold');
+        oracle.setClock(18400);oracle.context.detectYawn(closed);
+        assert.equal(oracle.context._mouthOpenSince,0,'The second closed sample falls below the unchanged MAR threshold');
+        assert.equal(oracle.context._marHist.length,5);
+        for (const atMs of [30000,30100,30200,30300,31501]) {
+            oracle.setClock(atMs);oracle.context.detectYawn(open);
+        }
+        assert.equal(oracle.context.yawnCount,3);
+        assert.equal(oracle.context.fatigue,100,'The actual accepted detector event remains capped at 100');
+    }
+    assert.equal(current.context.maxFatigue,100);
+    assert.equal(current.context.fatigueSampleSum,304);
+    assert.equal(current.context.fatigueSampleCount,4);
+});
 
 test('the pinned independent oracle survives normal retirement of the public v97 URL and integrity entry', () => {
     const directory=mkdtempSync(join(tmpdir(),'occulert-scoring-oracle-'));
