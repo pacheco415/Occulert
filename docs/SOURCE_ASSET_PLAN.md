@@ -123,3 +123,22 @@ Existing follow-up browser coverage retains its protected-context invalidation,
 conflict, reload and mobile-layout assertions. Registration changes no account,
 consent, server authority, stored follow-up or report behavior. The script stays
 outside the default offline asset lists; its source stays excluded from deployment.
+
+## Fleet History stylesheet copy source
+
+`fleet-history-page.css` is registered in copy mode at
+`src/fleet-history-page.css`, initially byte-identical to the active
+`fleet-history-page.v67.css`. Registration changes no served stylesheet, page
+reference, integrity entry or cache identity. Unchanged source is an exact
+no-op in ordinary and dry-run release modes; future edits use `asset:release`.
+
+The real-source release fixture covers a CSS comment edit, generated output
+and integrity, retained immutable hashes, the exact History page filename
+rewrite, ordered immutable headers and one cache advance without worker-list
+changes. It also runs the existing History page regressions against the
+fixture's active assets, preserving protected-context invalidation, saved
+preferences, date recovery and export contracts. Browser checks continue to
+exercise History controls and layout against the unchanged served stylesheet.
+The stylesheet stays outside the worker asset lists; its editable source stays
+excluded from deployment and offline caching. This registration changes no
+account, consent, server filter, loaded-record limit or print behavior.
