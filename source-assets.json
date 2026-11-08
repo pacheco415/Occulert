@@ -36,6 +36,10 @@
     "fleet-pilot-report.css": {
       "source": "src/fleet-pilot-report.css",
       "mode": "copy"
+    },
+    "fleet-followups.css": {
+      "source": "src/fleet-followups.css",
+      "mode": "copy"
     }
   }
 }

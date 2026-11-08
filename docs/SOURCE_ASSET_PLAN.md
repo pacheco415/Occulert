@@ -90,3 +90,20 @@ HTML references and integrity-manifest entries. The report assets remain outside
 offline asset lists. Real-source regressions exercise JS and CSS independently,
 including no-op snapshots, retained hashes, exact page rewrites, immutable headers and the
 single cache advance without unrelated worker-list changes.
+
+## Fleet follow-up stylesheet copy source
+
+`fleet-followups.css` is registered separately in copy mode at
+`src/fleet-followups.css`, initially byte-identical to the active
+`fleet-followups.v67.css`. Registration changes no served stylesheet, page
+reference, integrity entry or cache identity. Both release modes remain exact
+no-ops until its source changes. Future edits use `asset:release` to choose a
+fresh immutable URL and update the fleet page and integrity manifest together.
+
+The real-source release regression covers this stylesheet independently from
+report JS/CSS: unchanged snapshots, a CSS comment edit, generated output equality,
+retained hashes, exact page rewrites, ordered immutable headers and one cache
+advance without worker-list changes. The stylesheet remains outside the default
+offline lists and under existing source deployment exclusions. Existing fleet
+follow-up browser checks retain their mobile layout and protected session
+behavior assertions; source registration changes none of those contracts.
