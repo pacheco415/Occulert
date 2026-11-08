@@ -1,0 +1,12 @@
+.dashboard-page #fleetFollowups .followup-filters{display:flex;flex-wrap:wrap;gap:14px;min-width:0;margin:18px 0 12px;padding:14px;border:1px solid var(--portal-border-strong);border-radius:12px}
+.dashboard-page #fleetFollowups .followup-filters legend{padding:0 6px;font-weight:750}
+.dashboard-page #fleetFollowups .followup-filter-field{display:grid;gap:6px;flex:1 1 200px;min-width:0}
+.dashboard-page #fleetFollowups .followup-filter-field label{font-size:14px;font-weight:750}
+.dashboard-page #fleetFollowups .followup-filter-field input,.dashboard-page #fleetFollowups select{box-sizing:border-box;width:100%;min-width:0;max-width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--portal-border-strong);border-radius:8px;background:var(--portal-bg);color:var(--portal-text);font:inherit;font-size:16px;line-height:1.5}
+.dashboard-page #fleetFollowups select{appearance:none;-webkit-appearance:none;height:auto;min-height:calc(1.5em + 22px);padding-right:36px;overflow:hidden;text-overflow:ellipsis;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%)!important;background-position:calc(100% - 18px) 50%,calc(100% - 12px) 50%!important;background-size:6px 6px!important;background-repeat:no-repeat!important}
+.dashboard-page #fleetFollowups input:focus-visible,.dashboard-page #fleetFollowups select:focus-visible,.dashboard-page #fleetFollowups button:focus-visible{outline:3px solid var(--portal-blue);outline-offset:3px}
+.dashboard-page #fleetFollowups .followup-counts,.dashboard-page #fleetFollowups .followup-draft-notice{font-size:13px;line-height:1.6;overflow-wrap:anywhere;color:var(--portal-muted)}
+.dashboard-page #fleetFollowups .followup-pending{color:var(--portal-accent-text);overflow-wrap:anywhere}
+.dashboard-page #fleetFollowups .followup-issue{padding:10px;border:1px solid var(--portal-border-strong);border-radius:8px;color:var(--portal-text);overflow-wrap:anywhere}
+.dashboard-page #fleetFollowups [hidden]{display:none!important}
+@media(max-width:600px){.dashboard-page #fleetFollowups .followup-filter-field{flex-basis:100%}.dashboard-page #fleetFollowups .followup-controls button{width:100%}}

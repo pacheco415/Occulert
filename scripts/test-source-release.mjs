@@ -634,7 +634,7 @@ test('initial copy composes actual bundled source edits without touching source 
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
 
-for (const logical of ['fleet-pilot-report.js', 'fleet-pilot-report.css']) test(`registered real ${logical} is initially a no-op and releases through owned references`, () => {
+for (const logical of ['fleet-pilot-report.js', 'fleet-pilot-report.css', 'fleet-followups.css']) test(`registered real ${logical} is initially a no-op and releases through owned references`, () => {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-source-report-'));
   try {
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
@@ -671,7 +671,7 @@ for (const logical of ['fleet-pilot-report.js', 'fleet-pilot-report.css']) test(
     assert.ok(pages.length > 0);
     for (const page of pages) {
       assert.ok(read(cwd, page).includes('/' + released));
-      // Report tags currently have no SRI; preserve every other page byte and attribute.
+      // These fleet tags currently have no SRI; preserve every other page byte and attribute.
       assert.equal(read(cwd, page), read(root, page).replaceAll(versions[logical], released));
       assert.ok(!read(cwd, page).includes('/' + versions[logical]));
     }
