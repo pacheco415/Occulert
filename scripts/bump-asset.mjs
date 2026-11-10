@@ -65,6 +65,13 @@ function synchronizeRegisteredSources(changes) {
   }
 }
 
+function assertUnchangedDriverStamp(selected) {
+  const driver = sourceEntries.find(entry => entry.logical === 'driver-app.js');
+  if (driver && !selected.has(manifest['driver-app.js'])) {
+    assertDriverAppVersion(sources.get(manifest['driver-app.js']), manifest, { required: driver.mode === 'bundle' });
+  }
+}
+
 function synchronizeExperimentHelper(changes) {
   const name = manifest['detection-experiments.js'];
   if (!name) return;
@@ -135,6 +142,7 @@ if (refresh) {
   try { atHead = JSON.parse(execFileSync('git', ['show', 'HEAD:asset-versions.json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); }
   catch { throw new Error('Refresh requires Git history to verify the new release is unpublished'); }
   if (Object.values(atHead).includes(filename)) throw new Error('Cannot refresh a published active asset; bump it first');
+  assertUnchangedDriverStamp(new Set(Object.values(manifest).filter(name => !Object.values(atHead).includes(name))));
   integrity[filename] = digest(sources.get(filename));
   console.log(`Refresh integrity: ${filename}`);
   const changes = new Map();
@@ -157,6 +165,9 @@ if (refresh) {
       }
     }
   }
+  // A derived stamp must never silently repair bytes under a published URL.
+  // Legacy unstamped bundles can migrate only with a selected driver release.
+  assertUnchangedDriverStamp(selected);
   // A URL already used on another prepared branch must never be reused with
   // different immutable bytes. Traverse full history and include merge diffs:
   // a conflict resolution can introduce a URL absent from both parent commits.

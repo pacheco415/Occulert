@@ -143,10 +143,14 @@ function renderDriverBundle(root, overrides) {
 }
 
 export function synchronizeSourceEntry(root, entry, expected, beforeManifest, afterManifest) {
+  const driver = entry.logical === 'driver-app.js' || entry.mode === 'bundle';
+  if (driver && beforeManifest['driver-app.js'] === afterManifest['driver-app.js']) {
+    assertDriverAppVersion(Buffer.from(expected).toString('utf8'), afterManifest, { required: entry.mode === 'bundle' });
+  }
   // This expected program is an equality proof only. Bundle output below comes
   // from recompiling actual staged modules, including the derived initializer.
-  const bytes = Buffer.from(entry.logical === 'driver-app.js' || entry.mode === 'bundle'
-    ? synchronizeDriverAppVersion(Buffer.from(expected).toString('utf8'), afterManifest)
+  const bytes = Buffer.from(driver
+    ? synchronizeDriverAppVersion(Buffer.from(expected).toString('utf8'), afterManifest, { required: entry.mode === 'bundle' })
     : expected);
   if (entry.bytes.equals(bytes)) return new Map();
   if (entry.mode === 'copy') return new Map([[entry.source, bytes], [afterManifest[entry.logical], bytes]]);

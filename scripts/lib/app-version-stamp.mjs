@@ -1,4 +1,5 @@
 import { parse } from 'acorn';
+import { analyze } from 'eslint-scope';
 import { parseRuntimeAssetPath } from './asset-paths.mjs';
 
 // A release owns this one driver binding. Consumers read the loaded driver's
@@ -35,4 +36,52 @@ export function synchronizeDriverAppVersion(source, manifest, options) {
   if (declaration.init.value === version) return source;
   const quote = source[declaration.init.start];
   return source.slice(0, declaration.init.start) + quote + version + quote + source.slice(declaration.init.end);
+}
+
+// The trace adapter must validate the actual owned consumers, not infer their
+// behavior from a matching string in a comment or from an independent version.
+export function validateParkedAppVersionSources(core, helper, manifest) {
+  assertDriverAppVersion(core, manifest, { required: true });
+  function nodes(root, predicate) {
+    const matches = [];
+    const visit = node => {
+      if (!node || typeof node !== 'object') return;
+      if (predicate(node)) matches.push(node);
+      for (const value of Object.values(node)) {
+        if (Array.isArray(value)) value.forEach(visit);
+        else if (value?.type) visit(value);
+      }
+    };
+    visit(root); return matches;
+  }
+  function consumer(source, ownerName, flagsName, owned) {
+    const ast = parse(source, { ecmaVersion: 2022, sourceType: 'script', ranges: true });
+    const owners = nodes(ast, node => node.type === 'FunctionDeclaration' && node.id?.name === ownerName);
+    if (owners.length !== 1) throw new Error('Owned parked app version consumer is missing or ambiguous');
+    const properties = nodes(owners[0], node => node.type === 'Property' && (
+      !node.computed && node.key?.type === 'Identifier' && node.key.name === 'detectorVersion'
+      || node.key?.type === 'Literal' && node.key.value === 'detectorVersion'));
+    if (properties.length !== 1) throw new Error('Owned parked app version consumer is missing or ambiguous');
+    const value = properties[0].value;
+    if (!owned && (value.type !== 'ArrowFunctionExpression' || value.async || value.params.length)) throw new Error('Invalid parked helper app version consumer');
+    const expression = owned ? value : value.body;
+    const member = (node, object, property) => node?.type === 'MemberExpression' && !node.computed && node.object?.name === object && node.property?.name === property;
+    const prefix = expression?.left, suffix = expression?.right, stamp = prefix?.left;
+    if (expression?.type !== 'BinaryExpression' || expression.operator !== '+'
+      || prefix?.type !== 'BinaryExpression' || prefix.operator !== '+'
+      || stamp?.type !== 'Identifier' || stamp.name !== APP_VERSION_BINDING
+      || prefix.right?.type !== 'Literal' || prefix.right.value !== ':parked:'
+      || suffix?.type !== 'CallExpression' || suffix.arguments.length !== 1 || suffix.arguments[0]?.value !== '+'
+      || suffix.callee?.type !== 'MemberExpression' || suffix.callee.computed || suffix.callee.property?.name !== 'join'
+      || !member(suffix.callee.object, flagsName, 'names')) throw new Error('Owned parked app version consumer does not use the driver stamp');
+    const scopes = analyze(ast, { ecmaVersion: 2022, sourceType: 'script', optimistic: false, ignoreEval: false });
+    const bindings = scopes.scopes.flatMap(scope => scope.variables).filter(variable => variable.name === APP_VERSION_BINDING);
+    const references = scopes.scopes.flatMap(scope => scope.references).filter(reference => reference.identifier === stamp);
+    if (references.length !== 1 || (owned
+      ? bindings.length !== 1 || bindings[0].scope !== scopes.globalScope || references[0].resolved !== bindings[0]
+      : bindings.length !== 0 || references[0].resolved !== null)) throw new Error('Parked app version consumer shadows the single driver stamp');
+  }
+  consumer(core, 'fleetPayload', 'experimentFlags', true);
+  consumer(helper, 'createMountedController', 'flags', false);
+  return driverAppVersion(manifest) + ':parked:';
 }

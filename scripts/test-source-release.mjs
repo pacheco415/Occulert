@@ -123,6 +123,38 @@ test('source audit and release no-op reject a consistent but incorrectly stamped
   assert.deepEqual(snapshot(cwd), before);
 }));
 
+test('unrelated release, bump and refresh reject a stale published stamp without rewriting any bytes', () => {
+  for (const operation of ['release', 'bump', 'refresh']) fixture(cwd => {
+    stampedDriver(cwd);
+    const manifest = json(cwd, 'asset-versions.json'), hashes = json(cwd, 'asset-integrity.json');
+    const stale = read(cwd, 'driver-app.v1.js').replace('web-v1', 'web-v99');
+    write(cwd, 'driver-app.v1.js', stale); write(cwd, 'src/driver-app.js', stale);
+    hashes['driver-app.v1.js'] = sha(stale);
+    manifest['style.css'] = 'style.v1.css';
+    const css = '.sample{color:blue}\n';
+    write(cwd, 'style.v1.css', css); write(cwd, 'src/style.css', css);
+    hashes['style.v1.css'] = sha(css);
+    const registry = json(cwd, 'source-assets.json');
+    registry.assets['style.css'] = { source: 'src/style.css', mode: 'copy' };
+    write(cwd, 'source-assets.json', JSON.stringify(registry));
+    write(cwd, 'asset-versions.json', JSON.stringify(manifest));
+    write(cwd, 'asset-integrity.json', JSON.stringify(hashes)); commit(cwd);
+    if (operation === 'release') write(cwd, 'src/style.css', '.sample{color:red}\n');
+    if (operation === 'refresh') {
+      manifest['style.css'] = 'style.v2.css'; hashes['style.v2.css'] = sha(css);
+      write(cwd, 'style.v2.css', '.sample{color:red}\n');
+      write(cwd, 'asset-versions.json', JSON.stringify(manifest));
+      write(cwd, 'asset-integrity.json', JSON.stringify(hashes));
+    }
+    const args = operation === 'release' ? ['--release'] : ['style.css', ...(operation === 'refresh' ? ['--refresh'] : [])];
+    const before = snapshot(cwd);
+    for (const flags of [[], ['--dry-run']]) {
+      assert.throws(() => run(cwd, ...args, ...flags), /stamp does not match/);
+      assert.deepEqual(snapshot(cwd), before, operation + ' must not repair an unchanged published driver');
+    }
+  });
+});
+
 test('failed release restores the previous stamp, runtime and manifest together', () => fixture(cwd => {
   stampedDriver(cwd);
   const before = snapshot(cwd), manifest = json(cwd, 'asset-versions.json');
