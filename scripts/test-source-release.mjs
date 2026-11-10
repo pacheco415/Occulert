@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { auditSourceAssets, commitAssetPlan, loadSourceAssets } from './lib/source-assets.mjs';
 import { INITIAL_COPY_PIN } from './lib/initial-copy-assets.mjs';
+import { assertDriverAppVersion, driverAppVersion } from './lib/app-version-stamp.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const script = join(root, 'scripts/bump-asset.mjs');
@@ -56,6 +57,86 @@ function fixture(body) {
     body(cwd, original);
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 }
+
+function stampedDriver(cwd) {
+  const manifest = json(cwd, 'asset-versions.json'), active = manifest['driver-app.js'];
+  const source = read(cwd, active) + `const WEB_APP_VERSION='${driverAppVersion(manifest)}';\n`;
+  write(cwd, active, source); write(cwd, 'src/driver-app.js', source);
+  const hashes = json(cwd, 'asset-integrity.json'); hashes[active] = sha(source);
+  write(cwd, 'asset-integrity.json', JSON.stringify(hashes)); commit(cwd);
+}
+
+test('app stamp derives only from a valid active driver version, including nested runtime paths', () => {
+  assert.equal(driverAppVersion({ 'driver-app.js': 'driver-app.v123.js' }), 'web-v123');
+  assert.equal(driverAppVersion({ 'driver-app.js': 'assets/runtime/driver-app.v123.js' }), 'web-v123');
+  for (const active of ['other.v123.js', 'driver-app.v0.js', 'driver-app.v01.js', 'driver-app.v9007199254740992.js', 'driver-app.v123.js?next=1']) {
+    assert.throws(() => driverAppVersion({ 'driver-app.js': active }));
+  }
+  assert.throws(() => assertDriverAppVersion('const WEB_APP_VERSION="web-v122";', { 'driver-app.js': 'driver-app.v123.js' }), /does not match/);
+  assert.throws(() => assertDriverAppVersion('let WEB_APP_VERSION="web-v123";', { 'driver-app.js': 'driver-app.v123.js' }), /constant/);
+  assert.throws(() => assertDriverAppVersion('const other="web-v123";', { 'driver-app.js': 'driver-app.v123.js' }, { required: true }), /constant/);
+});
+
+test('driver stamp follows source and unregistered dependency releases, reserved names and exact no-ops', () => {
+  for (const dependencyBump of [false, true]) fixture(cwd => {
+    stampedDriver(cwd);
+    // This utility is intentionally not source-registered in the bump case.
+    if (dependencyBump) {
+      const registry = json(cwd, 'source-assets.json'); delete registry.assets['utility.js'];
+      write(cwd, 'source-assets.json', JSON.stringify(registry)); commit(cwd);
+    }
+    const baseline = git(cwd, 'rev-parse', 'HEAD');
+    git(cwd, 'checkout', '-qb', 'prepared');
+    write(cwd, 'driver-app.v2.js', 'const reserved=2;\n'); commit(cwd);
+    git(cwd, 'checkout', '-q', '--detach', baseline);
+    const original = read(cwd, 'driver-app.v1.js');
+    if (!dependencyBump) write(cwd, 'src/driver-app.js', original.replace('sample=1', 'sample=2'));
+    const args = dependencyBump ? ['utility.js'] : ['--release'];
+    const pending = snapshot(cwd), plan = JSON.parse(run(cwd, ...args, '--dry-run'));
+    assert.equal(plan.copies['driver-app.v1.js'], 'driver-app.v3.js');
+    assert.deepEqual(snapshot(cwd), pending, 'planning never changes the stamp or compiled bytes');
+    run(cwd, ...args);
+    const manifest = json(cwd, 'asset-versions.json'), active = manifest['driver-app.js'];
+    assert.equal(active, 'driver-app.v3.js');
+    assertDriverAppVersion(read(cwd, active), manifest, { required: true });
+    assert.equal(read(cwd, active), read(cwd, 'src/driver-app.js'));
+    assert.equal(json(cwd, 'asset-integrity.json')[active], sha(read(cwd, active)));
+    assert.equal(read(cwd, 'driver-app.v1.js'), original);
+    auditSourceAssets(cwd);
+    commit(cwd); const released = snapshot(cwd);
+    for (const flags of [['--release'], ['--release', '--dry-run']]) {
+      assert.equal(JSON.parse(run(cwd, ...flags)).noOp, true);
+      assert.deepEqual(snapshot(cwd), released);
+    }
+  });
+});
+
+test('source audit and release no-op reject a consistent but incorrectly stamped published driver', () => fixture(cwd => {
+  stampedDriver(cwd);
+  const stale = read(cwd, 'driver-app.v1.js').replace('web-v1', 'web-v99');
+  write(cwd, 'driver-app.v1.js', stale); write(cwd, 'src/driver-app.js', stale);
+  const hashes = json(cwd, 'asset-integrity.json'); hashes['driver-app.v1.js'] = sha(stale);
+  write(cwd, 'asset-integrity.json', JSON.stringify(hashes)); commit(cwd);
+  const before = snapshot(cwd);
+  assert.throws(() => auditSourceAssets(cwd), /stamp does not match/);
+  assert.throws(() => run(cwd, '--release'), /stamp does not match/);
+  assert.deepEqual(snapshot(cwd), before);
+}));
+
+test('failed release restores the previous stamp, runtime and manifest together', () => fixture(cwd => {
+  stampedDriver(cwd);
+  const before = snapshot(cwd), manifest = json(cwd, 'asset-versions.json');
+  const source = read(cwd, 'src/driver-app.js').replace('web-v1', 'web-v2');
+  manifest['driver-app.js'] = 'driver-app.v2.js';
+  const changes = new Map([['src/driver-app.js', source], ['driver-app.v2.js', source], ['asset-versions.json', JSON.stringify(manifest)]]);
+  let calls = 0;
+  assert.throws(() => commitAssetPlan(cwd, changes, { rename(from, to) {
+    if (++calls === 3) throw new Error('Stamp fixture filesystem failure');
+    renameSync(from, to);
+  } }), /Stamp fixture filesystem failure/);
+  assert.deepEqual(snapshot(cwd), before);
+  auditSourceAssets(cwd);
+}));
 
 function initialCopy(cwd, logical = 'fixture-catalog.js', bytes = "const identity={logical:'fixture-catalog.js',source:'src/fixture-catalog.js'};\n") {
   const registry = json(cwd, 'source-assets.json');
@@ -577,6 +658,7 @@ test('a changed real driver source produces an audited guard release without cha
   try {
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
     paths.add('scripts/lib/driver-catalog-assets.mjs');
+    paths.add('scripts/lib/app-version-stamp.mjs');
     // Include reviewable registered source and active assets before Git staging.
     for (const entry of Object.values(json(root, 'source-assets.json').assets)) paths.add(entry.source);
     const contract = json(root, 'source-driver-contract.json');

@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { assertReleaseBaseline, commitAssetPlan, loadSourceAssets, synchronizeSourceEntry } from './lib/source-assets.mjs';
 import { assertInitialCopyRuntimeSource, replaceInitialCopyUrl, synchronizeInitialCopyHtml, synchronizeInitialCopyWorker } from './lib/initial-copy-assets.mjs';
 import { synchronizeDriverCatalogPins } from './lib/driver-catalog-assets.mjs';
+import { assertDriverAppVersion, synchronizeDriverAppVersion } from './lib/app-version-stamp.mjs';
 
 const root = process.cwd();
 const read = name => readFileSync(join(root, name), 'utf8');
@@ -39,12 +40,15 @@ if (release) {
   assertReleaseBaseline(root, manifest, integrity, { initCopy });
   for (const entry of sourceEntries) {
     if (entry.logical.endsWith('.js')) new Function(entry.bytes.toString('utf8'));
+    if (entry.logical === 'driver-app.js') synchronizeDriverAppVersion(entry.bytes.toString('utf8'), manifest, { required: entry.mode === 'bundle' });
     const name = entry.initial ? entry.logical : entry.active;
     const prior = releaseInputs.get(name);
     if (prior && !prior.equals(entry.bytes)) throw new Error(`Conflicting source aliases: ${entry.active}`);
     releaseInputs.set(name, entry.bytes);
   }
   if (!sourceEntries.some(entry => entry.changed)) {
+    const driver = sourceEntries.find(entry => entry.logical === 'driver-app.js');
+    if (driver) assertDriverAppVersion(driver.bytes.toString('utf8'), manifest, { required: driver.mode === 'bundle' });
     console.log(JSON.stringify({ mode: 'release', sources: sourceEntries.map(({ logical, source, active, sha256 }) => ({ logical, source, active, sha256 })), copies: {}, rewrites: [], noOp: true, dryRun: dry }, null, 2));
     process.exit(0);
   }
@@ -57,6 +61,7 @@ function synchronizeRegisteredSources(changes) {
     const filename = manifest[entry.logical];
     const bytes = changes.get(filename) ?? read(filename);
     for (const [name, source] of synchronizeSourceEntry(root, entry, bytes, beforeManifest, manifest)) changes.set(name, source);
+    integrity[filename] = digest(changes.get(filename) ?? bytes);
   }
 }
 

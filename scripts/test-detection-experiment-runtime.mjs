@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import vm from 'node:vm';
 import {createAppHarness} from './lib/app-page-harness.mjs';
+import {driverAppVersion} from './lib/app-version-stamp.mjs';
 const versions=JSON.parse(fs.readFileSync('asset-versions.json','utf8'));
 const helper=fs.readFileSync(versions['detection-experiments.js'],'utf8');
 const old=fs.readFileSync('tests/fixtures/driver-app.v80.js','utf8');
@@ -12,6 +13,14 @@ const pins=vendor.files.map(({url,integrity})=>({url,integrity}));
 function harness(query,extra={}){return createAppHarness({preloadSources:[helper],sandboxOverrides:{location:{search:query},URLSearchParams,...extra}})}
 function begin(h){h.startSession();h.run('experimentController?.begin()');}
 function calibrated(h){begin(h);h.feed({ear:.3},3400);return h;}
+
+test('parked summary and exported trace use the same loaded driver app stamp',()=>{
+ const h=calibrated(harness('?calibration-min=12'));
+ const expected=driverAppVersion(versions)+':parked:calibrationMin';
+ assert.equal(h.run('fleetPayload().detectorVersion'),expected);
+ h.run('running=false;experimentController.stop()');
+ assert.equal(h.run('experimentController.exportData().session.detectorVersion'),expected);
+});
 
 test('empty query executes exactly the released default pipeline across calibration, eyes, nods, turns, loss and recovery',()=>{
  const before=createAppHarness({sourceOverride:old}),after=harness('');before.startSession();after.startSession();
