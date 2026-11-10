@@ -317,6 +317,7 @@ export function createLocalLifecycleOperations() {
             lastYawn = 0;
             _mouthOpenSince = 0;
             _marHist = [];
+            _sessionLog = [];
             maxFatigue = 0;
             {
                 fatigueSampleSum = 0;
@@ -689,3 +690,4 @@ export function set__lastLightCheck(value) { _lastLightCheck = value; return val
 export function set__trackLostSince(value) { _trackLostSince = value; return value; }
 export function set__lastTrackingWarning(value) { _lastTrackingWarning = value; return value; }
 export function set__lastBreakPrompt(value) { _lastBreakPrompt = value; return value; }
+export function set__sessionLog(value) { _sessionLog = value; return value; }
