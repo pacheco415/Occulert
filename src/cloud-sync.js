@@ -5,7 +5,84 @@ import { fleetPayload } from "./metrics.js";
 import "./alerts.js";
 import { browserHistoryStore } from "./storage-history.js";
 import { createWebEventOutboxAdapter, webEventRetryEnabled } from "./event-outbox-adapter.js";
-import { experimentFlags, startupAllowsMonitoring, syncEl, gpsConsent, cloudConsent, running, fatigue, confidence, sessionStart, lastFleetPush, cloudReady, backendSessionId, backendSessionPromise, backendEventQueue, backendSessionGeneration, backendSessionScope, cloudConsentRevision, cloudSummaryOutbox, lastPosition, FLEET_PUSH_INTERVAL, log, localSessionId, set_lastFleetPush, set_cloudReady, set_backendSessionId, set_backendSessionPromise, set_backendEventQueue, set_backendSessionGeneration, set_backendSessionScope, set_cloudSummaryOutbox } from "./ui.js";
+import { experimentFlags, startupAllowsMonitoring, syncEl, gpsConsent, cloudConsent, running, starting, fatigue, confidence, sessionStart, lastFleetPush, cloudReady, backendSessionId, backendSessionPromise, backendEventQueue, backendSessionGeneration, backendSessionScope, cloudConsentRevision, cloudSummaryOutbox, lastPosition, FLEET_PUSH_INTERVAL, log, localSessionId, set_lastFleetPush, set_cloudReady, set_backendSessionId, set_backendSessionPromise, set_backendEventQueue, set_backendSessionGeneration, set_backendSessionScope, set_cloudSummaryOutbox } from "./ui.js";
+
+// A parked answer belongs to the account and consent period that ran the test.
+// It is sent once after an explicit answer, never stored in a retry queue.
+let parkedAlertConfirmation = null;
+export function clearParkedAlertConfirmation() {
+    parkedAlertConfirmation?.controller.abort();
+    parkedAlertConfirmation = null;
+    const panel = document.getElementById('parkedCheckConfirmation');
+    if (panel) panel.hidden = true;
+    const status = document.getElementById('parkedCheckStatus');
+    if (status) status.textContent = '';
+}
+function parkedAlertConfirmationCurrent(scope) {
+    return Boolean(scope && scope === parkedAlertConfirmation && !scope.controller.signal.aborted
+        && !experimentFlags.any && !running && !starting && !document.hidden
+        && cloudConsent.checked && scope.revision === cloudConsentRevision
+        && window.OcculertBackend === scope.backend && scope.backend.isAuthLifecycleCurrent(scope.auth));
+}
+export function beginParkedAlertConfirmation() {
+    clearParkedAlertConfirmation();
+    const backend = window.OcculertBackend;
+    if (experimentFlags.any || !cloudConsent.checked || !backend?.currentUser?.()
+        || !backend.captureAuthLifecycle || !backend.isAuthLifecycleCurrent || !backend.captureAuthContext
+        || !backend.requireAuthContext || !backend.getSession || !backend.fetchWithDeadline)
+        return null;
+    parkedAlertConfirmation = { backend, auth: backend.captureAuthLifecycle(), revision: cloudConsentRevision,
+        controller: new AbortController(), completedAt: '', ready: false };
+    return parkedAlertConfirmation;
+}
+export function showParkedAlertConfirmation(scope) {
+    if (!parkedAlertConfirmationCurrent(scope)) return;
+    const panel = document.getElementById('parkedCheckConfirmation');
+    if (!panel) return;
+    scope.completedAt = new Date().toISOString();
+    scope.ready = true;
+    for (const id of ['parkedCheckYes', 'parkedCheckNo']) {
+        const button = document.getElementById(id);
+        if (button) button.disabled = false;
+    }
+    panel.hidden = false;
+}
+export async function saveParkedAlertConfirmation(confirmed) {
+    const scope = parkedAlertConfirmation;
+    if (!parkedAlertConfirmationCurrent(scope) || !scope.ready || typeof confirmed !== 'boolean') return;
+    scope.ready = false;
+    for (const id of ['parkedCheckYes', 'parkedCheckNo']) {
+        const button = document.getElementById(id);
+        if (button) button.disabled = true;
+    }
+    const status = document.getElementById('parkedCheckStatus');
+    if (status) status.textContent = 'Saving your parked check answer…';
+    try {
+        const auth = await scope.backend.getSession();
+        if (!parkedAlertConfirmationCurrent(scope)) return;
+        const context = scope.backend.captureAuthContext();
+        if (!auth?.access_token || auth.user?.id !== scope.auth.ownerId
+            || context.auth?.access_token !== auth.access_token || context.auth?.refresh_token !== auth.refresh_token
+            || context.auth?.user?.id !== scope.auth.ownerId) throw Error('Account changed');
+        scope.backend.requireAuthContext(context);
+        const response = await scope.backend.fetchWithDeadline('/api/parked-alert-checks', {
+            method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: scope.controller.signal,
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth.access_token },
+            body: JSON.stringify({ completed_at: scope.completedAt, platform: 'web', confirmed }),
+        });
+        const result = await response.json();
+        if (!parkedAlertConfirmationCurrent(scope)) return;
+        scope.backend.requireAuthContext(context);
+        if (!response.ok || result.ok !== true || result.check?.confirmed !== confirmed
+            || result.check?.completed_at !== scope.completedAt || result.check?.platform !== 'web')
+            throw Error('Save unconfirmed');
+        if (status) status.textContent = confirmed ? 'Confirmation saved for your fleet.'
+            : 'Result saved for your fleet. Check volume, mute, Focus, and audio routing while parked.';
+    } catch (_) {
+        if (parkedAlertConfirmationCurrent(scope) && status)
+            status.textContent = 'Could not confirm this result was saved. Run the parked check again to retry.';
+    }
+}
 // Event authorization is captured at session creation, not at upload time.
 // Detaching a stopped session may drain its queue without reviving revoked work.
 let backendEventScope = null;

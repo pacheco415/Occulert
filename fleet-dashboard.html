@@ -60,7 +60,7 @@
   .dashboard-page .launch-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px}
   .dashboard-page .launch-header p{margin:6px 0 0;color:var(--portal-muted);line-height:1.5}
   .dashboard-page .launch-badge{display:inline-flex;align-items:center;min-height:32px;border:1px solid rgba(77,141,255,.4);border-radius:999px;padding:6px 11px;background:rgba(77,141,255,.1);color:var(--portal-accent-text);font-size:12px;font-weight:900;white-space:nowrap}
-  .dashboard-page .launch-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;counter-reset:launch-step}
+  .dashboard-page .launch-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;counter-reset:launch-step}
   .dashboard-page .launch-step{counter-increment:launch-step;display:flex;flex-direction:column;min-width:0;border:1px solid var(--portal-border);border-radius:16px;padding:14px;background:var(--portal-surface-strong)}
   .dashboard-page .launch-step:before{content:counter(launch-step);display:grid;place-items:center;width:28px;height:28px;margin-bottom:12px;border:1px solid #4b6283;border-radius:50%;color:var(--portal-muted);font-size:12px;font-weight:900}
   .dashboard-page .launch-step[data-state="complete"]{border-color:rgba(16,185,129,.42);background:linear-gradient(145deg,rgba(16,185,129,.08),var(--portal-surface-strong))}
@@ -125,6 +125,7 @@
       <ol class="launch-grid" aria-label="Fleet pilot launch steps">
         <li class="launch-step" id="launchFleetStep" data-state="pending"><h3>Create the fleet</h3><p>Set the protected owner workspace.</p><a class="btn" href="/fleet-onboarding.html">Fleet setup</a><span class="launch-status" id="launchFleetStatus">Sign in to begin</span></li>
         <li class="launch-step" id="launchDriversStep" data-state="pending"><h3>Add pilot drivers</h3><p>Invite a small group and confirm they join.</p><a class="btn" href="/fleet-onboarding.html">Invite drivers</a><span class="launch-status" id="launchDriversStatus">0 of 5 active drivers</span></li>
+        <li class="launch-step" id="launchParkedStep" data-state="pending"><h3>Confirm a parked alert check</h3><p>Drivers report whether they heard or felt the test. Uses the current active roster; a confirmation does not establish fitness to drive.</p><a class="btn" href="/app.html">Open parked check</a><span class="launch-status" id="launchParkedStatus">Sign in to view parked check confirmations</span></li>
         <li class="launch-step" id="launchSessionStep" data-state="pending"><h3>Record first session</h3><p>Have a driver complete one protected session.</p><a class="btn" href="/app.html">Open driver app</a><span class="launch-status" id="launchSessionStatus">Waiting for first session</span></li>
         <li class="launch-step" id="launchDisplayStep" data-state="pending"><h3>Open shared display</h3><p>Use the aggregate-only view for manager visibility.</p><a class="btn" href="/fleet-display.html">Open TV display</a><span class="launch-status" id="launchDisplayStatus">Available after fleet setup</span></li>
         <li class="launch-step" id="launchReviewStep" data-state="pending"><h3>Review outcomes</h3><p>Use the agreed day-7 and day-30 review dates.</p><a class="btn" href="#pilotValueTitle">Review results</a><span class="launch-status" id="launchReviewStatus">Trial dates confirmed separately</span></li>
@@ -231,6 +232,6 @@
   </main>
   <div class="toast" id="toast"></div>
   <footer class="footer"><a href="/">Occulert</a> &nbsp;·&nbsp; <a href="/app.html">Driver App</a> &nbsp;·&nbsp; <a href="/privacy.html">Privacy</a><div style="margin-top:8px">© 2026 Occulert. Prototype only — not a certified safety, medical, emergency, or compliance device.</div></footer>
-<script src="/fleet-dashboard.v3.js" defer></script>
+<script src="/fleet-dashboard.v8.js" defer></script>
 </body>
 </html>

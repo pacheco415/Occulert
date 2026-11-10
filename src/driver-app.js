@@ -4,7 +4,7 @@ import { applySensitivity, sensitivityLevel } from "./calibration.js";
 import "./metrics.js";
 import { escalationLevel, demoAlert, VOICE_MSGS, _voiceEnabled, initializeVoicePreference, voiceUi, speak, toggleVoice, triggerBreakCheck, dismissBreak, registerAcceptedAlertHook, set_alerts, set_escalationLevel } from "./alerts.js";
 import { logEvent, exportCSV, browserHistoryStore } from "./storage-history.js";
-import { queueBackendEvent, getCloudSummaryOutbox, retryCloudSummaries, initCloud, changeWebEventConsent, initializeWebEventConsent } from "./cloud-sync.js";
+import { queueBackendEvent, getCloudSummaryOutbox, retryCloudSummaries, initCloud, changeWebEventConsent, initializeWebEventConsent, clearParkedAlertConfirmation, saveParkedAlertConfirmation } from "./cloud-sync.js";
 import { uiText, getPreference, experimentFlags, experimentController, startupAllowsMonitoring, demoBtn, calibrationEl, calibrationFill, alertsEl, alertScreen, logEl, reportEl, nodsEl, perclosEl, microsleepsEl, distractionEl, escalationEl, cloudConsent, cameraSourceSelect, cameraRefreshBtn, running, starting, fatigue, cloudConsentRevision, cloudSummaryClearPending, hiddenAt, CALIBRATION_MS, log, render, _sessionLog, initChart, updateChart, _isIOS, _isStandalone, triggerPWAInstall, loadExperimentController, publishDriverReadiness, initializeLocalLifecycle, handleVisibilityChange, startBtn, localSessionId, start, stop, set_unavailableCameraDeviceId, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_cloudConsentRevision, set_cloudSummaryClearPending, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_turnedSince, set_totalDistractionMs, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold, set_calibrating, set_calibrated, set_calibrationUntil, set_calibrationSamples, set_hiddenAt } from "./ui.js";
 initializeWebEventConsent();
 initializeLocalLifecycle();
@@ -38,6 +38,14 @@ if (recalBtn) {
 }
 ;
 demoBtn.onclick = demoAlert;
+document.getElementById('parkedCheckYes')?.addEventListener('click', () => { void saveParkedAlertConfirmation(true); });
+document.getElementById('parkedCheckNo')?.addEventListener('click', () => { void saveParkedAlertConfirmation(false); });
+window.addEventListener('occulert:auth-lifecycle', clearParkedAlertConfirmation);
+window.addEventListener('storage', event => {
+    if (event.key === 'occulert-auth' || event.key === null) clearParkedAlertConfirmation();
+});
+window.addEventListener('pagehide', clearParkedAlertConfirmation);
+document.addEventListener('visibilitychange', () => { if (document.hidden) clearParkedAlertConfirmation(); });
 const resetBtn = document.getElementById('resetBtn');
 if (resetBtn) {
     resetBtn.onclick = () => {
@@ -103,6 +111,7 @@ if (feedbackForm)
     });
 document.addEventListener('visibilitychange', () => { void handleVisibilityChange(); });
 cloudConsent.addEventListener('change', () => {
+    clearParkedAlertConfirmation();
     if (experimentFlags.any) {
         cloudConsent.checked = false;
         return;

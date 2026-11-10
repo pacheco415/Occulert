@@ -8,7 +8,7 @@ import "./calibration.js";
 import { scoringReadWallClock } from "./metrics.js";
 import "./storage-history.js";
 import { scoringTriggerEligible } from "./scoring-core.js";
-import { pushFleet } from "./cloud-sync.js";
+import { pushFleet, beginParkedAlertConfirmation, showParkedAlertConfirmation } from "./cloud-sync.js";
 import { uiText, getPreference, setPreference, experimentFlags, experimentController, startupAllowsMonitoring, alertsEl, alertScreen, alertTitle, alertSub, nightOpacity, running, starting, confidence, sessionStart, calibrating, log, _lastBreakPrompt, set__lastBreakPrompt } from "./ui.js";
 export let acceptedAlertHook = /** @type {((reason:string)=>void)|null} */ (null);
 /** @param {(reason:string)=>void} hook */
@@ -391,6 +391,7 @@ export function trigger(reason, eligibility) {
 export function demoAlert() {
     if (experimentFlags.observer || !startupAllowsMonitoring() || running || starting)
         return;
+    const confirmation = beginParkedAlertConfirmation();
     const result = document.getElementById('alertCheckResult');
     const audioOwner = beginAlertAudioScope();
     _alertTestOwner = audioOwner;
@@ -409,6 +410,7 @@ export function demoAlert() {
     setTimeout(() => {
         clearParkedAlertTest(audioOwner);
         releaseAlertAudioScope(audioOwner);
+        showParkedAlertConfirmation(confirmation);
     }, strongAlertPattern ? 2500 : 1800);
 }
 /** @type {boolean | undefined} */
