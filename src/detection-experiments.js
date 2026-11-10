@@ -11,10 +11,10 @@
     const selected = { elapsed: matches('fatigue-timing', 'elapsed'), pixels: matches('ear-units', 'pixels'),
       tasks: matches('detector', 'tasks'), noface: matches('noface-escalation', '1'),
       timePerclos: matches('perclos', 'time'), pitch: matches('pitch-gate', '1'),
-      distractionConfidence: matches('distraction-confidence', 'stable'), observer: matches('observer', '1'), calibrationMin: matches('calibration-min', '12') };
+      distractionConfidence: matches('distraction-confidence', 'stable'), observer: matches('observer', '1'), calibrationMin: matches('calibration-min', '12'), turnFatigue: matches('turn-fatigue', 'hold') };
     const names = Object.keys(selected).filter(key => selected[key]).sort();
     return Object.freeze({ ...selected, names: Object.freeze(names), any: names.length > 0,
-      primary: names.some(name => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin'].includes(name)), delegate: matches('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+      primary: names.some(name => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin', 'turnFatigue'].includes(name)), delegate: matches('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
   }
 
   function eyeEAR(landmarks, indices, width, height) {
@@ -524,7 +524,7 @@
       if (pitchUnknown) { b.write(s); return; }
       if (turned || pitchDown) {
         s.confidence = Math.max(35, s.confidence - 5 * scale);
-        if (!pitchDown && s.turnedSince && wall - s.turnedSince > 3000) s.fatigue += 2 * scale;
+        if (!pitchDown && s.turnedSince && wall - s.turnedSince > 3000) s.fatigue += flags.turnFatigue ? 0 : 2 * scale;
         else s.fatigue = Math.max(0, s.fatigue - scale);
       } else {
         if (nod) s.fatigue += 18;

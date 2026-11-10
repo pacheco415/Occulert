@@ -267,6 +267,17 @@ test('stable distraction confidence has exact independent and combined flag sema
  }
 });
 
+test('turn hold is an exact independent non-primary parked flag', () => {
+ const selected=parseFlags('?turn-fatigue=hold');
+ assert.equal(selected.turnFatigue,true);assert.equal(selected.any,true);assert.equal(selected.primary,false);
+ assert.deepEqual(selected.names,['turnFatigue']);
+ const combined=parseFlags('?turn-fatigue=hold&fatigue-timing=elapsed');
+ assert.equal(combined.primary,true);assert.deepEqual(combined.names,['elapsed','turnFatigue']);
+ for(const query of ['?turn-fatigue=hold&turn-fatigue=hold','?turn-fatigue=hold&turn-fatigue=off','?turn-fatigue=Hold','?turn-fatigue=true','?turn-fatigue=hold%20']){
+  assert.equal(parseFlags(query).any,false,query);
+ }
+});
+
 test('Tasks parsing records unsupported signals as null and rejects duplicate or invalid coefficients', () => {
   const result = { faceLandmarks: [[{}]], faceBlendshapes: [{ categories: [
     {categoryName:'eyeBlinkLeft',score:.2},{categoryName:'eyeBlinkRight',score:.8},{categoryName:'jawOpen',score:.3}

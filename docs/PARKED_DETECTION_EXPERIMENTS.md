@@ -11,6 +11,7 @@ These opt-in web experiments are for stationary software evaluation. The empty-q
 | `pitch-gate=1` | Calibrate a dimensionless neutral nose/eye/chin ratio while parked; pause eye/microsleep evidence while down or while calibrated pitch geometry is unknown. |
 | `calibration-min=12` | Keep the released calibration formula but require at least 12 samples; local-only and non-primary, identified as `calibrationMin`. |
 | `distraction-confidence=stable` | Use the calibrated confidence rule during a tracked head turn even after calibration falls back to defaults. |
+| `turn-fatigue=hold` | Hold the mature-turn fatigue increment at zero; preserve early-turn decay, confidence and all eye/yawn rules. |
 | `detector=tasks` | Collect the owned Tasks detector's bilateral blink, jaw and matrix measurements alongside the legacy detector on the same captured frame. Tasks does not control alerts. |
 | `observer=1` | An independent observer marks parked episodes; detector indicators and cues are withheld while scoring and decision timestamps continue. |
 | `tasks-delegate=cpu` | Explicitly request CPU for the optional Tasks runtime; its default is GPU. No silent fallback. |
@@ -146,6 +147,31 @@ combined with the other parked modes. Used alone, it retains the ordinary
 scoring path; primary experimental modes apply the same confidence rule in
 their controller. Keep it off by default until labeled parked evaluation
 supports changing the released behavior.
+
+## Parked head-turn fatigue hold
+
+`turn-fatigue=hold` removes only the two fatigue points added per processed frame
+after a tracked head turn exceeds 3000 ms. The score holds its current value
+instead of increasing from that term. The existing one-point decay before and
+at that boundary remains unchanged. This does not erase fatigue already present,
+prevent an accepted yawn from adding its existing eight points, exclude turned
+frames from PERCLOS or microsleep timing, or change frontal/recovery scoring.
+
+The option is local-only and non-primary when used alone. Both the ordinary
+scoring adapter and combined primary experiment controller apply it. Exact flag
+parsing, cloud suppression, provenance and summary behavior match the other
+parked experiments. No default, threshold, 6.5-second distraction delay,
+12-second alert cooldown, alert reason priority or wording changes here.
+
+The [scoring replay](SCORING_REPLAY.md) includes `turn-fatigue-hold` alongside
+`released`. Its synthetic calibrated open-eye 25-second turn at 150 ms/frame
+reaches fatigue 100 under the released policy and 0 under the held policy.
+Both produce their first Distraction alert at 6.6 seconds. At 18.6 seconds the
+released policy produces Fatigue and the held policy produces Distraction
+because their scores differ; this is the existing alert selection rule.
+Pre-existing fatigue can still take priority. The fixture validates software
+behavior only, without independently labeled accuracy or approval to promote
+the policy. Changing default alert reasons remains a separate decision.
 
 ## Independent stronger-alert audio option
 

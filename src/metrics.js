@@ -135,7 +135,7 @@ export function updateScore(ear, turned, nod, hasFace, rawEar = ear, noseY = nul
     }
     set_confidence(scoringConfidence(scoringMetricState(), turned, experimentFlags.distractionConfidence));
     const perclos = updateEyeMetrics(ear, turned);
-    scoringApplyMetricState(scoringTrackedFrame(scoringMetricState(), { ear, turned, nod, perclos }, now));
+    scoringApplyMetricState(scoringTrackedFrame(scoringMetricState(), { ear, turned, nod, perclos }, now, experimentFlags.turnFatigue));
 }
 export function riskText() {
     if (running && noFaceSince && Date.now() - noFaceSince > 2500)
