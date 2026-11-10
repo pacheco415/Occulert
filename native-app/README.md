@@ -74,15 +74,39 @@ mounted History interactions using the actual TSX components with React. The
 History fixtures substitute native storage, navigation and sharing bridges;
 they do not establish physical device or signed-binary acceptance.
 
+The [unanswered-alert observer](../docs/UNANSWERED_ALERT_OBSERVATION.md) is a
+default-off local experiment. It counts only aggregate candidates following
+accepted critical phone software output and further fresh closed-eye samples;
+it sends no messages and establishes neither perception nor vehicle movement.
+Ordinary sessions collect none of these diagnostics. Root verification covers
+its pure model; native verification also covers the actual output/analysis
+adapters, local recovery and privacy boundaries.
+
+The separately default-off [phone activity experiment](../docs/MOTION_ACTIVITY_OBSERVATION.md)
+can label those local counts with fresh activity estimates after an explicit
+Start. Automotive and stationary classifications can overlap and do not prove
+vehicle movement. Both experiment flags must be enabled; ordinary sessions
+make no new activity requests. Device permission and transition acceptance
+remain open, and no messaging or alert changes are included.
+
+Settings also contains optional [Apple emergency-readiness guides](../docs/EMERGENCY_READINESS_GUIDANCE.md),
+linked from Pre-drive for review while safely parked. They explain Medical ID,
+contacts, Emergency SOS, supported Crash Detection, Ultra Siren and Watch haptics
+through Apple’s own instructions. Occulert does not inspect or change those
+settings, activate emergency features or confirm readiness. This is reference
+guidance; exact-build readability and browser-return checks remain open.
+
 SDK 58 generates the UIKit scene lifecycle during prebuild. The current camera
 stack still requires a physical-device build: Google ML Kit 8 excludes arm64
 simulators, while the iPhone Duo simulator runs only arm64. Do not clear that
 exclusion to claim simulator support. See [upgrade details](UPGRADE_README.md).
+The separate [Simulator Trace variant](docs/SIMULATOR_TRACE.md) omits ML Kit
+and feeds the real scoring path with synthetic input for layout/flow checks.
 
 ### Run
 ```bash
-# iOS simulator
-npx expo start --ios
+# iOS Simulator layout/scoring variant, with synthetic input
+npm run ios:simulator-trace -- --device SIMULATOR_UUID
 
 # Android emulator  
 npx expo start --android
@@ -309,6 +333,37 @@ stronger repeated direct haptic. Settings only enables the Watch switch when
 iOS confirms that the companion is installed and includes a direct Watch alert
 test. Expo Go remains a safe no-op because it cannot contain the Watch target.
 
+The implemented source repeats the three-tap critical pattern every four seconds
+while the Watch app is active and the latest iPhone status reports closed eyes
+and is less than twelve seconds old. Each pattern retains its 400 ms tap spacing.
+The continuous episode ends after sixty seconds and leaves a pull-over message;
+new critical messages cannot extend that cap or add extra immediate patterns.
+Late timers do not catch up with a burst. Without an eligible closed-eye status,
+a fresh critical alert retains its original single three-tap pattern.
+
+Open eyes, an explicit stop, stale or lost tracking, a lower or replayed
+replacement alert, leaving the foreground, and receiver disposal cancel pending
+critical feedback. Returning to the foreground or receiving another closed-eye
+status does not restart canceled repetition. A fresh open-eye or stopped status
+at or after the latest alert resets the episode; a later eligible critical alert
+can start a new one. Older open/stop messages cancel feedback without renewing
+the cap, and critical messages from before an accepted reset stay silent.
+Ordinary alerts retain their two taps, 450 ms apart. The two-second incoming-feedback rule
+and authorized background notification path remain unchanged.
+
+Software verification compiles the actual receiver in the target's Swift 5 mode,
+plus its policy and lifecycle in Swift 6. The strict lane omits only unchanged
+framework delegate callbacks; the full lane exercises those callbacks too.
+Both use controlled clocks and small WatchConnectivity, notification and haptic
+stand-ins. They cover repeat
+cadence, per-tap cancellation, freshness boundaries, replacement ordering, the
+nonrenewable cap, delayed callbacks, lifecycle wiring and receiver disposal,
+alongside the existing background notification cases. It does not build the
+watchOS application or establish physical haptic timing, delivery or perception.
+The four-second repetition and sixty-second cap need exact-build checks on a
+paired Watch, including wrist lowering, app switching, open/stop updates,
+notification permissions, Focus and sustained closed-eye status.
+
 Build and submit both targets together with the production EAS profile. On the
 physical devices, open the Occulert Watch app, enable background alerts, confirm
 the iPhone reports the companion as installed, opt into Watch alerts, and test
@@ -357,3 +412,38 @@ Each alert sends: `{ type: 'occulert-alert', level, perclos, at }` where
 The installed face detector requires Android API 26 (Android 8.0) or later.
 `expo-build-properties` sets that minimum during managed prebuild. Older Android
 versions are unsupported; do not override the detector's manifest requirement.
+
+### Camera location and microphone permissions
+
+The VisionCamera config plugin explicitly sets `enableLocation: false` and
+`enableMicrophonePermission: false`. Managed iOS prebuild writes
+`$VCEnableLocation=false` into the Podfile, selecting the library's disabled
+location path. On Android, these options leave location and audio-recording
+permissions out of this plugin's additions. The existing camera-purpose text
+and frame-processor defaults remain unchanged.
+
+This setting addresses the linked location code without adding location access
+or a location-purpose string. Verify the exact rebuilt signed archive and
+Apple's ingestion result before recording the location warning as resolved;
+configuration alone does not prove that every location symbol was removed.
+
+### Android permissions
+
+The app declares `CAMERA` for foreground monitoring and parked camera setup,
+`VIBRATE` for haptic alerts, and retains the existing `WAKE_LOCK` declaration.
+The installed `expo-keep-awake` uses the activity's `FLAG_KEEP_SCREEN_ON`, which
+does not require `WAKE_LOCK`; retaining that permission is separate from the
+foreground-service removal.
+
+`FOREGROUND_SERVICE` is no longer app-declared. The `expo-audio` plugin's
+`enableBackgroundPlayback: false` also prevents its default Android media
+playback service and foreground-service permissions from being generated.
+Android recording remains disabled. The explicit iOS `UIBackgroundModes: ["audio"]`
+and runtime short-cue playback policy remain in place so the existing iOS
+foreground-loss warning can finish.
+
+The packaging tests pin the app-declared list and exercise the installed audio
+plugin's Android manifest and iOS plist changes in memory. Dependencies and the
+native template can contribute other permissions, such as audio settings or
+network access; these tests do not establish the complete Gradle-merged manifest,
+a signed Android build, or physical-device acceptance.

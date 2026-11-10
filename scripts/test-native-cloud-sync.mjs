@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 
 const cloud = read('native-app/lib/cloudSync.ts');
-const monitor = read('native-app/app/monitor.tsx');
+const monitorOwners = readNativeMonitorSourceOwners();
+const monitor = monitorOwners.screen;
 const settings = read('native-app/app/settings.tsx');
 const historyOwners = readHistorySourceOwners(read);
   const history = historyOwners.screen;
@@ -182,18 +184,18 @@ assert.doesNotMatch(
 );
 
 assert.match(monitor, /beginCloudSession\(\)/);
-assert.match(monitor, /logCloudAlert\(sessionId, result\.fatigueScore, occurredAt\)/);
+assert.match(monitorOwners.cloud, /logCloudAlert\(sessionId, result\.fatigueScore, occurredAt\)/);
 const completion = read('native-app/lib/sessionCompletion.ts');
 assert.match(monitor, /finalizeCompletedNativeSession/);
 assert.match(monitor, /finish: finishCloudSession/);
 assert.match(completion, /services\.finish\(cloudId/);
 assert.match(completion, /cloudSynced: true/);
 assert.match(
-  monitor,
+  monitorOwners.analysis,
   /if \(!isRunningRef\.current \|\| stoppingRef\.current\) return;/,
   'late frame callbacks must not mutate a stopped monitoring session',
 );
-assert.match(monitor, /headNodObservationsRef\.current \+= 1/);
+assert.match(monitorOwners.analysis, /headNodObservationsRef\.current \+= 1/);
 assert.match(cloud, /Candidate head-nod observations remain local until device validation/);
 assert.match(settings, /<CloudSyncCard \/>/);
 assert.match(historyOwners.review, /This alert rating stays only on this iPhone/);
@@ -293,24 +295,16 @@ assert.match(cloud, /response\.ok \? pinnedSupabaseConfig\(body\.supabase\) : nu
 
 // Run the real loadConfig and authFetch: a config naming another host must not
 // receive the email and password.
-// Remove the few TypeScript annotations so the shipped source runs unchanged.
-const sliceSource = (start, end, annotations) => {
+// Erase types while exercising the actual pinned configuration/auth functions.
+const sliceSource = (start, end) => {
   const from = cloud.indexOf(start), to = cloud.indexOf(end, from);
   assert.ok(from >= 0 && to > from, `${start} must remain directly testable`);
-  return annotations.reduce((source, [typed, plain]) => {
-    assert.ok(source.includes(typed), `expected ${typed}`);
-    return source.replace(typed, plain);
-  }, cloud.slice(from, to));
+  return stripTypeScriptTypes(cloud.slice(from, to));
 };
-const configAndAuthSource = sliceSource('async function loadConfig', 'async function secureStoreAvailable', [
-  ['loadConfig(): Promise<PublicConfig | null>', 'loadConfig()'],
-  ['fetchJsonWithTimeout<{ supabase?: unknown }>(', 'fetchJsonWithTimeout('],
-]) + sliceSource('async function authFetch', 'function authErrorText', [
-  ['authFetch(path: string, body: Record<string, unknown>): Promise<ApiResult<AuthResponse>>', 'authFetch(path, body)'],
-  ['fetchJsonWithTimeout<AuthResponse>(', 'fetchJsonWithTimeout('],
-]);
+const configAndAuthSource = sliceSource('async function loadConfig', 'function nativeEventLogin')
+  + sliceSource('async function authFetch', 'function authErrorText');
 const makeAuthFetch = new Function('API_BASE', 'pinnedSupabaseConfig', 'fetchJsonWithTimeout',
-  `let configPromise = null;\n${configAndAuthSource}\nreturn authFetch;`);
+  `let configPromise = null;const NATIVE_EVENT_RETRY_ENABLED=false;\n${configAndAuthSource}\nreturn authFetch;`);
 const credentialRequests = [];
 const fakeTransport = publicConfig => async (url, init = {}) => {
   if (url === 'https://www.occulert.com/api/public-config') return { response: { ok: true }, body: { ok: true, supabase: publicConfig } };
@@ -368,6 +362,7 @@ function signOutFixture(initial = cloudAuth()) {
     deleteItemAsync: async key => { events.push('auth-delete'); secure.delete(key); },
   };
   const bindings = {
+    SIMULATOR_TRACE: false,
     SecureStore: fixture.secureStore,
     AsyncStorage: {
       getItem: async key => storage.get(key) ?? null,
@@ -415,6 +410,7 @@ for (const wait of ['session creation', 'an earlier event']) {
     const f = signOutFixture(), pending = deferred();
     const detectedAt = Date.parse('2026-10-28T20:00:00.000Z');
     const queue = { current: wait === 'an earlier event' ? pending.promise : Promise.resolve() };
+    const monitor = monitorOwners.cloud;
     const from = monitor.indexOf("    const alerting = result.state === 'closed';");
     const to = monitor.indexOf('    prevAlertingRef.current = alerting;', from);
     assert.ok(from >= 0 && to > from, 'exercise the production monitor alert transition');
@@ -422,7 +418,7 @@ for (const wait of ['session creation', 'an earlier event']) {
       Date, now: detectedAt, result: { state: 'closed', fatigueScore: 61.4 },
       prevAlertingRef: { current: false }, alertCountRef: { current: 0 }, setAlertCount() {},
       cloudSessionRef: { current: wait === 'session creation' ? pending.promise : Promise.resolve('old-session') },
-      cloudEventQueueRef: queue, logCloudAlert: f.api.logCloudAlert,
+      cloudEventQueueRef: queue, logCloudAlert: f.api.logCloudAlert, queueNativeCloudAlert: () => null,
     });
     await flushCloud();
     assert.equal(eventRequests(f).length, 0, 'local alert handling must not wait for cloud work');

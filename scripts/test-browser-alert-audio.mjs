@@ -5,8 +5,19 @@ import test from 'node:test';
 import vm from 'node:vm';
 import { assetByStem } from './lib/current-assets.mjs';
 import { browserAlertBytes } from './generate-browser-alert.mjs';
+import { parse } from 'acorn';
 
 const driver = readFileSync(assetByStem('driver-app.js'), 'utf8');
+const driverProgram = parse(driver,{ecmaVersion:2022,sourceType:'script'});
+const uiDependencies = ['setTextIfChanged','uiText','uiState','pauseUi'].map(name => {
+  const matches = driverProgram.body.filter(node => node.type==='FunctionDeclaration' && node.id.name===name);
+  assert.equal(matches.length,1,`Execute the real extracted ${name} dependency`);
+  return driver.slice(matches[0].start,matches[0].end);
+}).join('\n');
+const triggerDependencies = driverProgram.body.filter(node => node.type==='FunctionDeclaration'
+  && ['scoringReadWallClock','scoringTriggerEligible'].includes(node.id.name));
+assert.equal(triggerDependencies.length,2,'Execute both real extracted eligibility/clock dependencies');
+const triggerDependencyCode = triggerDependencies.map(node=>driver.slice(node.start,node.end)).join('\n');
 const audioCode = driver.slice(driver.indexOf('let _ac=null,'), driver.indexOf('function trigger(reason'));
 assert.ok(audioCode.includes('function tone('), 'Test the active driver audio implementation');
 assert.ok(audioCode.includes('function playStrongAlert('), 'Emit the strong-alert source before testing the active driver');
@@ -51,8 +62,9 @@ function harness({ state = 'running', noContext = false, noMedia = false, runnin
     setTimeout(callback, duration) { const id = ++timerId; timers.set(id, { callback, duration }); return id; },
     clearTimeout(id) { timers.delete(id); },
   });
-  vm.runInContext(driver.slice(driver.indexOf('function setTextIfChanged('), driver.indexOf('function render(')), context);
+  vm.runInContext(uiDependencies, context);
   vm.runInContext(audioCode, context);
+  vm.runInContext(triggerDependencyCode, context);
   vm.runInContext('let cameraViewport={width:800,height:800};' + driver.slice(driver.indexOf('function endCameraViewportObservation('), driver.indexOf('function handleCameraViewportChange(')), context);
   return {
     context, document, contexts, media, oscillators, gains, pendingPlays, timers, session,
@@ -68,7 +80,7 @@ test('the Start gesture requests playback before asynchronous camera/model work'
   const firstStart = driver.slice(driver.indexOf('async function start(){'), driver.indexOf('async function stop('));
   Object.assign(h.context, {
     startupAllowsMonitoring: () => true, starting: false, detectorFailureStopping: false,
-    cameraFailureStopping: false, startBtn: {}, setMonitoringUi() {}, setCameraControlsDisabled() {},
+    cameraFailureStopping: false, startBtn: { dataset: {} }, setMonitoringUi() {}, setCameraControlsDisabled() {},
     setOverlay() {}, navigator: { audioSession: h.session, mediaDevices: { getUserMedia() {} } },
     initModel() { assert.equal(h.session.type, 'playback'); return new Promise(() => {}); },
   });
@@ -77,6 +89,8 @@ test('the Start gesture requests playback before asynchronous camera/model work'
   assert.equal(h.contexts[0].resumeCalls, 1);
   assert.equal(h.media[0].calls[0].muted, true);
   assert.equal(h.oscillators.length, 0);
+  assert.equal(h.context.startBtn.textContent,'STARTING...');
+  assert.deepEqual(JSON.parse(h.context.startBtn.dataset.driverText),['start.starting',null]);
 });
 
 test('interrupted and suspended contexts resume without producing a priming alert', async () => {
@@ -175,16 +189,17 @@ test('missing or denied AudioSession/media APIs and playback rejection stay cont
 async function offlineInstall(failAudio = false) {
   const listeners = new Map(), cached = new Map(), added = [], deleted = [];
   const cache = {
-    async add(request) {
-      const url = typeof request === 'string' ? request : new URL(request.url).pathname;
-      added.push({ url, integrity: request.integrity || '' });
-      if (failAudio && url === '/audio/alert.v1.wav') throw Error('Audio integrity mismatch');
-      cached.set(url, {});
-    },
+    async put(request, response) { cached.set(new URL(request.url).pathname, response); },
     async match(url) { return cached.get(url); },
   };
   const context = vm.createContext({
-    URL, Request, WebAssembly, Uint8Array, Map, Set,
+    URL, Request, Response, AbortController, setTimeout, clearTimeout, WebAssembly, Uint8Array, Map, Set,
+    async fetch(request) {
+      const url = new URL(request.url).pathname;
+      added.push({ url, integrity: request.integrity || '' });
+      if (failAudio && url === '/audio/alert.v1.wav') throw Error('Audio integrity mismatch');
+      return new Response('verified fixture bytes');
+    },
     self: { location: { origin: 'https://occulert.test' }, addEventListener(name, callback) { listeners.set(name, callback); }, async skipWaiting() {} },
     caches: { async open() { return cache; }, async delete(name) { deleted.push(name); } },
   });
@@ -227,7 +242,7 @@ function attachDriverLifecycle(h) {
   Object.assign(h.context, {
     startupAllowsMonitoring: () => true, starting: false, running: false,
     detectorFailureStopping: false, cameraFailureStopping: false, startCancelled: false,
-    startBtn: {}, setMonitoringUi() {}, setCameraControlsDisabled() {}, setOverlay() {},
+    startBtn: { dataset: {} }, setMonitoringUi() {}, setCameraControlsDisabled() {}, setOverlay() {},
     initModel: async () => { throw Error('Model not ready'); },
     cameraRecoveryGuidance: () => ({ title: 'Unavailable', text: 'Try again', hint: 'Park first' }),
     stream: null, video: {}, render() {}, log() {},
@@ -255,6 +270,8 @@ test('actual Stop restores prior routing, cancels fallback and disables all late
   h.run('running=true;beginAlertAudioScope();tone(880,450,.2);');
   assert.equal(h.session.type, 'playback');
   await h.run('stop();');
+  assert.equal(h.context.startBtn.textContent,'START MONITORING');
+  assert.deepEqual(JSON.parse(h.context.startBtn.dataset.driverText),['start.start',null]);
   assert.equal(h.session.type, 'ambient');
   assert.equal(h.run('_alertAudioRequested'), false);
   assert.equal(h.media[0].paused, true);

@@ -2,19 +2,19 @@ import { setCameraControlsDisabled, refreshCameraChoices, openSelectedCamera, cl
 import { detectorFailureStopping, discardFaceMesh, initModel, verifyFirstInference, loop, framePerformanceSnapshot, set_processingFrame, set_detectorFailureStopping, set_consecutiveInferenceFailures, set_lastDetectionResultAt } from "./detector.js";
 import "./calibration.js";
 import { startGPS, stopGPS, riskText, fleetPayload } from "./metrics.js";
-import { alerts, escalationLevel, _alertTestOwner, beginAlertAudioScope, releaseAlertAudioScope, clearParkedAlertTest, resetBreakReminder, dismissBreak, triggerBreakCheck, set_alerts, set_escalationLevel } from "./alerts.js";
+import { alerts, escalationLevel, _alertTestOwner, beginAlertAudioScope, releaseAlertAudioScope, clearParkedAlertTest, resetBreakReminder, dismissBreak, triggerBreakCheck, set_alerts, set_lastAlert, set_escalationLevel } from "./alerts.js";
 import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistory, setMonitoringUi } from "./storage-history.js";
 import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
 export const start = startMonitoring;
 export const stop = stopMonitoring;
-export const EXPERIMENT_HELPER_INTEGRITY = "sha256-M8psrrb+lz//+iJ/tcz/r2OIpnKXgAXmdE89dbS5BSY=";
+export const EXPERIMENT_HELPER_INTEGRITY = "sha256-UsKS/z/z68s17TdfXai4h9HOCJqJlny+opCCxBF4+rk=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
     try {
         const q = new URLSearchParams(window.location?.search || ''), yes = (k, v) => q.getAll(k).length === 1 && q.get(k) === v;
-        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable') };
+        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable'), observer: yes('observer', '1'), calibrationMin: yes('calibration-min', '12') };
         const names = Object.keys(f).filter(k => f[k]).sort();
-        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => k !== 'tasks' && k !== 'distractionConfidence'), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin'].includes(k)), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
     }
     catch (_) {
         return Object.freeze({ any: false, primary: false, names: Object.freeze([]) });
@@ -155,6 +155,25 @@ export function setTextIfChanged(element, value) {
     if (element.textContent !== value)
         element.textContent = value;
 }
+/** @param {HTMLElement|null} el @param {string} k @param {string} en @param {object} [p] */
+export function uiText(el, k, en, p) {
+    if (el) {
+        try {
+            const value = window.OcculertDriverI18n?.get(k, p);
+            if (typeof value === 'string' && value) en = value;
+        } catch (_) { }
+        el.textContent = en;
+        el.dataset.driverText = JSON.stringify([k, p]);
+    }
+}
+export function uiState(l, h) {
+    setTextIfChanged(driveStateEl, l);
+    setTextIfChanged(driveHintEl, h);
+    setTextIfChanged(statusEl, l);
+}
+export function pauseUi() {
+    setOverlay('Monitoring Paused', 'Monitoring did not start because Occulert left the foreground.', 'Return to Occulert and press Start Monitoring again only when safely parked.', false);
+}
 export function render(ear) {
     if (!startupAllowsMonitoring()) {
         window.OcculertStartup?.refresh?.();
@@ -181,9 +200,7 @@ export function render(ear) {
     syncEl.textContent = cloudConsent.checked ? (cloudReady ? 'ON' : 'LOCAL') : 'LOCAL';
     escalationEl.textContent = escalationLevel;
     if (!running) {
-        setTextIfChanged(driveStateEl, 'NOT MONITORING');
-        setTextIfChanged(driveHintEl, 'Press Start Monitoring only when safely parked.');
-        setTextIfChanged(statusEl, 'NOT MONITORING');
+        uiState('NOT MONITORING', 'Press Start Monitoring only when safely parked.');
         statusEl.className = 'status off';
         stateCard.className = 'card state-card';
         riskEl.textContent = '--';
@@ -193,9 +210,11 @@ export function render(ear) {
     }
     else {
         const trackingUnavailable = noFaceSince > 0;
-        const label = trackingUnavailable ? 'TRACKING UNAVAILABLE' : risk[0] === 'SAFE' ? 'TRACKING ACTIVE' : risk[0];
+        const label = trackingUnavailable ? 'TRACKING UNAVAILABLE' : experimentFlags.observer ? 'PARKED OBSERVER SESSION' : risk[0] === 'SAFE' ? 'TRACKING ACTIVE' : risk[0];
         const hint = trackingUnavailable
             ? 'Camera tracking is unavailable. Alerts may be missed. Pull over safely before adjusting the phone.'
+            : experimentFlags.observer
+                ? 'Independent labeling. Detector feedback is hidden. Remain safely parked.'
             : risk[0] === 'CALIBRATING'
                 ? 'Camera is starting. Keep your face centered while parked.'
                 : risk[0] === 'ALERT' || risk[0] === 'HIGH'
@@ -203,24 +222,20 @@ export function render(ear) {
                     : risk[0] === 'WATCH'
                         ? 'Fatigue signs are building. Prepare to stop if needed.'
                         : 'Camera tracking is active. Stay alert; this does not mean it is safe to drive.';
-        setTextIfChanged(driveStateEl, label);
-        setTextIfChanged(driveHintEl, hint);
-        setTextIfChanged(statusEl, label);
-        stateCard.className = 'card state-card ' + (trackingUnavailable ? 'noface' : risk[1]);
-        statusEl.className = 'status ' + (trackingUnavailable || ['ALERT', 'HIGH'].includes(risk[0]) ? 'alert' : 'on');
+        uiState(label, hint);
+        stateCard.className = 'card state-card ' + (trackingUnavailable ? 'noface' : experimentFlags.observer ? 'observer' : risk[1]);
+        statusEl.className = 'status ' + (trackingUnavailable || !experimentFlags.observer && ['ALERT', 'HIGH'].includes(risk[0]) ? 'alert' : 'on');
     }
     pushFleet();
 }
 export function showStoppedReason(message) {
-    setTextIfChanged(driveStateEl, 'MONITORING STOPPED');
-    setTextIfChanged(driveHintEl, message);
-    setTextIfChanged(statusEl, 'MONITORING STOPPED');
+    uiState('MONITORING STOPPED', message);
     statusEl.className = 'status alert';
     stateCard.className = 'card state-card danger';
     stateCard.focus?.({ preventScroll: true });
     stateCard.scrollIntoView?.({ block: 'nearest' });
 }
-export function drawEyes(lm, color) { ctx.clearRect(0, 0, canvas.width, canvas.height); [LEFT, RIGHT].forEach(idx => { ctx.beginPath(); idx.forEach((i, k) => { let p = lm[i], x = p.x * canvas.width, y = p.y * canvas.height; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke(); }); }
+export function drawEyes(lm, color) { ctx.clearRect(0, 0, canvas.width, canvas.height); if (experimentFlags.observer) return; [LEFT, RIGHT].forEach(idx => { ctx.beginPath(); idx.forEach((i, k) => { let p = lm[i], x = p.x * canvas.width, y = p.y * canvas.height; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke(); }); }
 export function requireForegroundStart() {
     if (!startCancelled && !document.hidden)
         return;
@@ -258,7 +273,7 @@ export function createLocalLifecycleOperations() {
         setMonitoringUi(true);
         startCancelled = false;
         startBtn.disabled = true;
-        startBtn.textContent = 'STARTING...';
+        uiText(startBtn, 'start.starting', 'STARTING...');
         setTextIfChanged(driveStateEl, 'PREPARING MONITORING');
         setTextIfChanged(driveHintEl, 'Stay parked while the camera and on-device model are prepared. Monitoring has not started.');
         setTextIfChanged(statusEl, 'PREPARING');
@@ -293,8 +308,15 @@ export function createLocalLifecycleOperations() {
             fatigue = 0;
             confidence = 0;
             set_alerts(0);
+            set_lastAlert(0);
             headNods = 0;
+            lastNod = 0;
             microsleeps = 0;
+            lastMicro = 0;
+            yawnCount = 0;
+            lastYawn = 0;
+            _mouthOpenSince = 0;
+            _marHist = [];
             maxFatigue = 0;
             {
                 fatigueSampleSum = 0;
@@ -331,6 +353,9 @@ export function createLocalLifecycleOperations() {
             alertsEl.textContent = '0';
             nodsEl.textContent = '0';
             microsleepsEl.textContent = '0';
+            const yawnCountEl = document.getElementById('yawnCountEl');
+            if (yawnCountEl)
+                yawnCountEl.textContent = '0';
             perclosEl.textContent = '0%';
             distractionEl.textContent = '0s';
             escalationEl.textContent = '0';
@@ -350,7 +375,7 @@ export function createLocalLifecycleOperations() {
                 feedbackStatus.textContent = '';
             overlay.classList.add('hide');
             startBtn.disabled = false;
-            startBtn.textContent = 'STOP MONITORING';
+            uiText(startBtn, 'start.stop', 'STOP MONITORING');
             startBtn.className = 'btn stop';
             if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
                 Notification.requestPermission().then(p => {
@@ -377,7 +402,7 @@ export function createLocalLifecycleOperations() {
             }
             video.srcObject = null;
             if (e && e.name === 'AbortError') {
-                setOverlay('Monitoring Paused', 'Monitoring did not start because Occulert left the foreground.', 'Return to Occulert and press Start Monitoring again only when safely parked.', false);
+                pauseUi();
                 log('Monitoring start cancelled after foreground loss');
             }
             else {
@@ -387,7 +412,7 @@ export function createLocalLifecycleOperations() {
                     await discardFaceMesh();
                 log((e && e.name === 'DetectionRuntimeError' ? 'Detector' : 'Camera') + ' error: ' + (e.message || e.name || e));
             }
-            startBtn.textContent = 'START MONITORING';
+            uiText(startBtn, 'start.start', 'START MONITORING');
             startBtn.className = 'btn primary';
             setMonitoringUi(false);
         }
@@ -435,7 +460,7 @@ export function createLocalLifecycleOperations() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (!preserveOverlay)
             setOverlay('AI Fatigue Monitoring', 'Supplemental prototype only. Keep your attention on the road, never rely on alerts alone, and never drive tired.<br>Press Start Monitoring only when safely parked.', '<strong>Foreground required:</strong> monitoring stops if this tab is hidden or the screen locks. Pull over safely before restarting.', true);
-        startBtn.textContent = 'START MONITORING';
+        uiText(startBtn, 'start.start', 'START MONITORING');
         startBtn.className = 'btn primary';
         setCameraControlsDisabled(false);
         void refreshCameraChoices();
@@ -483,7 +508,7 @@ export async function handleVisibilityChange(hidden = document.visibilityState =
             stream.getTracks().forEach(track => track.stop());
         stream = null;
         video.srcObject = null;
-        setOverlay('Monitoring Paused', 'Monitoring did not start because Occulert left the foreground.', 'Return to Occulert and press Start Monitoring again only when safely parked.', false);
+        pauseUi();
         return true;
     }
     await stop();
@@ -578,7 +603,7 @@ export function loadExperimentController() {
     }
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/detection-experiments.v3.js';
+        script.src = '/detection-experiments.v6.js';
         script.integrity = EXPERIMENT_HELPER_INTEGRITY;
         script.crossOrigin = 'anonymous';
         const timer = setTimeout(() => { script.remove(); reject(Error('Parked helper timed out')); }, 7000);

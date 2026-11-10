@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync, lstatSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve, relative, dirname, basename } from 'node:path';
+import { stripTypeScriptTypes } from 'node:module';
 import { build, version as esbuildVersion } from 'esbuild';
 import { parse } from 'acorn';
 import { analyze } from 'eslint-scope';
+import ts from 'typescript';
 export const compilerOptions = Object.freeze({ bundle: true, format: 'esm', platform: 'browser', target: 'es2022', write: false, minifyIdentifiers: false, minifySyntax: false, minifyWhitespace: true, treeShaking: false, charset: 'utf8', metafile: true });
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = (message) => { throw new Error('Driver build contract: ' + message); };
@@ -22,7 +24,7 @@ function canonical(node) {
     const omit = node.type ? ['start', 'end', 'loc', 'range', ...(node.type === 'Literal' ? ['raw'] : [])] : [];
     return Object.fromEntries(Object.keys(node).sort().filter(key => !omit.includes(key)).map(key => [key, canonical(node[key])]));
 }
-function rejectDynamicScope(ast) { visit(ast, node => requireContract(node.type !== 'WithStatement' && !(node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'eval'), 'dynamic eval/with scope is unsupported')); visit(ast, node => { const member = node.type === 'AssignmentExpression' ? node.left : node.type === 'UpdateExpression' ? node.argument : null; requireContract(!(member?.type === 'Identifier' && ['start', 'stop', 'trigger'].includes(member.name)), 'lifecycle/accepted-alert reassignment is unsupported'); if (member?.type === 'MemberExpression' && member.object.type === 'Identifier' && ['window', 'globalThis'].includes(member.object.name)) {
+function rejectDynamicScope(ast) { visit(ast, node => { requireContract(node.type !== 'WithStatement' && !(node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'eval'), 'dynamic eval/with scope is unsupported'); requireContract(node.type !== 'ImportExpression' && !(node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'require'), 'dynamic/CommonJS dependencies are unsupported'); }); visit(ast, node => { const member = node.type === 'AssignmentExpression' ? node.left : node.type === 'UpdateExpression' ? node.argument : null; requireContract(!(member?.type === 'Identifier' && ['start', 'stop', 'trigger'].includes(member.name)), 'lifecycle/accepted-alert reassignment is unsupported'); if (member?.type === 'MemberExpression' && member.object.type === 'Identifier' && ['window', 'globalThis'].includes(member.object.name)) {
     const name = member.computed && member.property.type === 'Literal' ? member.property.value : !member.computed && member.property.type === 'Identifier' ? member.property.name : null;
     requireContract(!member.computed || member.property.type === 'Literal', 'unknown computed global property writes are unsupported');
     requireContract(!['start', 'stop'].includes(name), 'native/global lifecycle property writes are unsupported');
@@ -40,6 +42,29 @@ function ownedRegularFile(root, name) {
     const path = resolve(root, name), entry = lstatSync(path);
     requireContract(entry.isFile() && !entry.isSymbolicLink(), 'input must be a regular owned file: ' + name);
     return path;
+}
+const sharedInput = 'lib/event-outbox.ts';
+const sharedModule = '../' + sharedInput;
+function sharedSource(sourceRoot, contract) {
+    assert.deepEqual(contract.sharedInputs, [sharedInput], 'Only the reviewed lib/event-outbox.ts shared input is supported');
+    const parent = dirname(sourceRoot), directory = lstatSync(parent);
+    requireContract(directory.isDirectory() && !directory.isSymbolicLink(), 'shared input parent must be an owned directory');
+    const path = ownedRegularFile(resolve(parent, 'lib'), 'event-outbox.ts');
+    const bytes = readFileSync(path), code = bytes.toString('utf8');
+    requireContract(Buffer.from(code, 'utf8').equals(bytes), 'shared input must be valid UTF-8: ' + sharedInput);
+    // Strip mode is the proof language: constructs requiring TypeScript code
+    // generation (enums, parameter properties, etc.) must fail before esbuild.
+    const erased = stripTypeScriptTypes(code, { mode: 'strip' });
+    // Type-only dependencies disappear during stripping. Check the raw syntax
+    // too so an erased import cannot expand this deliberately closed graph.
+    const raw = ts.createSourceFile(sharedInput, code, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
+    requireContract(raw.referencedFiles.length === 0 && raw.typeReferenceDirectives.length === 0 && raw.libReferenceDirectives.length === 0, 'shared input references are unsupported');
+    const check = node => {
+        requireContract(!ts.isImportDeclaration(node) && !ts.isImportEqualsDeclaration(node) && !ts.isImportTypeNode(node) && !(ts.isExportDeclaration(node) && node.moduleSpecifier) && !(ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || ts.isIdentifier(node.expression) && node.expression.text === 'require')), 'shared input dependencies are unsupported');
+        ts.forEachChild(node, check);
+    };
+    check(raw);
+    return { path: sharedInput, bytes, code: erased, rawSha256: hash(bytes), erasedSha256: hash(erased) };
 }
 export function readDriverContract(contractPath) {
     const bytes = readFileSync(ownedRegularFile(dirname(contractPath), basename(contractPath))), text = bytes.toString('utf8');
@@ -80,23 +105,27 @@ export function inspectSourceGraph(sourceRoot, contract) {
     requireContract(lstatSync(sourceRoot).isDirectory() && !lstatSync(sourceRoot).isSymbolicLink(), 'source directory must be an owned directory');
     requireContract(contract.schema === 1 && Array.isArray(contract.modules) && new Set(contract.modules).size === contract.modules.length, 'invalid module registry');
     requireContract(contract.modules.includes(contract.entry), 'entry must be tracked by registry');
+    const shared = sharedSource(sourceRoot, contract);
     const globals = new Map(), inputs = {}, asts = new Map(), edges = {};
-    for (const module of contract.modules) {
-        requireContract(/^[a-z][a-z-]*\.js$/.test(module), 'unsupported module path');
-        const bytes = readFileSync(ownedRegularFile(sourceRoot, module)), code = bytes.toString('utf8');
-        requireContract(Buffer.from(code, 'utf8').equals(bytes), 'source module must be valid UTF-8: ' + module);
+    for (const module of [...contract.modules, sharedModule]) {
+        requireContract(module === sharedModule || /^[a-z][a-z-]*\.js$/.test(module), 'unsupported module path');
+        const bytes = module === sharedModule ? shared.bytes : readFileSync(ownedRegularFile(sourceRoot, module)), code = module === sharedModule ? shared.code : bytes.toString('utf8');
+        if (module !== sharedModule) requireContract(Buffer.from(code, 'utf8').equals(bytes), 'source module must be valid UTF-8: ' + module);
         const ast = parseJs(code, 'module');
         rejectDynamicScope(ast);
         inputs[module] = hash(bytes);
         asts.set(module, ast);
         requireContract(!ast.body.some(node => ['ExportAllDeclaration', 'ExportDefaultDeclaration'].includes(node.type)), 'unsupported export form');
+        requireContract(!ast.body.some(node => node.type === 'ExportNamedDeclaration' && node.source), 're-export dependencies are unsupported');
         if (module === contract.entry)
             requireContract(!ast.body.some(node => node.type.startsWith('Export')), 'entry cannot publish ESM exports');
         edges[module] = ast.body.filter(node => node.type === 'ImportDeclaration').map(node => {
-            requireContract(typeof node.source.value === 'string' && /^\.\/[^/]+\.js$/.test(node.source.value), 'imports must be explicit local modules');
-            const target = node.source.value.slice(2);
-            requireContract(contract.modules.includes(target), 'untracked module dependency');
+            const specifier = node.source.value;
+            requireContract(typeof specifier === 'string' && (specifier === sharedModule || /^\.\/[^/]+\.js$/.test(specifier)), 'imports must be explicit local modules or the reviewed shared input');
+            const target = specifier === sharedModule ? sharedModule : specifier.slice(2);
+            requireContract(target === sharedModule || contract.modules.includes(target), 'untracked module dependency');
             requireContract(node.specifiers.every(spec => spec.type === 'ImportSpecifier' && spec.imported.type === 'Identifier' && spec.local.name === spec.imported.name), 'import aliases/default/namespace bindings unsupported');
+            requireContract(target !== sharedModule || node.specifiers.length > 0, 'shared input requires named imports');
             return target;
         });
         for (const binding of declarations(ast)) {
@@ -109,7 +138,7 @@ export function inspectSourceGraph(sourceRoot, contract) {
     function reach(module) { if (entryReachable.has(module))
         return; entryReachable.add(module); edges[module].forEach(reach); }
     reach(contract.entry);
-    requireContract(entryReachable.size === contract.modules.length, 'registry includes unreachable module inputs');
+    requireContract(entryReachable.size === contract.modules.length + 1, 'registry includes unreachable module inputs');
     for (const name of contract.partialPrefixFunctions)
         requireContract(globals.get(name)?.kind === 'function', 'prefix must name one owned function: ' + name);
     requireContract(new Set(contract.partialPrefixFunctions).size === contract.partialPrefixFunctions.length, 'duplicate prefix function');
@@ -131,7 +160,7 @@ export function inspectSourceGraph(sourceRoot, contract) {
     function evaluate(module) { if (evaluated.has(module))
         return; evaluated.add(module); edges[module].forEach(evaluate); executionModules.push(module); }
     evaluate(contract.entry);
-    return { globals, inputs, edges, asts, executionModules };
+    return { globals, inputs, edges, asts, executionModules, sharedInputs: [shared] };
 }
 function applyEdits(code, edits) {
     const unique = new Map();
@@ -353,7 +382,7 @@ export async function buildDriverArtifact({ sourceRoot, contractPath }) {
     const lockBytes = readFileSync(ownedRegularFile(dirname(contractPath), 'package-lock.json')), graph = inspectSourceGraph(sourceRoot, contract);
     const result = await build({ ...compilerOptions, absWorkingDir: sourceRoot, entryPoints: [contract.entry] });
     const compiledInputs = Object.keys(result.metafile.inputs).map(path => relative(sourceRoot, resolve(sourceRoot, path)).replaceAll('\\', '/')).sort();
-    assert.deepEqual(compiledInputs, [...contract.modules].sort(), 'Compiler read an untracked source input');
+    assert.deepEqual(compiledInputs, [...contract.modules, sharedModule].sort(), 'Compiler read an untracked source input');
     const stock = result.outputFiles[0].text, formatted = formatDriverBundle(stock, graph, contract);
-    return { ...formatted, stock, provenance: { esbuildVersion, compilerOptions, sourceInputs: graph.inputs, dependencyEvaluationEdges: graph.edges, moduleEvaluationOrder: graph.executionModules, contractSha256: hash(contractBytes), stockSha256: hash(stock), adapterSha256: hash(readFileSync(new URL(import.meta.url))), packageLockSha256: hash(lockBytes) } };
+    return { ...formatted, stock, provenance: { esbuildVersion, compilerOptions, sourceInputs: graph.inputs, sharedInputs: graph.sharedInputs.map(({ path, rawSha256, erasedSha256 }) => ({ path, rawSha256, erasedSha256 })), compilerInputs: compiledInputs.map(path => path === sharedModule ? sharedInput : 'src/' + path).sort(), typeScriptErasure: { implementation: 'node:module.stripTypeScriptTypes', mode: 'strip', nodeVersion: process.versions.node }, dependencyEvaluationEdges: graph.edges, moduleEvaluationOrder: graph.executionModules, contractSha256: hash(contractBytes), stockSha256: hash(stock), adapterSha256: hash(readFileSync(new URL(import.meta.url))), packageLockSha256: hash(lockBytes) } };
 }

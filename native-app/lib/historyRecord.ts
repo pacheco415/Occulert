@@ -1,6 +1,7 @@
 import type { FeedbackSession, SessionDeviceImpact, SessionTestConditions } from './feedback';
 import type { MonitorPerformanceSnapshot } from './monitorPerformance';
 import type { SensorFusionObservationSnapshot } from './sensorFusionObservation';
+import type { UnansweredAlertSnapshot } from './unansweredAlertPolicy';
 
 export interface SessionRecord extends FeedbackSession {
   driverId?: string;
@@ -11,6 +12,7 @@ export interface SessionRecord extends FeedbackSession {
   deviceImpactUpdatedAt?: string;
   monitorPerformance?: MonitorPerformanceSnapshot;
   sensorFusion?: SensorFusionObservationSnapshot;
+  unansweredAlerts?: UnansweredAlertSnapshot;
   recoveredFromInterruption?: boolean;
   recoveryNote?: string;
 }

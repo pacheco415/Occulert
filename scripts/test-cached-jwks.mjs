@@ -305,10 +305,14 @@ test('actual id-only session start uses signed identity and current owned driver
   const queries = [];
   f.lib.pgFetch = async (table, options) => { queries.push({ table, options });
     if (table === 'drivers') { assert.equal(options.params.user_id, 'eq.' + subject); return [{ id: subject, fleet_id: null }]; }
-    assert.equal(table, 'sessions'); assert.equal(options.method, 'POST'); assert.equal(options.body.driver_id, subject);
-    assert.equal(options.body.fleet_id, null); return [{ id: subject, ...options.body }]; };
+    assert.equal(table, 'rpc/start_rate_limited_session'); assert.equal(options.method, 'POST');
+    assert.deepEqual(JSON.parse(JSON.stringify(options.body)), { p_user_id: subject, p_session_id: null,
+      p_device: null, p_browser: null, p_detector_pipeline: null, p_detector_version: null, p_app_version: null });
+    return { session: { id: subject, driver_id: subject, fleet_id: null,
+      started_at: new Date().toISOString(), ended_at: null }, replayed: false }; };
   const result = await invoke(f.load('sessions.js'), protectedRequest('sessions', liveJwt(), 'POST', { driver_id: 'forged', fleet_id: 'forged' }));
   assert.equal(result.statusCode, 200); assert.equal(queries.length, 2); assert.equal(f.calls.length, 1);
+  assert.equal(result.body.session.driver_id, subject);
 });
 
 test('JWKS response streaming is capped at 64KiB and cancellation never blocks safe Auth fallback', async () => {

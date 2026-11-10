@@ -47,6 +47,8 @@ test('default source stays on origin/main while an unbuilt feature branch change
     assert.ok(output.includes(`Inspected source (HEAD): \`${feature}\``));
     assert.match(output, /1 files differ from the TestFlight source/);
     assert.match(output, /Physical acceptance for build 56: Not recorded/);
+    assert.match(output, /Historical TestFlight receipt: 1\.0\.0 \(56\); observed Apple VALID, internal IN_BETA_TESTING/);
+    assert.match(output, /Current Apple availability, replacement upload and remote build counter: Not checked/);
   } finally { f.cleanup(); }
 });
 
@@ -151,4 +153,19 @@ test('large native diffs keep status concise while preserving the complete file 
   assert.match(output, /200 files differ/);
   assert.match(output, /195 more/);
   assert.ok(output.trimEnd().split('\n').length <= 60);
+});
+
+test('private receipts render explicitly without accepting embedded operational details', () => {
+  const facts = { schemaVersion: 1, production: { visibility: 'private' }, migrations: { visibility: 'private' } };
+  const output = renderStatus({ git: { ref: 'origin/main', sourceCommit: 'a'.repeat(40), committedAt: at, native: { state: 'unchanged' } }, observations: facts });
+  assert.match(output, /Production website: Deployment receipts are kept private/);
+  assert.match(output, /Production migrations: Operational receipts are kept private/);
+  assert.doesNotMatch(output, /Production website: Unknown|Production migrations: Unknown|ledger verified/);
+  for (const field of ['production', 'migrations']) {
+    for (const details of [{ sourceCommit: 'b'.repeat(40) }, { observedAt: at }, { deploymentId: 'dpl_fixture' }, { pendingVersions: ['20260101000000'] }, { summary: 'hidden operational detail' }, { nested: { receipt: 'hidden' } }]) {
+      const mixed = structuredClone(facts);
+      Object.assign(mixed[field], details);
+      assert.throws(() => validateObservations(mixed), /marked private cannot contain receipt details/);
+    }
+  }
 });

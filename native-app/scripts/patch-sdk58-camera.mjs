@@ -323,7 +323,7 @@ const patches = [
 export function planSDK58CameraPatches(appRoot = nativeAppRoot) {
   const modules = join(appRoot, 'node_modules');
   const reactNative = JSON.parse(readFileSync(join(modules, 'react-native/package.json'), 'utf8'));
-  if (reactNative.version !== '0.88.0') throw Error('Review the camera compatibility patch before changing React Native 0.88.0.');
+  if (reactNative.version !== '0.88.1') throw Error('Review the camera compatibility patch before changing React Native 0.88.1.');
   const publicHook = readFileSync(join(modules, 'react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModuleWithJSIBindings.h'), 'utf8');
   if (!publicHook.includes('installJSIBindingsWithRuntime:') || !publicHook.includes('callInvoker:')) {
     throw Error('React Native does not expose the expected runtime and CallInvoker initialization hook.');

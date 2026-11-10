@@ -5,10 +5,11 @@
 import "./camera.js";
 import "./detector.js";
 import "./calibration.js";
-import "./metrics.js";
+import { scoringReadWallClock } from "./metrics.js";
 import "./storage-history.js";
+import { scoringTriggerEligible } from "./scoring-core.js";
 import { pushFleet } from "./cloud-sync.js";
-import { getPreference, setPreference, experimentFlags, experimentController, startupAllowsMonitoring, alertsEl, alertScreen, alertTitle, alertSub, nightOpacity, running, starting, confidence, sessionStart, calibrating, log, _lastBreakPrompt, set__lastBreakPrompt } from "./ui.js";
+import { uiText, getPreference, setPreference, experimentFlags, experimentController, startupAllowsMonitoring, alertsEl, alertScreen, alertTitle, alertSub, nightOpacity, running, starting, confidence, sessionStart, calibrating, log, _lastBreakPrompt, set__lastBreakPrompt } from "./ui.js";
 export let acceptedAlertHook = /** @type {((reason:string)=>void)|null} */ (null);
 /** @param {(reason:string)=>void} hook */
 export function registerAcceptedAlertHook(hook) { acceptedAlertHook = hook; }
@@ -112,6 +113,8 @@ export function requestAlertPlaybackSession() {
 export function beginAlertAudioScope() {
     cancelStrongAlert();
     const owner = ++_alertAudioOwner;
+    if (experimentFlags.observer)
+        return owner;
     _alertAudioRequested = true;
     primeAlertAudio(true);
     return owner;
@@ -246,6 +249,8 @@ export function playFallbackAlert(dur, gain, repeat = false) {
 }
 /** @param {number} freq @param {number} dur @param {number} gain */
 export function tone(freq, dur, gain) {
+    if (experimentFlags.observer)
+        return;
     if (!_alertAudioRequested || document.hidden)
         return;
     try {
@@ -292,9 +297,9 @@ document.addEventListener('pointerdown', () => {
 }, { passive: true });
 /** @param {string} reason @param {unknown} [eligibility] */
 export function trigger(reason, eligibility) {
-    let now = Date.now();
+    let now = scoringReadWallClock('trigger');
     const qualified = experimentFlags.noface && running && reason === 'Face lost after fatigue' && experimentController?.qualifiedLoss(eligibility);
-    if (now - lastAlert < 12000 || calibrating || confidence < 45 && !qualified)
+    if (!scoringTriggerEligible({ lastAlert, calibrating, confidence }, now, Boolean(qualified)))
         return;
     lastAlert = now;
     alerts++;
@@ -303,9 +308,13 @@ export function trigger(reason, eligibility) {
         escalationLevel = 0;
     escalationLevel = Math.min(4, escalationLevel + 1);
     lastEscalation = now;
+    // Parked independent labeling retains the decision and its timestamp but
+    // withholds detector cues from the observer.
+    if (!experimentFlags.observer) {
     const titles = ['DROWSY ALERT', 'LOUD ALERT', 'STRONG ALERT', 'PULL OVER NOW'];
-    alertTitle.textContent = titles[Math.max(0, escalationLevel - 1)] || 'DROWSY ALERT';
-    alertSub.textContent = escalationLevel >= 3 ? 'Pull over safely and rest' : 'Pull over safely';
+    const distracted = reason === 'Distraction';
+    alertTitle.textContent = distracted ? 'EYES ON THE ROAD' : titles[Math.max(0, escalationLevel - 1)] || 'DROWSY ALERT';
+    alertSub.textContent = distracted ? 'Pull over safely if you need to.' : escalationLevel >= 3 ? 'Pull over safely and rest' : 'Pull over safely';
     alertScreen.style.background = 'rgba(255,51,68,' + Number(nightOpacity.value) / 100 + ')';
     alertScreen.classList.add('show');
     if (!strongAlertPattern)
@@ -349,8 +358,8 @@ export function trigger(reason, eligibility) {
     }
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         try {
-            const _ntitle = 'Occulert ⚠️ Drowsiness Alert';
-            const _nbody = escalationLevel >= 3 ? 'Pull over safely — confirm safety now' : 'Stay alert! Drowsiness detected.';
+            const _ntitle = distracted ? 'Occulert ⚠️ Distraction Alert' : 'Occulert ⚠️ Drowsiness Alert';
+            const _nbody = distracted ? 'Eyes on the road. Pull over safely if you need to.' : escalationLevel >= 3 ? 'Pull over safely — confirm safety now' : 'Stay alert! Drowsiness detected.';
             const _nopts = { body: _nbody, icon: '/occulert-logo-main-192.png', badge: '/occulert-logo-main-96.png', tag: 'occulert-alert-' + Date.now(), silent: false, vibrate: escalationLevel >= 3 ? [700, 150, 700, 150, 700] : [500, 150, 500], requireInteraction: escalationLevel >= 3 };
             if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                 navigator.serviceWorker.ready.then(reg => reg.showNotification(_ntitle, _nopts)).catch(() => {
@@ -373,13 +382,14 @@ export function trigger(reason, eligibility) {
         playStrongAlert(escalationLevel);
     else
         tone(escalationLevel >= 3 ? 1100 : 880, escalationLevel >= 3 ? 900 : 450, escalationLevel >= 3 ? .35 : .2);
+    }
     log((reason || 'Drowsy') + ' alert triggered - escalation ' + escalationLevel);
     pushFleet(true);
     if (typeof acceptedAlertHook === 'function')
         acceptedAlertHook(reason);
 }
 export function demoAlert() {
-    if (!startupAllowsMonitoring() || running || starting)
+    if (experimentFlags.observer || !startupAllowsMonitoring() || running || starting)
         return;
     const result = document.getElementById('alertCheckResult');
     const audioOwner = beginAlertAudioScope();
@@ -416,13 +426,14 @@ function readVoicePreference() {
 export const VOICE_MSGS = ['Pull over safely', 'Take a break, you are tired', 'Drowsiness detected, rest now', 'Danger! Pull over immediately'];
 /** @param {string} msg */
 export function speak(msg) {
-    if (!readVoicePreference() || !window.speechSynthesis)
+    if (experimentFlags.observer || !readVoicePreference() || !window.speechSynthesis)
         return;
     try {
         if (window.speechSynthesis.paused)
             window.speechSynthesis.resume();
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(msg);
+        u.lang = 'en-US';
         u.rate = 0.9;
         u.pitch = 1.0;
         u.volume = 1.0;
@@ -433,9 +444,10 @@ export function speak(msg) {
 export function toggleVoice() {
     _voiceEnabled = !readVoicePreference();
     setPreference('occulert-voice', String(_voiceEnabled));
-    const b = document.getElementById('voiceToggleBtn');
-    if (b)
-        b.textContent = _voiceEnabled ? '🔊 Voice ON' : '🔇 Voice OFF';
+    voiceUi();
+}
+export function voiceUi() {
+    uiText(document.getElementById('voiceToggleBtn'), 'voice.' + (_voiceEnabled === true ? 'on' : 'off'), _voiceEnabled === true ? '🔊 Voice ON' : '🔇 Voice OFF');
 }
 export let _alertsSinceBreak = 0, _yawnsSinceBreak = 0;
 /** @param {'alert'|'yawn'} [kind] */
@@ -473,5 +485,7 @@ export function resetBreakReminder() {
 }
 /** @param {number} value */
 export function set_alerts(value) { alerts = value; return value; }
+/** @param {number} value */
+export function set_lastAlert(value) { lastAlert = value; return value; }
 /** @param {number} value */
 export function set_escalationLevel(value) { escalationLevel = value; return value; }

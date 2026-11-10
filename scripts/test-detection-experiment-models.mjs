@@ -5,6 +5,46 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 const require = createRequire(import.meta.url);
 const { createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline, createNoFaceEvidence, matrixPose, parseFlags, parseTasksResult, createTraceStore } = require('../'+JSON.parse(readFileSync(new URL('../asset-versions.json',import.meta.url),'utf8'))['detection-experiments.js']);
+const observerModels = require('../src/detection-experiments.js');
+
+test('observer episodes use only independent marks on the supplied monotonic session clock', () => {
+  const episodes = observerModels.createObserverEpisodes();
+  assert.equal(episodes.mark('drowsy', 120), true);
+  assert.equal(episodes.mark('drowsy', 480), true);
+  assert.equal(episodes.mark('high_fatigue', 800), true);
+  assert.equal(episodes.mark('not-a-label', 900), false);
+  assert.equal(episodes.mark('drowsy', 700), false);
+  assert.equal(episodes.stop(1250), true);
+  assert.deepEqual(episodes.entries(), [
+    { start_ms: 120, end_ms: 480, label: 'drowsy' },
+    { start_ms: 800, end_ms: 1250, label: 'high_fatigue' },
+  ]);
+  const snapshot = episodes.entries(); snapshot[0].label = 'changed';
+  assert.equal(episodes.entries()[0].label, 'drowsy');
+  assert.equal(episodes.summary().activeLabel, null);
+  episodes.reset(); assert.deepEqual(episodes.entries(), []);
+});
+
+test('observer bounds reject new episodes without silently dropping earlier labels', () => {
+  const episodes = observerModels.createObserverEpisodes({ capacity: 2 });
+  episodes.mark('drowsy', 0); episodes.mark('high_fatigue', 20);
+  episodes.mark('high_fatigue', 40);
+  assert.equal(episodes.mark('drowsy', 60), false);
+  assert.equal(episodes.entries().length, 2);
+  assert.equal(episodes.summary().rejected, 1);
+  assert.equal(episodes.mark('drowsy', NaN), false);
+  assert.equal(episodes.stop(-1), false);
+  assert.throws(() => observerModels.createObserverEpisodes({ capacity: 0 }));
+});
+
+test('observer is explicitly selected, combinable and has no primary scoring change', () => {
+  const flags = observerModels.parseFlags('?observer=1&perclos=time');
+  assert.deepEqual(flags.names, ['observer', 'timePerclos']);
+  assert.equal(observerModels.parseFlags('?observer=1').primary, false);
+  for (const query of ['', '?observer=true', '?observer=1&observer=1']) {
+    assert.equal(observerModels.parseFlags(query).any, false);
+  }
+});
 
 function oracle(samples, windowMs = 60000, gapMs = 1000) {
   let previous = null, rows = [], watermark = null;

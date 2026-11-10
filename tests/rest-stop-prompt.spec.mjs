@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+test.use({ locale: 'es-ES' });
+
 const MINUTE = 60_000;
 
 async function ready(page) {
@@ -8,6 +10,7 @@ async function ready(page) {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
   await page.addInitScript(() => {
     localStorage.clear();
+    localStorage.setItem('occulert_lang', 'en');
     localStorage.setItem('occulert-voice', 'true');
     window.restProbe = { hardwareRequests: 0, cameraOpens: 0, speech: [] };
     const media = new EventTarget();
@@ -24,9 +27,9 @@ async function ready(page) {
       pause() { this.paused = true; }
     };
     Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
-      paused: false, resume() {}, cancel() {}, speak(utterance) { window.restProbe.speech.push(utterance.text); },
+      paused: false, resume() {}, cancel() {}, speak(utterance) { window.restProbe.speech.push({ text: utterance.text, lang: utterance.lang }); },
     } });
-    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; this.lang = navigator.language; } };
   });
   await page.goto('/app.html');
   await expect(page.locator('#startBtn')).toBeEnabled();
@@ -84,7 +87,7 @@ async function alerts(page, count) {
   }
 }
 
-const promptCount = page => page.evaluate(() => window.restProbe.speech.filter(text => text.startsWith('Rest stop recommended.')).length);
+const promptCount = page => page.evaluate(() => window.restProbe.speech.filter(cue => cue.text.startsWith('Rest stop recommended.')).length);
 
 test('three real yawns report yawns separately from accepted alerts', async ({ page }) => {
   await ready(page);
@@ -94,6 +97,8 @@ test('three real yawns report yawns separately from accepted alerts', async ({ p
   expect(await page.evaluate(() => ({ alerts, yawns: yawnCount, hardware: window.restProbe.hardwareRequests })))
     .toEqual({ alerts: 0, yawns: 3, hardware: 0 });
   expect(await promptCount(page)).toBe(1);
+  expect(await page.evaluate(() => ({ locale: navigator.language, speech: window.restProbe.speech })))
+    .toEqual({ locale: 'es-ES', speech: [{ text: 'Rest stop recommended. Please pull over safely and take a break.', lang: 'en-US' }] });
 });
 
 test('mixed accepted alerts and real yawns retain their individual counts', async ({ page }) => {
@@ -104,23 +109,87 @@ test('mixed accepted alerts and real yawns retain their individual counts', asyn
   await expect(page.locator('#breakBanner')).toContainText('2 alerts, 1 yawn');
   expect(await page.evaluate(() => ({ alerts, yawns: yawnCount }))).toEqual({ alerts: 2, yawns: 1 });
   expect(await promptCount(page)).toBe(1);
+  expect(await page.evaluate(() => window.restProbe.speech)).toEqual([
+    { text: 'Pull over safely', lang: 'en-US' },
+    { text: 'Take a break, you are tired', lang: 'en-US' },
+    { text: 'Rest stop recommended. Please pull over safely and take a break.', lang: 'en-US' },
+  ]);
 });
 
-test('a second real session resets event counts, banner and reminder cooldown', async ({ page }) => {
+test('a second real session resets yawns, detector cooldowns, banner and reminder counts', async ({ page }) => {
   await ready(page);
   await alerts(page, 2); await yawn(page);
   await expect(page.locator('#breakBanner')).toBeVisible();
+  await expect(page.locator('#yawnCountEl')).toHaveText('1');
+  // Leave real nod/microsleep cooldowns and a pending mouth-open episode
+  // in session 1 so every new-session reset starts from meaningful state.
+  for (const noseY of [.5, .5, .5, .5, .56, .56, .56, .51, .51, .51]) {
+    await page.clock.fastForward(135);
+    await page.evaluate(value => {
+      const points = window.restMouthFrame(false);
+      points[4].y = value;
+      detectHeadNod(points);
+    }, noseY);
+  }
+  await page.evaluate(() => updateEyeMetrics(.1, false));
+  await page.clock.fastForward(1501);
+  await page.evaluate(() => {
+    updateEyeMetrics(.1, false);
+    for (let i = 0; i < 5; i++) detectYawn(window.restMouthFrame(true));
+  });
+  const previous = await page.evaluate(() => ({
+    headNods, microsleeps, yawnCount, lastNod, lastMicro, lastYawn,
+    mouthOpenSince: _mouthOpenSince, marSamples: _marHist.length,
+  }));
+  expect(previous).toMatchObject({ headNods: 1, microsleeps: 1, yawnCount: 1, marSamples: 5 });
+  for (const value of [previous.lastNod, previous.lastMicro, previous.lastYawn, previous.mouthOpenSince])
+    expect(value).toBeGreaterThan(0);
   await page.clock.fastForward(1301);
   await page.locator('#startBtn').click();
   await expect(page.locator('#startBtn')).toHaveText('START MONITORING');
   await expect(page.locator('#breakBanner')).toBeHidden();
   await start(page);
-  expect(await page.evaluate(() => ({ alerts: _alertsSinceBreak, yawns: _yawnsSinceBreak, lastPrompt: _lastBreakPrompt })))
-    .toEqual({ alerts: 0, yawns: 0, lastPrompt: 0 });
+  expect(await page.evaluate(() => ({
+    alerts: _alertsSinceBreak, yawns: _yawnsSinceBreak, lastPrompt: _lastBreakPrompt,
+    yawnCount, lastYawn, lastNod, lastMicro, mouthOpenSince: _mouthOpenSince, marHistory: _marHist,
+  }))).toEqual({ alerts: 0, yawns: 0, lastPrompt: 0, yawnCount: 0, lastYawn: 0,
+    lastNod: 0, lastMicro: 0, mouthOpenSince: 0, marHistory: [] });
+  await expect(page.locator('#yawnCountEl')).toHaveText('0');
   await expect(page.locator('#breakBanner')).toBeHidden();
   await alerts(page, 3);
   await expect(page.locator('#breakBanner')).toContainText('3 alerts, 0 yawns');
   expect(await promptCount(page)).toBe(2);
+  expect(await page.evaluate(() => window.restProbe.cameraOpens)).toBe(2);
+});
+
+test('a new session accepts its first alert while the same-session cooldown stays twelve seconds', async ({ page }) => {
+  await ready(page);
+  await page.evaluate(() => trigger('Fatigue'));
+  await expect(page.locator('#alerts')).toHaveText('1');
+  const oldAlertAt = await page.evaluate(() => lastAlert);
+  await page.clock.fastForward(1301);
+  await page.locator('#startBtn').click();
+  await expect(page.locator('#startBtn')).toHaveText('START MONITORING');
+  await start(page);
+  expect(await page.evaluate(() => ({ alerts, lastAlert, escalationLevel })))
+    .toEqual({ alerts: 0, lastAlert: 0, escalationLevel: 0 });
+  const first = await page.evaluate(() => {
+    const at = Date.now();
+    trigger('Fatigue');
+    return { at, alerts, lastAlert, escalationLevel };
+  });
+  expect(first.at - oldAlertAt).toBe(1301);
+  expect(first).toEqual({ at: first.at, alerts: 1, lastAlert: first.at, escalationLevel: 1 });
+  await expect(page.locator('#alerts')).toHaveText('1');
+  await page.clock.fastForward(11_999);
+  await page.evaluate(() => trigger('Fatigue'));
+  expect(await page.evaluate(() => ({ alerts, lastAlert, escalationLevel })))
+    .toEqual({ alerts: 1, lastAlert: first.at, escalationLevel: 1 });
+  await page.clock.fastForward(1);
+  await page.evaluate(() => trigger('Fatigue'));
+  expect(await page.evaluate(() => ({ alerts, lastAlert, escalationLevel })))
+    .toEqual({ alerts: 2, lastAlert: first.at + 12_000, escalationLevel: 2 });
+  await expect(page.locator('#alerts')).toHaveText('2');
   expect(await page.evaluate(() => window.restProbe.cameraOpens)).toBe(2);
 });
 

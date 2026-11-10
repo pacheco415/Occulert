@@ -85,8 +85,8 @@ test('browser container is immutable and matches the locked Playwright version',
   }
   assert.ok(workflow.includes(`assert.equal(require('@playwright/test/package.json').version, '${image[1]}')`));
   assert.ok(workflow.includes('for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK)'));
-  assert.ok(workflow.includes('run: npm run test:browser -- tests/onboarding-form-validation.spec.mjs --project=webkit'));
-  assert.match(workflow, /run: npm run test:browser -- --project=\$\{\{ matrix\.browser \}\} --reporter=line,json --output=test-results\/browser\s*\n/);
+  assert.ok(workflow.includes('run: node scripts/run-browser-check.mjs onboarding'));
+  assert.match(workflow, /run: node scripts\/run-browser-check\.mjs \$\{\{ matrix\.browser \}\}\s*\n/);
   assert.doesNotMatch(workflow, /continue-on-error|--privileged|--cap-add|--ipc=host|playwright install --with-deps/);
 });
 
@@ -111,6 +111,7 @@ test('retry report inputs match each browser and artifacts cannot collide across
   const workflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
   assert.match(workflow, /if: \$\{\{ matrix\.browser == 'webkit' \}\}/);
   assert.match(workflow, /name: browser-test-diagnostics-\$\{\{ matrix\.browser \}\}-\$\{\{ github\.run_attempt \}\}/);
+  assert.match(workflow, /\n            playwright-report\/\n/);
   assert.match(workflow, /write-verification-receipt\.mjs browser-\$\{\{ matrix\.browser \}\}/);
   assert.match(workflow, /name: verification-browser-\$\{\{ matrix\.browser \}\}-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}/);
   const step = workflow.split('      - name: List browser tests that passed after retry\n')[1].split('      - name: Preserve browser failure')[0];
@@ -164,7 +165,9 @@ test('real event concurrency job is isolated, bounded and never uses production 
   assert.match(harness, /host:root/);
   assert.match(harness, /pg_blocking_pids/);
   assert.doesNotMatch(harness, /await sleep\(100\)|pg_sleep/);
-  assert.match(harness, /assert.equal\(scenarios.length,6\)/);
+  assert.match(harness, /assert.equal\(scenarios.length,12\)/);
+  assert.match(harness, /runSessionStartQuotaConcurrency\(\{admin,worker,connect,waitFor,pass\}\)/);
+  assert.match(harness, /sessionStartQuotaMigrationSha256/);
   assert.match(harness, /status:'passed'/);
   const manifest = JSON.parse(read('./event-concurrency-runtime/package.json'));
   const lock = JSON.parse(read('./event-concurrency-runtime/package-lock.json'));
@@ -208,6 +211,6 @@ test('repeated offline browser experiment is isolated, bounded and failure prese
   assert.match(repeated, /name: verification-browser-webkit-offline-repeat-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}/);
   const guard = repeated.indexOf('test -z "$entries"');
   assert.ok(guard >= 0 && guard < repeated.indexOf('- uses: actions/checkout'));
-  assert.ok(repeated.includes("assert.equal(require('@playwright/test/package.json').version, '1.64.1')"));
+  assert.ok(repeated.includes("assert.equal(require('@playwright/test/package.json').version, '1.65.0')"));
   assert.doesNotMatch(repeated, /continue-on-error|secrets\.|DATABASE_URL|supabase db|needs:|--timeout=/);
 });

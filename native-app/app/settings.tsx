@@ -16,6 +16,7 @@ import {
   WATCH_ALERTS_PREFERENCE_KEY,
 } from '../lib/watchPreferences';
 import { CloudSyncCard } from '../components/CloudSyncCard';
+import { EmergencyReadinessCard } from '../components/EmergencyReadinessCard';
 import { AmbientBackground } from '../components/GlassSurface';
 import { colors, radii } from '../constants/theme';
 import { currentAppBuildInfo, formatAppBuildLabel } from '../lib/appBuildInfo';
@@ -548,6 +549,7 @@ export default function SettingsScreen() {
             <Text style={s.priorityText}>The iPhone camera and at least one phone alert are the primary setup. Watch, headphones, Health, and cloud sync are optional additions.</Text>
           </View>
         </View>
+        {Platform.OS === 'ios' && <EmergencyReadinessCard />}
         <SensitivitySlider value={sens} onChange={setSens} />
         {EYE_BASELINE_EXPERIMENT && <View style={s.card}>
           <Text style={s.cardTitle}>PARKED BASELINE EXPERIMENT</Text>

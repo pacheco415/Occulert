@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "repository": "pacheco415/Occulert",
+  "capturedAt": "2026-10-31T20:14:38.909Z",
+  "source": "GitHub connector REST open pull requests, all pages",
+  "complete": true,
+  "pullRequests": [
+    {
+      "number": 356,
+      "title": "Bound offline installation transfers and preserve usable caches",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/356",
+      "headRefName": "codex/offline-startup-reliability",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "7933f973d91a3b6aff005a5cd851b5f098e2033e"
+    },
+    {
+      "number": 324,
+      "title": "Coordinate Playwright 1.64.1 runtime and repeated offline validation",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/324",
+      "headRefName": "codex/playwright-runtime-upgrade",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "4c01c327bf00c0b1f7c99d5e36512b48909471d8"
+    },
+    {
+      "number": 273,
+      "title": "Bump @playwright/test from 1.63.0 to 1.64.1",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/273",
+      "headRefName": "dependabot/npm_and_yarn/playwright/test-1.64.1",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "a0ae7b17048465ea265e5c8e09650afa85579eed"
+    },
+    {
+      "number": 206,
+      "title": "Refresh gated fleet offboarding and serialize session starts",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/206",
+      "headRefName": "codex/fleet-offboarding",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "cabb047e3de9db23c1ce6ecd6182a49e989f5021"
+    }
+  ]
+}

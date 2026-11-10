@@ -3,6 +3,9 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { parseSessionHistory, assignMissingSessionIds, serializeSessionHistory, sessionHistoryNeedsMigration } from '../native-app/lib/sessionHistoryData.ts';
 
+const unansweredSnapshot = () => ({ version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 3,
+  byMotion: { unknown: 2, unavailable: 1, denied: 0, stale: 0, 'not-moving': 0, 'reported-activity': 0 } });
+
 test('only a missing storage key means empty session history', () => {
   assert.deepEqual(parseSessionHistory(null), []);
   assert.deepEqual(parseSessionHistory('[{"sessionId":"saved"}]'), [{ sessionId: 'saved' }]);
@@ -57,4 +60,27 @@ test('future versions and malformed envelopes cannot be read, migrated or overwr
   assert.throws(()=>serializeSessionHistory([],raw),/Saved session history/);
  }
  assert.throws(()=>serializeSessionHistory([null],null),/Saved session history/);
+});
+
+test('optional unanswered-alert counts round-trip without changing older records or sharing mutable counts', () => {
+ const old={sessionId:'old',unknown:{keep:true}},diagnostics=unansweredSnapshot();
+ const raw=JSON.stringify({schemaVersion:1,sessions:[old,{sessionId:'observed',unansweredAlerts:diagnostics}]});
+ const parsed=parseSessionHistory(raw);
+ assert.deepEqual(parsed[0],old);assert.equal(Object.hasOwn(parsed[0],'unansweredAlerts'),false);
+ assert.deepEqual(parsed[1].unansweredAlerts,diagnostics);
+ const encoded=serializeSessionHistory(parsed,raw);parsed[1].unansweredAlerts.byMotion.unknown=999;
+ assert.equal(parseSessionHistory(encoded)[1].unansweredAlerts.byMotion.unknown,2);
+});
+
+test('the complete History array rejects malformed observation counts before migration or replacement', () => {
+ const valid=unansweredSnapshot();
+ for(const invalid of [null,{}, {...valid,version:2}, {...valid,candidates:2},
+  {...valid,byMotion:{...valid.byMotion,unknown:-1}}, {...valid,rawTimeline:[]},
+  {...valid,byMotion:{...valid.byMotion,unknown:2.5}}, {...valid,candidates:1_000_001}]){
+  const rows=[{savedAt:'legacy-without-id'},{sessionId:'bad',unansweredAlerts:invalid}],raw=JSON.stringify(rows);
+  assert.throws(()=>parseSessionHistory(raw),/unreadable unanswered-alert diagnostics/);
+  assert.throws(()=>sessionHistoryNeedsMigration(raw),/unreadable unanswered-alert diagnostics/);
+  assert.throws(()=>serializeSessionHistory([],raw),/unreadable unanswered-alert diagnostics/);
+  assert.throws(()=>serializeSessionHistory(rows,null),/unreadable unanswered-alert diagnostics/);
+ }
 });

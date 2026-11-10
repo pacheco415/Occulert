@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import { assetByStem, cacheName, priorReleaseCacheName } from './lib/current-assets.mjs';
@@ -75,20 +76,20 @@ test('native monitoring timing stays bounded and deterministic', () => {
 });
 
 test('native analysis remains 10 Hz normally while display-only work is throttled', () => {
-  const monitor = read('native-app/app/monitor.tsx');
+  const owners = readNativeMonitorSourceOwners(), monitor = owners.screen;
   const liveMetrics = read('native-app/components/LiveMetrics.tsx');
-  assert.match(monitor, /now - lastSample\.value < analysisIntervalMs\.value/);
-  assert.match(monitor, /recordSample\(now, inferenceMs\)/);
-  assert.match(monitor, /deriveAlertLevel\(\{/);
-  assert.match(monitor, /shouldRefreshMonitorMetrics\(\{/);
-  assert.match(monitor, /displayedAlertLevelRef\.current = alertLevel/);
-  assert.match(monitor, /performanceTrackerRef\.current\.recordUiUpdate\(\)/);
+  assert.match(owners.analysis, /now - lastSample\.value < analysisIntervalMs\.value/);
+  assert.match(owners.analysis, /recordSample\(now, inferenceMs\)/);
+  assert.match(owners.analysis, /deriveAlertLevel\(\{/);
+  assert.match(owners.analysis, /shouldRefreshMonitorMetrics\(\{/);
+  assert.match(owners.analysis, /displayedAlertLevelRef\.current = alertLevel/);
+  assert.match(owners.analysis, /performanceTrackerRef\.current\.recordUiUpdate\(\)/);
   assert.match(monitor, /performanceTrackerRef\.current\.recordSessionStart\(/);
-  assert.match(monitor, /performanceTrackerRef\.current\.recordCameraStall\(\)/);
-  assert.match(monitor, /performanceTrackerRef\.current\.recordCameraRestart\(\)/);
+  assert.match(owners.camera, /performanceTrackerRef\.current\.recordCameraStall\(\)/);
+  assert.match(owners.camera, /performanceTrackerRef\.current\.recordCameraRestart\(\)/);
   assert.match(monitor, /monitorPerformance,/);
-  assert.doesNotMatch(monitor, /setSessionTime|timerRef/);
-  assert.doesNotMatch(monitor, /await startHeadphoneMotion\(\)/);
+  for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /setSessionTime|timerRef/);
+  for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /await startHeadphoneMotion\(\)/);
   assert.match(monitor, /const headphoneStart = startHeadphoneMotion\(\)/);
   assert.match(monitor, /await Promise\.all\(\[\s*loadAlertPreferences\(\),\s*getWatchAlertsEnabled\(\),/s);
   assert.match(liveMetrics, /memo\(function LiveMetrics/);
@@ -495,7 +496,7 @@ test('service-worker install cannot replace a usable cache without its detector'
   const deleted = [];
   let skipped = false;
   const cache = {
-    add: async url => {
+    put: async url => {
       url = typeof url === 'string' ? url : new URL(url.url).pathname;
       if (url === `/${assetByStem('driver-app.js')}`) throw new Error('transient detector download failure');
       cached.add(url);
@@ -503,6 +504,11 @@ test('service-worker install cannot replace a usable cache without its detector'
     match: async url => cached.has(url) ? { ok: true } : null,
   };
   const context = {
+    AbortController, setTimeout, clearTimeout, Response,
+    fetch: async request => {
+      if (new URL(request.url).pathname === `/${assetByStem('driver-app.js')}`) throw new Error('transient detector download failure');
+      return new Response('verified fixture bytes');
+    },
     URL,
     Request,
     Promise,
@@ -615,7 +621,7 @@ test('network-only account scripts time out without exposing cached auth and pre
     respondWith: promise => { responsePromise = promise; },
     waitUntil: () => { lifetimeUpdates++; },
   });
-  for (const path of ['/vendor/supabase-2.112.3.js', '/occulert-backend.v58.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', `/${assetByStem('occulert-backend.js')}`, `/${assetByStem('auth-helper.js')}`, `/${assetByStem('passkey-auth.js')}`, `/${assetByStem('passwordless-auth.js')}`, `/${assetByStem('supabase-loader.js')}`]) {
+  for (const path of ['/vendor/supabase-2.112.3.js', '/occulert-backend.v58.js', '/occulert-backend.v89.js', '/auth-helper.v49.js', '/passkey-auth.v49.js', '/passwordless-auth.v49.js', `/${assetByStem('occulert-backend.js')}`, `/${assetByStem('auth-helper.js')}`, `/${assetByStem('passkey-auth.js')}`, `/${assetByStem('passwordless-auth.js')}`, `/${assetByStem('supabase-loader.js')}`]) {
     const old = deferred();
     network = () => old.promise;
     dispatch(path);

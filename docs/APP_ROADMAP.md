@@ -35,23 +35,35 @@ release receipts, build-52 device reports and testing deferrals.
 
 ## Current backlog
 
-1. Finish current-source checks, then merge the remaining reviewed
-   pull requests sequentially against current main. Preserve immutable asset
-   bytes and compose overlapping browser changes from the active release.
-2. Complete native release notes and the device checklist for the inspected
-   source. Build and device acceptance are separate steps.
-3. Verify the production migration ledger and deployed definitions before
-   activating event quotas, fleet offboarding or schema consolidation.
-4. Review security and consent composition as the remaining branches merge.
-   Keep the external-script CSP policy and fresh server identity checks
-   for sensitive account and fleet changes and preserve consent boundaries.
-5. Benchmark detector experiments under safe parked conditions with flags
-   off by default. Do not change released alerts without supporting evidence.
-6. After the pull request backlog falls below five, introduce reviewed source
-   files and release output, modularize the driver app, consolidate schema
-   history, share identical styling and extract native History components.
+1. Keep reviewed source changes and required checks green on each pull request
+   and resulting main. Preserve immutable asset bytes; compose any overlapping
+   browser changes from the active release.
+2. Use the prepared [October 29 native handoff](RELEASE_2026-10-29.md) for source
+   and checklist details. An authorized build/submission and exact-build
+   physical acceptance remain separate from the completed source preparation.
+3. Keep alert retries and fleet offboarding off by default. Verify each
+   deployment prerequisite before activation; keep production operational
+   receipts private. Fleet offboarding remains a separate owner decision,
+   including the draft's proposed consequence that ongoing sessions retain their original fleet
+   attribution after membership removal.
+4. Preserve fresh server identity checks and account/consent boundaries as
+   remaining work is composed. Source tests do not replace a genuine signed-in
+   fleet walkthrough or physical Safari/PWA acceptance.
+5. Collect authorized, independently labeled parked data with the existing
+   observer and replay tooling before evaluating detector changes. Default-off
+   experiment code and synthetic tests do not support threshold promotion.
+6. Consider additional registered-source coverage, schema consolidation or
+   other maintenance when the active task selects it and a current-source
+   review identifies a remaining need. The driver source modules, shared event
+   engine, native History components and monitor extraction already exist;
+   inspect and extend them rather than repeating those refactors.
 
 ## Remaining evidence and later work
+
+[Future capability proposals](VISION_ROADMAP.md) collect possible Watch, spoken-cue,
+contact, road-camera, commercial and platform work. They require separate task
+selection and the gates below. Indexing that plan does not authorize changes to
+released alerts, detection thresholds, timing, data collection or messaging.
 
 The [verified 2026–2028 device roadmap](DEVICE_ROADMAP_2026_2028.md) expands the
 phone, Watch, headphone and glasses plan with primary sources and explicit

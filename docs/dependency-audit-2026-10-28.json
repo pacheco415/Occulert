@@ -1,0 +1,298 @@
+{
+  "schemaVersion": 1,
+  "observedDateLocal": "2026-10-28",
+  "timezone": "America/Los_Angeles",
+  "sourceCommit": "08d07428d51429b27233a7a48e4a9ba0f601f090",
+  "nativeManifestSha256": "ae94885afbdea0837a80eb0104ca49ef87a264bd266d199a3ad9bac6a5cb3f0f",
+  "nativeLockSha256": "2a24a536d88c77014f4550cbd6d6aed432132a0cb1aeb93707b401ab18bde3fd",
+  "registry": [
+    {
+      "name": "zod",
+      "url": "https://registry.npmjs.org/zod",
+      "checkedAtUtc": "2026-10-29T02:14:24.806Z",
+      "latest": "4.6.7",
+      "latestCompatibleMajor": "3.25.76",
+      "published": "2025-07-08T09:10:18.684Z"
+    },
+    {
+      "name": "expo",
+      "url": "https://registry.npmjs.org/expo",
+      "checkedAtUtc": "2026-10-29T02:14:24.971Z",
+      "latest": "58.0.21",
+      "latestCompatibleMajor": "58.0.21",
+      "published": "2026-10-28T15:36:05.811Z",
+      "cli": "^58.1.17"
+    },
+    {
+      "name": "@expo/cli",
+      "url": "https://registry.npmjs.org/@expo%2fcli",
+      "checkedAtUtc": "2026-10-29T02:14:25.161Z",
+      "latest": "58.1.17",
+      "latestCompatibleMajor": "58.1.17",
+      "published": "2026-10-28T15:39:30.715Z",
+      "zod": "^3.25.76"
+    }
+  ],
+  "advisory": {
+    "id": "GHSA-mrhx-c7xc-m3w5",
+    "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+    "severity": "high",
+    "affectedRange": "<4.6.6",
+    "patchedVersion": "4.6.6",
+    "publishedDate": "2026-10-01",
+    "updatedDate": "2026-10-23"
+  },
+  "lockedDependencyPath": [
+    {
+      "name": "expo",
+      "version": "58.0.21"
+    },
+    {
+      "name": "@expo/cli",
+      "version": "58.1.17",
+      "lockPath": "node_modules/expo/node_modules/@expo/cli",
+      "declaredZodRange": "^3.25.76"
+    },
+    {
+      "name": "zod",
+      "version": "3.25.76"
+    }
+  ],
+  "classification": {
+    "onlyZodConsumerInLock": "@expo/cli",
+    "applicationSourceImportsZod": false,
+    "binaryBuiltOrInspected": false,
+    "note": "A production dependency-tree audit includes Expo CLI; omit-dev does not establish native binary reachability or a clean runtime audit."
+  },
+  "verification": [
+    {
+      "installer": "11.17.0",
+      "node": "24.19.0",
+      "observedAtUtc": "2026-10-29T02:15:25.222Z",
+      "workingDirectory": "native-app",
+      "installCommand": "EXPO_NO_TELEMETRY=1 npm ci --include=dev",
+      "installExitCode": 0,
+      "verifyCommand": "EXPO_NO_TELEMETRY=1 npm run verify",
+      "verifyExitCode": 0,
+      "testTotals": {
+        "tests": 92,
+        "pass": 92,
+        "fail": 0,
+        "skipped": 0
+      },
+      "audits": {
+        "full": {
+          "command": "npm audit --json",
+          "exitCode": 1,
+          "counts": {
+            "info": 0,
+            "low": 6,
+            "moderate": 0,
+            "high": 3,
+            "critical": 0,
+            "total": 9
+          },
+          "underlyingAdvisories": [
+            {
+              "name": "deepmerge",
+              "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+              "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+              "severity": "low",
+              "range": ">=4.2.0 <=4.3.1"
+            },
+            {
+              "name": "zod",
+              "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+              "title": "Zod can exhaust memory while validating oversized constrained collections",
+              "severity": "high",
+              "range": "<4.6.6"
+            }
+          ],
+          "highPackages": [
+            "@expo/cli",
+            "expo",
+            "zod"
+          ],
+          "lowPackages": [
+            "@bacons/apple-targets",
+            "@expo/config",
+            "@expo/local-build-cache-provider",
+            "@expo/metro-config",
+            "@expo/prebuild-config",
+            "deepmerge"
+          ],
+          "suggestedExpoFix": {
+            "name": "expo",
+            "version": "51.0.39",
+            "isSemVerMajor": true
+          }
+        },
+        "omitDev": {
+          "command": "npm audit --omit=dev --json",
+          "exitCode": 1,
+          "counts": {
+            "info": 0,
+            "low": 6,
+            "moderate": 0,
+            "high": 3,
+            "critical": 0,
+            "total": 9
+          },
+          "underlyingAdvisories": [
+            {
+              "name": "deepmerge",
+              "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+              "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+              "severity": "low",
+              "range": ">=4.2.0 <=4.3.1"
+            },
+            {
+              "name": "zod",
+              "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+              "title": "Zod can exhaust memory while validating oversized constrained collections",
+              "severity": "high",
+              "range": "<4.6.6"
+            }
+          ],
+          "highPackages": [
+            "@expo/cli",
+            "expo",
+            "zod"
+          ],
+          "lowPackages": [
+            "@bacons/apple-targets",
+            "@expo/config",
+            "@expo/local-build-cache-provider",
+            "@expo/metro-config",
+            "@expo/prebuild-config",
+            "deepmerge"
+          ],
+          "suggestedExpoFix": {
+            "name": "expo",
+            "version": "51.0.39",
+            "isSemVerMajor": true
+          }
+        }
+      }
+    },
+    {
+      "installer": "10.9.8",
+      "node": "24.19.0",
+      "observedAtUtc": "2026-10-29T02:17:29.823Z",
+      "workingDirectory": "native-app",
+      "installCommand": "EXPO_NO_TELEMETRY=1 npm ci --include=dev",
+      "installExitCode": 0,
+      "verifyCommand": "EXPO_NO_TELEMETRY=1 npm run verify",
+      "verifyExitCode": 0,
+      "testTotals": {
+        "tests": 92,
+        "pass": 92,
+        "fail": 0,
+        "skipped": 0
+      },
+      "audits": {
+        "full": {
+          "command": "npm audit --json",
+          "exitCode": 1,
+          "counts": {
+            "info": 0,
+            "low": 6,
+            "moderate": 0,
+            "high": 3,
+            "critical": 0,
+            "total": 9
+          },
+          "underlyingAdvisories": [
+            {
+              "name": "deepmerge",
+              "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+              "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+              "severity": "low",
+              "range": ">=4.2.0 <=4.3.1"
+            },
+            {
+              "name": "zod",
+              "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+              "title": "Zod can exhaust memory while validating oversized constrained collections",
+              "severity": "high",
+              "range": "<4.6.6"
+            }
+          ],
+          "highPackages": [
+            "@expo/cli",
+            "expo",
+            "zod"
+          ],
+          "lowPackages": [
+            "@bacons/apple-targets",
+            "@expo/config",
+            "@expo/local-build-cache-provider",
+            "@expo/metro-config",
+            "@expo/prebuild-config",
+            "deepmerge"
+          ],
+          "suggestedExpoFix": {
+            "name": "expo",
+            "version": "51.0.39",
+            "isSemVerMajor": true
+          }
+        },
+        "omitDev": {
+          "command": "npm audit --omit=dev --json",
+          "exitCode": 1,
+          "counts": {
+            "info": 0,
+            "low": 6,
+            "moderate": 0,
+            "high": 3,
+            "critical": 0,
+            "total": 9
+          },
+          "underlyingAdvisories": [
+            {
+              "name": "deepmerge",
+              "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+              "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+              "severity": "low",
+              "range": ">=4.2.0 <=4.3.1"
+            },
+            {
+              "name": "zod",
+              "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+              "title": "Zod can exhaust memory while validating oversized constrained collections",
+              "severity": "high",
+              "range": "<4.6.6"
+            }
+          ],
+          "highPackages": [
+            "@expo/cli",
+            "expo",
+            "zod"
+          ],
+          "lowPackages": [
+            "@bacons/apple-targets",
+            "@expo/config",
+            "@expo/local-build-cache-provider",
+            "@expo/metro-config",
+            "@expo/prebuild-config",
+            "deepmerge"
+          ],
+          "suggestedExpoFix": {
+            "name": "expo",
+            "version": "51.0.39",
+            "isSemVerMajor": true
+          }
+        }
+      }
+    }
+  ],
+  "decision": {
+    "compatibleZod3PatchAvailable": false,
+    "newerStableExpo58PatchAvailable": false,
+    "overrideAdded": false,
+    "dependencyOrLockChanged": false,
+    "forcedAuditFixAccepted": false,
+    "reason": "Current supported Expo CLI requires Zod 3; keep trusted source/configuration and a private development server while awaiting a compatible upstream fix. Do not force Zod 4 under the 3.x consumer or downgrade Expo."
+  },
+  "scope": "Public package/advisory metadata, public-source hashes and local installation/verification facts only; no production service metadata, credentials, customer data, native build or deployment."
+}

@@ -5,6 +5,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import { prepareDetectorPage, detectBlankFrame } from './helpers/detector-runtime.mjs';
 import { observePageLoads } from './helpers/page-load-diagnostics.mjs';
+import { recordOfflineCacheSnapshot } from './helpers/offline-cache-diagnostics.mjs';
 
 test.use({ serviceWorkers: 'allow' });
 const currentCache = cacheName();
@@ -114,6 +115,8 @@ for (const upgrade of [false, true]) {
           controllerState: navigator.serviceWorker.controller?.state, activeState: registration.active?.state,
           cacheNames: await caches.keys(), initModelType: typeof window.initModel };
       }));
+      // Read-only inventory adds observation latency; it does not warm or repair caches.
+      await recordOfflineCacheSnapshot(page, diagnostics, 'before-mediapipe-offline');
       state.offline = true;
       diagnostics.record('origin-offline');
       // Cut the actual origin connection. Unlike Playwright's WebKit offline
@@ -122,14 +125,17 @@ for (const upgrade of [false, true]) {
       const result = await detectBlankFrame(page);
       expect(result.generation).toBeGreaterThan(0);
       expect(await page.evaluate(() => window.detectorCspViolations)).toEqual([]);
+      await recordOfflineCacheSnapshot(page, diagnostics, 'after-mediapipe-offline-success');
     } catch (error) {
       failed = true;
       diagnostics.record('test-failed', { message: error.message.slice(0, 500).replace(/https?:\/\/[^\s]+/g, value => value.split(/[?#]/, 1)[0]) });
+      await recordOfflineCacheSnapshot(page, diagnostics, 'after-mediapipe-failure');
       throw error;
     } finally {
       try {
         diagnostics.record('server-cleanup-start', { listening: server.listening });
         if (failed) await diagnostics.attach(testInfo);
+        else await diagnostics.attach(testInfo, 'mediapipe-offline-cache');
         server.closeAllConnections();
         diagnostics.record('server-connections-closed');
         await new Promise(resolve => server.close(resolve));

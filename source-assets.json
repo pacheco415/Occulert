@@ -8,6 +8,50 @@
     "detection-experiments.js": {
       "source": "src/detection-experiments.js",
       "mode": "copy"
+    },
+    "lang.js": {
+      "source": "src/lang.js",
+      "mode": "copy"
+    },
+    "driver-overview.js": {
+      "source": "src/driver-overview.js",
+      "mode": "copy"
+    },
+    "driver-startup-guard.js": {
+      "source": "src/driver-startup-guard.js",
+      "mode": "copy"
+    },
+    "driver-i18n.js": {
+      "source": "src/driver-i18n.js",
+      "mode": "copy"
+    },
+    "fleet-dashboard.js": {
+      "source": "src/fleet-dashboard.js",
+      "mode": "copy"
+    },
+    "fleet-pilot-report.js": {
+      "source": "src/fleet-pilot-report.js",
+      "mode": "copy"
+    },
+    "fleet-pilot-report.css": {
+      "source": "src/fleet-pilot-report.css",
+      "mode": "copy"
+    },
+    "fleet-followups.css": {
+      "source": "src/fleet-followups.css",
+      "mode": "copy"
+    },
+    "fleet-followups.js": {
+      "source": "src/fleet-followups.js",
+      "mode": "copy"
+    },
+    "fleet-history-page.css": {
+      "source": "src/fleet-history-page.css",
+      "mode": "copy"
+    },
+    "fleet-history-page.js": {
+      "source": "src/fleet-history-page.js",
+      "mode": "copy"
     }
   }
 }

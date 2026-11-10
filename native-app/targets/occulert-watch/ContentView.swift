@@ -142,7 +142,14 @@ struct ContentView: View {
       }
       .padding(.horizontal, 8)
     }
+    .onAppear {
+      receiver.setForegroundActive(scenePhase == .active)
+    }
+    .onDisappear {
+      receiver.setForegroundActive(false)
+    }
     .onChange(of: scenePhase) { _, phase in
+      receiver.setForegroundActive(phase == .active)
       if phase == .active {
         receiver.refreshNotificationAuthorization()
       }

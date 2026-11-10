@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v148';
+const CACHE = 'occulert-v168';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -39,10 +39,11 @@ const RUNTIME_ASSETS = [
   }
 ];
 const ALERT_AUDIO_ASSETS = [{ url: '/audio/alert.v1.wav', integrity: 'sha256-3fLbb34F09Mw3TsC1oy1Hkyg6pFnE5K5IbqP3YtPPCI=' }];
-const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v19.js","integrity":"sha256-dJ14YBpsImxDI8h3od5hMer0yTkIJA3gjVwQdwGP064="}];
-const EXPERIMENT_HELPER_ASSETS = [{"url":"/detection-experiments.v3.js","integrity":"sha256-M8psrrb+lz//+iJ/tcz/r2OIpnKXgAXmdE89dbS5BSY="}];
+const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v29.js","integrity":"sha256-K+bpXj0z2VMrRYH7x3S23sx0RPGVKSMZG1+cY2WJ+xs="}];
+const EXPERIMENT_HELPER_ASSETS = [{"url":"/detection-experiments.v6.js","integrity":"sha256-UsKS/z/z68s17TdfXai4h9HOCJqJlny+opCCxBF4+rk="}];
 const TASKS_RUNTIME_ASSETS = [{"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/vision_bundle.js", "integrity": "sha256-pCfCa2tALe6263Th9sdo0m7AzBWWlYyenj1RibfL9ao="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.js", "integrity": "sha256-4XDuZ91OFsGm/NiECiBmh+WlmyLCDkqQK8RFsJVFTXM="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.wasm", "integrity": "sha256-jaJ3pzOSbqzQR0uHBLNnQtbsMjHFeoYMW4id/48d+IY="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.js", "integrity": "sha256-6B1xWj1CzDNzYC6y96/3ldFkk022gOMklrZdq1N/llg="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.wasm", "integrity": "sha256-ooSDzULnToVb9evba0DZtmpbSeNelQILyXZp5oIqMZI="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/face_landmarker.task", "integrity": "sha256-ZBhOIpsmMQe8K4BMZiXbE0H/K7cxh0sLzC/mVE4Lyf8="}];
-const OPTIONAL_ASSETS = [...EXPERIMENT_HELPER_ASSETS, ...TASKS_RUNTIME_ASSETS];
+const DRIVER_I18N_ASSETS = [{url:'/driver-i18n.v1.js',integrity:"sha256-ZhTSOu5L3A6qve3fwfbqnT6OPkzBm2zVJa/lhSLduGg="}];
+const OPTIONAL_ASSETS = [...EXPERIMENT_HELPER_ASSETS, ...TASKS_RUNTIME_ASSETS, ...DRIVER_I18N_ASSETS];
 const OPTIONAL_PATHS = new Set(OPTIONAL_ASSETS.map(asset=>asset.url));
 const RUNTIME_INTEGRITY = new Map([...RUNTIME_ASSETS, ...ALERT_AUDIO_ASSETS, ...STARTUP_GUARD_ASSETS, ...OPTIONAL_ASSETS].map(asset => [asset.url, asset.integrity]));
 function selectedRuntimeAssets() {
@@ -56,7 +57,7 @@ function selectedRuntimeAssets() {
 }
 const SELECTED_RUNTIME_ASSETS = selectedRuntimeAssets();
 const STATIC_ASSETS = [
-  '/driver-overview.v1.js',
+  '/driver-overview.v2.js',
   '/driver-overview.v1.css',
   ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
   '/local-history.v2.js',
@@ -79,8 +80,8 @@ const STATIC_ASSETS = [
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v69.css',
-  '/driver-app.v98.js',
-  '/lang.v47.js',
+  '/driver-app.v108.js',
+  '/lang.v48.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
 ];
@@ -120,6 +121,7 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v87.js',
   '/occulert-backend.v88.js',
   '/occulert-backend.v89.js',
+  '/occulert-backend.v90.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
   '/supabase-loader.v47.js',
@@ -132,9 +134,9 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passwordless-auth.v62.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
-  '/driver-startup-guard.v19.js',
+  '/driver-startup-guard.v29.js',
   '/driver-app.v60.js',
-  '/driver-app.v98.js',
+  '/driver-app.v108.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
   ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
@@ -146,7 +148,7 @@ const CRITICAL_OFFLINE_ASSETS = [
   '/base.v47.css',
   '/app.html',
   '/driver-app.v69.css',
-  '/driver-app.v98.js',
+  '/driver-app.v108.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;
@@ -217,15 +219,44 @@ function cacheResponseBestEffort(request, response, timeoutMs = CACHE_WRITE_TIME
   return settleWithin(update, timeoutMs);
 }
 
+// Bound the complete transfer and cache write, including the response body. A stalled
+// noncritical file must not hold an otherwise usable offline installation open.
+function cacheInstallAsset(cache, url) {
+  const controller = new AbortController();
+  const integrity = RUNTIME_INTEGRITY.get(url);
+  const request = new Request(new URL(url, self.location.origin), { signal: controller.signal, ...(integrity ? { integrity } : {}) });
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error); else resolve();
+    };
+    const timer = setTimeout(() => {
+      // Settle even if an underlying cache operation ignores cancellation.
+      finish(new Error('Offline asset installation timed out'));
+      controller.abort();
+    }, 30_000);
+    Promise.resolve().then(async () => {
+      const response = await fetch(request);
+      if (settled) return;
+      // Match cache.add's success requirements; cache.put also validates Vary.
+      if (!response.ok || response.status === 206) throw new Error('Offline asset download failed');
+      await response.clone().arrayBuffer();
+      if (settled) return;
+      // Keep this Cache object: a late write cannot reopen a discarded install.
+      await cache.put(request, response);
+    }).then(() => finish(), error => finish(error || new Error('Offline asset installation failed')));
+  });
+}
+
 self.addEventListener('install', event => {
   event.waitUntil(
     (async () => {
       try {
         const cache = await caches.open(CACHE);
-        await Promise.allSettled(STATIC_ASSETS.map(url => {
-          const integrity = RUNTIME_INTEGRITY.get(url);
-          return cache.add(integrity ? new Request(new URL(url, self.location.origin), { integrity }) : url);
-        }));
+        await Promise.allSettled(STATIC_ASSETS.map(url => cacheInstallAsset(cache, url)));
         const criticalResponses = await Promise.all(CRITICAL_OFFLINE_ASSETS.map(url => cache.match(url)));
         if (criticalResponses.some(response => !response)) throw new Error('Critical offline assets were not cached');
         await self.skipWaiting();

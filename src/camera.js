@@ -4,7 +4,7 @@ import "./metrics.js";
 import { tone, speak } from "./alerts.js";
 import "./storage-history.js";
 import "./cloud-sync.js";
-import { startupAllowsMonitoring, startBtn, cameraSourceRow, cameraSourceSelect, cameraSourceHint, cameraRefreshBtn, CAMERA_DEVICE_STORAGE_KEY, availableCameraDevices, cameraLabelsRevealed, unavailableCameraDeviceId, guardedCameraTrack, cameraMuteTimer, cameraFailureStopping, running, starting, log, setOverlay, showStoppedReason, stop, set_availableCameraDevices, set_cameraLabelsRevealed, set_unavailableCameraDeviceId, set_guardedCameraTrack, set_cameraMuteTimer, set_cameraFailureStopping } from "./ui.js";
+import { uiText, startupAllowsMonitoring, startBtn, cameraSourceRow, cameraSourceSelect, cameraSourceHint, cameraRefreshBtn, CAMERA_DEVICE_STORAGE_KEY, availableCameraDevices, cameraLabelsRevealed, unavailableCameraDeviceId, guardedCameraTrack, cameraMuteTimer, cameraFailureStopping, running, starting, log, setOverlay, showStoppedReason, stop, set_availableCameraDevices, set_cameraLabelsRevealed, set_unavailableCameraDeviceId, set_guardedCameraTrack, set_cameraMuteTimer, set_cameraFailureStopping } from "./ui.js";
 let cameraViewport = null, viewportCalibrationStale = false, cameraViewportDiagnostics = [];
 export const VIEWPORT_CALIBRATION_NOTICE = 'Screen changed size. If you unfolded your phone, recalibrate when parked.';
 export function captureViewportGeometry() {
@@ -175,7 +175,7 @@ export async function refreshCameraChoices(activeDeviceId = '') {
     cameraSourceSelect.replaceChildren();
     const automatic = document.createElement('option');
     automatic.value = '';
-    automatic.textContent = 'Automatic (browser choice)';
+    uiText(automatic, 'camera.automatic', 'Automatic (browser choice)');
     cameraSourceSelect.appendChild(automatic);
     if (cameraLabelsRevealed)
         devices.forEach((device, index) => {
@@ -184,6 +184,7 @@ export async function refreshCameraChoices(activeDeviceId = '') {
             const option = document.createElement('option');
             option.value = device.deviceId;
             option.textContent = cameraOptionLabel(device, index);
+            if (!String(device.label || '').trim()) uiText(option, 'camera.numberedFallback', option.textContent, { number: index + 1 });
             cameraSourceSelect.appendChild(option);
         });
     if (savedId) {
@@ -195,7 +196,7 @@ export async function refreshCameraChoices(activeDeviceId = '') {
         if (!cameraLabelsRevealed || !savedDeviceAvailable) {
             const missing = document.createElement('option');
             missing.value = savedId;
-            missing.textContent = unavailableCameraDeviceId === savedId ? 'Saved camera (unavailable)' : 'Saved camera (camera access required)';
+            uiText(missing, unavailableCameraDeviceId === savedId ? 'camera.savedUnavailable' : 'camera.savedAccessRequired', unavailableCameraDeviceId === savedId ? 'Saved camera (unavailable)' : 'Saved camera (camera access required)');
             cameraSourceSelect.appendChild(missing);
         }
         cameraSourceSelect.value = savedId;

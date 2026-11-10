@@ -30,6 +30,7 @@ test('TV display derives aggregate operations metrics without exposing identitie
 
   assert.deepEqual(JSON.parse(JSON.stringify(result)), {
     activeSessions: 1,
+    unfinishedSessions: 0,
     activeDrivers: 2,
     recentSessions: 4,
     reviewSessions: 1,
@@ -72,7 +73,10 @@ test('7/30-day windows use session starts, include exact boundaries, and exclude
   assert.equal(seven.recentSessions, 5);
   assert.equal(thirty.recentSessions, 7);
   assert.equal(seven.invalidEndSessions, 3);
-  assert.equal(seven.activeSessions, 2, 'unended record count does not use the selected participation window');
+  assert.equal(seven.activeSessions, 1);
+  assert.equal(seven.unfinishedSessions, 1);
+  assert.equal(thirty.activeSessions, seven.activeSessions, 'fresh open records do not use the participation window');
+  assert.equal(thirty.unfinishedSessions, seven.unfinishedSessions, 'older open records do not use the participation window');
   assert.equal(seven.coverage, 100);
   assert.equal(seven.reviewSessions, 0, 'missing scores and missing events do not create a review flag');
   assert.equal(display.summarize(summary, now, '7').windowDays, 7);
@@ -105,19 +109,45 @@ test('50-session summaries explicitly mark potentially incomplete window coverag
 test('an old unended session is record state and the TV makes no live-monitoring claim', () => {
   const now = Date.parse('2026-09-24T18:00:00.000Z');
   const model = display.summarize({ sessions: [{ started_at: '2026-07-01T00:00:00.000Z', ended_at: null }] }, now, 7);
-  assert.equal(model.activeSessions, 1);
+  assert.equal(model.activeSessions, 0);
+  assert.equal(model.unfinishedSessions, 1);
+  assert.equal(model.pulse.now, 0);
   assert.equal(model.recentSessions, 0);
   const html = read('fleet-display.html');
-  assert.match(html, /Sessions without recorded end/);
-  assert.match(html, /No recorded end/);
+  assert.match(html, /Sessions in progress/);
+  assert.match(html, /Unfinished sessions/);
+  assert.match(html, /started within 12 hours/);
+  assert.match(html, /started over 12 hours ago/);
   assert.match(html, /live device monitoring is not verified/);
   assert.doesNotMatch(html, /Monitoring now|protected active sessions/);
 });
 
-test('TV refresh policy is active-aware, data-aware, and bounded after failures', () => {
+test('fresh and unfinished open records split at the inclusive 12-hour cutoff in either participation window', () => {
+  const now = Date.parse('2026-09-24T18:00:00.000Z');
+  const hour = 60 * 60 * 1000;
+  const open = (started, ended_at = null) => ({ started_at: typeof started === 'number' ? new Date(started).toISOString() : started, ended_at });
+  const fresh = [open(now), open(now - 12 * hour), { started_at: new Date(now - hour).toISOString() }];
+  const older = [open(now - 12 * hour - 1), open(now - 40 * 24 * hour)];
+  const excluded = [open(now + 1), open('invalid'), open(null), open(''), open(now - hour, 'invalid')];
+  for (const days of [7, 30]) {
+    for (const [sessions, active, unfinished] of [[fresh, 3, 0], [older, 0, 2], [[...fresh, ...older], 3, 2], [excluded, 0, 0]]) {
+      const model = display.summarize({ sessions }, now, days);
+      assert.equal(model.activeSessions, active);
+      assert.equal(model.unfinishedSessions, unfinished);
+      assert.equal(model.pulse.now, active);
+    }
+  }
+});
+
+test('TV refresh policy accelerates only fresh opens, honors data saving, and bounds failures', () => {
   assert.equal(display.refreshDelay({ activeSessions: 1 }, 0, false), 30000);
+  assert.equal(display.refreshDelay({ activeSessions: 1, unfinishedSessions: 2 }, 0, true), 30000);
   assert.equal(display.refreshDelay({ activeSessions: 0 }, 0, false), 90000);
+  assert.equal(display.refreshDelay({ activeSessions: 0, unfinishedSessions: 2 }, 0, false), 90000);
   assert.equal(display.refreshDelay({ activeSessions: 0 }, 0, true), 180000);
+  assert.equal(display.refreshDelay({ activeSessions: 0, unfinishedSessions: 2 }, 1, false), 180000);
+  assert.equal(display.refreshDelay({ activeSessions: 0, unfinishedSessions: 2 }, 1, true), 360000);
+  assert.equal(display.refreshDelay({ activeSessions: 1 }, 9, false), 240000);
   assert.equal(display.refreshDelay({ activeSessions: 0 }, 9, true), 900000);
 });
 
@@ -128,8 +158,8 @@ test('TV surface requests the owner-scoped summary without raw events or local f
   assert.match(html, /Driver names, vehicles, locations, individual scores, personal media, and raw events are not shown/);
   assert.doesNotMatch(html, /driverSearch|export|invite|latitude|longitude/i);
   assert.doesNotMatch(source, /localStorage|getItem\(|setItem\(|latitude|longitude|vehicle_id|\.name\b/);
-  assert.match(html, /fleet-display\.v58\.js/);
-  assert.match(html, /fleet-display\.v56\.css/);
+  assert.ok(html.includes('/' + assetByStem('fleet-display.js')));
+  assert.ok(html.includes('/' + assetByStem('fleet-display.css')));
 });
 
 const NOW = Date.parse('2026-09-24T18:00:00.000Z');
@@ -137,6 +167,8 @@ function browser(summary, options = {}) {
   const elements = new Map();
   const listeners = new Map();
   const timers = new Map();
+  const intervals = new Map();
+  let now = NOW;
   let nextTimer = 0;
   let calls = 0;
   let sessionCalls = 0;
@@ -157,9 +189,9 @@ function browser(summary, options = {}) {
   const document = { hidden: false, fullscreenElement: null, documentElement: html, getElementById: id => elements.get(id), addEventListener: (key, fn) => listeners.set(`document:${key}`, fn) };
   if (options.fullscreen !== false) html.requestFullscreen = options.requestFullscreen || (async () => { document.fullscreenElement = html; });
   document.exitFullscreen = async () => { document.fullscreenElement = null; };
-  class FixedDate extends Date { constructor(...args) { super(...(args.length ? args : [NOW])); } static now() { return NOW; } }
+  class FixedDate extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now; } }
   const root = {
-    document, navigator: { onLine: true, connection: { saveData: false } },
+    document, navigator: { onLine: true, connection: { saveData: options.saveData === true } },
     OcculertBackend: {
       getSession: async () => { sessionCalls++; return options.getSession ? options.getSession(user) : user ? { user } : null; },
       currentUser: () => user,
@@ -168,7 +200,7 @@ function browser(summary, options = {}) {
     },
     setTimeout: (fn, delay) => { const id = ++nextTimer; timers.set(id, { fn, delay }); return id; },
     clearTimeout: id => timers.delete(id),
-    setInterval: () => 1,
+    setInterval: (fn, delay) => { intervals.set(delay, fn); return 1; },
     addEventListener: (key, fn) => listeners.set(key, fn),
   };
   vm.runInNewContext(source, { window: root, Date: FixedDate });
@@ -176,6 +208,8 @@ function browser(summary, options = {}) {
     root, elements, timers, calls: () => calls,
     sessionCalls: () => sessionCalls, signOutCalls: () => signOutCalls,
     user: next => { user = next; }, result: next => { result = next; },
+    advance: milliseconds => { now += milliseconds; },
+    tickClock: () => intervals.get(15000)(),
     emit: (type, event = {}) => listeners.get(type)?.(event),
     fireTimer: delay => {
       const timer = [...timers].find(([, value]) => value.delay === delay);
@@ -193,6 +227,58 @@ const protectedSummary = () => ({
     { driver_id: 'a', started_at: '2026-09-24T16:00:00.000Z', ended_at: '2026-09-24T17:30:00.000Z', alert_count: 1 },
     { driver_id: 'a', started_at: '2026-09-10T16:00:00.000Z', ended_at: '2026-09-10T17:30:00.000Z' },
   ],
+});
+const protectedOpenSummary = () => ({
+  ...protectedSummary(),
+  sessions: [
+    { started_at: new Date(NOW - 12 * 60 * 60 * 1000 + 1).toISOString(), ended_at: null },
+    { started_at: new Date(NOW - 40 * 24 * 60 * 60 * 1000).toISOString(), ended_at: null },
+  ],
+});
+
+test('retained open records age into unfinished state and normal retry cadence after a failed refresh', async () => {
+  for (const saveData of [false, true]) {
+    const page = browser(protectedOpenSummary(), { saveData });
+    await page.settle();
+    assert.equal(page.elements.get('activeSessions').textContent, '1');
+    assert.equal(page.elements.get('unfinishedSessions').textContent, '1');
+    assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [30000]);
+    page.advance(2);
+    page.result({ ok: false, status: 502, body: { error: 'supabase_error' } });
+    page.elements.get('refreshButton').emit('click');
+    await page.settle();
+    assert.equal(page.elements.get('activeSessions').textContent, '0');
+    assert.equal(page.elements.get('unfinishedSessions').textContent, '2');
+    assert.equal(page.elements.get('pulseNow').textContent, '0');
+    assert.equal(page.elements.get('displayContent').hidden, false);
+    assert.match(page.elements.get('connectionDetails').textContent, /1 unsuccessful refresh.*last protected summary/);
+    assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [saveData ? 360000 : 180000]);
+  }
+});
+
+test('the display clock ages retained open counts without restarting the existing refresh timer', async () => {
+  const page = browser(protectedOpenSummary());
+  await page.settle();
+  const scheduled = [...page.timers];
+  page.advance(2);
+  page.tickClock();
+  assert.equal(page.elements.get('activeSessions').textContent, '0');
+  assert.equal(page.elements.get('unfinishedSessions').textContent, '2');
+  assert.equal(page.elements.get('pulseNow').textContent, '0');
+  assert.deepEqual([...page.timers], scheduled);
+  assert.equal(page.calls(), 1);
+});
+
+test('older-only protected summaries use the normal data-aware cadence from their first render', async () => {
+  for (const saveData of [false, true]) {
+    const summary = protectedOpenSummary();
+    summary.sessions.shift();
+    const page = browser(summary, { saveData });
+    await page.settle();
+    assert.equal(page.elements.get('activeSessions').textContent, '0');
+    assert.equal(page.elements.get('unfinishedSessions').textContent, '1');
+    assert.deepEqual([...page.timers.values()].map(timer => timer.delay), [saveData ? 180000 : 90000]);
+  }
 });
 
 function deferred() {
@@ -449,14 +535,19 @@ test('large text is reversible, exposes its pressed state, and needs no stored p
 });
 
 test('window selection clears protected data after same-tab sign-out without a storage event', async () => {
-  const page = browser(protectedSummary());
+  const page = browser(protectedOpenSummary());
   await page.settle();
+  assert.equal(page.elements.get('activeSessions').textContent, '1');
+  assert.equal(page.elements.get('unfinishedSessions').textContent, '1');
   page.user(null);
   page.elements.get('windowDays').value = '7';
   page.elements.get('windowDays').emit('change');
   assert.equal(page.elements.get('displayContent').hidden, true);
   assert.equal(page.elements.get('displayTitle').textContent, 'Fleet operations');
   assert.equal(page.elements.get('recentSessions').textContent, '0');
+  assert.equal(page.elements.get('activeSessions').textContent, '0');
+  assert.equal(page.elements.get('unfinishedSessions').textContent, '0');
+  assert.equal(page.elements.get('pulseNow').textContent, '0');
   assert.equal(page.timers.size, 0);
 });
 
@@ -546,14 +637,18 @@ test('lost fleet ownership or authentication clears previous protected aggregate
     { ok: false, status: 403, body: { error: 'forbidden' } },
     { ok: false, status: 401, body: { error: 'unauthorized' } },
   ]) {
-    const page = browser(protectedSummary());
+    const page = browser(protectedOpenSummary());
     await page.settle();
+    assert.equal(page.elements.get('activeSessions').textContent, '1');
+    assert.equal(page.elements.get('unfinishedSessions').textContent, '1');
     page.result(denied);
     page.elements.get('refreshButton').emit('click');
     await page.settle();
     assert.equal(page.elements.get('displayContent').hidden, true);
     assert.equal(page.elements.get('displayTitle').textContent, 'Fleet operations');
     assert.equal(page.elements.get('recentSessions').textContent, '0');
+    assert.equal(page.elements.get('activeSessions').textContent, '0');
+    assert.equal(page.elements.get('unfinishedSessions').textContent, '0');
     page.elements.get('windowDays').value = '7';
     page.elements.get('windowDays').emit('change');
     assert.equal(page.elements.get('displayContent').hidden, true);

@@ -46,6 +46,16 @@ interface AlertSystemProps {
   sessionEndedAt: number | null;
   onTimingEvent?: (event: AlertTimingEvent) => void;
   onLevelChange?: (level: AlertLevel) => void;
+  onCriticalOutputAccepted?: (event: CriticalOutputAcceptedEvent) => void;
+}
+
+/** Software output acceptance only; this does not establish perceived delivery. */
+export interface CriticalOutputAcceptedEvent {
+  level: 'critical';
+  decisionId: number;
+  decisionAt: number;
+  acceptedAt: number;
+  channel: 'phone-haptic' | 'phone-audio';
 }
 
 export type AlertTimingEvent =
@@ -72,6 +82,7 @@ export function AlertSystem({
   sessionEndedAt,
   onTimingEvent,
   onLevelChange,
+  onCriticalOutputAccepted,
   inline = false,
 }: AlertSystemProps) {
   const { reduceMotion } = useAccessibilityPreferences();
@@ -85,6 +96,7 @@ export function AlertSystem({
   const watchLiveSession = useRef(false);
   const pendingCueTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const cueSequenceVersion = useRef(0);
+  const criticalOutputOwner = useRef({ isRunning, sessionStartedAt });
   const lastWatchStatusAt = useRef(0);
   const watchStatusSnapshot = useRef({
     state: metrics.state,
@@ -119,6 +131,9 @@ export function AlertSystem({
   }, []);
 
   React.useLayoutEffect(() => cancelPendingCues, [cancelPendingCues]);
+  React.useLayoutEffect(() => {
+    criticalOutputOwner.current = { isRunning, sessionStartedAt };
+  }, [isRunning, sessionStartedAt]);
 
   // Preload output preferences before Start. handleStart also awaits this same
   // deduplicated read so an alert never waits for the native storage bridge.
@@ -244,6 +259,18 @@ export function AlertSystem({
     cancelPendingCues();
     const sequenceVersion = cueSequenceVersion.current;
     const preferences = currentAlertPreferences();
+    const outputOwner = criticalOutputOwner.current;
+    const reportCriticalOutputAccepted = (
+      channel: CriticalOutputAcceptedEvent['channel'],
+      isCurrent: () => boolean,
+    ) => {
+      if (lv !== 'critical' || !onCriticalOutputAccepted || !isCurrent()
+        || !outputOwner.isRunning || criticalOutputOwner.current !== outputOwner) return;
+      try {
+        onCriticalOutputAccepted({ level: 'critical', decisionId: sequenceVersion,
+          decisionAt: now, acceptedAt: Date.now(), channel });
+      } catch {}
+    };
 
     if (reduceMotion) {
       pulse.stopAnimation();
@@ -262,7 +289,7 @@ export function AlertSystem({
       onTimingEvent?.({ kind: 'phone-dispatch', decisionAt: now, dispatchedAt: Date.now() });
     }
     if (preferences.hapticEnabled) {
-      deliveryPlan.hapticOffsetsMs.forEach(offsetMs => scheduleCue(offsetMs, sequenceVersion, async () => {
+      deliveryPlan.hapticOffsetsMs.forEach(offsetMs => scheduleCue(offsetMs, sequenceVersion, async isCurrent => {
         try {
           if (lv === 'critical') {
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -271,6 +298,7 @@ export function AlertSystem({
           } else {
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }
+          reportCriticalOutputAccepted('phone-haptic', isCurrent);
         } catch {}
       }));
     }
@@ -320,12 +348,13 @@ export function AlertSystem({
               player.volume = lv === 'critical' ? 1.0 : lv === 'alert' ? 0.88 : 0.75;
               configureAlertSound(player, preferences.alertSound);
               player.play();
+              reportCriticalOutputAccepted('phone-audio', isCurrent);
             },
           );
         } catch {}
       }));
     } catch {}
-  }, [balancedPlayer, cancelPendingCues, leftPlayer, metrics.perclos, onTimingEvent, pulse, reduceMotion, rightPlayer, scheduleCue]);
+  }, [balancedPlayer, cancelPendingCues, leftPlayer, metrics.perclos, onCriticalOutputAccepted, onTimingEvent, pulse, reduceMotion, rightPlayer, scheduleCue]);
 
   React.useEffect(() => {
     if (!reduceMotion) return;

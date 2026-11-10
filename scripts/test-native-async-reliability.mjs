@@ -1,3 +1,4 @@
+import { withNativeMonitorHookBindings } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -22,6 +23,9 @@ import * as sessionCompletion from '../native-app/lib/sessionCompletion.ts';
 import * as monitorAlertPolicy from '../native-app/lib/alertPolicy.ts';
 import { RollingClosedFraction } from '../native-app/lib/rollingClosedFraction.ts';
 import { HeadNodDetector } from '../native-app/lib/headNodDetector.ts';
+import * as simulatorTraceModel from '../native-app/lib/simulatorTraceModel.ts';
+import { createUnansweredAlertObservation } from '../native-app/lib/unansweredAlertObservation.ts';
+import { createMotionActivityObservation } from '../native-app/lib/motionActivityObservation.ts';
 
 // Execute the production TS logic with native bridges replaced. Removing imports
 // and JSX presentation avoids requiring a device, Expo, or a TS compiler in CI.
@@ -46,7 +50,7 @@ const auth = (owner, expires_at = 0) => ({ access_token: `${owner}-access`, refr
 const token = owner => ({ ...auth(owner), expires_in: 3600 });
 const AUTH_KEY = 'occulert.cloud.auth.v1';
 const CONSENT_KEY = 'occulert-cloud-sync-enabled';
-function cloudFixture(initial, { consent = false } = {}) {
+function cloudFixture(initial, { consent = false, simulatorTrace = false, eventOutboxFlag = false } = {}) {
   const secure = new Map(initial ? [[AUTH_KEY, JSON.stringify(initial)]] : []);
   const storage = new Map([[CONSENT_KEY, String(consent)]]), requests = [], timers = new Map();
   let nextTimer = 0;
@@ -75,8 +79,11 @@ function cloudFixture(initial, { consent = false } = {}) {
   fixture.api = load(read('native-app/lib/cloudSync.ts'), [
     'getCloudState', 'signInToCloud', 'signOutOfCloud', 'setCloudSyncEnabled',
     'beginCloudSession', 'logCloudAlert', 'finishCloudSession', 'cloudSessionScopes', 'retryPendingCloudSessions', 'getPendingCloudSummaryState', 'pendingCloudSummaryStateIsCurrent',
+    'queueNativeCloudAlert', 'nativeCloudEventRetryStatus',
   ], {
-    SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage,
+    SecureStore: fixture.secureStore, AsyncStorage: fixture.asyncStorage, SIMULATOR_TRACE: simulatorTrace,
+    process: { env: { EXPO_PUBLIC_EVENT_OUTBOX: eventOutboxFlag ? '1' : undefined } },
+    createNativeEventOutbox: () => { assert.fail('simulator transport must not construct the retry adapter'); },
     updateSessionHistory: async update => { fixture.history = update(fixture.history || []); },
     createSessionSummaryOutbox, pinnedSupabaseConfig, Platform: { OS: 'ios', Version: '26' }, createAsyncMutationQueue, createCachedBooleanPreference,
     currentAppBuildInfo: () => ({ appVersion: '1.0.0', appBuildNumber: 'test' }),
@@ -197,6 +204,21 @@ for (const status of [200, 401]) {
     assert.equal(await pending, false);
     assert.equal((await f.api.getCloudState()).email, 'new@example.com');
     assert.equal(f.requests.some(r => r.url.includes('grant_type=refresh_token')), false);
+  });
+}
+
+// This contract is only for callers that omit time. Timed alerts have a
+// separately tested, owner/consent-scoped fallback on invalid_occurred_at.
+for (const status of [200, 400, 409, 503]) {
+  test(`native untimed alert stays untimed and sends once on ${status}`, async () => {
+    const f = cloudFixture(auth('old', 4000000000), { consent: true });
+    f.transport = () => response(status, status === 200 ? {} : { error: 'invalid_occurred_at' });
+    assert.equal(await f.api.logCloudAlert('session', 61.4), status === 200);
+    const events = f.requests.filter(r => r.url.endsWith('/api/events'));
+    assert.equal(events.length, 1, 'an untimed request must not trigger a timestamp-stripping resend');
+    assert.deepEqual(JSON.parse(events[0].init.body), {
+      session_id: 'session', type: 'drowsy', fatigue_score: 61,
+    });
   });
 }
 
@@ -413,13 +435,20 @@ function hookFixture() {
   }, unmount() { effects.forEach(effect => effect?.cleanup?.()); } };
 }
 
-function monitorCameraStartFixture(stage) {
+function monitorCameraStartFixture(stage, { simulator = false, autorun = false, unansweredObservation = false, motionActivity = false } = {}) {
   const h = hookFixture(), entered = deferred(), pending = deferred();
   const f = { entered, pending, history: [], checkpoints: [], hookBaselines: [], baselineSaves: [], cameraClears: 0,
-    clock: 1_000_000, cameraListener: null, held: false };
+    clock: 1_000_000, cameraListener: null, held: false, intervals: new Map(), nextInterval: 0,
+    observers: [], checkpointClears: [], motionObservers: [], motionFactoryCalls: 0,
+    motionStarts: [], motionStops: [], motionActivities: [], motionStatuses: [], appStateListeners: [], motionStatus: {} };
   class Clock extends Date { static now() { return f.clock; } }
   const { useEyeTracking: realEyeTracking } = load(read('native-app/hooks/useEyeTracking.ts'), ['useEyeTracking'], {
     ...h.React, ...monitorThresholds, baselinePreset: eyeBaselineModel.baselinePreset, RollingClosedFraction, Date: Clock,
+  });
+  const setInterval = (fn, delay) => { const id = ++f.nextInterval; f.intervals.set(id, { fn, delay }); return id; };
+  const clearInterval = id => f.intervals.delete(id);
+  const { useSimulatorTrace } = load(read('native-app/hooks/useSimulatorTrace.ts'), ['useSimulatorTrace'], {
+    ...h.React, ...simulatorTraceModel, Date: Clock, setInterval, clearInterval,
   });
   const identity = kind => ({ state: 'available', deviceId: 'virtual-front', deviceType: 'virtual', isVirtual: true,
     constituentDeviceTypes: ['outer', 'inner'], streamingDeviceType: kind, streamingUniqueId: kind, streamingType: kind });
@@ -431,24 +460,59 @@ function monitorCameraStartFixture(stage) {
   };
   const player = { pause() {}, seekTo: async () => {}, play() {} }, isCurrent = () => true;
   const device = { id: 'virtual-front' }, router = { replace() {}, back() {}, push() {} };
+  const appState = { currentState: 'active', addEventListener(_event, listener) {
+    const entry = { listener, removed: false }; f.appStateListeners.push(entry);
+    return { remove() { entry.removed = true; } };
+  } };
+  const addMotionListener = (kind, listener) => {
+    const entry = { listener, removed: false }; f[kind].push(entry);
+    return { remove() { entry.removed = true; } };
+  };
+  const motionBridge = {
+    async start(owner) {
+      f.motionStarts.push(owner); await boundary('motion-start');
+      return { owner, state: 'active', authorization: 'authorized', isAvailable: true, isActive: true, ...f.motionStatus };
+    },
+    async stop(owner) { f.motionStops.push(owner); },
+    addActivityListener: listener => addMotionListener('motionActivities', listener),
+    addStatusListener: listener => addMotionListener('motionStatuses', listener),
+  };
   const source = read('native-app/app/monitor.tsx');
-  const cutoff = source.indexOf('\n  if (!hasPermission) {');
+  const cutoff = source.indexOf('\n  if (!hasPermission && !SIMULATOR_TRACE) {');
   assert.ok(cutoff > source.indexOf('  const frameProcessor ='));
   const component = source.slice(0, cutoff)
-    + '\nreturn {handleStart,handleStop,toggleSetupPreview,onEyeState,eyeBaseline,isRunning,baselineMessage};\n}';
-  const api = load(component, ['MonitorScreen'], {
+    + '\nreturn {handleStart,handleStop,toggleSetupPreview,onEyeState,eyeBaseline,isRunning,baselineMessage,metrics,alertCount,simulatorPhase,observeUnansweredSample,recordUnansweredCriticalOutput};\n}';
+  const bindings = {
     ...h.React, React: h.React, ...frontCameraPolicy, ...monitorPerformance, ...monitorLifecycle,
     ...cameraSetup, ...cameraResilience, ...captureLoadPolicy, ...monitorThresholds, ...eyeBaselineModel,
     ...sensorFusion, ...sessionCompletion, ...monitorAlertPolicy, HeadNodDetector,
-    EYE_BASELINE_EXPERIMENT: true, Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
-    useRouter: () => router, useAccessibilityPreferences: () => ({ reduceMotion: true }),
-    useCameraDevice: () => device, useCameraPermission: () => ({ hasPermission: true, requestPermission: async () => true }),
+    stopNativeCloudEvents() {}, queueNativeCloudAlert: () => null,
+    EYE_BASELINE_EXPERIMENT: !simulator, SIMULATOR_TRACE: simulator, useSimulatorTrace,
+    UNANSWERED_ALERT_OBSERVATION_ENABLED: unansweredObservation,
+    MOTION_ACTIVITY_OBSERVATION_ENABLED: motionActivity,
+    createUnansweredAlertObservation: (_enabled, _clocks, motionCategory) => {
+      assert.equal(unansweredObservation, true, 'a disabled actual screen must not construct an observer');
+      const observer = createUnansweredAlertObservation(true, { now: () => f.clock, wallNow: () => f.clock }, motionCategory);
+      f.observers.push(observer); return observer;
+    },
+    createMotionActivityBridge: () => {
+      assert.ok(unansweredObservation && motionActivity, 'both development flags are required for native motion lookup');
+      f.motionFactoryCalls++; return motionBridge;
+    },
+    createMotionActivityObservation: (enabled, bridge) => {
+      const observer = createMotionActivityObservation(enabled, bridge, { now: () => f.clock, wallNow: () => f.clock });
+      f.motionObservers.push(observer); return observer;
+    },
+    Date: Clock, performance: { now: () => f.clock }, __DEV__: false, require: () => 'sound',
+    Platform: { OS: 'ios' },
+    useRouter: () => router, useLocalSearchParams: () => autorun ? { 'trace-run': '1' } : {}, useAccessibilityPreferences: () => ({ reduceMotion: true }),
+    useCameraDevice: () => simulator ? null : device, useCameraPermission: () => ({ hasPermission: !simulator, requestPermission: async () => true }),
     useFaceDetector: () => ({ detectFaces: () => [] }), useFrameProcessor: callback => callback,
     useRunOnJS: callback => callback, useSharedValue: value => h.React.useRef({ value }).current,
     useAlertAudioPlayer: () => ({ player, isCurrent }),
     useEyeTracking: (level, baseline) => { f.hookBaselines.push(baseline); return realEyeTracking(level, baseline); },
     Battery: { usePowerState: () => ({ batteryLevel: 1, batteryState: 0, lowPowerMode: false }), BatteryState: { CHARGING: 1, FULL: 2 } },
-    AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
+    AppState: appState,
     BackHandler: { addEventListener: () => ({ remove() {} }) },
     currentAlertPreferences: () => ({ audioEnabled: false, hapticEnabled: false }),
     deliverCueIfCurrent, loadAlertPreferences: () => boundary('preferences'), getWatchAlertsEnabled: async () => false,
@@ -468,17 +532,285 @@ function monitorCameraStartFixture(stage) {
     getWatchStatus: async () => ({ moduleAvailable: false, paired: false, appInstalled: false, reachable: false }),
     consumePreDriveSafety: () => true, currentAppBuildInfo: () => ({ appVersion: 'fixture', appBuildNumber: 'fixture' }),
     saveActiveSessionCheckpoint: async value => { await boundary('checkpoint'); f.checkpoints.push(value); },
-    clearActiveSessionCheckpoint: async () => {},
+    clearActiveSessionCheckpoint: async id => { f.checkpointClears.push(id); },
     updateSessionHistory: async update => { f.history = update(f.history); },
     finishCloudSession: async () => { assert.fail('experimental camera sessions must remain local'); },
-    Alert: { alert() {} }, setInterval: () => 1, clearInterval() {},
-  });
+    beginCloudSession: () => { assert.fail('simulator and experimental camera sessions must remain local'); },
+    logCloudAlert: async () => { assert.fail('experimental camera sessions must remain local'); },
+    Alert: { alert() {} }, setInterval, clearInterval,
+  };
+  const api = load(component, ['MonitorScreen'], withNativeMonitorHookBindings(bindings, load));
   f.render = () => h.render(() => api.MonitorScreen());
   f.switchToInner = () => { assert.equal(typeof f.cameraListener, 'function'); f.cameraListener(identity('inner')); };
   f.unmount = () => h.unmount();
+  f.emitMotion = (changes = {}, owner = f.motionStarts.at(-1)) => {
+    const sample = { owner, authorization: 'authorized', confidence: 'high', activityStartedAt: f.clock,
+      sourceUptimeMs: f.clock, receivedUptimeMs: f.clock, receivedAt: f.clock,
+      automotive: true, stationary: false, walking: false, running: false, cycling: false, unknown: false, ...changes };
+    for (const entry of f.motionActivities) if (!entry.removed) entry.listener(sample);
+    return sample;
+  };
+  f.setAppState = async nextState => {
+    appState.currentState = nextState;
+    for (const entry of f.appStateListeners) if (!entry.removed) entry.listener(nextState);
+    await flush();
+  };
+  f.advanceTrace = milliseconds => { for (let elapsed = 0; elapsed < milliseconds; elapsed += 100) {
+    f.clock += 100;
+    for (const interval of [...f.intervals.values()]) if (interval.delay === 100) interval.fn();
+    f.render();
+  } };
   f.render();
   return f;
 }
+
+test('simulator trace uses the actual monitor and eye scoring without a camera, then Stop cancels it', async () => {
+  const f = monitorCameraStartFixture(null, { simulator: true });
+  await flush(); let screen = f.render(); await screen.handleStart(); f.render(); screen = f.render();
+  assert.equal(screen.isRunning, true); assert.equal(screen.metrics.ear, .3); assert.equal(screen.metrics.state, 'open');
+  f.advanceTrace(2_700); screen = f.render(); assert.equal(screen.alertCount, 0, 'slow blink must not trigger an alert');
+  f.advanceTrace(4_300); screen = f.render();
+  assert.equal(screen.simulatorPhase, 'closed for 3 seconds'); assert.equal(screen.metrics.state, 'closed');
+  assert.equal(screen.metrics.closedDurationMs, 3_000); assert.equal(screen.alertCount, 1); assert.ok(screen.metrics.fatigueScore > 0);
+  f.advanceTrace(1_000); screen = f.render(); assert.equal(screen.metrics.state, 'noFace');
+  await screen.handleStop(); screen = f.render(); assert.equal(screen.isRunning, false);
+  assert.equal([...f.intervals.values()].filter(value => value.delay === 100).length, 0);
+  const stopped = JSON.stringify(screen.metrics); f.advanceTrace(2_000); assert.equal(JSON.stringify(f.render().metrics), stopped);
+  f.unmount();
+});
+
+test('the actual Start keeps disabled checkpoints absent and resets real observation counts for each enabled session', async () => {
+  for (const enabled of [false, true]) {
+    const f = monitorCameraStartFixture(null, { unansweredObservation: enabled });
+    try {
+      await flush(); let screen = f.render(); await screen.handleStart(); screen = f.render();
+      assert.equal(screen.isRunning, true);
+      assert.equal(f.observers.length, enabled ? 1 : 0);
+      assert.equal(Object.hasOwn(f.checkpoints[0], 'unansweredAlerts'), enabled);
+      if (!enabled) {
+        f.clock += 6_000; await screen.handleStop();
+        assert.equal(Object.hasOwn(f.history[0], 'unansweredAlerts'), false);
+        continue;
+      }
+      const observer = f.observers[0], oldGeneration = observer.generation;
+      assert.equal(f.checkpoints[0].unansweredAlerts.candidates, 0);
+      screen.observeUnansweredSample({ generation: oldGeneration, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+      screen.recordUnansweredCriticalOutput({ level: 'critical', decisionId: 1, decisionAt: f.clock,
+        acceptedAt: f.clock, channel: 'phone-haptic' });
+      for (let index = 0; index < 12; index++) {
+        f.clock += 500;
+        screen.observeUnansweredSample({ generation: oldGeneration, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+      }
+      assert.equal(observer.snapshot().candidates, 1);
+      assert.equal(f.checkpoints[0].unansweredAlerts.candidates, 0, 'the initial checkpoint remains its independent zero-count snapshot');
+      await screen.handleStop(); screen = f.render();
+      assert.equal(f.history[0].unansweredAlerts.candidates, 1);
+      const oldRecord = f.history[0];
+      f.clock += 1_000;
+      const nextCheckpoint = f.checkpoints.length;
+      await screen.handleStart(); screen = f.render();
+      assert.equal(screen.isRunning, true); assert.ok(observer.generation > oldGeneration);
+      assert.equal(observer.snapshot().candidates, 0);
+      assert.equal(f.checkpoints[nextCheckpoint].unansweredAlerts.candidates, 0);
+      assert.equal(oldRecord.unansweredAlerts.candidates, 1, 'a new Start cannot replace prior local counts');
+      f.clock += 1_000; await screen.handleStop();
+      assert.equal(f.history[0].unansweredAlerts.candidates, 0);
+      assert.equal(f.history[1].unansweredAlerts.candidates, 1);
+    } finally { f.unmount(); }
+  }
+});
+
+test('aborted actual Start never resumes an observation window or completes a History record', async () => {
+  for (const stage of ['preferences', 'checkpoint']) {
+    const f = monitorCameraStartFixture(stage, { unansweredObservation: true });
+    try {
+      await flush(); let screen = f.render(); const starting = screen.handleStart(); await f.entered.promise;
+      const observer = f.observers[0], oldGeneration = observer.generation;
+      assert.equal(observer.snapshot()?.candidates, stage === 'checkpoint' ? 0 : undefined);
+      await screen.handleStop(); f.pending.resolve(); await starting; screen = f.render();
+      assert.equal(screen.isRunning, false); assert.equal(f.history.length, 0);
+      assert.equal(f.checkpoints.length, stage === 'checkpoint' ? 1 : 0);
+      if (stage === 'checkpoint') {
+        assert.equal(f.checkpoints[0].unansweredAlerts.candidates, 0);
+        assert.deepEqual(f.checkpointClears, [f.checkpoints[0].sessionId]);
+      }
+      for (let index = 0; index < 14; index++) {
+        f.clock += 500;
+        observer.sample({ generation: oldGeneration, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+        observer.criticalOutput(oldGeneration, { level: 'critical', decisionId: index + 1,
+          decisionAt: f.clock, acceptedAt: f.clock, channel: 'phone-haptic' });
+      }
+      assert.equal(observer.snapshot()?.candidates, stage === 'checkpoint' ? 0 : undefined);
+      assert.equal(f.history.length, 0);
+    } finally { f.pending.resolve(); f.unmount(); }
+  }
+});
+
+test('actual screen cleanup invalidates enabled observation ownership and late callbacks cannot add candidates', async () => {
+  for (const enabled of [false, true]) {
+    const f = monitorCameraStartFixture(null, { unansweredObservation: enabled }); let unmounted = false;
+    try {
+      await flush(); let screen = f.render(); await screen.handleStart(); screen = f.render();
+      const observer = f.observers[0], generation = observer?.generation;
+      if (enabled) {
+        screen.observeUnansweredSample({ generation, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+        screen.recordUnansweredCriticalOutput({ level: 'critical', decisionId: 1, decisionAt: f.clock,
+          acceptedAt: f.clock, channel: 'phone-haptic' });
+        for (let index = 0; index < 12; index++) {
+          f.clock += 500;
+          screen.observeUnansweredSample({ generation, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+        }
+        assert.equal(observer.snapshot().candidates, 1);
+      }
+      f.unmount(); unmounted = true;
+      assert.equal(f.observers.length, enabled ? 1 : 0, 'flag-off cleanup never constructs an observer');
+      if (enabled) assert.ok(observer.generation > generation, 'the actual effect cleanup invalidates the old observer generation');
+      for (let index = 0; index < 15; index++) {
+        f.clock += 500;
+        const sample = { generation: generation ?? 0, sampledAt: f.clock, sourceAt: f.clock, state: index === 0 ? 'open' : 'closed' };
+        const output = { level: 'critical', decisionId: index + 2, decisionAt: f.clock, acceptedAt: f.clock, channel: 'phone-haptic' };
+        screen.observeUnansweredSample(sample); screen.recordUnansweredCriticalOutput(output);
+        observer?.sample(sample); observer?.criticalOutput(generation, output);
+      }
+      if (enabled) assert.equal(observer.snapshot().candidates, 1, 'cleanup retains saved counts but no pending or late window can continue');
+      assert.equal(f.history.length, 0, 'observation cleanup alone never invents a completed History record');
+    } finally { if (!unmounted) f.unmount(); }
+  }
+});
+
+function countActualUnansweredCandidate(f, screen, decisionId = 1) {
+  const generation = f.observers[0].generation;
+  screen.observeUnansweredSample({ generation, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+  screen.recordUnansweredCriticalOutput({ level: 'critical', decisionId, decisionAt: f.clock,
+    acceptedAt: f.clock, channel: 'phone-haptic' });
+  for (let index = 0; index < 12; index++) {
+    f.clock += 500;
+    screen.observeUnansweredSample({ generation, sampledAt: f.clock, sourceAt: f.clock, state: 'closed' });
+  }
+}
+
+test('actual motion collection requires both flags and starts only after explicit parked camera Start', async () => {
+  for (const unansweredObservation of [false, true]) for (const motionActivity of [false, true]) {
+    const enabled = unansweredObservation && motionActivity;
+    const f = monitorCameraStartFixture(null, { unansweredObservation, motionActivity });
+    try {
+      await flush(); let screen = f.render();
+      assert.equal(f.motionFactoryCalls, enabled ? 1 : 0);
+      assert.equal(f.motionStarts.length, 0, 'mounting the screen cannot request motion collection');
+      await screen.handleStart(); screen = f.render(); await flush();
+      assert.equal(screen.isRunning, true); assert.equal(f.motionStarts.length, enabled ? 1 : 0);
+      assert.equal(Object.hasOwn(f.checkpoints[0], 'unansweredAlerts'), unansweredObservation);
+      assert.equal(Object.hasOwn(f.checkpoints[0], 'motionActivity'), false);
+      f.clock += 1_000; await screen.handleStop();
+      assert.equal(Object.hasOwn(f.history[0], 'unansweredAlerts'), unansweredObservation);
+      assert.doesNotMatch(JSON.stringify(f.history[0]), /activityStartedAt|sourceUptimeMs|receivedUptimeMs|receivedAt|occulert-motion-activity-/);
+    } finally { f.unmount(); }
+  }
+});
+
+test('actual motion startup never blocks camera monitoring and all optional outcomes only label local candidates', async () => {
+  for (const [outcome, changes, sample, expected] of [
+    ['denied', { state: 'denied', authorization: 'denied' }, null, 'denied'],
+    ['restricted', { authorization: 'restricted' }, null, 'denied'],
+    ['missing', { state: 'not-built', isAvailable: false, isActive: false }, null, 'unavailable'],
+    ['unavailable', { state: 'unavailable', isAvailable: false, isActive: false }, null, 'unavailable'],
+    ['error', { state: 'error', authorization: 'unknown' }, null, 'unknown'],
+    ['stationary', {}, { automotive: false, stationary: true }, 'not-moving'],
+    ['automotive', {}, {}, 'reported-activity'],
+    ['overlap', {}, { stationary: true }, 'unknown'],
+    ['stale', {}, { stale: true }, 'stale'],
+  ]) {
+    const f = monitorCameraStartFixture('motion-start', { unansweredObservation: true, motionActivity: true }); f.motionStatus = changes;
+    try {
+      await flush(); let screen = f.render(); await screen.handleStart(); screen = f.render();
+      assert.equal(screen.isRunning, true, outcome + ': a stalled permission/result path cannot delay camera Start');
+      assert.equal(f.motionStarts.length, 1); assert.equal(f.motionObservers[0].category(), 'unknown');
+      f.pending.resolve(); await flush();
+      if (sample) f.emitMotion(sample.stale ? { activityStartedAt: f.clock - 10_001 } : sample);
+      assert.equal(f.motionObservers[0].category(), expected);
+      countActualUnansweredCandidate(f, screen);
+      assert.equal(f.observers[0].snapshot().candidates, 1, outcome + ': optional labels never suppress or accelerate the six-second observer');
+      assert.equal(f.observers[0].snapshot().byMotion[expected], 1);
+      await screen.handleStop();
+      assert.equal(f.history[0].unansweredAlerts.byMotion[expected], 1);
+      assert.doesNotMatch(JSON.stringify(f.history[0].unansweredAlerts), /activityStartedAt|receivedAt|Uptime|owner|automotive|stationary/);
+    } finally { f.pending.resolve(); f.unmount(); }
+  }
+});
+
+test('actual aborted Start before monitoring requests no motion and preserves existing camera recovery ordering', async () => {
+  for (const stage of ['preferences', 'checkpoint']) {
+    const f = monitorCameraStartFixture(stage, { unansweredObservation: true, motionActivity: true });
+    try {
+      await flush(); const screen = f.render(), starting = screen.handleStart(); await f.entered.promise;
+      assert.equal(f.motionStarts.length, 0);
+      await screen.handleStop(); f.pending.resolve(); await starting;
+      assert.equal(f.render().isRunning, false); assert.equal(f.motionStarts.length, 0); assert.equal(f.history.length, 0);
+      assert.equal(f.motionObservers[0].category(), 'unknown');
+    } finally { f.pending.resolve(); f.unmount(); }
+  }
+});
+
+test('actual Stop rejects old motion callbacks and permission completion while a newer session keeps its own source', async () => {
+  const f = monitorCameraStartFixture('motion-start', { unansweredObservation: true, motionActivity: true });
+  try {
+    await flush(); let screen = f.render(); await screen.handleStart(); screen = f.render();
+    const oldOwner = f.motionStarts[0], oldActivity = f.motionActivities[0].listener;
+    f.clock += 1_000; await screen.handleStop(); screen = f.render();
+    assert.ok(f.motionStops.includes(oldOwner)); assert.ok(f.motionActivities.every(entry => entry.removed));
+    f.clock += 1_000; await screen.handleStart(); screen = f.render(); await flush();
+    const newOwner = f.motionStarts.at(-1); assert.notEqual(newOwner, oldOwner);
+    f.emitMotion(); assert.equal(f.motionObservers[0].category(), 'reported-activity');
+    f.pending.resolve(); await flush();
+    oldActivity({ owner: oldOwner, authorization: 'denied' });
+    assert.equal(f.motionObservers[0].category(), 'reported-activity');
+    assert.equal(f.motionStops.filter(owner => owner === newOwner).length, 0, 'old completion cannot stop the newer native source');
+    countActualUnansweredCandidate(f, screen); await screen.handleStop();
+    assert.equal(f.history[0].unansweredAlerts.byMotion['reported-activity'], 1);
+    assert.equal(f.history[1].unansweredAlerts.candidates, 0);
+  } finally { f.pending.resolve(); f.unmount(); }
+});
+
+test('actual foreground loss and unmount remove motion listeners and cannot resume collection from late events', async () => {
+  for (const boundary of ['background', 'unmount']) {
+    const f = monitorCameraStartFixture(null, { unansweredObservation: true, motionActivity: true }); let unmounted = false;
+    try {
+      await flush(); let screen = f.render(); await screen.handleStart(); screen = f.render(); await flush();
+      f.emitMotion(); const owner = f.motionStarts[0], activity = f.motionActivities[0].listener;
+      f.clock += 1_000;
+      if (boundary === 'background') { await f.setAppState('background'); screen = f.render(); assert.equal(screen.isRunning, false); }
+      else { f.unmount(); unmounted = true; }
+      assert.ok(f.motionStops.includes(owner)); assert.ok(f.motionActivities.every(entry => entry.removed));
+      activity({ owner, authorization: 'authorized', confidence: 'high', activityStartedAt: f.clock,
+        sourceUptimeMs: f.clock, receivedUptimeMs: f.clock, receivedAt: f.clock,
+        automotive: true, stationary: false, walking: false, running: false, cycling: false, unknown: false });
+      assert.equal(f.motionObservers[0].category(), 'unknown');
+      assert.equal(f.motionStarts.length, 1, 'a late callback never implicitly starts the source again');
+    } finally { if (!unmounted) f.unmount(); }
+  }
+});
+
+test('simulator cloud transport stays unavailable even when stored consent and auth exist', async () => {
+  for (const eventOutboxFlag of [false, true]) {
+    const f = cloudFixture(auth('owner', 4_000_000_000), { consent: true, simulatorTrace: true, eventOutboxFlag });
+    assert.equal((await f.api.getCloudState()).available, false);
+    assert.equal(await f.api.beginCloudSession(), null);
+    assert.equal(f.api.queueNativeCloudAlert(Promise.resolve('session'), 90, new Date().toISOString()), null);
+    assert.equal(f.api.nativeCloudEventRetryStatus(), null);
+    await f.api.retryPendingCloudSessions();
+    assert.equal(f.requests.length, 0); assert.equal(f.timers.size, 0);
+  }
+});
+
+test('trace deep link can start only the simulator variant and cannot restart after Stop', async () => {
+  for (const simulator of [false, true]) {
+    const f = monitorCameraStartFixture(null, { simulator, autorun: true });
+    await flush(); f.render(); await flush(); let screen = f.render();
+    assert.equal(screen.isRunning, simulator);
+    if (simulator) { await screen.handleStop(); f.render(); await flush(); assert.equal(f.render().isRunning, false); }
+    f.unmount();
+  }
+});
 
 for (const stage of ['preferences', 'checkpoint']) {
   test(`camera switch during awaited ${stage} cannot restore an invalidated baseline in the running session or saved provenance`, async () => {
@@ -733,6 +1065,62 @@ test('history mutation refuses malformed members without writing away existing b
   await assert.rejects(api.loadSessionHistory(), /Saved session history/);
   await assert.rejects(api.updateSessionHistory(() => []), /Saved session history/);
   assert.deepEqual(writes, []);
+});
+
+test('malformed observation diagnostics prevent History ID migration and callback writes across the whole array', async () => {
+  const history = await import('../native-app/lib/sessionHistoryData.ts');
+  const valid = { version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 1,
+    byMotion: { unknown: 1, unavailable: 0, denied: 0, stale: 0, 'not-moving': 0, 'reported-activity': 0 } };
+  let stored = JSON.stringify([{ savedAt: 'legacy-without-id' }, { sessionId: 'invalid', unansweredAlerts: { ...valid, candidates: 2 } }]);
+  const writes = [], original = stored;
+  const api = load(read('native-app/lib/sessionHistory.ts'), ['loadSessionHistory', 'updateSessionHistory'], {
+    ...history, AsyncStorage: { getItem: async () => stored, setItem: async (_key, value) => { writes.push(value); stored = value; } },
+  });
+  await assert.rejects(api.loadSessionHistory(), /unreadable unanswered-alert diagnostics/);
+  await assert.rejects(api.updateSessionHistory(() => []), /unreadable unanswered-alert diagnostics/);
+  assert.equal(stored, original); assert.equal(writes.length, 0);
+  stored = JSON.stringify({ schemaVersion: 1, sessions: [{ sessionId: 'valid', unansweredAlerts: valid }] });
+  const before = stored;
+  await assert.rejects(api.updateSessionHistory(rows => [{ ...rows[0], unansweredAlerts: { ...valid, rawMotion: [] } }]), /unreadable unanswered-alert diagnostics/);
+  assert.equal(stored, before); assert.equal(writes.length, 0);
+});
+
+test('checkpoint storage captures optional counts before queued work and rejects invalid counts without replacing bytes', async () => {
+  const recovery = await import('../native-app/lib/sessionRecoveryModel.ts');
+  const { copyUnansweredAlertSnapshot } = await import('../native-app/lib/unansweredAlertPolicy.ts');
+  const { buildMonitorCheckpoint } = await import('../native-app/lib/monitorCheckpointModel.ts');
+  const counts = { version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 1,
+    byMotion: { unknown: 1, unavailable: 0, denied: 0, stale: 0, 'not-moving': 0, 'reported-activity': 0 } };
+  const checkpoint = buildMonitorCheckpoint({ sessionId: 'observed', startedAt: 1_000, checkpointedAt: 2_000, alertCount: 0,
+    fatigueSum: 0, fatigueSamples: 0, maxFatigue: 0, headNodObservations: 0, headphoneHeadNodObservations: 0,
+    headphoneMotionSamples: 0, headphoneMotionStatus: 'unavailable', monitorPerformance: { samples: 0 }, sensitivity: 'medium', buildInfo: {}, unansweredAlerts: counts });
+  const gate = deferred(); let stored = null, block = true; const writes = [];
+  const api = load(read('native-app/lib/sessionRecovery.ts'), ['saveActiveSessionCheckpoint', 'loadActiveSessionCheckpoint'], {
+    ...recovery, copyUnansweredAlertSnapshot,
+    AsyncStorage: { getItem: async () => { if (block) await gate.promise; return stored; }, setItem: async (_key, value) => { writes.push(value); stored = value; } },
+  });
+  const pending = api.saveActiveSessionCheckpoint(checkpoint);
+  checkpoint.unansweredAlerts.byMotion.unknown = 9; gate.resolve(); await pending; block = false;
+  assert.equal(JSON.parse(stored).unansweredAlerts.byMotion.unknown, 1);
+  const before = stored;
+  await assert.rejects(api.saveActiveSessionCheckpoint({ ...checkpoint, unansweredAlerts: { ...counts, rawTimeline: [] } }), /Invalid unanswered-alert/);
+  assert.equal(stored, before); assert.equal(writes.length, 1);
+  stored = JSON.stringify({ ...JSON.parse(before), unansweredAlerts: null });
+  await assert.rejects(api.saveActiveSessionCheckpoint({ ...JSON.parse(before), unansweredAlerts: counts }), /checkpoint could not be read/);
+  assert.equal(JSON.parse(stored).unansweredAlerts, null); assert.equal(writes.length, 1);
+});
+
+test('native cloud finalization and its durable retry queue exclude optional unanswered-alert counts', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  const unansweredAlerts = { version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 1,
+    byMotion: { unknown: 1, unavailable: 0, denied: 0, stale: 0, 'not-moving': 0, 'reported-activity': 0 } };
+  let available = false; const payloads = [];
+  f.transport = (_url, options) => { payloads.push(JSON.parse(options.body)); return response(available ? 200 : 503, { ok: true, session: { id: 'session', ended_at: '2026-11-01T12:00:00.000Z' } }); };
+  await f.api.finishCloudSession('session', { averageFatigue: 0, maxFatigue: 0, safetyScore: 100, alertCount: 0, unansweredAlerts }, '2026-11-01T12:00:00.000Z');
+  assert.doesNotMatch(f.storage.get('occulert.cloud.session-outbox.v1'), /unansweredAlerts|byMotion|software-output-accepted/);
+  available = true; await f.api.retryPendingCloudSessions();
+  assert.equal(payloads.length, 2); assert.deepEqual(payloads[0], payloads[1]);
+  assert.doesNotMatch(JSON.stringify(payloads), /unansweredAlerts|byMotion|software-output-accepted/);
 });
 
 test('password login never inherits stored sharing consent from absent or replacement auth', async () => {

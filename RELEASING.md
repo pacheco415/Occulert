@@ -22,6 +22,17 @@
    Typecheck are all green on that PR; confirm they ran on the resulting `main`
    commit too.
 
+The browser workflow runs its existing onboarding probe and complete browser
+suites through `scripts/run-browser-check.mjs`. The wrapper enables only
+`DEBUG=pw:browser`, streams test output, and preserves the test process's exit
+code or signal. Its bounded stderr tail and before/after memory, cgroup and
+shared-memory observations are saved under `playwright-report/browser-process/`
+and included in the browser diagnostics artifact.
+Unavailable platform probes are recorded explicitly and do not change a test
+result. These observations help investigate process or storage loss; a passing
+retry or an empty OOM counter does not establish its cause. Keep the first
+attempt's traces and retry report when assessing an intermittent failure.
+
 Keep superseded assets for at least 14 days so cached older pages can still
 load. After that grace period, remove a file only after checking references in
 HTML, runtime JS, `sw.js`, `asset-versions.json`, `asset-integrity.json`, and
@@ -37,7 +48,8 @@ Use `npm run asset:bump -- <logical-name> --dry-run` to review an asset release 
 ### Editable source pilot
 
 `source-assets.json` currently registers `driver-app.js` in bundle mode, built
-from `src/driver-app.js` and its eight domain modules. Edit the actual source,
+from `src/driver-app.js`, its nine domain modules and the exact shared
+`lib/event-outbox.ts` input. Edit the actual source,
 then review `npm run asset:release -- --dry-run` and run `npm run asset:release`.
 Release processes every changed registered source in one plan, copies its
 versioned importers, synchronizes
@@ -101,7 +113,7 @@ Retained old SDK loaders require their documented CDN compatibility grant during
 the existing 14-day retention window; remove it after the reference audit passes.
 
 The driver now uses the bundled source mode described in
-[docs/DRIVER_MODULES.md](docs/DRIVER_MODULES.md). Edit its eight modules and entry,
+[docs/DRIVER_MODULES.md](docs/DRIVER_MODULES.md). Edit its domain modules and entry,
 then release through `asset:release`; do not copy compiled output into the entry.
 Other logical assets retain the existing manual immutable release process.
 
@@ -109,8 +121,60 @@ The optional parked helper now has editable copy-mode source at
 `src/detection-experiments.js`, registered as `detection-experiments.js`.
 `asset:release` releases its changes together with the compiled driver and
 startup guard, synchronizing helper integrity and importer references in one
-cache update. The helper remains outside the nine-module driver bundle and
+cache update. The helper remains outside the driver bundle and
 loads only for selected parked experiments.
+
+### Initialize a new copy-mode asset
+
+An initial release requires explicit intent. Declare one new logical JS or CSS
+name in `source-assets.json` with `mode: "copy"` and an owned UTF-8 source under
+`src/`; then run:
+
+```sh
+npm run asset:release -- --init-copy=driver-i18n.js --dry-run
+npm run asset:release -- --init-copy=driver-i18n.js
+```
+
+The example name does not itself register or enable a driver catalog. The flag
+accepts exactly one registered copy-mode name absent from both current and HEAD
+asset manifests. It cannot initialize a bundle, replace an existing logical
+entry, reuse another active asset's stem, or bypass an unfinished release.
+Other missing registry entries still fail. Existing changed registered sources
+and their versioned importers participate in the normal composed release.
+
+Before running the command, use a quoted root-relative logical URL such as
+`/driver-i18n.js` for new references in owned HTML or worker pin pairs.
+The tool rewrites this URL to a fresh immutable filename. It leaves the registry
+key and source path, including strings such as `src/driver-i18n.js`, unchanged;
+it does not create an unversioned served alias. The dry-run plan lists the new
+mapping under `initializations`, existing asset copies under `copies`, all
+rewrites, and the single advanced cache identity. Full fetched history and local
+filenames reserve versions, including prepared or deleted files.
+
+For a new HTML script or stylesheet, include
+`integrity="sha256-INIT-COPY" crossorigin="anonymous"`. For a worker pin, use an
+owned literal pair such as
+`{ url: '/driver-i18n.js', integrity: 'sha256-INIT-COPY' }`.
+The marker is a release placeholder, never a valid published pin. The initial
+release replaces it with the final output's SHA-256 SRI. An already exact final
+pin is also accepted; unrelated or mismatched pins, duplicate attributes,
+computed/spread worker entries, unpaired worker URLs and worker query/fragment
+URLs, including interpolated logical URL templates, fail before writes. Worker initialization supports literal `url`/`integrity`
+pairs, not bare cache-list placeholders or separate pin constants. HTML SRI
+initialization supports script and stylesheet tags, not preload pins.
+Initial logical URL placeholders and the reserved pin marker in runtime JS/CSS
+are rejected, including JS-loader assignments and interpolated templates. The
+tool does not infer loader pin ownership or rewrite dynamic expressions. This
+restriction does not change ordinary versioned-asset importer synchronization.
+
+Initialization does not decide whether an asset belongs in the default install,
+optional cache or startup contract. Choose and review those references for the
+feature, then verify size, offline and startup behavior. The tool stages the new
+output, manifests, integrity pins, immutable headers, source synchronization and
+cache advance atomically; a failed write restores old files and removes new ones.
+Review and verify the release before committing. Once committed, use ordinary
+`asset:release` for future source edits; the initialization flag rejects an
+existing logical entry.
 
 ### Weekly retired asset cleanup
 

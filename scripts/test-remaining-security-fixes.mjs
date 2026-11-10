@@ -1,3 +1,4 @@
+import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
 import { assetByStem } from './lib/current-assets.mjs';
@@ -48,19 +49,19 @@ test('native cloud writes recheck current consent', () => {
 });
 
 test('monitoring fails visibly without overlapping the navigation or showing a duplicate modal', () => {
-  const monitor = read('native-app/app/monitor.tsx');
-  assert.match(monitor, /SENSOR_STARTUP_GRACE_MS = 10_000/);
-  assert.match(monitor, /SENSOR_STALL_MS = 5_000/);
-  assert.match(monitor, /hasCameraSampleRef\.current \? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS/);
-  assert.match(monitor, /hasCameraSampleRef\.current = true/);
-  assert.match(monitor, /lastSampleAtRef\.current = Date\.now\(\)/);
-  assert.match(monitor, /Monitoring stopped: camera analysis stalled/);
-  assert.doesNotMatch(monitor, /Alert\.alert\('Monitoring stopped'/);
-  assert.match(monitor, /<MonitorLayout/);
-  assert.doesNotMatch(monitor, /sensorFault: \{ position: 'absolute'/);
-  assert.match(monitor, /attentionKey=\{sensorFault \|\|/);
+  const owners = readNativeMonitorSourceOwners(), monitor = owners.screen;
+  assert.match(owners.camera, /SENSOR_STARTUP_GRACE_MS = 10_000/);
+  assert.match(owners.camera, /SENSOR_STALL_MS = 5_000/);
+  assert.match(owners.camera, /hasCameraSampleRef\.current \? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS/);
+  assert.match(owners.analysis, /hasCameraSampleRef\.current = true/);
+  assert.match(owners.camera, /lastSampleAtRef\.current = Date\.now\(\)/);
+  assert.match(owners.camera, /Monitoring stopped: camera analysis stalled/);
+  for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /Alert\.alert\('Monitoring stopped'/);
+  assert.match(owners.view, /<MonitorLayout/);
+  for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /sensorFault: \{ position: 'absolute'/);
+  assert.match(owners.view, /attentionKey=\{sensorFault \|\|/);
   assert.match(monitor, /sensitivityLoaded/);
-  assert.match(monitor, /disabled=\{isStarting \|\| isStopping \|\| !sensitivityLoaded \|\| !baselineLoaded \|\| baselineBusy\}/);
+  assert.match(owners.view, /disabled=\{isStarting \|\| isStopping \|\| !sensitivityLoaded \|\| !baselineLoaded \|\| baselineBusy\}/);
   assert.match(monitor, /updateSessionHistory/);
 });
 

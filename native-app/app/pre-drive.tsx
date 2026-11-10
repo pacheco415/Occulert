@@ -154,6 +154,19 @@ export default function PreDriveScreen() {
         <ParkedReadinessCard />
 
         {Platform.OS === 'ios' && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Review Apple emergency-readiness guidance"
+            accessibilityHint="Opens optional setup guides in Settings. Review only while safely parked."
+            style={styles.emergencyGuidanceLink}
+            onPress={() => router.push('/settings')}
+          >
+            <Text style={styles.emergencyGuidanceTitle}>Apple emergency setup guides</Text>
+            <Text style={styles.emergencyGuidanceDetail}>Optional reference to review while parked in Settings.</Text>
+          </TouchableOpacity>
+        )}
+
+        {Platform.OS === 'ios' && (
           <View style={styles.healthCard}>
             <View style={styles.healthHeading}>
               <View style={styles.healthIcon}>
@@ -312,6 +325,9 @@ export default function PreDriveScreen() {
 }
 
 const styles = StyleSheet.create({
+  emergencyGuidanceLink: { minHeight: 48, padding: 16, marginBottom: 20, borderRadius: radii.medium, borderWidth: 1, borderColor: colors.glassBorder, backgroundColor: colors.material },
+  emergencyGuidanceTitle: { color: colors.cyan, fontSize: 15, lineHeight: 22, fontWeight: '600' },
+  emergencyGuidanceDetail: { color: colors.textSecondary, fontSize: 13, lineHeight: 20, marginTop: 4 },
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 },
   hero: { alignItems: 'center', paddingTop: 12, marginBottom: 22 },

@@ -24,6 +24,74 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   private var statusTimeoutTask: Task<Void, Never>?
   private var hapticSequenceTask: Task<Void, Never>?
   private var lastStoppedStatusAt = 0.0
+  private let criticalRepeatInterval = 4.0
+  private let criticalEpisodeLimit = 60.0
+  private var criticalEpisodeStartedAt: Double?
+  private var criticalLastPatternStartedAt: Double?
+  private var criticalEpisodeCanceled = false
+  private var criticalEpisodeResetStatusAt = 0.0
+  private var criticalRepeatTask: Task<Void, Never>?
+  private var hapticGeneration: UInt64 = 0
+  private var isForegroundActive = WKExtension.shared().applicationState == .active
+
+  deinit {
+    statusTimeoutTask?.cancel()
+    hapticSequenceTask?.cancel()
+    criticalRepeatTask?.cancel()
+  }
+
+  func setForegroundActive(_ active: Bool) {
+    isForegroundActive = active
+    if !active { cancelForegroundFeedback() }
+    // Returning to the foreground never resumes a canceled episode.
+  }
+
+  func cancelForegroundFeedback() {
+    cancelHapticTasks()
+    if criticalEpisodeStartedAt != nil { criticalEpisodeCanceled = true }
+  }
+
+  private func cancelHapticTasks() {
+    hapticGeneration &+= 1
+    hapticSequenceTask?.cancel()
+    hapticSequenceTask = nil
+    criticalRepeatTask?.cancel()
+    criticalRepeatTask = nil
+  }
+
+  private func cancelCriticalFeedback() {
+    if lastLevel == "critical" { cancelHapticTasks() }
+    if criticalEpisodeStartedAt != nil { criticalEpisodeCanceled = true }
+  }
+
+  private func resetCriticalEpisode() {
+    cancelCriticalFeedback()
+    criticalEpisodeStartedAt = nil
+    criticalLastPatternStartedAt = nil
+    criticalEpisodeCanceled = false
+    criticalEpisodeResetStatusAt = lastStatusAt
+  }
+
+  private func hasFreshClosedStatus() -> Bool {
+    let ageMilliseconds = Date().timeIntervalSince1970 * 1_000 - lastStatusAt
+    return isForegroundActive && WKExtension.shared().applicationState == .active
+      && isMonitoring && monitoringState == "closed"
+      && lastStatusAt > lastStoppedStatusAt && lastAlertAt > lastStoppedStatusAt
+      && lastAlertAt > criticalEpisodeResetStatusAt
+      && ageMilliseconds >= 0 && ageMilliseconds < statusFreshnessMilliseconds
+  }
+
+  private func criticalFeedbackIsEligible() -> Bool {
+    guard let startedAt = criticalEpisodeStartedAt else { return false }
+    let elapsed = ProcessInfo.processInfo.systemUptime - startedAt
+    return !criticalEpisodeCanceled && lastLevel == "critical"
+      && elapsed >= 0 && elapsed < criticalEpisodeLimit && hasFreshClosedStatus()
+  }
+
+  private func finishCriticalEpisode() {
+    cancelCriticalFeedback()
+    if lastLevel == "critical" { lastMessage = "Pull over safely and rest now." }
+  }
 
   override init() {
     super.init()
@@ -180,6 +248,14 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     guard sentAt > lastAlertAt else { return }
 
     let level = message["level"] as? String ?? "alert"
+    // A replacement owns all future feedback. Only an already-live critical
+    // episode may retain its original deadline and next pattern time.
+    let continuingCritical = level == "critical" && shouldDeliverFeedback
+      && criticalFeedbackIsEligible()
+    cancelHapticTasks()
+    if criticalEpisodeStartedAt != nil && !continuingCritical {
+      criticalEpisodeCanceled = true
+    }
     lastAlertAt = sentAt
     lastLevel = level
     lastMessage = switch level {
@@ -199,12 +275,11 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
   }
 
   private func playHaptic(level: String) {
-    hapticSequenceTask?.cancel()
-    hapticSequenceTask = nil
+    cancelHapticTasks()
 
     switch level {
     case "critical":
-      playCriticalHapticSequence()
+      startCriticalFeedback()
     case "alert":
       playStandardAlertHapticSequence()
     case "tracking":
@@ -214,10 +289,77 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     }
   }
 
-  private func playCriticalHapticSequence() {
-    let device = WKInterfaceDevice.current()
-    device.play(.failure)
-    hapticSequenceTask = Task { @MainActor in
+  private func startCriticalFeedback() {
+    // A delayed pre-reset alert cannot turn a newer open/stop into fresh
+    // foreground feedback, even when it is still inside the ingress window.
+    guard lastAlertAt > lastStoppedStatusAt,
+      lastAlertAt > criticalEpisodeResetStatusAt
+    else { return }
+    if criticalEpisodeStartedAt != nil {
+      guard criticalFeedbackIsEligible() else {
+        finishCriticalEpisode()
+        return
+      }
+      // A replacement critical message does not add a pattern, move its next
+      // due time, or renew the continuous closed-eye episode's cap.
+    } else if hasFreshClosedStatus() {
+      criticalEpisodeStartedAt = ProcessInfo.processInfo.systemUptime
+      criticalLastPatternStartedAt = criticalEpisodeStartedAt
+      playCriticalHapticSequence(requiresClosedStatus: true)
+    } else {
+      // Preserve the existing one-shot critical alert without arming repeats.
+      // A later status message alone cannot start or resume this timer.
+      playCriticalHapticSequence(requiresClosedStatus: false)
+      return
+    }
+
+    let generation = hapticGeneration
+    criticalRepeatTask = Task { @MainActor [weak self] in
+      while !Task.isCancelled {
+        guard let delay = self?.criticalTimerDelay(generation: generation) else { return }
+        do {
+          try await Task.sleep(nanoseconds: UInt64(max(0.000_001, delay) * 1_000_000_000))
+        } catch {
+          return
+        }
+        guard !Task.isCancelled else { return }
+        guard self?.criticalTimerFired(generation: generation) == true else { return }
+      }
+    }
+  }
+
+  private func criticalTimerDelay(generation: UInt64) -> Double? {
+    guard generation == hapticGeneration else { return nil }
+    guard criticalFeedbackIsEligible(), let startedAt = criticalEpisodeStartedAt,
+      let lastPatternAt = criticalLastPatternStartedAt
+    else {
+      finishCriticalEpisode()
+      return nil
+    }
+    return min(lastPatternAt + criticalRepeatInterval, startedAt + criticalEpisodeLimit)
+      - ProcessInfo.processInfo.systemUptime
+  }
+
+  private func criticalTimerFired(generation: UInt64) -> Bool {
+    guard generation == hapticGeneration else { return false }
+    guard criticalFeedbackIsEligible(), let lastPatternAt = criticalLastPatternStartedAt else {
+      finishCriticalEpisode()
+      return false
+    }
+    let now = ProcessInfo.processInfo.systemUptime
+    if now >= lastPatternAt + criticalRepeatInterval {
+      // Record the actual start, so a delayed timer never catches up in bursts.
+      criticalLastPatternStartedAt = now
+      playCriticalHapticSequence(requiresClosedStatus: true)
+    }
+    return true
+  }
+
+  private func playCriticalHapticSequence(requiresClosedStatus: Bool) {
+    hapticSequenceTask?.cancel()
+    let generation = hapticGeneration
+    guard playCriticalPulse(generation: generation, requiresClosedStatus: requiresClosedStatus) else { return }
+    hapticSequenceTask = Task { @MainActor [weak self] in
       for _ in 0..<2 {
         do {
           try await Task.sleep(nanoseconds: 400_000_000)
@@ -225,21 +367,38 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
           return
         }
         guard !Task.isCancelled else { return }
-        device.play(.failure)
+        guard self?.playCriticalPulse(generation: generation, requiresClosedStatus: requiresClosedStatus) == true
+        else { return }
       }
     }
+  }
+
+  private func playCriticalPulse(generation: UInt64, requiresClosedStatus: Bool) -> Bool {
+    guard generation == hapticGeneration && isForegroundActive,
+      WKExtension.shared().applicationState == .active
+    else { return false }
+    if requiresClosedStatus && !criticalFeedbackIsEligible() {
+      finishCriticalEpisode()
+      return false
+    }
+    WKInterfaceDevice.current().play(.failure)
+    return true
   }
 
   private func playStandardAlertHapticSequence() {
     let device = WKInterfaceDevice.current()
     device.play(.notification)
-    hapticSequenceTask = Task { @MainActor in
+    let generation = hapticGeneration
+    hapticSequenceTask = Task { @MainActor [weak self] in
       do {
         try await Task.sleep(nanoseconds: 450_000_000)
       } catch {
         return
       }
       guard !Task.isCancelled else { return }
+      guard let self, self.hapticGeneration == generation,
+        self.isForegroundActive, WKExtension.shared().applicationState == .active
+      else { return }
       device.play(.notification)
     }
   }
@@ -291,7 +450,15 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     let duration = min(86_400, max(0, numberValue(message["sessionTime"])))
     sessionSeconds = Int(duration)
 
+    let statusAgeMilliseconds = Date().timeIntervalSince1970 * 1_000 - sentAt
+    let isFreshStatus = statusAgeMilliseconds >= 0
+      && statusAgeMilliseconds < statusFreshnessMilliseconds
     guard running else {
+      if isFreshStatus && sentAt >= lastAlertAt {
+        resetCriticalEpisode()
+      } else {
+        cancelCriticalFeedback()
+      }
       lastStoppedStatusAt = sentAt
       isMonitoring = false
       monitoringState = "stopped"
@@ -305,6 +472,7 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
     }
     let ageMilliseconds = max(0, Date().timeIntervalSince1970 * 1_000 - sentAt)
     guard ageMilliseconds < statusFreshnessMilliseconds else {
+      cancelCriticalFeedback()
       isMonitoring = false
       monitoringState = "stale"
       return
@@ -312,11 +480,17 @@ final class AlertReceiver: NSObject, ObservableObject, WCSessionDelegate {
 
     isMonitoring = true
     monitoringState = acceptedState
+    if acceptedState == "open" && isFreshStatus && sentAt >= lastAlertAt {
+      resetCriticalEpisode()
+    } else if acceptedState != "closed" || !isFreshStatus {
+      cancelCriticalFeedback()
+    }
     let remainingMilliseconds = max(1, statusFreshnessMilliseconds - ageMilliseconds)
     let timeoutAt = sentAt
     statusTimeoutTask = Task { [weak self] in
       try? await Task.sleep(nanoseconds: UInt64(remainingMilliseconds * 1_000_000))
       guard !Task.isCancelled, let self, self.lastStatusAt == timeoutAt else { return }
+      self.cancelCriticalFeedback()
       self.isMonitoring = false
       self.monitoringState = "stale"
     }

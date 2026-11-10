@@ -3,15 +3,105 @@ import test from 'node:test';
 import { createCaptureCameraFixture, createCaptureWatchdogFixture } from './lib/capture-camera-test-harness.mjs';
 import { createCaptureLoadDiagnostics } from '../lib/captureLoadDiagnostics.ts';
 import { isActiveSessionCheckpoint, parseActiveSessionCheckpoint } from '../lib/sessionRecoveryModel.ts';
+import { deriveCameraLoadPolicy } from '../lib/cameraResilience.ts';
 import {
   CAPTURE_LOAD_EXPERIMENT,
   CAPTURE_TRANSITION_GRACE_MS,
+  ROAD_STREAM_EVALUATION_FPS,
   captureLoadConfiguration,
   createCaptureTransitionGuard,
+  deriveRoadStreamLoadPolicy,
   selectCaptureLoadFormat,
 } from '../lib/captureLoadPolicy.ts';
 
 const format = (videoWidth, videoHeight, minFps = 15, maxFps = 30) => ({ videoWidth, videoHeight, minFps, maxFps });
+const roadConditions = { evaluationRequested: true, thermalState: 'nominal', pressureLevel: 'nominal' };
+
+test('road evaluation stays disabled without an exact explicit request', () => {
+  const disabled = { mode: 'disabled', requestedRoadFps: 0, reason: 'not-requested' };
+  assert.deepEqual(deriveRoadStreamLoadPolicy({ thermalState: 'nominal', pressureLevel: 'nominal' }), disabled);
+  for (const evaluationRequested of [false, undefined, null, 0, 1, 'true', {}, []]) {
+    assert.deepEqual(deriveRoadStreamLoadPolicy({ ...roadConditions, evaluationRequested }), disabled);
+  }
+  assert.deepEqual(deriveRoadStreamLoadPolicy({
+    ...roadConditions, evaluationRequested: false, thermalState: 'critical', fallbackLatched: true,
+  }), disabled);
+});
+
+test('only known nominal or fair load proposes the fixed five-fps evaluation tier', () => {
+  assert.equal(ROAD_STREAM_EVALUATION_FPS, 5);
+  for (const thermalState of ['nominal', 'fair']) {
+    for (const pressureLevel of ['nominal', 'fair']) {
+      assert.deepEqual(deriveRoadStreamLoadPolicy({ ...roadConditions, thermalState, pressureLevel }), {
+        mode: 'evaluation', requestedRoadFps: 5, reason: 'none',
+      });
+    }
+  }
+});
+
+test('serious heat or pressure drops the road recommendation before driver settings are considered', () => {
+  for (const thermalState of ['serious', 'critical']) {
+    assert.deepEqual(deriveRoadStreamLoadPolicy({ ...roadConditions, thermalState }), {
+      mode: 'driverOnlyFallback', requestedRoadFps: 0, reason: 'heat',
+    });
+  }
+  for (const pressureLevel of ['serious', 'critical', 'shutdown']) {
+    assert.deepEqual(deriveRoadStreamLoadPolicy({ ...roadConditions, pressureLevel }), {
+      mode: 'driverOnlyFallback', requestedRoadFps: 0, reason: 'pressure',
+    });
+  }
+});
+
+test('unknown or malformed conditions and latch values never propose road frames', () => {
+  const fallback = { mode: 'driverOnlyFallback', requestedRoadFps: 0, reason: 'unknown' };
+  for (const value of ['unknown', 'unrecognized', null, undefined, NaN, Infinity, -1, 0, true, {}, []]) {
+    assert.deepEqual(deriveRoadStreamLoadPolicy({ ...roadConditions, thermalState: value }), fallback);
+    assert.deepEqual(deriveRoadStreamLoadPolicy({ ...roadConditions, pressureLevel: value }), fallback);
+  }
+  for (const fallbackLatched of [null, 'true', 'false', 1, 0, {}, []]) {
+    assert.deepEqual(deriveRoadStreamLoadPolicy({ ...roadConditions, fallbackLatched }), fallback);
+  }
+});
+
+test('a caller-owned fallback latch survives cooling and an evaluation toggle until a new parked session', () => {
+  const hot = deriveRoadStreamLoadPolicy({ ...roadConditions, thermalState: 'serious' });
+  const fallbackLatched = hot.mode === 'driverOnlyFallback';
+  const retained = { mode: 'driverOnlyFallback', requestedRoadFps: 0, reason: 'latched' };
+  assert.deepEqual(deriveRoadStreamLoadPolicy({ ...roadConditions, fallbackLatched }), retained);
+  assert.equal(deriveRoadStreamLoadPolicy({ ...roadConditions, fallbackLatched, evaluationRequested: false }).requestedRoadFps, 0);
+  assert.deepEqual(deriveRoadStreamLoadPolicy({ ...roadConditions, fallbackLatched }), retained);
+  assert.deepEqual(deriveRoadStreamLoadPolicy({ ...roadConditions, fallbackLatched: false }), {
+    mode: 'evaluation', requestedRoadFps: 5, reason: 'none',
+  }, 'the future owner resets the latch only for a new parked session');
+});
+
+test('road decisions are pure and share neither input state nor mutable results', () => {
+  const input = Object.freeze({ ...roadConditions, fallbackLatched: false });
+  const before = structuredClone(input);
+  const first = deriveRoadStreamLoadPolicy(input);
+  const second = deriveRoadStreamLoadPolicy(input);
+  assert.deepEqual(first, second);
+  assert.notStrictEqual(first, second);
+  first.requestedRoadFps = 0;
+  assert.deepEqual(deriveRoadStreamLoadPolicy(input), { mode: 'evaluation', requestedRoadFps: 5, reason: 'none' });
+  assert.deepEqual(input, before);
+});
+
+test('road fallback leaves the existing driver reduction and critical-heat stop decisions intact', () => {
+  for (const [thermalState, mode, analysisIntervalMs, reason] of [
+    ['nominal', 'normal', 100, 'none'],
+    ['serious', 'reduced', 200, 'heat'],
+    ['critical', 'stop', 200, 'heat'],
+  ]) {
+    const input = Object.freeze({ thermalState, lowPowerMode: false, batteryLevel: 1, isCharging: false });
+    const before = deriveCameraLoadPolicy(input);
+    const road = deriveRoadStreamLoadPolicy({ ...roadConditions, thermalState, pressureLevel: 'serious' });
+    assert.equal(road.requestedRoadFps, 0);
+    assert.deepEqual(deriveCameraLoadPolicy(input), before);
+    assert.deepEqual(before, { mode, analysisIntervalMs, reason });
+    assert.equal(Object.hasOwn(road, 'analysisIntervalMs'), false);
+  }
+});
 
 test('capture experiment is disabled without the explicit build flag', () => {
   assert.equal(CAPTURE_LOAD_EXPERIMENT, process.env.EXPO_PUBLIC_CAPTURE_LOAD_EXPERIMENT === '1');

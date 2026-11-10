@@ -4,12 +4,14 @@
 
 The coordinated test-only upgrade pins `@playwright/test`, its locked
 `playwright` and `playwright-core` packages, the official Noble container, and
-its runtime assertion to 1.64.1. It adopts the dependency update proposed in
-[Dependabot #273](https://github.com/pacheco415/Occulert/pull/273), but preserves
-main's later container, fresh-workspace ownership guards, probe, full suite,
-retry policy, diagnostics, and verification artifacts. It does not change the
-application or service worker. Do not merge the old dependency-only PR separately
-without reconciling the matching runtime pins.
+its runtime assertions to stable 1.65.0. This refresh continues
+[PR #324](https://github.com/pacheco415/Occulert/pull/324), which coordinates the
+dependency work from [Dependabot #273](https://github.com/pacheco415/Occulert/pull/273).
+It preserves current main's fresh-workspace ownership guards, form probe, full
+suite, retry policy, browser-process diagnostics, action pins and verification
+artifacts. It does not change the application or service worker. Keep both PRs
+open until the coordinated runtime passes its acceptance gates; do not merge
+the old dependency-only PR separately.
 
 The [upstream issue](https://github.com/microsoft/playwright/issues/42803)
 identifies a libsoup 3.6.5 use-after-free in Playwright 1.63.0's Linux WebKit
@@ -20,9 +22,12 @@ network-process loss, but it does not prove that this upstream defect caused
 Occulert's failures. A newer bundled browser is a candidate remediation, not a
 confirmed application fix.
 
-The official registry returned the 1.64.1 Noble multi-platform manifest digest
-`sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea`
-on October 26, 2026. Never substitute an unverified tag-only image.
+The [official stable release](https://github.com/microsoft/playwright/releases/tag/v1.65.0)
+was published November 5, 2026. On November 8 and again November 10, the official
+registry returned the 1.65.0 Noble multi-platform manifest digest
+`sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d`.
+The SHA-256 of the returned index bytes matched that digest. Both browser jobs
+use this exact image. Never substitute an unverified tag-only image.
 
 ## Required hosted evidence
 
@@ -77,11 +82,12 @@ fields, badges and footer retain shipped filter effects. The correct label,
 populated DOM and white captured frame are consistent with that renderer defect;
 they do not by themselves establish its cause in Occulert.
 
-As checked October 28, the [latest official stable release](https://github.com/microsoft/playwright/releases/tag/v1.64.1)
-is still 1.64.1. Do not substitute an alpha, disable rendering effects, force
-clicks, reduce assertion coverage or extend the probe's test deadline to obtain
-a passing result. Reducing probe workers cannot address the retained failure:
-that run already used one.
+The October 28 review found 1.64.1 was still the latest stable release. That
+dated observation is superseded by the November 10 review below. Do not
+substitute an alpha, disable rendering effects, force clicks, reduce assertion
+coverage or extend the probe's test deadline to obtain a passing result.
+Reducing probe workers cannot address the retained failure: that run already
+used one.
 
 The refreshed workflow preserves main's parallel browser matrix, required
 `smoke` aggregate, retry report and verification receipts, plus the independent
@@ -96,6 +102,65 @@ active filter metadata and runner CPU/memory availability. It records no form
 values. These observations help distinguish a missing label from a renderer
 stall on the next actual Linux run; they are not a rendering workaround.
 
-**The upgrade remains not ready for merge** until the unchanged Linux form
-probe, complete browser matrix and offline repetitions pass on the refreshed
-PR head. A local macOS pass cannot resolve a Linux-specific acceptance failure.
+## November 10 refresh and unresolved acceptance
+
+The refreshed candidate retains original PR head
+`4c01c327bf00c0b1f7c99d5e36512b48909471d8` as its first parent and current main
+`0373418636440865b5aa417984c9524f5e2710d7` as its second parent. The package and
+lockfile start from current main; only `@playwright/test`, `playwright` and
+`playwright-core` advance to 1.65.0. Current main's application assets and
+dependency updates are retained. The form diagnostics from this draft remain
+unchanged, and the full-suite jobs retain `scripts/run-browser-check.mjs` from
+main for bounded browser stderr and resource observations.
+
+The November 10 npm registry check still reports stable 1.65.0. The exact
+[tagged browser manifest](https://github.com/microsoft/playwright/blob/v1.65.0/packages/playwright-core/browsers.json)
+(blob `fcd39c9ce9b7ac5253b811d9b05ab7c6c5f68e7c`) pins WebKit revision 2388,
+browser version 27.2. The refreshed image index is unchanged from the
+[November 8 readiness review](https://github.com/pacheco415/Occulert/pull/324).
+Its Linux amd64 manifest is
+`sha256:bc4fbb329a25287ed23e9216c97063646abdd1bf2da669a9895fa3e2078b2302`.
+The earlier observation that the image tag was unavailable no longer applies.
+
+The November 8 review downloaded and verified the complete 111,767,372-byte
+amd64 WebKit layer
+`sha256:1aea89d9b89dfe8f2337e8810ca1436c81549266c3a1376a8fbcbe5fba010609`.
+It inspected the actual `webkit-2388` bundled libraries:
+
+| Library | SHA-256 |
+| --- | --- |
+| GTK `sys/lib/libsoup-3.0.so.0.7.4` | `81839c7074fc8c105bb130dfc9080e72751e69b4f61ce60e4f17af65066eabe1` |
+| WPE `sys/lib/libsoup-3.0.so.0.7.4` | `47ac78474975d417b377a68cbbea58794a90c533f8ec93f6d2c6d96312956bd7` |
+
+Their exported version functions return 3.6.6 in static ELF disassembly. This
+retained evidence establishes the bundled version, but does not identify the
+library actually loaded by the network process or prove the queue-item
+lifetime remedy's machine-code content. Tagged source metadata naming 3.6.5
+does not override the inspected bundle. This refresh does not claim a new
+layer download or binary inspection.
+
+The rendering gate remains separate. The tagged
+[WebKit configuration](https://github.com/microsoft/playwright/blob/v1.65.0/browser_patches/webkit/UPSTREAM_CONFIG.sh)
+pins base `5b391e6d3b14d549908dad2c6695999291313f30`. The
+[ancestry comparison](https://github.com/WebKit/WebKit/compare/3a41ad1d523ccc432418410723dfe5e60f1f9a63...5b391e6d3b14d549908dad2c6695999291313f30)
+places that base 4,576 commits behind the known rendering fix, with zero ahead
+and the tagged base as merge base. The complete tagged
+[bootstrap patch](https://github.com/microsoft/playwright/blob/v1.65.0/browser_patches/webkit/patches/bootstrap.diff)
+(blob `ab31e39a60fcc511607003e8d8a87bdc201287d4`) has no modifications to either
+`SkiaCompositingLayer` source file and no `ShouldReuseFilteredBackdrop` or
+`filteredBackdrops` identifiers. These source checks do not show the known
+remedy included and do not independently certify final browser behavior.
+
+**The upgrade remains draft and is not ready for merge.** Acceptance still
+requires rendering-remedy evidence, the exact loaded network-process library
+mapping/hash and remedy content, and the unchanged Linux form probe, complete
+browser matrix and twenty offline repetitions on the refreshed PR head. Keep
+first-attempt failures, retry reports and source/environment receipts. A stable
+tag, a library version, or a passing retry alone does not satisfy those gates.
+
+The preparation environment has no Docker or Podman. Prior local browser
+launch and pinned download attempts were blocked; this refresh does not repeat
+those attempts or claim a local engine pass. Portable checks and test collection
+can validate the prepared source, but hosted execution and the outstanding
+runtime evidence are still required. Historical macOS results do not resolve
+the Linux-specific acceptance failure.

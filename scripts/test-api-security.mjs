@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 
 const require = createRequire(import.meta.url);
@@ -16,6 +17,19 @@ const verifiedUser = {
   email: "manager@example.com",
   email_confirmed_at: "2026-07-19T00:00:00.000Z",
 };
+
+function eventReply(body) {
+  return { event: { id: "00000000-0000-4000-8000-000000000002", session_id: body.p_session_id,
+    type: body.p_type, fatigue_score: body.p_fatigue_score, confidence: body.p_confidence,
+    latitude: body.p_latitude, longitude: body.p_longitude }, client_event_id: null, replayed: false };
+}
+
+function sessionReply(body, extra = {}) {
+  return { session: { id: body.p_session_id || "00000000-0000-4000-8000-000000000001",
+    driver_id: "driver-1", fleet_id: "fleet-1", started_at: new Date().toISOString(), ended_at: null,
+    device: body.p_device, browser: body.p_browser, detector_pipeline: body.p_detector_pipeline,
+    detector_version: body.p_detector_version, app_version: body.p_app_version, ...extra }, replayed: false };
+}
 
 function loadHandler(path, pgFetch, user = verifiedUser) {
   const handlerPath = require.resolve(path);
@@ -65,9 +79,9 @@ let patchedSession;
 let insertedSession;
 const sessions = loadHandler("../api/sessions.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
-  if (table === "sessions" && options.method === "POST") {
+  if (table === "rpc/start_rate_limited_session" && options.method === "POST") {
     insertedSession = options.body;
-    return [{ id: "00000000-0000-4000-8000-000000000001", ...options.body }];
+    return sessionReply(options.body);
   }
   if (table === "sessions" && !options.method) return allowSessionUpdate ? [{ id: "00000000-0000-4000-8000-000000000001", started_at: "2026-07-19T00:00:00.000Z", ended_at: null }] : [];
   if (table === "sessions" && options.method === "PATCH") {
@@ -86,20 +100,22 @@ const startedSession = await invoke(sessions, request("POST", {
   fleet_id: "attacker-fleet",
 }));
 assert.equal(startedSession.status, 200);
-assert.equal(insertedSession.driver_id, "driver-1");
-assert.equal(insertedSession.fleet_id, "fleet-1", "client cannot choose fleet for its session");
-assert.equal(insertedSession.detector_pipeline, "ios_mlkit_eye_probability");
-assert.equal(insertedSession.detector_version, "mlkit-probability-perclos-1");
-assert.equal(insertedSession.app_version, "v1.0.0 (52)");
+assert.equal(insertedSession.p_user_id, verifiedUser.id);
+assert.equal(insertedSession.p_driver_id, undefined, "the database derives driver identity");
+assert.equal(insertedSession.p_fleet_id, undefined, "the client cannot choose fleet for its session");
+assert.equal(insertedSession.p_started_at, undefined, "the database assigns start time");
+assert.equal(insertedSession.p_detector_pipeline, "ios_mlkit_eye_probability");
+assert.equal(insertedSession.p_detector_version, "mlkit-probability-perclos-1");
+assert.equal(insertedSession.p_app_version, "v1.0.0 (52)");
 
 await invoke(sessions, request("POST", {
   detector_pipeline: "attacker_pipeline",
   detector_version: "<script>",
   app_version: "bad/value",
 }));
-assert.equal(insertedSession.detector_pipeline, null, "only documented detector families are accepted");
-assert.equal(insertedSession.detector_version, null, "provenance labels are limited to safe text");
-assert.equal(insertedSession.app_version, null, "app labels are limited to safe text");
+assert.equal(insertedSession.p_detector_pipeline, null, "only documented detector families are accepted");
+assert.equal(insertedSession.p_detector_version, null, "provenance labels are limited to safe text");
+assert.equal(insertedSession.p_app_version, null, "app labels are limited to safe text");
 
 const patchBody = { session_id: "00000000-0000-4000-8000-000000000001", average_fatigue: 30, max_fatigue: 60, safety_score: 80 };
 const deniedPatch = await invoke(sessions, request("PATCH", patchBody));
@@ -126,9 +142,10 @@ let insertedEvent;
 const events = loadHandler("../api/events.js", async (table, options = {}) => {
   if (table === "drivers") return [{ id: "driver-1" }];
   if (table === "sessions") return allowEventSession ? [{ id: "00000000-0000-4000-8000-000000000001", started_at: "2026-07-19T00:00:00.000Z", ended_at: null }] : [];
-  if (table === "events") {
-    insertedEvent = options.body;
-    return [{ id: "event-1", ...options.body }];
+  if (table === "rpc/record_idempotent_event") {
+    const result = eventReply(options.body);
+    insertedEvent = result.event;
+    return result;
   }
   throw new Error(`unexpected events call: ${table}`);
 });
@@ -189,6 +206,61 @@ assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must no
   assert.equal(storageCalls, 0, "malformed event types must never query or mutate storage");
 }
 
+// A detection can precede an asynchronously created server session even with
+// synchronized clocks. Omitted timestamps have a separate server-assigned meaning.
+{
+  const RealDate = Date;
+  let now = RealDate.parse("2026-10-27T12:00:00.000Z");
+  globalThis.Date = class extends RealDate {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+    static now() { return now; }
+  };
+  try {
+    let releaseDriver, signalDriverLookup;
+    const driverLookupStarted = new Promise(resolve => { signalDriverLookup = resolve; });
+    const driverReady = new Promise(resolve => { releaseDriver = resolve; });
+    let storedSession;
+    const delayedStart = loadHandler("../api/sessions.js", async (table, options = {}) => {
+      if (table === "drivers") { signalDriverLookup(); await driverReady; return [{ id: "driver-1" }]; }
+      assert.equal(table, "rpc/start_rate_limited_session");
+      assert.equal(options.method, "POST");
+      assert.equal(options.body.p_started_at, undefined);
+      storedSession = sessionReply(options.body).session;
+      return { session: storedSession, replayed: false };
+    });
+    const starting = invoke(delayedStart, request("POST", {}));
+    await driverLookupStarted;
+    const detectedAt = new Date().toISOString();
+    now += 30000;
+    releaseDriver();
+    assert.equal((await starting).status, 200);
+    assert.equal(storedSession.started_at, new Date().toISOString());
+    assert.ok(detectedAt < storedSession.started_at);
+    let writes = 0, saved;
+    const delayedEvents = loadHandler("../api/events.js", async (table, options = {}) => {
+      if (table === "drivers") return [{ id: "driver-1" }];
+      if (table === "sessions") return [storedSession];
+      assert.equal(table, "rpc/record_idempotent_event");
+      writes++;
+      saved = options.body;
+      return eventReply(saved);
+    });
+    for (const occurred_at of [detectedAt, new Date(now + 5000).toISOString()]) {
+      const rejected = await invoke(delayedEvents, request("POST", { ...eventBody, occurred_at }));
+      assert.equal(rejected.status, 400);
+      assert.equal(rejected.body.error, "invalid_occurred_at");
+    }
+    assert.equal(writes, 0, "pre-session and ahead-clock timestamps cannot write");
+    assert.equal((await invoke(delayedEvents, request("POST", eventBody))).status, 200);
+    assert.equal(saved.p_occurred_at, null, "omission delegates to database processing time, not detection time");
+    storedSession.ended_at = new Date(now).toISOString();
+    now += 30000;
+    assert.equal((await invoke(delayedEvents, request("POST", eventBody))).status, 200);
+    assert.equal(saved.p_occurred_at, null, "during grace the atomic RPC assigns the bounded session-end time");
+    assert.equal(writes, 2, "each successful invocation writes once; the API does not resend rejected calls");
+  } finally { globalThis.Date = RealDate; }
+}
+
 // Client event time must stay inside the owned session; finished sessions have a short delivery grace.
 {
   const now = Date.now();
@@ -204,17 +276,17 @@ assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must no
       assert.equal(options.params.select, "id,started_at,ended_at");
       return [row];
     }
-    assert.equal(table, "events");
+    assert.equal(table, "rpc/record_idempotent_event");
     writes++;
     saved = options.body;
-    return [{ id: "event-1", ...saved }];
+    return eventReply(saved);
   });
   for (const occurred_at of [start, finish]) {
     assert.equal((await invoke(timedEvents, request("POST", { ...eventBody, occurred_at }))).status, 200);
-    assert.equal(saved.created_at, occurred_at);
+    assert.equal(saved.p_occurred_at, occurred_at);
   }
   assert.equal((await invoke(timedEvents, request("POST", eventBody))).status, 200);
-  assert.equal(saved.created_at, finish, "legacy event delivery during grace must not be stamped after session end");
+  assert.equal(saved.p_occurred_at, null, "legacy grace omission stays a server-assigned intent");
   const previousWrites = writes;
   for (const occurred_at of [new Date(now - 600001).toISOString(), new Date(now).toISOString(), "invalid", null, 42]) {
     const result = await invoke(timedEvents, request("POST", { ...eventBody, occurred_at }));
@@ -247,14 +319,14 @@ assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must no
       assert.equal(options.params.id, "eq." + eventBody.session_id);
       return [row];
     }
-    assert.equal(table, "events");
+    assert.equal(table, "rpc/record_idempotent_event");
     writes++;
     saved = options.body;
-    return [{ id: "event-1", ...saved }];
+    return eventReply(saved);
   });
   try {
     assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 200);
-    assert.equal(saved.created_at, row.ended_at);
+    assert.equal(saved.p_occurred_at, null);
     const beforeInvalid = writes;
     for (const occurred_at of [
       "2026-02-31T12:00:00Z", "2026-02-29T12:00:00Z",
@@ -269,18 +341,18 @@ assert.equal(insertedEvent.longitude, null, "explicitly absent longitude must no
     assert.equal(writes, beforeInvalid, "invalid ISO timestamps or precise bounds must not reach the insert");
     for (const occurred_at of ["2026-03-03T12:00:00.123456Z", "2026-03-03T13:00:00.123456+01:00", "2026-03-03T07:00:00.123456-05:00"]) {
       assert.equal((await invoke(strictEvents, request("POST", { ...eventBody, occurred_at }))).status, 200);
-      assert.equal(saved.created_at, occurred_at, "accepted timestamps must preserve timezone and microsecond precision for storage");
+      assert.equal(saved.p_occurred_at, occurred_at, "accepted timestamps must preserve timezone and microsecond precision for storage");
     }
     row.ended_at = "2026-03-03T12:58:00.000000Z";
     assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 200, "exactly two minutes remains inside the delivery grace");
-    assert.equal(saved.created_at, row.ended_at);
+    assert.equal(saved.p_occurred_at, null);
     row.ended_at = "2026-03-03T12:57:59.999999Z";
     const beforeStale = writes;
     assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 409);
     assert.equal(writes, beforeStale);
     row.ended_at = null;
     assert.equal((await invoke(strictEvents, request("POST", eventBody))).status, 200);
-    assert.equal(saved.created_at, new Date(now).toISOString(), "open sessions keep the server arrival timestamp");
+    assert.equal(saved.p_occurred_at, null, "open sessions delegate omitted time to the same atomic server clock");
     row.started_at = "2024-02-28T00:00:00Z";
     assert.equal((await invoke(strictEvents, request("POST", { ...eventBody, occurred_at: "2024-02-29T12:00:00Z" }))).status, 200, "a real leap day remains valid");
     row.started_at = "2026-03-04T00:00:00Z";
@@ -637,12 +709,15 @@ const fleetSummaryResult = await invoke(fleetSummary, request("GET"));
 assert.equal(fleetSummaryResult.status, 200);
 assert.equal(fleetSummaryCalls[0].options.params.owner_user_id, "eq.user-1");
 assert.equal(fleetSummaryCalls[1].options.params.fleet_id, "eq.fleet-1");
+assert.equal(fleetSummaryCalls[1].options.params.limit, "500");
+assert.equal(fleetSummaryCalls[1].options.params.order, "id.asc");
 assert.equal(fleetSummaryCalls[2].options.params.fleet_id, "eq.fleet-1");
 assert.equal(fleetSummaryCalls[3].table, "events");
 assert.equal(fleetSummaryCalls[3].options.params.session_id, `in.(${fleetSessionId})`);
 assert.doesNotMatch(fleetSummaryCalls[3].options.params.select, /latitude|longitude/i);
 assert.equal(fleetSummaryResult.body.telemetry_trust, "unverified_client_report");
 assert.equal(fleetSummaryResult.body.events_included, true);
+assert.equal(fleetSummaryResult.body.roster_limit, 500);
 assert.match(fleetSummaryResult.headers["server-timing"], /fleet;dur=\d+, roster;dur=\d+, events;dur=\d+/);
 assert.deepEqual(fleetSummaryResult.body.privacy, {
   includes_location: false,
@@ -668,8 +743,8 @@ assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions"]);
 assert.equal(lightweightResult.body.events_included, false);
 assert.deepEqual(lightweightResult.body.events, []);
 
-// Exercise the query's real ordering at the latest-50 boundary. Equal start
-// times must select the same sessions as follow-ups, independent of row order.
+// Exercise real bounded query results in different insertion orders: the
+// roster's 500 rows, the latest 50 sessions and the latest 200 tied events.
 const orderingDb = new PGlite();
 try {
   await orderingDb.exec(`
@@ -678,11 +753,20 @@ try {
       max_fatigue numeric, safety_score numeric, alert_count integer, head_nod_count integer,
       detector_pipeline text, detector_version text, app_version text);
     create index sessions_fleet_started_id_idx on sessions (fleet_id, started_at desc, id desc);
+    create table drivers (id uuid primary key, fleet_id uuid, name text, active boolean, vehicle_id text);
+    create table events (id uuid primary key, session_id uuid, type text,
+      fatigue_score numeric, confidence numeric, created_at timestamptz);
   `);
   const sessionId = n => `11111111-1111-4111-8111-${n.toString(16).padStart(12, "0")}`;
+  const rosterId = n => `44444444-4444-4444-8444-${n.toString(16).padStart(12, "0")}`;
+  const eventId = n => `55555555-5555-4555-8555-${n.toString(16).padStart(12, "0")}`;
   const ownedFleetId = "22222222-2222-4222-8222-222222222222";
   const otherFleetId = "33333333-3333-4333-8333-333333333333";
-  const driverId = "44444444-4444-4444-8444-444444444444";
+  const driverId = rosterId(1);
+  const ownedDrivers = Array.from({ length: 501 }, (_, i) => ({
+    id: rosterId(i + 1), fleet_id: ownedFleetId, name: `Synthetic driver ${i + 1}`, active: true,
+  }));
+  const foreignDrivers = [{ id: rosterId(0), fleet_id: otherFleetId, name: "Excluded driver", active: true }];
   const ownedRows = Array.from({ length: 66 }, (_, i) => ({
     id: sessionId(i + 1), fleet_id: ownedFleetId, driver_id: driverId,
     started_at: i < 3 ? "2026-09-26T12:00:00Z" : i < 63 ? "2026-09-25T12:00:00Z" : "2026-09-24T12:00:00Z",
@@ -692,6 +776,22 @@ try {
     started_at: "2026-09-27T12:00:00Z",
   }));
   const expectedIds = [3, 2, 1, ...Array.from({ length: 47 }, (_, i) => 63 - i)].map(sessionId);
+  const expectedDriverIds = Array.from({ length: 500 }, (_, i) => rosterId(i + 1));
+  const ownedEvents = Array.from({ length: 209 }, (_, i) => ({
+    id: eventId(i + 1), session_id: sessionId(3), type: "drowsy", fatigue_score: 40, confidence: 90,
+    created_at: i < 2 ? "2026-09-26T12:00:00Z" : i < 207 ? "2026-09-25T12:00:00Z" : "2026-09-24T12:00:00Z",
+  }));
+  const foreignEvents = [{ id: eventId(999), session_id: sessionId(101), type: "drowsy", created_at: "2026-09-27T12:00:00Z" }];
+  const expectedEventIds = [2, 1, ...Array.from({ length: 198 }, (_, i) => 207 - i)].map(eventId);
+  function sqlOrder(order, allowed, direction) {
+    if (!order) return "";
+    return " order by " + order.split(",").map(term => {
+      const [column, suppliedDirection] = term.split(".");
+      assert.ok(allowed.includes(column));
+      assert.equal(suppliedDirection, direction);
+      return `${column} ${direction}`;
+    }).join(",");
+  }
   const eventScopes = [], followupScopes = [];
   const fetchOrderedRows = async (table, { params }) => {
     if (table === "fleets") {
@@ -700,7 +800,9 @@ try {
     }
     if (table === "drivers") {
       assert.equal(params.fleet_id, "eq." + ownedFleetId);
-      return [{ id: driverId, name: "Driver", active: true }];
+      assert.doesNotMatch(params.select, /email|latitude|longitude|location|raw_motion/i);
+      return (await orderingDb.query(`select ${params.select} from drivers where fleet_id=$1${sqlOrder(params.order, ["id"], "asc")} limit $2`,
+        [ownedFleetId, params.limit ? Number(params.limit) : 1000])).rows;
     }
     if (table === "sessions") {
       assert.equal(params.fleet_id, "eq." + ownedFleetId);
@@ -720,6 +822,8 @@ try {
         assert.equal(params.limit, "200");
         assert.doesNotMatch(params.select, /latitude|longitude/i);
         eventScopes.push(params.session_id);
+        return (await orderingDb.query(`select ${params.select} from events where session_id=any($1::uuid[])${sqlOrder(params.order, ["created_at", "id"], "desc")} limit $2`,
+          [params.session_id.slice(4, -1).split(","), Number(params.limit)])).rows;
       } else followupScopes.push(params.session_id);
       return [];
     }
@@ -727,16 +831,26 @@ try {
   };
   const orderedSummary = loadHandler("../api/fleet-summary.js", fetchOrderedRows);
   const orderedFollowups = loadHandler("../api/fleet-followups.js", fetchOrderedRows);
-  for (const rows of [[...ownedRows, ...foreignRows], [...foreignRows, ...ownedRows].reverse()]) {
-    await orderingDb.exec("truncate sessions");
+  for (const reverse of [false, true]) {
+    const ordered = rows => reverse ? [...rows].reverse() : rows;
+    await orderingDb.exec("truncate sessions,drivers,events");
     await orderingDb.query(`insert into sessions (id,fleet_id,driver_id,started_at)
       select id,fleet_id,driver_id,started_at from jsonb_to_recordset($1::jsonb)
-      as fixture(id uuid,fleet_id uuid,driver_id uuid,started_at timestamptz)`, [JSON.stringify(rows)]);
+      as fixture(id uuid,fleet_id uuid,driver_id uuid,started_at timestamptz)`, [JSON.stringify(ordered([...ownedRows, ...foreignRows]))]);
+    await orderingDb.query(`insert into drivers (id,fleet_id,name,active)
+      select id,fleet_id,name,active from jsonb_to_recordset($1::jsonb)
+      as fixture(id uuid,fleet_id uuid,name text,active boolean)`, [JSON.stringify(ordered([...ownedDrivers, ...foreignDrivers]))]);
+    await orderingDb.query(`insert into events (id,session_id,type,fatigue_score,confidence,created_at)
+      select id,session_id,type,fatigue_score,confidence,created_at from jsonb_to_recordset($1::jsonb)
+      as fixture(id uuid,session_id uuid,type text,fatigue_score numeric,confidence numeric,created_at timestamptz)`, [JSON.stringify(ordered([...ownedEvents, ...foreignEvents]))]);
     const summary = await invoke(orderedSummary, request("GET"));
     const followups = await invoke(orderedFollowups, request("GET"));
     assert.equal(summary.status, 200);
     assert.equal(followups.status, 200);
     assert.deepEqual(summary.body.sessions.map(row => row.id), expectedIds);
+    assert.deepEqual(summary.body.drivers.map(row => row.id), expectedDriverIds, "a stable page of at most 500 owned drivers is returned");
+    assert.deepEqual(summary.body.events.map(row => row.id), expectedEventIds, "tied events keep a stable latest 200 selection");
+    assert.equal(summary.body.roster_limit, 500, "the response states its bound without claiming truncation or completeness");
     assert.deepEqual(followups.body.sessions.map(row => row.id), expectedIds);
     assert.equal(summary.body.telemetry_trust, "unverified_client_report");
     assert.deepEqual(summary.body.privacy, fleetSummaryResult.body.privacy);
@@ -985,6 +1099,8 @@ for (const [route, limit, fields] of [
    assert.equal(options.params.driver_id, "eq.driver-1");
    return [{ id: patchBody.session_id, started_at: new Date(Date.now() - 60000).toISOString(), ended_at: null }];
   }
+  if (table === "rpc/start_rate_limited_session") return sessionReply(options.body);
+  if (table === "rpc/record_idempotent_event") return eventReply(options.body);
   assert.ok(["POST", "PATCH"].includes(options.method));
   return [{ id: table === "sessions" ? patchBody.session_id : "record-1", ...options.body }];
  });
@@ -1014,7 +1130,7 @@ for (const [route, limit, fields] of [
  assert.equal(method.headers["cache-control"], "no-store");
 }
 
-// Repeat-safe starts use the existing UUID primary key, without a new schema.
+// Repeat-safe starts retain the existing UUID identity across the atomic quota RPC.
 const retryStartId = "f89d1cf9-893f-4fb6-a924-6669b4568221";
 const originalStart = {
  id: retryStartId, driver_id: "driver-1", fleet_id: "old-fleet", started_at: "2026-10-03T10:00:00.000Z",
@@ -1029,17 +1145,19 @@ for (const ended of [false, true]) for (const race of [false, true]) {
    assert.equal(options.params.user_id, "eq.user-1");
    return [{ id: "driver-1", fleet_id: "new-fleet" }];
   }
-  assert.equal(table, "sessions");
   if (!options.method) {
+   assert.equal(table, "sessions");
    assert.deepEqual(options.params, { id: "eq." + retryStartId, driver_id: "eq.driver-1", select: "*", limit: "1" });
    reads++;
    return race && reads === 1 ? [] : [storedStart];
   }
+  assert.equal(table, "rpc/start_rate_limited_session");
   assert.equal(options.method, "POST");inserts++;
-  assert.equal(options.body.id, retryStartId);
-  assert.equal(options.body.driver_id, "driver-1");
-  assert.equal(options.body.fleet_id, "new-fleet");
-  throw { details: { code: "23505" } };
+  assert.equal(options.body.p_session_id, retryStartId);
+  assert.equal(options.body.p_user_id, "user-1");
+  assert.equal(options.body.p_driver_id, undefined);
+  assert.equal(options.body.p_fleet_id, undefined);
+  return { session: storedStart, replayed: true };
  });
  const replay = await invoke(handler, request("POST", {
   session_id: retryStartId, driver_id: "attacker-driver", fleet_id: "attacker-fleet", device: "Changed device",
@@ -1054,15 +1172,18 @@ let firstStart;
 const freshStart = loadHandler("../api/sessions.js", async (table, options = {}) => {
  if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
  if (!options.method) return [];
- firstStart = options.body;return [{ ...options.body }];
+ assert.equal(table, "rpc/start_rate_limited_session");
+ firstStart = options.body;return sessionReply(options.body);
 });
 assert.equal((await invoke(freshStart, request("POST", { session_id: retryStartId, driver_id: "attacker", fleet_id: "attacker" }))).status, 200);
-assert.equal(firstStart.id, retryStartId);assert.equal(firstStart.driver_id, "driver-1");assert.equal(firstStart.fleet_id, "fleet-1");
+assert.equal(firstStart.p_session_id, retryStartId);assert.equal(firstStart.p_user_id, "user-1");
+assert.equal(firstStart.p_driver_id, undefined);assert.equal(firstStart.p_fleet_id, undefined);
 for (const session_id of [null, "", "bad", 42, {}, []]) assert.equal((await invoke(freshStart, request("POST", { session_id }))).status, 400);
 const foreignStart = loadHandler("../api/sessions.js", async (table, options = {}) => {
  if (table === "drivers") return [{ id: "driver-1", fleet_id: "fleet-1" }];
  if (!options.method) { assert.equal(options.params.driver_id, "eq.driver-1");return []; }
- throw { details: { code: "23505" } };
+ assert.equal(table, "rpc/start_rate_limited_session");
+ return { error: "session_id_conflict" };
 });
 const conflict = await invoke(foreignStart, request("POST", { session_id: retryStartId }));
 assert.equal(conflict.status, 409);assert.deepEqual(conflict.body, { ok: false, error: "session_id_conflict" });
@@ -1123,29 +1244,35 @@ try {
  } finally {process.env.SUPABASE_SERVICE_ROLE_KEY=savedServiceKey;}
 } finally {if (savedGate===undefined) delete process.env.SESSION_START_RECOVERY_ENABLED;else process.env.SESSION_START_RECOVERY_ENABLED=savedGate;}
 
-// Exercise the actual handler against a real UUID primary key. The barrier
-// makes both first reads finish before either insert, forcing the 23505 path.
+// Exercise the actual handler and reviewed quota RPC against the real schema.
+// Both first reads finish before the RPCs, exercising the database replay path.
 const startDb = new PGlite();
 try {
+ const startOwner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+ const startOther = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
  await startDb.exec(`
-  create table drivers (id uuid primary key, user_id text unique not null, fleet_id text);
-  create table sessions (
-   id uuid primary key default gen_random_uuid(), driver_id uuid references drivers(id), fleet_id text,
-   started_at timestamptz, ended_at timestamptz, device text, browser text,
-   detector_pipeline text, detector_version text, app_version text,
-   safety_score numeric, alert_count integer
-  );
-  insert into drivers values
-   ('11111111-1111-4111-8111-111111111111', 'user-1', 'fleet-1'),
-   ('22222222-2222-4222-8222-222222222222', 'foreign-user', 'foreign-fleet');
+  create schema auth; create role anon; create role authenticated; create role service_role bypassrls;
+  create table auth.users (id uuid primary key);
+  create function auth.uid() returns uuid language sql stable as $$select null::uuid$$;
+  insert into auth.users values ('${startOwner}'),('${startOther}');
  `);
+ await startDb.exec(readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8').replace('create extension if not exists "pgcrypto";', ''));
+ await startDb.exec(readFileSync(new URL('../supabase/migrations/20261022120000_revoke_direct_table_access.sql', import.meta.url), 'utf8'));
+ await startDb.exec(readFileSync(new URL('../supabase/migrations/20261031192453_session_start_quota.sql', import.meta.url), 'utf8'));
+ const startFleet = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+ const otherStartFleet = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+ await startDb.exec(`insert into fleets(id,owner_user_id,company_name) values
+  ('${startFleet}','${startOwner}','Original fleet'),('${otherStartFleet}','${startOther}','Foreign fleet');
+  insert into drivers(id,user_id,fleet_id,name) values
+  ('11111111-1111-4111-8111-111111111111','${startOwner}','${startFleet}','Owner'),
+  ('22222222-2222-4222-8222-222222222222','${startOther}','${otherStartFleet}','Other');
+  grant usage on schema public to service_role; set role service_role;`);
  let firstReads = 0, writes = 0, lostReply = false;
  let releaseReads;
  const simultaneousReads = new Promise(resolve => { releaseReads = resolve; });
  const sessionStore = async (table, options = {}) => {
   if (table === "drivers") return (await startDb.query("select id,fleet_id from drivers where user_id=$1 limit 1", [options.params.user_id.slice(3)])).rows;
-  assert.equal(table, "sessions");
-  if (!options.method) {
+  if (table === "sessions" && !options.method) {
    const rows = (await startDb.query("select * from sessions where id=$1 and driver_id=$2 limit 1", [options.params.id.slice(3), options.params.driver_id.slice(3)])).rows;
    if (options.params.id === `eq.${retryStartId}` && firstReads < 2) {
     if (++firstReads === 2) releaseReads();
@@ -1153,20 +1280,16 @@ try {
    }
    return rows;
   }
-  assert.equal(options.method, "POST", "start recovery never patches or upserts a session");
+  assert.equal(table, "rpc/start_rate_limited_session");
+  assert.equal(options.method, "POST", "start recovery uses the reviewed atomic create/replay RPC");
   writes += 1;
-  const fields = Object.keys(options.body);
-  assert.ok(fields.every(field => ["id", "driver_id", "fleet_id", "started_at", "device", "browser", "detector_pipeline", "detector_version", "app_version"].includes(field)));
-  let rows;
-  try {
-   rows = (await startDb.query(`insert into sessions (${fields.join(",")}) values (${fields.map((_, index) => `$${index + 1}`).join(",")}) returning *`, Object.values(options.body))).rows;
-  } catch (error) {
-   throw { details: { code: error.code } };
-  }
+  const fields = ['p_user_id', 'p_session_id', 'p_device', 'p_browser', 'p_detector_pipeline', 'p_detector_version', 'p_app_version'];
+  assert.deepEqual(Object.keys(options.body), fields);
+  const result = (await startDb.query('select public.start_rate_limited_session($1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::text,$7::text) as result', fields.map(field => options.body[field]))).rows[0].result;
   if (lostReply) { lostReply = false; throw { status: 504 }; }
-  return rows;
+  return result;
  };
- const persistedStarts = loadHandler("../api/sessions.js", sessionStore);
+ const persistedStarts = loadHandler("../api/sessions.js", sessionStore, { id: startOwner });
  const concurrent = await Promise.all([
   invoke(persistedStarts, request("POST", { session_id: retryStartId, device: "First attempt", user_id: "foreign-user", driver_id: "foreign-driver", fleet_id: "foreign-fleet" })),
   invoke(persistedStarts, request("POST", { session_id: retryStartId, device: "Second attempt", started_at: "2099-01-01T00:00:00Z" })),
@@ -1176,18 +1299,18 @@ try {
  assert.deepEqual(concurrent[0].body.session, concurrent[1].body.session);
  assert.equal((await startDb.query("select count(*)::integer as count from sessions")).rows[0].count, 1);
  assert.equal(concurrent[0].body.session.driver_id, "11111111-1111-4111-8111-111111111111");
- assert.equal(concurrent[0].body.session.fleet_id, "fleet-1");
+ assert.equal(concurrent[0].body.session.fleet_id, startFleet);
  assert.ok(Date.parse(concurrent[0].body.session.started_at) <= Date.now());
 
  await startDb.query("update sessions set ended_at='2026-10-03T10:15:00Z', safety_score=77, alert_count=2 where id=$1", [retryStartId]);
- await startDb.query("update drivers set fleet_id='new-fleet' where user_id='user-1'");
+ await startDb.query("update drivers set fleet_id=null where user_id=$1", [startOwner]);
  const completed = (await startDb.query("select * from sessions where id=$1", [retryStartId])).rows[0];
  const replayCompleted = await invoke(persistedStarts, request("POST", { session_id: retryStartId, safety_score: 0, device: "Changed", fleet_id: "new-fleet" }));
  assert.equal(replayCompleted.status, 200);
  assert.deepEqual(replayCompleted.body.session, JSON.parse(JSON.stringify(completed)));
  assert.equal(writes, 2, "a completed replay must preserve the original historical row without another insert");
 
- const foreignStarts = loadHandler("../api/sessions.js", sessionStore, { id: "foreign-user" });
+ const foreignStarts = loadHandler("../api/sessions.js", sessionStore, { id: startOther });
  const denied = await invoke(foreignStarts, request("POST", { session_id: retryStartId, driver_id: concurrent[0].body.session.driver_id, user_id: "user-1" }));
  assert.equal(denied.status, 409);assert.deepEqual(denied.body, { ok: false, error: "session_id_conflict" });
  const hidden = await invoke(foreignStarts, { ...request("GET"), query: { session_id: retryStartId, driver_id: concurrent[0].body.session.driver_id } });

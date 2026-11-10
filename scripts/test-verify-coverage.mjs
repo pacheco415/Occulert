@@ -17,7 +17,7 @@ test('every root test and audit has a verification entry or a documented exclusi
   assert.match(scripts['test:accessibility'], /tests\/accessibility-controls\.spec\.mjs/);
   const browserWorkflow = readFileSync(new URL('../.github/workflows/browser-smoke.yml', import.meta.url), 'utf8');
   const nativeWorkflow = readFileSync(new URL('../.github/workflows/native-app-typecheck.yml', import.meta.url), 'utf8');
-  assert.match(browserWorkflow, /npm run test:browser/);
+  assert.match(browserWorkflow, /node scripts\/run-browser-check\.mjs \$\{\{ matrix\.browser \}\}/);
   assert.match(nativeWorkflow, /node --test scripts\/test-watch-notification\.mjs/);
 });
 

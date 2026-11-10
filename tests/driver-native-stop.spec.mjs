@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+test.use({ locale: 'es-ES' });
+
 test('bare monitoring coordinators work while native Window.stop stays intact', async ({ page }) => {
   await page.addInitScript(() => {
     window.__occulertNativeStop = window.stop;
@@ -25,6 +27,7 @@ test('failed voice restoration preserves safe defaults and explicit voice contro
     window.__occulertVoiceProbe = { reads: 0, writes: [], spoken: [], cancellations: 0, cameraRequests: 0 };
     const read = Storage.prototype.getItem;
     const write = Storage.prototype.setItem;
+    write.call(localStorage, 'occulert_lang', 'en');
     // A denied restore must fall back to OFF even when the saved value is ON.
     write.call(localStorage, 'occulert-voice', 'true');
     Storage.prototype.getItem = function (key) {
@@ -40,13 +43,13 @@ test('failed voice restoration preserves safe defaults and explicit voice contro
     };
     // Observe the voice action without emitting real audio on either browser.
     Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, value: class {
-      constructor(text) { this.text = text; }
+      constructor(text) { this.text = text; this.lang = navigator.language; }
     } });
     Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
       paused: false,
       resume() {},
       cancel() { window.__occulertVoiceProbe.cancellations++; },
-      speak(utterance) { window.__occulertVoiceProbe.spoken.push(utterance.text); },
+      speak(utterance) { window.__occulertVoiceProbe.spoken.push({ text: utterance.text, lang: utterance.lang }); },
     } });
     const devices = new EventTarget();
     devices.enumerateDevices = async () => [];
@@ -74,6 +77,7 @@ test('failed voice restoration preserves safe defaults and explicit voice contro
   expect(await page.evaluate(() => ({ voice: _voiceEnabled, spoken: window.__occulertVoiceProbe.spoken })))
     .toEqual({ voice: true, spoken: [] });
   await page.evaluate(() => speak('parked fixture'));
+  expect(await page.evaluate(() => navigator.language)).toBe('es-ES');
   await page.locator('#voiceToggleBtn').click();
   await expect(page.locator('#voiceToggleBtn')).toHaveText('🔇 Voice OFF');
   expect(await page.evaluate(() => {
@@ -81,7 +85,7 @@ test('failed voice restoration preserves safe defaults and explicit voice contro
     return { voice: _voiceEnabled, sameNative: window.stop === window.__occulertNativeStop,
       probe: window.__occulertVoiceProbe };
   })).toEqual({ voice: false, sameNative: true,
-    probe: { reads: 1, writes: ['true', 'false'], spoken: ['parked fixture'], cancellations: 1, cameraRequests: 0 } });
+    probe: { reads: 1, writes: ['true', 'false'], spoken: [{ text: 'parked fixture', lang: 'en-US' }], cancellations: 1, cameraRequests: 0 } });
   await expect(page.locator('#preferenceStorageNotice')).toHaveCount(1);
   await expect(page.locator('#startBtn')).toBeEnabled();
 });

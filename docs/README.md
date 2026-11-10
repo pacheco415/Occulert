@@ -6,6 +6,7 @@ scope and evidence requirements. Specialist documents below explain contracts
 and procedures; [archived roadmap records](archive/APP_ROADMAP_2026-09-28.md)
 and dated release notes preserve historical evidence.
 
+- [Future capability proposals; select each task separately](VISION_ROADMAP.md)
 - [Backend implementation and next steps](BACKEND_ROADMAP.md)
 - [Detection evidence and future upgrades](FACIAL_RECOGNITION_ROADMAP.md)
 - [Verified 2026–2028 phone, Watch, headphone and glasses roadmap](DEVICE_ROADMAP_2026_2028.md)
@@ -13,6 +14,8 @@ and dated release notes preserve historical evidence.
 - [Beta test and pilot evidence plan](BETA_TEST_PLAN.md)
 - [Accuracy benchmark](ACCURACY_BENCHMARK.md)
 - [Event-level alert observation benchmark](EVENT_BENCHMARK.md)
+- [Road model benchmark: synthetic fixtures only](ROAD_MODEL_BENCHMARK.md)
+- [Corroboration replay: fixture runner, no results](CORROBORATION_REPLAY.md)
 - [One-page pilot overview](PILOT_OVERVIEW.md)
 - [Pilot recruitment package: qualification and unsent emails](PILOT_OUTREACH.md)
 - [30-day pilot scorecard and voluntary feedback](PILOT_SCORECARD.md)

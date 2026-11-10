@@ -1,0 +1,106 @@
+{
+  "schema": "occulert.corroboration-timeline",
+  "version": 1,
+  "kind": "synthetic-fixture",
+  "dataset": { "id": "hand-authored-corroboration", "version": "1", "labelSource": "synthetic" },
+  "sessions": [
+    {
+      "sessionId": "syn-a",
+      "participant": "synthetic-p1",
+      "split": "test",
+      "platform": "ios",
+      "detectorVersion": "native-fixture-1",
+      "collection": "parked",
+      "consentVersion": "synthetic",
+      "durationMs": 600000,
+      "tracking": [[0, 600000]],
+      "accessories": { "headphone": [[0, 600000]] },
+      "observations": [
+        { "atMs": 110000, "source": "camera", "kind": "elevated" },
+        { "atMs": 112000, "source": "headphone", "kind": "head_nod" },
+        { "atMs": 200000, "source": "headphone", "kind": "head_nod" },
+        { "atMs": 305000, "source": "camera", "kind": "elevated" },
+        { "atMs": 309000, "source": "headphone", "kind": "head_nod" },
+        { "atMs": 500000, "source": "camera", "kind": "elevated" },
+        { "atMs": 506000, "source": "headphone", "kind": "head_nod" }
+      ],
+      "alerts": [
+        { "atMs": 130000, "level": "alert" },
+        { "atMs": 450000, "level": "watch" }
+      ],
+      "episodes": [
+        { "startMs": 100000, "endMs": 160000, "label": "drowsy" },
+        { "startMs": 300000, "endMs": 330000, "label": "drowsy" }
+      ]
+    },
+    {
+      "sessionId": "syn-b",
+      "participant": "synthetic-p2",
+      "split": "test",
+      "platform": "ios",
+      "detectorVersion": "native-fixture-1",
+      "collection": "passenger",
+      "consentVersion": "synthetic",
+      "durationMs": 300000,
+      "tracking": [[0, 300000]],
+      "accessories": { "headphone": [[0, 150000]], "road": [[0, 300000]] },
+      "observations": [
+        { "atMs": 52000, "source": "camera", "kind": "elevated" },
+        { "atMs": 55000, "source": "road", "kind": "lane_departure" },
+        { "atMs": 62000, "source": "camera", "kind": "head_nod" },
+        { "atMs": 63000, "source": "road", "kind": "lane_departure" },
+        { "atMs": 200000, "source": "camera", "kind": "elevated" },
+        { "atMs": 201000, "source": "headphone", "kind": "head_nod" },
+        { "atMs": 203000, "source": "road", "kind": "closing_distance" }
+      ],
+      "alerts": [
+        { "atMs": 60000, "level": "critical" }
+      ],
+      "episodes": [
+        { "startMs": 50000, "endMs": 80000, "label": "high_fatigue" }
+      ]
+    },
+    {
+      "sessionId": "syn-c",
+      "participant": "synthetic-p3",
+      "split": "train",
+      "platform": "ios",
+      "detectorVersion": "native-fixture-1",
+      "collection": "parked",
+      "consentVersion": "synthetic",
+      "durationMs": 120000,
+      "tracking": [[0, 120000]],
+      "accessories": {},
+      "observations": [
+        { "atMs": 15000, "source": "camera", "kind": "elevated" }
+      ],
+      "alerts": [
+        { "atMs": 20000, "level": "alert" }
+      ],
+      "episodes": [
+        { "startMs": 10000, "endMs": 40000, "label": "drowsy" }
+      ]
+    },
+    {
+      "sessionId": "syn-d",
+      "participant": "synthetic-p4",
+      "split": "test",
+      "platform": "ios",
+      "detectorVersion": "native-fixture-1",
+      "collection": "parked",
+      "consentVersion": "synthetic",
+      "durationMs": 200000,
+      "tracking": [[0, 100000], [120000, 200000]],
+      "accessories": { "watch": [[0, 200000]] },
+      "observations": [
+        { "atMs": 95000, "source": "camera", "kind": "elevated" }
+      ],
+      "alerts": [
+        { "atMs": 150000, "level": "alert" }
+      ],
+      "episodes": [
+        { "startMs": 90000, "endMs": 130000, "label": "drowsy" }
+      ]
+    }
+  ]
+}

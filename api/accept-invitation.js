@@ -68,7 +68,7 @@ module.exports = async function handler(request, response) {
     if (known) {
       const status = known === "invitation_email_mismatch" || known === "driver_already_assigned" ? 403
         : known === "driver_profile_required" ? 409
-        : known === "invalid_invitation" ? 404 : 410;
+          : known === "invalid_invitation" ? 404 : 410;
       return json(response, status, { ok: false, error: known });
     }
     return json(response, supabaseErrorStatus(error), { ok: false, error: "supabase_error" });

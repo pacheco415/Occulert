@@ -1,14 +1,16 @@
 import "./camera.js";
 import "./detector.js";
-import "./metrics.js";
+import { scoringReadWallClock } from "./metrics.js";
 import "./alerts.js";
 import "./storage-history.js";
 import "./cloud-sync.js";
-import { setPreference, calibrationMinimumSamples, experimentFlags, calibrationEl, calibrationFill, calHint, calibrating, calibrationUntil, calibrationSamples, baselineEAR, baseClosedThreshold, baseWatchThreshold, eyeClosedThreshold, CALIBRATION_MS, log, SENSITIVITY_PRESETS, set_calibrating, set_calibrated, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold } from "./ui.js";
+import { scoringCalibrationSamples, scoringCalibrationThresholds, scoringSensitivityThresholds } from "./scoring-core.js";
+import { setPreference, calibrationMinimumSamples, experimentFlags, calibrationEl, calibrationFill, calHint, calibrating, calibrationUntil, calibrationSamples, baselineEAR, baseClosedThreshold, baseWatchThreshold, eyeClosedThreshold, CALIBRATION_MS, log, SENSITIVITY_PRESETS, set_calibrationSamples, set_calibrating, set_calibrated, set_baselineEAR, set_baseClosedThreshold, set_baseWatchThreshold, set_eyeClosedThreshold, set_eyeWatchThreshold } from "./ui.js";
 // Keep the selected setting for this page even when persistence is unavailable.
 export let sensitivityLevel = 'medium';
 export function finishCalibration() {
-    if (calibrationSamples.length < calibrationMinimumSamples) {
+    const thresholds = scoringCalibrationThresholds(calibrationSamples, calibrationMinimumSamples);
+    if (!thresholds) {
         set_calibrating(false);
         set_calibrated(false);
         calibrationEl.textContent = 'DEFAULT';
@@ -24,10 +26,9 @@ export function finishCalibration() {
         return;
     }
     calibrationSamples.sort((a, b) => a - b);
-    let mid = calibrationSamples.slice(Math.floor(calibrationSamples.length * .2), Math.ceil(calibrationSamples.length * .8));
-    set_baselineEAR(mid.reduce((a, b) => a + b, 0) / mid.length);
-    set_baseClosedThreshold(Math.max(.12, Math.min(.22, baselineEAR * .66)));
-    set_baseWatchThreshold(Math.max(baseClosedThreshold + .025, Math.min(.28, baselineEAR * .82)));
+    set_baselineEAR(thresholds.baselineEAR);
+    set_baseClosedThreshold(thresholds.baseClosedThreshold);
+    set_baseWatchThreshold(thresholds.baseWatchThreshold);
     if (typeof applySensitivity === 'function')
         applySensitivity(sensitivityLevel);
     set_calibrated(true);
@@ -44,9 +45,8 @@ export function finishCalibration() {
 export function updateCalibration(ear) {
     if (!calibrating)
         return;
-    if (ear > .16 && ear < .45)
-        calibrationSamples.push(ear);
-    let left = Math.max(0, calibrationUntil - Date.now()), pct = Math.min(100, Math.round((1 - left / CALIBRATION_MS) * 100));
+    set_calibrationSamples(scoringCalibrationSamples(calibrationSamples, ear));
+    let left = Math.max(0, calibrationUntil - scoringReadWallClock('calibration')), pct = Math.min(100, Math.round((1 - left / CALIBRATION_MS) * 100));
     calibrationEl.textContent = pct + '%';
     calibrationFill.style.width = pct + '%';
     if (calHint)
@@ -59,8 +59,9 @@ export function applySensitivity(level) {
     sensitivityLevel = level;
     const preset = SENSITIVITY_PRESETS[level];
     const factor = experimentFlags.pixels ? 4 / 3 : 1;
-    set_eyeClosedThreshold(Math.max(.10 * factor, Math.min(.25 * factor, baseClosedThreshold + preset.offset * factor)));
-    set_eyeWatchThreshold(Math.max(eyeClosedThreshold + .025 * factor, Math.min(.31 * factor, baseWatchThreshold + preset.offset * factor)));
+    const thresholds = scoringSensitivityThresholds(baseClosedThreshold, baseWatchThreshold, preset.offset, factor);
+    set_eyeClosedThreshold(thresholds.eyeClosedThreshold);
+    set_eyeWatchThreshold(thresholds.eyeWatchThreshold);
     setPreference('occulert-sensitivity', level);
     document.querySelectorAll('[data-sensitivity]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.sensitivity === level);

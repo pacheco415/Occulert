@@ -12,7 +12,12 @@ test('ignored build command stays within the Vercel configuration schema limit',
   const config = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url)));
   assert.equal(typeof config.ignoreCommand, 'string');
   assert.ok(config.ignoreCommand.length <= 256, 'Vercel limits ignoreCommand to 256 characters');
-  assert.deepEqual(config.git.deploymentEnabled, { 'dependabot/**': false });
+  assert.deepEqual(config.git.deploymentEnabled, {
+    'dependabot/**': false,
+    // This source branch must remain reviewable before its SQL prerequisite is
+    // applied; main remains deployment-enabled after the separate approval gate.
+    'codex/legacy-event-quota': false,
+  });
 });
 function fixture(run) {
   const cwd = mkdtempSync(join(tmpdir(), 'occulert-deploy-ignore-'));

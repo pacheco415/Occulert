@@ -74,6 +74,21 @@ export function HistorySessionDiagnostics({ item, isExpanded }: { item: SessionR
                 </Text>
               </View>
             )}
+            {isExpanded && item.unansweredAlerts && (
+              <View style={s.observationBox}>
+                <Text style={s.observationTitle}>Unanswered-alert candidates (experimental)</Text>
+                <Text style={s.observationInfo}>Candidates: {item.unansweredAlerts.candidates}</Text>
+                <Text style={s.observationInfo}>
+                  Motion context: Unknown {item.unansweredAlerts.byMotion.unknown} · Unavailable {item.unansweredAlerts.byMotion.unavailable} · Denied {item.unansweredAlerts.byMotion.denied} · Stale {item.unansweredAlerts.byMotion.stale}
+                </Text>
+                <Text style={s.observationInfo}>
+                  Reported stationary: {item.unansweredAlerts.byMotion['not-moving']} · Reported automotive activity: {item.unansweredAlerts.byMotion['reported-activity']}
+                </Text>
+                <Text style={s.observationCaution}>
+                  Counts follow software acceptance of critical output; whether a person heard or felt it is unverified. Activity estimates do not prove vehicle movement. Local observation only; no messages are sent. It does not change scores or alerts and is not included in cloud sync, exports, or session feedback.
+                </Text>
+              </View>
+            )}
 
   </>;
 }

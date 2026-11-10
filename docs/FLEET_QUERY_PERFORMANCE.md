@@ -19,4 +19,20 @@ The migration uses a three-second lock timeout and 30-second statement timeout. 
 
 After applying the migration, inspect index validity and run the Supabase performance advisor. Newly created indexes can be reported as unused until real queries use them; retain them when they cover the verified query and foreign-key access paths. RLS policy optimization and reporting pagination remain separate work.
 
+## Bounded summary snapshot
+
+`/api/fleet-summary` selects at most 500 drivers from the verified owner's fleet,
+ordered by ID ascending. The additive `roster_limit: 500` response field states
+that bound; the returned roster is not a full-fleet total. Reaching the limit
+does not establish that more drivers exist, so the route makes no completeness
+or truncation claim and performs no extra count query. Pagination and adapting
+the dashboard to larger rosters remain separate work.
+
+Sessions retain their latest-50 ordering. Events retain their 200-row limit and
+use `created_at.desc,id.desc` so equal timestamps have a deterministic selection
+at that boundary. Existing owner/fleet/session scopes and privacy projections
+remain unchanged. `test-api-security.mjs` runs these actual query selections in
+PGlite with 501 owned drivers, foreign rows and tied event timestamps in both
+insertion orders; response contracts retain no-store and timing/privacy fields.
+
 References: [Supabase query optimization](https://supabase.com/docs/guides/database/query-optimization), [unindexed foreign key advisor](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys).
