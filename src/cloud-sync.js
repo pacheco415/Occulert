@@ -10,8 +10,20 @@ import { experimentFlags, startupAllowsMonitoring, syncEl, gpsConsent, cloudCons
 // A parked answer belongs to the account and consent period that ran the test.
 // It is sent once after an explicit answer, never stored in a retry queue.
 let parkedAlertConfirmation = null;
+function parkedAlertStorageChanged(event) {
+    if (event.key === 'occulert-auth' || event.key === null) clearParkedAlertConfirmation();
+}
+function parkedAlertVisibilityChanged() {
+    if (document.hidden) clearParkedAlertConfirmation();
+}
 export function clearParkedAlertConfirmation() {
-    parkedAlertConfirmation?.controller.abort();
+    if (parkedAlertConfirmation) {
+        parkedAlertConfirmation.controller.abort();
+        window.removeEventListener('occulert:auth-lifecycle', clearParkedAlertConfirmation);
+        window.removeEventListener('storage', parkedAlertStorageChanged);
+        window.removeEventListener('pagehide', clearParkedAlertConfirmation);
+        document.removeEventListener('visibilitychange', parkedAlertVisibilityChanged);
+    }
     parkedAlertConfirmation = null;
     const panel = document.getElementById('parkedCheckConfirmation');
     if (panel) panel.hidden = true;
@@ -33,6 +45,10 @@ export function beginParkedAlertConfirmation() {
         return null;
     parkedAlertConfirmation = { backend, auth: backend.captureAuthLifecycle(), revision: cloudConsentRevision,
         controller: new AbortController(), completedAt: '', ready: false };
+    window.addEventListener('occulert:auth-lifecycle', clearParkedAlertConfirmation);
+    window.addEventListener('storage', parkedAlertStorageChanged);
+    window.addEventListener('pagehide', clearParkedAlertConfirmation);
+    document.addEventListener('visibilitychange', parkedAlertVisibilityChanged);
     return parkedAlertConfirmation;
 }
 export function showParkedAlertConfirmation(scope) {

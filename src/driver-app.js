@@ -40,12 +40,6 @@ if (recalBtn) {
 demoBtn.onclick = demoAlert;
 document.getElementById('parkedCheckYes')?.addEventListener('click', () => { void saveParkedAlertConfirmation(true); });
 document.getElementById('parkedCheckNo')?.addEventListener('click', () => { void saveParkedAlertConfirmation(false); });
-window.addEventListener('occulert:auth-lifecycle', clearParkedAlertConfirmation);
-window.addEventListener('storage', event => {
-    if (event.key === 'occulert-auth' || event.key === null) clearParkedAlertConfirmation();
-});
-window.addEventListener('pagehide', clearParkedAlertConfirmation);
-document.addEventListener('visibilitychange', () => { if (document.hidden) clearParkedAlertConfirmation(); });
 const resetBtn = document.getElementById('resetBtn');
 if (resetBtn) {
     resetBtn.onclick = () => {

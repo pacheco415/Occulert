@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { getEventListeners } from 'node:events';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
@@ -9,6 +10,8 @@ const end = source.indexOf('// Event authorization', start);
 assert.ok(start >= 0 && end > start, 'The parked confirmation source block must exist');
 const parkedSource = source.slice(start, end).replace(/^export /gm, '');
 const completedAt = '2026-11-10T08:00:00.000Z';
+const noParkedListeners = { auth: 0, storage: 0, pagehide: 0, visibility: 0 };
+const activeParkedListeners = { auth: 1, storage: 1, pagehide: 1, visibility: 1 };
 
 function deferred() {
   let resolve, reject;
@@ -47,8 +50,8 @@ function harness({ signedIn = true, sharing = true, experiment = false } = {}) {
     static now() { return Date.parse(completedAt); }
   }
   const context = {
-    window: { OcculertBackend: backend },
-    document: { hidden: false, getElementById: id => elements[id] || null },
+    window: Object.assign(new EventTarget(), { OcculertBackend: backend }),
+    document: Object.assign(new EventTarget(), { hidden: false, getElementById: id => elements[id] || null }),
     cloudConsent: { checked: sharing }, cloudConsentRevision: 0,
     experimentFlags: { any: experiment }, running: false, starting: false,
     AbortController, Date: ClockDate,
@@ -72,6 +75,14 @@ function harness({ signedIn = true, sharing = true, experiment = false } = {}) {
       auth = value;
       authRevision += 1;
       if (!routineRefresh) lifecycleRevision += 1;
+    },
+    listenerCounts() {
+      return {
+        auth: getEventListeners(context.window, 'occulert:auth-lifecycle').length,
+        storage: getEventListeners(context.window, 'storage').length,
+        pagehide: getEventListeners(context.window, 'pagehide').length,
+        visibility: getEventListeners(context.document, 'visibilitychange').length,
+      };
     },
     ready() { const scope = api.begin(); api.show(scope); return scope; },
   };
@@ -114,7 +125,64 @@ test('signed-out, local-only, and experimental checks cannot establish a cloud s
     assert.equal(h.elements.parkedCheckConfirmation.hidden, true);
     assert.equal(h.sessionCalls, 0);
     assert.deepEqual(h.requests, []);
+    assert.deepEqual(h.listenerCounts(), noParkedListeners);
   }
+});
+
+test('parked listeners exist only for a valid scope and replacement cues do not accumulate them', () => {
+  const h = harness();
+  assert.deepEqual(h.listenerCounts(), noParkedListeners, 'idle source evaluation adds no listeners');
+  h.api.clear();
+  assert.deepEqual(h.listenerCounts(), noParkedListeners);
+  const first = h.ready();
+  assert.deepEqual(h.listenerCounts(), activeParkedListeners);
+  h.api.show(first);
+  assert.deepEqual(h.listenerCounts(), activeParkedListeners, 'showing the same question adds no listeners');
+  const replacement = h.ready();
+  assert.equal(first.controller.signal.aborted, true);
+  assert.equal(replacement.controller.signal.aborted, false);
+  assert.deepEqual(h.listenerCounts(), activeParkedListeners, 'only the replacement scope remains registered');
+  h.api.clear();
+  assert.equal(replacement.controller.signal.aborted, true);
+  assert.equal(h.elements.parkedCheckConfirmation.hidden, true);
+  assert.deepEqual(h.listenerCounts(), noParkedListeners);
+  h.api.clear();
+  assert.deepEqual(h.listenerCounts(), noParkedListeners, 'repeated cleanup is harmless');
+});
+
+for (const interruption of ['auth lifecycle', 'auth storage', 'all storage', 'pagehide', 'hidden']) {
+  test(`${interruption} clears and aborts the active parked scope and removes its listeners`, async () => {
+    const h = harness();
+    const scope = h.ready();
+    h.elements.parkedCheckStatus.textContent = 'Previous status';
+    assert.deepEqual(h.listenerCounts(), activeParkedListeners);
+    if (interruption === 'auth lifecycle') h.context.window.dispatchEvent(new Event('occulert:auth-lifecycle'));
+    else if (interruption === 'auth storage' || interruption === 'all storage') {
+      h.context.window.dispatchEvent(Object.assign(new Event('storage'), { key: interruption === 'all storage' ? null : 'occulert-auth' }));
+    } else if (interruption === 'pagehide') h.context.window.dispatchEvent(new Event('pagehide'));
+    else {
+      h.context.document.hidden = true;
+      h.context.document.dispatchEvent(new Event('visibilitychange'));
+    }
+    assert.equal(scope.controller.signal.aborted, true);
+    assert.equal(h.elements.parkedCheckConfirmation.hidden, true);
+    assert.equal(h.elements.parkedCheckStatus.textContent, '');
+    assert.deepEqual(h.listenerCounts(), noParkedListeners);
+    await h.api.save(true);
+    assert.deepEqual(h.requests, []);
+    h.api.show(scope);
+    assert.equal(h.elements.parkedCheckConfirmation.hidden, true, 'an obsolete cue cannot revive a cleared scope');
+  });
+}
+
+test('unrelated storage and visible-page events preserve the current parked question', () => {
+  const h = harness();
+  const scope = h.ready();
+  h.context.window.dispatchEvent(Object.assign(new Event('storage'), { key: 'unrelated-view-preference' }));
+  h.context.document.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(scope.controller.signal.aborted, false);
+  assert.equal(h.elements.parkedCheckConfirmation.hidden, false);
+  assert.deepEqual(h.listenerCounts(), activeParkedListeners);
 });
 
 test('a new cue supersedes the earlier question and an older completion cannot revive it', async () => {

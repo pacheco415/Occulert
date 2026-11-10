@@ -444,8 +444,8 @@ const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
   const file = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");
   return total + statSync(join(root, file)).size;
 }, 0);
-// Consented parked-check answers add 4,765 bytes to the static install list:
-// 374,244 -> 379,009, including 4,199 bytes of client scope/cancellation logic.
+// Consented parked-check answers add 5,209 bytes to the static install list:
+// 374,244 -> 379,453, including 4,643 bytes of client scope/cancellation logic.
 // Keep the optional experiment/catalog assets outside this bounded install.
 if (staticAssetBytes > 380_000) fail(`service worker install cache must remain at or below 380 KB (found ${staticAssetBytes} bytes)`);
 if (staticAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the experimental passkey client must not be stored in the offline static cache");
