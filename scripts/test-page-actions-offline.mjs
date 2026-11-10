@@ -212,14 +212,22 @@ function stalledInstall(stalledPath, phase) {
       return claimed;
     } };
 }
-const flushInstallTasks = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+const flushInstallTasks = async (isReady = () => true) => {
+  // Response streams can need an event-loop turn, not just more microtasks.
+  // Wait for the observed state without depending on a runtime's task count.
+  for (let attempt = 0; attempt < 100; attempt++) {
+    await new Promise(resolve => setImmediate(resolve));
+    if (isReady()) return;
+  }
+  assert.fail('service worker install did not reach the expected state within 100 event-loop turns');
+};
 
 for (const phase of ['headers', 'body', 'write']) {
 for (const critical of [false, true]) {
   test(`stalled ${critical ? 'critical' : 'noncritical'} install ${phase} is bounded and aborted without losing the old cache`, async () => {
     const path = critical ? '/' + assetByStem('driver-app.js') : '/favicon.ico';
     const worker = stalledInstall(path, phase);
-    await flushInstallTasks();
+    await flushInstallTasks(() => worker.timers.size === 1);
     assert.equal(worker.skipWaitingCalled(), false);
     assert.equal(worker.timers.size, 1, 'only the stalled transfer must retain its deadline');
     const deadline = [...worker.timers.values()][0];
