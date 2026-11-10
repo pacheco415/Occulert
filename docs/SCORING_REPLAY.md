@@ -48,6 +48,7 @@ zero alerts.
 | `calibration-min-12` | `calibration-min=12` |
 | `noface-escalation-1` | `noface-escalation=1` |
 | `distraction-confidence-stable` | `distraction-confidence=stable` |
+| `perclos-turn-exclude` | `perclos-turn=exclude`; omit turned eye observations and break microsleep continuity |
 
 The runner reuses the actual parked controller source for its existing variants,
 not copied decision formulas. It recomputes smoothing/nods and continuity from
@@ -149,7 +150,7 @@ compared too, including an independently advancing 1 ms `Date.now` fixture.
 
 Live version-3 export to released replay tests compare captured scoring and
 decisions at all three rates with fixed and stepping wall clocks, with no
-missing phase clocks. All six policies are also checked against actual live
+missing phase clocks. All seven policies are also checked against actual live
 helper/results paths on the same synthetic raw observations. These tests
 generate no independent labels and authorize no promotion.
 

@@ -20,6 +20,7 @@ export const scoringVariants = Object.freeze([
     { name: 'calibration-min-12', query: '?calibration-min=12', minimumSamples: 12 },
     { name: 'noface-escalation-1', query: '?noface-escalation=1' },
     { name: 'distraction-confidence-stable', query: '?distraction-confidence=stable' },
+    { name: 'perclos-turn-exclude', query: '?perclos-turn=exclude' },
 ].map(Object.freeze));
 const stateKeys = ['fatigue','confidence','maxFatigue','fatigueSampleSum','fatigueSampleCount','perclosWindow','eyesClosedSince','microsleeps','lastMicro','turnedSince','totalDistractionMs','noFaceSince','lastFaceSeen','calibrating','calibrated','calibrationUntil','calibrationSamples','baselineEAR','baseClosedThreshold','baseWatchThreshold','eyeClosedThreshold','eyeWatchThreshold','lastAlert','earHistory','noseYHistory','lastNod','headNods'];
 const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -124,7 +125,7 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
         now: () => mono, wallNow: phase => point(phase ?? 'score').wall, calibrationMs: 3200, dimensions: () => ({width:360,height:480}),
         applySensitivity, resetContinuous: () => Object.assign(state,scoringResetContinuity(state)),
         defaultCalibration: ear => Object.assign(state,scoringUpdateCalibration(state,ear,point('calibration').wall,minimumSamples,offset(sensitivity))),
-        defaultEyeMetrics: (ear,turned) => { const result = scoringEyeMetrics(state,ear,turned,point('eye').wall); Object.assign(state,result.state); return result.perclos; },
+        defaultEyeMetrics: (ear,turned) => { const result = scoringEyeMetrics(state,ear,turned,point('eye').wall,flags.perclosTurn); Object.assign(state,result.state); return result.perclos; },
         alert: accept, log: noop, render: noop, ui: {face:noop,perclos:noop,microsleeps:noop,distraction:noop,calibration:noop,tasks:noop},
     }, flags);
     controller.begin();
@@ -155,7 +156,7 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
         else state = scoringReplayFrame(state,{ear,turned:row.turned,nod,hasFace:row.hasFace,
             ...(row.hasFace && state.calibrating ? { calibrationNowMs: point('calibration').wall } : {}),
             ...(row.hasFace && !state.calibrating ? { eyeNowMs: point('eye').wall } : {})},wall,
-            { minimumSamples, sensitivityOffset: offset(sensitivity), stableDistraction: flags.distractionConfidence });
+            { minimumSamples, sensitivityOffset: offset(sensitivity), stableDistraction: flags.distractionConfidence, excludeTurned: flags.perclosTurn });
         if (row.yawn) state = scoringYawn(state);
         const candidate = row.hasFace && scoringAlertCandidate(state);
         const reason = candidate === 'Distraction' ? scoringDistractionMatured(state,point('eligibility').wall) && candidate : candidate;

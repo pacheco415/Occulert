@@ -33,6 +33,6 @@ export function scoringReplayFrame(state, frame, nowMs, options) {
         return scoringCalibrationFrame(scoringUpdateCalibration(next, frame.ear, frame.calibrationNowMs ?? nowMs, options.minimumSamples, options.sensitivityOffset));
     }
     next.confidence = scoringConfidence(next, frame.turned, options.stableDistraction);
-    const metrics = scoringEyeMetrics(next, frame.ear, frame.turned, frame.eyeNowMs ?? nowMs);
+    const metrics = scoringEyeMetrics(next, frame.ear, frame.turned, frame.eyeNowMs ?? nowMs, options.excludeTurned);
     return scoringTrackedFrame(metrics.state, { ...frame, perclos: metrics.perclos }, nowMs);
 }

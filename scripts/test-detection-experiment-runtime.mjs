@@ -24,7 +24,7 @@ test('empty query executes exactly the released default pipeline across calibrat
 });
 
 test('all exact selected modes disable every cloud route while preserving another ordinary pending outbox',async()=>{
- for(const query of ['?fatigue-timing=elapsed','?ear-units=pixels','?detector=tasks','?noface-escalation=1','?perclos=time','?pitch-gate=1','?distraction-confidence=stable','?detector=tasks&ear-units=pixels&perclos=time&pitch-gate=1&noface-escalation=1&fatigue-timing=elapsed&distraction-confidence=stable']){
+ for(const query of ['?fatigue-timing=elapsed','?ear-units=pixels','?detector=tasks','?noface-escalation=1','?perclos=time','?pitch-gate=1','?distraction-confidence=stable','?perclos-turn=exclude','?detector=tasks&ear-units=pixels&perclos=time&pitch-gate=1&noface-escalation=1&fatigue-timing=elapsed&distraction-confidence=stable&perclos-turn=exclude']){
   const calls=[];const api=new Proxy({}, {get:(_,name)=>()=>{calls.push(name);return Promise.resolve({})}});
   const h=createAppHarness({initialStorage:{'occulert-cloud-outbox':'ordinary-pending-value'},preloadSources:[helper],sandboxOverrides:{location:{search:query},URLSearchParams,OcculertBackend:api,OcculertSync:api}});
   assert.equal(h.el('cloudConsent').checked,false);assert.equal(h.el('cloudConsent').disabled,true);
@@ -218,5 +218,64 @@ test('duplicate and malformed distraction-confidence flags leave the ordinary mo
   const fixture=distractionSession(query,false,135),{h}=fixture;
   assert.equal(h.get('experimentFlags.any'),false,query);assert.equal(h.get('experimentController'),null,query);
   assert.equal(Number.isNaN(firstDistraction(fixture)),true,query);assert.equal(h.get('alerts'),0,query);
+ }
+});
+
+test('the actual excluded-turn pipeline keeps earlier eye samples but never times a microsleep across the turn',()=>{
+ const ordinary=calibrated(harness('')),excluded=calibrated(harness('?perclos-turn=exclude'));
+ assert.equal(excluded.get('experimentFlags.primary'),false);
+ for(const h of [ordinary,excluded]){h.run('confidence=100;earHistory=[]');h.feed({ear:.08},900,150);}
+ const before=JSON.parse(JSON.stringify(excluded.get('perclosWindow')));
+ for(let i=0;i<167;i++)for(const h of [ordinary,excluded])h.frame({ear:.08,noseX:.7,stepMs:150});
+ assert.deepEqual(JSON.parse(JSON.stringify(excluded.get('perclosWindow'))),before,'Excluded observations add neither open nor closed samples');
+ assert.equal(excluded.get('eyesClosedSince'),0);assert.equal(excluded.get('microsleeps'),0);
+ assert.ok(ordinary.get('microsleeps')>0);
+ excluded.frame({ear:.08,stepMs:150});const resumed=excluded.clock.now;
+ assert.equal(excluded.get('eyesClosedSince'),resumed);
+ for(let i=0;i<10;i++)excluded.frame({ear:.08,stepMs:150});
+ assert.equal(excluded.get('microsleeps'),0,'The strict 1500 ms boundary remains unchanged');
+ excluded.frame({ear:.08,stepMs:150});assert.equal(excluded.get('microsleeps'),1);
+ excluded.frame({face:false,stepMs:150});assert.equal(excluded.get('eyesClosedSince'),0);
+ excluded.frame({ear:.08,stepMs:150});assert.equal(excluded.get('eyesClosedSince'),excluded.clock.now,'Face loss still breaks continuity');
+});
+
+test('excluded turns prune stale eye samples in the actual runtime without creating microsleeps',()=>{
+ const h=calibrated(harness('?perclos-turn=exclude'));h.run('confidence=100');h.feed({ear:.3},900,150);
+ for(let i=0;i<405;i++)h.frame({ear:.08,noseX:.7,stepMs:150});
+ assert.equal(h.get('perclosWindow.length'),0);assert.equal(h.get('eyesClosedSince'),0);assert.equal(h.get('microsleeps'),0);
+ assert.equal(h.get('fatigue'),100,'The independent head-turn fatigue contribution is unchanged');
+});
+
+test('exclusion composes with primary elapsed and no-face scoring',()=>{
+ for(const query of ['?fatigue-timing=elapsed','?noface-escalation=1','?fatigue-timing=elapsed&noface-escalation=1']){
+  const h=calibrated(harness(query+'&perclos-turn=exclude'));h.run('confidence=100;earHistory=[]');
+  h.feed({ear:.08},900,150);const count=h.get('perclosWindow.length');
+  h.feed({ear:.08,noseX:.7},5000,150);
+  assert.equal(h.get('perclosWindow.length'),count,query);assert.equal(h.get('microsleeps'),0,query);assert.equal(h.get('eyesClosedSince'),0,query);
+  h.frame({ear:.08,stepMs:150});const resumed=h.clock.now;
+  for(let i=0;i<10;i++)h.frame({ear:.08,stepMs:150});
+  assert.equal(h.get('microsleeps'),0,query);h.frame({ear:.08,stepMs:150});
+  assert.equal(h.get('microsleeps'),1,query);assert.equal(h.get('lastMicro')-resumed,1650,query);
+ }
+});
+
+test('time-PERCLOS already excludes turns and remains byte-identical when the new flag is combined',()=>{
+ const base=calibrated(harness('?perclos=time')),excluded=calibrated(harness('?perclos=time&perclos-turn=exclude'));
+ for(const h of [base,excluded])h.run('confidence=100');
+ for(const spec of [...Array(8).fill({ear:.08}),...Array(30).fill({ear:.08,noseX:.7}),...Array(16).fill({ear:.08}),{face:false}]){
+  base.frame({...spec,stepMs:150});excluded.frame({...spec,stepMs:150});
+  assert.equal(JSON.stringify(excluded.state()),JSON.stringify(base.state()));
+  assert.equal(excluded.run('JSON.stringify(experimentController.summary().timePerclos)'),base.run('JSON.stringify(experimentController.summary().timePerclos)'));
+ }
+});
+
+test('duplicate and malformed eye-exclusion flags leave the ordinary pipeline byte-identical',()=>{
+ for(const query of ['?perclos-turn=exclude&perclos-turn=exclude','?perclos-turn=exclude&perclos-turn=keep','?perclos-turn=Exclude','?perclos-turn=true','?perclos-turn=exclude%20']){
+  const base=calibrated(harness('')),invalid=calibrated(harness(query));
+  assert.equal(invalid.get('experimentFlags.any'),false,query);assert.equal(invalid.get('experimentController'),null,query);
+  for(const spec of [...Array(10).fill({ear:.08}),...Array(50).fill({ear:.08,noseX:.7}),...Array(12).fill({ear:.3}),{face:false}]){
+   base.frame({...spec,stepMs:150});invalid.frame({...spec,stepMs:150});
+   assert.equal(JSON.stringify(invalid.state()),JSON.stringify(base.state()),query);
+  }
  }
 });

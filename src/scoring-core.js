@@ -59,13 +59,13 @@ export function scoringConfidence(state, turned, stableDistraction = false) {
     return Math.min(100, state.confidence + (state.calibrated || stableDistraction && turned ? 5 : 3));
 }
 
-export function scoringEyeMetrics(state, ear, turned, nowMs) {
-    const next = { ...state }, closed = ear < state.eyeClosedThreshold;
-    next.perclosWindow = [...state.perclosWindow, { t: nowMs, closed }].filter(row => nowMs - row.t < 60000);
+export function scoringEyeMetrics(state, ear, turned, nowMs, excludeTurned = false) {
+    const next = { ...state }, closed = ear < state.eyeClosedThreshold, sampled = !excludeTurned || !turned;
+    next.perclosWindow = (sampled ? [...state.perclosWindow, { t: nowMs, closed }] : state.perclosWindow).filter(row => nowMs - row.t < 60000);
     const perclos = next.perclosWindow.length ? Math.round(next.perclosWindow.filter(row => row.closed).length / next.perclosWindow.length * 100) : 0;
-    if (closed && !next.eyesClosedSince)
+    if (closed && sampled && !next.eyesClosedSince)
         next.eyesClosedSince = nowMs;
-    if (!closed)
+    if (!closed || !sampled)
         next.eyesClosedSince = 0;
     const microsleep = Boolean(next.eyesClosedSince && nowMs - next.eyesClosedSince > 1500 && nowMs - next.lastMicro > 3000 && next.confidence > 45);
     if (microsleep) {

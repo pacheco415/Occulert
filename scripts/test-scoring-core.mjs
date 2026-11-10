@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { scoringTriggerEligible, scoringCalibrationThresholds, scoringTrackedFrame, scoringYawn, scoringAlertCandidate } from '../src/scoring-core.js';
+import { scoringTriggerEligible, scoringCalibrationThresholds, scoringTrackedFrame, scoringYawn, scoringAlertCandidate, scoringEyeMetrics } from '../src/scoring-core.js';
 import { scoringReplayFrame, scoringAlertReason } from '../benchmark/scoring-step.mjs';
 import { createReleasedScoringOracle, initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../benchmark/released-scoring-oracle.mjs';
 import { buildDriverArtifact } from './lib/driver-build.mjs';
@@ -13,6 +13,36 @@ import { landmarks } from '../tests/helpers/scoring-replay-geometry.mjs';
 
 const compiled = await buildDriverArtifact({ sourceRoot: fileURLToPath(new URL('../src', import.meta.url)),
     contractPath: fileURLToPath(new URL('../source-driver-contract.json', import.meta.url)) });
+
+test('turn exclusion preserves flag-off eye-state bytes, expires the window and breaks closed-eye continuity', () => {
+    const initial = initialScoringState({calibrating:false,calibrated:true,confidence:100});
+    let state = structuredClone(initial);
+    for (const [elapsed,ear,turned] of [[0,.3,false],[100,.08,false],[1000,.08,true],[1601,.08,true],[60000,.08,true],[60100,.08,true]]) {
+        const at=SCORING_EPOCH+elapsed, before=structuredClone(state);
+        assert.equal(JSON.stringify(scoringEyeMetrics(state,ear,turned,at,false)),JSON.stringify(scoringEyeMetrics(state,ear,turned,at)));
+        const result=scoringEyeMetrics(state,ear,turned,at,true);
+        assert.deepEqual(state,before,'The input state and window are not modified');state=result.state;
+        if(turned){assert.equal(state.eyesClosedSince,0);assert.equal(result.microsleep,false);}
+    }
+    assert.deepEqual(state.perclosWindow,[],'Old evidence expires during excluded observations');
+    assert.equal(state.microsleeps,0);
+    assert.equal(state.lastMicro,0);
+    const resumed=SCORING_EPOCH+60200;
+    state=scoringEyeMetrics(state,.08,false,resumed,true).state;
+    assert.equal(state.eyesClosedSince,resumed,'Resume starts a new closure, never bridges the turn');
+    assert.equal(state.totalDistractionMs,59200,'Turn duration is still accounted for');
+    let result=scoringEyeMetrics(state,.08,false,resumed+1500,true);
+    assert.equal(result.microsleep,false,'Exactly 1500 ms remains below the strict microsleep boundary');
+    result=scoringEyeMetrics(result.state,.08,false,resumed+1501,true);
+    assert.equal(result.microsleep,true);assert.equal(result.state.microsleeps,1);
+    const lastMicro=result.state.lastMicro;
+    state=scoringEyeMetrics(result.state,.08,true,resumed+1600,true).state;
+    assert.equal(state.eyesClosedSince,0);assert.equal(state.lastMicro,lastMicro,'Exclusion preserves the cooldown history');
+    state=scoringEyeMetrics(state,.08,false,resumed+1700,true).state;
+    result=scoringEyeMetrics(state,.08,false,resumed+3201,true);
+    assert.equal(result.microsleep,false,'Fresh closure does not bypass the existing 3000 ms cooldown');
+    assert.deepEqual(initial.perclosWindow,[]);
+});
 
 test('accepted yawn preserves the +8 cap, updates the peak immediately and leaves scored averages untouched', () => {
     for (const [fatigue, maxFatigue, expected, peak] of [[0,0,8,8],[72,75,80,80],[95,97,100,100],[100,100,100,100],[50,90,58,90]]) {
