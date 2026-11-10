@@ -2,12 +2,12 @@ import { setCameraControlsDisabled, refreshCameraChoices, openSelectedCamera, cl
 import { detectorFailureStopping, discardFaceMesh, initModel, verifyFirstInference, loop, framePerformanceSnapshot, set_processingFrame, set_detectorFailureStopping, set_consecutiveInferenceFailures, set_lastDetectionResultAt } from "./detector.js";
 import "./calibration.js";
 import { startGPS, stopGPS, riskText, fleetPayload } from "./metrics.js";
-import { alerts, escalationLevel, _alertTestOwner, beginAlertAudioScope, releaseAlertAudioScope, clearParkedAlertTest, resetBreakReminder, dismissBreak, triggerBreakCheck, set_alerts, set_escalationLevel } from "./alerts.js";
+import { alerts, escalationLevel, _alertTestOwner, beginAlertAudioScope, releaseAlertAudioScope, clearParkedAlertTest, resetBreakReminder, dismissBreak, triggerBreakCheck, set_alerts, set_lastAlert, set_escalationLevel } from "./alerts.js";
 import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistory, setMonitoringUi } from "./storage-history.js";
 import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
 export const start = startMonitoring;
 export const stop = stopMonitoring;
-export const EXPERIMENT_HELPER_INTEGRITY = "sha256-8jgSH171aEJc65cFUJU0UgAyUQpdb+LVjjyYR/NosZY=";
+export const EXPERIMENT_HELPER_INTEGRITY = "sha256-UsKS/z/z68s17TdfXai4h9HOCJqJlny+opCCxBF4+rk=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
     try {
@@ -308,8 +308,15 @@ export function createLocalLifecycleOperations() {
             fatigue = 0;
             confidence = 0;
             set_alerts(0);
+            set_lastAlert(0);
             headNods = 0;
+            lastNod = 0;
             microsleeps = 0;
+            lastMicro = 0;
+            yawnCount = 0;
+            lastYawn = 0;
+            _mouthOpenSince = 0;
+            _marHist = [];
             maxFatigue = 0;
             {
                 fatigueSampleSum = 0;
@@ -346,6 +353,9 @@ export function createLocalLifecycleOperations() {
             alertsEl.textContent = '0';
             nodsEl.textContent = '0';
             microsleepsEl.textContent = '0';
+            const yawnCountEl = document.getElementById('yawnCountEl');
+            if (yawnCountEl)
+                yawnCountEl.textContent = '0';
             perclosEl.textContent = '0%';
             distractionEl.textContent = '0s';
             escalationEl.textContent = '0';
@@ -593,7 +603,7 @@ export function loadExperimentController() {
     }
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/detection-experiments.v5.js';
+        script.src = '/detection-experiments.v6.js';
         script.integrity = EXPERIMENT_HELPER_INTEGRITY;
         script.crossOrigin = 'anonymous';
         const timer = setTimeout(() => { script.remove(); reject(Error('Parked helper timed out')); }, 7000);

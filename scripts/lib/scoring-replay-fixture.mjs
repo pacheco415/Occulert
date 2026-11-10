@@ -5,6 +5,7 @@ import { buildDriverArtifact } from './driver-build.mjs';
 import { fileURLToPath } from 'node:url';
 import { traceContract } from '../../benchmark/parked-detection-trace.mjs';
 import { createReleasedScoringOracle, initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../../benchmark/released-scoring-oracle.mjs';
+import { landmarks } from '../../tests/helpers/scoring-replay-geometry.mjs';
 
 const compiled = await buildDriverArtifact({ sourceRoot: fileURLToPath(new URL('../../src',import.meta.url)),
     contractPath: fileURLToPath(new URL('../../source-driver-contract.json',import.meta.url)) });
@@ -23,7 +24,8 @@ export function recordScoringFixture({ fps = 7, clockStepMs = 0, frames = synthe
         dimensions:() => ({width:360,height:480}),applySensitivity:() => context.applySensitivity(sensitivity),
         resetContinuous:() => context.resetContinuousObservations(),defaultCalibration:ear => context.updateCalibration(ear),
         defaultEyeMetrics:(ear,turned) => context.updateEyeMetrics(ear,turned),alert:(reason,eligibility) => context.trigger(reason,eligibility),
-        log:noop,render:noop,tracking:noop,clearEyes:noop,resetMouth:noop,draw:noop,otherFaceMetrics:noop,
+        log:noop,render:noop,tracking:noop,clearEyes:noop,
+        resetMouth:() => {context._mouthOpenSince=0;context._marHist=[];},draw:noop,otherFaceMetrics:points => context.detectYawn(points),
         calcEAR:() => current.rawEar ?? current.ear,headTurn:() => current.turned,
         smooth:value => context.smooth(value),detectNod:landmarks => context.detectHeadNod(landmarks),
         ui:{face:noop,perclos:noop,microsleeps:noop,distraction:noop,calibration:noop,tasks:noop,observer:noop},
@@ -50,14 +52,12 @@ export function recordScoringFixture({ fps = 7, clockStepMs = 0, frames = synthe
             // The real results entry validates/prepares raw observations before
             // smoothing/nod extraction, unlike calling score on derived inputs.
             original.setClock(time);
-            const landmarks = Array.from({length:468},() => ({x:.5,y:.5}));
-            landmarks[4].y = current.noseY;
-            controller.results({multiFaceLandmarks:frame.hasFace?[landmarks]:[]});
-        } else original.step({...current});
+            controller.results({multiFaceLandmarks:frame.hasFace?[landmarks(current)]:[]});
+        } else original.step({...current,mouthLandmarks:landmarks(current)});
         recorded.push({frame_id:frame.atMs,fatigue:context.fatigue,confidence:context.confidence,calibrated:context.calibrated});
         if (!flags.primary) controller.recordResults({multiFaceLandmarks:frame.hasFace?[[]]:[]},frame.hasFace?current.rawEar:null,
             frame.hasFace?context.earHistory.reduce((a,b)=>a+b,0)/context.earHistory.length:null,current.turned);
     }
     time = Math.max(1,frames.at(-1)?.atMs ?? 1); context.running = false; controller.stop();
-    return {trace:JSON.parse(JSON.stringify(controller.exportData())),recorded,finalState:structuredClone(snapshot()),alerts:original.alerts,decisions};
+    return {trace:JSON.parse(JSON.stringify(controller.exportData())),recorded,finalState:structuredClone(snapshot()),alerts:original.alerts,decisions,yawnCount:context.yawnCount};
 }

@@ -351,8 +351,12 @@
       frame.scoringInput = { order: ++scoringOrder, frameId: frame.frameId, atMs: now() - startedAt,
         wallMs: input.wall - scoringWallStart, rawEar: input.hasFace ? input.rawEar : null,
         ear: input.hasFace ? input.ear : null, hasFace: input.hasFace === true, faceMissing: input.faceMissing === true,
-        turned: input.turned === true, nod: input.nod === true, noseY: input.hasFace ? input.noseY : null,
+        turned: input.turned === true, nod: input.nod === true, yawn: false, noseY: input.hasFace ? input.noseY : null,
         sensitivity: b.scoringSettings().sensitivity, clocks: frame.scoringClocks ??= {} };
+    }
+    function recordScoringYawn() {
+      if (!active || !scoringReplay || !frame || frame.recorded || frame.generation !== generation || !frame.scoringInput?.hasFace) return;
+      frame.scoringInput.yawn = true;
     }
     function recordScoringClock(phase, wall) {
       if (!active || !scoringReplay || !frame || frame.recorded || frame.generation !== generation
@@ -395,7 +399,7 @@
       scoringReplay = null; scoringOrder = 0;
       if ((flags.tasks || flags.observer) && typeof b.scoringState === 'function' && typeof b.scoringSettings === 'function') {
         scoringWallStart = b.wallNow();
-        scoringReplay = { version: 1, epochMs: 1700000000000, initialState: scoringSnapshot(),
+        scoringReplay = { version: 2, epochMs: 1700000000000, initialState: scoringSnapshot(),
           initialSettings: { ...b.scoringSettings() }, frames: [], controls: [], droppedFrames: 0, droppedControls: 0 };
       }
       observeGeometry();
@@ -649,7 +653,7 @@
             ? 'session_id,start_ms,end_ms,label\n' + observer.entries().map(row =>
               [s.localSessionId, row.start_ms, row.end_ms, row.label].join(',')).join('\n') + '\n' : null;
         }
-        lastTrace = { schema: 'occulert.parked-detection-trace', version: scoringReplay ? 2 : 1,
+        lastTrace = { schema: 'occulert.parked-detection-trace', version: scoringReplay ? 3 : 1,
           session: { sessionId: s.localSessionId, durationMs, platform: 'web',
             detectorVersion: b.detectorVersion(), ...b.provenance(), ...summary() },
           samples: trace.samples(), legacyAlerts: trace.alerts(),
@@ -662,7 +666,7 @@
       return lastTrace?.session ?? null;
     }
     return Object.freeze({ begin, stop, score, results, observeGeometry, finishCalibration, capture, recordResults,
-      qualifiedLoss, recordAlert, summary, exportData, units, legacyResult, recalibrate, recordScoringInput, recordScoringClock, prepareObservation,
+      qualifiedLoss, recordAlert, summary, exportData, units, legacyResult, recalibrate, recordScoringInput, recordScoringClock, recordScoringYawn, prepareObservation,
       markObserver, observerState, exportObserverEpisodes });
   }
   const api = Object.freeze({ ...models, createController });
