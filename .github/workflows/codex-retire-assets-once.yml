@@ -43,8 +43,6 @@ jobs:
         run: npm run asset:retire -- --write
       - name: Check seven-day retirement deadline window
         run: npm run asset:retire -- --check --fail-within-days=7
-      - name: Run complete site verification
-        run: npm run verify
       - name: Review changes and record one cleanup commit
         run: |
           set -euo pipefail
@@ -60,3 +58,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Retire eligible superseded immutable assets"
           git push origin HEAD:refs/heads/codex/retire-assets-2026-11-13
+      - name: Run complete site verification on committed cleanup
+        run: npm run verify
