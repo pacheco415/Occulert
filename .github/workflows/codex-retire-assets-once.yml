@@ -1,0 +1,62 @@
+name: Temporary one-time retired asset preparation
+
+on:
+  push:
+    branches:
+      - codex/retire-assets-2026-11-13
+    paths:
+      - .github/workflows/codex-retire-assets-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: retire-assets-2026-11-13
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Include every remote branch and full history
+        run: |
+          set -euo pipefail
+          git fetch --prune --tags origin '+refs/heads/*:refs/remotes/origin/*'
+          test "$(git rev-parse --is-shallow-repository)" = false
+          git status --porcelain
+          git rev-parse HEAD
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Install locked dependencies with Node 24
+        run: |
+          node --version
+          npm ci
+      - name: Review eligible assets without changes
+        run: npm run asset:retire
+      - name: Apply only script-approved retirements
+        run: npm run asset:retire -- --write
+      - name: Check seven-day retirement deadline window
+        run: npm run asset:retire -- --check --fail-within-days=7
+      - name: Run complete site verification
+        run: npm run verify
+      - name: Review changes and record one cleanup commit
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --name-status
+          git diff --stat
+          git add -u
+          if git diff --cached --quiet; then
+            echo "No eligible asset modifications to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Retire eligible superseded immutable assets"
+          git push origin HEAD:refs/heads/codex/retire-assets-2026-11-13
