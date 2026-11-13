@@ -113,7 +113,7 @@ Redeploy after adding these. Until they are set, `api/sessions.js`,
 `501 backend_not_configured` instead of touching a database.
 
 The Vercel Hobby deployment has a 12-function limit. This source keeps 12
-top-level `api/*.js` entry points: `api/[endpoint].js` dispatches six named
+top-level `api/*.js` entry points: `api/[endpoint].js` dispatches seven named
 URLs to handlers in `api/_lib/routes/`. Keep those URLs and the route allowlist
 in sync when editing the API, and run `npm run test:vercel-function-budget`
 before deployment. The Stripe webhook must continue receiving its original
@@ -183,6 +183,33 @@ Invitation creation returns the one-time link only to the verified manager.
 The dashboard can open a pre-addressed message in the manager's existing mail
 app or copy the link. Sending a new link revokes the prior token, creates a
 fresh token, and is limited to reduce abuse without adding a paid provider.
+
+### Parked alert check confirmations
+
+Before deploying `/api/parked-alert-checks`, apply and verify
+`supabase/migrations/20261110080001_parked_alert_checks.sql` in the existing
+project's canonical migration order. This source change does not apply production
+SQL. The table and its invoker functions grant access only to `service_role`;
+RLS is enabled, with no direct browser-role grants.
+
+After a signed-in driver enables cloud sync and runs the existing parked test,
+the browser asks whether they heard or felt it. Choosing Yes or No sends only
+`completed_at`, `platform` and `confirmed`. The server verifies the token and
+resolves the driver's current active fleet membership itself. It stores the
+latest answer per driver/fleet; a newer No replaces an earlier Yes. The answer
+is client-reported, not independent evidence of delivery or fitness to drive.
+
+The owner's GET returns only confirmed and active-driver counts across the
+complete current active roster. This denominator is the roster, not the separate
+monthly completed-session activity metric. Inactive and other-fleet drivers do
+not contribute. No age expiry is introduced: reactivation or returning to the
+same fleet makes that fleet’s retained latest answer eligible again. Missing or failed counts remain unavailable, not zero. Account,
+driver and fleet deletion cascade to these records.
+
+No answer is queued or retried automatically. The browser discards a pending
+answer after a consent/account change, monitoring start, a replacement test or
+leaving the page. A request already accepted by the server cannot be recalled.
+Local-only drivers keep the existing output check and send no confirmation.
 
 ## 4. Frontend behavior
 

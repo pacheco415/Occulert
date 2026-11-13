@@ -43,6 +43,7 @@
     "test:fleet-period-report",
     "test:fleet-history-filters",
     "test:driver-parked-check",
+    "test:parked-alert-checks",
     "test:detection",
     "test:detection-experiments",
     "test:fleet-followups",

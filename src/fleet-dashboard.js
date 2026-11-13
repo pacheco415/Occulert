@@ -113,6 +113,13 @@ function allowDashboardShare(){return!fleetMode&&!protectedUserId||allowProtecte
 function pilotWindowDays(){let days=Number(document.getElementById('pilotRange')?.value||30);return days===7?7:30}
 function pilotWindowSessions(days=pilotWindowDays()){let now=Date.now(),cutoff=now-days*86400000;return sessionHistoryRows().slice(0,50).filter(session=>{let started=safeDate(session.startedAt);return started&&started.getTime()>=cutoff&&started.getTime()<=now})}
 /* pilot-launch-checklist:start */
+function parkedCheckState(value){
+  if(!value||value.ok!==true||value.telemetry_trust!=='unverified_client_report'
+    ||typeof value.fleet_id!=='string'||!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value.fleet_id))return null;
+  let active=value.active_driver_count,confirmed=value.confirmed_driver_count;
+  if(!Number.isSafeInteger(active)||!Number.isSafeInteger(confirmed)||active<0||confirmed<0||confirmed>active)return null;
+  return{active,confirmed,state:active>0&&confirmed===active?'complete':confirmed>0?'available':'pending'};
+}
 function pilotLaunchState(input={}){
   let now=Number.isFinite(Number(input.now))?Number(input.now):Date.now();
   let drivers=Array.isArray(input.drivers)?input.drivers:[];
@@ -143,6 +150,10 @@ function renderPilotLaunchChecklist(){
   document.getElementById('pilotLaunchBadge').textContent=badge;
   setLaunchStep('launchFleetStep',state.fleetReady?'complete':'pending',state.fleetReady?'Protected fleet ready':'Sign in and create a fleet');
   setLaunchStep('launchDriversStep',state.overPilotTarget?'available':state.activeDrivers?'complete':state.fleetReady?'available':'pending',driverStatus);
+  let parked=state.fleetReady?parkedCheckState(protectedParkedChecks):null;
+  setLaunchStep('launchParkedStep',parked?parked.state:'pending',parked
+    ?`${parked.confirmed} of ${parked.active} active drivers confirmed a parked alert check`
+    :state.fleetReady?'Parked check confirmations unavailable':'Sign in to view parked check confirmations');
   setLaunchStep('launchSessionStep',state.firstSessionReady?'complete':state.activeDrivers?'available':'pending',
     state.firstSessionReady?`${state.sessionCount}${state.historyLimited?' recent':''} protected session${state.sessionCount===1?'':'s'} recorded${state.historyLimited?' · 50-record limit':''}`:'Waiting for first protected session');
   setLaunchStep('launchDisplayStep',state.displayReady?'available':'pending',state.displayReady?'Privacy-safe display available':'Available after fleet setup');
@@ -196,7 +207,7 @@ function exportSessionHistoryCSV(){
   requestDashboardCSVDownload(csv,fleetMode?'occulert-protected-session-history.csv':'occulert-local-demo-session-history.csv');
 }
 /* protected-session-history:end */
-function dashboardDataSnapshot(){let local=fleetMode?null:getLocal(),rawRows=cloudRows.length||fleetMode?cloudRows:local?[local]:[];return JSON.stringify({fleetMode,protectedFleetName,protectedFleetPlan,protectedLastSuccessfulAt,protectedRefreshFailures,cloudRows,protectedDrivers,protectedSessions,protectedEvents,local,localDrivers:fleetMode?null:getDrivers(),localHistory:fleetMode?null:getJSON('occulert-session-history',[]),freshness:rawRows.map(row=>[String(row.driverId||row.id||row.name||''),timestamp(row),fresh(row)])})}
+function dashboardDataSnapshot(){let local=fleetMode?null:getLocal(),rawRows=cloudRows.length||fleetMode?cloudRows:local?[local]:[];return JSON.stringify({fleetMode,protectedFleetName,protectedFleetPlan,protectedLastSuccessfulAt,protectedRefreshFailures,protectedParkedChecks,cloudRows,protectedDrivers,protectedSessions,protectedEvents,local,localDrivers:fleetMode?null:getDrivers(),localHistory:fleetMode?null:getJSON('occulert-session-history',[]),freshness:rawRows.map(row=>[String(row.driverId||row.id||row.name||''),timestamp(row),fresh(row)])})}
 function captureDashboardFocus(){let active=document.activeElement,key=active&&active.getAttribute&&active.getAttribute('data-focus-key');return key?{key}:null}
 function restoreDashboardFocus(state){if(!state)return;let target=Array.from(document.querySelectorAll('[data-focus-key]')).find(element=>element.getAttribute('data-focus-key')===state.key);if(target){try{target.focus({preventScroll:true})}catch(error){target.focus()}}}
 function renderDriverList(){lastRows=sortRows(lastRows);let visible=filterRows(lastRows);document.getElementById('drivers').innerHTML=visible.length?visible.map(driverRow).join(''):lastRows.length?'<div class="notice"><strong>No drivers match this filter.</strong></div>':emptyState()}
@@ -224,12 +235,31 @@ function clearDemoData(){demoRows=[];if(!fleetMode){cloudRows=[];sessionHistoryD
 function rowsFromFleet(summary){let sessions=Array.isArray(summary.sessions)?summary.sessions:[],latest=new Map();sessions.forEach(s=>{if(!latest.has(s.driver_id))latest.set(s.driver_id,s)});return (summary.drivers||[]).map(d=>{let s=latest.get(d.id),active=d.active!==false,hasSafetyScore=!!s&&s.safety_score!==null&&s.safety_score!==undefined&&s.safety_score!==''&&Number.isFinite(Number(s.safety_score)),score=hasSafetyScore?Number(s.safety_score):null,status=!active?'INACTIVE':!s||!hasSafetyScore?'NO DATA':score<50?'ALERT':score<75?'WATCH':'SAFE';return{name:d.name,driverId:d.id,route:d.vehicle_id||'Unassigned vehicle',status,safetyScore:score,hasSafetyScore,hasSession:!!s,active,sessionActive:!!s&&!s.ended_at,fatigue:s&&s.max_fatigue,alerts:s&&s.alert_count,lastUpdate:s&&(s.ended_at||s.started_at),cloudConsent:true,cloudSynced:true,detectorPipeline:s&&s.detector_pipeline}})}
 /* fleet-summary-projection:end */
 /* fleet-refresh-request:start */
+let protectedParkedChecks=null;
+async function loadProtectedParkedChecks(backend,auth,version,cancelled){
+  if(!backend.captureAuthContext||!backend.requireAuthContext||!backend.fetchWithDeadline)return null;
+  let abort=new AbortController();
+  cancelled.catch(()=>abort.abort());
+  try{
+    let context=backend.captureAuthContext();
+    if(version!==protectedFleetGeneration||window.OcculertBackend!==backend||!auth?.access_token
+      ||auth.user?.id!==currentProtectedOwner()||context.auth?.access_token!==auth.access_token
+      ||context.auth?.refresh_token!==auth.refresh_token||context.auth?.user?.id!==auth.user.id)return null;
+    backend.requireAuthContext(context);
+    let response=await backend.fetchWithDeadline('/api/parked-alert-checks',{method:'GET',credentials:'same-origin',cache:'no-store',signal:abort.signal,
+      headers:{Accept:'application/json',Authorization:'Bearer '+auth.access_token}});
+    let data=await response.json();
+    if(abort.signal.aborted||version!==protectedFleetGeneration||window.OcculertBackend!==backend)return null;
+    backend.requireAuthContext(context);
+    return response.ok&&parkedCheckState(data)?data:null;
+  }catch{return null}finally{abort.abort()}
+}
 function setProtectedFleetBusy(value){protectedFleetLoading=value;let button=document.getElementById('refreshNow');if(button){button.disabled=value;button.textContent=value?'Refreshing…':'Refresh now'}document.getElementById('cloudStatus')?.setAttribute('aria-busy',String(value))}
 function cancelProtectedFleetRefresh(){protectedFleetGeneration+=1;protectedFleetCancel?.()}
 async function boundedProtectedFleetRequest(work,cancelled){let timer;try{return await Promise.race([Promise.resolve().then(work),cancelled,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Protected request timed out')),PROTECTED_REQUEST_TIMEOUT_MS)})])}finally{clearTimeout(timer)}}
 function currentProtectedOwner(){let user=window.OcculertBackend?.currentUser?.();return typeof user?.id==='string'?user.id:''}
 function showSignedOutActions(show){document.getElementById('signedOutActions')?.classList.toggle('hidden',!show);document.getElementById('driverAppNav')?.classList.toggle('hidden',!show);document.getElementById('accountNav')?.classList.toggle('hidden',show);document.getElementById('refreshNow')?.classList.toggle('hidden',show);let primary=document.getElementById('fleetPrimaryNav');if(primary){primary.href=show?'/login.html':'/fleet-onboarding.html';primary.textContent=show?'Sign In':'Fleet setup'}}
-function clearProtectedFleetCache(){protectedMonthlyActivity=null;resetDashboardPreferences();window.OcculertFollowups?.reset();window.OcculertPilotReport?.reset();protectedTelemetryTrust='';protectedReportPrivacy=null;protectedReportShape=false;cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedEventsRefreshPending=false;protectedFleetId='';protectedFleetName='';protectedFleetPlan='';protectedEventsLoadedAt=0;protectedLastSuccessfulAt=0;protectedRefreshFailures=0;sessionHistoryDirty=true;lastDashboardSnapshot=''}
+function clearProtectedFleetCache(){protectedMonthlyActivity=null;protectedParkedChecks=null;resetDashboardPreferences();window.OcculertFollowups?.reset();window.OcculertPilotReport?.reset();protectedTelemetryTrust='';protectedReportPrivacy=null;protectedReportShape=false;cloudRows=[];protectedDrivers=[];protectedSessions=[];protectedEvents=[];protectedEventsRefreshPending=false;protectedFleetId='';protectedFleetName='';protectedFleetPlan='';protectedEventsLoadedAt=0;protectedLastSuccessfulAt=0;protectedRefreshFailures=0;sessionHistoryDirty=true;lastDashboardSnapshot=''}
 function resetProtectedFleet(){cancelProtectedFleetRefresh();let localDemoRows=demoRows;fleetMode=false;protectedUserId='';protectedAccountRefreshPending=false;clearProtectedFleetCache();cloudRows=localDemoRows;showSignedOutActions(true);syncProtectedControls();document.getElementById('cloudStatus').textContent='Not signed in. Showing same-browser local data only; protected fleet data remains unavailable.';render()}
 function reconcileProtectedOwner(expectedUserId){let currentUserId=currentProtectedOwner();if(currentUserId===expectedUserId)return false;if(!currentUserId){resetProtectedFleet();return true}cancelProtectedFleetRefresh();clearProtectedFleetCache();protectedUserId=currentUserId;fleetMode=true;protectedAccountRefreshPending=true;showSignedOutActions(false);syncProtectedControls();document.getElementById('cloudStatus').textContent='Signed-in account changed. Loading the new account’s protected fleet data.';render();return true}
 function recordProtectedRefreshFailure(stage){lastDashboardSnapshot='';protectedRefreshFailures=Math.min(4,protectedRefreshFailures+1);let last=protectedLastSuccessfulAt?new Date(protectedLastSuccessfulAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';document.getElementById('cloudStatus').textContent=stage==='account'?'Account check unavailable or timed out. Sign-out was not confirmed. '+(last?'Showing the protected data last updated at '+last+'. ':'Protected fleet data is unavailable. '):last?'Connection interrupted or timed out. Showing the protected data last updated at '+last+'. ':'Protected fleet data is temporarily unavailable or the request timed out. ';document.getElementById('cloudStatus').textContent+='Use Refresh now to retry; automatic retries will slow down to reduce data use.';refreshDashboardIfNeeded();window.OcculertPilotReport?.update()}
@@ -251,11 +281,14 @@ async function loadProtectedFleet(options={}){
     if(reconcileProtectedOwner(expectedUserId))return false;
     if(session?.user?.id!==expectedUserId)throw new Error('Protected account could not be confirmed');
     stage='summary';
-    let result=await boundedProtectedFleetRequest(()=>backend.getFleetSummary({includeEvents}),cancelled);
+    let [result,parked]=await Promise.all([
+      boundedProtectedFleetRequest(()=>backend.getFleetSummary({includeEvents}),cancelled),
+      boundedProtectedFleetRequest(()=>loadProtectedParkedChecks(backend,session,version,cancelled),cancelled).catch(()=>null),
+    ]);
     if(version!==protectedFleetGeneration)return false;
     if(reconcileProtectedOwner(expectedUserId))return false;
     if(!result.ok&&result.status===401){backend.signOut();resetProtectedFleet();return false}
-    if(result.ok){protectedMonthlyActivity=result.body.monthly_activity||null;lastDashboardSnapshot='';protectedReportShape=Array.isArray(result.body.sessions)&&Array.isArray(result.body.drivers);protectedTelemetryTrust=String(result.body.telemetry_trust||'');protectedReportPrivacy=result.body.privacy||null;window.OcculertFollowups?.show();protectedFleetId=String(result.body.fleet.id||'');restoreDashboardPreferences();protectedFleetName=result.body.fleet.company_name||'your fleet';protectedFleetPlan=String(result.body.fleet.plan||'fleet').slice(0,40);protectedDrivers=Array.isArray(result.body.drivers)?result.body.drivers:[];protectedSessions=Array.isArray(result.body.sessions)?result.body.sessions:[];if(result.body.events_included!==false){protectedEvents=Array.isArray(result.body.events)?result.body.events:[];protectedEventsLoadedAt=Date.now()}cloudRows=rowsFromFleet(result.body);protectedLastSuccessfulAt=Date.now();protectedRefreshFailures=0;sessionHistoryDirty=true;document.getElementById('cloudStatus').textContent='Protected connection active for '+protectedFleetName+'. Active sessions refresh every 30 seconds; otherwise the dashboard uses a lower-cost 90-second refresh.'}
+    if(result.ok){protectedParkedChecks=parked?.fleet_id===result.body.fleet.id?parked:null;protectedMonthlyActivity=result.body.monthly_activity||null;lastDashboardSnapshot='';protectedReportShape=Array.isArray(result.body.sessions)&&Array.isArray(result.body.drivers);protectedTelemetryTrust=String(result.body.telemetry_trust||'');protectedReportPrivacy=result.body.privacy||null;window.OcculertFollowups?.show();protectedFleetId=String(result.body.fleet.id||'');restoreDashboardPreferences();protectedFleetName=result.body.fleet.company_name||'your fleet';protectedFleetPlan=String(result.body.fleet.plan||'fleet').slice(0,40);protectedDrivers=Array.isArray(result.body.drivers)?result.body.drivers:[];protectedSessions=Array.isArray(result.body.sessions)?result.body.sessions:[];if(result.body.events_included!==false){protectedEvents=Array.isArray(result.body.events)?result.body.events:[];protectedEventsLoadedAt=Date.now()}cloudRows=rowsFromFleet(result.body);protectedLastSuccessfulAt=Date.now();protectedRefreshFailures=0;sessionHistoryDirty=true;document.getElementById('cloudStatus').textContent='Protected connection active for '+protectedFleetName+'. Active sessions refresh every 30 seconds; otherwise the dashboard uses a lower-cost 90-second refresh.'}
     else if(result.body&&result.body.error==='fleet_not_found'){clearProtectedFleetCache();document.getElementById('cloudStatus').textContent='No owned fleet found. Use Fleet setup to create one and invite drivers.'}
     else{recordProtectedRefreshFailure(stage);return false}
     refreshDashboardIfNeeded();window.OcculertPilotReport?.update();return result.ok

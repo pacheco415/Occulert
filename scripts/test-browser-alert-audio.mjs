@@ -59,6 +59,7 @@ function harness({ state = 'running', noContext = false, noMedia = false, runnin
     document, navigator: { audioSession: session }, window: { AudioContext: noContext ? undefined : Context, location: { search } },
     Audio: noMedia ? undefined : Media, Promise, URLSearchParams,
     driveStateEl: {}, driveHintEl: {}, statusEl: {},
+    beginParkedAlertConfirmation: () => null, showParkedAlertConfirmation() {}, clearParkedAlertConfirmation() {},
     setTimeout(callback, duration) { const id = ++timerId; timers.set(id, { callback, duration }); return id; },
     clearTimeout(id) { timers.delete(id); },
   });

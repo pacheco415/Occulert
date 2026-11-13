@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Occulert" />
 
-<script id="driver-startup-guard" src="/driver-startup-guard.v29.js" integrity="sha256-K+bpXj0z2VMrRYH7x3S23sx0RPGVKSMZG1+cY2WJ+xs=" crossorigin="anonymous" defer></script>
+<script id="driver-startup-guard" src="/driver-startup-guard.v44.js" integrity="sha256-WG7nifErDn77KaNaxWkVpCH5TwmHYSqvQ29FqvzZDRQ=" crossorigin="anonymous" defer></script>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/occulert-logo-main-192.png" /><link rel="canonical" href="https://www.occulert.com/app.html" />
 
@@ -151,7 +151,7 @@
 
 
     <div class="night-row"><label for="nightOpacity"><span id="nightBrightnessLabel" lang="en" dir="ltr">&#127761; Night Alert Brightness</span><span id="nightOpacityHelp" style="font-size:10px;color:var(--text3);margin-left:6px;font-weight:400;font-style:italic" lang="en" dir="ltr">Alert screen opacity</span></label><div class="night-slider"><input type="range" id="nightOpacity" min="30" max="95" value="72" step="1"><span class="night-val" id="nightVal" lang="en" dir="ltr">72%</span></div></div>
-    <div class="card privacy-card" lang="en" dir="ltr"><div class="label" lang="en" dir="ltr">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b lang="en" dir="ltr">Enable GPS for this session</b><br><span class="small" lang="en" dir="ltr">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b lang="en" dir="ltr">Enable cloud session sync</b><br><span class="small" lang="en" dir="ltr">Requires sign-in and saves session totals plus alerts. Camera images are never uploaded. Otherwise data stays local.</span></span></label><p id="cloudEventStatus" class="small" role="status" aria-live="polite" hidden></p></div>
+    <div class="card privacy-card" lang="en" dir="ltr"><div class="label" lang="en" dir="ltr">Privacy Controls</div><label class="toggle"><input id="gpsConsent" type="checkbox"><span><b lang="en" dir="ltr">Enable GPS for this session</b><br><span class="small" lang="en" dir="ltr">Shares approximate location with the local report and optional fleet dashboard.</span></span></label><label class="toggle"><input id="cloudConsent" type="checkbox"><span><b lang="en" dir="ltr">Enable cloud session sync</b><br><span class="small" lang="en" dir="ltr">Requires sign-in and saves session totals plus alerts and parked-check answers you choose to share. Camera images are never uploaded. Otherwise data stays local.</span></span></label><p id="cloudEventStatus" class="small" role="status" aria-live="polite" hidden></p></div>
     <div class="card"><div class="label" lang="en" dir="ltr">Calibration</div><div class="value" id="calibration" lang="en" dir="ltr">NOT STARTED</div><div class="cal-bar-wrap"><div class="cal-bar-fill" id="calibrationFill"></div></div><p class="metric-note" id="calHint" lang="en" dir="ltr">Keep your face centered and eyes open during calibration.</p></div>
     <div class="grid">
       <div class="card"><div class="label" lang="en" dir="ltr">Fatigue</div><div dir="ltr" class="value" id="fatigue" lang="en">0</div><div class="bar"><div class="fill" id="fatigueFill"></div></div></div>
@@ -174,7 +174,7 @@
       <div class="card"><div class="label" lang="en" dir="ltr">Cloud Sync</div><div dir="ltr" class="value" id="sync" lang="en">LOCAL</div></div>
       <div class="card"><div class="label" lang="en" dir="ltr">Location</div><div dir="ltr" class="value" id="location" lang="en">--</div></div>
     </div>
-    <details class="dev-tools"><summary lang="en" dir="ltr">Parked diagnostics</summary><p class="small" lang="en" dir="ltr">Run the alert check while parked. It does not add an alert or change a saved session.</p><button class="btn demo" id="demoBtn" type="button" lang="en" dir="ltr">Test sound and vibration</button><p class="small" id="alertCheckResult" lang="en" dir="ltr" role="status" aria-live="polite"></p><button class="btn" id="resetBtn" type="button" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8;margin-top:8px;margin-bottom:0;font-size:12px;padding:10px" lang="en" dir="ltr">Clear on-screen diagnostics</button></details>
+    <details class="dev-tools"><summary lang="en" dir="ltr">Parked diagnostics</summary><p class="small" lang="en" dir="ltr">Run the alert check while parked. It does not add an alert or change a saved session.</p><button class="btn demo" id="demoBtn" type="button" lang="en" dir="ltr">Test sound and vibration</button><p class="small" id="alertCheckResult" lang="en" dir="ltr" role="status" aria-live="polite"></p><div id="parkedCheckConfirmation" lang="en" dir="ltr" role="group" aria-labelledby="parkedCheckQuestion" hidden><p id="parkedCheckQuestion"><strong>Did you hear or feel it?</strong></p><p class="small">Choose Yes or No to share this answer with your fleet. This check does not establish fitness to drive.</p><button class="btn" id="parkedCheckYes" type="button">Yes</button><button class="btn" id="parkedCheckNo" type="button">No</button><p class="small" id="parkedCheckStatus" role="status" aria-live="polite"></p></div><button class="btn" id="resetBtn" type="button" style="background:rgba(100,116,139,.1);border-color:#475569;color:#94a3b8;margin-top:8px;margin-bottom:0;font-size:12px;padding:10px" lang="en" dir="ltr">Clear on-screen diagnostics</button></details>
     <div class="card"><div class="label" lang="en" dir="ltr">Session Report</div><p id="experimentStatus" lang="en" dir="ltr" role="status" hidden></p><button id="exportDetectionTrace" type="button" class="btn" hidden lang="en" dir="ltr">Export parked detection comparison</button><div class="report" id="report" lang="en" dir="ltr"></div></div>
     <div class="card" id="feedbackCard" hidden>
       <div class="label" lang="en" dir="ltr">Post-drive alert feedback</div>
@@ -232,7 +232,7 @@
 <script src="/occulert-backend.v90.js" defer></script>
 <script src="/security-utils.v47.js" defer></script>
 <script src="/local-history.v2.js" defer></script>
-<script src="/driver-app.v108.js" defer></script>
+<script src="/driver-app.v123.js" defer></script>
 <script src="/driver-overview.v2.js" defer></script>
 <template id="driverCatalog"><script src="/driver-i18n.v1.js" defer integrity="sha256-ZhTSOu5L3A6qve3fwfbqnT6OPkzBm2zVJa/lhSLduGg=" crossorigin="anonymous"></script></template>
 <script src="/lang.v48.js" defer></script>
