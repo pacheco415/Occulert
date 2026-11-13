@@ -826,6 +826,11 @@ try {
     if (table === "drivers") {
       assert.equal(params.fleet_id, "eq." + ownedFleetId);
       assert.doesNotMatch(params.select, /email|latitude|longitude|location|raw_motion/i);
+      if (params.id) {
+        assert.equal(params.limit, '50');
+        return (await orderingDb.query(`select ${params.select} from drivers where fleet_id=$1 and id=any($2::uuid[]) limit $3`,
+          [ownedFleetId, params.id.slice(4, -1).split(','), Number(params.limit)])).rows;
+      }
       return (await orderingDb.query(`select ${params.select} from drivers where fleet_id=$1${sqlOrder(params.order, ["id"], "asc")} limit $2`,
         [ownedFleetId, params.limit ? Number(params.limit) : 1000])).rows;
     }

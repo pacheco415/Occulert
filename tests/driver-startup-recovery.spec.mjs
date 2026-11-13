@@ -401,6 +401,15 @@ test.describe('cached complete driver startup', () => {
       await expect(page.locator('#startBtn')).toHaveText(/START MONITORING/i);
       expect(await page.evaluate(() => typeof initModel)).toBe('function');
       await expectNoPermissionedWork(page);
+      await test.step('a query-bearing offline navigation reuses the canonical driver shell', async () => {
+        await page.goto(origin + '/app.html?lang=es', { waitUntil: 'domcontentloaded' });
+        expect(new URL(page.url()).search).toBe('?lang=es');
+        await expect(page.locator('#startBtn')).toBeEnabled();
+        expect(await page.evaluate(() => window.OcculertStartup?.isReady())).toBe(true);
+        expect(await page.locator('#driverPanelTitle').count()).toBe(1);
+        expect(await page.evaluate(async () => Boolean(await caches.match('/app.html?lang=es')))).toBe(false);
+        await expectNoPermissionedWork(page);
+      });
     } catch (error) {
       await recordOfflineCacheSnapshot(page, diagnostics, 'after-failure');
       await diagnostics.attach(testInfo, 'offline-startup-diagnostics');

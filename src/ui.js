@@ -317,6 +317,7 @@ export function createLocalLifecycleOperations() {
             lastYawn = 0;
             _mouthOpenSince = 0;
             _marHist = [];
+            _sessionLog = [];
             maxFatigue = 0;
             {
                 fatigueSampleSum = 0;
@@ -474,11 +475,6 @@ export function createLocalLifecycleOperations() {
         if (feedbackCard)
             feedbackCard.hidden = !p.savedAt;
         reportEl.textContent = 'OCCULERT SESSION REPORT\n\nStatus: ' + p.status + '\nDuration: ' + mins + ' min\nSafety Score: ' + p.safetyScore + '/100\n\nCalibration: ' + (calibrated ? 'Personalized' : 'Default') + '\nOpen-eye EAR: ' + baselineEAR.toFixed(3) + '\nClosed-eye threshold: ' + eyeClosedThreshold.toFixed(3) + '\n\nAlerts Triggered: ' + alerts + '\nEscalation Level: ' + escalationLevel + '\nHead Nods Detected: ' + headNods + '\nMicrosleeps Detected: ' + microsleeps + '\nPERCLOS: ' + (p.perclos === null ? 'Unavailable' : p.perclos + '%') + '\nDistraction Time: ' + p.distractionSeconds + 's\nAverage Fatigue: ' + p.avgFatigue + '/100\nMax Fatigue: ' + p.maxFatigue + '/100\n\nGPS Enabled: ' + (p.gpsEnabled ? 'Yes' : 'No') + '\nDistance: ' + p.distanceMiles + ' mi\nLast Location: ' + (p.location ? p.location.lat + ', ' + p.location.lng : 'Not available') + '\n\nSync Mode: ' + (cloudConsent.checked && cloudReady ? 'Cloud + Local' : 'Local only') + '\nLocal history: ' + (p.savedAt ? 'Saved' : 'Not saved — copy this report before leaving') + '\nReport generated: ' + new Date().toLocaleString() + '\n\nSafety and liability: Occulert is a supplemental prototype only. It may miss drowsiness, may trigger false alerts, and is not a certified safety, medical, emergency, legal, employment, fleet compliance, or transportation compliance device. Do not interact with the app while driving. If tired or unsafe, pull over and rest.';
-        try {
-            if (!experimentFlags.any && cloudConsent.checked && cloudReady && window.OcculertSync)
-                await window.OcculertSync.saveSessionHistory(p);
-        }
-        catch (e) { }
         log('Session ended');
         if (experimentalClose)
             await experimentalClose;
@@ -511,8 +507,9 @@ export async function handleVisibilityChange(hidden = document.visibilityState =
         pauseUi();
         return true;
     }
-    await stop();
+    const pendingStop = stop();
     showStoppedReason('Monitoring stopped when Occulert left the foreground. Restart only while safely parked.');
+    await pendingStop;
     return true;
 }
 export let yawnCount = 0, lastYawn = 0, _marHist = [], _mouthOpenSince = 0;
@@ -689,3 +686,4 @@ export function set__lastLightCheck(value) { _lastLightCheck = value; return val
 export function set__trackLostSince(value) { _trackLostSince = value; return value; }
 export function set__lastTrackingWarning(value) { _lastTrackingWarning = value; return value; }
 export function set__lastBreakPrompt(value) { _lastBreakPrompt = value; return value; }
+export function set__sessionLog(value) { _sessionLog = value; return value; }

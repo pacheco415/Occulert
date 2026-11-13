@@ -51,12 +51,14 @@ test('Sessions shows one driver\'s recent protected sessions and Escape returns 
   await page.keyboard.press('Escape');
   await expect(panel).toBeHidden();
   await expect(page.locator('#driverDetailList li')).toHaveCount(0);
+  await expect(page.locator('#driverDetailTitle')).toHaveText('Recent sessions');
   await expect(trigger).toBeFocused();
 
   await trigger.click();
   await expect(panel).toBeVisible();
   await page.locator('#driverDetailClose').click();
   await expect(panel).toBeHidden();
+  await expect(page.locator('#driverDetailTitle')).toHaveText('Recent sessions');
 });
 
 test('a failed load shows no sessions and signing out discards the panel', async ({ page }) => {
@@ -74,4 +76,5 @@ test('a failed load shows no sessions and signing out discards the panel', async
   await expect(page.locator('#driverDetailList li')).toHaveCount(0);
   await page.evaluate(() => { window.OcculertBackend.currentUser = () => null; window.dispatchEvent(new StorageEvent('storage', { key: 'occulert-auth' })); });
   await expect(page.locator('#driverDetail')).toBeHidden();
+  await expect(page.locator('#driverDetailTitle')).toHaveText('Recent sessions');
 });
