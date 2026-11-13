@@ -325,6 +325,58 @@ test('a pending consent enable cannot restore runtime sync after newer disable',
   assert.equal(f.storage.get(CONSENT_KEY), 'false');
 });
 
+test('native opt-out persists even when pending-summary removal fails', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  f.asyncStorage.removeItem = async () => { throw new Error('queue removal unavailable'); };
+  assert.equal(await f.api.setCloudSyncEnabled(false), false, 'queue cleanup is still reported as unconfirmed');
+  assert.equal((await f.api.getCloudState()).syncEnabled, false);
+  assert.equal(f.storage.get(CONSENT_KEY), 'false', 'restart must not restore the revoked sharing choice');
+  const restarted = cloudFixture(JSON.parse(f.secure.get(AUTH_KEY)), { consent: f.storage.get(CONSENT_KEY) === 'true' });
+  assert.equal((await restarted.api.getCloudState()).syncEnabled, false);
+  assert.equal(await restarted.api.beginCloudSession(), null);
+  assert.equal(restarted.requests.length, 0);
+});
+
+test('native opt-out persists before stalled pending-summary removal finishes', async () => {
+  const f = cloudFixture(auth('old', 4000000000), { consent: true });
+  const started = deferred(), removal = deferred();
+  f.asyncStorage.removeItem = async key => {
+    started.resolve();
+    await removal.promise;
+    f.storage.delete(key);
+  };
+  const disable = f.api.setCloudSyncEnabled(false);
+  await started.promise;
+  assert.equal(f.storage.get(CONSENT_KEY), 'false', 'killing the app during cleanup must preserve opt-out');
+  removal.resolve();
+  assert.equal(await disable, true);
+});
+
+for (const replacement of ['disable', 'sign-out', 'new login']) {
+  test(`a stale native consent read cannot persist opt-in after ${replacement}`, async () => {
+    const f = cloudFixture(auth('old', 4000000000));
+    const started = deferred(), readConsent = deferred();
+    let delay = true;
+    f.asyncStorage.getItem = async key => {
+      if (key === CONSENT_KEY && delay) {
+        delay = false;
+        started.resolve();
+        return readConsent.promise;
+      }
+      return f.storage.get(key) ?? null;
+    };
+    const enable = f.api.setCloudSyncEnabled(true);
+    await started.promise;
+    if (replacement === 'disable') assert.equal(await f.api.setCloudSyncEnabled(false), true);
+    else if (replacement === 'sign-out') await f.api.signOutOfCloud();
+    else assert.equal((await f.api.signInToCloud('new@example.com', 'password')).ok, true);
+    readConsent.resolve('false');
+    assert.equal(await enable, false);
+    assert.equal(f.storage.get(CONSENT_KEY), 'false', 'a superseded action must never write a new opt-in');
+    assert.equal((await f.api.getCloudState()).syncEnabled, false);
+  });
+}
+
 const HEALTH_KEY = 'occulert.apple-health.readiness.v1';
 function healthFixture() {
   const store = new Map(), queries = [];

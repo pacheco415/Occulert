@@ -62,6 +62,7 @@ export interface CloudState {
   signedIn: boolean;
   email: string | null;
   syncEnabled: boolean;
+  signOutIncomplete?: true;
 }
 
 export interface CloudSessionStats {
@@ -87,6 +88,7 @@ let authCache: StoredAuth | null | undefined;
 let authLoadPromise: Promise<StoredAuth | null> | null = null;
 let authRefreshPromise: Promise<StoredAuth | null> | null = null;
 let authMutationVersion = 0;
+let signOutIncomplete = false;
 const authStorageQueue = createAsyncMutationQueue();
 const cloudSessionScopes = new Map<string, SummaryScope>();
 const sessionOutbox = createSessionSummaryOutbox(AsyncStorage, scope =>
@@ -395,6 +397,7 @@ async function saveAuth(
     if (expectedVersion !== authMutationVersion) return null;
     authMutationVersion += 1;
     authCache = auth;
+    signOutIncomplete = false;
     authRefreshPromise = null;
     if (NATIVE_EVENT_RETRY_ENABLED && previous) {
       const before = nativeEventLogin(previous), after = nativeEventLogin(auth);
@@ -409,26 +412,33 @@ async function saveAuth(
   });
 }
 
-async function clearAuth(): Promise<void> {
+async function clearAuth(): Promise<boolean> {
   consentRuntimeOverride = false;
   consentMutationVersion += 1;
   authMutationVersion += 1;
   authCache = null;
   authRefreshPromise = null;
   cloudSessionScopes.clear();
-  await Promise.allSettled([
+  const clearVersion = authMutationVersion;
+  signOutIncomplete = true;
+  const results = await Promise.allSettled([
     authStorageQueue.run(() => SecureStore.deleteItemAsync(AUTH_KEY, SECURE_OPTIONS)),
     cloudSyncPreference.set(false),
     sessionOutbox.clear(),
     invalidateNativeEventRetry(),
   ]);
+  const complete = results.every(result => result.status === 'fulfilled');
+  // A completed older cleanup must not change the state of a newer login.
+  if (clearVersion === authMutationVersion) signOutIncomplete = !complete;
+  return complete;
 }
 
 function captureSignOutAuth(): Promise<StoredAuth | null> {
-  if (authCache !== undefined) return Promise.resolve(authCache);
+  if (authCache !== undefined && !signOutIncomplete) return Promise.resolve(authCache);
   // A cold sign-out needs the saved session, not loadAuth's stale-read fallback
   // (which could resolve a newer login). Queue this raw snapshot before deletion
   // and later token writes; it never caches or restores the captured credentials.
+  // An explicit retry after failed deletion uses the same isolated snapshot.
   return authStorageQueue.run(async () => {
     try {
       const raw = await withCloudReadDeadline(() => SecureStore.getItemAsync(AUTH_KEY, SECURE_OPTIONS));
@@ -624,6 +634,7 @@ export async function getCloudState(): Promise<CloudState> {
         signedIn: Boolean(auth),
         email: auth?.user.email || null,
         syncEnabled: Boolean(auth) && syncEnabled,
+        ...(signOutIncomplete ? { signOutIncomplete: true as const } : {}),
       };
     });
   } catch {
@@ -686,7 +697,17 @@ export async function signOutOfCloud(): Promise<void> {
   void capturedAuth.then(revokeCapturedSignOutAuth).catch(() => {
     // Runtime auth/consent are already cleared even if revocation is offline.
   });
-  await localClearing;
+  let complete = false;
+  try {
+    // Bound the caller's wait, not the native mutation itself. A timed-out
+    // delete still owns its real queue slot so it cannot erase a newer login.
+    complete = await withCloudReadDeadline(() => localClearing);
+  } catch {
+    // Keep the incomplete marker until actual cleanup or a new login succeeds.
+  }
+  if (!complete) {
+    throw new Error('Sign-out could not be fully saved. Retry before closing the app.');
+  }
 }
 
 function headerSafeAccessToken(value: unknown): value is string {
@@ -726,14 +747,24 @@ export async function setCloudSyncEnabled(enabled: boolean): Promise<boolean> {
   if (consentRevision !== consentMutationVersion) return false;
   if (enabled && !auth) return false;
   const consentVersion = authMutationVersion;
+  const current = () => consentRevision === consentMutationVersion
+    && (!enabled || Boolean(auth && authIsCurrent(auth, consentVersion)));
   try {
-    // Persist native opt-out independently of retry-queue removal failures.
-    if (NATIVE_EVENT_RETRY_ENABLED && !enabled) await cloudSyncPreference.set(false);
-    if (!enabled || !await consentEnabled()) await sessionOutbox.clear();
+    // Persist opt-out before either queue is removed, including the default
+    // path without alert retries. Failed or stalled cleanup must not restore
+    // sharing after the app restarts.
+    if (!enabled) await cloudSyncPreference.set(false);
+    if (!current()) return false;
+    const wasEnabled = enabled ? await consentEnabled() : false;
+    if (!current()) return false;
+    if (!enabled || !wasEnabled) await sessionOutbox.clear();
+    if (!current()) return false;
     await pendingAlertRemoval;
-    if (!NATIVE_EVENT_RETRY_ENABLED || enabled) await cloudSyncPreference.set(enabled);
-    if (consentRevision !== consentMutationVersion) return false;
-    if (enabled && (!auth || !authIsCurrent(auth, consentVersion))) return false;
+    // Every asynchronous prerequisite can outlive a newer opt-out or login.
+    // Check before writing so a stale action cannot persist a new opt-in.
+    if (!current()) return false;
+    if (enabled) await cloudSyncPreference.set(true);
+    if (!current()) return false;
     consentRuntimeOverride = enabled;
     if (enabled) void retryPendingCloudSessions();
     return true;

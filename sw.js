@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v180';
+const CACHE = 'occulert-v196';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -39,7 +39,7 @@ const RUNTIME_ASSETS = [
   }
 ];
 const ALERT_AUDIO_ASSETS = [{ url: '/audio/alert.v1.wav', integrity: 'sha256-3fLbb34F09Mw3TsC1oy1Hkyg6pFnE5K5IbqP3YtPPCI=' }];
-const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v29.js","integrity":"sha256-K+bpXj0z2VMrRYH7x3S23sx0RPGVKSMZG1+cY2WJ+xs="}];
+const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v45.js","integrity":"sha256-P8As88x1otsJoT8cWp3kvuN6Wgs4AQc5Kpskd84k8VU="}];
 const EXPERIMENT_HELPER_ASSETS = [{"url":"/detection-experiments.v6.js","integrity":"sha256-UsKS/z/z68s17TdfXai4h9HOCJqJlny+opCCxBF4+rk="}];
 const TASKS_RUNTIME_ASSETS = [{"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/vision_bundle.js", "integrity": "sha256-pCfCa2tALe6263Th9sdo0m7AzBWWlYyenj1RibfL9ao="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.js", "integrity": "sha256-4XDuZ91OFsGm/NiECiBmh+WlmyLCDkqQK8RFsJVFTXM="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.wasm", "integrity": "sha256-jaJ3pzOSbqzQR0uHBLNnQtbsMjHFeoYMW4id/48d+IY="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.js", "integrity": "sha256-6B1xWj1CzDNzYC6y96/3ldFkk022gOMklrZdq1N/llg="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.wasm", "integrity": "sha256-ooSDzULnToVb9evba0DZtmpbSeNelQILyXZp5oIqMZI="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/face_landmarker.task", "integrity": "sha256-ZBhOIpsmMQe8K4BMZiXbE0H/K7cxh0sLzC/mVE4Lyf8="}];
 const DRIVER_I18N_ASSETS = [{url:'/driver-i18n.v1.js',integrity:"sha256-ZhTSOu5L3A6qve3fwfbqnT6OPkzBm2zVJa/lhSLduGg="}];
@@ -80,7 +80,7 @@ const STATIC_ASSETS = [
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v69.css',
-  '/driver-app.v108.js',
+  '/driver-app.v124.js',
   '/lang.v48.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
@@ -133,9 +133,9 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passwordless-auth.v62.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
-  '/driver-startup-guard.v29.js',
+  '/driver-startup-guard.v45.js',
   '/driver-app.v60.js',
-  '/driver-app.v108.js',
+  '/driver-app.v124.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
   ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
@@ -147,10 +147,24 @@ const CRITICAL_OFFLINE_ASSETS = [
   '/base.v47.css',
   '/app.html',
   '/driver-app.v69.css',
-  '/driver-app.v108.js',
+  '/driver-app.v124.js',
 ];
+const QUERY_INDEPENDENT_ASSETS = new Set([...STATIC_ASSETS, ...RUNTIME_INTEGRITY.keys()]);
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;
+
+function offlineCacheKey(request) {
+  const url = new URL(request.url);
+  if (!url.search) return request;
+  // Only installed static shells and pinned runtimes have query-independent
+  // bytes. Never reuse arbitrary query-bearing responses or login-link URLs.
+  return QUERY_INDEPENDENT_ASSETS.has(url.pathname) ? new URL(url.pathname, url.origin).href : null;
+}
+
+function matchOfflineResponse(request) {
+  const key = offlineCacheKey(request);
+  return key ? caches.match(key) : Promise.resolve(undefined);
+}
 
 function settleWithin(promise, timeoutMs, fallback = null) {
   return new Promise(resolve => {
@@ -208,13 +222,16 @@ function completeNetworkResponse(response, isPending) {
 }
 
 function cacheResponseBestEffort(request, response, timeoutMs = CACHE_WRITE_TIMEOUT_MS) {
+  // Do not persist query values (which may contain sign-in credentials) or
+  // replace an installed canonical response with query-dependent network data.
+  if (new URL(request.url).search) return Promise.resolve();
   let copy;
   try {
     copy = response.clone();
   } catch (error) {
     return Promise.resolve();
   }
-  const update = caches.open(CACHE).then(cache => cache.put(request, copy));
+  const update = Promise.resolve().then(() => caches.open(CACHE)).then(cache => cache.put(request, copy));
   return settleWithin(update, timeoutMs);
 }
 
@@ -291,8 +308,8 @@ self.addEventListener('notificationclick', event => {
 
 // Optional runtimes verify cached bytes too: a cached corrupt model is unusable.
 async function verifiedOptionalResponse(request, path) {
- const pin=RUNTIME_INTEGRITY.get(path),cached=await caches.match(request);
- if(cached){try{const bytes=await cached.clone().arrayBuffer(),hash=await crypto.subtle.digest('SHA-256',bytes);let binary='';for(const b of new Uint8Array(hash))binary+=String.fromCharCode(b);if('sha256-'+btoa(binary)===pin)return cached}catch(_){}const cache=await caches.open(CACHE);await cache.delete(request)}
+ const pin=RUNTIME_INTEGRITY.get(path),key=offlineCacheKey(request),cached=await matchOfflineResponse(request);
+ if(cached){try{const bytes=await cached.clone().arrayBuffer(),hash=await crypto.subtle.digest('SHA-256',bytes);let binary='';for(const b of new Uint8Array(hash))binary+=String.fromCharCode(b);if('sha256-'+btoa(binary)===pin)return cached}catch(_){}const cache=await caches.open(CACHE);await cache.delete(key)}
  const response=await fetchWithDeadline(new Request(request,{integrity:pin}),15000,undefined,completeNetworkResponse);
  if(response?.ok)await cacheResponseBestEffort(request,response);
  return response||Response.error();
@@ -303,7 +320,7 @@ self.addEventListener('message',event=>{
 self.addEventListener('fetch', event => {
   const req = event.request;
 
-  if (req.method !== 'GET') return;
+  if (req.method !== 'GET' || req.headers?.has('authorization') || req.headers?.has('range')) return;
   const url = new URL(req.url);
   // Let the browser handle foreign requests without consulting the app cache.
   if (url.origin !== self.location.origin) return;
@@ -333,14 +350,14 @@ self.addEventListener('fetch', event => {
     event.respondWith((async () => {
       const networkResponse = await networkAttempt;
       if (networkResponse && networkResponse.ok) return networkResponse;
-      const cachedResponse = await caches.match(req);
+      const cachedResponse = await matchOfflineResponse(req);
       if (cachedResponse) return cachedResponse;
       return networkResponse || Response.error();
     })());
     return;
   }
 
-  if (url.origin === self.location.origin && (req.mode === 'navigate' || req.url.endsWith('.html'))) {
+  if (url.origin === self.location.origin && (req.mode === 'navigate' || url.pathname.endsWith('.html'))) {
     const networkAttempt = fetchWithDeadline(req, NETWORK_FIRST_TIMEOUT_MS, undefined, completeNetworkResponse);
     const cacheUpdate = networkAttempt
       .then(response => response && response.ok ? cacheResponseBestEffort(req, response) : null)
@@ -349,20 +366,20 @@ self.addEventListener('fetch', event => {
     event.respondWith((async () => {
       const networkResponse = await networkAttempt;
       if (networkResponse && networkResponse.ok) return networkResponse;
-      const cachedResponse = await caches.match(req) || await caches.match('/index.html');
+      const cachedResponse = await matchOfflineResponse(req) || await caches.match('/index.html');
       return cachedResponse || networkResponse || Response.error();
     })());
     return;
   }
 
   event.respondWith(
-    caches.match(req).then(match => {
+    matchOfflineResponse(req).then(match => {
       if (match) return match;
       const integrity = url.origin === self.location.origin && RUNTIME_INTEGRITY.get(url.pathname);
       return fetch(integrity ? new Request(req, { integrity }) : req).then(res => {
         if (res && res.ok && url.origin === self.location.origin) {
-          const copy = res.clone();
-          caches.open(CACHE).then(cache => cache.put(req, copy));
+          const update = cacheResponseBestEffort(req, res);
+          if (typeof event.waitUntil === 'function') event.waitUntil(update);
         }
         return res;
       }).catch(() => {

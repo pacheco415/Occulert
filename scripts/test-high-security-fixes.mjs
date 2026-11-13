@@ -139,7 +139,7 @@ test('web copy and runtime disclose and enforce foreground-only monitoring', asy
   assert.match(howItWorks, /open in the foreground/i);
   assert.match(app, /async function handleVisibilityChange/);
   assert.match(app, /Monitoring stopped because Occulert left the foreground/);
-  assert.match(app, /await stop\(\)/);
+  assert.match(app, /const pendingStop\s*=\s*stop\(\)/);
   assert.match(app, /Do not interact with the app while driving/);
   assert.match(appPage, /Supplemental prototype only/);
 
