@@ -38,15 +38,17 @@ for (const query of ['', '?calibration-min=12&calibration-min=12','?calibration-
     assert.deepEqual([...flags.names],[]);
 });
 test('actual compiled cloud entrypoints cannot contact a provider under the calibration-only flag', async () => {
-    const {flags}=selection('?calibration-min=12'),calls=[];
+    const {flags}=selection('?calibration-min=12'),calls=[],localWrites=[];
     const context={experimentFlags:flags,cloudConsent:{checked:true},cloudReady:true,running:true,sessionStart:1,lastFleetPush:0,
-        FLEET_PUSH_INTERVAL:5000,Date,Promise,syncEl:{textContent:''},localStorage:{setItem(){}},
-        window:{OcculertBackend:new Proxy({}, {get:(_target,key)=>()=>{calls.push(key);throw Error('Cloud call under parked calibration');}}),
-            OcculertSync:{saveLiveSession:()=>{calls.push('fleet');throw Error('Fleet call under parked calibration');}}},
+        FLEET_PUSH_INTERVAL:5000,Date,Promise,syncEl:{textContent:''},localStorage:{setItem:(...args)=>localWrites.push(args)},
+        window:{OcculertBackend:new Proxy({}, {get:(_target,key)=>()=>{calls.push(key);throw Error('Cloud call under parked calibration');}})},
         set_lastFleetPush:value=>{context.lastFleetPush=value;},set_cloudReady:value=>{context.cloudReady=value;}};
-    const names=['beginBackendSession','queueBackendEvent','pushFleet','initCloud'];
+    const names=['beginBackendSession','queueBackendEvent','finishBackendSession','retryCloudSummaries','getCloudSummaryOutbox','cloudSummaryScope','pushFleet','initCloud'];
     const functions=ast.body.filter(node=>node.type==='FunctionDeclaration'&&names.includes(node.id.name));
     vm.createContext(context);vm.runInContext(functions.map(node=>compiled.code.slice(node.start,node.end)).join('\n'),context);
     assert.equal(await context.beginBackendSession(),null);context.queueBackendEvent('drowsy');
+    await context.finishBackendSession({}, {id:'parked-session',scope:{ownerId:'ordinary',revision:0},consented:true,eventQueue:Promise.resolve()});
+    await context.retryCloudSummaries();assert.equal(context.getCloudSummaryOutbox(),null);assert.equal(context.cloudSummaryScope(),null);
     await context.pushFleet(true,{});await context.initCloud();assert.deepEqual(calls,[]);assert.equal(context.cloudReady,false);
+    assert.deepEqual(localWrites,[['occulert-live-session','{}']]);
 });

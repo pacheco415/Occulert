@@ -1,9 +1,33 @@
 import { test, expect } from '@playwright/test';
+import { SUPABASE_HOST } from '../scripts/lib/csp-policy.mjs';
 
-async function openProbe(page, query, audioState = 'running') {
+const cloudSessionId = '33333333-3333-4333-8333-333333333333';
+
+async function openProbe(page, query, audioState = 'running', cloudRequests = null) {
   await page.clock.install({ time: new Date('2026-10-12T05:00:00Z') });
   await page.clock.pauseAt(new Date('2026-10-12T05:01:00Z'));
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+  if (cloudRequests) {
+    // Keep the shipped backend, authentication lifecycle and event sender.
+    // Only the provider responses are fixtures; no production request leaves the page.
+    await page.addInitScript(() => localStorage.setItem('occulert-auth', JSON.stringify({
+      access_token: 'alert-label-access-token', refresh_token: 'alert-label-refresh-token',
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: '11111111-1111-4111-8111-111111111111', email: 'driver@example.invalid' },
+    })));
+    await page.route('**/api/public-config', route => route.fulfill({ json: {
+      ok: true, supabase: { configured: true, url: `https://${SUPABASE_HOST}`, anonKey: 'public-test-key' },
+    } }));
+    await page.route('**/api/sessions', async route => {
+      cloudRequests.sessions.push({ method: route.request().method(), authorization: route.request().headers().authorization });
+      await route.fulfill({ json: { ok: true, session: { id: cloudSessionId } } });
+    });
+    await page.route('**/api/events', async route => {
+      const body = route.request().postDataJSON();
+      cloudRequests.events.push({ body, authorization: route.request().headers().authorization });
+      await route.fulfill({ json: { ok: true, event: { id: 'alert-label-event', session_id: body.session_id } } });
+    });
+  }
   await page.addInitScript(state => {
     const probe = window.strongAudioProbe = { oscillators: [], players: [], session: { type: 'auto' } };
     Object.defineProperty(navigator, 'audioSession', { configurable: true, value: probe.session });
@@ -94,20 +118,30 @@ for (const query of ['', '?alert-pattern=strong']) {
   for (const sharing of [false, true]) {
     for (const level of [3, 4]) {
       test(`${query ? 'strong' : 'ordinary'} level ${level} gives truthful guidance with cloud sharing ${sharing ? 'on' : 'off'}`, async ({ page }) => {
-        await openProbe(page, query);
-        await page.evaluate(({ level, sharing }) => {
+        const cloudRequests = { sessions: [], events: [] };
+        await openProbe(page, query, 'running', cloudRequests);
+        await page.evaluate(async ({ level, sharing }) => {
           cloudConsent.checked = sharing;
-          cloudReady = sharing;
+          cloudConsent.dispatchEvent(new Event('change'));
+          await initCloud();
           sessionStart = Date.now() - 60_000;
-          window.alertLabelCloudSaves = 0;
-          window.OcculertSync = { saveLiveSession: async () => { window.alertLabelCloudSaves++; } };
-          running = true; calibrating = false; confidence = 70; lastAlert = 0;
+          running = true; calibrating = false; confidence = 70; fatigue = 83; lastAlert = 0;
+          await beginBackendSession();
           lastEscalation = Date.now(); escalationLevel = level - 1;
           beginAlertAudioScope(); trigger('Fatigue');
+          await backendEventQueue;
         }, { level, sharing });
         await expect(page.locator('#cloudConsent')).toBeChecked({ checked: sharing });
         expect(await page.evaluate(() => cloudReady)).toBe(sharing);
-        await expect.poll(() => page.evaluate(() => window.alertLabelCloudSaves)).toBe(sharing ? 1 : 0);
+        expect(cloudRequests.sessions).toHaveLength(sharing ? 1 : 0);
+        expect(cloudRequests.events).toHaveLength(sharing ? 1 : 0);
+        if (sharing) {
+          expect(cloudRequests.sessions[0]).toEqual({ method: 'POST', authorization: 'Bearer alert-label-access-token' });
+          expect(cloudRequests.events[0]).toEqual({ authorization: 'Bearer alert-label-access-token', body: {
+            session_id: cloudSessionId, type: 'drowsy', fatigue_score: 83, confidence: 70,
+            occurred_at: '2026-10-12T05:01:00.000Z',
+          } });
+        }
         await expect(page.locator('#alertTitle')).toHaveText(level === 3 ? 'STRONG ALERT' : 'PULL OVER NOW');
         await expect(page.locator('#alertSub')).toHaveText('Pull over safely and rest');
         await expect(page.locator('#alertScreen')).not.toContainText(/fleet|saved|emergency|confirm safety/i);
