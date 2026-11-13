@@ -8,7 +8,7 @@ import { beginBackendSession, detachBackendSession, finishBackendSession, pushFl
 export const start = startMonitoring;
 export const stop = stopMonitoring;
 // Generated from the final driver asset mapping by the release tool.
-export const WEB_APP_VERSION = 'web-v111';
+export const WEB_APP_VERSION = 'web-v119';
 export const EXPERIMENT_HELPER_INTEGRITY = "sha256-Hf2msYDcgvAiU9WqDGZAonEMh6FND4vEIuc/iKDNR2k=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
@@ -605,7 +605,7 @@ export function loadExperimentController() {
     }
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/detection-experiments.v8.js';
+        script.src = '/detection-experiments.v10.js';
         script.integrity = EXPERIMENT_HELPER_INTEGRITY;
         script.crossOrigin = 'anonymous';
         const timer = setTimeout(() => { script.remove(); reject(Error('Parked helper timed out')); }, 7000);

@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v173';
+const CACHE = 'occulert-v184';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -39,8 +39,8 @@ const RUNTIME_ASSETS = [
   }
 ];
 const ALERT_AUDIO_ASSETS = [{ url: '/audio/alert.v1.wav', integrity: 'sha256-3fLbb34F09Mw3TsC1oy1Hkyg6pFnE5K5IbqP3YtPPCI=' }];
-const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v32.js","integrity":"sha256-sktYn0XftDys7Wf+UwCErQ3/cIFjj1MBKxR7df2c/jY="}];
-const EXPERIMENT_HELPER_ASSETS = [{"url":"/detection-experiments.v8.js","integrity":"sha256-Hf2msYDcgvAiU9WqDGZAonEMh6FND4vEIuc/iKDNR2k="}];
+const STARTUP_GUARD_ASSETS = [{"url":"/driver-startup-guard.v40.js","integrity":"sha256-PfH2h4mxBdZukNKFheXk+OV2uVV9tWfVZrxU2PtazKI="}];
+const EXPERIMENT_HELPER_ASSETS = [{"url":"/detection-experiments.v10.js","integrity":"sha256-Hf2msYDcgvAiU9WqDGZAonEMh6FND4vEIuc/iKDNR2k="}];
 const TASKS_RUNTIME_ASSETS = [{"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/vision_bundle.js", "integrity": "sha256-pCfCa2tALe6263Th9sdo0m7AzBWWlYyenj1RibfL9ao="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.js", "integrity": "sha256-4XDuZ91OFsGm/NiECiBmh+WlmyLCDkqQK8RFsJVFTXM="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_internal.wasm", "integrity": "sha256-jaJ3pzOSbqzQR0uHBLNnQtbsMjHFeoYMW4id/48d+IY="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.js", "integrity": "sha256-6B1xWj1CzDNzYC6y96/3ldFkk022gOMklrZdq1N/llg="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/wasm/vision_wasm_nosimd_internal.wasm", "integrity": "sha256-ooSDzULnToVb9evba0DZtmpbSeNelQILyXZp5oIqMZI="}, {"url": "/vendor/mediapipe/tasks-vision-1.0.1-occulert.1/face_landmarker.task", "integrity": "sha256-ZBhOIpsmMQe8K4BMZiXbE0H/K7cxh0sLzC/mVE4Lyf8="}];
 const DRIVER_I18N_ASSETS = [{url:'/driver-i18n.v1.js',integrity:"sha256-ZhTSOu5L3A6qve3fwfbqnT6OPkzBm2zVJa/lhSLduGg="}];
 const OPTIONAL_ASSETS = [...EXPERIMENT_HELPER_ASSETS, ...TASKS_RUNTIME_ASSETS, ...DRIVER_I18N_ASSETS];
@@ -80,7 +80,7 @@ const STATIC_ASSETS = [
   '/homepage.v67.js',
   '/public-guidance.v67.css',
   '/driver-app.v69.css',
-  '/driver-app.v111.js',
+  '/driver-app.v119.js',
   '/lang.v48.js',
   '/security-utils.v47.js',
   '/static-page.v60.js'
@@ -121,7 +121,7 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v87.js',
   '/occulert-backend.v88.js',
   '/occulert-backend.v89.js',
-  '/occulert-backend.v90.js',
+  '/occulert-backend.v93.js',
   '/occulert-backend.v92.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
@@ -133,11 +133,12 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/passwordless-auth.v60.js',
   '/passwordless-auth.v61.js',
   '/passwordless-auth.v62.js',
+  '/occulert-backend.v90.js',
 ]);
 const NETWORK_FIRST_ASSETS = new Set([
-  '/driver-startup-guard.v32.js',
+  '/driver-startup-guard.v40.js',
   '/driver-app.v60.js',
-  '/driver-app.v111.js',
+  '/driver-app.v119.js',
 ]);
 const CRITICAL_OFFLINE_ASSETS = [
   ...STARTUP_GUARD_ASSETS.map(asset => asset.url),
@@ -149,7 +150,7 @@ const CRITICAL_OFFLINE_ASSETS = [
   '/base.v47.css',
   '/app.html',
   '/driver-app.v69.css',
-  '/driver-app.v111.js',
+  '/driver-app.v119.js',
 ];
 const NETWORK_FIRST_TIMEOUT_MS = 2500;
 const CACHE_WRITE_TIMEOUT_MS = 1000;
