@@ -33,7 +33,7 @@ test('manager priorities explain zero, unknown scores and coverage without imply
   await expect(queue.locator('.ops-row').filter({hasText:'New Driver'})).toContainText('voluntary sharing while parked');
   await expect(queue.locator('.ops-row').filter({hasText:'Older Record'})).toContainText('does not show current driving status');
   await expect(queue).not.toContainText('Inactive Driver');
-  await expect(coverage.locator('.ops-row').filter({hasText:'Active drivers'})).toContainText('4');
+  await expect(coverage.locator('.ops-row').filter({hasText:'Active roster drivers'})).toContainText('4');
   await expect(coverage.locator('.ops-row').filter({hasText:'With a loaded session'})).toContainText('3/4');
   await expect(coverage.locator('.ops-row').filter({hasText:'Latest score missing'})).toContainText('1');
   await expect(coverage).not.toContainText('Live coverage');

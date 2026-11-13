@@ -30,6 +30,7 @@ and dated release notes preserve historical evidence.
 - [Self-hosted MediaPipe runtime](MEDIAPIPE_RUNTIME.md)
 - [Passwordless profile onboarding](PASSKEY_ONBOARDING.md)
 - [Dated technical audit](AUDIT.md)
+- [November 8 native release intent for the next TestFlight build](RELEASE_2026-11-08.md)
 - [September 21 release evidence](RELEASE_2026-09-21.md)
 - [September 21 source stabilization record](SOURCE_STABILIZATION_2026-09-21.md)
 
