@@ -16,6 +16,14 @@ const PIPELINES = new Set(["web_mediapipe_ear", "ios_mlkit_eye_probability", "an
 
 const { json } = require("./_lib/responses");
 
+// Free-text client labels. Postgres text cannot store NUL or an unpaired
+// surrogate, so either one failed the whole session start as a provider
+// error. Non-strings are unknown, not coerced into "[object Object]".
+function labelText(value, maxLength) {
+  if (typeof value !== "string") return null;
+  return value.replace(/\0/g, "").slice(0, maxLength).toWellFormed() || null;
+}
+
 function provenanceText(value, maxLength) {
   if (typeof value !== "string") return null;
   const text = value.trim();
@@ -74,8 +82,8 @@ module.exports = async function handler(request, response) {
         body: {
           p_user_id: user.id,
           p_session_id: hasClientId ? body.session_id : null,
-          p_device: body.device ? String(body.device).slice(0, 120) : null,
-          p_browser: body.browser ? String(body.browser).slice(0, 240) : null,
+          p_device: labelText(body.device, 120),
+          p_browser: labelText(body.browser, 240),
           p_detector_pipeline: PIPELINES.has(body.detector_pipeline) ? body.detector_pipeline : null,
           p_detector_version: provenanceText(body.detector_version, 80),
           p_app_version: provenanceText(body.app_version, 80),
