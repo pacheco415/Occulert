@@ -267,6 +267,15 @@ test('stable distraction confidence has exact independent and combined flag sema
  }
 });
 
+test('turned eye exclusion requires an exact, non-primary parked flag',()=>{
+ const flags=parseFlags('?perclos-turn=exclude');
+ assert.equal(flags.any,true);assert.equal(flags.primary,false);assert.equal(flags.perclosTurn,true);
+ assert.deepEqual(flags.names,['perclosTurn']);
+ const combined=parseFlags('?perclos-turn=exclude&perclos=time');
+ assert.equal(combined.primary,true);assert.deepEqual(combined.names,['perclosTurn','timePerclos']);
+ for(const query of ['?perclos-turn=exclude&perclos-turn=exclude','?perclos-turn=exclude&perclos-turn=keep','?perclos-turn=Exclude','?perclos-turn=true','?perclos-turn=exclude%20'])assert.equal(parseFlags(query).any,false,query);
+});
+
 test('Tasks parsing records unsupported signals as null and rejects duplicate or invalid coefficients', () => {
   const result = { faceLandmarks: [[{}]], faceBlendshapes: [{ categories: [
     {categoryName:'eyeBlinkLeft',score:.2},{categoryName:'eyeBlinkRight',score:.8},{categoryName:'jawOpen',score:.3}

@@ -8,6 +8,7 @@ These opt-in web experiments are for stationary software evaluation. The empty-q
 | `ear-units=pixels` | Measure landmark distances in video pixels and recalibrate on resolution/orientation changes. |
 | `noface-escalation=1` | Request the existing full alert once when face loss follows closed eyes, WATCH fatigue (35), or a downward nose estimate within 3 seconds; freeze fatigue decay for that qualified loss episode. |
 | `perclos=time` | Compute closed / usable observed milliseconds in a 60-second window, rather than a fraction of frames. |
+| `perclos-turn=exclude` | Exclude turned observations from frame-count PERCLOS and reset closed-eye continuity during the turn. |
 | `pitch-gate=1` | Calibrate a dimensionless neutral nose/eye/chin ratio while parked; pause eye/microsleep evidence while down or while calibrated pitch geometry is unknown. |
 | `calibration-min=12` | Keep the released calibration formula but require at least 12 samples; local-only and non-primary, identified as `calibrationMin`. |
 | `distraction-confidence=stable` | Use the calibrated confidence rule during a tracked head turn even after calibration falls back to defaults. |
@@ -146,6 +147,31 @@ combined with the other parked modes. Used alone, it retains the ordinary
 scoring path; primary experimental modes apply the same confidence rule in
 their controller. Keep it off by default until labeled parked evaluation
 supports changing the released behavior.
+
+## Parked turned-eye exclusion
+
+`perclos-turn=exclude` treats eye evidence from a turned face as excluded from
+frame-count PERCLOS. It appends neither closed nor open samples during the turn.
+Earlier samples remain until their normal 60-second expiry, and each excluded
+frame clears the continuous closed-eye start time. The first frontal closed
+observation starts a new interval; a turn cannot join two closed intervals into
+a microsleep. Already counted microsleeps and the existing cooldown remain.
+
+Used alone, the flag retains the ordinary scoring path. Combined primary modes
+apply the same exclusion through the shared eye metrics or pitch controller.
+The existing `perclos=time` policy already treats turns as unknown, so adding
+this flag leaves that policy's state unchanged. The ordinary frame-count path
+keeps its legacy numeric-zero display for an empty window; that sentinel does
+not establish observed open eyes. No synthetic open samples are inserted.
+
+The flag is exact, default off, locally identified as `perclosTurn`, and disables
+cloud sharing with the other parked experiments. It does not change confidence,
+distraction timing, the head-turn fatigue increment, alert priority or thresholds.
+The [scoring replay](SCORING_REPLAY.md) compares `released` and
+`perclos-turn-exclude` on a synthetic 25-second turned low-EAR interval, followed
+by frontal closure. Tests verify exclusion, window expiry and a fresh closure
+longer than 1500 ms after recovery. These checks validate software behavior;
+independently labeled parked data is still required to evaluate the hypothesis.
 
 ## Independent stronger-alert audio option
 

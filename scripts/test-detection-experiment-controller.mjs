@@ -90,6 +90,16 @@ test('pitch without sufficient parked baseline falls back to current thresholds 
   assert.equal(h.state.eyeClosedThreshold,.18);scoreAt(h,10135,{ear:.08,ratio:.7});assert.ok(h.state.fatigue>0);
 });
 
+test('pitch frame-count PERCLOS excludes turns only when selected and expires retained samples',()=>{
+ const base=fixture('?pitch-gate=1',observerModels),excluded=fixture('?pitch-gate=1&perclos-turn=exclude',observerModels);
+ for(const h of [base,excluded]){calibrate(h);scoreAt(h,3400,{ear:.3});scoreAt(h,3550,{ear:.08});}
+ const count=excluded.state.perclosWindow.length;
+ for(let at=3700;at<=7000;at+=150)for(const h of [base,excluded])scoreAt(h,at,{ear:.08,turned:true});
+ assert.equal(excluded.state.perclosWindow.length,count);assert.ok(base.state.perclosWindow.length>count);
+ assert.equal(excluded.state.eyesClosedSince,0);assert.equal(excluded.state.microsleeps,0);
+ scoreAt(excluded,64000,{ear:.08,turned:true});assert.equal(excluded.state.perclosWindow.length,0);
+});
+
 test('elapsed rates preserve the 135ms accumulation; time PERCLOS uses supported time and resets gaps',()=>{
   const h=fixture('?fatigue-timing=elapsed&perclos=time');scoreAt(h,0,{ear:.08});assert.equal(h.state.fatigue,0);
   scoreAt(h,135,{ear:.08});assert.equal(h.state.fatigue,17);

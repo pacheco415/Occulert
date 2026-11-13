@@ -114,7 +114,7 @@ export function resetContinuousObservations() {
     distractionEl.textContent = Math.round(totalDistractionMs / 1000) + 's';
 }
 export function updateEyeMetrics(ear, turned) {
-    const result = scoringEyeMetrics(scoringMetricState(), ear, turned, scoringReadWallClock('eye'));
+    const result = scoringEyeMetrics(scoringMetricState(), ear, turned, scoringReadWallClock('eye'), experimentFlags.perclosTurn);
     scoringApplyMetricState(result.state);
     perclosEl.textContent = result.perclos + '%';
     if (result.microsleep) {
