@@ -109,8 +109,9 @@ and all Vercel connection policies together and verify `/api/public-config`.
 The iPhone app pins the same host in `native-app/lib/supabaseHost.ts` and refuses
 any other project, so moving projects also needs a new native build;
 `npm run test:native-cloud` fails until both constants match.
-Retained old SDK loaders require their documented CDN compatibility grant during
-the existing 14-day retention window; remove it after the reference audit passes.
+Both policies allow scripts from this site only and connections to this site and
+that project only; `npm run test:page-actions` rejects any other host. The old SDK
+loader's CDN compatibility grant was retired on 2026-11-12 and must not return.
 
 The driver now uses the bundled source mode described in
 [docs/DRIVER_MODULES.md](docs/DRIVER_MODULES.md). Edit its domain modules and entry,
