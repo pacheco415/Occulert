@@ -150,11 +150,19 @@ export function CloudSyncCard() {
 
   const signOut = () => {
     runBusyAction(async () => {
-      await signOutOfCloud();
+      let incomplete = false;
+      try {
+        await signOutOfCloud();
+      } catch {
+        incomplete = true;
+      }
       if (!mountedRef.current) return;
       setEmail('');
       setPassword('');
-      await refresh();
+      const confirmed = await refresh();
+      if (incomplete && visible() && (!confirmed || stateRef.current?.signOutIncomplete)) {
+        Alert.alert('Sign-out incomplete', 'Sharing is off in this open app, but saved sign-in or sharing settings could not be fully cleared. They may return after restarting. Retry sign-out before closing the app.');
+      }
     });
   };
 
@@ -213,7 +221,7 @@ export function CloudSyncCard() {
         {busy
           ? <ActivityIndicator accessibilityLabel="Checking cloud sync status" size="small" color="#60a5fa" />
           : <Text accessibilityLiveRegion="polite" accessibilityRole="text" style={[s.status, state?.signedIn && s.statusOn]}>
-              {state?.signedIn ? 'SIGNED IN' : state ? 'OPTIONAL' : 'UNCONFIRMED'}
+              {state?.signOutIncomplete ? 'SIGN-OUT INCOMPLETE' : state?.signedIn ? 'SIGNED IN' : state ? 'OPTIONAL' : 'UNCONFIRMED'}
             </Text>}
       </View>
 
@@ -242,7 +250,27 @@ export function CloudSyncCard() {
         </View>
       )}
 
-      {state && !state.signedIn && (
+      {state?.signOutIncomplete && (
+        <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={s.statusCheck}>
+          <Text style={s.label}>Finish signing out</Text>
+          <Text style={s.statusDetail}>
+            Sharing is off in this open app. Saved sign-in or sharing settings could not be fully cleared and may return after restarting. Retry before closing the app.
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Retry incomplete cloud sign-out"
+            accessibilityHint="Retries removing saved sign-in and sharing settings from this device"
+            accessibilityState={{ disabled: busy, busy }}
+            disabled={busy}
+            onPress={signOut}
+            style={[s.retryBtn, busy && s.disabled]}
+          >
+            <Text style={s.linkText}>Retry sign-out</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {state && !state.signedIn && !state.signOutIncomplete && (
         <View style={s.form}>
           <Text style={s.formIntro}>
             Sign in with an existing Occulert driver account and its password. Monitoring and local history work without an account.

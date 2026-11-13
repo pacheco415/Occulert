@@ -277,15 +277,6 @@
       ]
     },
     {
-      "source": "/(.*)\\.v49\\.(js|css)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
       "source": "/vendor/inter-5.3.0/(.*)",
       "headers": [
         {
@@ -682,7 +673,25 @@
       ]
     },
     {
-      "source": "/(.*)\\.v115\\.(js|css)",
+      "source": "/(.*)\\.v124\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v10\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v45\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -692,6 +701,24 @@
     },
     {
       "source": "/(.*)\\.v8\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v11\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v115\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -746,6 +773,33 @@
     },
     {
       "source": "/(.*)\\.v44\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v128\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v12\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v49\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",

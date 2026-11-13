@@ -83,7 +83,9 @@ function fetchTextWithDeadline(url, options, maxBytes) {
     }
     Promise.resolve().then(() => {
       if (settled) return;
-      return fetch(url, Object.assign({}, options, { signal: controller.signal }));
+      // The apikey header is not stripped like Authorization on cross-origin
+      // redirects. Never forward service credentials or a mutation elsewhere.
+      return fetch(url, Object.assign({}, options, { redirect: 'error', signal: controller.signal }));
     }).then(async response => {
       if (settled) return;
       let text;

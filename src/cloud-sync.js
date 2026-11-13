@@ -295,14 +295,6 @@ export async function pushFleet(force = false, payload) {
         log('Local session snapshot could not be saved. Copy the session report before leaving.');
         return;
     }
-    if (!experimentFlags.any && cloudConsent.checked && cloudReady && window.OcculertSync) {
-        try {
-            await window.OcculertSync.saveLiveSession(p);
-        }
-        catch (error) {
-            log('Cloud latest-session sync unavailable - local copy kept');
-        }
-    }
 }
 export async function initCloud() {
     if (experimentFlags.any) {

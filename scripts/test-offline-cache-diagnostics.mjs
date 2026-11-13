@@ -80,7 +80,8 @@ test('offline test retains assertions and timeout, records before transition and
   assert.match(section, /throw error/);
   assert.match(section, /diagnostics\.stop\(\)/);
   assert.match(section, /await expectNoPermissionedWork\(page\)/);
-  assert.equal((section.match(/toBeEnabled\(\)/g) || []).length, 2);
+  assert.equal((section.match(/toBeEnabled\(\)/g) || []).length, 3);
+  assert.match(section, /page\.goto\(origin \+ '\/app\.html\?lang=es'/);
 });
 
 

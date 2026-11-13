@@ -30,6 +30,7 @@
     "test:watch-status",
     "test:fleet-history",
     "test:fleet-display",
+    "test:fleet-driver-detail",
     "test:pilot-launch",
     "test:pilot-report",
     "test:login",

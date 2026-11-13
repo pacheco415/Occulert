@@ -360,7 +360,7 @@ export function trigger(reason, eligibility) {
         try {
             const _ntitle = distracted ? 'Occulert ⚠️ Distraction Alert' : 'Occulert ⚠️ Drowsiness Alert';
             const _nbody = distracted ? 'Eyes on the road. Pull over safely if you need to.' : escalationLevel >= 3 ? 'Pull over safely — confirm safety now' : 'Stay alert! Drowsiness detected.';
-            const _nopts = { body: _nbody, icon: '/occulert-logo-main-192.png', badge: '/occulert-logo-main-96.png', tag: 'occulert-alert-' + Date.now(), silent: false, vibrate: escalationLevel >= 3 ? [700, 150, 700, 150, 700] : [500, 150, 500], requireInteraction: escalationLevel >= 3 };
+            const _nopts = { body: _nbody, icon: '/occulert-logo-main-192.png', badge: '/occulert-logo-main-96.png', tag: 'occulert-alert', renotify: true, silent: false, vibrate: escalationLevel >= 3 ? [700, 150, 700, 150, 700] : [500, 150, 500], requireInteraction: escalationLevel >= 3 };
             if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                 navigator.serviceWorker.ready.then(reg => reg.showNotification(_ntitle, _nopts)).catch(() => {
                     try {
