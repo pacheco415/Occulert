@@ -9,13 +9,13 @@ const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const { validJsonBody } = require("./_lib/validation");
+const { validJsonBody, storableText } = require("./_lib/validation");
 const MAX_BODY_LENGTH = 2048;
 
 const { json } = require("./_lib/responses");
 
 function clean(value, max) {
-  return String(value || "").replace(/\0/g, "").trim().slice(0, max);
+  return storableText(value, max);
 }
 
 function validBody(request) {
@@ -64,10 +64,14 @@ module.exports = async function handler(request, response) {
 
     const rows = await pgFetch("fleets", {
       method: "POST",
+      params: { select: "id,company_name,plan,created_at" },
       body: { company_name: companyName, owner_user_id: user.id, plan: "trial" },
     });
     if (!rows.length) return json(response, 502, { ok: false, error: "fleet_not_saved" });
-    return json(response, 201, { ok: true, created: true, fleet: rows[0] });
+    const saved = rows[0];
+    return json(response, 201, { ok: true, created: true, fleet: {
+      id: saved.id, company_name: saved.company_name, plan: saved.plan, created_at: saved.created_at,
+    } });
   } catch (error) {
     if (error && error.details && error.details.code === "23505") {
       try {
