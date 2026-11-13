@@ -26,7 +26,7 @@ const MAX_EMAIL_LENGTH = 240;
 // typed into a different, valid one that someone else controls.
 function normalizedEmail(value) {
   const email = String(value || "").trim().toLowerCase();
-  return email.length <= MAX_EMAIL_LENGTH && !email.includes("\0") &&
+  return email.length <= MAX_EMAIL_LENGTH && !email.includes("\0") && email.isWellFormed() &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
 }
 
@@ -84,6 +84,7 @@ module.exports = async function handler(request, response) {
       const rows = await pgFetch("fleet_invitations", {
         method: "PATCH",
         params: {
+          select: "id,email,expires_at,accepted_at,revoked_at,created_at",
           id: "eq." + invitationId,
           fleet_id: "eq." + fleet.id,
           accepted_at: "is.null",
@@ -92,7 +93,13 @@ module.exports = async function handler(request, response) {
         body: { revoked_at: new Date().toISOString() },
       });
       if (!rows.length) return json(response, 404, { ok: false, error: "invitation_not_found" });
-      return json(response, 200, { ok: true, invitation: rows[0] });
+      // A PATCH returns the whole stored row. Answer with the listing fields
+      // only, so the token digest and internal actor IDs stay on the server.
+      const revoked = rows[0];
+      return json(response, 200, { ok: true, invitation: {
+        id: revoked.id, email: revoked.email, expires_at: revoked.expires_at,
+        accepted_at: revoked.accepted_at, revoked_at: revoked.revoked_at, created_at: revoked.created_at,
+      } });
     }
 
     const replacementId = String(request.body && request.body.replace_invitation_id || "");

@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v169';
+const CACHE = 'occulert-v170';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -124,7 +124,6 @@ const NETWORK_ONLY_ASSETS = new Set([
   '/occulert-backend.v90.js',
   '/passkey-auth.v49.js',
   '/passkey-auth.v60.js',
-  '/supabase-loader.v47.js',
   '/supabase-loader.v49.js',
   '/supabase-loader.v48.js',
   '/vendor/supabase-2.112.3.js',
