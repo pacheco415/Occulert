@@ -2,6 +2,71 @@
 
 Run `node scripts/report-dependency-audits.mjs` with Node 24. The report directory contains separate site, full native and native production dependency-tree JSON reports, plus a receipt recording source revision, lockfile hashes, time and Node/npm versions. CI retains these for 14 days and checks weekly and after relevant dependency changes. An unavailable registry or malformed audit response fails the reporting job; existing vulnerability findings remain visible without misrepresenting the report as clean.
 
+## November 12, 2026 — glob cancellation backport and remaining advisories
+
+Fresh audits at `2026-11-13T06:34:33.071Z` (November 12 in America/Los_Angeles), using Node `24.22.1` and npm
+`11.9.0`, reported the following affected-package counts after the backport:
+
+| Dependency tree | Moderate | Low | High / critical | Total |
+| --- | --- | --- | --- | --- |
+| Site, all dependencies | 3 | 0 | 0 / 0 | 3 |
+| Native, all dependencies | 8 | 1 | 0 / 0 | 9 |
+| Native, `--omit=dev` | 8 | 1 | 0 / 0 | 9 |
+
+These counts are unchanged from the audit before the backport. The site
+lockfile SHA-256 is
+`234638f6756657eb1b50e166954ae9bb5b62e999452d2cbb9de2afaf060e0813`;
+the updated native lockfile SHA-256 is
+`0c2f0c9833bdbdcf0be5ff55457679554543c5538abe46c25d945b29215a10b0`.
+All three audit responses were available; their exit status was 1 for findings.
+
+The two `glob@13.0.6` instances below `@expo/config` and
+`@expo/config-plugins` were updated to the published compatible
+[`glob@13.0.7`](https://registry.npmjs.org/glob/13.0.7) release. Its dependency
+ranges and Node engine requirements are unchanged. Inspection of the published
+tarball confirms the four missing early returns described in
+[GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)
+are backported to the 13.x walkers. Only those two lock entries changed; no
+manifest range, override, parent package or security exemption was added.
+
+The dependency compatibility suite now exercises each consumer's actual
+resolved `glob` package against a temporary 40-directory tree. It checks normal
+matching, then aborts a walk when its first in-flight directory read returns.
+Both installed 13.0.6 copies failed by reading all 40 directories; both 13.0.7
+copies pass by stopping after the first read. The test waits for outstanding
+reads to drain, rather than relying on a timing threshold to detect continued
+work. A clean `npm ci --include=dev` verified the registry integrity and applied
+the existing postinstall patches. Typecheck and all 12 dependency compatibility
+tests passed, with zero skips.
+
+This backport does **not** clear the audit: the advisory still marks versions
+`>=9.0.0 <=14.0.1` as affected, and the separate
+`@bacons/apple-targets → glob@10.5.0` path remains unchanged. The other unique
+advisories are [minimatch GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
+and [deepmerge GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4).
+The minimatch patch floor, `11.0.1`, is outside the installed consumers' 9.x
+and 10.x ranges. The registry still lists `deepmerge@4.3.1` as latest and the
+advisory lists no patched release. Current parent releases offer no compatible
+complete repair; npm's suggested ESLint 9 and Expo 52 downgrades were not applied.
+
+The inspected source paths reach these libraries through lint/build tooling,
+including Expo's production dependency graph. ESLint and Expo fingerprint's
+inspected matchers use minimatch's default optimization level, whereas that
+advisory requires level 2 or higher. This narrows those specific call paths;
+it does not establish that every transitive use is safe. Application source
+does not directly import the three libraries. No native binary was built or
+inspected, so the `--omit=dev` result does not establish shipped-bundle
+reachability or a clean native runtime audit.
+
+The first normal `npm run verify` attempt stopped at `expo install --check`
+with `HTTP Proxy timed out`; no gate was disabled. The separate dependency
+suite subsequently passed its ordinary Expo compatibility resolver check.
+A single normal retry of `npm run verify` then passed, including the online
+dependency gate, typecheck and all native regression suites at the backport
+checkpoint: 255 tests passed,
+zero failed, and three existing Swift-dependent tests were skipped on this
+Linux host. No native build or physical-device validation is claimed.
+
 ## November 8, 2026 — Zod cleared; glob and minimatch tooling advisories
 
 `node scripts/report-dependency-audits.mjs` ran at **2026-11-08T21:57:10Z**
