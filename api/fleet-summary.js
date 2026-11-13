@@ -11,6 +11,7 @@ const { isUuid } = require("./_lib/validation");
 
 const { json } = require("./_lib/responses");
 const ROSTER_LIMIT = 500;
+const { monthlyActivity } = require('./_lib/fleet-monthly-activity');
 
 function shouldIncludeEvents(request) {
   let value = request.query && request.query.include_events;
@@ -101,6 +102,15 @@ module.exports = async function handler(request, response) {
     }
     const eventsLookupMs = Date.now() - eventsStartedAt;
 
+    // Optional until the migration is deployed. Failure is unavailable, never
+    // a fabricated zero or a count inferred from the bounded session snapshot.
+    let monthly = null;
+    try {
+      monthly = monthlyActivity(await pgFetch('rpc/fleet_monthly_activity', {
+        method: 'POST', body: { p_actor_id: user.id, p_fleet_id: fleet.id },
+      }));
+    } catch {}
+
     response.setHeader("Server-Timing", [
       "fleet;dur=" + fleetLookupMs,
       "roster;dur=" + rosterLookupMs,
@@ -116,6 +126,7 @@ module.exports = async function handler(request, response) {
       sessions: sessions,
       events: events,
       events_included: includeEvents,
+      monthly_activity: monthly,
       telemetry_trust: "unverified_client_report",
       detector_provenance_trust: "client_declared",
       privacy: {
