@@ -134,5 +134,6 @@
   "detection-experiments.v6.js": "52c292ff3ff3ebcb35ed375f5da8b887d1ce089a89967cbea29082c41178fab9",
   "driver-startup-guard.v29.js": "2be6e95e3d33d9532b4581fbc774b6decc7444f1952923191b5f9c636589fb1b",
   "fleet-dashboard.v6.js": "a204719308161030db252862a72c5257431addad07f4b80c10c9e201cb92618a",
-  "fleet-dashboard.v7.js": "a204719308161030db252862a72c5257431addad07f4b80c10c9e201cb92618a"
+  "fleet-dashboard.v7.js": "a204719308161030db252862a72c5257431addad07f4b80c10c9e201cb92618a",
+  "fleet-dashboard.v8.js": "7d56adc1415beb6695f22e9344bb59c9326bcaec3a5849180660a880954faef5"
 }
