@@ -63,10 +63,7 @@ export function scoringEyeMetrics(state, ear, turned, nowMs, excludeTurned = fal
     const next = { ...state }, closed = ear < state.eyeClosedThreshold, sampled = !excludeTurned || !turned;
     next.perclosWindow = (sampled ? [...state.perclosWindow, { t: nowMs, closed }] : state.perclosWindow).filter(row => nowMs - row.t < 60000);
     const perclos = next.perclosWindow.length ? Math.round(next.perclosWindow.filter(row => row.closed).length / next.perclosWindow.length * 100) : 0;
-    if (closed && sampled && !next.eyesClosedSince)
-        next.eyesClosedSince = nowMs;
-    if (!closed || !sampled)
-        next.eyesClosedSince = 0;
+    next.eyesClosedSince = closed && sampled ? next.eyesClosedSince || nowMs : 0;
     const microsleep = Boolean(next.eyesClosedSince && nowMs - next.eyesClosedSince > 1500 && nowMs - next.lastMicro > 3000 && next.confidence > 45);
     if (microsleep) {
         next.microsleeps++;
