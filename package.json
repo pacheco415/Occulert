@@ -88,7 +88,7 @@
     "audit:sitemap": "node scripts/update-sitemap.mjs --check",
     "test:sitemap": "node --test scripts/test-sitemap.mjs",
     "test:api-validation": "node --test scripts/test-api-validation.mjs",
-    "test:provider-budget": "node --test scripts/test-provider-budget.mjs",
+    "test:provider-budget": "node --test scripts/test-provider-budget.mjs scripts/test-stripe-transport.mjs",
     "test:vendor-supabase": "node --test scripts/test-vendor-supabase.mjs",
     "test:owned-fonts": "node --test scripts/test-owned-fonts.mjs",
     "test:accessibility": "playwright test tests/accessibility-baseline.spec.mjs tests/accessibility-controls.spec.mjs",

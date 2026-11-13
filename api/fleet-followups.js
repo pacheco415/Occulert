@@ -37,18 +37,31 @@ module.exports = async function handler(req, res) {
       const saved = rows[0];
       return json(res, 200, { ok: true, followup: { session_id: saved.session_id, status: saved.status, version: saved.version, updated_at: saved.updated_at } });
     }
-    const [sessions, drivers] = await Promise.all([
-      pgFetch('sessions', { params: { select: 'id,driver_id,started_at,ended_at,alert_count', fleet_id: 'eq.' + fleet.id, order: 'started_at.desc,id.desc', limit: '50' } }),
-      pgFetch('drivers', { params: { select: 'id,name', fleet_id: 'eq.' + fleet.id } }),
-    ]);
+    const sessions = await pgFetch('sessions', { params: { select: 'id,driver_id,started_at,ended_at,alert_count', fleet_id: 'eq.' + fleet.id, order: 'started_at.desc,id.desc', limit: '50' } });
+    if (!Array.isArray(sessions) || sessions.length > 50) throw new Error('invalid_followup_sessions');
     const ids = sessions.map(session => session.id).filter(isUuid);
-    const outcomes = ids.length ? await pgFetch('fleet_session_followups', {
-      params: { select: 'session_id,status,version,updated_at', session_id: 'in.(' + ids.join(',') + ')' },
-    }) : [];
-    const names = new Map(drivers.map(driver => [driver.id, driver.name]));
+    // Fetch only drivers referenced by this page. An unfiltered roster read
+    // can hit PostgREST's row cap before reaching a recent session's driver.
+    // The fleet predicate remains necessary after membership changes.
+    const driverIds = [...new Set(sessions.map(session => session.driver_id).filter(isUuid).map(id => id.toLowerCase()))];
+    const [drivers, outcomes] = await Promise.all([
+      driverIds.length ? pgFetch('drivers', { params: { select: 'id,name', fleet_id: 'eq.' + fleet.id,
+        id: 'in.(' + driverIds.join(',') + ')', limit: '50' } }) : [],
+      ids.length ? pgFetch('fleet_session_followups', {
+        params: { select: 'session_id,status,version,updated_at', session_id: 'in.(' + ids.join(',') + ')', limit: '50' },
+      }) : [],
+    ]);
+    if (!Array.isArray(drivers) || drivers.length > driverIds.length) throw new Error('invalid_followup_drivers');
+    const requested = new Set(driverIds), names = new Map();
+    for (const driver of drivers) {
+      if (!driver || !isUuid(driver.id) || !requested.has(driver.id.toLowerCase()) || names.has(driver.id.toLowerCase())) {
+        throw new Error('invalid_followup_drivers');
+      }
+      names.set(driver.id.toLowerCase(), driver.name);
+    }
     const saved = new Map(outcomes.map(outcome => [outcome.session_id, outcome]));
     return json(res, 200, { ok: true, limit: 50, sessions: sessions.map(session => ({
-      id: session.id, driver_name: names.get(session.driver_id) || 'Driver', started_at: session.started_at,
+      id: session.id, driver_name: names.get(session.driver_id?.toLowerCase()) || 'Driver', started_at: session.started_at,
       ended_at: session.ended_at, alert_count: session.alert_count,
       followup: saved.get(session.id) || { session_id: session.id, status: 'open', version: 0, updated_at: null },
     })) });

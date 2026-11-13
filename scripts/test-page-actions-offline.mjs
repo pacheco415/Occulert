@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash, webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import test from 'node:test';
 import { assetByStem } from './lib/current-assets.mjs';
@@ -10,14 +11,15 @@ function workerFetchHarness() {
   const key = request => new URL(typeof request === 'string' ? request : request.url, origin).href;
   let network = async () => new Response('fresh network bytes');
   vm.runInNewContext(readFileSync('sw.js', 'utf8'), {
-    Request, URL, Headers, Response, AbortController, Uint8Array, setTimeout, clearTimeout,
+    Request, URL, Headers, Response, AbortController, Uint8Array, setTimeout, clearTimeout, crypto: webcrypto, btoa,
     self: { location: { origin }, addEventListener: (name, handler) => events.set(name, handler) },
     fetch: async request => { activity.fetches++; return network(request); },
     caches: {
       match: async request => { activity.cacheReads++; return entries.get(key(request))?.clone(); },
       open: async () => {
         activity.cacheOpens++;
-        return { put: async (request, response) => { activity.cacheWrites++; entries.set(key(request), response.clone()); } };
+        return { put: async (request, response) => { activity.cacheWrites++; entries.set(key(request), response.clone()); },
+          delete: async request => entries.delete(key(request)) };
       },
     },
   });
@@ -28,7 +30,7 @@ function workerFetchHarness() {
       let response;
       const lifetimes = [];
       events.get('fetch')({
-        request: { method: 'GET', mode: 'no-cors', destination: 'script', url, ...options },
+        request: options.request || { method: 'GET', mode: 'no-cors', destination: 'script', url, ...options },
         respondWith: promise => { activity.interceptions++; response = promise; },
         waitUntil: promise => { activity.lifetimes++; lifetimes.push(promise); },
       });
@@ -103,6 +105,90 @@ test('service worker still bypasses non-GET requests', async () => {
     assert.equal(await worker.dispatch(url, { method: 'POST' }), undefined);
   }
   assert.deepEqual(worker.activity, { interceptions: 0, lifetimes: 0, fetches: 0, cacheReads: 0, cacheOpens: 0, cacheWrites: 0 });
+});
+
+test('installed static assets with query variants reuse the canonical offline cache', async () => {
+  for (const path of ['/' + assetByStem('driver-app.js'), '/' + assetByStem('driver-app.css')]) {
+    const worker = workerFetchHarness();
+    worker.entries.set('https://www.occulert.com' + path, new Response('installed static asset'));
+    worker.setNetwork(async () => { throw Error('Offline'); });
+    const response = await worker.dispatch('https://www.occulert.com' + path + '?diagnostic=1');
+    assert.equal(await response.text(), 'installed static asset');
+    assert.equal(worker.entries.size, 1, 'query variants must not add cache entries');
+  }
+});
+
+test('offline driver navigation with a query opens the installed driver, not the homepage', async () => {
+  const worker = workerFetchHarness();
+  worker.entries.set('https://www.occulert.com/app.html', new Response('installed driver shell'));
+  worker.entries.set('https://www.occulert.com/index.html', new Response('installed homepage'));
+  worker.setNetwork(async () => { throw Error('Offline'); });
+  const response = await worker.dispatch('https://www.occulert.com/app.html?lang=es', { mode: 'navigate', destination: 'document' });
+  assert.equal(await response.text(), 'installed driver shell');
+});
+
+test('queried documents never persist login-link values or replace canonical installed bytes', async () => {
+  for (const path of ['/login.html?code=private-fixture', '/app.html?lang=es']) {
+    const worker = workerFetchHarness();
+    worker.entries.set('https://www.occulert.com/app.html', new Response('installed driver shell'));
+    const response = await worker.dispatch('https://www.occulert.com' + path, { mode: 'navigate', destination: 'document' });
+    assert.equal(await response.text(), 'fresh network bytes');
+    assert.equal(worker.activity.cacheWrites, 0);
+    assert.deepEqual([...worker.entries.keys()], ['https://www.occulert.com/app.html']);
+    assert.equal(await worker.entries.get('https://www.occulert.com/app.html').text(), 'installed driver shell');
+  }
+});
+
+test('unlisted query variants ignore previously stored query-bearing cache entries', async () => {
+  const worker = workerFetchHarness(), url = 'https://www.occulert.com/login.html?code=private-fixture';
+  worker.entries.set(url, new Response('obsolete query-bearing page'));
+  worker.entries.set('https://www.occulert.com/index.html', new Response('installed homepage'));
+  worker.setNetwork(async () => { throw Error('Offline'); });
+  const response = await worker.dispatch(url, { mode: 'navigate', destination: 'document' });
+  assert.equal(await response.text(), 'installed homepage');
+});
+
+test('credentialed and partial requests bypass the offline cache', async () => {
+  for (const headers of [new Headers({ Authorization: 'Bearer fixture' }), new Headers({ Range: 'bytes=0-7' })]) {
+    const worker = workerFetchHarness();
+    assert.equal(await worker.dispatch('https://www.occulert.com/fixture.json', { headers }), undefined);
+    assert.deepEqual(worker.activity, { interceptions: 0, lifetimes: 0, fetches: 0, cacheReads: 0, cacheOpens: 0, cacheWrites: 0 });
+  }
+});
+
+test('optional runtime query variants verify canonical cached bytes and ignore query-bearing poison', async () => {
+  for (const logical of ['driver-i18n.js', 'detection-experiments.js']) {
+    const worker = workerFetchHarness(), path = assetByStem(logical);
+    const canonical = 'https://www.occulert.com/' + path, queried = canonical + '?diagnostic=1';
+    const source = readFileSync(path, 'utf8');
+    worker.entries.set(canonical, new Response(source));
+    worker.entries.set(queried, new Response('unverified query response'));
+    worker.setNetwork(async () => { throw Error('Offline'); });
+    const response = await worker.dispatch(queried, { request: new Request(queried) });
+    assert.equal(await response.text(), source);
+    assert.equal(worker.activity.fetches, 0);
+    assert.equal(worker.activity.cacheWrites, 0);
+  }
+});
+
+test('corrupt optional canonical cache is discarded and queried recovery retains exact network SRI', async () => {
+  const worker = workerFetchHarness(), path = assetByStem('driver-i18n.js');
+  const canonical = 'https://www.occulert.com/' + path, queried = canonical + '?diagnostic=1';
+  const source = readFileSync(path, 'utf8');
+  const pin = 'sha256-' + createHash('sha256').update(source).digest('base64');
+  worker.entries.set(canonical, new Response('corrupt canonical response'));
+  worker.entries.set(queried, new Response('unverified query response'));
+  worker.setNetwork(async request => {
+    assert.equal(request.url, queried); assert.equal(request.integrity, pin);
+    return new Response(source);
+  });
+  const response = await worker.dispatch(queried, { request: new Request(queried) });
+  assert.equal(await response.text(), source);
+  assert.equal(worker.entries.has(canonical), false);
+  assert.equal(worker.activity.cacheWrites, 0, 'queried network bytes cannot replace the canonical asset');
+  worker.setNetwork(async () => { throw Error('Offline'); });
+  const unavailable = await worker.dispatch(queried, { request: new Request(queried) });
+  assert.equal(unavailable.type, 'error', 'an obsolete query-bearing entry cannot bypass verification');
 });
 
 for (const failure of ['none', 'dispatcher', 'guard-missing', 'guard-integrity', 'http-error', 'partial-response']) {
