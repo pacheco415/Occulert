@@ -102,13 +102,18 @@ test('an empty history and a truncated history are described without implying co
 for (const [name, body] of [
   ['another driver’s session', { ok: true, has_more: false, sessions: [session(1), session(2, { driver_id: OTHER_DRIVER })] }],
   ['a duplicated session', { ok: true, has_more: false, sessions: [session(1), session(1)] }],
+  ['an array-valued session ID', { ok: true, has_more: false, sessions: [session(1, { id: [session(1).id] })] }],
+  ['an object-valued session ID', { ok: true, has_more: false, sessions: [session(1, { id: { toString: null, valueOf: null } })] }],
   ['an invalid start time', { ok: true, has_more: false, sessions: [session(1, { started_at: 'yesterday' })] }],
+  ['an object-valued start time', { ok: true, has_more: false, sessions: [session(1, { started_at: { toString: null, valueOf: null } })] }],
   ['an oversized page', { ok: true, has_more: false, sessions: Array.from({ length: 51 }, (_, i) => session(1, { id: `55555555-5555-4555-8555-${String(i).padStart(12, '0')}` })) }],
   ['a missing completeness flag', { ok: true, sessions: [session(1)] }],
   ['a refusal body', { ok: false, error: 'fleet_not_found' }],
 ]) {
   test(`a response containing ${name} shows nothing rather than a partial list`, async () => {
     const b = boot({ reply: { body } });
+    assert.equal(b.run(`driverDetailSessions(${JSON.stringify(body)},${JSON.stringify(DRIVER)})`), null,
+      'malformed response fields are rejected without invoking object coercion');
     await b.open();
     assert.equal(b.elements.get('driverDetailList').children.length, 0);
     assert.equal(b.text('driverDetailSummary'), '');
@@ -149,12 +154,14 @@ test('closing, or leaving the protected view, discards the loaded sessions and a
   assert.equal(b.elements.get('driverDetail').hidden, true);
   assert.equal(b.elements.get('driverDetailList').children.length, 0);
   assert.equal(b.text('driverDetailSummary'), '');
+  assert.equal(b.text('driverDetailTitle'), 'Recent sessions');
   assert.equal(b.trigger.focused, 1, 'focus returns to the control that opened the panel');
 
   await b.open();
   b.run('clearProtectedFleetCache()');
   assert.equal(b.elements.get('driverDetail').hidden, true);
   assert.equal(b.elements.get('driverDetailList').children.length, 0);
+  assert.equal(b.text('driverDetailTitle'), 'Recent sessions', 'the previous driver name is discarded with protected data');
 
   let release;
   const late = boot({ reply: () => new Promise(resolve => { release = () => resolve(page([session(1)])); }) });
@@ -164,6 +171,7 @@ test('closing, or leaving the protected view, discards the loaded sessions and a
   release(); await pending;
   assert.equal(late.elements.get('driverDetail').hidden, true);
   assert.equal(late.elements.get('driverDetailList').children.length, 0, 'a reply for a discarded view is never rendered');
+  assert.equal(late.text('driverDetailTitle'), 'Recent sessions');
 });
 
 test('the Sessions control exists only on protected rows and the panel markup is present', () => {

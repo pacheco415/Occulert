@@ -71,7 +71,7 @@ async function assertAlert(page, reason, level, transport) {
     options: {
       body: distracted ? distractionCue : level >= 3 ? 'Pull over safely — confirm safety now' : 'Stay alert! Drowsiness detected.',
       icon: '/occulert-logo-main-192.png', badge: '/occulert-logo-main-96.png',
-      tag: expect.stringMatching(/^occulert-alert-\d+$/), silent: false,
+      tag: 'occulert-alert', renotify: true, silent: false,
       vibrate: level >= 3 ? [700, 150, 700, 150, 700] : [500, 150, 500],
       requireInteraction: level >= 3,
     },
