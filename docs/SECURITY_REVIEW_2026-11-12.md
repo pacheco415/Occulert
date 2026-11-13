@@ -14,6 +14,12 @@ integration review. The Codex Security deep-scan coordinator is not exposed in
 this workspace; this document records the direct engineering review and its
 tests, not a sealed result from that unavailable scanner.
 
+During final validation, #419's fleet driver detail panel merged into `main`
+at `98143eabab36fa0c69546e0f9b54f99748c1bd89`. The patch integrates that
+change, preserves its panel and tests, and releases the combined dashboard
+under a fresh immutable URL. The integration review also covers the panel's
+response validation and clearing of prior-account presentation state.
+
 The reviewers used synthetic records and hardware adapters for behavioral
 tests. Live database checks were limited to schema, privileges, migration
 metadata and security advisories; no driver records were fetched or modified.
@@ -36,6 +42,7 @@ Conditional transport findings do not establish an actual credential leak.
 | Offline shell and query storage — moderate privacy/availability | Query variants could miss installed static files, make the offline driver load the homepage, or retain login-link query values as cache keys. | Canonical fallback is limited to known static/pinned paths. Query-bearing network responses are never persisted or used to replace canonical bytes. Authorization and Range requests bypass the cache. Tests preserve optional-runtime hash/SRI validation and reject poisoned query entries. |
 | Fleet follow-ups — low availability/data quality | An unbounded roster fetch could hit the provider's row cap before reaching a driver referenced by the displayed session page. | Fetch only the distinct driver IDs from the at-most-50 scoped sessions, retain the fleet predicate, bound related reads, and reject malformed, duplicate or unrequested driver IDs and excessive related rows. Empty pages skip both related lookups. |
 | Dashboard saved data — low availability | Malformed local JSON names, IDs, dates, numbers or nested events could throw during normalization, history, pilot metrics or refresh. | Accept bounded primitive values, reject malformed containers and event identities, preserve valid zero values, and leave original stored bytes untouched. Regressions include non-callable JSON coercion properties. |
+| Fleet detail integration — low privacy/data quality | The newly merged panel retained the previous driver's name in its hidden title after account reset, and its response validator accepted an array as a session ID. | Clear the title together with the rest of the panel and require a string session ID before UUID validation. Regression cases cover malformed IDs, account reset, close and delayed responses. |
 | Session export and notifications — low reliability | The session CSV carried rows across successful restarts, and each alert used a unique notification tag. | Compose the prepared source/test fixes from #408 and #411: reset CSV only after successful start and use a stable notification tag with renotification. Failed starts preserve the preceding export. |
 | Cloud verification and bundle size | Dead `OcculertSync` hooks had no implementation, while test stubs could make them appear to be a real upload path. | Compose the prepared source/test change from #412. Retain the actual authenticated backend flow and test it with intercepted provider responses. This also keeps the combined driver below its existing size budget. |
 | Native build tooling — moderate advisory | Two `glob@13.0.6` dependency paths continued filesystem traversal after cancellation. | Install the compatible published 13.0.7 backport only on those two paths. Real-package regressions change from 40 total directory reads despite cancellation to one initial read. Dependency ranges and parent packages are unchanged. See [dependency evidence](DEPENDENCY_AUDITS.md). |
@@ -89,10 +96,11 @@ The final native verification passed the ordinary Expo dependency gate,
 TypeScript and 257 tests with zero failures. Three existing Swift-dependent
 tests were skipped on Linux and remain covered by the macOS CI job. Both site
 and native dependencies were installed with their prescribed clean-install
-commands. The initial site run omitted newly generated, still-untracked assets
-from a Git-based release-test fixture; all other 109 verification steps passed.
-After staging the assets, all 37 release-tool cases passed. The pull request
-records the subsequent complete run and hosted results for the committed patch.
+commands. Site verification passed all 110 steps before integrating #419. Its
+initial release-fixture failure was resolved by staging the newly generated
+assets, and the subsequent complete run had zero failed steps. The pull request
+records final integration verification and hosted results for the committed
+patch, including #419's additional verification step.
 
 Local browser installation failed because the downloaded Chromium archive was
 truncated; local Playwright collection succeeded, but collection is not browser
