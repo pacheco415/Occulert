@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { auditCspPolicy, SUPABASE_HOST } from './lib/csp-policy.mjs';
 const valid = `script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST}`;
 test('owned WASM scripts and only the actual project host pass', () => assert.deepEqual(auditCspPolicy(valid), []));
@@ -12,6 +13,19 @@ for (const host of ['https://*.supabase.co', 'https://another.supabase.co', 'wss
 test('an unsafe first duplicate directive cannot be hidden by a safe last one', () => {
  assert.ok(auditCspPolicy(`script-src 'unsafe-inline'; ${valid}`).length);
  assert.ok(auditCspPolicy(`${valid}; script-src 'unsafe-inline'`).length);
+});
+for (const host of ['https://cdn.jsdelivr.net', 'https://unpkg.com', 'https://*.googleapis.com']) {
+ test(`script host ${host} outside the owned origin is rejected`, () => assert.ok(auditCspPolicy(valid.replace("script-src ", `script-src ${host} `)).includes('Script CSP contains an unapproved source')));
+ test(`connection host ${host} outside the site and project is rejected`, () => assert.ok(auditCspPolicy(valid.replace("connect-src ", `connect-src ${host} `)).includes('Connection policy contains an unapproved host')));
+}
+test('both deployed policies allow only owned scripts and the configured project', () => {
+ const policies = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')).headers
+  .flatMap(rule => rule.headers).filter(header => header.key === 'Content-Security-Policy').map(header => header.value);
+ assert.equal(policies.length, 2);
+ for (const policy of policies) {
+  assert.deepEqual(auditCspPolicy(policy), []);
+  assert.doesNotMatch(policy, /jsdelivr|unpkg|googleapis/);
+ }
 });
 test('missing script or connection directives are rejected', () => {
  assert.ok(auditCspPolicy(`connect-src https://${SUPABASE_HOST}`).length);
