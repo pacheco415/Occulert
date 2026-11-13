@@ -70,6 +70,15 @@
   .dashboard-page .launch-step p{margin:0 0 14px;color:var(--portal-muted);font-size:12px;line-height:1.5}
   .dashboard-page .launch-step .btn{width:100%;margin-top:auto}
   .dashboard-page .launch-status{display:block;margin-top:auto;color:var(--portal-soft);font-size:11px;font-weight:800;line-height:1.4}
+  #driverDetail[hidden]{display:none}
+  #driverDetail{margin-top:16px;border:1px solid var(--portal-border);border-radius:16px;padding:16px;background:var(--portal-surface-strong)}
+  #driverDetail:focus-visible{outline:2px solid var(--portal-accent-text);outline-offset:2px}
+  #driverDetail h3{margin:0;color:var(--portal-text);font-size:16px;overflow-wrap:anywhere}
+  .driver-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
+  .dashboard-page .driver-detail-header .btn{min-height:44px}
+  #driverDetailList{margin:12px 0 0;padding:0;list-style:none}
+  .driver-detail-session{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,1fr));gap:8px 12px;align-items:baseline;border-top:1px solid #344d72;padding:10px 0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+  @media(max-width:720px){.driver-detail-session{grid-template-columns:1fr 1fr}.driver-detail-session strong{grid-column:1/-1}}
   #fleetFollowups[hidden]{display:none}
   .followup-item{border-top:1px solid #344d72;padding:18px 0;margin-top:16px}
   .followup-item h3{margin:0;font-size:16px;color:#f5f7fa;overflow-wrap:anywhere}
@@ -175,6 +184,15 @@
         </div>
         <p class="sub" id="scoreComparisonNote">Score methods differ by device. Compare trends within the same recorded source. Device metadata and scores are client reported.</p>
         <div class="drivers" id="drivers"></div>
+        <section id="driverDetail" tabindex="-1" aria-labelledby="driverDetailTitle" hidden>
+          <div class="driver-detail-header">
+            <h3 id="driverDetailTitle">Recent sessions</h3>
+            <div class="toolbar"><a class="btn" href="/fleet-history.html">Open History</a><button class="btn" id="driverDetailClose" type="button">Close</button></div>
+          </div>
+          <p class="sub" id="driverDetailStatus" role="status" aria-live="polite"></p>
+          <p class="sub" id="driverDetailSummary"></p>
+          <ul id="driverDetailList" aria-label="Recent protected sessions for the selected driver"></ul>
+        </section>
       </div>
       <aside>
         <details class="panel-details secondary-panel">
@@ -232,6 +250,6 @@
   </main>
   <div class="toast" id="toast"></div>
   <footer class="footer"><a href="/">Occulert</a> &nbsp;·&nbsp; <a href="/app.html">Driver App</a> &nbsp;·&nbsp; <a href="/privacy.html">Privacy</a><div style="margin-top:8px">© 2026 Occulert. Prototype only — not a certified safety, medical, emergency, or compliance device.</div></footer>
-<script src="/fleet-dashboard.v7.js" defer></script>
+<script src="/fleet-dashboard.v8.js" defer></script>
 </body>
 </html>

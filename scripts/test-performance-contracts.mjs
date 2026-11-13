@@ -917,6 +917,8 @@ function dashboardRefreshHarness({ empty = false, storage = new Map(), storageDe
   context = { Date: ClockDate, window, document: { hidden: false, getElementById: element }, navigator: { connection: {} },
     localStorage: { getItem(key) { storageReads.push(key); if(storageDenied)throw Error('Blocked'); return storage.get(key) ?? null; },
       setItem(key,value) { if(storageDenied)throw Error('Blocked'); storage.set(key,value); } },
+    // The driver detail panel has its own suite; here it is only reset with the fleet cache.
+    resetDriverDetail() {},
     syncProtectedControls() {}, render: () => views.push(context.state().protectedFleetName),
     refreshDashboardIfNeeded: () => views.push(context.state().protectedFleetName), protectedHistoryOpen: () => false,
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
