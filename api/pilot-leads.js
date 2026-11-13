@@ -1,4 +1,4 @@
-const { isJsonMediaType, isJsonObject, jsonObjectWithinLimit } = require("./_lib/validation");
+const { isJsonMediaType, isJsonObject, jsonObjectWithinLimit, storableText } = require("./_lib/validation");
 const MAX_FIELD_LENGTH = 1200;
 const MAX_BODY_LENGTH = 4096;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
@@ -57,14 +57,14 @@ const OPERATING_GOALS = Object.freeze({
 });
 
 function clean(value, max = MAX_FIELD_LENGTH) {
-  return String(value || "").replace(/\0/g, "").trim().slice(0, max);
+  return storableText(value, max);
 }
 
 // Contact addresses are refused, never shortened: a cut-down address can be a
 // different, valid inbox.
 function cleanEmail(value) {
   const email = String(value || "").trim().toLowerCase();
-  return email.length <= 240 && !email.includes("\0") ? email : "";
+  return email.length <= 240 && !email.includes("\0") && email.isWellFormed() ? email : "";
 }
 
 function allowlistedLabel(value, labels) {
