@@ -84,6 +84,13 @@ jobs:
           node-version-file: .nvmrc
       - run: node --test scripts/test-watch-notification.mjs scripts/test-motion-activity-native.mjs
 
+      - name: Install native camera test dependencies
+        working-directory: native-app
+        run: npm ci --include=dev
+      - name: Verify camera interruptions on macOS
+        working-directory: native-app
+        run: npm run test:camera-interruptions
+
       - name: Save source and environment verification evidence
         if: ${{ !cancelled() }}
         run: node scripts/write-verification-receipt.mjs watch-notification '${{ job.status }}'

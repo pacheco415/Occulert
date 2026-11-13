@@ -38,9 +38,11 @@ release receipts, build-52 device reports and testing deferrals.
 1. Keep reviewed source changes and required checks green on each pull request
    and resulting main. Preserve immutable asset bytes; compose any overlapping
    browser changes from the active release.
-2. Use the prepared [October 29 native handoff](RELEASE_2026-10-29.md) for source
-   and checklist details. An authorized build/submission and exact-build
-   physical acceptance remain separate from the completed source preparation.
+2. Use the prepared [November 8 native handoff](RELEASE_2026-11-08.md) for source
+   and checklist details; it extends the
+   [October 29 checklist](RELEASE_2026-10-29.md). An authorized build/submission
+   and exact-build physical acceptance remain separate from the completed
+   source preparation.
 3. Keep alert retries and fleet offboarding off by default. Verify each
    deployment prerequisite before activation; keep production operational
    receipts private. Fleet offboarding remains a separate owner decision,

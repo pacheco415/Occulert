@@ -1,6 +1,7 @@
+/* global MutationObserver, location */
 
 (() => {
-  const corePath = '/driver-app.v98.js';
+  const corePath = '/driver-app.v120.js';
   let state = 'loading';
   const byId = id => document.getElementById(id);
   const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
@@ -15,10 +16,10 @@
     const failed = state === 'failed', ready = state === 'ready';
     const controls = byId('driverControls'), startButton = byId('startBtn');
     if (controls) controls.disabled = !ready;
-    if (startButton) { startButton.disabled = !ready; startButton.textContent = ready ? 'START MONITORING' : failed ? 'APP UNAVAILABLE' : 'Loading app…'; }
+    if (startButton) { startButton.disabled = !ready; startButton.textContent = ready ? 'START MONITORING' : failed ? 'APP UNAVAILABLE' : 'Loading app…'; if (failed) { delete startButton.dataset.driverText; startButton.lang = 'en'; startButton.dir = 'ltr'; } else startButton.dataset.driverText = JSON.stringify([ready ? 'start.start' : 'start.loading']); }
     const notice = byId('startupNotice');
     if (notice) { notice.hidden = ready; notice.setAttribute('role', failed ? 'alert' : 'status'); notice.setAttribute('aria-live', failed ? 'assertive' : 'polite'); }
-    setText('startupTitle', failed ? 'App could not load' : 'Loading app…');
+    setText('startupTitle', failed ? 'App could not load' : 'Loading app…'); const title = byId('startupTitle'); if (title) { if (failed) { delete title.dataset.driverText; title.lang = 'en'; title.dir = 'ltr'; } else title.dataset.driverText = JSON.stringify(['start.loading']); }
     setText('startupMessage', failed ? 'No monitoring is active. Reload the app when safely parked.' : 'Monitoring controls will be available when the app finishes loading.');
     const reload = byId('startupReload');
     if (reload) { reload.hidden = !failed; reload.onclick = () => location.reload(); }
