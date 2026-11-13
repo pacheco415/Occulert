@@ -122,6 +122,7 @@
     "test:motion-activity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-motion-activity.mjs scripts/test-motion-activity-native.mjs",
     "test:emergency-readiness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-emergency-readiness.mjs",
     "test:road-model-benchmark": "node --test scripts/test-road-model-benchmark.mjs",
+    "test:fleet-monthly-activity": "node --test scripts/test-fleet-monthly-activity.mjs",
     "test:corroboration-replay": "node --test scripts/test-corroboration-replay.mjs",
     "test:parked-alert-checks": "node --test scripts/test-parked-alert-checks-api.mjs scripts/test-parked-alert-checks-db.mjs scripts/test-parked-alert-checks-client.mjs"
   },

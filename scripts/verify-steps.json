@@ -108,6 +108,7 @@
     "test:motion-activity",
     "test:emergency-readiness",
     "test:road-model-benchmark",
+    "test:fleet-monthly-activity",
     "test:corroboration-replay"
   ],
   "additionalChecks": [
