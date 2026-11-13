@@ -35,7 +35,7 @@ test('empty query executes exactly the released default pipeline across calibrat
 test('all exact selected modes disable every cloud route while preserving another ordinary pending outbox',async()=>{
  for(const query of ['?fatigue-timing=elapsed','?ear-units=pixels','?detector=tasks','?noface-escalation=1','?perclos=time','?pitch-gate=1','?distraction-confidence=stable','?detector=tasks&ear-units=pixels&perclos=time&pitch-gate=1&noface-escalation=1&fatigue-timing=elapsed&distraction-confidence=stable']){
   const calls=[];const api=new Proxy({}, {get:(_,name)=>()=>{calls.push(name);return Promise.resolve({})}});
-  const h=createAppHarness({initialStorage:{'occulert-cloud-outbox':'ordinary-pending-value'},preloadSources:[helper],sandboxOverrides:{location:{search:query},URLSearchParams,OcculertBackend:api,OcculertSync:api}});
+  const h=createAppHarness({initialStorage:{'occulert-cloud-outbox':'ordinary-pending-value'},preloadSources:[helper],sandboxOverrides:{location:{search:query},URLSearchParams,OcculertBackend:api}});
   assert.equal(h.el('cloudConsent').checked,false);assert.equal(h.el('cloudConsent').disabled,true);
   calibrated(h);h.run('cloudConsent.checked=true;cloudReady=true');
   await h.run('beginBackendSession()');h.run("queueBackendEvent('drowsy')");await h.run('retryCloudSummaries()');await h.run('initCloud()');

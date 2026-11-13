@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdir, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { Worker } from 'node:worker_threads';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -130,6 +131,55 @@ for (const [consumer, intermediates] of [
       });
       assert.deepEqual(result, ['src/app/*.ts', 'src/app/*.tsx', 'src/lib/*.ts', 'src/lib/*.tsx']);
     } finally { await worker.terminate(); }
+  });
+}
+
+for (const consumer of ['@expo/config', '@expo/config-plugins']) {
+  test(`${consumer} glob stops filesystem traversal when an AbortSignal fires`, { timeout: 5000 }, async () => {
+    const consumerRequire = createRequire(require.resolve(consumer));
+    const { glob } = consumerRequire('glob');
+    const cwd = mkdtempSync(join(tmpdir(), 'occulert-glob-abort-'));
+    const expected = [];
+    const populate = (parent, depth) => {
+      if (!depth) return;
+      for (let index = 0; index < 3; index++) {
+        const child = parent ? `${parent}/branch-${index}` : `branch-${index}`;
+        mkdirSync(join(cwd, child));
+        writeFileSync(join(cwd, child, 'fixture.txt'), 'fixture');
+        expected.push(`${child}/fixture.txt`);
+        populate(child, depth - 1);
+      }
+    };
+    try {
+      populate('', 3);
+      assert.deepEqual((await glob('**/*.txt', { cwd })).sort(), expected.sort());
+
+      const controller = new AbortController();
+      const reason = new Error('Controlled traversal cancellation');
+      let directoryReads = 0;
+      let activeReads = 0;
+      let resolveIdle;
+      const idle = new Promise(resolve => { resolveIdle = resolve; });
+      const traversal = glob('**/*', {
+        cwd, signal: controller.signal,
+        fs: {
+          readdir(path, options, callback) {
+            directoryReads++;
+            activeReads++;
+            readdir(path, options, (error, entries) => {
+              // GHSA-3g3m-2fjr-6pw4: a rejected walk must not keep descending
+              // after an in-flight directory read returns following cancellation.
+              controller.abort(reason);
+              try { callback(error, entries); }
+              finally { if (--activeReads === 0) resolveIdle(); }
+            });
+          },
+        },
+      });
+      await assert.rejects(traversal, error => error === reason);
+      await idle;
+      assert.equal(directoryReads, 1, 'aborted traversal must not read any child directories');
+    } finally { rmSync(cwd, { recursive: true, force: true }); }
   });
 }
 

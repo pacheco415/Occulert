@@ -37,8 +37,12 @@ export function detectHeadNod(lm) {
 }
 export function miles(m) { return (m / 1609.344).toFixed(2); }
 export function hav(a, b) { let R = 6371000, toRad = x => x * Math.PI / 180, dLat = toRad(b.lat - a.lat), dLon = toRad(b.lng - a.lng), s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(s)); }
+let gpsGeneration = 0;
 export function startGPS() {
-    if (!gpsConsent.checked) {
+    stopGPS();
+    const generation = gpsGeneration;
+    const current = () => generation === gpsGeneration && running && gpsConsent.checked && !document.hidden;
+    if (!current()) {
         gpsEl.textContent = 'OFF';
         locationEl.textContent = '--';
         return;
@@ -50,25 +54,32 @@ export function startGPS() {
     }
     gpsEl.textContent = 'ASK';
     gpsEl.className = 'value gps warn';
-    set_gpsWatch(navigator.geolocation.watchPosition(pos => {
-        let p = { lat: +pos.coords.latitude.toFixed(6), lng: +pos.coords.longitude.toFixed(6), accuracy: Math.round(pos.coords.accuracy || 0), speed: pos.coords.speed ? Math.round(pos.coords.speed * 2.23694) : 0, ts: new Date().toISOString() };
-        if (lastPosition) {
-            let d = hav(lastPosition, p);
-            if (d > 2 && d < 1000)
-                set_distanceMeters(distanceMeters + (d));
-        }
-        set_lastPosition(p);
-        routePoints.push(p);
-        set_routePoints(routePoints.slice(-80));
-        gpsEl.textContent = 'ON';
-        gpsEl.className = 'value gps on';
-        locationEl.textContent = p.lat.toFixed(2) + ',' + p.lng.toFixed(2);
-    }, err => { gpsEl.textContent = 'OFF'; gpsEl.className = 'value gps warn'; log('GPS unavailable: ' + err.message); }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 }));
+    try {
+        set_gpsWatch(navigator.geolocation.watchPosition(pos => {
+            if (!current()) return;
+            let p = { lat: +pos.coords.latitude.toFixed(6), lng: +pos.coords.longitude.toFixed(6), accuracy: Math.round(pos.coords.accuracy || 0), speed: pos.coords.speed ? Math.round(pos.coords.speed * 2.23694) : 0, ts: new Date().toISOString() };
+            if (lastPosition) {
+                let d = hav(lastPosition, p);
+                if (d > 2 && d < 1000)
+                    set_distanceMeters(distanceMeters + (d));
+            }
+            set_lastPosition(p);
+            routePoints.push(p);
+            set_routePoints(routePoints.slice(-80));
+            gpsEl.textContent = 'ON';
+            gpsEl.className = 'value gps on';
+            locationEl.textContent = p.lat.toFixed(2) + ',' + p.lng.toFixed(2);
+        }, err => { if (!current()) return; gpsEl.textContent = 'OFF'; gpsEl.className = 'value gps warn'; log('GPS unavailable: ' + err.message); }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 }));
+    } catch (_) {
+        gpsEl.textContent = 'OFF';
+        log('GPS unavailable. Camera monitoring continues.');
+    }
 }
 export function stopGPS() {
-    if (gpsWatch !== null)
-        navigator.geolocation.clearWatch(gpsWatch);
+    gpsGeneration += 1;
+    const watch = gpsWatch;
     set_gpsWatch(null);
+    try { if (watch !== null) navigator.geolocation.clearWatch(watch); } catch (_) { }
     gpsEl.textContent = lastPosition ? 'SAVED' : 'OFF';
     gpsEl.className = 'value gps ' + (lastPosition ? 'on' : 'warn');
 }
