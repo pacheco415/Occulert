@@ -7,12 +7,12 @@ const { supabaseErrorStatus } = require("./_lib/supabase-errors");
 const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
-const { validJsonBody } = require("./_lib/validation");
+const { validJsonBody, storableText } = require("./_lib/validation");
 
 const { json } = require("./_lib/responses");
 
 function clean(value, max) {
-  return String(value || "").replace(/\0/g, "").trim().slice(0, max);
+  return storableText(value, max);
 }
 
 module.exports = async function handler(request, response) {
