@@ -24,7 +24,7 @@ test('empty query executes exactly the released default pipeline across calibrat
 });
 
 test('all exact selected modes disable every cloud route while preserving another ordinary pending outbox',async()=>{
- for(const query of ['?fatigue-timing=elapsed','?ear-units=pixels','?detector=tasks','?noface-escalation=1','?perclos=time','?pitch-gate=1','?distraction-confidence=stable','?detector=tasks&ear-units=pixels&perclos=time&pitch-gate=1&noface-escalation=1&fatigue-timing=elapsed&distraction-confidence=stable']){
+ for(const query of ['?fatigue-timing=elapsed','?ear-units=pixels','?detector=tasks','?noface-escalation=1','?perclos=time','?pitch-gate=1','?distraction-confidence=stable','?turn-fatigue=hold','?detector=tasks&ear-units=pixels&perclos=time&pitch-gate=1&noface-escalation=1&fatigue-timing=elapsed&distraction-confidence=stable&turn-fatigue=hold']){
   const calls=[];const api=new Proxy({}, {get:(_,name)=>()=>{calls.push(name);return Promise.resolve({})}});
   const h=createAppHarness({initialStorage:{'occulert-cloud-outbox':'ordinary-pending-value'},preloadSources:[helper],sandboxOverrides:{location:{search:query},URLSearchParams,OcculertBackend:api}});
   assert.equal(h.el('cloudConsent').checked,false);assert.equal(h.el('cloudConsent').disabled,true);
@@ -218,5 +218,51 @@ test('duplicate and malformed distraction-confidence flags leave the ordinary mo
   const fixture=distractionSession(query,false,135),{h}=fixture;
   assert.equal(h.get('experimentFlags.any'),false,query);assert.equal(h.get('experimentController'),null,query);
   assert.equal(Number.isNaN(firstDistraction(fixture)),true,query);assert.equal(h.get('alerts'),0,query);
+ }
+});
+
+test('turn hold leaves default scoring identical until maturity and preserves the existing distraction timing',()=>{
+ const ordinary=distractionSession('',true,150),parked=distractionSession('?turn-fatigue=hold',true,150);
+ assert.equal(parked.h.get('experimentFlags.primary'),false);
+ const fields=['confidence','perclosWindow','eyesClosedSince','microsleeps','turnedSince','totalDistractionMs'];
+ for(let elapsed=150;elapsed<=25000;elapsed+=150){
+  ordinary.h.frame({ear:.3,noseX:.7,stepMs:150});parked.h.frame({ear:.3,noseX:.7,stepMs:150});
+  for(const field of fields)assert.equal(JSON.stringify(parked.h.get(field)),JSON.stringify(ordinary.h.get(field)),field);
+  assert.equal(parked.h.get('fatigue'),0);
+  if(elapsed<=3000)assert.equal(JSON.stringify(parked.h.state()),JSON.stringify(ordinary.h.state()));
+ }
+ const events=fixture=>JSON.parse(fixture.h.run('JSON.stringify(_sessionLog.filter(row=>row.type==="alert").map(row=>({at:row.ts-sessionStart,reason:row.value})))'));
+ const before=events(ordinary),after=events(parked);
+ assert.deepEqual(before.map(row=>row.reason),['Distraction','Fatigue']);
+ assert.deepEqual(after.map(row=>row.reason),['Distraction','Distraction']);
+ assert.deepEqual(after.map(row=>row.at),before.map(row=>row.at));
+ assert.equal(after[1].at-after[0].at,12000);
+ assert.equal(ordinary.h.get('maxFatigue'),100);assert.equal(parked.h.get('maxFatigue'),0);
+ parked.h.frame({ear:.3,noseX:.5,stepMs:150});
+ assert.equal(parked.h.get('turnedSince'),0);assert.equal(parked.h.get('fatigue'),0);
+});
+
+test('turn hold composes with primary elapsed and time-PERCLOS flags without changing confidence or eye metrics',()=>{
+ for(const query of ['?fatigue-timing=elapsed','?perclos=time','?fatigue-timing=elapsed&perclos=time']){
+  const base=distractionSession(query,true,150),hold=distractionSession(query+'&turn-fatigue=hold',true,150);
+  assert.equal(hold.h.get('experimentFlags.primary'),true);
+  for(let elapsed=150;elapsed<=25000;elapsed+=150){
+   base.h.frame({ear:.3,noseX:.7,stepMs:150});hold.h.frame({ear:.3,noseX:.7,stepMs:150});
+   assert.equal(hold.h.get('fatigue'),0,query);
+   for(const field of ['confidence','microsleeps','turnedSince','totalDistractionMs'])assert.equal(hold.h.get(field),base.h.get(field),field);
+   assert.equal(hold.h.el('perclos').textContent,base.h.el('perclos').textContent);
+  }
+  assert.ok(base.h.get('fatigue')>0,query);
+ }
+});
+
+test('invalid turn hold flags leave every ordinary scoring sample byte-identical',()=>{
+ for(const query of ['?turn-fatigue=hold&turn-fatigue=hold','?turn-fatigue=hold&turn-fatigue=off','?turn-fatigue=Hold','?turn-fatigue=true','?turn-fatigue=hold%20']){
+  const ordinary=distractionSession('',true,150),invalid=distractionSession(query,true,150);
+  assert.equal(invalid.h.get('experimentFlags.any'),false,query);assert.equal(invalid.h.get('experimentController'),null,query);
+  for(let elapsed=150;elapsed<=25000;elapsed+=150){
+   ordinary.h.frame({ear:.3,noseX:.7,stepMs:150});invalid.h.frame({ear:.3,noseX:.7,stepMs:150});
+   assert.equal(JSON.stringify(invalid.h.state()),JSON.stringify(ordinary.h.state()),query);
+  }
  }
 });

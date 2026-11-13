@@ -85,12 +85,12 @@ export function scoringDistractionSeconds(state, nowMs) {
     return Math.round((state.totalDistractionMs + (state.turnedSince ? nowMs - state.turnedSince : 0)) / 1000);
 }
 
-export function scoringTrackedFrame(state, frame, nowMs) {
+export function scoringTrackedFrame(state, frame, nowMs, holdTurnFatigue = false) {
     const next = { ...state };
     if (frame.turned) {
         next.confidence = Math.max(35, next.confidence - 5);
         if (next.turnedSince && nowMs - next.turnedSince > 3000)
-            next.fatigue += 2;
+            next.fatigue += holdTurnFatigue ? 0 : 2;
         else
             next.fatigue = Math.max(0, next.fatigue - 1);
     } else {

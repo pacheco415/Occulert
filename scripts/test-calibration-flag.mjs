@@ -25,6 +25,14 @@ test('exact calibration-min=12 is named, local-only and non-primary in both actu
     assert.deepEqual([...flags.names],['calibrationMin']);
     assert.deepEqual(structuredClone(helper.module.exports.parseFlags('?calibration-min=12')),structuredClone(flags));
 });
+test('both actual parsers agree on turn-fatigue hold, combinations and invalid values', () => {
+    for (const query of ['?turn-fatigue=hold','?turn-fatigue=hold&perclos=time',
+        '?turn-fatigue=hold&turn-fatigue=hold','?turn-fatigue=hold&turn-fatigue=off','?turn-fatigue=Hold','?turn-fatigue=true']) {
+        const {flags,minimum}=selection(query);
+        assert.equal(minimum,1);
+        assert.deepEqual(structuredClone(flags),structuredClone(helper.module.exports.parseFlags(query)),query);
+    }
+});
 for (const query of ['', '?calibration-min=12&calibration-min=12','?calibration-min=012','?calibration-min=true']) test(`calibration selection preserves the released default for ${query||'empty query'}`, () => {
     const {flags,minimum}=selection(query);assert.equal(minimum,1);assert.equal(flags.any,false);assert.equal(flags.primary,false);
     assert.deepEqual([...flags.names],[]);

@@ -14,6 +14,28 @@ import { landmarks } from '../tests/helpers/scoring-replay-geometry.mjs';
 const compiled = await buildDriverArtifact({ sourceRoot: fileURLToPath(new URL('../src', import.meta.url)),
     contractPath: fileURLToPath(new URL('../source-driver-contract.json', import.meta.url)) });
 
+test('parked turn hold changes only the mature-turn increment and preserves default scoring bytes', () => {
+    const state = initialScoringState({ calibrating: false, calibrated: true, confidence: 100,
+        fatigue: 50, maxFatigue: 55, turnedSince: SCORING_EPOCH, fatigueSampleSum: 200, fatigueSampleCount: 4 });
+    for (const elapsed of [0, 2999, 3000, 3001, 25000]) {
+        for (const turned of [false, true]) {
+            const frame = { ear: .1, turned, nod: true, perclos: 60 }, now = SCORING_EPOCH + elapsed;
+            const released = scoringTrackedFrame(state, frame, now);
+            const disabled = scoringTrackedFrame(state, frame, now, false);
+            assert.equal(JSON.stringify(disabled), JSON.stringify(released));
+            const held = scoringTrackedFrame(state, frame, now, true);
+            if (turned && elapsed > 3000) {
+                assert.deepEqual(held, { ...released, fatigue: 50, fatigueSampleSum: 250 });
+            } else assert.equal(JSON.stringify(held), JSON.stringify(released));
+        }
+    }
+    assert.equal(state.fatigue, 50, 'The pure scorer never mutates its input');
+    const alreadyFatigued = scoringTrackedFrame({ ...state, fatigue: 80, maxFatigue: 80 },
+        { ear: .3, turned: true, nod: false, perclos: 0 }, SCORING_EPOCH + 25000, true);
+    assert.equal(scoringAlertCandidate(alreadyFatigued), 'Fatigue', 'The experiment does not change alert priority or erase existing fatigue');
+    assert.equal(scoringYawn(alreadyFatigued).fatigue, 88, 'Accepted yawns retain the existing score contribution');
+});
+
 test('accepted yawn preserves the +8 cap, updates the peak immediately and leaves scored averages untouched', () => {
     for (const [fatigue, maxFatigue, expected, peak] of [[0,0,8,8],[72,75,80,80],[95,97,100,100],[100,100,100,100],[50,90,58,90]]) {
         const before = initialScoringState({ fatigue, maxFatigue, fatigueSampleSum: 216, fatigueSampleCount: 3 });
