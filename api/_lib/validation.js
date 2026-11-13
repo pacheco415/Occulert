@@ -19,6 +19,12 @@ function integerOrNull(value) {
   const count = numberOrNull(value, 0, 10000);
   return count === null ? null : Math.round(count);
 }
+// Postgres text rejects NUL and unpaired UTF-16 surrogates, and cutting a
+// string to its limit can split an emoji into one. Unfiltered, either one made
+// the database refuse the whole row, which callers reported as an outage.
+function storableText(value, max) {
+  return String(value || "").replace(/\0/g, "").trim().slice(0, max).toWellFormed();
+}
 function isJsonMediaType(request) {
   const mediaType = String(request.headers?.['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
   return mediaType === 'application/json';
@@ -36,4 +42,4 @@ function jsonObjectWithinLimit(body, maxLength) {
 function validJsonBody(request, maxLength = 4096) {
   return isJsonMediaType(request) && jsonObjectWithinLimit(request.body, maxLength);
 }
-module.exports = { isUuid, numberOrNull, strictNumberOrNull, integerOrNull, isJsonMediaType, isJsonObject, jsonObjectWithinLimit, validJsonBody };
+module.exports = { storableText, isUuid, numberOrNull, strictNumberOrNull, integerOrNull, isJsonMediaType, isJsonObject, jsonObjectWithinLimit, validJsonBody };
