@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createRequire} from 'node:module';
-const require=createRequire(import.meta.url),{isUuid,numberOrNull,strictNumberOrNull,integerOrNull,validJsonBody}=require('../api/_lib/validation.js');
+const require=createRequire(import.meta.url),{isUuid,numberOrNull,strictNumberOrNull,integerOrNull,validJsonBody,storableText}=require('../api/_lib/validation.js');
+test('stored text is trimmed, bounded and always acceptable to Postgres',()=>{
+ assert.equal(storableText('  Safe Transit  ',160),'Safe Transit');
+ assert.equal(storableText('a\u0000b',10),'ab');
+ assert.equal(storableText(null,10),'');
+ assert.equal(storableText('ab\u{1F600}',4),'ab\u{1F600}','a whole emoji inside the limit is kept');
+ assert.equal(storableText('abc\u{1F600}',4),'abc\uFFFD','a cut through an emoji leaves no unpaired surrogate');
+ assert.equal(storableText('x\uD800y',10),'x\uFFFDy');
+ for(const value of ['abc\u{1F600}','\uDC00','x\uD800'])assert.equal(storableText(value,4).isWellFormed(),true);
+});
 test('UUID validation never coerces client values',()=>{
  assert.equal(isUuid('f89d1cf9-893f-4fb6-a924-6669b4568221'),true);assert.equal(isUuid('F89D1CF9-893F-4FB6-A924-6669B4568221'),true);
  for(const value of [null,undefined,{},[],1,'','not-a-uuid',' f89d1cf9-893f-4fb6-a924-6669b4568221'])assert.equal(isUuid(value),false);
