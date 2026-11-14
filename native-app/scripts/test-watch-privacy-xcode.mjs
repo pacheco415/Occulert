@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { createWatchPrivacyFixture, privacyMembership, repairWatchPrivacy, runReactNativePrivacyAggregation, parsePlist } from './lib/watch-privacy-fixture.mjs';
@@ -30,7 +30,19 @@ function checkFixed(fixture) {
   return membership;
 }
 
-test('actual RN aggregation reproduces the old duplicate and repaired/repeated prebuild compiles one Watch manifest', { timeout: 600000 }, async () => {
+function checkBuiltWatch(fixture, suffix) {
+  const product = buildWatch(fixture, suffix);
+  const copied = join(product, 'PrivacyInfo.xcprivacy');
+  assert.ok(existsSync(copied));
+  const compiledManifest = JSON.parse(fixture.run('plutil', ['-convert', 'json', '-o', '-', copied]));
+  assert.deepEqual(compiledManifest, parsePlist(fixture.originalWatch.toString()),
+    'compiled Watch bundle must contain all and only its own source declarations, regardless of plist encoding');
+  assert.deepEqual(readFileSync(fixture.watchManifest), fixture.originalWatch);
+  assert.deepEqual(compiledManifest.NSPrivacyAccessedAPITypes,
+    [{ NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategorySystemBootTime', NSPrivacyAccessedAPITypeReasons: ['35F9.1'] }]);
+}
+
+test('actual RN aggregation reproduces the old duplicate and the actual local repair compiles one Watch manifest', { timeout: 600000 }, async () => {
   const fixture = createWatchPrivacyFixture({ legacy: true });
   try {
     fixture.prebuild();
@@ -52,49 +64,27 @@ test('actual RN aggregation reproduces the old duplicate and repaired/repeated p
     const phoneBefore = broken.phone;
     const phoneBytes = readFileSync(phoneBefore[0].path);
     const phoneDeclarations = parsePlist(phoneBytes.toString());
-    const brokenProject = readFileSync(fixture.projectPath);
     await repairWatchPrivacy(fixture);
     assert.deepEqual(checkFixed(fixture).phone, phoneBefore, 'the local repair must preserve the phone file/build references');
     assert.deepEqual(readFileSync(phoneBefore[0].path), phoneBytes, 'the local repair must not write the phone manifest');
-    // The full Expo repair must also see the untouched graph produced by RN,
-    // rather than benefiting from the isolated local-mod preservation check.
-    writeFileSync(fixture.projectPath, brokenProject);
-    assert.deepEqual(privacyMembership(fixture), broken);
-    fixture.useFix();
-    fixture.prebuild();
-    // Expo merges the newly configured empty privacy declaration, including its
-    // default tracking-domain array, and may regenerate phone reference UUIDs.
-    const mergedDeclarations = { ...phoneDeclarations, NSPrivacyTrackingDomains: [] };
-    assert.deepEqual(parsePlist(readFileSync(phoneBefore[0].path, 'utf8')), mergedDeclarations,
-      'full Expo repair must preserve all prior phone declarations');
     const firstAggregation = runReactNativePrivacyAggregation(fixture);
     assert.equal(firstAggregation.aggregationPath, phoneBefore[0].path);
-    assert.deepEqual(parsePlist(readFileSync(phoneBefore[0].path, 'utf8')), mergedDeclarations);
+    assert.deepEqual(parsePlist(readFileSync(phoneBefore[0].path, 'utf8')), phoneDeclarations);
     const fixed = checkFixed(fixture);
     const aggregatedPhoneBytes = readFileSync(phoneBefore[0].path);
     runReactNativePrivacyAggregation(fixture);
     assert.deepEqual(checkFixed(fixture), fixed, 'actual repeated aggregation must preserve every resource reference');
     assert.deepEqual(readFileSync(phoneBefore[0].path), aggregatedPhoneBytes, 'actual repeated aggregation must be byte-identical');
-    fixture.prebuild();
+    await repairWatchPrivacy(fixture);
     runReactNativePrivacyAggregation(fixture);
-    const repeated = checkFixed(fixture);
-    assert.deepEqual(repeated.phone.map(file => file.path), fixed.phone.map(file => file.path));
-    assert.deepEqual({ ...repeated, phone: [] }, { ...fixed, phone: [] },
-      'repeated prebuild and actual aggregation must preserve exact Watch identities and one-copy membership');
-    assert.deepEqual(parsePlist(readFileSync(phoneBefore[0].path, 'utf8')), mergedDeclarations);
-    const product = buildWatch(fixture, 'fixed-output');
-    const copied = join(product, 'PrivacyInfo.xcprivacy');
-    assert.ok(existsSync(copied));
-    const compiledManifest = JSON.parse(fixture.run('plutil', ['-convert', 'json', '-o', '-', copied]));
-    assert.deepEqual(compiledManifest, parsePlist(fixture.originalWatch.toString()),
-      'compiled Watch bundle must contain all and only its own source declarations, regardless of plist encoding');
-    assert.deepEqual(readFileSync(fixture.watchManifest), fixture.originalWatch);
-    assert.deepEqual(compiledManifest.NSPrivacyAccessedAPITypes,
-      [{ NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategorySystemBootTime', NSPrivacyAccessedAPITypeReasons: ['35F9.1'] }]);
+    assert.deepEqual(checkFixed(fixture), fixed, 'repeated local repair and actual aggregation must preserve every resource identity');
+    assert.deepEqual(readFileSync(phoneBefore[0].path), aggregatedPhoneBytes);
+    assert.deepEqual(parsePlist(readFileSync(phoneBefore[0].path, 'utf8')), phoneDeclarations);
+    checkBuiltWatch(fixture, 'repaired-output');
   } finally { fixture.cleanup(); }
 });
 
-test('clean full Expo generation keeps RN aggregation in the generated phone file', { timeout: 180000 }, () => {
+test('clean and repeated Expo generation aggregate only the phone file and compile one Watch manifest', { timeout: 420000 }, () => {
   const fixture = createWatchPrivacyFixture();
   try {
     fixture.prebuild();
@@ -105,5 +95,17 @@ test('clean full Expo generation keeps RN aggregation in the generated phone fil
     const phone = parsePlist(readFileSync(before.phone[0].path, 'utf8'));
     assert.ok(phone.NSPrivacyAccessedAPITypes.some(api => api.NSPrivacyAccessedAPIType === 'NSPrivacyAccessedAPICategoryUserDefaults'),
       'the actual RN implementation must add its phone core API declarations');
+    fixture.prebuild();
+    const regenerated = checkFixed(fixture);
+    assert.deepEqual(parsePlist(readFileSync(regenerated.phone[0].path, 'utf8')), {
+      NSPrivacyAccessedAPITypes: [], NSPrivacyCollectedDataTypes: [],
+      NSPrivacyTracking: false, NSPrivacyTrackingDomains: [],
+    }, 'clean prebuild recreates the phone manifest before CocoaPods aggregation');
+    const reaggregation = runReactNativePrivacyAggregation(fixture);
+    assert.equal(reaggregation.aggregationPath, regenerated.phone[0].path);
+    assert.deepEqual(checkFixed(fixture), regenerated);
+    assert.deepEqual(parsePlist(readFileSync(regenerated.phone[0].path, 'utf8')), phone,
+      'actual RN reaggregation must restore the complete phone declarations after clean generation');
+    checkBuiltWatch(fixture, 'clean-output');
   } finally { fixture.cleanup(); }
 });

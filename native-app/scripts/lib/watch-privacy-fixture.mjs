@@ -38,9 +38,11 @@ export function createWatchPrivacyFixture({ legacy = false } = {}) {
       maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'], ...options });
   }
   return { root, directory, projectPath, watchManifest, originalWatch, env, run,
-    prebuild: () => run(process.execPath, [require.resolve('expo/bin/cli'), 'prebuild', '--platform', 'ios', '--no-install']),
+    // Exercise the release path explicitly. Expo 58 defaults to clean generation;
+    // existing-graph repair is tested separately through the actual local mod.
+    prebuild: () => run(process.execPath, [require.resolve('expo/bin/cli'),
+      'prebuild', '--platform', 'ios', '--no-install', '--clean']),
     introspect: () => JSON.parse(run(process.execPath, [require.resolve('expo/bin/cli'), 'config', '--type', 'introspect', '--json'])),
-    useFix: () => writeFileSync(configPath, currentConfig),
     project: () => XcodeProject.open(projectPath),
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };

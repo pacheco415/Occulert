@@ -46,7 +46,7 @@ function androidManifest(services = []) {
 const androidPermissions = manifest => manifest.manifest['uses-permission'].map(entry => entry.$['android:name']).sort();
 const expectedAudioPermissions = ['CAMERA', 'VIBRATE', 'WAKE_LOCK', 'MODIFY_AUDIO_SETTINGS'].map(name => 'android.permission.' + name).sort();
 
-test('actual Expo config and repeated prebuild give phone and Watch exactly one separate privacy resource', () => {
+test('actual Expo config and repeated clean prebuild give phone and Watch exactly one separate privacy resource', () => {
   const fixture = createWatchPrivacyFixture();
   try {
     assert.equal(existsSync(join(fixture.directory, 'ios')), false);
@@ -71,7 +71,7 @@ test('actual Expo config and repeated prebuild give phone and Watch exactly one 
     fixture.prebuild();
     const repeated = privacyMembership(fixture);
     assert.deepEqual(repeated.phone.map(file => file.path), before.phone.map(file => file.path),
-      'Expo may regenerate phone reference UUIDs but must retain exactly one phone-owned resource');
+      'clean Expo generation replaces phone UUIDs but must retain exactly one phone-owned resource');
     assert.deepEqual({ ...repeated, phone: [] }, { ...before, phone: [] },
       'repeat generation must preserve Watch resource identities and one-copy membership');
     assert.deepEqual(readFileSync(fixture.watchManifest), fixture.originalWatch);

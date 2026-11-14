@@ -43,7 +43,7 @@ module.exports = function withWatchPrivacy(config) {
     assert.equal(exceptions.length, 1, 'Expected one Watch membership exception set.');
 
     const resources = watch.getResourcesBuildPhase();
-    // Repair a soft prebuild after RN previously added the phone resource.
+    // Repair existing membership after RN previously added the phone resource.
     // Remove only that Watch build-file membership, never the shared phone file
     // reference or the phone target's own resource membership.
     for (const file of resources.getFileReferences()) {
