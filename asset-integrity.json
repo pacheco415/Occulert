@@ -119,5 +119,6 @@
   "fleet-dashboard.v10.js": "82a89f29070f1dc7b52ede9c60e54fb633a640c83ebcec0b0f0c40f25ba68ddb",
   "driver-startup-guard.v45.js": "3fc02cf3cc75a2db09a13f1c5a9de4bee37a5a0b380107392a9b2477ce24f155",
   "fleet-dashboard.v8.js": "7d56adc1415beb6695f22e9344bb59c9326bcaec3a5849180660a880954faef5",
-  "fleet-dashboard.v11.js": "776d46ed25e3bf8581e6b18aec1288bf5f23d359173527139570c005b035f8ce"
+  "fleet-dashboard.v11.js": "776d46ed25e3bf8581e6b18aec1288bf5f23d359173527139570c005b035f8ce",
+  "fleet-dashboard.v13.js": "238ff65443e5ef7babf5054e458b9c2043d46818ccf4ad26a233f8784f019f00"
 }

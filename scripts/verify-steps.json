@@ -109,7 +109,8 @@
     "test:emergency-readiness",
     "test:road-model-benchmark",
     "test:fleet-monthly-activity",
-    "test:corroboration-replay"
+    "test:corroboration-replay",
+    "test:fleet-entitlements"
   ],
   "additionalChecks": [
     "test:verify-runner"

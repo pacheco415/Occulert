@@ -277,3 +277,13 @@ deploying dependent source. No migration was applied as part of source work.
 A missing or failed aggregate is reported as null and shown as unavailable;
 existing roster and recent-session reporting still work. See
 [the definition and boundaries](docs/FLEET_MONTHLY_ACTIVITY.md).
+
+## Plan and usage summary (test mode)
+
+The optional `entitlements` value in `GET /api/fleet-summary` reads `plan` and
+`status` from `fleet_billing_test` and needs no new migration. It is
+informational: no route refuses a request because of it. Leave
+`OCCULERT_ENTITLEMENT_ENFORCEMENT_ENABLED` unset; no route consults the check it
+controls. A failed billing read is reported as null and shown as unavailable,
+and a database without the test-billing migration reports a trial. See
+[the plan and usage summary](docs/BILLING_INTEGRATION.md#plan-and-usage-summary-test-mode).

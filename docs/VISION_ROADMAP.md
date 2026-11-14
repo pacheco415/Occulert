@@ -285,6 +285,7 @@ Pricing hypothesis for owner review: retain standalone monitoring and existing s
 - **Change:** server-only entitlement checks derived from `fleet_billing_test`, behind a flag that defaults to allowing everything. Show the owner what their plan would limit.
 - **Do not:** lock any driver out of safety alerts, or read entitlements from the client.
 - **Done when:** API and DB tests pass and `docs/BILLING_INTEGRATION.md` is updated.
+- **State:** merged as [#427](https://github.com/pacheco415/Occulert/pull/427). `GET /api/fleet-summary` reports a test-mode plan summary and the fleet dashboard shows it to the owner; see [the plan and usage summary](BILLING_INTEGRATION.md#plan-and-usage-summary-test-mode). The server check sits behind `OCCULERT_ENTITLEMENT_ENFORCEMENT_ENABLED`, which defaults to off, and no route consults it, so nothing is enforced. The limits are the pricing page's proposals; approved prices (Task 5.3) and an enforcement design remain open.
 
 ### Task 5.3 — Pricing page update
 
