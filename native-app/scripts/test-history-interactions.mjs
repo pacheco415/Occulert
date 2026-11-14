@@ -1,9 +1,98 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHistoryFixture, mixedSessions, COMPLETE_REVIEW } from './lib/history-test-harness.mjs';
+import { parseSessionHistory } from '../lib/sessionHistoryData.ts';
 
 const unansweredSnapshot = () => ({ version: 1, mode: 'observation-only', evidence: 'software-output-accepted', candidates: 6,
   byMotion: { unknown: 1, unavailable: 1, denied: 1, stale: 1, 'not-moving': 1, 'reported-activity': 1 } });
+
+function acceptedHistoryFixture(sessions) {
+  const raw = JSON.stringify({ schemaVersion: 1, sessions });
+  assert.deepEqual(parseSessionHistory(raw), sessions, 'these saved records are accepted by the production parser');
+  const fixture = createHistoryFixture({ sessions });
+  fixture.stored.set('occulert-session-history', raw);
+  return { fixture, raw };
+}
+
+function renderedText(node) {
+  return node.findAllByType('Text').map(text => text.children.join(''));
+}
+
+test('legacy build fields keep JSX text behavior without rewriting accepted History records', async () => {
+  const variants = [
+    { appVersion: true, appBuildNumber: '1', expected: 'App  · Build 1' },
+    { appVersion: '2', appBuildNumber: true, expected: 'App 2 · Build ' },
+    { appVersion: false, appBuildNumber: null, expected: 'App not recorded · Build not recorded' },
+    { appVersion: 0, appBuildNumber: 0, expected: 'App not recorded · Build not recorded' },
+    { appVersion: ['v', true, null, 2, ['.', '3', false]], appBuildNumber: [true, 4], expected: 'App v2.3 · Build 4' },
+    { appVersion: 7, appBuildNumber: 8, expected: 'App 7 · Build 8' },
+  ];
+  const sessions = variants.map(({ expected, ...values }, index) => ({
+    sessionId: `legacy-build-${index}`, savedAt: '2026-10-04T08:00:00.000Z', durationSec: 3, ...values,
+  }));
+  const { fixture: f, raw } = acceptedHistoryFixture(sessions);
+  await f.mount();
+  try {
+    variants.forEach(({ expected }, index) => assert.ok(renderedText(f.card(`legacy-build-${index}`)).includes(expected), expected));
+    assert.deepEqual(f.records(), sessions);
+    assert.equal(f.stored.get('occulert-session-history'), raw);
+    assert.equal(f.writes.filter(write => write.key === 'occulert-session-history').length, 0);
+  } finally { await f.unmount(); }
+});
+
+test('overflow from accepted finite fusion counters remains visible in actual History', async () => {
+  const sensorFusion = {
+    mode: 'observation-only', camera: { samples: 1, trackedSamples: 1 },
+    headphone: { samples: 0 }, watch: { checked: false },
+    coincidences: { cameraHeadphoneNods: 1e308, elevatedCameraHeadphoneNods: 1e308 },
+  };
+  const sessions = [0, 1].map(index => ({ sessionId: `large-${index}`, savedAt: '2026-10-04T08:00:00.000Z', sensorFusion }));
+  const { fixture: f, raw } = acceptedHistoryFixture(sessions);
+  await f.mount();
+  try {
+    await f.invoke(f.root.findByProps({ accessibilityHint: 'Shows local aggregate camera, headphone, and Apple Watch observation coverage' }));
+    assert.ok(renderedText(f.root).includes('Camera + headphone head-nod overlap: Infinity across 2 sessions · Infinity during elevated camera observations'));
+    await f.invoke(f.card('large-0').findByProps({ accessibilityLabel: 'Show session review details' }));
+    assert.ok(renderedText(f.card('large-0')).includes('Head-nod overlap: 1e+308 camera + headphone · 1e+308 during elevated camera observations'));
+    assert.deepEqual(f.records(), sessions);
+    assert.equal(f.stored.get('occulert-session-history'), raw);
+    assert.equal(f.writes.filter(write => write.key === 'occulert-session-history').length, 0);
+  } finally { await f.unmount(); }
+});
+
+test('legacy diagnostic fields retain JSX suppression and template interpolation separately', async () => {
+  const sessions = [{
+    sessionId: 'legacy-diagnostics', savedAt: '2026-10-04T08:00:00.000Z',
+    monitorPerformance: {
+      timeToFirstSampleMs: true, p95InferenceMs: true, averageSampleIntervalMs: false, uiUpdatesPerSecond: null,
+      alertTiming: { alertsTriggered: 1, averagePhoneDispatchMs: true, maxPhoneDispatchMs: false,
+        watchLiveAcknowledgements: true, watchResults: false, averageWatchRoundTripMs: true, watchQueuedFallbacks: true },
+    },
+    headNodObservations: true, cameraHeadNodObservations: false, headphoneHeadNodObservations: true, headphoneMotionSamples: null,
+    sensorFusion: { mode: 'observation-only', camera: { trackedSamples: true, samples: false, watchSamples: null },
+      headphone: {}, watch: {}, coincidences: { cameraHeadphoneNods: false, elevatedCameraHeadphoneNods: true } },
+  }];
+  const { fixture: f, raw } = acceptedHistoryFixture(sessions);
+  await f.mount();
+  try {
+    await f.invoke(f.card('legacy-diagnostics').findByProps({ accessibilityLabel: 'Show session review details' }));
+    const text = renderedText(f.card('legacy-diagnostics'));
+    for (const expected of [
+      'First camera sample: true ms',
+      'Inference p95:  ms · Average sample interval:  ms',
+      'Display updates: /sec · Camera stalls: ',
+      'Phone software dispatch:  ms average ·  ms max',
+      'Watch live acknowledgements: / · true ms average round trip · true queued backup',
+      'Camera candidates: ',
+      'Headphone candidates:  from 0 transient samples',
+      'Camera: / tracked samples · 0 watch · 0 closed',
+      'Head-nod overlap:  camera + headphone ·  during elevated camera observations',
+    ]) assert.ok(text.includes(expected), expected);
+    assert.deepEqual(f.records(), sessions);
+    assert.equal(f.stored.get('occulert-session-history'), raw);
+    assert.equal(f.writes.filter(write => write.key === 'occulert-session-history').length, 0);
+  } finally { await f.unmount(); }
+});
 
 test('actual History TSX distinguishes unknown/zero metrics and exposes accessible review expansion', async () => {
   const f = createHistoryFixture({ sessions: mixedSessions() });

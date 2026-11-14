@@ -139,6 +139,7 @@ export function createAlertSystemFixture({ inline = true, state = 'closed', clos
   vm.runInNewContext(guidanceCode, {
     module: guidanceModule, exports: guidanceModule.exports, require: specifier => bridges[specifier],
     AlertSystem, View: native.View, Text: native.Text, s: monitorStyles,
+    ...load(path.join(nativeRoot, 'lib/strings.ts')),
     ...load(path.join(nativeRoot, 'lib/frontCameraSwitch.ts')),
   }, { filename: 'MonitorGuidanceFixture.tsx', timeout: 1000 });
   const { MonitorGuidance } = guidanceModule.exports;

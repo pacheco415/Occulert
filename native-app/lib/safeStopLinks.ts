@@ -1,3 +1,4 @@
+import { strings } from './strings.ts';
 export type SafeStopKind = 'rest-area' | 'gas-station' | 'food-coffee';
 
 export interface SafeStopOption {
@@ -7,9 +8,9 @@ export interface SafeStopOption {
 }
 
 export const SAFE_STOP_OPTIONS: readonly SafeStopOption[] = [
-  { kind: 'rest-area', label: 'Rest area', detail: 'Search for a nearby place to park and rest' },
-  { kind: 'gas-station', label: 'Gas station', detail: 'Search for a nearby staffed stop' },
-  { kind: 'food-coffee', label: 'Food or coffee', detail: 'Search for a nearby open business' },
+  { kind: 'rest-area', label: strings.monitor.safeStop.restArea.label, detail: strings.monitor.safeStop.restArea.detail },
+  { kind: 'gas-station', label: strings.monitor.safeStop.gasStation.label, detail: strings.monitor.safeStop.gasStation.detail },
+  { kind: 'food-coffee', label: strings.monitor.safeStop.foodCoffee.label, detail: strings.monitor.safeStop.foodCoffee.detail },
 ];
 
 const SEARCH_QUERIES: Record<SafeStopKind, string> = {

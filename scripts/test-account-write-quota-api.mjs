@@ -291,7 +291,7 @@ for (const route of ['profile', 'fleets']) test(`${route} shares the remaining p
 });
 
 test('migration reporting names both dependent POST routes and keeps the prerequisite explicit', () => {
-  const version = '20261114183018', rows = migrationInventory().filter(row => row.version);
+  const version = '20261114210442', rows = migrationInventory().filter(row => row.version);
   const report = statusReport(rows.filter(row => row.version !== version).map(row => ({ version: row.version })));
   assert.equal(report.pending.length, 1);
   assert.deepEqual(report.pending[0].dependent_api_routes, ['/api/profile', '/api/fleets']);

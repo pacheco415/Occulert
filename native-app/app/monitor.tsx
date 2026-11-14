@@ -1,3 +1,4 @@
+import { strings, formatString } from '../lib/strings.ts';
 import { useMonitorCloudAlerts } from '../hooks/useMonitorCloudAlerts';
 import { useMonitorCameraIdentity } from '../hooks/useMonitorCameraIdentity';
 import { useMonitorCameraLifecycle } from '../hooks/useMonitorCameraLifecycle';
@@ -98,7 +99,7 @@ export default function MonitorScreen() {
   const eyeBaselineRef = useRef<number | null>(null);
   const [baselineLoaded, setBaselineLoaded] = useState(!EYE_BASELINE_EXPERIMENT);
   const [baselineBusy, setBaselineBusy] = useState(false);
-  const [baselineMessage, setBaselineMessage] = useState('Parked eye-baseline experiment · local sessions only.');
+  const [baselineMessage, setBaselineMessage] = useState<string>(strings.monitor.baseline.initial);
   const baselineCollectorRef = useRef(new ParkedEyeBaseline());
   const baselineGenerationRef = useRef(0);
   const cameraBaselineRevisionRef = useRef(0);
@@ -414,8 +415,8 @@ export default function MonitorScreen() {
         reservedSessionId = nextSessionId;
       } catch (error) {
         setSensorFault(error instanceof ActiveSessionCheckpointConflictError
-          ? 'Monitoring did not start because a previous interrupted drive still needs recovery. Return Home and retry recovery before starting again.'
-          : 'Monitoring did not start because local recovery storage could not be verified. Return Home and retry before starting again.');
+          ? strings.monitor.faults.recoveryRequired
+          : strings.monitor.faults.recoveryUnverified);
         return;
       }
       if (shouldAbortMonitoringStart(
@@ -430,7 +431,7 @@ export default function MonitorScreen() {
       reset();
       simulatorProofRef.current = '';
       sessionEyeBaselineRef.current = eyeBaselineRef.current;
-      if(EYE_BASELINE_EXPERIMENT)setBaselineMessage(sessionEyeBaselineRef.current===null?'Experimental local session uses current presets; no personal baseline was saved.':'Experimental local session uses the saved parked baseline.');
+      if(EYE_BASELINE_EXPERIMENT)setBaselineMessage(sessionEyeBaselineRef.current===null?strings.monitor.baseline.sessionPresets:strings.monitor.baseline.sessionSaved);
       baselineGenerationRef.current += 1;
       setupPreviewActiveRef.current = false;
       setSetupPreviewActive(false);
@@ -655,8 +656,8 @@ export default function MonitorScreen() {
         // A local storage problem must not trap a fatigued driver inside
         // Occulert. Monitoring has already been disarmed before saving starts.
         Alert.alert(
-          'Drive may not be fully saved',
-          'Monitoring has stopped. Occulert will still open Maps so you can find a safer place to stop.',
+          strings.monitor.dialogs.incompleteSaveTitle,
+          strings.monitor.dialogs.incompleteSaveMaps,
         );
       }
 
@@ -672,8 +673,8 @@ export default function MonitorScreen() {
       }
       if (!opened) {
         Alert.alert(
-          'Unable to open Maps',
-          `After you are safely parked, open your maps app and search for “${safeStopSearchQuery(kind)}”.`,
+          strings.monitor.dialogs.mapsUnavailableTitle,
+          formatString(strings.monitor.dialogs.mapsUnavailableDetail, { query: safeStopSearchQuery(kind) }),
         );
       }
     } finally {
@@ -689,8 +690,8 @@ export default function MonitorScreen() {
       navigate,
       () => {
         Alert.alert(
-          'Drive may not be fully saved',
-          'Monitoring has stopped, but Occulert could not finish saving this drive.',
+          strings.monitor.dialogs.incompleteSaveTitle,
+          strings.monitor.dialogs.incompleteSaveNavigation,
         );
       },
     );
@@ -724,11 +725,11 @@ export default function MonitorScreen() {
       // the false impression that face monitoring continued behind another app.
       deliverMonitoringPausedCue();
       setSensorFault(
-        'Face monitoring paused. Monitoring stopped when Occulert left the foreground. Restart only after you are safely parked.',
+        strings.monitor.faults.foregroundEnded,
       );
       void handleStopRef.current({ deferCloudFinalization: true }).catch(() => {
         setSensorFault(
-          'Face monitoring paused. Monitoring stopped when Occulert left the foreground, but this drive could not be saved.',
+          strings.monitor.faults.foregroundSaveFailed,
         );
       });
     });

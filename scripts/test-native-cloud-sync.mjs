@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
+import ts from 'typescript';
+import { strings, formatString } from '../native-app/lib/strings.ts';
 import { createSingleFlightActionRunner } from '../native-app/lib/singleFlightAction.ts';
 import { createAsyncMutationQueue } from '../native-app/lib/asyncMutationQueue.ts';
 import { createCachedBooleanPreference } from '../native-app/lib/cachedBooleanPreference.ts';
@@ -17,6 +19,21 @@ import { SUPABASE_HOST as WEB_SUPABASE_HOST } from './lib/csp-policy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
+function assertCatalogCopy(source, key, expected) {
+  const file = ts.createSourceFile('native-copy.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const imported = file.statements.some(node => ts.isImportDeclaration(node)
+    && /(?:^|\/)strings(?:\.ts)?$/.test(node.moduleSpecifier.text)
+    && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+    && node.importClause.namedBindings.elements.some(item => !item.isTypeOnly && item.name.text === 'strings' && !item.propertyName));
+  let bound = false;
+  function visit(node) {
+    if (ts.isPropertyAccessExpression(node) && node.getText(file) === `strings.${key}`) bound = true;
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  assert.ok(imported && bound, `${key}: use the actual catalog binding`);
+  assert.equal(key.split('.').reduce((value, part) => value?.[part], strings), expected, `${key}: preserve released English`);
+}
 
 const cloud = read('native-app/lib/cloudSync.ts');
 const monitorOwners = readNativeMonitorSourceOwners();
@@ -198,11 +215,11 @@ assert.match(
 assert.match(monitorOwners.analysis, /headNodObservationsRef\.current \+= 1/);
 assert.match(cloud, /Candidate head-nod observations remain local until device validation/);
 assert.match(settings, /<CloudSyncCard \/>/);
-assert.match(historyOwners.review, /This alert rating stays only on this iPhone/);
-assert.match(historyOwners.diagnostics, /Does not trigger alerts/);
+assertCatalogCopy(historyOwners.review, "history.review.ratingPrivacy", "This alert rating stays only on this iPhone. Choose the best match after parking. It is included only if you choose to send feedback.");
+assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.headMotionCaution", "Saved locally as aggregate observations only and included only if you choose Send session feedback. Does not trigger alerts or change scores.");
 
 assert.match(cloudCard, /createSingleFlightActionRunner/);
-assert.match(cloudCard, /could not complete or confirm that change/);
+assertCatalogCopy(cloudCard, "settings.cloud.unavailableDetail", "Occulert could not complete or confirm that change. Please check your connection and try again.");
 assert.doesNotMatch(cloudCard, /applyConsent\([^)]*\)\.catch\(\(\) => \{\}\)/);
 assert.match(cloudCard, /backgroundColor: colors\.blueStrong/);
 assert.ok(
@@ -344,7 +361,7 @@ const cloudToken = (owner, access_token = `${owner}-fresh-access`) => ({
 });
 const logoutRequests = fixture => fixture.requests.filter(({ url }) => new URL(url).pathname === '/auth/v1/logout');
 const refreshRequests = fixture => fixture.requests.filter(({ url }) => url.includes('grant_type=refresh_token'));
-function signOutFixture(initial = cloudAuth()) {
+function signOutFixture(initial = cloudAuth(), platform = { OS: 'ios', Version: '27.1' }) {
   const secure = new Map(initial ? [[signOutAuthKey, JSON.stringify(initial)]] : []);
   const storage = new Map([[signOutConsentKey, 'true'], [SESSION_SUMMARY_OUTBOX_KEY, JSON.stringify({ old: [] })]]);
   const requests = [], timers = new Map(), events = [];
@@ -370,7 +387,7 @@ function signOutFixture(initial = cloudAuth()) {
       removeItem: async key => { events.push('outbox-clear'); storage.delete(key); },
     },
     createAsyncMutationQueue, createCachedBooleanPreference, createSessionSummaryOutbox, pinnedSupabaseConfig,
-    updateSessionHistory: async () => {}, Platform: { OS: 'ios', Version: '27.1' },
+    updateSessionHistory: async () => {}, Platform: platform,
     currentAppBuildInfo: () => ({}), formatAppBuildLabel: () => 'test',
     setTimeout: (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId; },
     clearTimeout: id => timers.delete(id),
@@ -387,9 +404,9 @@ function signOutFixture(initial = cloudAuth()) {
   const body = cloud.replace(/^import[\s\S]*?;\s*/gm, '').replace(/^export /gm, '');
   const exports = {};
   vm.runInNewContext(`${stripTypeScriptTypes(body)}\nObject.assign(exports, {
-    getCloudState, signInToCloud, signOutOfCloud, setCloudSyncEnabled, loadAuth, refreshIfNeeded, cloudSessionScopes, logCloudAlert,
+    getCloudState, signInToCloud, signOutOfCloud, setCloudSyncEnabled, loadAuth, refreshIfNeeded, cloudSessionScopes, beginCloudSession, logCloudAlert,
     snapshot: () => ({ auth: authCache, authVersion: authMutationVersion, consent: consentRuntimeOverride }),
-  });`, { exports, AbortController, Date, ...bindings }, { timeout: 1000 });
+  });`, { exports, AbortController, Date, ...bindings, strings, formatString }, { timeout: 1000 });
   fixture.api = exports;
   fixture.api.cloudSessionScopes.set('old-session', { ownerId: 'old', consentVersion: 0 });
   fixture.expire = async () => {
@@ -404,6 +421,29 @@ function signOutFixture(initial = cloudAuth()) {
 
 const eventRequests = fixture => fixture.requests.filter(({ url }) => url.endsWith('/api/events'));
 const eventBodies = fixture => eventRequests(fixture).map(({ init }) => JSON.parse(init.body));
+
+for (const [platform, expectedDevice, expectedBrowser] of [
+  [{ OS: 'ios', Version: '27.1' }, 'ios 27.1', 'Occulert native app (ios)'],
+  [{ OS: 'android', Version: 36 }, 'android 36', 'Occulert native app (android)'],
+]) {
+  test(`native ${platform.OS} session transport sends plain-string device and browser labels`, async () => {
+    const f = signOutFixture(cloudAuth(), platform);
+    f.transport = async url => {
+      assert.equal(new URL(url).pathname, '/api/sessions');
+      return cloudResponse(200, { session: { id: 'created-session' } });
+    };
+
+    assert.equal(await f.api.beginCloudSession(), 'created-session');
+    const requests = f.requests.filter(({ url }) => new URL(url).pathname === '/api/sessions');
+    assert.equal(requests.length, 1, 'session creation must send one actual request');
+    assert.equal(requests[0].init.method, 'POST');
+    const body = JSON.parse(requests[0].init.body);
+    assert.equal(typeof body.device, 'string');
+    assert.equal(typeof body.browser, 'string');
+    assert.equal(body.device, expectedDevice);
+    assert.equal(body.browser, expectedBrowser);
+  });
+}
 
 for (const wait of ['session creation', 'an earlier event']) {
   test(`native monitor captures occurrence time before waiting for ${wait}`, async () => {

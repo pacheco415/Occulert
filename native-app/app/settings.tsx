@@ -1,3 +1,4 @@
+import { strings, formatString } from '../lib/strings.ts';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Switch, TouchableOpacity, Alert, Linking, AppState, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -85,41 +86,41 @@ const watchSettingPersister = createSettingPersister({
 
 const showSettingSaveError = () => {
   Alert.alert(
-    'Could not save setting',
-    'Your previous setting is still active. Please try again.',
+    strings.settings.saveError.title,
+    strings.settings.saveError.detail,
   );
 };
 
 const describeHeadphoneMotion = (status: HeadphoneMotionStatus): string => {
   switch (status.state) {
     case 'active':
-      return 'Receiving compatible-headphone motion during monitoring';
+      return strings.settings.headphoneMotion.description.active;
     case 'starting':
-      return 'Starting compatible-headphone motion…';
+      return strings.settings.headphoneMotion.description.starting;
     case 'stopped':
       return status.authorization === 'notDetermined'
-        ? 'Available — iOS may request Motion access when monitoring starts'
-        : 'Available — starts automatically with monitoring';
+        ? strings.settings.headphoneMotion.description.permissionPending
+        : strings.settings.headphoneMotion.description.available;
     case 'denied':
-      return 'Motion access is denied in iPhone Settings';
+      return strings.settings.headphoneMotion.description.denied;
     case 'unavailable':
-      return 'Connect compatible AirPods or Beats to enable motion observations';
+      return strings.settings.headphoneMotion.description.notConnected;
     case 'error':
-      return 'Motion status could not be confirmed';
+      return strings.settings.headphoneMotion.description.error;
     default:
-      return 'Headphone motion support is unavailable in this build';
+      return strings.settings.headphoneMotion.description.unavailable;
   }
 };
 
 const labelHeadphoneMotion = (status: HeadphoneMotionStatus): string => {
   switch (status.state) {
-    case 'active': return 'ACTIVE';
-    case 'starting': return 'STARTING';
-    case 'stopped': return 'READY';
-    case 'denied': return 'DENIED';
-    case 'unavailable': return 'NOT CONNECTED';
-    case 'error': return 'CHECK';
-    default: return 'UNAVAILABLE';
+    case 'active': return strings.settings.headphoneMotion.status.active;
+    case 'starting': return strings.settings.headphoneMotion.status.starting;
+    case 'stopped': return strings.settings.headphoneMotion.status.ready;
+    case 'denied': return strings.settings.headphoneMotion.status.denied;
+    case 'unavailable': return strings.settings.headphoneMotion.status.notConnected;
+    case 'error': return strings.settings.headphoneMotion.status.check;
+    default: return strings.settings.headphoneMotion.status.unavailable;
   }
 };
 
@@ -249,7 +250,7 @@ export default function SettingsScreen() {
         if (settingsMountedRef.current) setFeedbackBusy(busy);
       },
       onError: () => {
-        if (isActive()) Alert.alert('Feedback unavailable', 'Try again, or email hello@occulert.com from your preferred email app.');
+        if (isActive()) Alert.alert(strings.settings.feedback.unavailableTitle, strings.settings.feedback.unavailableDetail);
       },
     });
   };
@@ -308,22 +309,22 @@ export default function SettingsScreen() {
   };
 
   const watchDescription = !watchStatus.moduleAvailable
-    ? 'Watch support is unavailable in this build'
+    ? strings.settings.watch.description.unavailable
     : !watchStatus.paired
-      ? 'Open Occulert on your Watch, then refresh connections'
+      ? strings.settings.watch.description.openCompanion
       : !watchStatus.appInstalled
-        ? 'Open the Watch companion to confirm installation'
+        ? strings.settings.watch.description.confirmInstallation
         : watchStatus.reachable
-          ? 'Connected — enable background alerts in the Watch app'
-          : 'Companion installed — open it to finish wrist alert setup';
+          ? strings.settings.watch.description.enableBackground
+          : strings.settings.watch.description.finishSetup;
 
   const headphoneMotionDescription = describeHeadphoneMotion(headphoneMotionStatus);
   const headphoneMotionLabel = labelHeadphoneMotion(headphoneMotionStatus);
   const deviceReadinessSummary = watchAvailable
     ? watch
-      ? 'Phone alert tests available · Watch alerts enabled'
-      : 'Phone alert tests available · Watch available but disabled'
-    : 'Phone alert tests available · Open Watch app, then refresh';
+      ? strings.settings.connections.summary.watchEnabled
+      : strings.settings.connections.summary.watchDisabled
+    : strings.settings.connections.summary.openWatch;
 
   const refreshConnectedDevices = () => {
     void deviceRefreshRunnerRef.current.run({
@@ -343,7 +344,7 @@ export default function SettingsScreen() {
       },
       onError: () => {
         if (!settingsMountedRef.current) return;
-        Alert.alert('Connections could not refresh', 'Check the optional devices and try again while parked.');
+        Alert.alert(strings.settings.connections.refreshErrorTitle, strings.settings.connections.refreshErrorDetail);
       },
     });
   };
@@ -383,8 +384,8 @@ export default function SettingsScreen() {
       onError: () => {
         if (!settingsMountedRef.current) return;
         Alert.alert(
-          'Audio test unavailable',
-          'Check the iPhone volume and selected audio output, then try again while safely parked.',
+          strings.settings.audioTest.unavailableTitle,
+          strings.settings.audioTest.unavailableDetail,
         );
       },
     });
@@ -394,14 +395,14 @@ export default function SettingsScreen() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       .then(() => {
         if (settingsMountedRef.current) Alert.alert(
-          'Vibration check sent',
-          'Confirm you felt it while parked. If you did not, check your iPhone haptic settings and keep an audible alert enabled.',
+          strings.settings.hapticTest.sentTitle,
+          strings.settings.hapticTest.sentDetail,
         );
       })
       .catch(() => {
         if (settingsMountedRef.current) Alert.alert(
-          'Vibration test unavailable',
-          'Check iPhone haptic settings and keep an audible alert enabled.',
+          strings.settings.hapticTest.unavailableTitle,
+          strings.settings.hapticTest.unavailableDetail,
         );
       });
   };
@@ -414,22 +415,22 @@ export default function SettingsScreen() {
         if (!settingsMountedRef.current) return;
         setWatchStatus(status);
         if (!result.accepted) {
-          Alert.alert('Watch unavailable', 'Open Occulert on your Apple Watch, then try again.');
+          Alert.alert(strings.settings.watch.test.unavailableTitle, strings.settings.watch.test.openCompanion);
         } else if (result.acknowledged) {
-          const timing = result.roundTripMs === null ? '' : ` in ${result.roundTripMs} ms`;
+          const timing = result.roundTripMs === null ? '' : formatString(strings.settings.watch.test.roundTrip, { milliseconds: String(result.roundTripMs) });
           Alert.alert(
-            'Watch test received',
-            `Your Apple Watch acknowledged the live alert${timing}. The iPhone remains the primary safety alert.`,
+            strings.settings.watch.test.receivedTitle,
+            formatString(strings.settings.watch.test.receivedDetail, { timing }),
           );
         } else if (result.reachable) {
           Alert.alert(
-            'Watch test sent',
-            'The Watch was reachable but did not acknowledge the live message. Treat the iPhone as the primary alert.',
+            strings.settings.watch.test.sentTitle,
+            strings.settings.watch.test.sentDetail,
           );
         } else {
           Alert.alert(
-            'Watch backup saved',
-            'Background delivery may be delayed. Open Occulert on your Apple Watch for live wrist alerts; the iPhone remains primary.',
+            strings.settings.watch.test.backupTitle,
+            strings.settings.watch.test.backupDetail,
           );
         }
       },
@@ -438,7 +439,7 @@ export default function SettingsScreen() {
       },
       onError: () => {
         if (!settingsMountedRef.current) return;
-        Alert.alert('Watch test unavailable', 'Check the Watch connection, then try again while safely parked.');
+        Alert.alert(strings.settings.watch.test.errorTitle, strings.settings.watch.test.errorDetail);
       },
     });
   };
@@ -450,11 +451,11 @@ export default function SettingsScreen() {
       await clearSessionHistory();
       if (settingsMountedRef.current) setLocalSessionCount(0);
       Alert.alert(
-        'Local history deleted',
-        'Session summaries were removed from this iPhone. Any separately synced cloud records were not changed.',
+        strings.settings.localData.delete.successTitle,
+        strings.settings.localData.delete.successDetail,
       );
     } catch {
-      Alert.alert('Could not delete local history', 'Your local session summaries remain saved. Please try again.');
+      Alert.alert(strings.settings.localData.delete.errorTitle, strings.settings.localData.delete.errorDetail);
     } finally {
       if (settingsMountedRef.current) setLocalDataBusy(false);
     }
@@ -462,12 +463,12 @@ export default function SettingsScreen() {
 
   const confirmDeleteAllLocalSessions = () => {
     Alert.alert(
-      'Delete all local session history?',
-      'This permanently removes every local session summary, review, and diagnostic from this iPhone. You can review or share a privacy-limited text copy first. Cloud records are not changed. This cannot be undone.',
+      strings.settings.localData.delete.confirmTitle,
+      strings.settings.localData.delete.confirmDetail,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Review First', onPress: () => router.push('/history') },
-        { text: 'Delete All', style: 'destructive', onPress: () => { void deleteAllLocalSessions(); } },
+        { text: strings.settings.common.cancel, style: 'cancel' },
+        { text: strings.settings.localData.delete.reviewFirst, onPress: () => router.push('/history') },
+        { text: strings.settings.localData.delete.deleteAll, style: 'destructive', onPress: () => { void deleteAllLocalSessions(); } },
       ],
     );
   };
@@ -487,9 +488,9 @@ export default function SettingsScreen() {
       if (settingsMountedRef.current) setRecoveryDataPresent(false);
       if (settingsMountedRef.current) setRecoverySessionId(null);
       if (settingsMountedRef.current) setRecoveryDataUnreadable(false);
-      Alert.alert('Recovery data cleared', 'The interrupted-drive checkpoint was removed from this iPhone.');
+      Alert.alert(strings.settings.localData.recovery.successTitle, strings.settings.localData.recovery.successDetail);
     } catch {
-      Alert.alert('Could not clear recovery data', 'The checkpoint may have changed. Refresh its status before trying again.');
+      Alert.alert(strings.settings.localData.recovery.errorTitle, strings.settings.localData.recovery.errorDetail);
       refreshLocalDataStatus();
     } finally {
       if (settingsMountedRef.current) setLocalDataBusy(false);
@@ -498,13 +499,13 @@ export default function SettingsScreen() {
 
   const confirmClearRecoveryData = () => {
     Alert.alert(
-      recoveryDataUnreadable ? 'Discard unreadable recovery data?' : 'Clear interrupted-drive recovery data?',
+      recoveryDataUnreadable ? strings.settings.localData.recovery.discardTitle : strings.settings.localData.recovery.clearTitle,
       recoveryDataUnreadable
-        ? 'Occulert cannot read this checkpoint. Clearing it permanently removes the stored data, which may still be useful to support, and allows a new drive to start. Existing session history is not changed. Consider contacting pilot support first.'
-        : 'This removes the temporary local checkpoint used to recover an interrupted monitoring session. Existing session history is not changed.',
+        ? strings.settings.localData.recovery.discardDetail
+        : strings.settings.localData.recovery.clearDetail,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Clear', style: 'destructive', onPress: () => { void clearRecoveryData(); } },
+        { text: strings.settings.common.cancel, style: 'cancel' },
+        { text: strings.settings.localData.recovery.clearAction, style: 'destructive', onPress: () => { void clearRecoveryData(); } },
       ],
     );
   };
@@ -521,7 +522,7 @@ export default function SettingsScreen() {
       // Offer the same manual recovery if the browser cannot open the link.
     }
     if (settingsMountedRef.current) {
-      Alert.alert('Help page unavailable', 'Open occulert.com/support.html in Safari, or email hello@occulert.com for support.');
+      Alert.alert(strings.settings.support.unavailableTitle, strings.settings.support.unavailableDetail);
     }
   };
 
@@ -538,51 +539,51 @@ export default function SettingsScreen() {
       <AmbientBackground />
       <KeyboardAvoidingView style={s.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <Text style={s.eyebrow}>OCCULERT</Text>
-        <Text style={s.title}>Settings</Text>
+        <Text style={s.eyebrow}>{strings.settings.screen.brand}</Text>
+        <Text style={s.title}>{strings.settings.screen.title}</Text>
         <View style={s.priorityCard}>
           <View style={s.priorityIcon}>
             <Ionicons name="shield-checkmark-outline" size={20} color={colors.cyan} />
           </View>
           <View style={s.priorityCopy}>
-            <Text style={s.priorityTitle}>Keep the core setup simple</Text>
-            <Text style={s.priorityText}>The iPhone camera and at least one phone alert are the primary setup. Watch, headphones, Health, and cloud sync are optional additions.</Text>
+            <Text style={s.priorityTitle}>{strings.settings.screen.priorityTitle}</Text>
+            <Text style={s.priorityText}>{strings.settings.screen.priorityDetail}</Text>
           </View>
         </View>
         {Platform.OS === 'ios' && <EmergencyReadinessCard />}
         <SensitivitySlider value={sens} onChange={setSens} />
         {EYE_BASELINE_EXPERIMENT && <View style={s.card}>
-          <Text style={s.cardTitle}>PARKED BASELINE EXPERIMENT</Text>
-          <Text style={s.sub}>Local sessions only. While parked, look forward with eyes open during the three-second Setup check. Insufficient samples use current presets.</Text>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Recalibrate parked eye baseline" disabled={baselineResetBusy} onPress={() => {
+          <Text style={s.cardTitle}>{strings.settings.baseline.title}</Text>
+          <Text style={s.sub}>{strings.settings.baseline.detail}</Text>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={strings.settings.baseline.resetAccessibility} disabled={baselineResetBusy} onPress={() => {
             if(baselineResetBusyRef.current)return;
             baselineResetBusyRef.current=true;setBaselineResetBusy(true);
             const revision=settingsViewRevisionRef.current;
             void clearDeviceEyeBaseline().then(()=>{
               if(settingsMountedRef.current&&settingsFocusedRef.current&&revision===settingsViewRevisionRef.current)router.push('/monitor');
-            }).catch(()=>{if(settingsMountedRef.current&&revision===settingsViewRevisionRef.current)Alert.alert('Could not reset baseline','The saved baseline remains unchanged. Try again.');}).finally(()=>{
+            }).catch(()=>{if(settingsMountedRef.current&&revision===settingsViewRevisionRef.current)Alert.alert(strings.settings.baseline.errorTitle,strings.settings.baseline.errorDetail);}).finally(()=>{
               baselineResetBusyRef.current=false;if(settingsMountedRef.current)setBaselineResetBusy(false);
             });
-          }}><Text style={s.label}>{baselineResetBusy?'Resetting…':'Recalibrate while parked'}</Text></TouchableOpacity>
+          }}><Text style={s.label}>{baselineResetBusy?strings.settings.baseline.resetting:strings.settings.baseline.resetAction}</Text></TouchableOpacity>
         </View>}
         <View style={s.card}>
-          <Text style={s.cardTitle}>ALERTS</Text>
+          <Text style={s.cardTitle}>{strings.settings.alerts.title}</Text>
           <View style={s.row}>
-            <View style={s.rowL}><Ionicons name="phone-portrait-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Haptic vibration</Text><Text style={s.sub}>Vibrate on alert</Text></View></View>
-            <Switch accessibilityLabel="Haptic vibration alerts" accessibilityHint="Controls vibration from the iPhone during alerts" value={haptic} onValueChange={v=>saveBooleanSetting(HAPTIC_ALERT_PREFERENCE_KEY,v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <View style={s.rowL}><Ionicons name="phone-portrait-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>{strings.settings.alerts.hapticLabel}</Text><Text style={s.sub}>{strings.settings.alerts.hapticDetail}</Text></View></View>
+            <Switch accessibilityLabel={strings.settings.alerts.hapticAccessibility} accessibilityHint={strings.settings.alerts.hapticHint} value={haptic} onValueChange={v=>saveBooleanSetting(HAPTIC_ALERT_PREFERENCE_KEY,v,haptic,setHaptic)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
           <View style={s.row}>
-            <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Audio tone</Text><Text style={s.sub}>Sound on alert</Text></View></View>
-            <Switch accessibilityLabel="Audio tone alerts" accessibilityHint="Controls alert sounds from the iPhone's current audio output" value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
+            <View style={s.rowL}><Ionicons name="volume-high-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>{strings.settings.alerts.audioLabel}</Text><Text style={s.sub}>{strings.settings.alerts.audioDetail}</Text></View></View>
+            <Switch accessibilityLabel={strings.settings.alerts.audioAccessibility} accessibilityHint={strings.settings.alerts.audioHint} value={audio} onValueChange={v=>saveBooleanSetting(AUDIO_ALERT_PREFERENCE_KEY,v,audio,setAudio)} trackColor={{true:'#2563eb',false:'#1a3a4a'}} thumbColor="#fff" />
           </View>
           <View style={s.div}/>
           <View style={s.soundBlock}>
             <View style={s.rowL}>
               <Ionicons name="musical-notes-outline" size={18} color="#60a5fa" />
               <View style={s.rowCopy}>
-                <Text style={s.label}>Alert sound</Text>
-                <Text style={s.sub}>Choose the tone profile used for phone alerts</Text>
+                <Text style={s.label}>{strings.settings.alerts.soundTitle}</Text>
+                <Text style={s.sub}>{strings.settings.alerts.soundDetail}</Text>
               </View>
             </View>
             <View style={s.soundOptions}>
@@ -591,7 +592,7 @@ export default function SettingsScreen() {
                 return (
                   <TouchableOpacity
                     key={value}
-                    accessibilityLabel={`${profile.label} alert sound`}
+                    accessibilityLabel={formatString(strings.settings.alerts.soundAccessibility, { sound: profile.label })}
                     accessibilityHint={profile.description}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
@@ -604,51 +605,51 @@ export default function SettingsScreen() {
                 );
               })}
             </View>
-            <Text style={s.soundNote}>This changes the tone profile only. Alert timing, severity, and centered critical delivery stay the same.</Text>
+            <Text style={s.soundNote}>{strings.settings.alerts.soundLimits}</Text>
           </View>
           <View style={s.alertSafetyNote}>
             <Ionicons name="shield-checkmark-outline" size={15} color={colors.amber} />
-            <Text style={s.alertSafetyText}>A continuous closed-eye reading reaches the prominent alert at about 0.6 seconds and, after the startup warmup, the stronger stage at 1.2 seconds. Standard alerts repeat twice and critical alerts repeat three times on each enabled output. Audio and haptic choices also control the foreground-loss warning; keep at least one enabled. Alerts cannot make drowsy driving safe—pull over and rest.</Text>
+            <Text style={s.alertSafetyText}>{strings.settings.alerts.safetyLimits}</Text>
           </View>
         </View>
         <View style={s.card}>
-          <Text style={s.cardTitle}>CONNECTED DEVICES</Text>
+          <Text style={s.cardTitle}>{strings.settings.connections.title}</Text>
           <View accessibilityLiveRegion="polite" style={s.deviceSummary}>
             <View style={s.deviceSummaryIcon}>
               <Ionicons name="checkmark-done-outline" size={18} color={colors.green} />
             </View>
             <View style={s.deviceSummaryCopy}>
-              <Text style={s.deviceSummaryTitle}>Parked readiness check</Text>
+              <Text style={s.deviceSummaryTitle}>{strings.settings.connections.readinessTitle}</Text>
               <Text style={s.deviceSummaryText}>{deviceReadinessSummary}</Text>
             </View>
           </View>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityHint="Refreshes Apple Watch and compatible headphone connection status"
+            accessibilityHint={strings.settings.connections.refreshHint}
             accessibilityState={{ disabled: deviceRefreshBusy, busy: deviceRefreshBusy }}
             disabled={deviceRefreshBusy}
             onPress={refreshConnectedDevices}
             style={[s.refreshRow, deviceRefreshBusy && s.testRowDisabled]}
           >
             <Ionicons name="refresh" size={16} color={colors.cyan} />
-            <Text style={s.refreshText}>{deviceRefreshBusy ? 'REFRESHING CONNECTIONS…' : 'REFRESH CONNECTIONS'}</Text>
+            <Text style={s.refreshText}>{deviceRefreshBusy ? strings.settings.connections.refreshing : strings.settings.connections.refreshAction}</Text>
           </TouchableOpacity>
           <View style={s.div} />
           <View style={s.row}>
             <View style={s.rowL}>
               <Ionicons name="headset-outline" size={18} color="#60a5fa" />
               <View style={s.rowCopy}>
-                <Text style={s.label}>AirPods / Bluetooth audio</Text>
-                <Text style={s.sub}>Uses the iPhone's current audio output automatically</Text>
+                <Text style={s.label}>{strings.settings.headphones.audioTitle}</Text>
+                <Text style={s.sub}>{strings.settings.headphones.audioDetail}</Text>
               </View>
             </View>
-            <Text style={s.status}>AUTOMATIC</Text>
+            <Text style={s.status}>{strings.settings.headphones.audioStatus}</Text>
           </View>
           <View style={s.div} />
           <TouchableOpacity
-            accessibilityHint="Plays the three-tone urgent alert sequence through the iPhone's current audio output"
+            accessibilityHint={strings.settings.audioTest.hint}
             accessibilityRole="button"
-            accessibilityLabel={audioTestBusy ? 'Preparing audio test' : 'Test current audio output'}
+            accessibilityLabel={audioTestBusy ? strings.settings.audioTest.preparingAccessibility : strings.settings.audioTest.accessibility}
             accessibilityState={{ disabled: audioTestBusy, busy: audioTestBusy }}
             disabled={audioTestBusy}
             style={[s.testRow, audioTestBusy && s.testRowDisabled]}
@@ -656,27 +657,27 @@ export default function SettingsScreen() {
           >
             <Ionicons name="volume-high-outline" size={17} color="#60a5fa" />
             <Text style={s.testText}>
-              {audioTestBusy ? 'PREPARING AUDIO TEST…' : 'TEST CURRENT AUDIO OUTPUT'}
+              {audioTestBusy ? strings.settings.audioTest.preparing : strings.settings.audioTest.action}
             </Text>
           </TouchableOpacity>
-          <Text style={s.testNote}>Use only while parked. This plays the selected sound as the centered three-tone critical sequence and does not change your alert setting.</Text>
+          <Text style={s.testNote}>{strings.settings.audioTest.parkedDetail}</Text>
           <TouchableOpacity
-            accessibilityHint="Sends a test vibration on this iPhone without changing a session"
+            accessibilityHint={strings.settings.hapticTest.hint}
             accessibilityRole="button"
-            accessibilityLabel="Test iPhone vibration"
+            accessibilityLabel={strings.settings.hapticTest.accessibility}
             style={s.testRow}
             onPress={testHapticOutput}
           >
             <Ionicons name="phone-portrait-outline" size={17} color="#60a5fa" />
-            <Text style={s.testText}>TEST IPHONE VIBRATION</Text>
+            <Text style={s.testText}>{strings.settings.hapticTest.action}</Text>
           </TouchableOpacity>
-          <Text style={s.testNote}>Use only while parked. The app cannot confirm you felt the vibration; keep an audible alert enabled if it is hard to notice.</Text>
+          <Text style={s.testNote}>{strings.settings.hapticTest.parkedDetail}</Text>
           <View style={s.div} />
           <View style={s.row}>
             <View style={s.rowL}>
               <Ionicons name="pulse-outline" size={18} color="#60a5fa" />
               <View style={s.rowCopy}>
-                <Text style={s.label}>Compatible headphone motion</Text>
+                <Text style={s.label}>{strings.settings.headphoneMotion.title}</Text>
                 <Text style={s.sub}>{headphoneMotionDescription}</Text>
               </View>
             </View>
@@ -687,22 +688,22 @@ export default function SettingsScreen() {
             <View style={s.rowL}>
               <Ionicons name="ear-outline" size={18} color="#60a5fa" />
               <View style={s.rowCopy}>
-                <Text style={s.label}>Headphone alert pattern</Text>
-                <Text style={s.sub}>Balanced is clearest; optional stereo emphasis is available for early alerts</Text>
+                <Text style={s.label}>{strings.settings.headphones.patternTitle}</Text>
+                <Text style={s.sub}>{strings.settings.headphones.patternDetail}</Text>
               </View>
             </View>
             <View style={s.patternOptions}>
               {([
-                ['balanced', 'Centered'],
-                ['alternating', 'Alternate L/R'],
+                ['balanced', strings.settings.headphones.pattern.centered],
+                ['alternating', strings.settings.headphones.pattern.alternating],
               ] as const).map(([value, label]) => {
                 const selected = inEarPattern === value;
                 return (
                   <TouchableOpacity
                     key={value}
                     accessibilityRole="button"
-                    accessibilityLabel={`${label} headphone alert pattern`}
-                    accessibilityHint="Changes stereo emphasis for early alerts only"
+                    accessibilityLabel={formatString(strings.settings.headphones.patternAccessibility, { pattern: label })}
+                    accessibilityHint={strings.settings.headphones.patternHint}
                     accessibilityState={{ selected }}
                     style={[s.patternOption, selected && s.patternOptionSelected]}
                     onPress={() => chooseInEarPattern(value)}
@@ -712,22 +713,22 @@ export default function SettingsScreen() {
                 );
               })}
             </View>
-            <Text style={s.patternNote}>Both ears remain audible. Critical and tracking-loss alerts stay centered.</Text>
+            <Text style={s.patternNote}>{strings.settings.headphones.patternLimits}</Text>
           </View>
           <View style={s.div} />
           <View style={s.row}>
             <View style={s.rowL}>
               <Ionicons name="watch-outline" size={18} color="#60a5fa" />
               <View style={s.rowCopy}>
-                <Text style={s.label}>Apple Watch alerts</Text>
+                <Text style={s.label}>{strings.settings.watch.title}</Text>
                 <Text style={s.sub}>{watchDescription}</Text>
               </View>
             </View>
-            <Switch accessibilityLabel="Apple Watch alerts" accessibilityHint="Controls optional alert delivery to the paired Apple Watch" disabled={!watchAvailable} value={watch && watchAvailable} onValueChange={changeWatchAlerts} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
+            <Switch accessibilityLabel={strings.settings.watch.title} accessibilityHint={strings.settings.watch.toggleHint} disabled={!watchAvailable} value={watch && watchAvailable} onValueChange={changeWatchAlerts} trackColor={{ true: '#2563eb', false: '#1a3a4a' }} thumbColor="#fff" />
           </View>
           <View style={s.div} />
           <TouchableOpacity
-            accessibilityHint="Sends one urgent-pattern test to the paired Apple Watch"
+            accessibilityHint={strings.settings.watch.test.hint}
             accessibilityRole="button"
             accessibilityState={{ disabled: !watchAvailable || !watch || watchTestBusy, busy: watchTestBusy }}
             disabled={!watchAvailable || !watch || watchTestBusy}
@@ -736,77 +737,75 @@ export default function SettingsScreen() {
           >
             <Ionicons name="pulse-outline" size={17} color="#60a5fa" />
             <Text style={s.testText}>
-              {watchTestBusy ? 'SENDING WATCH TEST…' : 'Test Watch alert · urgent pattern'}
+              {watchTestBusy ? strings.settings.watch.test.sending : strings.settings.watch.test.action}
             </Text>
           </TouchableOpacity>
         </View>
         <CloudSyncCard />
         <View style={s.card}>
-          <Text style={s.cardTitle}>PRIVACY &amp; LOCAL DATA</Text>
+          <Text style={s.cardTitle}>{strings.settings.localData.title}</Text>
           <View style={s.privacySummary}>
             <View style={s.privacySummaryIcon}>
               <Ionicons name="phone-portrait-outline" size={19} color={colors.green} />
             </View>
             <View style={s.rowCopy}>
-              <Text style={s.privacySummaryTitle}>Stored on this iPhone</Text>
-              <Text style={s.privacySummaryText}>
-                Session summaries, your reviews and test conditions, bounded performance diagnostics, preferences, and a temporary interrupted-drive checkpoint.
-              </Text>
+              <Text style={s.privacySummaryTitle}>{strings.settings.localData.storedTitle}</Text>
+              <Text style={s.privacySummaryText}>{strings.settings.localData.storedDetail}</Text>
             </View>
           </View>
           <View style={s.privNote}>
             <Ionicons name="eye-off-outline" size={14} color="#4a7a8a" />
-            <Text style={s.privTxt}>Occulert does not save camera video, photos, microphone audio, or a location route. Optional Apple Health context is a small local summary managed from the pre-drive screen.</Text>
+            <Text style={s.privTxt}>{strings.settings.localData.privacyDetail}</Text>
           </View>
           <View style={s.privNote}>
             <Ionicons name="cloud-outline" size={14} color="#4a7a8a" />
-            <Text style={s.privTxt}>Cloud session summaries are separate and sync only when you enable cloud sync while signed in. Deleting local data here does not delete cloud records.</Text>
+            <Text style={s.privTxt}>{strings.settings.localData.cloudDetail}</Text>
           </View>
           <View style={s.privNote}>
             <Ionicons name="time-outline" size={14} color="#4a7a8a" />
-            <Text style={s.privTxt}>Local history keeps up to 50 recent summaries. New saves can remove the oldest local records. Share selected summaries from History if you want to keep a text copy elsewhere. Local reviews and test conditions are not included in automatic cloud sync.</Text>
+            <Text style={s.privTxt}>{strings.settings.localData.retentionDetail}</Text>
           </View>
           <View accessibilityLiveRegion="polite" style={s.localDataStatus}>
             <Text style={s.localDataStatusText}>
               {localDataStatusBusy
-                ? 'Checking local history…'
+                ? strings.settings.localData.historyChecking
                 : localSessionCount === null
-                  ? 'Local history count unavailable'
-                  : `${localSessionCount} local ${localSessionCount === 1 ? 'session' : 'sessions'}`}
+                  ? strings.settings.localData.historyUnavailable
+                  : formatString(localSessionCount === 1 ? strings.settings.localData.sessionCountOne : strings.settings.localData.sessionCountMany, { count: localSessionCount })}
             </Text>
             <Text style={s.localDataStatusText}>
               {localDataStatusBusy
-                ? 'Checking recovery data…'
+                ? strings.settings.localData.recovery.checking
                 : recoveryDataUnreadable
-                  ? 'Unreadable recovery checkpoint saved'
+                  ? strings.settings.localData.recovery.unreadable
                 : recoveryDataPresent === null
-                  ? 'Recovery status unavailable'
-                  : recoveryDataPresent ? 'Recovery checkpoint saved' : 'No recovery checkpoint'}
+                  ? strings.settings.localData.recovery.unavailable
+                  : recoveryDataPresent ? strings.settings.localData.recovery.saved : strings.settings.localData.recovery.none}
             </Text>
             {!localDataStatusBusy && (localSessionCount === null || recoveryDataPresent === null) && (
               <>
                 <Text style={s.localDataStatusError}>
                   {recoveryDataUnreadable
-                    ? 'The unreadable checkpoint is preserved. You can retry, contact pilot support, or explicitly discard only that checkpoint below.'
-                    : 'Destructive controls stay unavailable until Occulert confirms what is stored on this iPhone.'}
+                    ? strings.settings.localData.recovery.unreadableDetail
+                    : strings.settings.localData.unconfirmedDetail}
                 </Text>
                 <TouchableOpacity
                   accessibilityRole="button"
-                  accessibilityLabel="Retry local data status check"
-                  accessibilityHint="Checks local session history and interrupted-drive recovery data again"
+                  accessibilityLabel={strings.settings.localData.retryAccessibility}
+                  accessibilityHint={strings.settings.localData.retryHint}
                   onPress={refreshLocalDataStatus}
                   style={s.localDataRetry}
                 >
                   <Ionicons name="refresh" size={15} color={colors.cyan} />
-                  <Text style={s.localDataRetryText}>TRY AGAIN</Text>
+                  <Text style={s.localDataRetryText}>{strings.settings.localData.retryAction}</Text>
                 </TouchableOpacity>
               </>
             )}
           </View>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Review or export local session history"
-            accessibilityHint="Opens Session History, where privacy-limited summaries can be shared before local deletion"
+            accessibilityLabel={strings.settings.localData.review.accessibility}
+            accessibilityHint={strings.settings.localData.review.hint}
             accessibilityState={{ disabled: localDataBusy, busy: localDataBusy }}
             disabled={localDataBusy}
             onPress={() => router.push('/history')}
@@ -814,18 +813,16 @@ export default function SettingsScreen() {
           >
             <Ionicons name="share-outline" size={17} color="#93c5fd" />
             <View style={s.rowCopy}>
-              <Text style={s.localDataReviewTitle}>Review or export local history</Text>
-              <Text style={s.localDataActionDetail}>
-                Open saved summaries and share a privacy-limited text copy before deleting anything.
-              </Text>
+              <Text style={s.localDataReviewTitle}>{strings.settings.localData.review.title}</Text>
+              <Text style={s.localDataActionDetail}>{strings.settings.localData.review.detail}</Text>
             </View>
             <Ionicons name="chevron-forward" size={17} color="#4a7a8a" />
           </TouchableOpacity>
           <View style={s.div} />
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Delete all local session history"
-            accessibilityHint="Permanently removes local session summaries after confirmation without changing cloud records"
+            accessibilityLabel={strings.settings.localData.delete.accessibility}
+            accessibilityHint={strings.settings.localData.delete.hint}
             accessibilityState={{ disabled: localHistoryDeleteDisabled, busy: localDataBusy || localDataStatusBusy }}
             disabled={localHistoryDeleteDisabled}
             onPress={confirmDeleteAllLocalSessions}
@@ -833,15 +830,15 @@ export default function SettingsScreen() {
           >
             <Ionicons name="trash-outline" size={17} color="#fca5a5" />
             <View style={s.rowCopy}>
-              <Text style={s.localDataActionTitle}>Delete all local session history</Text>
-              <Text style={s.localDataActionDetail}>Removes summaries, reviews, test conditions, and diagnostics from this iPhone.</Text>
+              <Text style={s.localDataActionTitle}>{strings.settings.localData.delete.accessibility}</Text>
+              <Text style={s.localDataActionDetail}>{strings.settings.localData.delete.detail}</Text>
             </View>
           </TouchableOpacity>
           <View style={s.div} />
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Clear interrupted-drive recovery data"
-            accessibilityHint="Removes the temporary local recovery checkpoint after confirmation"
+            accessibilityLabel={strings.settings.localData.recovery.accessibility}
+            accessibilityHint={strings.settings.localData.recovery.hint}
             accessibilityState={{ disabled: recoveryDeleteDisabled, busy: localDataBusy || localDataStatusBusy }}
             disabled={recoveryDeleteDisabled}
             onPress={confirmClearRecoveryData}
@@ -849,42 +846,42 @@ export default function SettingsScreen() {
           >
             <Ionicons name="refresh-circle-outline" size={18} color="#fca5a5" />
             <View style={s.rowCopy}>
-              <Text style={s.localDataActionTitle}>Clear interrupted-drive recovery data</Text>
+              <Text style={s.localDataActionTitle}>{strings.settings.localData.recovery.accessibility}</Text>
               <Text style={s.localDataActionDetail}>{recoveryDataUnreadable
-                ? 'Permanently discard an unreadable checkpoint after confirmation. Consider contacting pilot support first.'
-                : 'Keeps existing session history and removes only the temporary checkpoint.'}</Text>
+                ? strings.settings.localData.recovery.unreadableActionDetail
+                : strings.settings.localData.recovery.actionDetail}</Text>
             </View>
           </TouchableOpacity>
         </View>
         <View style={s.card}>
-          <Text style={s.cardTitle}>PILOT SUPPORT</Text>
+          <Text style={s.cardTitle}>{strings.settings.support.title}</Text>
           <TouchableOpacity
             accessibilityRole="link"
-            accessibilityLabel="Help and support"
-            accessibilityHint="Opens Occulert setup, troubleshooting, and contact guidance in your browser"
+            accessibilityLabel={strings.settings.support.helpTitle}
+            accessibilityHint={strings.settings.support.helpHint}
             style={s.row}
             onPress={() => { void openSupportPage(); }}
           >
-            <View style={s.rowL}><Ionicons name="help-circle-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>Help and support</Text><Text style={s.sub}>Setup, troubleshooting, and contact guidance</Text></View></View>
+            <View style={s.rowL}><Ionicons name="help-circle-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>{strings.settings.support.helpTitle}</Text><Text style={s.sub}>{strings.settings.support.helpDetail}</Text></View></View>
             <Ionicons name="open-outline" size={18} color="#4a7a8a" />
           </TouchableOpacity>
           <View style={s.div} />
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel={feedbackBusy ? 'Preparing pilot feedback draft' : 'Prepare pilot feedback'}
-            accessibilityHint="Opens an email draft; if Mail is unavailable, offers a separate choice to share the draft"
+            accessibilityLabel={feedbackBusy ? strings.settings.feedback.preparingAccessibility : strings.settings.feedback.accessibility}
+            accessibilityHint={strings.settings.feedback.hint}
             accessibilityState={{ disabled: feedbackBusy, busy: feedbackBusy }}
             disabled={feedbackBusy}
             style={[s.row, feedbackBusy && s.localDataActionDisabled]}
             onPress={sendFeedback}
           >
-            <View style={s.rowL}><Ionicons name="chatbubble-ellipses-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>{feedbackBusy ? 'Preparing feedback…' : 'Prepare feedback'}</Text><Text style={s.sub}>Review the draft before choosing whether to send it</Text></View></View>
+            <View style={s.rowL}><Ionicons name="chatbubble-ellipses-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>{feedbackBusy ? strings.settings.feedback.preparing : strings.settings.feedback.action}</Text><Text style={s.sub}>{strings.settings.feedback.detail}</Text></View></View>
             <Ionicons name="chevron-forward" size={18} color="#4a7a8a" />
           </TouchableOpacity>
-          <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>Feedback opens as a draft in Mail, or you can choose another app if Mail is unavailable. Nothing is sent automatically. No camera video, audio, raw motion readings, or location is attached.</Text></View>
+          <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>{strings.settings.feedback.privacyDetail}</Text></View>
         </View>
-        <Text accessibilityLabel={`Occulert ${appBuildLabel}`} style={s.ver}>
-          Occulert™ · {appBuildLabel} · San Francisco, CA
+        <Text accessibilityLabel={formatString(strings.settings.footer.accessibility, { build: appBuildLabel })} style={s.ver}>
+          {formatString(strings.settings.footer.text, { build: appBuildLabel })}
         </Text>
       </ScrollView>
       </KeyboardAvoidingView>

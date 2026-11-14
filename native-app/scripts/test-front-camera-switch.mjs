@@ -7,6 +7,7 @@ import vm from 'node:vm';
 import { frontCameraTransition, initialFrontCameraSwitchState, createFrontCameraDiagnostics } from '../lib/frontCameraSwitch.ts';
 import { createMonitorPerformanceTracker } from '../lib/monitorPerformance.ts';
 import { isActiveSessionCheckpoint } from '../lib/sessionRecoveryModel.ts';
+import { strings } from '../lib/strings.ts';
 
 const monitor = readNativeMonitorSourceOwners().identity;
 const identity = (kind, id = kind) => ({
@@ -18,6 +19,7 @@ function callbackFixture({ running = false, experiment = true } = {}) {
   const events = { setups: 0, resets: 0, notices: 0, clears: 0, baseline: .9, identities: [], records: [], messages: [] };
   const ref = current => ({ current });
   const context = {
+    strings,
     useCallback: fn => fn, frontCameraTransition, EYE_BASELINE_EXPERIMENT: experiment,
     isRunningRef: ref(running), setupPreviewActiveRef: ref(!running),
     frontCameraSwitchRef: ref(initialFrontCameraSwitchState()), frontCameraIdentityRef: ref(null),
@@ -161,7 +163,7 @@ test('a queued camera clear follows an in-flight parked save and stale load cann
   let finishLoad, effectCleanup;
   const loaded = [];
   const revision = { current: 0 };
-  const loadContext = { EYE_BASELINE_EXPERIMENT: true, useEffect: effect => { effectCleanup = effect(); },
+  const loadContext = { strings, EYE_BASELINE_EXPERIMENT: true, useEffect: effect => { effectCleanup = effect(); },
     baselineMountedRef: { current: false }, baselineGenerationRef: { current: 0 }, cameraBaselineRevisionRef: revision,
     baselineCanSaveRef: { current: false }, eyeBaselineRef: { current: null }, loadDeviceEyeBaseline: () => new Promise(resolve => { finishLoad = resolve; }),
     setEyeBaseline: value => loaded.push(value), setBaselineMessage: () => {}, setBaselineLoaded: () => {} };

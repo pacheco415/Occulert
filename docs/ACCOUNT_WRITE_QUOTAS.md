@@ -1,8 +1,10 @@
 # Profile and fleet write quotas
 
-W2 is prepared from main `c03a0a9b1127b51f5ca5791ea1fc871e22c0c5ce`.
-This document describes the source contract and a deployment prerequisite. It
-does not assert that any migration has been applied to a hosted database.
+W2 was prepared from main `c03a0a9b1127b51f5ca5791ea1fc871e22c0c5ce` and
+composed with main `7fc0aec86ba678207aefa36260e2331493b7e6a6` for release.
+The database prerequisite was applied and verified on November 14, 2026,
+following the project owner's approval. The source contract and the dated
+database receipt below do not by themselves establish deployment of the API.
 
 ## Limits and counting
 
@@ -83,8 +85,8 @@ The existing shared provider budget still covers Auth, reservation and storage.
 
 1. Review the intended project's migration ledger and deployed definitions.
    Do not replay the baseline, earlier quotas or an already-applied migration.
-2. With separate production approval, apply
-   `20261114183018_account_write_quota.sql` once before deploying either
+2. With the project owner's production approval, apply
+   `20261114210442_account_write_quota.sql` once before deploying either
    dependent POST route. Verify the actual function
    definition, owner, SECURITY DEFINER/search path, service-only EXECUTE ACL,
    quota table constraints, RLS, grants and auth-user deletion cascade. A ledger
@@ -98,6 +100,32 @@ The existing shared provider budget still covers Auth, reservation and storage.
 convention. Main retains its automatic deployment behavior; keep the source PR
 unmerged until the database prerequisite is applied and verified. No deployment,
 migration application or feature-flag activation is authorized by these tests.
+
+## November 14 release verification
+
+The intended production project and missing prerequisite were checked before
+the approved application. The exact reviewed SQL was applied once and its
+deployed definition, ownership, access controls and constraints were verified.
+The detailed operational receipt remains private. Supabase assigned the
+canonical migration filename `20261114210442_account_write_quota.sql`; this
+unmerged source file and its references were aligned with that actual version.
+Its SQL bytes are unchanged from the prepared
+`20261114183018` file, with SHA-256
+`7ef7e21c108f8d99b9f402db63c92fd4ed787bf13568d3b7a3dc569190cdc082`.
+No historical migrations were replayed or ledger entries repaired. The
+migration does not change the project's default privileges.
+
+Acceptance invoked the actual function as `service_role` with two newly
+inserted synthetic auth parents inside one rollback-only transaction. Both
+60/10 limits, exact denial receipts, unchanged denied buckets, independent
+accounts/operations, storage count constraints, expired-window reset,
+unexpired-window stability and auth deletion cascade passed. The final
+read-only query after `ROLLBACK` confirmed that both synthetic auth parents
+and all their quota rows were absent. No real account was used or modified.
+
+Post-application advisors were reviewed; this receipt does not claim a clean
+project-wide advisor report. Fresh source checks and the deployed API still
+need their own release verification.
 
 ## Verification
 

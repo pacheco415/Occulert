@@ -1,3 +1,4 @@
+import { strings } from '../lib/strings.ts';
 import React, { useCallback, useEffect } from 'react';
 import { EYE_BASELINE_EXPERIMENT, ParkedEyeBaseline } from '../lib/eyeBaselineModel';
 
@@ -86,8 +87,8 @@ export function useMonitorCameraIdentity({
       // This state is the real useEyeTracking input, not only the saved-session label.
       setEyeBaseline(null);
       setBaselineMessage(running
-        ? 'Camera changed. Experimental eye baseline cleared; current presets apply.'
-        : 'Camera changed. Parked setup and the experimental eye baseline were reset.');
+        ? strings.monitor.baseline.cameraChangedActive
+        : strings.monitor.baseline.cameraChangedParked);
       void clearDeviceEyeBaseline().then(() => {
         if (baselineMountedRef.current && cameraRevision === cameraBaselineRevisionRef.current) {
           baselineCanSaveRef.current = true;
@@ -95,7 +96,7 @@ export function useMonitorCameraIdentity({
       }).catch(() => {
         if (!baselineMountedRef.current || cameraRevision !== cameraBaselineRevisionRef.current) return;
         baselineCanSaveRef.current = false;
-        setBaselineMessage('Experimental baseline could not be cleared from storage. Current presets apply; reset it in Settings before another session.');
+        setBaselineMessage(strings.monitor.baseline.clearFailed);
       });
     }
     if (running) performanceTrackerRef.current.recordFrontCamera(identity, Date.now(), baselineCleared);
@@ -122,9 +123,9 @@ export function useMonitorCameraIdentity({
       baselineCanSaveRef.current = true;
       eyeBaselineRef.current = value;
       setEyeBaseline(value);
-      setBaselineMessage(value === null ? 'While parked, open Setup check and look forward with eyes open for three seconds.' : 'Saved parked eye baseline · experimental local sessions only.');
+      setBaselineMessage(value === null ? strings.monitor.baseline.setup : strings.monitor.baseline.saved);
     }).catch(() => {
-      if (active && cameraRevision === cameraBaselineRevisionRef.current) setBaselineMessage('Saved baseline unavailable. Current presets apply; use Recalibrate in Settings to reset it.');
+      if (active && cameraRevision === cameraBaselineRevisionRef.current) setBaselineMessage(strings.monitor.baseline.unavailable);
     }).finally(() => { if (active) setBaselineLoaded(true); });
     return () => { active = false; baselineMountedRef.current=false;baselineGenerationRef.current += 1; };
   }, []);

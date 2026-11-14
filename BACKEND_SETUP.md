@@ -100,7 +100,7 @@ refunded or automatically retried. Rejections return 429
 `account_write_rate_limited` with an integer `Retry-After` from 1 to 3,600 seconds.
 
 **Deployment prerequisite:** apply
-`20261114183018_account_write_quota.sql` once, with the project owner's approval,
+`20261114210442_account_write_quota.sql` once, with the project owner's approval,
 and verify the `reserve_account_write(uuid,text)` definition and service-only
 EXECUTE ACL, `account_write_rate_limits` RLS/CRUD grants, fixed account/operation
 key, and auth-user deletion cascade **before deploying either dependent POST

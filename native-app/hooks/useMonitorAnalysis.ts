@@ -1,3 +1,4 @@
+import { strings, formatString } from '../lib/strings.ts';
 import React, { useCallback, useEffect } from 'react';
 import { Platform } from 'react-native';
 import { useFrameProcessor } from 'react-native-vision-camera';
@@ -104,19 +105,19 @@ export function useMonitorAnalysis({
         const assessment = assessCameraSetup({faceFound,faceX,faceY,faceWidth,faceHeight,frameWidth,frameHeight,leftEyeOpenProbability:leftProb,rightEyeOpenProbability:rightProb,pitchAngle,yawAngle,rollAngle});
         const clock = typeof performance !== 'undefined' ? performance.now() : now;
         const result = baselineCollectorRef.current.add(clock,leftProb,rightProb,assessment.ready);
-        setBaselineMessage(`Parked eyes-open baseline: ${Math.round(result.progress*100)}% · keep looking forward.`);
+        setBaselineMessage(formatString(strings.monitor.baseline.progress, { progress: String(Math.round(result.progress*100)) }));
         if (result.done) {
           baselineFinishedRef.current = true;
-          if (result.baseline === null) setBaselineMessage('Too few reliable eyes-open samples. Current presets apply; retry the parked Setup check.');
+          if (result.baseline === null) setBaselineMessage(strings.monitor.baseline.insufficient);
           else {
             const generation = baselineGenerationRef.current, value = result.baseline;
             baselineBusyRef.current = true;setBaselineBusy(true);
             void saveDeviceEyeBaseline(value,result.samples).then(() => {
               if (generation === baselineGenerationRef.current && setupPreviewActiveRef.current && !isRunningRef.current) {
-                eyeBaselineRef.current = value;setEyeBaseline(value);setBaselineMessage('Parked baseline saved on this device · experimental local sessions only.');
+                eyeBaselineRef.current = value;setEyeBaseline(value);setBaselineMessage(strings.monitor.baseline.savedOnDevice);
               }
             }).catch(() => {
-              if (generation === baselineGenerationRef.current) setBaselineMessage('Baseline was not saved. Current presets apply; retry the parked Setup check.');
+              if (generation === baselineGenerationRef.current) setBaselineMessage(strings.monitor.baseline.saveFailed);
             }).finally(() => { baselineBusyRef.current = false; if (baselineMountedRef.current) setBaselineBusy(false); });
           }
         }

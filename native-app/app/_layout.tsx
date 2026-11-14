@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '../constants/theme';
 import { SIMULATOR_TRACE } from '../lib/simulatorTrace';
 import { SimulatorTraceBanner } from '../components/SimulatorTraceBanner';
+import { strings } from '../lib/strings';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -26,22 +27,22 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.background },
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Occulert', headerShown: false }} />
+        <Stack.Screen name="index" options={{ title: strings.navigation.app, headerShown: false }} />
         <Stack.Screen
           name="pre-drive"
-          options={{ title: '', headerBackTitle: 'Home' }}
+          options={{ title: '', headerBackTitle: strings.navigation.home }}
         />
         <Stack.Screen
           name="monitor"
           options={{
-            title: 'Monitoring',
-            headerBackTitle: 'Safety Check',
+            title: strings.navigation.monitoring,
+            headerBackTitle: strings.navigation.safetyCheck,
             headerShown: false,
             gestureEnabled: false,
           }}
         />
-        <Stack.Screen name="settings" options={{ title: '', headerBackTitle: 'Home' }} />
-        <Stack.Screen name="history" options={{ title: '', headerBackTitle: 'Home' }} />
+        <Stack.Screen name="settings" options={{ title: '', headerBackTitle: strings.navigation.home }} />
+        <Stack.Screen name="history" options={{ title: '', headerBackTitle: strings.navigation.home }} />
     </Stack>
   );
   return (

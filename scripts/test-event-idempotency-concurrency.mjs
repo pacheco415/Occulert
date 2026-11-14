@@ -49,7 +49,7 @@ try{
  await admin.query(read('../supabase/migrations/20261022120000_revoke_direct_table_access.sql'));
  await admin.query(read('../supabase/migrations/20261026164040_atomic_event_idempotency.sql'));
  await admin.query(read('../supabase/migrations/20261031192453_session_start_quota.sql'));
- await admin.query(read('../supabase/migrations/20261114183018_account_write_quota.sql'));
+ await admin.query(read('../supabase/migrations/20261114210442_account_write_quota.sql'));
  await admin.query('grant usage on schema public to service_role');
  const worker=await Promise.all(Array.from({length:12},()=>connect(true)));
  const reset=async()=>admin.query(`truncate auth.users cascade;insert into auth.users values('${owner}'),('${other}');insert into drivers(id,user_id,name) values('${driver}','${owner}','Fixture');insert into sessions(id,driver_id,started_at) values('${session}','${driver}',clock_timestamp()-interval '1 hour'),('${second}','${driver}',clock_timestamp()-interval '1 hour');`);
@@ -134,7 +134,7 @@ if(receiptDirectory){
  mkdirSync(receiptDirectory,{recursive:true});
  const migration=read('../supabase/migrations/20261026164040_atomic_event_idempotency.sql');
  const sessionStartMigration=read('../supabase/migrations/20261031192453_session_start_quota.sql');
- const accountWriteMigration=read('../supabase/migrations/20261114183018_account_write_quota.sql');
+ const accountWriteMigration=read('../supabase/migrations/20261114210442_account_write_quota.sql');
  writeFileSync(join(receiptDirectory,'event-concurrency.json'),JSON.stringify({
   status:'passed',commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
   node:process.version,postgres:serverVersion,migrationSha256:createHash('sha256').update(migration).digest('hex'),

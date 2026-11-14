@@ -1,3 +1,4 @@
+import { strings } from './strings.ts';
 export type CameraInterruptionReason = 'none' | 'background' | 'audioInUse' | 'videoInUse'
   | 'multitasking' | 'systemPressure' | 'unknown';
 
@@ -16,7 +17,7 @@ export interface CameraInterruptionNativeModule {
   addListener?(event: 'cameraInterrupted', listener: (value: unknown) => void): { remove(): void };
 }
 
-export const MULTITASKING_CAMERA_MESSAGE = 'Camera paused because another app is sharing the screen. Make Occulert full screen, then restart when parked.';
+export const MULTITASKING_CAMERA_MESSAGE = strings.monitor.faults.multitasking;
 export const CAMERA_INTERRUPTION_QUERY_TIMEOUT_MS = 500;
 
 export function unknownCameraInterruption(deviceId: string): CameraInterruptionState {

@@ -1,3 +1,4 @@
+import { strings, formatString } from './strings.ts';
 import type { SensorFusionObservationSnapshot } from './sensorFusionObservation';
 
 export const FUSION_VALIDATION_SESSION_TARGET = 5;
@@ -44,10 +45,10 @@ export interface FusionValidationSessionPlan {
 }
 
 const SESSION_CHECKLIST = [
-  'Set up the phone and optional accessories only while parked.',
-  'Keep Occulert open in the foreground during a normal trip.',
-  'Do not stage fatigue, eye closure, or head movements.',
-  'Review the aggregate observation in History after parking.',
+  strings.history.fusionPlan.setup,
+  strings.history.fusionPlan.foreground,
+  strings.history.fusionPlan.noStaging,
+  strings.history.fusionPlan.review,
 ] as const;
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -116,10 +117,10 @@ export function summarizeFusionValidation(
   )).length;
   const missingCoverage: string[] = [];
 
-  if (snapshots.length < target) missingCoverage.push(`${target - snapshots.length} more complete fusion sessions`);
-  if (cameraSessions === 0) missingCoverage.push('camera observations');
-  if (headphoneSessions === 0) missingCoverage.push('compatible headphone motion');
-  if (watchCheckedSessions === 0) missingCoverage.push('Apple Watch availability checks');
+  if (snapshots.length < target) missingCoverage.push(formatString(strings.history.fusionPlan.sessionsMissing, { count: target - snapshots.length }));
+  if (cameraSessions === 0) missingCoverage.push(strings.history.fusionPlan.cameraMissing);
+  if (headphoneSessions === 0) missingCoverage.push(strings.history.fusionPlan.headphoneMissing);
+  if (watchCheckedSessions === 0) missingCoverage.push(strings.history.fusionPlan.watchMissing);
 
   return {
     observedSessions: snapshots.length,
@@ -177,32 +178,32 @@ export function planNextFusionValidationSession(
     return {
       ...base,
       id: 'camera-baseline',
-      title: 'Capture a camera baseline',
-      detail: 'Complete one ordinary foreground session with the phone camera observing normally.',
+      title: strings.history.fusionPlan.cameraTitle,
+      detail: strings.history.fusionPlan.cameraDetail,
     };
   }
   if (!setupCoverage[1]) {
     return {
       ...base,
       id: 'camera-headphones',
-      title: 'Add compatible headphones',
-      detail: 'If compatible headphones are already available, include their local motion observations in a normal session.',
+      title: strings.history.fusionPlan.headphonesTitle,
+      detail: strings.history.fusionPlan.headphonesDetail,
     };
   }
   if (!setupCoverage[2]) {
     return {
       ...base,
       id: 'camera-watch',
-      title: 'Add an Apple Watch check',
-      detail: 'If an Apple Watch is already available, refresh its connection before a normal foreground session.',
+      title: strings.history.fusionPlan.watchTitle,
+      detail: strings.history.fusionPlan.watchDetail,
     };
   }
   if (!setupCoverage[3]) {
     return {
       ...base,
       id: 'combined-accessories',
-      title: 'Capture combined accessory context',
-      detail: 'If both accessories are already available, include headphone motion and a Watch availability check together.',
+      title: strings.history.fusionPlan.combinedTitle,
+      detail: strings.history.fusionPlan.combinedDetail,
     };
   }
   if (snapshots.length < target) {
@@ -210,16 +211,16 @@ export function planNextFusionValidationSession(
     return {
       ...base,
       id: 'repeat-observation',
-      title: 'Repeat a complete observation',
-      detail: `${remaining} more normal ${remaining === 1 ? 'session is' : 'sessions are'} needed to reach the local coverage target.`,
+      title: strings.history.fusionPlan.repeatTitle,
+      detail: formatString(strings.history.fusionPlan.repeatDetail, { count: remaining, sessions: remaining === 1 ? strings.history.fusionPlan.oneSession : strings.history.fusionPlan.sessions }),
     };
   }
 
   return {
     ...base,
     id: 'coverage-complete',
-    title: 'Planned setup coverage is represented',
-    detail: 'No additional setup is prioritized. This does not establish detection accuracy or safety.',
+    title: strings.history.fusionPlan.completeTitle,
+    detail: strings.history.fusionPlan.completeDetail,
     complete: true,
     checklist: [],
   };

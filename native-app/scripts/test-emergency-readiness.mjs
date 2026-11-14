@@ -6,6 +6,7 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import ts from 'typescript';
 import { EMERGENCY_READINESS_COPY, EMERGENCY_READINESS_GUIDES } from '../lib/emergencyReadiness.ts';
+import { strings, formatString } from '../lib/strings.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const filename = new URL('../components/EmergencyReadinessCard.tsx', import.meta.url);
@@ -41,6 +42,7 @@ async function mount({ platform = 'ios', focused = true, open = () => Promise.re
     'expo-router': { useFocusEffect },
     '../constants/theme': { colors: {}, radii: {} },
     '../lib/emergencyReadiness': { EMERGENCY_READINESS_COPY, EMERGENCY_READINESS_GUIDES },
+    '../lib/strings.ts': { strings, formatString },
   };
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, require: name => {

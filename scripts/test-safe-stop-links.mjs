@@ -2,6 +2,7 @@ import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { strings } from '../native-app/lib/strings.ts';
 import {
   SAFE_STOP_OPTIONS,
   buildSafeStopSearchUrls,
@@ -42,7 +43,8 @@ test('the monitor stops and saves before handing off to Maps', () => {
   const owners = readNativeMonitorSourceOwners(), monitor = owners.screen, presentation = owners.view;
   const liveMetrics = readFileSync(new URL('../native-app/components/LiveMetrics.tsx', import.meta.url), 'utf8');
   assert.match(presentation, /alertCount > 0/);
-  assert.match(presentation, /Only use this after you are safely parked/);
+  assert.match(presentation, /strings\.monitor\.safeStop\.warning/);
+  assert.equal(strings.monitor.safeStop.warning, 'Only use this after you are safely parked, or ask a passenger. Opening Maps ends monitoring and saves this drive first.');
   assert.match(monitor, /await handleStop\(\{ deferCloudFinalization: true \}\)/);
   const completion = readFileSync(new URL('../native-app/lib/sessionCompletion.ts', import.meta.url), 'utf8');
   assert.match(monitor, /await completeNativeSessionStop/);
@@ -50,14 +52,16 @@ test('the monitor stops and saves before handing off to Maps', () => {
   assert.match(completion, /void services\.finalize\(localId\)\.catch\(\(\) => \{\}\)/);
   assert.match(monitor, /buildSafeStopSearchUrls\(Platform\.OS, kind\)/);
   assert.match(monitor, /Linking\.openURL\(url\)/);
-  assert.match(presentation, /does not read, store, or upload your location/i);
+  assert.match(presentation, /strings\.monitor\.safeStop\.privacy/);
+  assert.equal(strings.monitor.safeStop.privacy, 'Occulert sends only a search phrase to Maps and does not read, store, or upload your location.');
 
   const controlsStart = presentation.indexOf('<MonitorLayout');
   const metricsStart = presentation.indexOf('<LiveMetrics');
   const safeStopStart = presentation.indexOf('style={s.safeStopBtn}', controlsStart);
   assert.ok(controlsStart >= 0 && controlsStart < metricsStart && metricsStart < safeStopStart);
   const primaryStart = presentation.indexOf('primaryAction={', controlsStart);
-  const stopStart = presentation.indexOf('accessibilityLabel="Stop monitoring and save this drive"', primaryStart);
+  const stopStart = presentation.indexOf('accessibilityLabel={strings.monitor.controls.stopAccessibilityLabel}', primaryStart);
+  assert.equal(strings.monitor.controls.stopAccessibilityLabel, 'Stop monitoring and save this drive');
   assert.ok(primaryStart > controlsStart && stopStart > primaryStart && stopStart < metricsStart);
   assert.doesNotMatch(liveMetrics, /metrics:\s*\{\s*position:\s*'absolute'/);
 });
