@@ -5,7 +5,7 @@ import { scoringSmooth, scoringNodHistory, scoringNodDetected, scoringResetConti
 import { alerts, escalationLevel, tone, trigger, speak, triggerBreakCheck } from "./alerts.js";
 import "./storage-history.js";
 import { queueBackendEvent } from "./cloud-sync.js";
-import { experimentFlags, experimentController, experimentSessionSummary, video, canvas, ctx, faceStateEl, nodsEl, gpsEl, locationEl, perclosEl, microsleepsEl, distractionEl, gpsConsent, cloudConsent, running, fatigue, confidence, earHistory, maxFatigue, fatigueSampleSum, fatigueSampleCount, noseYHistory, headNods, lastNod, driverId, gpsWatch, lastPosition, routePoints, distanceMeters, perclosWindow, eyesClosedSince, microsleeps, lastMicro, turnedSince, totalDistractionMs, calibrating, calibrated, eyeClosedThreshold, eyeWatchThreshold, noFaceSince, lastFaceSeen, LEFT, RIGHT, log, setTextIfChanged, render, drawEyes, yawnCount, lastYawn, _marHist, _mouthOpenSince, MAR_YAWN_THRESH, YAWN_HOLD_MS, YAWN_COOLDOWN_MS, _lastLightCheck, _trackLostSince, _lastTrackingWarning, TRACKING_WARNING_DELAY_MS, TRACKING_WARNING_COOLDOWN_MS, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_lastNod, set_gpsWatch, set_lastPosition, set_routePoints, set_distanceMeters, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_lastMicro, set_turnedSince, set_totalDistractionMs, set_noFaceSince, set_lastFaceSeen, set_yawnCount, set_lastYawn, set__marHist, set__mouthOpenSince, set__lastLightCheck, set__trackLostSince, set__lastTrackingWarning } from "./ui.js";
+import { WEB_APP_VERSION, experimentFlags, experimentController, experimentSessionSummary, video, canvas, ctx, faceStateEl, nodsEl, gpsEl, locationEl, perclosEl, microsleepsEl, distractionEl, gpsConsent, cloudConsent, running, fatigue, confidence, earHistory, maxFatigue, fatigueSampleSum, fatigueSampleCount, noseYHistory, headNods, lastNod, driverId, gpsWatch, lastPosition, routePoints, distanceMeters, perclosWindow, eyesClosedSince, microsleeps, lastMicro, turnedSince, totalDistractionMs, calibrating, calibrated, eyeClosedThreshold, eyeWatchThreshold, noFaceSince, lastFaceSeen, LEFT, RIGHT, log, setTextIfChanged, render, drawEyes, yawnCount, lastYawn, _marHist, _mouthOpenSince, MAR_YAWN_THRESH, YAWN_HOLD_MS, YAWN_COOLDOWN_MS, _lastLightCheck, _trackLostSince, _lastTrackingWarning, TRACKING_WARNING_DELAY_MS, TRACKING_WARNING_COOLDOWN_MS, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_lastNod, set_gpsWatch, set_lastPosition, set_routePoints, set_distanceMeters, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_lastMicro, set_turnedSince, set_totalDistractionMs, set_noFaceSince, set_lastFaceSeen, set_yawnCount, set_lastYawn, set__marHist, set__mouthOpenSince, set__lastLightCheck, set__trackLostSince, set__lastTrackingWarning } from "./ui.js";
 export function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 export function calcEAR(lm, idx) {
     if (experimentFlags.pixels)
@@ -37,8 +37,12 @@ export function detectHeadNod(lm) {
 }
 export function miles(m) { return (m / 1609.344).toFixed(2); }
 export function hav(a, b) { let R = 6371000, toRad = x => x * Math.PI / 180, dLat = toRad(b.lat - a.lat), dLon = toRad(b.lng - a.lng), s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(s)); }
+let gpsGeneration = 0;
 export function startGPS() {
-    if (!gpsConsent.checked) {
+    stopGPS();
+    const generation = gpsGeneration;
+    const current = () => generation === gpsGeneration && running && gpsConsent.checked && !document.hidden;
+    if (!current()) {
         gpsEl.textContent = 'OFF';
         locationEl.textContent = '--';
         return;
@@ -50,25 +54,32 @@ export function startGPS() {
     }
     gpsEl.textContent = 'ASK';
     gpsEl.className = 'value gps warn';
-    set_gpsWatch(navigator.geolocation.watchPosition(pos => {
-        let p = { lat: +pos.coords.latitude.toFixed(6), lng: +pos.coords.longitude.toFixed(6), accuracy: Math.round(pos.coords.accuracy || 0), speed: pos.coords.speed ? Math.round(pos.coords.speed * 2.23694) : 0, ts: new Date().toISOString() };
-        if (lastPosition) {
-            let d = hav(lastPosition, p);
-            if (d > 2 && d < 1000)
-                set_distanceMeters(distanceMeters + (d));
-        }
-        set_lastPosition(p);
-        routePoints.push(p);
-        set_routePoints(routePoints.slice(-80));
-        gpsEl.textContent = 'ON';
-        gpsEl.className = 'value gps on';
-        locationEl.textContent = p.lat.toFixed(2) + ',' + p.lng.toFixed(2);
-    }, err => { gpsEl.textContent = 'OFF'; gpsEl.className = 'value gps warn'; log('GPS unavailable: ' + err.message); }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 }));
+    try {
+        set_gpsWatch(navigator.geolocation.watchPosition(pos => {
+            if (!current()) return;
+            let p = { lat: +pos.coords.latitude.toFixed(6), lng: +pos.coords.longitude.toFixed(6), accuracy: Math.round(pos.coords.accuracy || 0), speed: pos.coords.speed ? Math.round(pos.coords.speed * 2.23694) : 0, ts: new Date().toISOString() };
+            if (lastPosition) {
+                let d = hav(lastPosition, p);
+                if (d > 2 && d < 1000)
+                    set_distanceMeters(distanceMeters + (d));
+            }
+            set_lastPosition(p);
+            routePoints.push(p);
+            set_routePoints(routePoints.slice(-80));
+            gpsEl.textContent = 'ON';
+            gpsEl.className = 'value gps on';
+            locationEl.textContent = p.lat.toFixed(2) + ',' + p.lng.toFixed(2);
+        }, err => { if (!current()) return; gpsEl.textContent = 'OFF'; gpsEl.className = 'value gps warn'; log('GPS unavailable: ' + err.message); }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 }));
+    } catch (_) {
+        gpsEl.textContent = 'OFF';
+        log('GPS unavailable. Camera monitoring continues.');
+    }
 }
 export function stopGPS() {
-    if (gpsWatch !== null)
-        navigator.geolocation.clearWatch(gpsWatch);
+    gpsGeneration += 1;
+    const watch = gpsWatch;
     set_gpsWatch(null);
+    try { if (watch !== null) navigator.geolocation.clearWatch(watch); } catch (_) { }
     gpsEl.textContent = lastPosition ? 'SAVED' : 'OFF';
     gpsEl.className = 'value gps ' + (lastPosition ? 'on' : 'warn');
 }
@@ -150,7 +161,7 @@ export function riskText() {
         return ['WATCH', 'warn'];
     return ['SAFE', 'safe'];
 }
-export function fleetPayload() { let avg = fatigueSampleCount ? Math.round(fatigueSampleSum / fatigueSampleCount) : 0, score = Math.max(0, 100 - Math.round(maxFatigue * .65) - alerts * 8 - headNods * 3 - microsleeps * 5 - Math.round(totalDistractionMs / 20000)), r = riskText()[0], experiment = experimentFlags.any ? (experimentSessionSummary || experimentController?.summary()) : null, perclos = experimentFlags.timePerclos ? (experiment?.timePerclos?.perclos ?? null) : Number(perclosEl.textContent.replace('%', '')) || 0; return { ...(experimentFlags.any ? { detectorVersion: 'web-v81:parked:' + experimentFlags.names.join('+'), experiment } : {}), driverId, name: 'Local Driver', status: r, fatigue: Math.round(fatigue), confidence: Math.round(confidence), alerts, headNods, microsleeps, perclos, distractionSeconds: Math.round((totalDistractionMs + (turnedSince ? Date.now() - turnedSince : 0)) / 1000), escalationLevel, maxFatigue: Math.round(maxFatigue), avgFatigue: avg, safetyScore: score, lastUpdate: new Date().toISOString(), location: gpsConsent.checked ? lastPosition : null, route: gpsConsent.checked ? routePoints : [], distanceMiles: gpsConsent.checked ? Number(miles(distanceMeters)) : 0, speedMph: lastPosition && gpsConsent.checked ? lastPosition.speed : 0, gpsEnabled: gpsConsent.checked && !!lastPosition, cloudConsent: cloudConsent.checked }; }
+export function fleetPayload() { let avg = fatigueSampleCount ? Math.round(fatigueSampleSum / fatigueSampleCount) : 0, score = Math.max(0, 100 - Math.round(maxFatigue * .65) - alerts * 8 - headNods * 3 - microsleeps * 5 - Math.round(totalDistractionMs / 20000)), r = riskText()[0], experiment = experimentFlags.any ? (experimentSessionSummary || experimentController?.summary()) : null, perclos = experimentFlags.timePerclos ? (experiment?.timePerclos?.perclos ?? null) : Number(perclosEl.textContent.replace('%', '')) || 0; return { ...(experimentFlags.any ? { detectorVersion: WEB_APP_VERSION + ':parked:' + experimentFlags.names.join('+'), experiment } : {}), driverId, name: 'Local Driver', status: r, fatigue: Math.round(fatigue), confidence: Math.round(confidence), alerts, headNods, microsleeps, perclos, distractionSeconds: Math.round((totalDistractionMs + (turnedSince ? Date.now() - turnedSince : 0)) / 1000), escalationLevel, maxFatigue: Math.round(maxFatigue), avgFatigue: avg, safetyScore: score, lastUpdate: new Date().toISOString(), location: gpsConsent.checked ? lastPosition : null, route: gpsConsent.checked ? routePoints : [], distanceMiles: gpsConsent.checked ? Number(miles(distanceMeters)) : 0, speedMph: lastPosition && gpsConsent.checked ? lastPosition.speed : 0, gpsEnabled: gpsConsent.checked && !!lastPosition, cloudConsent: cloudConsent.checked }; }
 export function onResults(res) {
     signalDetectionResult();
     if (!running)

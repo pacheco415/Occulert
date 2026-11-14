@@ -43,7 +43,7 @@ const contrastRatio = (foreground, background) => {
 
 assert.equal(
   nativePackage.dependencies['expo-secure-store'],
-  '~58.0.2',
+  '~58.0.3',
   'native auth tokens must use the SDK-compatible SecureStore package',
 );
 assert.ok(
@@ -514,7 +514,7 @@ test('native sign-out invalidates local state and revokes once while token delet
   assert.equal(requests[0].init.headers.Authorization, 'Bearer old-access');
   assert.equal(refreshRequests(f).length, 0);
   assert.equal((await f.api.getCloudState()).signedIn, false);
-  assert.equal(f.timers.size, 0, 'the completed revocation releases its request deadline before deletion settles');
+  assert.equal(f.timers.size, 1, 'only the bounded local sign-out wait remains after remote revocation');
   deletion.resolve();
   await logout;
   await flushCloud();
@@ -680,10 +680,11 @@ test('native cold keychain timeout clears locally and ignores late credentials',
   const f = signOutFixture(), read = deferred();
   f.secureStore.getItemAsync = () => read.promise;
   const logout = f.api.signOutOfCloud();
+  const rejected = assert.rejects(logout, /Sign-out could not be fully saved/);
   assert.equal(f.api.snapshot().auth, null);
   await flushCloud();
   await f.expire();
-  await logout;
+  await rejected;
   read.resolve(JSON.stringify(cloudAuth()));
   await flushCloud();
   assert.equal(f.secure.has(signOutAuthKey), false);
@@ -692,19 +693,80 @@ test('native cold keychain timeout clears locally and ignores late credentials',
   assert.equal(f.api.snapshot().auth, null);
 });
 
-test('native sign-out stays cleared if native token deletion fails', async () => {
+test('native sign-out times out stalled deletion while preserving the real queue before a new login', async () => {
+  const f = signOutFixture(), deletion = deferred();
+  await f.api.getCloudState();
+  f.secureStore.deleteItemAsync = async key => { await deletion.promise; f.secure.delete(key); };
+  const logout = f.api.signOutOfCloud();
+  const rejected = assert.rejects(logout, /Sign-out could not be fully saved/);
+  assert.equal(f.api.snapshot().auth, null);
+  assert.equal(f.api.snapshot().consent, false);
+  await flushCloud();
+  assert.equal(f.storage.get(signOutConsentKey), 'false');
+  assert.equal(logoutRequests(f).length, 1);
+  await f.expire();
+  await rejected;
+  assert.equal(f.timers.size, 0);
+  assert.equal(f.secure.has(signOutAuthKey), true);
+  assert.equal((await f.api.getCloudState()).signOutIncomplete, true);
+  assert.equal((await f.api.getCloudState()).signedIn, false);
+
+  let loginFinished = false;
+  const login = f.api.signInToCloud('new@example.com', 'password').then(result => { loginFinished = true; return result; });
+  await flushCloud();
+  assert.equal(loginFinished, false, 'a timed-out delete must keep its actual storage barrier');
+  assert.equal(f.events.includes('auth-write'), false);
+  deletion.resolve();
+  assert.equal((await login).ok, true);
+  await flushCloud();
+  assert.equal(JSON.parse(f.secure.get(signOutAuthKey)).access_token, 'new-login-access');
+  assert.equal((await f.api.getCloudState()).email, 'new@example.com');
+  assert.equal((await f.api.getCloudState()).signOutIncomplete, undefined);
+  assert.equal(f.storage.get(signOutConsentKey), 'false');
+});
+
+test('native sign-out reports incomplete removal without restoring runtime credentials', async () => {
   const f = signOutFixture();
   await f.api.getCloudState();
   f.secureStore.deleteItemAsync = async () => { throw new Error('keychain unavailable'); };
-  await f.api.signOutOfCloud();
+  await assert.rejects(f.api.signOutOfCloud(), /Sign-out could not be fully saved/);
   await flushCloud();
   assert.equal((await f.api.getCloudState()).signedIn, false);
+  assert.equal((await f.api.getCloudState()).signOutIncomplete, true);
   assert.equal(f.api.snapshot().consent, false);
   assert.equal(f.api.cloudSessionScopes.size, 0);
   assert.equal(f.storage.get(signOutConsentKey), 'false');
   assert.equal(logoutRequests(f).length, 1, 'captured credentials can still revoke remotely after local delete failure');
   assert.equal(logoutRequests(f)[0].init.headers.Authorization, 'Bearer old-access');
   assert.equal(f.events.includes('auth-write'), false);
+});
+
+test('failed native credential deletion remains actionable while remote revocation is offline', async () => {
+  const f = signOutFixture();
+  await f.api.getCloudState();
+  f.transport = async () => { throw new Error('offline'); };
+  f.secureStore.deleteItemAsync = async () => { throw new Error('keychain unavailable'); };
+  await assert.rejects(f.api.signOutOfCloud(), /Sign-out could not be fully saved/);
+  await flushCloud();
+  assert.equal(f.secure.has(signOutAuthKey), true, 'failed native deletion must not be claimed as complete');
+  assert.equal(f.storage.get(signOutConsentKey), 'false');
+  assert.equal((await f.api.getCloudState()).signOutIncomplete, true);
+  assert.equal(logoutRequests(f).length, 1);
+
+  // A successful explicit retry removes the saved credentials even though the
+  // in-memory sign-in was already cleared by the first attempt.
+  f.secureStore.deleteItemAsync = async key => { f.secure.delete(key); };
+  f.transport = async () => cloudResponse(200);
+  await f.api.signOutOfCloud();
+  await flushCloud();
+  assert.equal(f.secure.has(signOutAuthKey), false);
+  assert.equal((await f.api.getCloudState()).signOutIncomplete, undefined);
+  assert.equal(logoutRequests(f).length, 2, 'the retry may revoke only the still-saved captured session');
+  assert.equal(logoutRequests(f)[1].init.headers.Authorization, 'Bearer old-access');
+  const restarted = signOutFixture(null);
+  restarted.storage.set(signOutConsentKey, f.storage.get(signOutConsentKey));
+  assert.equal((await restarted.api.getCloudState()).signedIn, false);
+  assert.equal((await restarted.api.getCloudState()).syncEnabled, false);
 });
 
 for (const failure of ['unavailable', 'malformed']) {

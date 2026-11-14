@@ -30,6 +30,7 @@
     "test:watch-status",
     "test:fleet-history",
     "test:fleet-display",
+    "test:fleet-driver-detail",
     "test:pilot-launch",
     "test:pilot-report",
     "test:login",
@@ -107,6 +108,7 @@
     "test:motion-activity",
     "test:emergency-readiness",
     "test:road-model-benchmark",
+    "test:fleet-monthly-activity",
     "test:corroboration-replay"
   ],
   "additionalChecks": [

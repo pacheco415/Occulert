@@ -204,7 +204,7 @@ try {
   assert.equal(calls.length, databaseCalls, 'malformed cursor cannot reach a fleet/storage query');
   injectMalformedRows = true;
   assert.equal((await invoke(summary, request('GET'))).status, 200);
-  assert.equal((await invoke(followups, request('GET'))).status, 200);
+  assert.equal((await invoke(followups, request('GET'))).status, 502, 'an oversized provider snapshot fails closed before related followup/name queries');
   assert.ok(calls.filter(call => ['events', 'fleet_session_followups'].includes(call.table)).every(call => !call.options.params.session_id.includes('\n')));
   console.log('Session UUID interoperability passed: SQL-backed creation/recovery/finalization, bounded history, events, real followup ownership, malformed IDs and zero metrics.');
 } finally {

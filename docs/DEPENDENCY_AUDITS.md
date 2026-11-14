@@ -2,6 +2,126 @@
 
 Run `node scripts/report-dependency-audits.mjs` with Node 24. The report directory contains separate site, full native and native production dependency-tree JSON reports, plus a receipt recording source revision, lockfile hashes, time and Node/npm versions. CI retains these for 14 days and checks weekly and after relevant dependency changes. An unavailable registry or malformed audit response fails the reporting job; existing vulnerability findings remain visible without misrepresenting the report as clean.
 
+## November 12, 2026 — glob cancellation backport and remaining advisories
+
+Fresh audits at `2026-11-13T06:34:33.071Z` (November 12 in America/Los_Angeles), using Node `24.22.1` and npm
+`11.9.0`, reported the following affected-package counts after the backport:
+
+| Dependency tree | Moderate | Low | High / critical | Total |
+| --- | --- | --- | --- | --- |
+| Site, all dependencies | 3 | 0 | 0 / 0 | 3 |
+| Native, all dependencies | 8 | 1 | 0 / 0 | 9 |
+| Native, `--omit=dev` | 8 | 1 | 0 / 0 | 9 |
+
+These counts are unchanged from the audit before the backport. The site
+lockfile SHA-256 is
+`234638f6756657eb1b50e166954ae9bb5b62e999452d2cbb9de2afaf060e0813`;
+the updated native lockfile SHA-256 is
+`0c2f0c9833bdbdcf0be5ff55457679554543c5538abe46c25d945b29215a10b0`.
+All three audit responses were available; their exit status was 1 for findings.
+
+The two `glob@13.0.6` instances below `@expo/config` and
+`@expo/config-plugins` were updated to the published compatible
+[`glob@13.0.7`](https://registry.npmjs.org/glob/13.0.7) release. Its dependency
+ranges and Node engine requirements are unchanged. Inspection of the published
+tarball confirms the four missing early returns described in
+[GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)
+are backported to the 13.x walkers. Only those two lock entries changed; no
+manifest range, override, parent package or security exemption was added.
+
+The dependency compatibility suite now exercises each consumer's actual
+resolved `glob` package against a temporary 40-directory tree. It checks normal
+matching, then aborts a walk when its first in-flight directory read returns.
+Both installed 13.0.6 copies failed by reading all 40 directories; both 13.0.7
+copies pass by stopping after the first read. The test waits for outstanding
+reads to drain, rather than relying on a timing threshold to detect continued
+work. A clean `npm ci --include=dev` verified the registry integrity and applied
+the existing postinstall patches. Typecheck and all 12 dependency compatibility
+tests passed, with zero skips.
+
+This backport does **not** clear the audit: the advisory still marks versions
+`>=9.0.0 <=14.0.1` as affected, and the separate
+`@bacons/apple-targets → glob@10.5.0` path remains unchanged. The other unique
+advisories are [minimatch GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
+and [deepmerge GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4).
+The minimatch patch floor, `11.0.1`, is outside the installed consumers' 9.x
+and 10.x ranges. The registry still lists `deepmerge@4.3.1` as latest and the
+advisory lists no patched release. Current parent releases offer no compatible
+complete repair; npm's suggested ESLint 9 and Expo 52 downgrades were not applied.
+
+The inspected source paths reach these libraries through lint/build tooling,
+including Expo's production dependency graph. ESLint and Expo fingerprint's
+inspected matchers use minimatch's default optimization level, whereas that
+advisory requires level 2 or higher. This narrows those specific call paths;
+it does not establish that every transitive use is safe. Application source
+does not directly import the three libraries. No native binary was built or
+inspected, so the `--omit=dev` result does not establish shipped-bundle
+reachability or a clean native runtime audit.
+
+The first normal `npm run verify` attempt stopped at `expo install --check`
+with `HTTP Proxy timed out`; no gate was disabled. The separate dependency
+suite subsequently passed its ordinary Expo compatibility resolver check.
+A single normal retry of `npm run verify` then passed, including the online
+dependency gate, typecheck and all native regression suites at the backport
+checkpoint: 255 tests passed,
+zero failed, and three existing Swift-dependent tests were skipped on this
+Linux host. No native build or physical-device validation is claimed.
+
+## November 8, 2026 — Zod cleared; glob and minimatch tooling advisories
+
+`node scripts/report-dependency-audits.mjs` ran at **2026-11-08T21:57:10Z**
+(November 8 in America/Los_Angeles) on source
+`20cbcabbe0ffcb0b946990271c14a0f7187cf6c8` with Node `v24.22.2` and npm
+`10.9.9`. Lock hashes: site
+`234638f6756657eb1b50e166954ae9bb5b62e999452d2cbb9de2afaf060e0813`, native
+`4e26981a3f8a91d529c6b54d0305d365429cca1ec053c8e86f8f80e20dd0431c`.
+
+| Report | Critical | High | Moderate | Low |
+| --- | ---: | ---: | ---: | ---: |
+| Site, all dependencies | 0 | 0 | 3 | 0 |
+| Native, all dependencies | 0 | 0 | 9 | 1 |
+| Native, `--omit=dev` tree | 0 | 0 | 9 | 1 |
+
+The October 28 Zod finding is gone. PR #357 (`7fbd6c6`, October 31) moved the
+lock to Expo CLI `58.1.18`, which no longer depends on Zod, and the native lock
+now contains no `zod` package. The current lock resolves `expo@58.0.23` and
+`@expo/cli@58.1.19`, the newest published SDK 58 releases at this check.
+
+The 13 affected-package entries reduce to three advisories:
+
+- [minimatch GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
+  (moderate, affects `>=7.0.0 <11.0.1`). Site: `eslint@10.14.0` and
+  `@eslint/config-array@0.23.5` resolve `minimatch@10.2.6`, all development
+  tooling. The newest ESLint (`10.14.0`) still declares `minimatch ^10.2.6`, so
+  no compatible patch exists. Native: `minimatch@10.2.6` and `9.0.9` through
+  Expo configuration and glob tooling.
+- [glob GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)
+  (moderate, affects `>=9.0.0 <=14.0.1`). Native: `glob@13.0.6` under `expo`,
+  `@expo/config`, `@expo/config-plugins` and `@expo/fingerprint`, plus
+  top-level `glob@10.5.0`. The published fix line is 14.x, while Expo CLI
+  `58.1.19` declares `glob ^13.0.0`. The `@expo/config`/`prebuild-config` 55.x
+  copies come from `@bacons/apple-targets@5.0.0`.
+- [deepmerge GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)
+  (low), already recorded October 28. `deepmerge@4.3.1` is the newest published
+  release.
+
+All three sit in lint, build, configuration and fingerprint tooling. Application
+source does not import them, and no native binary was built or inspected. As
+before, `--omit=dev` still includes Expo's CLI and configuration packages, so it
+does not prove a clean shipped-app audit. No override or dependency change was
+made. Do not force minimatch 11 or glob 14 into dependents that declare 10.x or
+13.x, and do not run `npm audit fix --force`: npm's suggested fixes are an ESLint
+downgrade to 9.39.5 and an Expo downgrade to 53.0.11.
+
+The native tree and both lockfiles at this source are byte-identical to main
+`415dd7e`. There, `npm ci --include=dev && npm run verify` passed from
+`native-app/` on Linux with Node `v24.22.2` and npm `10.9.9`, without
+`EXPO_NO_TELEMETRY` set. `expo install --check` reported dependencies up to
+date. Of 254 native tests, 251 passed, none failed and 3 were skipped: two
+camera-interruption cases marked SKIP, and the Swift motion-activity harness,
+which needs `swiftc` and runs in the macOS workflow. The EAS npm `10.9.8`
+installer check was not rerun.
+
 ## October 28, 2026 — SDK 58 Zod advisory
 
 [The dated receipt](dependency-audit-2026-10-28.json) records source

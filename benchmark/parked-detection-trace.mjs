@@ -7,15 +7,14 @@ import {join} from 'node:path';
 import {toCsv} from './prepare-dataset.mjs';
 import {parseFile,validateInput} from './run-event-benchmark.mjs';
 import {contentSha256,sourceSnapshot} from './provenance.mjs';
+import {validateParkedAppVersionSources} from '../scripts/lib/app-version-stamp.mjs';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 // Import a trace with its matching source revision. Unknown future versions need
 // an explicit contract update; pin-shaped strings alone are not provenance.
 const versions=JSON.parse(readFileSync(new URL('../asset-versions.json',import.meta.url),'utf8'));
 const helperBytes=readFileSync(new URL('../'+versions['detection-experiments.js'],import.meta.url));
 const core=readFileSync(new URL('../'+versions['driver-app.js'],import.meta.url),'utf8');
-const helperPrefix=helperBytes.toString().match(/detectorVersion:\(\)=> '(web-v\d+:parked:)'/)?.[1];
-const corePrefix=core.match(/detectorVersion:'(web-v\d+:parked:)'/)?.[1];
-if(!helperPrefix||helperPrefix!==corePrefix)throw Error('Owned detector source versions disagree');
+const corePrefix=validateParkedAppVersionSources(core,helperBytes.toString('utf8'),versions);
 const runtime=JSON.parse(readFileSync(new URL('../vendor/mediapipe/tasks-vision-1.0.1-occulert.1/runtime-manifest.json',import.meta.url),'utf8'));
 export const traceContract=Object.freeze({detectorPrefix:corePrefix,runtimeVersion:runtime.runtimeVersion,
  helperIntegrity:'sha256-'+createHash('sha256').update(helperBytes).digest('base64'),

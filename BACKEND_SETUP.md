@@ -266,3 +266,14 @@ Successful responses advertise `session_start_protocol: "client_uuid_v1"`. This 
 ## Optional stored-lead notification
 
 Leave `LEAD_NOTIFY_WEBHOOK_URL` unset to keep notifications disabled. Configure it only with an authorized HTTPS email, Slack or Zapier webhook destination. After a successful Supabase insert the server sends only the event type, server-derived source, received timestamp and lead ID. It never forwards name, email, phone, company or message to this optional destination. The lead ID remains linkable metadata and should be treated as private. Redirects and URL credentials are rejected. Delivery is best effort, bounded to three seconds, and failure does not fail the stored lead submission. This is separate from the existing contact-data storage fallback webhook.
+
+## Monthly active-driver count
+
+The optional `monthly_activity` aggregate in `GET /api/fleet-summary` requires
+`supabase/migrations/20261107160000_fleet_monthly_activity.sql`. Apply it only
+after inspecting the existing ledger and obtaining production migration
+authorization, then verify service-only execution and owner isolation before
+deploying dependent source. No migration was applied as part of source work.
+A missing or failed aggregate is reported as null and shown as unavailable;
+existing roster and recent-session reporting still work. See
+[the definition and boundaries](docs/FLEET_MONTHLY_ACTIVITY.md).

@@ -484,3 +484,83 @@ test('compiled calibration completes when storage writes first fail during monit
  assert.ok(h.state().alerts>0);
  assert.equal(h.el('parkedControls').children.filter(child=>child.id==='preferenceStorageNotice').length,1);
 });
+
+function gpsHarness() {
+ const h=createAppHarness({sourceOverride:preferenceDriver});
+ h.run(`const gpsCallbacks=[],clearedWatches=[];
+  navigator.geolocation={
+   watchPosition:(success,error)=>{gpsCallbacks.push({success,error});return gpsCallbacks.length},
+   clearWatch:id=>clearedWatches.push(id),
+  };`);
+ h.startSession();h.run('gpsConsent.checked=true;startGPS();');
+ return h;
+}
+function locationCallback(h,index,latitude=37.1) {
+ h.run(`gpsCallbacks[${index}].success({coords:{latitude:${latitude},longitude:-122.1,accuracy:5,speed:0}})`);
+}
+
+test('compiled GPS ignores callbacks and errors from a stopped watch',()=>{
+ const h=gpsHarness();locationCallback(h,0);
+ h.run('running=false;stopGPS();');
+ const before=h.get('JSON.stringify({lastPosition,routePoints,distanceMeters,gps:gpsEl.textContent,location:locationEl.textContent})');
+ locationCallback(h,0,37.2);h.run("gpsCallbacks[0].error({message:'late error'})");
+ assert.equal(h.get('JSON.stringify({lastPosition,routePoints,distanceMeters,gps:gpsEl.textContent,location:locationEl.textContent})'),before);
+ assert.equal(h.get('clearedWatches.join()'),'1');
+});
+
+test('compiled GPS rejects prior-session locations after a restart but accepts the new watcher',()=>{
+ const h=gpsHarness();locationCallback(h,0);
+ h.run('stopGPS();');h.startSession();h.run('startGPS();');
+ locationCallback(h,0,37.2);
+ assert.equal(h.get('lastPosition'),null);assert.equal(h.get('routePoints.length'),0);
+ locationCallback(h,1,37.3);
+ assert.equal(h.get('lastPosition.lat'),37.3);assert.equal(h.get('routePoints.length'),1);
+ assert.equal(h.get('distanceMeters'),0,'first fix of a new session cannot inherit old distance');
+ h.run("gpsCallbacks[0].error({message:'superseded error'})");
+ assert.equal(h.el('gps').textContent,'ON');
+});
+
+test('compiled GPS ignores results when sharing is off or the document is hidden',()=>{
+ for(const revoke of ['gpsConsent.checked=false','document.hidden=true']){
+  const h=gpsHarness();h.run(revoke);locationCallback(h,0);
+  assert.equal(h.get('lastPosition'),null);assert.equal(h.get('routePoints.length'),0);
+ }
+});
+
+test('compiled GPS stop invalidates callbacks before an unavailable clearWatch can run',async()=>{
+ const h=gpsHarness();
+ h.run(`navigator.geolocation.clearWatch=()=>{gpsCallbacks[0].success({coords:{latitude:38,longitude:-122,accuracy:5,speed:0}});throw Error('clear unavailable')};`);
+ await h.run('stop()');
+ assert.equal(h.get('running'),false);assert.equal(h.get('gpsWatch'),null);
+ assert.equal(h.get('lastPosition'),null);assert.equal(h.get('routePoints.length'),0);
+ assert.match(h.el('report').textContent,/OCCULERT SESSION REPORT/);
+});
+
+test('compiled optional GPS failure cannot break camera startup or leave a dead running session',async()=>{
+ const h=createAppHarness({sourceOverride:preferenceDriver});
+ h.run(`navigator.mediaDevices={getUserMedia:async()=>({})};
+  navigator.geolocation={watchPosition:()=>{throw Error('GPS denied')},clearWatch:()=>{}};
+  gpsConsent.checked=true;
+  initModel=async()=>{};verifyFirstInference=async()=>{};initCloud=async()=>{};
+  openSelectedCamera=async()=>({getTracks:()=>[]});attachCameraTrackGuards=()=>{};
+  refreshCameraChoices=async()=>[];requestSessionWakeLock=async()=>{};`);
+ await h.run('start()');
+ assert.equal(h.get('running'),true);assert.notEqual(h.get('stream'),null);
+ assert.equal(h.get('video.srcObject===stream'),true);assert.equal(h.get('raf'),1);
+ assert.equal(h.el('gps').textContent,'OFF');
+ await h.run('stop()');assert.equal(h.get('running'),false);
+});
+
+test('compiled foreground stop announces immediately and cannot overwrite a restarted session',async()=>{
+ const h=createAppHarness({sourceOverride:preferenceDriver});h.startSession();
+ h.run(`cloudConsent.checked=true;cloudReady=true;backendSessionScope={ownerId:'owner-a',revision:cloudConsentRevision};
+  backendSessionId='cloud-one';backendSessionPromise=Promise.resolve('cloud-one');
+  let releaseOldEvent;backendEventQueue=new Promise(resolve=>releaseOldEvent=resolve);
+  window.OcculertBackend={currentUser:()=>({id:'owner-a'}),createCloudSummaryOutbox:()=>({enqueue:()=>true,flush:async()=>new Set(['cloud-one'])})};`);
+ const hidden=h.run('handleVisibilityChange(true)');
+ assert.equal(h.get('running'),false);assert.equal(h.el('driveState').textContent,'MONITORING STOPPED');
+ h.startSession();h.run('render();');const restartedState=h.el('driveState').textContent;
+ h.run('releaseOldEvent()');await hidden;
+ assert.equal(h.get('running'),true);assert.equal(h.el('driveState').textContent,restartedState);
+ assert.notEqual(restartedState,'MONITORING STOPPED');
+});

@@ -20,6 +20,9 @@ import {
   prependRecoveredSession,
   recoveredSessionFromCheckpoint,
 } from '../lib/sessionRecoveryModel';
+import { strings } from '../lib/strings';
+
+const copy = strings.home;
 
 interface QuickLinkProps {
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -106,37 +109,33 @@ export default function HomeScreen() {
           </GlassSurface>
           <View style={styles.privacyPill}>
             <View style={styles.privacyDot} />
-            <Text style={styles.privacyPillText}>ON-DEVICE · PRIVATE</Text>
+            <Text style={styles.privacyPillText}>{copy.privacyPill}</Text>
           </View>
         </View>
 
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>DRIVER AWARENESS</Text>
-          <Text style={styles.title}>Stay alert.{`\n`}Arrive safe.</Text>
-          <Text style={styles.subtitle}>
-            Supplemental fatigue alerts, designed to stay clear and calm when the road needs your attention.
-          </Text>
+          <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
+          <Text style={styles.title}>{copy.title}</Text>
+          <Text style={styles.subtitle}>{copy.subtitle}</Text>
         </View>
 
         <View style={styles.safetyBox} accessibilityRole="alert">
           <View style={styles.safetyIcon}>
             <Ionicons name="warning" size={18} color={colors.amber} />
           </View>
-          <Text style={styles.safetyText}>
-            Set up only while parked. Mount the phone facing you, then keep Occulert in the foreground.
-          </Text>
+          <Text style={styles.safetyText}>{copy.parkedSetup}</Text>
         </View>
 
         {recoveryState === 'checking' && (
           <View
-            accessibilityLabel="Checking for an interrupted previous drive"
+            accessibilityLabel={copy.recoveryChecking.accessibilityLabel}
             accessibilityLiveRegion="polite"
             style={styles.recoveryCheckingBox}
           >
             <ActivityIndicator size="small" color={colors.cyan} />
             <View style={styles.recoveryCopy}>
-              <Text style={styles.recoveryCheckingTitle}>Checking the previous drive</Text>
-              <Text style={styles.recoveryDetail}>A new session will be available when this local recovery check finishes.</Text>
+              <Text style={styles.recoveryCheckingTitle}>{copy.recoveryChecking.title}</Text>
+              <Text style={styles.recoveryDetail}>{copy.recoveryChecking.detail}</Text>
             </View>
           </View>
         )}
@@ -144,7 +143,7 @@ export default function HomeScreen() {
         {recoveryState === 'recovered' && (
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Previous interrupted drive recovered. Open session history"
+            accessibilityLabel={copy.recoveryRecovered.accessibilityLabel}
             activeOpacity={0.8}
             onPress={() => router.push('/history')}
             style={styles.recoveryBox}
@@ -153,8 +152,8 @@ export default function HomeScreen() {
               <Ionicons name="refresh-circle" size={20} color={colors.green} />
             </View>
             <View style={styles.recoveryCopy}>
-              <Text style={styles.recoveryTitle}>Previous drive recovered</Text>
-              <Text style={styles.recoveryDetail}>A local checkpoint was saved after monitoring ended unexpectedly. Review it in Session History.</Text>
+              <Text style={styles.recoveryTitle}>{copy.recoveryRecovered.title}</Text>
+              <Text style={styles.recoveryDetail}>{copy.recoveryRecovered.detail}</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
@@ -166,26 +165,26 @@ export default function HomeScreen() {
               <Ionicons name="warning" size={19} color={colors.amber} />
             </View>
             <View style={styles.recoveryCopy}>
-              <Text style={styles.recoveryErrorTitle}>Couldn’t check the previous drive</Text>
+              <Text style={styles.recoveryErrorTitle}>{copy.recoveryError.title}</Text>
               <Text style={styles.recoveryDetail}>{recoveryUnreadable
-                ? 'The checkpoint was kept, but Occulert cannot read it. You can retry or review the explicit discard option in Settings. Consider contacting pilot support before discarding it.'
-                : 'Your local history stays on this iPhone. Try the recovery check again before starting another session.'}</Text>
+                ? copy.recoveryError.unreadableDetail
+                : copy.recoveryError.retryableDetail}</Text>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel="Retry previous drive recovery"
+                accessibilityLabel={copy.recoveryError.retryAccessibilityLabel}
                 onPress={() => setRecoveryAttempt(attempt => attempt + 1)}
                 style={styles.recoveryRetry}
               >
-                <Text style={styles.recoveryRetryText}>Try again</Text>
+                <Text style={styles.recoveryRetryText}>{copy.recoveryError.retry}</Text>
               </TouchableOpacity>
               {recoveryUnreadable && (
                 <TouchableOpacity
                   accessibilityRole="button"
-                  accessibilityLabel="Open Settings to review unreadable recovery data"
+                  accessibilityLabel={copy.recoveryError.reviewAccessibilityLabel}
                   onPress={() => router.push('/settings')}
                   style={styles.recoveryRetry}
                 >
-                  <Text style={styles.recoveryRetryText}>Review in Settings</Text>
+                  <Text style={styles.recoveryRetryText}>{copy.recoveryError.review}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -200,13 +199,13 @@ export default function HomeScreen() {
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={recoveryBlocksStart
-              ? 'Pre-drive safety check unavailable while previous drive recovery is unresolved'
-              : 'Begin pre-drive safety check'}
+              ? copy.start.blockedAccessibilityLabel
+              : copy.start.readyAccessibilityLabel}
             accessibilityHint={recoveryState === 'checking'
-              ? 'Wait for the local recovery check to finish'
+              ? copy.start.checkingHint
               : recoveryState === 'error'
-                ? 'Retry previous drive recovery before starting another session'
-                : 'Opens the parked pre-drive safety confirmation'}
+                ? copy.start.errorHint
+                : copy.start.readyHint}
             accessibilityState={{ disabled: recoveryBlocksStart, busy: recoveryState === 'checking' }}
             disabled={recoveryBlocksStart}
             onPress={() => router.push('/pre-drive')}
@@ -217,22 +216,20 @@ export default function HomeScreen() {
               <Ionicons name="shield-checkmark" size={22} color={colors.text} />
             </View>
             <View style={styles.startCopy}>
-              <Text style={styles.startLabel}>{recoveryState === 'checking' ? 'Checking previous drive…' : recoveryState === 'error' ? 'Recovery check required' : 'Begin safely'}</Text>
-              <Text style={styles.startDetail}>{recoveryBlocksStart ? 'Resolve local recovery first' : 'Pre-drive check'}</Text>
+              <Text style={styles.startLabel}>{recoveryState === 'checking' ? copy.start.checkingLabel : recoveryState === 'error' ? copy.start.errorLabel : copy.start.readyLabel}</Text>
+              <Text style={styles.startDetail}>{recoveryBlocksStart ? copy.start.blockedDetail : copy.start.readyDetail}</Text>
             </View>
             <Ionicons name="arrow-forward" size={20} color={colors.text} />
           </TouchableOpacity>
         </GlassSurface>
 
-        <Text style={styles.sectionLabel}>YOUR OCCULERT</Text>
+        <Text style={styles.sectionLabel}>{copy.sectionLabel}</Text>
         <View style={styles.quickLinks}>
-          <QuickLink icon="time-outline" label="Session history" detail="Review test sessions" href="/history" />
-          <QuickLink icon="options-outline" label="Settings" detail="Tune alerts and sync" href="/settings" />
+          <QuickLink icon="time-outline" label={copy.historyLink.label} detail={copy.historyLink.detail} href="/history" />
+          <QuickLink icon="options-outline" label={copy.settingsLink.label} detail={copy.settingsLink.detail} href="/settings" />
         </View>
 
-        <Text style={styles.footer}>
-          Supplemental prototype only. Pull over whenever you feel drowsy or unsafe.
-        </Text>
+        <Text style={styles.footer}>{copy.footer}</Text>
       </ScrollView>
     </SafeAreaView>
   );

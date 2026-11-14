@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import test from 'node:test';
 import vm from 'node:vm';
 import { createHmac } from 'node:crypto';
+import { createServer } from 'node:http';
 
 const require = createRequire(import.meta.url);
 const source = readFileSync(new URL('../api/_lib/supabase.js', import.meta.url), 'utf8');
@@ -37,6 +38,39 @@ test('storage configuration exposes only a Boolean and never makes a network req
   delete b.context.process.env.SUPABASE_URL;
   assert.equal(b.lib.serverStorageConfigured(), false);
   assert.equal(b.calls.length, 0);
+});
+
+test('Supabase Auth, REST and admin requests never forward credentials or writes through redirects', { timeout: 5000 }, async () => {
+  let redirectedCalls = 0, originalCalls = 0;
+  const destination = createServer((request, response) => {
+    redirectedCalls++;
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify(user));
+  });
+  await new Promise(resolve => destination.listen(0, '127.0.0.1', resolve));
+  const redirector = createServer((request, response) => {
+    originalCalls++;
+    response.writeHead(307, { location: `http://127.0.0.1:${destination.address().port}/receiver` });
+    response.end();
+  });
+  await new Promise(resolve => redirector.listen(0, '127.0.0.1', resolve));
+  try {
+    for (const operation of ['verifyAccessToken', 'pgFetch', 'deleteAuthUser']) {
+      const b = boot((url, options) => globalThis.fetch(url, options));
+      b.context.process.env.SUPABASE_URL = `http://127.0.0.1:${redirector.address().port}`;
+      const request = operation === 'pgFetch' ? b.lib.pgFetch('drivers', { method: 'POST', body: { name: 'Synthetic driver' } })
+        : b.lib[operation]('fixture');
+      await assert.rejects(request, error => error.provider === 'supabase' && error.status === 503 && error.message === 'supabase_unavailable');
+      assert.equal(b.calls[0].options.redirect, 'error');
+      assert.equal(b.calls.length, 1, 'redirection failures must not trigger retries');
+      assert.equal(b.timers.size, 0);
+    }
+    assert.equal(originalCalls, 3);
+    assert.equal(redirectedCalls, 0, 'the destination must receive neither the apikey header nor the request body');
+  } finally {
+    redirector.closeAllConnections(); destination.closeAllConnections();
+    await Promise.all([new Promise(resolve => redirector.close(resolve)), new Promise(resolve => destination.close(resolve))]);
+  }
 });
 
 for (const status of [400, 401, 403, 429, 500, 503]) test(`token verification distinguishes status ${status} from confirmed invalid credentials`, async () => {

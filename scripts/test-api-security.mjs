@@ -108,6 +108,20 @@ assert.equal(insertedSession.p_detector_pipeline, "ios_mlkit_eye_probability");
 assert.equal(insertedSession.p_detector_version, "mlkit-probability-perclos-1");
 assert.equal(insertedSession.p_app_version, "v1.0.0 (52)");
 
+// Postgres text refuses NUL and unpaired surrogates. Sending either used to
+// fail the whole start as a provider outage instead of saving a clean label.
+const unstorableLabels = await invoke(sessions, request("POST", {
+  device: "iPhone\u0000 15", browser: "x".repeat(239) + "\u{1F600}", detector_version: { toString() { return "forged"; } },
+}));
+assert.equal(unstorableLabels.status, 200);
+assert.equal(insertedSession.p_device, "iPhone 15");
+assert.equal(insertedSession.p_browser, "x".repeat(239) + "\uFFFD", "a cut that splits an emoji must not leave an unpaired surrogate");
+assert.equal(insertedSession.p_browser.isWellFormed(), true);
+const nonTextLabels = await invoke(sessions, request("POST", { device: { toString() { return "forged"; } }, browser: ["a"] }));
+assert.equal(nonTextLabels.status, 200);
+assert.equal(insertedSession.p_device, null, "non-string labels are unknown, not coerced");
+assert.equal(insertedSession.p_browser, null);
+
 await invoke(sessions, request("POST", {
   detector_pipeline: "attacker_pipeline",
   detector_version: "<script>",
@@ -492,6 +506,8 @@ assert.equal(createdFleet.status, 201);
 assert.equal(insertedFleet.owner_user_id, "user-1", "fleet ownership must come from the verified access token");
 assert.equal(insertedFleet.plan, "trial", "browser callers must not choose privileged plans");
 assert.equal(Object.hasOwn(insertedFleet, "role"), false, "browser callers must not create privileged roles");
+assert.deepEqual(Object.keys(createdFleet.body.fleet).sort(), ["company_name", "created_at", "id", "plan"],
+  "fleet creation must answer with the same fields as the owner's fleet lookup");
 
 const unverifiedFleet = loadHandler("../api/fleets.js", async () => {
   throw new Error("database must not be called for an unverified owner");
@@ -642,7 +658,9 @@ const revokeInvitation = loadHandler("../api/fleet-invitations.js", async (table
   }
   assert.equal(table, "fleet_invitations");
   revocationCall = options;
-  return revocable ? [{ id: replacementId, revoked_at: options.body.revoked_at }] : [];
+  // PostgREST answers a PATCH with the stored row; model its private columns.
+  return revocable ? [{ id: replacementId, email: "driver@example.com", revoked_at: options.body.revoked_at,
+    token_hash: "a".repeat(64), invited_by: "user-1", accepted_by: null, fleet_id: "fleet-1" }] : [];
 });
 const revokedInvitation = await invoke(revokeInvitation, request("DELETE", {
   invitation_id: replacementId, fleet_id: "attacker-fleet", owner_user_id: "attacker", accepted_at: null,
@@ -650,8 +668,13 @@ const revokedInvitation = await invoke(revokeInvitation, request("DELETE", {
 assert.equal(revokedInvitation.status, 200);
 assert.equal(revocationCall.method, "PATCH");
 assert.deepEqual(revocationCall.params, {
+  select: "id,email,expires_at,accepted_at,revoked_at,created_at",
   id: `eq.${replacementId}`, fleet_id: "eq.fleet-1", accepted_at: "is.null", revoked_at: "is.null",
 });
+assert.equal(revocationCall.params.select.includes("token_hash"), false, "revocation must never select token hashes");
+assert.deepEqual(Object.keys(revokedInvitation.body.invitation).sort(), ["email", "id", "revoked_at"],
+  "a revoked invitation must answer with listing fields only");
+assert.equal(JSON.stringify(revokedInvitation.body).includes("a".repeat(64)), false, "the stored token digest must stay on the server");
 assert.deepEqual(Object.keys(revocationCall.body), ["revoked_at"]);
 assert.ok(Number.isFinite(Date.parse(revocationCall.body.revoked_at)));
 revocable = false;
@@ -733,13 +756,15 @@ const lightweightSummary = loadHandler("../api/fleet-summary.js", async (table) 
   if (table === "fleets") return [{ id: "fleet-1", company_name: "Safe Transit", plan: "trial" }];
   if (table === "drivers") return [];
   if (table === "sessions") return [{ id: fleetSessionId, driver_id: "driver-1" }];
+  if (table === "rpc/fleet_monthly_activity") return null;
   throw new Error("a lightweight fleet refresh must not query events");
 });
 const lightweightRequest = request("GET");
 lightweightRequest.url = "/api/fleet-summary?include_events=0";
 const lightweightResult = await invoke(lightweightSummary, lightweightRequest);
 assert.equal(lightweightResult.status, 200);
-assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions"]);
+assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions", "rpc/fleet_monthly_activity"]);
+assert.equal(lightweightResult.body.monthly_activity, null);
 assert.equal(lightweightResult.body.events_included, false);
 assert.deepEqual(lightweightResult.body.events, []);
 
@@ -801,6 +826,11 @@ try {
     if (table === "drivers") {
       assert.equal(params.fleet_id, "eq." + ownedFleetId);
       assert.doesNotMatch(params.select, /email|latitude|longitude|location|raw_motion/i);
+      if (params.id) {
+        assert.equal(params.limit, '50');
+        return (await orderingDb.query(`select ${params.select} from drivers where fleet_id=$1 and id=any($2::uuid[]) limit $3`,
+          [ownedFleetId, params.id.slice(4, -1).split(','), Number(params.limit)])).rows;
+      }
       return (await orderingDb.query(`select ${params.select} from drivers where fleet_id=$1${sqlOrder(params.order, ["id"], "asc")} limit $2`,
         [ownedFleetId, params.limit ? Number(params.limit) : 1000])).rows;
     }
