@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as checkpointModel from '../../lib/monitorCheckpointModel.ts';
 import * as simulatorTraceModel from '../../lib/simulatorTraceModel.ts';
+import { strings, formatString } from '../../lib/strings.ts';
 
 export const MONITOR_SOURCE_PATHS = Object.freeze({
   screen: 'app/monitor.tsx',
@@ -144,7 +145,7 @@ export function readNativeMonitorSourceOwners(read = relative => readFileSync(ne
 /** Run the actual moved hooks in an existing bridge-substituted React fixture. */
 export function withNativeMonitorHookBindings(bindings, load) {
   const owners = readNativeMonitorSourceOwners();
-  const scope = { SIMULATOR_TRACE: false, ...bindings, ...checkpointModel, ...simulatorTraceModel };
+  const scope = { SIMULATOR_TRACE: false, ...bindings, ...checkpointModel, ...simulatorTraceModel, strings, formatString };
   Object.assign(scope, load(readFileSync(new URL('hooks/useSimulatorTrace.ts', root), 'utf8'), ['useSimulatorTrace'], scope));
   for (const [owner, name] of Object.entries(HOOKS)) Object.assign(scope, load(owners[owner], [name], scope));
   return scope;

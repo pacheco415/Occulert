@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { EMERGENCY_READINESS_COPY, EMERGENCY_READINESS_GUIDES } from '../native-app/lib/emergencyReadiness.ts';
+import { strings } from '../native-app/lib/strings.ts';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const officialGuides = new Map([
@@ -54,6 +55,7 @@ test('actual card copy states parked-only informational limits without emergency
   assert.deepEqual(Object.keys(EMERGENCY_READINESS_COPY).sort(), ['availability', 'limits', 'parked', 'privacy', 'title']);
   const copy = Object.values(EMERGENCY_READINESS_COPY).concat(EMERGENCY_READINESS_GUIDES.flatMap(guide => [guide.title, guide.detail])).join('\n');
   assertsInformationalOnly(copy);
+  assertsInformationalOnly(Object.values(strings.settings.emergency.card).join('\n'));
   assertsInformationalOnly(read('native-app/components/EmergencyReadinessCard.tsx'));
   assert.match(EMERGENCY_READINESS_COPY.parked, /parked/i);
   assert.match(EMERGENCY_READINESS_COPY.limits, /Occulert/i);
@@ -72,7 +74,8 @@ test('guidance stays in iOS parked preparation and preserves the four pre-drive 
   assert.match(settings, /Platform\.OS === 'ios'\s*&&\s*<EmergencyReadinessCard\s*\/>/);
   assert.ok(settings.indexOf('<EmergencyReadinessCard') < settings.indexOf('<SensitivitySlider'), 'the optional compact card is near the Settings header');
   const readiness = preDrive.indexOf('<ParkedReadinessCard');
-  const guidance = preDrive.indexOf('accessibilityLabel="Review Apple emergency-readiness guidance"');
+  const guidance = preDrive.indexOf('accessibilityLabel={strings.preDrive.emergency.accessibility}');
+  assert.equal(strings.preDrive.emergency.accessibility, 'Review Apple emergency-readiness guidance');
   const health = preDrive.indexOf('<View style={styles.healthCard}>');
   assert.ok(readiness >= 0 && guidance > readiness, 'guidance follows the existing parked readiness card');
   assert.ok(health > guidance, 'guidance is before optional Health');

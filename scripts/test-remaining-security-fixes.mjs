@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import ts from 'typescript';
+import { strings } from '../native-app/lib/strings.ts';
 import { createSettingPersister } from '../native-app/lib/settingPersistence.ts';
 import {
   commitSessionHistoryEdit,
@@ -16,6 +18,21 @@ import { buildSessionHistoryExport } from '../native-app/lib/sessionHistoryExpor
 
 const require = createRequire(import.meta.url);
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+function assertCatalogCopy(source, key, expected) {
+  const file = ts.createSourceFile('native-copy.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const imported = file.statements.some(node => ts.isImportDeclaration(node)
+    && /(?:^|\/)strings(?:\.ts)?$/.test(node.moduleSpecifier.text)
+    && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+    && node.importClause.namedBindings.elements.some(item => !item.isTypeOnly && item.name.text === 'strings' && !item.propertyName));
+  let bound = false;
+  function visit(node) {
+    if (ts.isPropertyAccessExpression(node) && node.getText(file) === `strings.${key}`) bound = true;
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  assert.ok(imported && bound, `${key}: use the actual catalog binding`);
+  assert.equal(key.split('.').reduce((value, part) => value?.[part], strings), expected, `${key}: preserve released English`);
+}
 const pngSize = path => {
   const image = readFileSync(new URL(`../${path}`, import.meta.url));
   assert.equal(image.subarray(1, 4).toString('ascii'), 'PNG');
@@ -55,7 +72,7 @@ test('monitoring fails visibly without overlapping the navigation or showing a d
   assert.match(owners.camera, /hasCameraSampleRef\.current \? SENSOR_STALL_MS : SENSOR_STARTUP_GRACE_MS/);
   assert.match(owners.analysis, /hasCameraSampleRef\.current = true/);
   assert.match(owners.camera, /lastSampleAtRef\.current = Date\.now\(\)/);
-  assert.match(owners.camera, /Monitoring stopped: camera analysis stalled/);
+  assertCatalogCopy(owners.camera, 'monitor.faults.analysisStalled', 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.');
   for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /Alert\.alert\('Monitoring stopped'/);
   assert.match(owners.view, /<MonitorLayout/);
   for (const owner of owners.runtimeOwners) assert.doesNotMatch(owner.source, /sensorFault: \{ position: 'absolute'/);
@@ -86,8 +103,8 @@ test('audio and haptic preferences are cached before alert delivery', () => {
 test('native Settings reports persistence failures and restores the confirmed value', () => {
   const settings = read('native-app/app/settings.tsx');
   assert.match(settings, /createSettingPersister/);
-  assert.match(settings, /Could not save setting/);
-  assert.match(settings, /previous setting is still active/);
+  assertCatalogCopy(settings, "settings.saveError.title", "Could not save setting");
+  assertCatalogCopy(settings, "settings.saveError.detail", "Your previous setting is still active. Please try again.");
   assert.match(settings, /storedSettingPersister\.save/);
   assert.match(settings, /watchSettingPersister\.save/);
   assert.match(settings, /createSettingPersister\(alertPreferenceStorage\)/);
@@ -98,8 +115,8 @@ test('sensitivity changes use the same ordered persistence and rollback contract
   const slider = read('native-app/components/SensitivitySlider.tsx');
   assert.match(slider, /createSettingPersister/);
   assert.match(slider, /previousValue: value/);
-  assert.match(slider, /Could not save sensitivity/);
-  assert.match(slider, /previous sensitivity setting is still active/);
+  assertCatalogCopy(slider, "settings.sensitivity.errorTitle", "Could not save sensitivity");
+  assertCatalogCopy(slider, "settings.sensitivity.errorDetail", "Your previous sensitivity setting is still active. Please try again.");
   assert.doesNotMatch(slider, /try \{ await AsyncStorage\.setItem/);
 });
 
@@ -399,10 +416,11 @@ test('History load failures stay visible without pretending saved sessions are e
   assert.match(history, /return \(\) => \{\s*focusedRef\.current = false;\s*historyLoadAttemptRef\.current \+= 1;/, 'leaving History must invalidate its pending read');
   assert.match(load, /setHistoryLoadError\(true\)/);
   assert.doesNotMatch(load, /catch \{[\s\S]*setSessions\(\[\]\)/);
-  assert.match(historyOwners.load, /Checking local session history/);
-  assert.match(historyOwners.load, /Couldn’t load local history/);
-  assert.match(historyOwners.load, /Your saved sessions were not deleted/);
-  assert.match(historyOwners.load, /accessibilityLabel=\{historyLoadBusy \? 'Retrying local session history'/);
+  assertCatalogCopy(historyOwners.load, "history.load.checkingAccessibilityLabel", "Checking local session history");
+  assertCatalogCopy(historyOwners.load, "history.load.errorTitle", "Couldn’t load local history");
+  assertCatalogCopy(historyOwners.load, "history.load.errorWithoutSessions", "Your saved sessions were not deleted. Try reading them from this iPhone again.");
+  assert.match(historyOwners.load, /accessibilityLabel=\{historyLoadBusy \? strings\.history\.load\.retryingAccessibilityLabel/);
+  assertCatalogCopy(historyOwners.load, 'history.load.retryingAccessibilityLabel', 'Retrying local session history');
   assert.match(history, /!historyLoadError && sessions\.length === 0/);
 });
 
@@ -413,10 +431,10 @@ test('History serializes each session operation and announces pending saves', ()
   assert.match(history, /runSessionOperation\([\s\S]*sessionRecordKey\(target, index\),[\s\S]*'saving'/);
   assert.match(history, /sessionRecordKey\(target, index\),[\s\S]*'deleting'/);
   assert.match(historyOwners.card, /accessibilityLiveRegion="polite"/);
-  assert.match(historyOwners.card, /Saving changes…/);
-  assert.match(historyOwners.card, /Deleting session…/);
+  assertCatalogCopy(historyOwners.card, "history.card.saving", "Saving changes…");
+  assertCatalogCopy(historyOwners.card, "history.card.deleting", "Deleting session…");
   assert.match(historyOwners.review, /accessibilityState=\{\{ selected, disabled: sessionBusy, busy: sessionBusy \}\}/);
-  assert.match(historyOwners.filters, /Wait for session changes before sharing summaries/);
+  assertCatalogCopy(historyOwners.filters, "history.filters.shareBusy", "Wait for session changes before sharing summaries");
   assert.match(historyOwners.filters, /accessibilityState=\{\{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy \}\}/);
   assert.match(historyOwners.card, /disabled=\{sessionBusy\}/);
 });

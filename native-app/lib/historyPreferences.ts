@@ -1,3 +1,4 @@
+import { strings } from './strings.ts';
 import type { AlertAssessment } from './feedback';
 
 export type HistoryFilter = 'all' | 'needs-review' | 'reviewed' | 'recovered';
@@ -116,10 +117,10 @@ export function validateHistoryDateRange(
   const startTimestamp = localDateTimestamp(start);
   const endTimestamp = localDateTimestamp(end);
   if (startTimestamp === null || endTimestamp === null) {
-    return { range: null, error: 'Enter two real dates as YYYY-MM-DD, with a year of 1900 or later.' };
+    return { range: null, error: strings.history.dateErrors.invalid };
   }
-  if (startTimestamp > endTimestamp) return { range: null, error: 'From must be on or before To.' };
-  if (endTimestamp > localDayStart(now)) return { range: null, error: 'Choose dates on or before today on this iPhone.' };
+  if (startTimestamp > endTimestamp) return { range: null, error: strings.history.dateErrors.reversed };
+  if (endTimestamp > localDayStart(now)) return { range: null, error: strings.history.dateErrors.future };
   return { range: { start, end }, error: null };
 }
 
@@ -219,7 +220,7 @@ export type HistoryDateGroupKey = 'today' | 'yesterday' | 'earlier';
 
 export interface HistoryDateGroup<T> {
   key: HistoryDateGroupKey;
-  label: 'Today' | 'Yesterday' | 'Earlier';
+  label: string;
   sessions: Array<{ item: T; index: number }>;
 }
 
@@ -252,8 +253,8 @@ export function groupIndexedSessionsByDate<T extends { savedAt?: string; updated
   });
 
   return ([
-    { key: 'today', label: 'Today', sessions: groupedSessions.today },
-    { key: 'yesterday', label: 'Yesterday', sessions: groupedSessions.yesterday },
-    { key: 'earlier', label: 'Earlier', sessions: groupedSessions.earlier },
+    { key: 'today', label: strings.history.presentation.today, sessions: groupedSessions.today },
+    { key: 'yesterday', label: strings.history.presentation.yesterday, sessions: groupedSessions.yesterday },
+    { key: 'earlier', label: strings.history.presentation.earlier, sessions: groupedSessions.earlier },
   ] satisfies Array<HistoryDateGroup<T>>).filter(group => group.sessions.length > 0);
 }

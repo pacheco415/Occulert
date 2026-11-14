@@ -1,4 +1,5 @@
 import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
+import { strings } from '../native-app/lib/strings.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -102,11 +103,13 @@ test('fusion validation dashboard remains local, aggregate, and observation-only
   const pilotExport = read('native-app/lib/pilotProgressExport.ts');
   const feedback = read('native-app/lib/feedback.ts');
 
-  assert.match(historyOwners.fusion, /LOCAL FUSION VALIDATION/);
-  assert.match(historyOwners.fusion, /NEXT VALIDATION SESSION/);
-  assert.match(historyOwners.fusion, /Optional accessories are never required/);
-  assert.match(historyOwners.fusion, /No accuracy rate or safety score is produced/);
-  assert.match(historyOwners.fusion, /excluded from sync, exports, and feedback/);
+  for (const key of ['eyebrow', 'nextHeading', 'accessoriesOptional', 'caution']) {
+    assert.match(historyOwners.fusion, new RegExp(`<Text[^>]*>\\{strings\\.history\\.fusion\\.${key}\\}</Text>`));
+  }
+  assert.equal(strings.history.fusion.eyebrow, 'ALL HISTORY · LOCAL FUSION VALIDATION');
+  assert.equal(strings.history.fusion.nextHeading, 'NEXT VALIDATION SESSION');
+  assert.equal(strings.history.fusion.accessoriesOptional, 'Optional accessories are never required to use Occulert or complete a safe trip.');
+  assert.equal(strings.history.fusion.caution, 'Aggregate planning context only. No accuracy rate or safety score is produced, and these observations do not change alerts. Fusion diagnostics remain on this iPhone and are excluded from sync, exports, and feedback.');
   assert.doesNotMatch(cloudSync, /summarizeFusionValidation/);
   assert.doesNotMatch(historyExport, /summarizeFusionValidation/);
   assert.doesNotMatch(pilotExport, /summarizeFusionValidation/);

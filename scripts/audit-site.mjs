@@ -10,9 +10,14 @@ import "./audit-assets.mjs";
 import "./audit-mediapipe.mjs";
 import "./audit-retired-assets.mjs";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { extname, join, normalize } from "node:path";
+import { dirname, extname, join, normalize, resolve } from "node:path";
+import { pathToFileURL } from 'node:url';
+import ts from 'typescript';
 
 const root = process.cwd();
+// Load copy from the repository being audited, including fixture checkouts.
+const nativeCatalogPath = join(root, 'native-app/lib/strings.ts');
+const { strings: nativeStrings } = await import(pathToFileURL(nativeCatalogPath).href);
 readHistorySourceOwners(read);
 const monitorOwners = readNativeMonitorSourceOwners(relative => read('native-app/' + relative));
 const failures = [];
@@ -59,6 +64,26 @@ function assertIncludes(path, needle, message) {
 
 function assertNotIncludes(path, needle, message) {
   if (assertionSource(path).includes(needle)) fail(message);
+}
+
+function assertNativeCatalogCopy(path, key, expected, message) {
+  const source = ts.createSourceFile(path, read(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const imported = source.statements.some(node => {
+    if (!ts.isImportDeclaration(node) || typeof node.moduleSpecifier.text !== 'string') return false;
+    const candidate = resolve(dirname(join(root, path)), node.moduleSpecifier.text);
+    if ((candidate.endsWith('.ts') ? candidate : candidate + '.ts') !== nativeCatalogPath) return false;
+    return !node.importClause?.isTypeOnly && node.importClause?.namedBindings
+      && ts.isNamedImports(node.importClause.namedBindings)
+      && node.importClause.namedBindings.elements.some(item => !item.isTypeOnly && item.name.text === 'strings' && !item.propertyName);
+  });
+  let bound = false;
+  function visit(node) {
+    if (ts.isPropertyAccessExpression(node) && node.getText(source) === `strings.${key}`) bound = true;
+    ts.forEachChild(node, visit);
+  }
+  visit(source);
+  const value = key.split('.').reduce((current, part) => current?.[part], nativeStrings);
+  if (!imported || !bound || value !== expected) fail(message);
 }
 
 function assertSingleH1(path) {
@@ -473,23 +498,23 @@ assertIncludes(HISTORY_SOURCE_PATHS.screen, "openFeedbackWithFallback(target", "
 assertIncludes("native-app/lib/feedback.ts", "No camera images, video, audio, raw motion readings, or location are attached.", "native pilot feedback must state that sensitive media, raw motion, and location are not attached");
 assertIncludes(HISTORY_SOURCE_PATHS.reviewModel, "false_alert", "native session history must capture structured false-alert feedback");
 assertIncludes(HISTORY_SOURCE_PATHS.reviewModel, "missed_alert", "native session history must capture structured missed-alert feedback");
-assertIncludes(HISTORY_SOURCE_PATHS.review, "This alert rating stays only on this iPhone", "native alert assessments must disclose their local-only storage");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.review, "history.review.ratingPrivacy", "This alert rating stays only on this iPhone. Choose the best match after parking. It is included only if you choose to send feedback.", "native alert assessments must disclose their local-only storage");
 assertIncludes("native-app/app/monitor.tsx", "sensitivity: sessionSensitivityRef.current", "native session history must preserve the sensitivity used for each session");
 assertIncludes(HISTORY_SOURCE_PATHS.reviewModel, "CHECKPOINT_TARGET = 10", "native history must track progress toward the first 10-session accuracy checkpoint");
 assertIncludes(HISTORY_SOURCE_PATHS.viewModel, "item.sensitivity === 'medium'", "native accuracy checkpoint must count only reviewed Medium-sensitivity sessions");
-assertIncludes(HISTORY_SOURCE_PATHS.pilot, "Ratings stay on this iPhone", "native accuracy checkpoint must disclose local-only rating storage");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.pilot, "history.pilot.checkpointNote", "Only complete reviewed sessions recorded on Medium count here. Recovered partial sessions are excluded. Ratings stay on this iPhone.", "native accuracy checkpoint must disclose local-only rating storage");
 assertIncludes("native-app/lib/feedback.ts", "Alert assessment:", "native session feedback must include the tester's alert assessment");
 assertIncludes("native-app/lib/feedback.ts", "Sensitivity:", "native session feedback must include the recorded sensitivity");
-assertIncludes(HISTORY_SOURCE_PATHS.review, "Record only after you are safely parked.", "native test-condition review must prohibit in-drive interaction");
-assertIncludes(HISTORY_SOURCE_PATHS.review, "Conditions stay on this iPhone", "native test conditions must disclose local-only storage");
-assertIncludes(HISTORY_SOURCE_PATHS.pilot, "TEST CONDITION COVERAGE", "native pilot checkpoint must summarize test-condition coverage");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.review, "history.review.conditionsSafety", "Record only after you are safely parked.", "native test-condition review must prohibit in-drive interaction");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.review, "history.review.conditionsPrivacy", "Conditions stay on this iPhone and are included only if you choose Send session feedback. No location or media is attached.", "native test conditions must disclose local-only storage");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.pilot, "history.pilot.coverageTitle", "TEST CONDITION COVERAGE", "native pilot checkpoint must summarize test-condition coverage");
 assertIncludes("native-app/lib/feedback.ts", "Phone position:", "native session feedback must include structured test conditions");
-assertIncludes(HISTORY_SOURCE_PATHS.review, "tester observations, not device measurements", "native device-impact review must not misrepresent subjective observations as measurements");
-assertIncludes(HISTORY_SOURCE_PATHS.review, "let the phone cool before another session", "native device-impact review must give safe temperature-warning guidance");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.review, "history.review.deviceNote", "Record after safely parking. These are tester observations, not device measurements.", "native device-impact review must not misrepresent subjective observations as measurements");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.review, "history.review.temperatureWarning", "If iPhone shows a temperature warning, stop using Occulert and let the phone cool before another session.", "native device-impact review must give safe temperature-warning guidance");
 assertIncludes("native-app/lib/feedback.ts", "Battery impact (tester-reported):", "native session feedback must label subjective battery observations");
 assertIncludes("native-app/lib/feedback.ts", "Phone heat (tester-reported):", "native session feedback must label subjective phone-heat observations");
-assertIncludes(HISTORY_SOURCE_PATHS.card, "Review complete", "native history must identify fully reviewed sessions");
-assertIncludes(HISTORY_SOURCE_PATHS.card, "Needs review", "native history must identify incomplete session reviews");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.card, "history.common.reviewComplete", "Review complete", "native history must identify fully reviewed sessions");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.card, "history.common.needsReview", "Needs review", "native history must identify incomplete session reviews");
 assertIncludes(HISTORY_SOURCE_PATHS.card, "expanded: isExpanded", "native session review details must expose their expanded state for accessibility");
 assertIncludes("native-app/app/monitor.tsx", "...currentAppBuildInfo()", "native sessions must preserve their exact app version and native build");
 assertIncludes("native-app/lib/appBuildInfo.ts", "Constants.platform?.ios?.buildNumber", "native pilot metadata must use the embedded immutable iOS build number");
@@ -505,12 +530,12 @@ assertIncludes("native-app/constants/thresholds.ts", "EARLY_CLOSED_ALERT_MS = 60
 assertIncludes("native-app/constants/thresholds.ts", "CRITICAL_CLOSED_ALERT_MS = 1_200", "native monitoring must retain a stronger prolonged-closure stage");
 assertIncludes("native-app/app/monitor.tsx", "monitoring-paused.wav", "native monitoring must package an audible foreground-loss warning");
 assertIncludes("native-app/hooks/useMonitorAnalysis.ts", "headNodObservationsRef.current += 1", "native monitoring must store candidate head-nod observations locally");
-assertIncludes(HISTORY_SOURCE_PATHS.diagnostics, "Does not trigger alerts", "experimental head-nod observations must not be presented as an alert signal");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.diagnostics, "history.diagnostics.headMotionCaution", "Saved locally as aggregate observations only and included only if you choose Send session feedback. Does not trigger alerts or change scores.", "experimental head-nod observations must not be presented as an alert signal");
 assertNotIncludes("native-app/components/AlertSystem.tsx", "headNod", "unvalidated head-nod observations must not affect alert delivery");
 assertNotIncludes("native-app/lib/cloudSync.ts", "headNodObservations", "unvalidated head-nod observations must remain out of cloud sync");
 assertIncludes("native-app/app.json", "NSMotionUsageDescription", "native iOS builds must explain compatible-headphone motion access");
 assertIncludes("native-app/app/monitor.tsx", "headphoneHeadNodObservationsRef.current += 1", "native monitoring must keep headphone candidate observations separate");
-assertIncludes(HISTORY_SOURCE_PATHS.diagnostics, "Saved locally as aggregate observations only", "native history must disclose aggregate-only head-motion storage");
+assertNativeCatalogCopy(HISTORY_SOURCE_PATHS.diagnostics, "history.diagnostics.headMotionCaution", "Saved locally as aggregate observations only and included only if you choose Send session feedback. Does not trigger alerts or change scores.", "native history must disclose aggregate-only head-motion storage");
 assertNotIncludes("native-app/lib/cloudSync.ts", "headphoneMotionSamples", "raw headphone-motion diagnostics must remain out of cloud sync");
 assertNotIncludes("native-app/components/AlertSystem.tsx", "headphoneMotion", "unvalidated headphone motion must not affect alert delivery");
 assertIncludes("native-app/lib/alertPolicy.ts", "CRITICAL_WARMUP_SECONDS = 10", "native monitoring must not trigger a critical alert immediately after startup");
@@ -519,7 +544,7 @@ assertIncludes("native-app/components/AlertSystem.tsx", "deriveAlertLevel", "nat
 assertIncludes("native-app/components/AlertSystem.tsx", "shouldDeliverAlert", "native alert escalation must use the tested cooldown policy");
 assertIncludes("native-app/components/AlertSystem.tsx", "alertDeliveryPlan", "native alert outputs must use the bounded severity plan");
 assertIncludes("native-app/components/AlertSystem.tsx", "cancelPendingCues", "native alert output sequences must cancel stale timers");
-assertIncludes("native-app/app/settings.tsx", "centered three-tone critical sequence", "native Settings must explain the parked urgent audio test");
+assertNativeCatalogCopy("native-app/app/settings.tsx", "settings.audioTest.parkedDetail", "Use only while parked. This plays the selected sound as the centered three-tone critical sequence and does not change your alert setting.", "native Settings must explain the parked urgent audio test");
 assertIncludes("native-app/targets/occulert-watch/AlertReceiver.swift", "playCriticalHapticSequence", "the Watch must use the stronger critical wrist sequence");
 assertIncludes("native-app/targets/occulert-watch/AlertReceiver.swift", "hapticSequenceTask?.cancel()", "the Watch must replace a pending haptic sequence when a newer alert arrives");
 assertIncludes("native-app/app/settings.tsx", "watchTestRunnerRef.current.run", "the parked Watch test must reject overlapping sends");
@@ -531,7 +556,7 @@ assertNotIncludes(`${assetByStem('liquid-glass.css')}`, "backdrop-filter: blur(1
 assertIncludes("docs/APP_ROADMAP.md", "Review the full diff and repair findings", "the roadmap must preserve review and repair before release");
 assertNotIncludes("features.html", "designed to actually wake you up", "public alert copy must not imply that alerts make drowsy driving safe");
 assertIncludes("native-app/components/AlertSystem.tsx", "setTrackingLost(true)", "native monitoring must apply a grace period before warning about tracking loss");
-assertIncludes("native-app/components/AlertSystem.tsx", "TRACKING LOST", "native monitoring must warn after sustained tracking loss");
+assertNativeCatalogCopy("native-app/components/AlertSystem.tsx", "monitor.alerts.tracking.title", "TRACKING LOST", "native monitoring must warn after sustained tracking loss");
 assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "          inline", "native alert banners must use the scrolling layout flow");
 for (const owner of monitorOwners.runtimeOwners) assertNotIncludes("native-app/" + owner.path, "sensorFault: { position: 'absolute'", "native sensor-fault banners must share the scrolling layout flow");
 for (const owner of monitorOwners.runtimeOwners) assertNotIncludes("native-app/" + owner.path, "Alert.alert('Monitoring stopped'", "native sensor faults must not stack a blocking modal over the in-app warning");
@@ -544,14 +569,14 @@ assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "<Camera
 assertIncludes("native-app/components/monitor/MonitorPresentation.tsx", "<LiveMetrics", "native metrics must share the control layout flow so alert actions cannot overlap them");
 for (const owner of monitorOwners.runtimeOwners) assertNotIncludes("native-app/" + owner.path, "metrics: {\n    position: 'absolute'", "native metrics must not rely on a fixed bottom offset that can overlap added controls");
 assertIncludes("native-app/lib/watchBridge.ts", "getIsWatchAppInstalled", "Apple Watch controls must require the companion app, not pairing alone");
-assertIncludes("native-app/app/settings.tsx", "AUTOMATIC", "connected audio settings must describe iPhone output routing truthfully");
+assertNativeCatalogCopy("native-app/app/settings.tsx", "settings.headphones.audioStatus", "AUTOMATIC", "connected audio settings must describe iPhone output routing truthfully");
 assertIncludes("native-app/app/monitor.tsx", "getWatchAlertsEnabled()", "native monitoring must preload the cached Watch preference before alerts can fire");
 assertIncludes("native-app/components/AlertSystem.tsx", "getWatchAlertsEnabled()", "native alerts must use the shared Watch preference cache without blocking delivery on storage");
 assertNotIncludes("native-app/components/AlertSystem.tsx", "getWatchAlertsEnabled(true)", "native alert delivery must not force a storage refresh on the time-critical path");
 assertIncludes("native-app/lib/watchBridge.ts", "updateApplicationContext", "Watch alerts must preserve the latest background delivery fallback");
 assertNotIncludes("native-app/lib/watchBridge.ts", "mod.transferUserInfo", "Watch alerts must not use the crash-prone user-info transfer path");
 assertIncludes("native-app/targets/occulert-watch/AlertReceiver.swift", "didReceiveUserInfo", "the Watch companion must receive queued alert deliveries");
-assertIncludes("native-app/app/settings.tsx", "Test Watch alert", "connected-device settings must provide a direct Watch alert test");
+assertNativeCatalogCopy("native-app/app/settings.tsx", "settings.watch.test.action", "Test Watch alert · urgent pattern", "connected-device settings must provide a direct Watch alert test");
 assertIncludes("native-app/app.json", "@bacons/apple-targets", "native iOS builds must package the Watch companion target");
 assertIncludes("native-app/targets/occulert-watch/expo-target.config.js", "type: 'watch'", "the Watch companion must be configured as a watchOS target");
 assertIncludes("native-app/targets/occulert-watch/expo-target.config.js", "'com.apple.developer.usernotifications.time-sensitive': true", "the Watch target must declare its Time Sensitive Notifications entitlement");

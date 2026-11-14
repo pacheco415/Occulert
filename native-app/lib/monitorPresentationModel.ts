@@ -1,3 +1,4 @@
+import { strings } from './strings.ts';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
 import type { CameraSetupAssessment } from './cameraSetup';
 
@@ -12,23 +13,23 @@ export function deriveMonitorPresentation({ metrics, sensorFault, isStopping, is
   }[metrics.state];
   const recoveryRequired = Boolean(sensorFault?.startsWith('Monitoring did not start'));
   const monitorStatusLabel = sensorFault
-    ? recoveryRequired ? 'RECOVERY REQUIRED' : 'STOPPED · CHECK CAMERA'
+    ? recoveryRequired ? strings.monitor.status.recoveryRequired : strings.monitor.status.checkCamera
     : isStopping
-      ? 'SAVING DRIVE'
+      ? strings.monitor.status.saving
       : isStarting
-        ? 'STARTING'
+        ? strings.monitor.status.starting
         : cameraRecovering
-          ? 'RECOVERING CAMERA'
+          ? strings.monitor.status.recovering
         : isRunning
           ? ({
-              open: 'TRACKING',
-              watch: 'CHECKING EYES',
-              closed: 'DROWSINESS ALERT',
-              noFace: 'TRACKING UNAVAILABLE',
+              open: strings.monitor.status.tracking,
+              watch: strings.monitor.status.checkingEyes,
+              closed: strings.monitor.status.drowsinessAlert,
+              noFace: strings.monitor.status.trackingUnavailable,
             } as const)[metrics.state]
           : setupPreviewActive
-            ? cameraSetup.ready ? 'SETUP READY' : 'CHECKING SETUP'
-            : 'NOT MONITORING';
+            ? cameraSetup.ready ? strings.monitor.status.setupReady : strings.monitor.status.checkingSetup
+            : strings.monitor.status.stopped;
   const monitorStatusColor = sensorFault
     ? '#ef4444'
     : cameraRecovering
