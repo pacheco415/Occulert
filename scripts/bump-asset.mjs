@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { assertReleaseBaseline, commitAssetPlan, loadSourceAssets, synchronizeSourceEntry } from './lib/source-assets.mjs';
 import { assertInitialCopyRuntimeSource, replaceInitialCopyUrl, synchronizeInitialCopyHtml, synchronizeInitialCopyWorker } from './lib/initial-copy-assets.mjs';
 import { synchronizeDriverCatalogPins } from './lib/driver-catalog-assets.mjs';
+import { assertEveryBranchFetched } from './lib/branch-fetch-guard.mjs';
 
 const root = process.cwd();
 const read = name => readFileSync(join(root, name), 'utf8');
@@ -156,6 +157,10 @@ if (refresh) {
   // different immutable bytes. Traverse full history and include merge diffs:
   // a conflict resolution can introduce a URL absent from both parent commits.
   if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: root, encoding: 'utf8' }).trim() !== 'false') throw new Error('Fetch full Git history before choosing new immutable asset URLs');
+  // Full history of one branch is not enough: a clone that began with --depth 1
+  // still fetches a single branch after --unshallow. Dry runs are refused too,
+  // because a plan built from partial history names the wrong URLs.
+  assertEveryBranchFetched(root);
   const historicalAssets = new Set(execFileSync('git', ['log', '--all', '--full-history', '--diff-merges=first-parent', '--format=', '--name-only', '--', ':(top,glob)*.v*.js', ':(top,glob)*.v*.css'], { cwd: root, encoding: 'utf8', timeout: 15000, maxBuffer: 32 * 1024 * 1024 }).split(/\r?\n/).map(name => name.trim()).filter(Boolean));
   const replacements = new Map();
   for (const name of selected) {

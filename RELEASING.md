@@ -81,6 +81,24 @@ review the generated diff, and run all verification before committing.
 
 Before choosing a new asset URL, fetch the current main and relevant remote branches into a full-history checkout. The release tool reserves filenames found anywhere in known Git history, including other local/remote-tracking branches and deleted files. It includes merge diffs so filenames and cache names first introduced during conflict resolution stay reserved after removal. It also advances the service-worker cache beyond every recorded cache version in known history, so two prepared releases cannot share a cache identity. It does not contact GitHub automatically or know branches that have never been fetched. Never reuse an immutable URL from another prepared release, even after its file is deleted.
 
+A complete history of one branch is not enough. A clone made with `--depth 1`
+or `--single-branch` keeps a one-branch fetch rule even after
+`git fetch --unshallow`, so every later fetch still skips the other prepared
+branches. `asset:release`, `asset:bump` (dry runs included) and
+`asset:retire -- --write` therefore refuse to choose a name unless
+`remote.origin.fetch` covers every origin branch. Fetch every branch and every
+pull request head immediately before a release:
+
+```sh
+git remote set-branches origin '*'
+git fetch origin '+refs/heads/*:refs/remotes/origin/*' '+refs/pull/*/head:refs/remotes/pr/*'
+```
+
+Pull request heads keep the names of closed or deleted branches reserved. The
+check reads the fetch rule only; it cannot tell how recently the checkout was
+fetched. A commit that no branch or pull request points to cannot be fetched by
+another checkout, so the names it uses are not reserved.
+
 The PR Site Audit checks the actual PR head against the base revision with
 `scripts/audit-asset-lineage.mjs`. A stale logical release or an immutable filename
 collision blocks the PR. Rebase onto current main, copy its current active asset
@@ -190,7 +208,8 @@ Removal starts at 14 days after retirement. The audit warns from day 14 through
 day 20 and fails at day 21. Run cleanup weekly so the warning window does not
 expire. Write mode drops integrity entries, unused immutable Vercel version
 rules and unreferenced exact-name asset fixtures, and advances CACHE once beyond
-all recorded cache versions. Review tests that use fixtures with other names
+all recorded cache versions. It needs every origin branch fetched, as a release
+does (see Prepared branch asset names). Review tests that use fixtures with other names
 (the tool preserves these), run full verification, and follow the normal PR
 checks before merge. An empty cleanup does not change files or CACHE.
 
