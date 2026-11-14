@@ -4,6 +4,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { dirname, join } from 'node:path';
 import { parse } from 'acorn';
 import { parseRuntimeAssetPath, resolveRuntimeAssetPath } from './asset-paths.mjs';
+import { assertDriverAppVersion, synchronizeDriverAppVersion } from './app-version-stamp.mjs';
 
 export const SOURCE_REGISTRY = 'source-assets.json';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -85,6 +86,7 @@ export function auditSourceAssets(root = process.cwd()) {
   for (const entry of entries) {
     if (entry.changed) throw new Error(`Source mismatch: ${entry.logical}: ${entry.source} differs from ${entry.active}; run asset:release`);
     if (integrity[entry.active] !== entry.sha256) throw new Error(`Source output integrity mismatch: ${entry.active}`);
+    if (entry.logical === 'driver-app.js') assertDriverAppVersion(entry.bytes.toString('utf8'), manifest, { required: entry.mode === 'bundle' });
   }
   const exclusions = new Set(readFileSync(join(root, '.vercelignore'), 'utf8').split(/\r?\n/).map(line => line.trim()));
   for (const name of ['src/', 'build/', SOURCE_REGISTRY, ...(entries.some(entry => entry.mode === 'bundle') ? ['lib/', 'source-driver-contract.json', 'jsconfig.json', 'eslint.config.mjs'] : [])]) if (!exclusions.has(name)) throw new Error(`.vercelignore must exclude ${name}`);
@@ -141,9 +143,17 @@ function renderDriverBundle(root, overrides) {
 }
 
 export function synchronizeSourceEntry(root, entry, expected, beforeManifest, afterManifest) {
-  const bytes = Buffer.from(expected);
+  const driver = entry.logical === 'driver-app.js' || entry.mode === 'bundle';
+  if (driver && beforeManifest['driver-app.js'] === afterManifest['driver-app.js']) {
+    assertDriverAppVersion(Buffer.from(expected).toString('utf8'), afterManifest, { required: entry.mode === 'bundle' });
+  }
+  // This expected program is an equality proof only. Bundle output below comes
+  // from recompiling actual staged modules, including the derived initializer.
+  const bytes = Buffer.from(driver
+    ? synchronizeDriverAppVersion(Buffer.from(expected).toString('utf8'), afterManifest, { required: entry.mode === 'bundle' })
+    : expected);
   if (entry.bytes.equals(bytes)) return new Map();
-  if (entry.mode === 'copy') return new Map([[entry.source, bytes]]);
+  if (entry.mode === 'copy') return new Map([[entry.source, bytes], [afterManifest[entry.logical], bytes]]);
   const contract = json(root, 'source-driver-contract.json');
   const replacements = new Map(Object.keys(beforeManifest).filter(key => beforeManifest[key] !== afterManifest[key]).map(key => [beforeManifest[key], afterManifest[key]]));
   const escaped = [...replacements.keys()].map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
@@ -157,6 +167,7 @@ export function synchronizeSourceEntry(root, entry, expected, beforeManifest, af
   for (const name of contract.modules) {
     const path = 'src/' + name, original = readFileSync(ownedFile(root, path), 'utf8');
     let updated = pattern ? original.replace(pattern, value => replacements.get(value)) : original;
+    updated = synchronizeDriverAppVersion(updated, afterManifest, { sourceType: 'module' });
     if (pin?.type === 'Literal' && typeof pin.value === 'string') {
       const ast = parse(updated, { ecmaVersion: 2022, sourceType: 'module' });
       const owned = ast.body.map(node => node.type === 'ExportNamedDeclaration' ? node.declaration : node).filter(node => node?.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === 'EXPERIMENT_HELPER_INTEGRITY');
@@ -164,6 +175,8 @@ export function synchronizeSourceEntry(root, entry, expected, beforeManifest, af
     }
     if (updated !== original) { overrides[name] = updated; changes.set(path, updated); }
   }
-  if (!renderDriverBundle(root, overrides).equals(bytes)) throw new Error('Bundled importer changes must originate in actual source modules; update source and use asset:release');
+  const compiled = renderDriverBundle(root, overrides);
+  if (!compiled.equals(bytes)) throw new Error('Bundled importer changes must originate in actual source modules; update source and use asset:release');
+  changes.set(afterManifest['driver-app.js'], compiled);
   return changes;
 }

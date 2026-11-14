@@ -6,6 +6,7 @@ import { assertReleaseBaseline, commitAssetPlan, loadSourceAssets, synchronizeSo
 import { assertInitialCopyRuntimeSource, replaceInitialCopyUrl, synchronizeInitialCopyHtml, synchronizeInitialCopyWorker } from './lib/initial-copy-assets.mjs';
 import { synchronizeDriverCatalogPins } from './lib/driver-catalog-assets.mjs';
 import { assertEveryBranchFetched } from './lib/branch-fetch-guard.mjs';
+import { assertDriverAppVersion, synchronizeDriverAppVersion } from './lib/app-version-stamp.mjs';
 
 const root = process.cwd();
 const read = name => readFileSync(join(root, name), 'utf8');
@@ -40,12 +41,15 @@ if (release) {
   assertReleaseBaseline(root, manifest, integrity, { initCopy });
   for (const entry of sourceEntries) {
     if (entry.logical.endsWith('.js')) new Function(entry.bytes.toString('utf8'));
+    if (entry.logical === 'driver-app.js') synchronizeDriverAppVersion(entry.bytes.toString('utf8'), manifest, { required: entry.mode === 'bundle' });
     const name = entry.initial ? entry.logical : entry.active;
     const prior = releaseInputs.get(name);
     if (prior && !prior.equals(entry.bytes)) throw new Error(`Conflicting source aliases: ${entry.active}`);
     releaseInputs.set(name, entry.bytes);
   }
   if (!sourceEntries.some(entry => entry.changed)) {
+    const driver = sourceEntries.find(entry => entry.logical === 'driver-app.js');
+    if (driver) assertDriverAppVersion(driver.bytes.toString('utf8'), manifest, { required: driver.mode === 'bundle' });
     console.log(JSON.stringify({ mode: 'release', sources: sourceEntries.map(({ logical, source, active, sha256 }) => ({ logical, source, active, sha256 })), copies: {}, rewrites: [], noOp: true, dryRun: dry }, null, 2));
     process.exit(0);
   }
@@ -58,6 +62,14 @@ function synchronizeRegisteredSources(changes) {
     const filename = manifest[entry.logical];
     const bytes = changes.get(filename) ?? read(filename);
     for (const [name, source] of synchronizeSourceEntry(root, entry, bytes, beforeManifest, manifest)) changes.set(name, source);
+    integrity[filename] = digest(changes.get(filename) ?? bytes);
+  }
+}
+
+function assertUnchangedDriverStamp(selected) {
+  const driver = sourceEntries.find(entry => entry.logical === 'driver-app.js');
+  if (driver && !selected.has(manifest['driver-app.js'])) {
+    assertDriverAppVersion(sources.get(manifest['driver-app.js']), manifest, { required: driver.mode === 'bundle' });
   }
 }
 
@@ -131,6 +143,7 @@ if (refresh) {
   try { atHead = JSON.parse(execFileSync('git', ['show', 'HEAD:asset-versions.json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); }
   catch { throw new Error('Refresh requires Git history to verify the new release is unpublished'); }
   if (Object.values(atHead).includes(filename)) throw new Error('Cannot refresh a published active asset; bump it first');
+  assertUnchangedDriverStamp(new Set(Object.values(manifest).filter(name => !Object.values(atHead).includes(name))));
   integrity[filename] = digest(sources.get(filename));
   console.log(`Refresh integrity: ${filename}`);
   const changes = new Map();
@@ -153,6 +166,9 @@ if (refresh) {
       }
     }
   }
+  // A derived stamp must never silently repair bytes under a published URL.
+  // Legacy unstamped bundles can migrate only with a selected driver release.
+  assertUnchangedDriverStamp(selected);
   // A URL already used on another prepared branch must never be reused with
   // different immutable bytes. Traverse full history and include merge diffs:
   // a conflict resolution can introduce a URL absent from both parent commits.

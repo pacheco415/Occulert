@@ -2,6 +2,8 @@ import { assetByStem } from './lib/current-assets.mjs';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { parse } from "acorn";
+import { driverAppVersion } from "./lib/app-version-stamp.mjs";
 
 const values = new Map();
 const calls = [];
@@ -125,6 +127,30 @@ assert.equal(adopted.access_token, "passkey-access");
 backend.adoptSession(signedIn.body);
 assert.equal((await backend.ensureDriverProfile({ name: "Test Driver", vehicle: "Van 12" })).ok, true);
 assert.equal((await backend.startSession()).body.session.id, "session-1");
+const sessionBody = () => JSON.parse(calls.filter(call => call.url === "/api/sessions" && call.method === "POST").at(-1).body);
+assert.equal(sessionBody().app_version, null, "a retained unstamped driver does not claim a newer build");
+assert.equal(sessionBody().detector_version, "web-ear-perclos-1");
+// The backend is loaded before the driver in app.html. Its session method must
+// read the subsequently initialized, actual released classic-script binding.
+const versions = JSON.parse(readFileSync(new URL("../asset-versions.json", import.meta.url)));
+const driverSource = readFileSync(new URL(`../${versions["driver-app.js"]}`, import.meta.url), "utf8");
+const declaration = parse(driverSource, { ecmaVersion: 2022, sourceType: "script" }).body
+  .find(node => node.type === "VariableDeclaration" && node.declarations.some(binding => binding.id.name === "WEB_APP_VERSION"));
+assert.ok(declaration, "the released driver owns the build stamp");
+vm.runInContext(driverSource.slice(declaration.start, declaration.end), context);
+assert.equal((await backend.startSession()).body.session.id, "session-1");
+assert.equal(sessionBody().app_version, driverAppVersion(versions));
+assert.equal(sessionBody().detector_version, "web-ear-perclos-1");
+const cachedWindow = { ...window };
+cachedWindow.window = cachedWindow;
+const cachedContext = vm.createContext({ ...context, window: cachedWindow });
+vm.runInContext(clientSource, cachedContext);
+vm.runInContext("const WEB_APP_VERSION='web-v1';", cachedContext);
+cachedWindow.OcculertBackend.adoptSession(signedIn.body);
+assert.equal((await cachedWindow.OcculertBackend.startSession()).body.session.id, "session-1");
+assert.equal(sessionBody().app_version, "web-v1", "a retained stamped driver keeps its loaded version with a newer backend");
+assert.equal(sessionBody().detector_version, "web-ear-perclos-1");
+assert.equal(calls.some(call => call.url.includes("asset-versions.json")), false, "session provenance needs no network version lookup");
 assert.equal((await backend.logEvent("session-1", "drowsy", { fatigue_score: 80 })).ok, true);
 assert.equal((await backend.endSession("session-1", { safety_score: 70 })).ok, true);
 assert.equal((await backend.getFleet()).body.fleet.id, "fleet-1");
