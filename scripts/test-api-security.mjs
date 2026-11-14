@@ -31,6 +31,12 @@ function sessionReply(body, extra = {}) {
     detector_version: body.p_detector_version, app_version: body.p_app_version, ...extra }, replayed: false };
 }
 
+function accountWriteReply(options, operation, userId = verifiedUser.id) {
+  assert.equal(options.method, "POST");
+  assert.deepEqual(options.body, { p_user_id: userId, p_operation: operation });
+  return { allowed: true, user_id: userId, operation };
+}
+
 function loadHandler(path, pgFetch, user = verifiedUser) {
   const handlerPath = require.resolve(path);
   delete require.cache[handlerPath];
@@ -431,6 +437,7 @@ for (const body of [null, true, "text", 3, []]) {
 
 let insertedProfile;
 const profile = loadHandler("../api/profile.js", async (table, options = {}) => {
+  if (table === "rpc/reserve_account_write") return accountWriteReply(options, "profile");
   assert.equal(table, "drivers");
   if (!options.method) return [];
   if (options.method === "POST") {
@@ -472,6 +479,7 @@ for (const race of [false, true]) {
       let row = { id: "driver-1", user_id: "user-1", name: "Existing Driver", vehicle_id: "TRK-7", fleet_id: "fleet-1", active: false };
       let raced = false, patch;
       const update = loadHandler("../api/profile.js", async (table, options = {}) => {
+        if (table === "rpc/reserve_account_write") return accountWriteReply(options, "profile");
         assert.equal(table, "drivers");
         if (!options.method) return race && !raced ? [] : [row];
         if (options.method === "POST") { raced = true; throw { details: { code: "23505" } }; }
@@ -498,6 +506,7 @@ for (const race of [false, true]) {
   let row = { id: "driver-1", user_id: "user-1", name: "John Smith", email: "old@example.com", vehicle_id: "TRK-7", fleet_id: "fleet-1", active: false };
   let raced = false;
   const updatingProfile = loadHandler("../api/profile.js", async (_table, options = {}) => {
+    if (_table === "rpc/reserve_account_write") return accountWriteReply(options, "profile");
     if (!options.method) return race && !raced ? [] : [row];
     if (options.method === "POST") { raced = true; throw { details: { code: "23505" } }; }
     assert.equal(options.method, "PATCH");
@@ -528,6 +537,7 @@ for (const body of [null, true, "text", 3, []]) {
 
 let insertedFleet;
 const fleets = loadHandler("../api/fleets.js", async (table, options = {}) => {
+  if (table === "rpc/reserve_account_write") return accountWriteReply(options, "fleet");
   assert.equal(table, "fleets");
   if (!options.method) {
     assert.equal(options.params.owner_user_id, "eq.user-1");
@@ -1238,6 +1248,7 @@ for (const [route, limit, fields] of [
  const calls = [];
  const bounded = loadHandler(route, async (table, options = {}) => {
   calls.push({ table, options });
+  if (table === "rpc/reserve_account_write") return accountWriteReply(options, "profile");
   if (table === "drivers" && !options.method) {
    assert.equal(options.params.user_id, "eq.user-1");
    return [{ id: "driver-1", fleet_id: "fleet-1", name: "Existing Driver", vehicle_id: "TRK-7" }];
@@ -1259,7 +1270,8 @@ for (const [route, limit, fields] of [
  assert.equal(accepted.body.ok, true);
  assert.equal(accepted.headers["cache-control"], "no-store");
  assert.equal(accepted.headers["content-type"], "application/json; charset=utf-8");
- assert.equal(calls.filter(call => call.options.method).length, 1);
+ assert.equal(calls.filter(call => call.options.method).length, route === "../api/profile.js" ? 2 : 1);
+ assert.equal(calls.filter(call => call.table === "rpc/reserve_account_write").length, route === "../api/profile.js" ? 1 : 0);
  calls.length = 0;
  const oversized = await invoke(bounded, request("POST", { ...body, padding: body.padding + "x" }));
  assert.equal(oversized.status, 415);

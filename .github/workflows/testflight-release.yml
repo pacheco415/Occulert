@@ -1,0 +1,153 @@
+name: Controlled TestFlight
+run-name: TestFlight ${{ inputs.mode }} — ${{ inputs.source_sha }}
+
+# Manual only. Never attach this control to release/testflight or a push event.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Separate operation to perform
+        type: choice
+        options: [preflight, build, submit]
+        default: preflight
+        required: true
+      source_sha:
+        description: Full reviewed main commit SHA (40 lowercase hex characters)
+        type: string
+        required: true
+      evidence_run_id:
+        description: Build requires a successful preflight run ID; submit requires its successful build run ID
+        type: string
+        default: ''
+      build_id_sha256:
+        description: Submit only — build UUID SHA-256 fingerprint from the successful build receipt (never enter a raw UUID)
+        type: string
+        default: ''
+      archive_sha256:
+        description: Submit only — IPA SHA-256 from the build receipt and its reviewed archive report
+        type: string
+        default: ''
+      archive_reviewed:
+        description: Submit only — reviewed the actual IPA report, exact source and remaining release gates
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+# All three modes share a production lock. A new dispatch must not cancel a
+# command that may already have created a build or submission remotely.
+concurrency:
+  group: occulert-testflight-production
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Apple codesign/security inspect the actual IPA without transferring any
+    # private archive or signing material through public Actions artifacts.
+    runs-on: macos-26
+    timeout-minutes: 180
+    env:
+      TF_MODE: ${{ inputs.mode }}
+      TF_SOURCE_SHA: ${{ inputs.source_sha }}
+      TF_EVIDENCE_RUN_ID: ${{ inputs.evidence_run_id }}
+      TF_BUILD_ID_SHA256: ${{ inputs.build_id_sha256 }}
+      TF_ARCHIVE_SHA256: ${{ inputs.archive_sha256 }}
+      TF_ARCHIVE_REVIEWED: ${{ inputs.archive_reviewed && 'true' || 'false' }}
+    steps:
+      - name: Require a new manual main dispatch before checkout
+        run: |
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REPOSITORY" = pacheco415/Occulert
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          test "$GITHUB_SHA" = "$GITHUB_WORKFLOW_SHA"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Validate reviewed source and prior workflow evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/testflight-release.mjs source
+      - name: Install the pinned release CLI and exact source dependencies without credentials
+        run: |
+          npm install --global npm@10.9.8 eas-cli@27.10.0
+          npm ci --include=dev --prefix "$RUNNER_TEMP/occulert-testflight-control/source/native-app"
+      - name: Read-only Expo preflight and complete source archive comparison
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: node scripts/testflight-release.mjs preflight
+      - name: Recheck source gates and queue exactly one production build
+        id: queue
+        if: inputs.mode == 'build'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: node scripts/testflight-release.mjs queue
+      - name: Preserve the public queued build fingerprint before waiting
+        if: ${{ !cancelled() && inputs.mode == 'build' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: testflight-queued-${{ github.run_id }}
+          path: ${{ runner.temp }}/occulert-testflight-control/queued.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Wait for that exact build and inspect the private phone and Watch archive
+        if: ${{ inputs.mode == 'build' && steps.queue.outcome == 'success' }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: node scripts/testflight-release.mjs finish
+      - name: Recheck the inspected exact build and submit it to TestFlight
+        if: inputs.mode == 'submit'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: node scripts/testflight-release.mjs submit
+      - name: Preserve the bounded release receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: testflight-${{ inputs.mode }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/occulert-testflight-control/receipt.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Summarize verified release evidence
+        if: ${{ !cancelled() }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+          import { resolve } from 'node:path';
+          const path = resolve(process.env.RUNNER_TEMP, 'occulert-testflight-control/receipt.json');
+          if (existsSync(path)) {
+            const receipt = JSON.parse(readFileSync(path, 'utf8'));
+            const lines = [
+              '## Controlled TestFlight receipt', '',
+              `Operation: **${receipt.mode}**`, '',
+              `Source: \`${receipt.sourceSha}\``, '',
+              `Native tree: \`${receipt.nativeTree}\``, '',
+              `EAS CLI: \`${receipt.easVersion}\``, '',
+            ];
+            if (receipt.build) lines.push(`Build UUID SHA-256: \`${receipt.build.idSha256}\``, '',
+              `Version: **${receipt.build.appVersion} (${receipt.build.appBuildVersion})**`, '');
+            if (receipt.artifact) lines.push(`IPA SHA-256: \`${receipt.artifact.sha256}\``, '');
+            if (receipt.archiveReview) {
+              const report = receipt.archiveReview;
+              lines.push('### Actual archive inspection', '',
+                'Phone and Watch identities, versions, build numbers and companion relation match the source.', '',
+                'Apple codesign verified both signatures. Current store-shaped profiles allow the signed entitlements and the actual signing certificates.', '',
+                'Source capabilities match; debugging, location/microphone disclosure, Health background delivery and multitasking camera access checks passed.', '',
+                `Privacy manifests: **${report.privacy.manifests}**, schema checked; tracking is not declared. Watch root manifest present: **${report.privacy.watchRootManifestPresent}**.`, '',
+                'Exact purpose strings and privacy reason codes are included in receipt.json → archiveReview.', '',
+                'Limits: profile CMS is decoded, not independently Apple-trust validated; JavaScript experiment values rely on source/environment preflight, not binary proof. A resolved Podfile.lock, Apple processing and physical acceptance are not established by this report.', '');
+            }
+            lines.push('A build receipt does not authorize automatic submission. Submission completion does not establish Apple processing, tester availability, or physical acceptance.');
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          }
+          NODE

@@ -30,7 +30,7 @@ const cases = [
 // Run each actual handler with its real local validation/response dependencies.
 // Mock the verified identity and storage boundary, never the route's guards.
 function harness(entry, options = {}) {
-  const calls = [], mutations = [], auth = [];
+  const calls = [], mutations = [], auth = [], reservations = [];
   const routeUrl = new URL(`../api/${entry.route}.js`, import.meta.url);
   const routeRequire = createRequire(routeUrl);
   const storage = {
@@ -40,6 +40,14 @@ function harness(entry, options = {}) {
     pgFetch: async (table, opts = {}) => {
       calls.push({ table, ...opts });
       if (options.pgFetch) return options.pgFetch(table, opts, mutations);
+      if (table === 'rpc/reserve_account_write') {
+        assert.equal(opts.method, 'POST');
+        assert.deepEqual(JSON.parse(JSON.stringify(opts.body)), {
+          p_user_id: verifiedUser.id, p_operation: entry.route === 'profile' ? 'profile' : 'fleet',
+        });
+        reservations.push({ table, ...opts });
+        return { allowed: true, user_id: verifiedUser.id, operation: opts.body.p_operation };
+      }
       if (opts.method === 'POST' || opts.method === 'PATCH') mutations.push({ table, ...opts });
       if (table === 'rpc/check_pilot_lead_rate_limit') { mutations.pop(); return [{ allowed: true }]; }
       if (table === 'fleets' && !opts.method) return entry.route === 'fleets' ? [] : [{ id: uuid }];
@@ -67,7 +75,7 @@ function harness(entry, options = {}) {
     assert.equal(headers['cache-control'], 'no-store');
     return { status: response.statusCode, body: response.body, headers };
   }
-  return { invoke, calls, mutations, auth };
+  return { invoke, calls, mutations, auth, reservations };
 }
 
 for (const entry of cases) test(`${entry.route} ${entry.method} rejects pseudo JSON without mutation and accepts case/parameters`, async () => {
@@ -76,6 +84,7 @@ for (const entry of cases) test(`${entry.route} ${entry.method} rejects pseudo J
     const [status, error] = entry.invalid || [415, 'invalid_json_body'];
     assert.equal(result.status, status, media); assert.equal(result.body.error, error);
     assert.equal(h.mutations.length, 0);
+    assert.equal(h.reservations.length, 0);
     if (entry.route === 'account' || entry.route === 'pilot-leads') assert.equal(h.auth.length, 0);
     else assert.equal(h.auth.length, 1);
     const expectedReads = entry.route === 'fleets' || entry.route === 'fleet-followups' ? ['fleets'] : [];
@@ -84,6 +93,7 @@ for (const entry of cases) test(`${entry.route} ${entry.method} rejects pseudo J
   const h = harness(entry), result = await h.invoke(entry.body, ' Application/JSON ; Charset=UTF-8');
   assert.equal(result.status, entry.status);
   assert.equal(h.mutations.length, 1);
+  assert.equal(h.reservations.length, ['profile', 'fleets'].includes(entry.route) ? 1 : 0);
 });
 
 for (const entry of cases) test(`${entry.route} ${entry.method} retains its parsed-object character limit and rejection stage`, async () => {
@@ -95,14 +105,17 @@ for (const entry of cases) test(`${entry.route} ${entry.method} retains its pars
   assert.equal(result.status, entry.route === 'fleet-followups' ? 400 : entry.status);
   if (entry.route === 'fleet-followups') { assert.equal(result.body.error, 'invalid_followup'); assert.equal(h.mutations.length, 0); }
   else assert.equal(h.mutations.length, 1);
+  assert.equal(h.reservations.length, ['profile', 'fleets'].includes(entry.route) ? 1 : 0);
   const large = harness(entry), rejected = await large.invoke({ ...exact, padding: exact.padding + 'é' });
   const [status, error] = entry.route === 'pilot-leads' ? [413, 'payload_too_large'] : entry.invalid || [415, 'invalid_json_body'];
   assert.equal(rejected.status, status); assert.equal(rejected.body.error, error);
   assert.equal(large.mutations.length, 0);
+  assert.equal(large.reservations.length, 0);
   for (const body of [[], 'not parsed JSON', null, true]) {
     const invalid = harness(entry), response = await invalid.invoke(body);
     const expected = entry.route === 'pilot-leads' ? [400, Array.isArray(body) ? 'invalid_body' : 'invalid_lead'] : entry.invalid || [415, 'invalid_json_body'];
     assert.equal(response.status, expected[0]); assert.equal(response.body.error, expected[1]); assert.equal(invalid.mutations.length, 0);
+    assert.equal(invalid.reservations.length, 0);
   }
 });
 

@@ -17,6 +17,7 @@ test('ignored build command stays within the Vercel configuration schema limit',
     // This source branch must remain reviewable before its SQL prerequisite is
     // applied; main remains deployment-enabled after the separate approval gate.
     'codex/legacy-event-quota': false,
+    'codex/profile-write-quota': false,
   });
 });
 function fixture(run) {
