@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
+import { assertEveryBranchFetched, fetchEveryBranchCommands, fetchRulesCoverEveryBranch } from './lib/branch-fetch-guard.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const script = join(root, 'scripts/bump-asset.mjs');
 const sha = source => createHash('sha256').update(source).digest('hex');
@@ -149,6 +150,116 @@ test('merge-resolution-only filenames and caches stay reserved after removal', (
     assert.equal(read(cwd, 'leaf.v3.js'), source);
     assert.match(read(cwd, 'sw.js'), /occulert-v94/);
   } finally { rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
+});
+
+
+test('fetch rules must cover every origin branch', () => {
+  const all = '+refs/heads/*:refs/remotes/origin/*';
+  for (const rules of [[all], ['refs/heads/*:refs/remotes/origin/*'], ['+refs/*:refs/*'], ['+refs/heads/main:refs/remotes/origin/main', all], [all, '+refs/pull/*/head:refs/remotes/pr/*'], [all, '^refs/tags/nightly'], [all, '^refs/tags/*'], [all, '^refs/pull/*']]) {
+    assert.equal(fetchRulesCoverEveryBranch(rules), true, rules.join(' '));
+  }
+  for (const rules of [[], ['+refs/heads/main:refs/remotes/origin/main'], ['+refs/heads/main:refs/remotes/origin/main', '+refs/heads/codex/topic:refs/remotes/origin/codex/topic'], ['+refs/pull/*/head:refs/remotes/pr/*'], [all, '^refs/heads/main'], [all, '^refs/heads/codex/*'], [all, '^refs/*'], [all, '^refs/hea*'], [all, '^refs/h*'], [all, '^refs/hea*main']]) {
+    assert.equal(fetchRulesCoverEveryBranch(rules), false, rules.join(' ') || 'no rules');
+  }
+});
+
+test('negative fetch patterns that exclude real branch refs are refused', () => {
+  const base = mkdtempSync(join(tmpdir(), 'occulert-negative-fetch-'));
+  const origin = join(base, 'origin');
+  const branches = ['main', 'prepared-main', 'retained'];
+  const cases = [
+    { negative: '^refs/hea*', retained: [] },
+    { negative: '^refs/h*', retained: [] },
+    { negative: '^refs/hea*main', retained: ['retained'] },
+    { negative: '^refs/heads/*main', retained: ['retained'] },
+    { negative: '^refs/heads/main', retained: ['prepared-main', 'retained'] },
+    { negative: '^refs/tags/nightly', retained: branches },
+    { negative: '^refs/tags/*', retained: branches },
+    { negative: '^refs/pull/*', retained: branches },
+    { negative: '^main', retained: branches },
+    { negative: '^h*', retained: branches },
+  ];
+  try {
+    mkdirSync(origin);
+    fixtureGit(origin, ['init', '-q', '--initial-branch=main']);
+    fixtureGit(origin, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'Fixture branches']);
+    for (const branch of branches.slice(1)) fixtureGit(origin, ['branch', branch]);
+    for (const [index, { negative, retained }] of cases.entries()) {
+      fixtureGit(origin, ['check-ref-format', '--allow-onelevel', '--refspec-pattern', negative.slice(1)]);
+      const clone = join(base, `clone-${index}`);
+      mkdirSync(clone);
+      fixtureGit(clone, ['init', '-q']);
+      fixtureGit(clone, ['remote', 'add', 'origin', pathToFileURL(origin).href]);
+      fixtureGit(clone, ['config', '--add', 'remote.origin.fetch', negative]);
+      fixtureGit(clone, ['fetch', '-q', '--no-tags', 'origin']);
+      // Git may also create origin/HEAD, a symbolic default-branch pointer.
+      const fetched = fixtureGit(clone, ['for-each-ref', '--format=%(refname)', 'refs/remotes/origin/']).toString().trim().split('\n').filter(ref => ref && ref !== 'refs/remotes/origin/HEAD');
+      assert.deepEqual(fetched, retained.map(branch => `refs/remotes/origin/${branch}`), negative);
+      if (retained.length === branches.length) assertEveryBranchFetched(clone);
+      else assert.throws(() => assertEveryBranchFetched(clone), /Fetch every origin branch/, negative);
+    }
+  } finally { rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
+});
+
+test('a single-branch clone is refused until every origin branch is fetched', () => {
+  const base = mkdtempSync(join(tmpdir(), 'occulert-single-branch-'));
+  const origin = join(base, 'origin'), clone = join(base, 'clone');
+  const commit = (cwd, message) => {
+    fixtureGit(cwd, ['add', '.']);
+    fixtureGit(cwd, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', message]);
+  };
+  try {
+    mkdirSync(origin);
+    const source = 'const sample = 1;\n';
+    writeFileSync(join(origin, 'leaf.v1.js'), source);
+    writeFileSync(join(origin, 'asset-versions.json'), JSON.stringify({ 'leaf.js': 'leaf.v1.js' }));
+    writeFileSync(join(origin, 'asset-integrity.json'), JSON.stringify({ 'leaf.v1.js': sha(source) }));
+    writeFileSync(join(origin, 'index.html'), '<script src="/leaf.v1.js"></script>');
+    writeFileSync(join(origin, 'sw.js'), "const CACHE = 'occulert-v1'; const files=['/leaf.v1.js'];\n");
+    writeFileSync(join(origin, 'vercel.json'), JSON.stringify({ headers: [{ source: '/(.*)\\.(js|css)', headers: [] }] }));
+    fixtureGit(origin, ['init', '-q']); commit(origin, 'Initial release');
+    const initial = fixtureGit(origin, ['rev-parse', '--abbrev-ref', 'HEAD']).toString().trim();
+    // A second commit makes the depth-1 clone below genuinely shallow.
+    writeFileSync(join(origin, 'notes.txt'), 'Later main commit.\n'); commit(origin, 'Later main commit');
+    fixtureGit(origin, ['checkout', '-qb', 'prepared-release']);
+    writeFileSync(join(origin, 'leaf.v2.js'), 'const otherPreparedBytes = 2;\n');
+    writeFileSync(join(origin, 'sw.js'), "const CACHE = 'occulert-v2'; const files=['/leaf.v2.js'];\n");
+    commit(origin, 'Prepared URL on another branch');
+    fixtureGit(origin, ['checkout', '-q', initial]);
+
+    // The checkout behind PR #419: cloned with --depth 1, then given full history.
+    fixtureGit(base, ['clone', '-q', '--depth', '1', pathToFileURL(origin).href, clone]);
+    assert.throws(() => run(clone, 'leaf.js', '--dry-run'), /Fetch full Git history/);
+    fixtureGit(clone, ['fetch', '-q', '--unshallow']);
+    assert.equal(fixtureGit(clone, ['rev-parse', '--is-shallow-repository']).toString().trim(), 'false');
+    // Full history of one branch still cannot see the other prepared release.
+    assert.throws(() => fixtureGit(clone, ['rev-parse', '--verify', '-q', 'refs/remotes/origin/prepared-release']));
+    const before = read(clone, 'asset-versions.json');
+    for (const args of [['leaf.js', '--dry-run'], ['leaf.js']]) {
+      assert.throws(() => run(clone, ...args), error => {
+        assert.match(error.stderr, /Fetch every origin branch before choosing new immutable asset names/);
+        assert.match(error.stderr, /remote\.origin\.fetch = \+refs\/heads\/[^*\s]+:refs\/remotes\/origin\/[^*\s]+\)/);
+        for (const command of fetchEveryBranchCommands) assert.ok(error.stderr.includes(command), command);
+        return true;
+      });
+    }
+    assert.equal(read(clone, 'asset-versions.json'), before);
+    assert.ok(!existsSync(join(clone, 'leaf.v2.js')), 'a refused run must not create the colliding URL');
+    assert.match(read(clone, 'sw.js'), /occulert-v1/);
+
+    // The printed commands are the complete fix.
+    for (const command of fetchEveryBranchCommands) {
+      fixtureGit(clone, command.split(' ').slice(1).map(word => word.replace(/^'|'$/g, '')));
+    }
+    assertEveryBranchFetched(clone);
+    const plan = JSON.parse(run(clone, 'leaf.js', '--dry-run'));
+    assert.equal(plan.copies['leaf.v1.js'], 'leaf.v3.js');
+    assert.equal(plan.cache, 'occulert-v3');
+    run(clone, 'leaf.js');
+    assert.equal(JSON.parse(read(clone, 'asset-versions.json'))['leaf.js'], 'leaf.v3.js');
+    assert.equal(read(clone, 'leaf.v1.js'), source);
+    assert.match(read(clone, 'sw.js'), /occulert-v3/);
+  } finally { rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
 
 
