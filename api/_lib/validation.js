@@ -22,8 +22,10 @@ function integerOrNull(value) {
 // Postgres text rejects NUL and unpaired UTF-16 surrogates, and cutting a
 // string to its limit can split an emoji into one. Unfiltered, either one made
 // the database refuse the whole row, which callers reported as an outage.
+// Non-text JSON fields are missing, never coerced into stored display labels.
 function storableText(value, max) {
-  return String(value || "").replace(/\0/g, "").trim().slice(0, max).toWellFormed();
+  if (typeof value !== "string") return "";
+  return value.replace(/\0/g, "").trim().slice(0, max).toWellFormed();
 }
 function isJsonMediaType(request) {
   const mediaType = String(request.headers?.['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
