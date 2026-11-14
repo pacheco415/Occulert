@@ -30,8 +30,8 @@ test('both deployed policies retain exact image and media sources alongside owne
  }
 });
 test('missing script or connection directives are rejected', () => {
- assert.ok(auditCspPolicy(`connect-src https://${SUPABASE_HOST}`).length);
- assert.ok(auditCspPolicy("script-src 'self' 'wasm-unsafe-eval'").length);
+ assert.ok(auditCspPolicy(`connect-src https://${SUPABASE_HOST}`).includes('CSP must specify script-src'));
+ assert.ok(auditCspPolicy("script-src 'self' 'wasm-unsafe-eval'").includes('CSP must specify connect-src'));
 });
 
 for (const directive of ['script-src-elem', 'script-src-attr']) {
