@@ -27,5 +27,16 @@ export function auditCspPolicy(value) {
     // other host, including a wildcard cloud domain, is an exfiltration path.
     if (connections.some(source => source !== "'self'" && !allowed.has(source))) errors.push('Connection policy contains an unapproved host');
   }
+  for (const [name, allowed] of [
+    ['img-src', ["'self'", 'data:']],
+    ['media-src', ["'self'"]],
+  ]) {
+    const sources = directives.get(name);
+    if (!sources) errors.push(`CSP must specify ${name}`);
+    else {
+      if (sources.some(source => !allowed.includes(source))) errors.push(`${name} contains an unapproved source`);
+      if (allowed.some(source => !sources.includes(source))) errors.push(`${name} must retain ${allowed.join(' and ')}`);
+    }
+  }
   return errors;
 }
