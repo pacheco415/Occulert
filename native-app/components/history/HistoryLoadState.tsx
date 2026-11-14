@@ -1,3 +1,4 @@
+import { strings, formatString } from '../../lib/strings';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../constants/theme';
@@ -21,39 +22,39 @@ export function HistoryLoadState({ sessionCount, loaded, historyLoadError, histo
   return <>
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel={historyLoadBusy ? 'Refreshing local history' : 'Refresh local history'}
-          accessibilityHint="Rereads summaries and saved sync badges on this iPhone while preserving current filters, sorting, and date drafts"
+          accessibilityLabel={historyLoadBusy ? strings.history.load.refreshing : strings.history.load.refresh}
+          accessibilityHint={strings.history.load.refreshHint}
           accessibilityState={{ disabled: historyLoadBusy || sessionOperationsBusy, busy: historyLoadBusy }}
           disabled={historyLoadBusy || sessionOperationsBusy}
           style={[s.refreshButton, (historyLoadBusy || sessionOperationsBusy) && s.operationDisabled]}
           onPress={() => { void load(true); }}
         >
           {historyLoadBusy ? <ActivityIndicator size="small" color="#93c5fd" /> : <Ionicons name="refresh-outline" size={17} color="#93c5fd" />}
-          <Text style={s.refreshText}>{historyLoadBusy ? 'Reading local history…' : 'Refresh local history'}</Text>
+          <Text style={s.refreshText}>{historyLoadBusy ? strings.history.load.reading : strings.history.load.refresh}</Text>
         </TouchableOpacity>
 
         {pendingCloud.count > 0 && pendingCloudSummaryStateIsCurrent(pendingCloud) && (
           <TouchableOpacity accessibilityRole="button"
-            accessibilityLabel={`Retry ${pendingCloud.count} pending cloud summaries`}
-            accessibilityHint="Retries only saved session endings for the current signed-in owner with cloud sharing enabled"
+            accessibilityLabel={formatString(strings.history.load.retryCloud, { count: pendingCloud.count })}
+            accessibilityHint={strings.history.load.retryCloudHint}
             accessibilityState={{disabled:retryCloudBusy||historyLoadBusy,busy:retryCloudBusy}}
             disabled={retryCloudBusy||historyLoadBusy}
             style={[s.refreshButton,(retryCloudBusy||historyLoadBusy)&&s.operationDisabled]}
             onPress={()=>{void retrySavedCloudSummaries();}}>
-            <Text style={s.refreshText}>{retryCloudBusy?'Checking saved cloud summaries…':`Retry ${pendingCloud.count} pending cloud summaries`}</Text>
+            <Text style={s.refreshText}>{retryCloudBusy?strings.history.load.checkingCloud:formatString(strings.history.load.retryCloud, { count: pendingCloud.count })}</Text>
           </TouchableOpacity>
         )}
 
         {!loaded && historyLoadBusy && (
           <View
-            accessibilityLabel="Checking local session history"
+            accessibilityLabel={strings.history.load.checkingAccessibilityLabel}
             accessibilityLiveRegion="polite"
             style={s.loadingBox}
           >
             <ActivityIndicator size="small" color={colors.cyan} />
             <View style={s.loadErrorCopy}>
-              <Text style={s.loadingTitle}>Checking local history</Text>
-              <Text style={s.loadErrorDetail}>Reading session summaries saved on this iPhone.</Text>
+              <Text style={s.loadingTitle}>{strings.history.load.checkingTitle}</Text>
+              <Text style={s.loadErrorDetail}>{strings.history.load.checkingDetail}</Text>
             </View>
           </View>
         )}
@@ -62,21 +63,21 @@ export function HistoryLoadState({ sessionCount, loaded, historyLoadError, histo
           <View accessibilityRole="alert" style={s.loadError}>
             <Ionicons name="warning-outline" size={21} color="#fbbf24" />
             <View style={s.loadErrorCopy}>
-              <Text style={s.loadErrorTitle}>Couldn’t load local history</Text>
+              <Text style={s.loadErrorTitle}>{strings.history.load.errorTitle}</Text>
               <Text style={s.loadErrorDetail}>
                 {sessionCount > 0
-                  ? 'The last loaded sessions remain visible below. Retry to confirm they are current.'
-                  : 'Your saved sessions were not deleted. Try reading them from this iPhone again.'}
+                  ? strings.history.load.errorWithSessions
+                  : strings.history.load.errorWithoutSessions}
               </Text>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={historyLoadBusy ? 'Retrying local session history' : 'Retry local session history'}
+                accessibilityLabel={historyLoadBusy ? strings.history.load.retryingAccessibilityLabel : strings.history.load.retryAccessibilityLabel}
                 accessibilityState={{ disabled: historyLoadBusy || sessionOperationsBusy, busy: historyLoadBusy }}
                 disabled={historyLoadBusy || sessionOperationsBusy}
                 onPress={() => { void load(true); }}
                 style={s.loadRetry}
               >
-                <Text style={s.loadRetryText}>{historyLoadBusy ? 'Retrying…' : 'Try again'}</Text>
+                <Text style={s.loadRetryText}>{historyLoadBusy ? strings.history.load.retrying : strings.history.load.retry}</Text>
               </TouchableOpacity>
             </View>
           </View>

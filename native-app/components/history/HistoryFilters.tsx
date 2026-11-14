@@ -1,3 +1,4 @@
+import { strings, formatString } from '../../lib/strings';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -41,28 +42,28 @@ export function HistoryFilters({ model, sessionCount, historyPeriod, historyFilt
   const { needsReviewCount, reviewedCount, recoveredCount, nextReviewSession, selectedScope, checkpointProgress, filterCounts, assessmentCounts, filteredSessions, periodSessions, shownRecoveredCount, sessionOperationsBusy } = model;
   return (
           <>
-            <Text style={s.scopeLabel}>ALL HISTORY</Text>
+            <Text style={s.scopeLabel}>{strings.history.filters.allHistory}</Text>
             <View style={s.historySummary}>
               <View style={s.historySummaryItem}>
                 <Text style={s.historySummaryValue}>{needsReviewCount}</Text>
-                <Text style={s.historySummaryLabel}>Need review</Text>
+                <Text style={s.historySummaryLabel}>{strings.history.filters.needReview}</Text>
               </View>
               <View style={s.historySummaryDivider} />
               <View style={s.historySummaryItem}>
                 <Text style={s.historySummaryValue}>{reviewedCount}</Text>
-                <Text style={s.historySummaryLabel}>Reviewed</Text>
+                <Text style={s.historySummaryLabel}>{strings.history.common.reviewed}</Text>
               </View>
               <View style={s.historySummaryDivider} />
               <View style={s.historySummaryItem}>
                 <Text style={s.historySummaryValue}>{recoveredCount}</Text>
-                <Text style={s.historySummaryLabel}>Recovered</Text>
+                <Text style={s.historySummaryLabel}>{strings.history.common.recovered}</Text>
               </View>
             </View>
             {nextReviewSession && (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={`Continue reviewing the next shown unfinished session from ${fmtDate(sessionHistoryDate(nextReviewSession.item))}`}
-                accessibilityHint="Expands the first unfinished session matching all selected filters in the selected sort order"
+                accessibilityLabel={formatString(strings.history.filters.continueAccessibilityLabel, { date: fmtDate(sessionHistoryDate(nextReviewSession.item)) })}
+                accessibilityHint={strings.history.filters.continueReviewHint}
                 accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
                 disabled={sessionOperationsBusy}
                 onPress={continueReviewing}
@@ -72,15 +73,13 @@ export function HistoryFilters({ model, sessionCount, historyPeriod, historyFilt
                   <Ionicons name="arrow-forward" size={17} color="#dbeafe" />
                 </View>
                 <View style={s.continueReviewCopy}>
-                  <Text style={s.continueReviewTitle}>Continue reviewing</Text>
-                  <Text style={s.continueReviewDetail}>
-                    Next shown unfinished session · {selectedScope} · All history: {checkpointProgress} of {CHECKPOINT_TARGET} Medium reviews complete
-                  </Text>
+                  <Text style={s.continueReviewTitle}>{strings.history.filters.continueReview}</Text>
+                  <Text style={s.continueReviewDetail}>{formatString(strings.history.filters.continueDetail, { scope: selectedScope, count: checkpointProgress, target: CHECKPOINT_TARGET })}</Text>
                 </View>
               </TouchableOpacity>
             )}
-            <Text style={s.scopeLabel}>SESSION DATES</Text>
-            <View accessibilityRole="tablist" accessibilityLabel="Session dates" style={s.filterRow}>
+            <Text style={s.scopeLabel}>{strings.history.filters.datesHeading}</Text>
+            <View accessibilityRole="tablist" accessibilityLabel={strings.history.filters.datesAccessibilityLabel} style={s.filterRow}>
               {HISTORY_PERIODS.map(period => {
                 const selected = historyPeriod === period.value;
                 return (
@@ -89,10 +88,10 @@ export function HistoryFilters({ model, sessionCount, historyPeriod, historyFilt
                     accessibilityRole="tab"
                     accessibilityLabel={period.label}
                     accessibilityHint={period.value === 'all'
-                      ? 'Shows saved sessions from every date'
+                      ? strings.history.filters.allDatesHint
                       : period.value === 'custom'
-                        ? 'Enter and apply inclusive From and To local calendar dates'
-                        : 'Includes today and the preceding local calendar days; excludes unrecorded and future dates'}
+                        ? strings.history.filters.customDatesHint
+                        : strings.history.filters.recentDatesHint}
                     accessibilityState={{ selected }}
                     style={[s.filterButton, selected && s.filterButtonSelected]}
                     onPress={() => {
@@ -114,32 +113,32 @@ export function HistoryFilters({ model, sessionCount, historyPeriod, historyFilt
             </View>
             {showCustomDates && (
               <View style={s.customDateBox}>
-                <Text style={s.conditionsTitle}>Custom local dates</Text>
-                <Text style={s.periodNote}>Enter YYYY-MM-DD. Both dates are included, from 1900 through today. Apply to change the shown view; typing leaves the applied filters unchanged.</Text>
+                <Text style={s.conditionsTitle}>{strings.history.filters.customDatesTitle}</Text>
+                <Text style={s.periodNote}>{strings.history.filters.customDatesDetail}</Text>
                 <View style={s.customDateRow}>
                   <View style={s.customDateField}>
-                    <Text style={s.conditionLabel}>From</Text>
+                    <Text style={s.conditionLabel}>{strings.history.filters.from}</Text>
                     <TextInput
-                      accessibilityLabel="From date, YYYY-MM-DD"
+                      accessibilityLabel={strings.history.filters.fromAccessibilityLabel}
                       value={customStart}
                       maxLength={10}
                       autoCorrect={false}
                       autoCapitalize="none"
-                      placeholder="YYYY-MM-DD"
+                      placeholder={strings.history.filters.datePlaceholder}
                       placeholderTextColor="#6592a5"
                       style={s.customDateInput}
                       onChangeText={changeCustomStart}
                     />
                   </View>
                   <View style={s.customDateField}>
-                    <Text style={s.conditionLabel}>To</Text>
+                    <Text style={s.conditionLabel}>{strings.history.filters.to}</Text>
                     <TextInput
-                      accessibilityLabel="To date, YYYY-MM-DD"
+                      accessibilityLabel={strings.history.filters.toAccessibilityLabel}
                       value={customEnd}
                       maxLength={10}
                       autoCorrect={false}
                       autoCapitalize="none"
-                      placeholder="YYYY-MM-DD"
+                      placeholder={strings.history.filters.datePlaceholder}
                       placeholderTextColor="#6592a5"
                       style={s.customDateInput}
                       onChangeText={changeCustomEnd}
@@ -149,20 +148,16 @@ export function HistoryFilters({ model, sessionCount, historyPeriod, historyFilt
                 {customDateError && <Text accessibilityRole="alert" style={s.customDateError}>{customDateError}</Text>}
                 <View style={s.filterRow}>
                   <TouchableOpacity accessibilityRole="button" style={[s.filterButton, s.filterButtonSelected]} onPress={applyCustomDates}>
-                    <Text style={s.filterButtonTextSelected}>Apply dates</Text>
+                    <Text style={s.filterButtonTextSelected}>{strings.history.filters.applyDates}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity accessibilityRole="button" accessibilityHint="Keeps the applied filters unchanged" style={s.filterButton} onPress={() => { setShowCustomDates(false); setCustomDateError(null); }}>
-                    <Text style={s.filterButtonText}>Close date editor</Text>
+                  <TouchableOpacity accessibilityRole="button" accessibilityHint={strings.history.filters.closeDatesHint} style={s.filterButton} onPress={() => { setShowCustomDates(false); setCustomDateError(null); }}>
+                    <Text style={s.filterButtonText}>{strings.history.filters.closeDates}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
             {historyPeriod !== 'all' && (
-              <Text style={s.periodNote}>
-                {historyPeriod === 'custom' && historyView.range
-                  ? `Applied ${historyView.range.start} through ${historyView.range.end}, including both local calendar dates.`
-                  : `Includes today and the previous ${historyPeriod === '7-days' ? 6 : 29} days.`} Unrecorded and future dates stay in All time.
-              </Text>
+              <Text style={s.periodNote}>{formatString(strings.history.filters.periodNote, { period: historyPeriod === 'custom' && historyView.range ? formatString(strings.history.filters.appliedCustomDates, { start: historyView.range.start, end: historyView.range.end }) : formatString(strings.history.filters.appliedRecentDates, { days: historyPeriod === '7-days' ? 6 : 29 }) })}</Text>
             )}
             {HISTORY_RECORDED_FILTERS.map(group => (
               <React.Fragment key={group.key}>
@@ -174,8 +169,8 @@ export function HistoryFilters({ model, sessionCount, historyPeriod, historyFilt
                       <TouchableOpacity
                         key={option.value}
                         accessibilityRole="tab"
-                        accessibilityLabel={`${group.label}: ${option.label}`}
-                        accessibilityHint={option.value === 'unknown' ? 'Includes missing or unrecognized saved values' : 'Combines with all other selected filters'}
+                        accessibilityLabel={formatString(strings.history.common.labelValue, { label: group.label, value: option.label })}
+                        accessibilityHint={option.value === 'unknown' ? strings.history.filters.unrecordedHint : strings.history.filters.combinedHint}
                         accessibilityState={{ selected }}
                         style={[s.filterButton, selected && s.filterButtonSelected]}
                         onPress={() => chooseRecordedFilter(group.key, option.value)}
@@ -187,9 +182,9 @@ export function HistoryFilters({ model, sessionCount, historyPeriod, historyFilt
                 </View>
               </React.Fragment>
             ))}
-            <Text style={s.periodNote}>Not recorded includes missing or unrecognized saved values. Lighting and eyewear are saved tester observations.</Text>
-            <Text style={s.scopeLabel}>SORT SHOWN SESSIONS</Text>
-            <View accessibilityRole="tablist" accessibilityLabel="Session sort order" style={s.filterRow}>
+            <Text style={s.periodNote}>{strings.history.filters.recordedNote}</Text>
+            <Text style={s.scopeLabel}>{strings.history.filters.sortHeading}</Text>
+            <View accessibilityRole="tablist" accessibilityLabel={strings.history.filters.sortAccessibilityLabel} style={s.filterRow}>
               {HISTORY_SORTS.map(option => {
                 const selected = historyView.sort === option.value;
                 return (
@@ -201,94 +196,86 @@ export function HistoryFilters({ model, sessionCount, historyPeriod, historyFilt
                 );
               })}
             </View>
-            <Text style={s.periodNote}>Missing sort values appear last. Equal durations or alert counts use newest date first. Recovered sessions remain partial summaries.</Text>
-            <Text style={s.scopeLabel}>REVIEW STATUS</Text>
-            <View accessibilityRole="tablist" accessibilityLabel="Session review status" style={s.filterRow}>
+            <Text style={s.periodNote}>{strings.history.filters.sortNote}</Text>
+            <Text style={s.scopeLabel}>{strings.history.filters.reviewHeading}</Text>
+            <View accessibilityRole="tablist" accessibilityLabel={strings.history.filters.reviewAccessibilityLabel} style={s.filterRow}>
               {HISTORY_FILTERS.map(filter => {
                 const selected = historyFilter === filter.value;
                 return (
                   <TouchableOpacity
                     key={filter.value}
                     accessibilityRole="tab"
-                    accessibilityLabel={`${filter.label}, ${filterCounts[filter.value]} sessions`}
-                    accessibilityHint="Combines with the selected date, recorded conditions, and alert feedback filters"
+                    accessibilityLabel={formatString(strings.history.filters.sessionsAccessibilityLabel, { label: filter.label, count: filterCounts[filter.value] })}
+                    accessibilityHint={strings.history.filters.reviewHint}
                     accessibilityState={{ selected }}
                     style={[s.filterButton, selected && s.filterButtonSelected]}
                     onPress={() => chooseHistoryFilter(filter.value)}
                   >
-                    <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>
-                      {filter.label} · {filterCounts[filter.value]}
-                    </Text>
+                    <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>{formatString(strings.history.filters.labelCount, { label: filter.label, count: filterCounts[filter.value] })}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-            <Text style={s.scopeLabel}>ALERT FEEDBACK · USER OBSERVATIONS</Text>
-            <View accessibilityRole="tablist" accessibilityLabel="Saved alert feedback" style={s.filterRow}>
+            <Text style={s.scopeLabel}>{strings.history.filters.assessmentHeading}</Text>
+            <View accessibilityRole="tablist" accessibilityLabel={strings.history.filters.assessmentAccessibilityLabel} style={s.filterRow}>
               {HISTORY_ASSESSMENTS.map(assessment => {
                 const selected = historyAssessment === assessment.value;
                 return (
                   <TouchableOpacity
                     key={assessment.value}
                     accessibilityRole="tab"
-                    accessibilityLabel={`${assessment.label}, ${assessmentCounts[assessment.value]} sessions`}
+                    accessibilityLabel={formatString(strings.history.filters.sessionsAccessibilityLabel, { label: assessment.label, count: assessmentCounts[assessment.value] })}
                     accessibilityHint={assessment.value === 'not-assessed'
-                      ? 'Shows sessions without a recognized saved alert rating, within the selected date and review status'
-                      : 'Shows matching saved user observations within the selected date and review status; this is not measured accuracy'}
+                      ? strings.history.filters.unassessedHint
+                      : strings.history.filters.assessmentHint}
                     accessibilityState={{ selected }}
                     style={[s.filterButton, selected && s.filterButtonSelected]}
                     onPress={() => chooseHistoryAssessment(assessment.value)}
                   >
-                    <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>
-                      {assessment.label} · {assessmentCounts[assessment.value]}
-                    </Text>
+                    <Text style={[s.filterButtonText, selected && s.filterButtonTextSelected]}>{formatString(strings.history.filters.labelCount, { label: assessment.label, count: assessmentCounts[assessment.value] })}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-            <Text style={s.periodNote}>
-              Saved alert feedback reflects user observations, not measured detection accuracy. Not assessed includes missing or unrecognized ratings. Recovered checkpoints remain partial sessions.
-            </Text>
-            <Text accessibilityLiveRegion="polite" style={s.filterResult}>
-              {selectedScope} · Showing {filteredSessions.length} of {periodSessions.length} sessions in this period · {shownRecoveredCount} shown recovered partial sessions · {sessionCount} saved overall
-            </Text>
+            <Text style={s.periodNote}>{strings.history.filters.assessmentNote}</Text>
+            <Text accessibilityLiveRegion="polite" style={s.filterResult}>{formatString(strings.history.filters.results, { scope: selectedScope, shown: filteredSessions.length, period: periodSessions.length, recovered: shownRecoveredCount, saved: sessionCount })}</Text>
             {filteredSessions.length > 0 && (
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={sessionOperationsBusy
-                  ? 'Wait for session changes before sharing summaries'
-                  : `Share ${filteredSessions.length} visible session summaries`}
-                accessibilityHint="Shares only the shown sessions in their displayed order and identifies all selected filters"
+                  ? strings.history.filters.shareBusy
+                  : formatString(strings.history.filters.shareAccessibilityLabel, { count: filteredSessions.length })}
+                accessibilityHint={strings.history.filters.shareHint}
                 accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
                 disabled={sessionOperationsBusy}
                 style={[s.exportButton, sessionOperationsBusy && s.operationDisabled]}
                 onPress={() => { void shareSessions(filteredSessions.map(({ item }) => item)); }}
               >
                 <Ionicons name="share-outline" size={16} color="#93c5fd" />
-                <Text style={s.exportButtonText}>SHARE SHOWN SUMMARIES</Text>
+                <Text style={s.exportButtonText}>{strings.history.filters.share}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityHint="Shows aggregate progress and test-condition coverage"
+              accessibilityHint={strings.history.filters.progressHint}
               accessibilityState={{ expanded: showReviewProgress }}
               style={s.reviewToggle}
               onPress={() => setShowReviewProgress(current => !current)}
             >
               <Text style={s.reviewToggleText}>
-                {showReviewProgress ? 'Hide review progress' : 'Show review progress'}
+                {showReviewProgress ? strings.history.filters.hideProgress : strings.history.filters.showProgress}
               </Text>
               <Ionicons name={showReviewProgress ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityHint="Shows local aggregate camera, headphone, and Apple Watch observation coverage"
+              accessibilityHint={strings.history.filters.fusionHint}
               accessibilityState={{ expanded: showFusionValidation }}
               style={s.reviewToggle}
               onPress={() => setShowFusionValidation(current => !current)}
             >
               <Text style={s.reviewToggleText}>
-                {showFusionValidation ? 'Hide fusion observations' : 'Show fusion observations'}
+                {showFusionValidation ? strings.history.filters.hideFusion : strings.history.filters.showFusion}
               </Text>
               <Ionicons name={showFusionValidation ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
             </TouchableOpacity>

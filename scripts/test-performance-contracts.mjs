@@ -1,3 +1,5 @@
+import ts from 'typescript';
+import { strings } from '../native-app/lib/strings.ts';
 import { readNativeMonitorSourceOwners } from '../native-app/scripts/lib/monitor-source-owners.mjs';
 import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import { fleetDashboardContract, fleetDashboardRuntime } from './lib/fleet-dashboard-source.mjs';
@@ -29,6 +31,24 @@ function markedBlock(source, name) {
   const end = source.indexOf(endMarker);
   assert.ok(start >= 0 && end > start, `${name} block must be present`);
   return source.slice(start + startMarker.length, end);
+}
+
+// Bind the real source to its catalog entry and pin the released English contract.
+function assertCatalogCopy(source, key, expected) {
+  const file = ts.createSourceFile('native-copy.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const imported = file.statements.some(node => ts.isImportDeclaration(node)
+    && /(?:^|\/)strings(?:\.ts)?$/.test(node.moduleSpecifier.text)
+    && !node.importClause?.isTypeOnly
+    && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+    && node.importClause.namedBindings.elements.some(item => !item.isTypeOnly && item.name.text === 'strings' && !item.propertyName));
+  let bound = false;
+  function visit(node) {
+    if (ts.isPropertyAccessExpression(node) && node.getText(file) === `strings.${key}`) bound = true;
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  assert.ok(imported && bound, `${key}: use the actual catalog binding`);
+  assert.equal(key.split('.').reduce((value, part) => value?.[part], strings), expected, `${key}: preserve released English`);
 }
 
 test('native monitoring timing stays bounded and deterministic', () => {
@@ -154,13 +174,13 @@ test('the native build pins its SDK 58 toolchain and exposes local aggregate dia
   const historyOwners = readHistorySourceOwners(read);
   const history = historyOwners.screen;
   assert.equal(eas.build.production.ios.image, 'sdk-58');
-  assert.match(historyOwners.diagnostics, /LOCAL PERFORMANCE DIAGNOSTICS/);
-  assert.match(historyOwners.diagnostics, /First camera sample/);
-  assert.match(historyOwners.diagnostics, /Inference p95/);
-  assert.match(historyOwners.diagnostics, /Phone software dispatch/);
-  assert.match(historyOwners.diagnostics, /Watch live acknowledgements/);
-  assert.match(historyOwners.diagnostics, /not haptic onset/);
-  assert.match(historyOwners.diagnostics, /No camera frames are saved/);
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.performanceTitle", "LOCAL PERFORMANCE DIAGNOSTICS");
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.firstSample", "First camera sample: {sample}");
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.inference", "Inference p95: {p95} ms · Average sample interval: {interval} ms");
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.phoneDispatch", "Phone software dispatch: {average} ms average · {maximum} ms max");
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.watchAcknowledgements", "Watch live acknowledgements: {acknowledged}/{results}{roundTrip}{queued}");
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.performanceCaution", "Aggregate camera and alert timings stay in this session record on this iPhone. Phone dispatch is measured before hardware sound begins; Watch timing is message acknowledgement, not haptic onset. No camera frames are saved.");
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.performanceCaution", "Aggregate camera and alert timings stay in this session record on this iPhone. Phone dispatch is measured before hardware sound begins; Watch timing is message acknowledgement, not haptic onset. No camera frames are saved.");
 });
 
 test('web monitoring defers MediaPipe and prevents overlapping inference', async () => {

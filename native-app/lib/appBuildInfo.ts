@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { strings, formatString } from './strings.ts';
 
 export interface AppBuildInfo {
   appVersion?: string;
@@ -8,8 +9,8 @@ export interface AppBuildInfo {
 export function formatAppBuildLabel({ appVersion, appBuildNumber }: AppBuildInfo): string {
   if (appVersion && appBuildNumber) return `v${appVersion} (${appBuildNumber})`;
   if (appVersion) return `v${appVersion}`;
-  if (appBuildNumber) return `Build ${appBuildNumber}`;
-  return 'Version unavailable';
+  if (appBuildNumber) return formatString(strings.settings.buildInfo.buildOnly, { buildNumber: String(appBuildNumber) });
+  return strings.settings.buildInfo.versionUnavailable;
 }
 
 function normalized(value: string | number | null | undefined): string | undefined {

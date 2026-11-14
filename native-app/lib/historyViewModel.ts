@@ -1,3 +1,4 @@
+import { strings } from './strings.ts';
 import { planNextFusionValidationSession, summarizeFusionValidation } from './fusionValidationSummary.ts';
 import { filterIndexedSessionsByAssessment, filterIndexedSessionsByPeriod, filterIndexedSessionsByRecordedConditions, sortIndexedSessions, type HistoryAssessmentFilter, type HistoryFilter, type HistoryPeriod, type HistoryViewPreferences } from './historyPreferences.ts';
 import type { SessionOperation, SessionRecord } from './historyRecord';
@@ -64,7 +65,7 @@ export function deriveHistoryView({ sessions, historyFilter, historyPeriod, hist
   // A single shown group keeps metric and oldest sorting intact instead of regrouping by date.
   const groupedFilteredSessions = filteredSessions.length > 0 ? [{
     key: 'shown',
-    label: HISTORY_SORTS.find(option => option.value === historyView.sort)?.label || 'Newest first',
+    label: HISTORY_SORTS.find(option => option.value === historyView.sort)?.label || strings.history.common.newestFirst,
     sessions: filteredSessions,
   }] : [];
   const sessionOperationsBusy = Object.keys(sessionOperations).length > 0;

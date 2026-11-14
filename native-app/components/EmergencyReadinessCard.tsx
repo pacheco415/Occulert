@@ -1,3 +1,4 @@
+import { strings, formatString } from '../lib/strings.ts';
 import React, { useCallback, useRef, useState } from 'react';
 import { AppState, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -55,8 +56,8 @@ export function EmergencyReadinessCard() {
       <Text style={styles.limit}>{EMERGENCY_READINESS_COPY.limits}</Text>
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel={expanded ? 'Hide Apple setup guides' : 'Review Apple setup guides'}
-        accessibilityHint={expanded ? 'Collapses the optional Apple setup guides' : 'Expands optional guidance to review while safely parked'}
+        accessibilityLabel={expanded ? strings.settings.emergency.card.collapse : strings.settings.emergency.card.expand}
+        accessibilityHint={expanded ? strings.settings.emergency.card.collapseHint : strings.settings.emergency.card.expandHint}
         accessibilityState={{ expanded, disabled: opening !== null }}
         disabled={opening !== null}
         style={styles.disclosure}
@@ -66,7 +67,7 @@ export function EmergencyReadinessCard() {
           setFailedGuide(null);
         }}
       >
-        <Text style={styles.linkTitle}>{expanded ? 'Hide Apple setup guides' : 'Review Apple setup guides'}</Text>
+        <Text style={styles.linkTitle}>{expanded ? strings.settings.emergency.card.collapse : strings.settings.emergency.card.expand}</Text>
       </TouchableOpacity>
       {expanded && (
         <View>
@@ -76,8 +77,8 @@ export function EmergencyReadinessCard() {
             <TouchableOpacity
               key={guide.id}
               accessibilityRole="link"
-              accessibilityLabel={`Open Apple guide: ${guide.title}. ${guide.detail}`}
-              accessibilityHint="Opens official Apple guidance in your browser. Review only while safely parked."
+              accessibilityLabel={formatString(strings.settings.emergency.card.guideAccessibility, { title: guide.title, detail: guide.detail })}
+              accessibilityHint={strings.settings.emergency.card.guideHint}
               accessibilityState={{ disabled: opening !== null, busy: opening === guide.id }}
               disabled={opening !== null}
               activeOpacity={0.8}
@@ -86,12 +87,12 @@ export function EmergencyReadinessCard() {
             >
               <Text style={styles.linkTitle}>{guide.title}</Text>
               <Text style={styles.copy}>{guide.detail}</Text>
-              <Text style={styles.linkNote}>{opening === guide.id ? 'Opening Apple guide…' : 'Open Apple guide ↗'}</Text>
+              <Text style={styles.linkNote}>{opening === guide.id ? strings.settings.emergency.card.guideOpening : strings.settings.emergency.card.guideOpen}</Text>
             </TouchableOpacity>
           ))}
           {failedGuide && (
             <View accessibilityLiveRegion="polite" style={styles.failure}>
-              <Text style={styles.copy}>Could not open Apple's guide. Copy this address into your browser while parked:</Text>
+              <Text style={styles.copy}>{strings.settings.emergency.card.guideError}</Text>
               <Text selectable style={styles.fallbackUrl}>{failedGuide.url}</Text>
             </View>
           )}

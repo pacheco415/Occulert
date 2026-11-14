@@ -1,3 +1,4 @@
+import { strings, formatString } from '../../lib/strings.ts';
 import React from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -55,17 +56,15 @@ export function MonitorPermissionState({ onRequestAccess }: { onRequestAccess():
       <SafeAreaView style={s.container}>
         <View style={s.permBox}>
           <Text style={s.permIcon}>📷</Text>
-          <Text style={s.permTitle}>Camera Access Required</Text>
-          <Text style={s.permSub}>
-            Occulert uses your front camera to detect fatigue. No video is stored or uploaded.
-          </Text>
+          <Text style={s.permTitle}>{strings.monitor.permission.title}</Text>
+          <Text style={s.permSub}>{strings.monitor.permission.detail}</Text>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Grant camera access"
+            accessibilityLabel={strings.monitor.permission.accessibilityLabel}
             style={s.permBtn}
             onPress={onRequestAccess}
           >
-            <Text style={s.permBtnText}>Grant Camera Access</Text>
+            <Text style={s.permBtnText}>{strings.monitor.permission.action}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -77,8 +76,8 @@ export function MonitorCameraUnavailable() {
       <SafeAreaView style={s.container}>
         <View style={s.permBox}>
           <Text style={s.permIcon}>📷</Text>
-          <Text style={s.permTitle}>No Front Camera Found</Text>
-          <Text style={s.permSub}>Occulert needs a front-facing camera to monitor fatigue.</Text>
+          <Text style={s.permTitle}>{strings.monitor.unavailable.title}</Text>
+          <Text style={s.permSub}>{strings.monitor.unavailable.detail}</Text>
         </View>
       </SafeAreaView>
     );
@@ -102,7 +101,7 @@ export function MonitorPresentation({
       >
         <SafeAreaView style={s.safeStopBackdrop}>
           <View
-            accessibilityLabel="Safe stop options"
+            accessibilityLabel={strings.monitor.safeStop.accessibilityLabel}
             accessibilityViewIsModal
             style={s.safeStopSheet}
           >
@@ -112,25 +111,21 @@ export function MonitorPresentation({
                   <Ionicons name="navigate" size={24} color="#7dd3fc" />
                 </View>
                 <View style={s.safeStopHeadingText}>
-                  <Text style={s.safeStopTitle}>Find a safe place to stop</Text>
-                  <Text style={s.safeStopKicker}>DROWSINESS ALERT FOLLOW-UP</Text>
+                  <Text style={s.safeStopTitle}>{strings.monitor.safeStop.title}</Text>
+                  <Text style={s.safeStopKicker}>{strings.monitor.safeStop.kicker}</Text>
                 </View>
               </View>
 
-              <Text style={s.safeStopWarning}>
-                Only use this after you are safely parked, or ask a passenger. Opening Maps ends monitoring and saves this drive first.
-              </Text>
-              <Text style={s.safeStopPrivacy}>
-                Occulert sends only a search phrase to Maps and does not read, store, or upload your location.
-              </Text>
+              <Text style={s.safeStopWarning}>{strings.monitor.safeStop.warning}</Text>
+              <Text style={s.safeStopPrivacy}>{strings.monitor.safeStop.privacy}</Text>
 
               <View style={s.safeStopOptions}>
                 {SAFE_STOP_OPTIONS.map((option) => (
                   <TouchableOpacity
                     key={option.kind}
                     accessibilityRole="button"
-                    accessibilityLabel={`Find ${option.label.toLowerCase()}`}
-                    accessibilityHint={`${option.detail}. Ends monitoring, saves this drive, then opens Maps.`}
+                    accessibilityLabel={formatString(strings.monitor.safeStop.optionAccessibilityLabel, { label: option.label.toLowerCase() })}
+                    accessibilityHint={formatString(strings.monitor.safeStop.optionHint, { detail: option.detail })}
                     accessibilityState={{ disabled: safeStopBusy, busy: safeStopBusy }}
                     disabled={safeStopBusy}
                     style={[s.safeStopOption, safeStopBusy && s.disabledBtn]}
@@ -153,14 +148,14 @@ export function MonitorPresentation({
             </ScrollView>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={safeStopBusy ? 'Ending and saving drive' : 'Cancel safe stop search'}
+              accessibilityLabel={safeStopBusy ? strings.monitor.safeStop.savingAccessibilityLabel : strings.monitor.safeStop.cancelAccessibilityLabel}
               accessibilityState={{ disabled: safeStopBusy, busy: safeStopBusy }}
               disabled={safeStopBusy}
               style={s.safeStopCancel}
               onPress={() => setSafeStopOpen(false)}
             >
               <Text style={s.safeStopCancelText}>
-                {safeStopBusy ? 'ENDING AND SAVING DRIVE…' : 'CANCEL'}
+                {safeStopBusy ? strings.monitor.safeStop.saving : strings.monitor.safeStop.cancel}
               </Text>
             </TouchableOpacity>
           </View>
@@ -173,8 +168,8 @@ export function MonitorPresentation({
         camera={
           SIMULATOR_TRACE ? (
             <View style={[StyleSheet.absoluteFill, s.camOff]}>
-              <Text style={[s.camOffTxt, { color: '#fbbf24', fontSize: 20 }]}>SIMULATOR TRACE</Text>
-              <Text style={s.camOffTxt}>{isRunning || setupPreviewActive ? simulatorPhase : 'Tap Start to run the scripted trace'}</Text>
+              <Text style={[s.camOffTxt, { color: '#fbbf24', fontSize: 20 }]}>{strings.monitor.preview.simulator}</Text>
+              <Text style={s.camOffTxt}>{isRunning || setupPreviewActive ? simulatorPhase : strings.monitor.preview.startTrace}</Text>
             </View>
           ) : (isRunning || setupPreviewActive) && device ? (
             <MonitorCaptureCamera
@@ -193,7 +188,7 @@ export function MonitorPresentation({
           ) : (
             <View style={[StyleSheet.absoluteFill, s.camOff]}>
               <Ionicons name="eye-off" size={64} color="#1a3a4a" />
-              <Text style={s.camOffTxt}>Tap Start to begin monitoring</Text>
+              <Text style={s.camOffTxt}>{strings.monitor.preview.startMonitoring}</Text>
             </View>
           )
         }
@@ -201,16 +196,16 @@ export function MonitorPresentation({
           <GlassSurface style={s.topBar} tintColor="rgba(5, 10, 18, 0.5)">
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={isRunning ? 'Return home and end monitoring' : 'Return home'}
+              accessibilityLabel={isRunning ? strings.monitor.controls.homeActive : strings.monitor.controls.homeStopped}
               style={s.backBtn}
               onPress={onHome}
             >
               <Ionicons name="chevron-back" size={20} color="#c8e8f0" />
-              <Text style={s.backLbl}>Home</Text>
+              <Text style={s.backLbl}>{strings.monitor.controls.home}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={isRunning ? 'Open settings and end monitoring' : 'Open settings'}
+              accessibilityLabel={isRunning ? strings.monitor.controls.settingsActive : strings.monitor.controls.settingsStopped}
               style={s.settingsBtn}
               onPress={onSettings}
             >
@@ -222,8 +217,8 @@ export function MonitorPresentation({
           !isRunning ? (
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Start fatigue monitoring"
-              accessibilityHint="Starts on-device camera monitoring using the current setup"
+              accessibilityLabel={strings.monitor.controls.startAccessibilityLabel}
+              accessibilityHint={strings.monitor.controls.startHint}
               accessibilityState={{ disabled: isStarting || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusy }}
               disabled={isStarting || isStopping || !sensitivityLoaded || !baselineLoaded || baselineBusy}
               style={[
@@ -235,26 +230,26 @@ export function MonitorPresentation({
               <Ionicons name="eye" size={22} color="#fff" />
               <Text style={s.startTxt}>
                 {isStarting
-                  ? 'PREPARING SENSORS...'
+                  ? strings.monitor.controls.preparing
                   : isStopping
-                    ? 'SAVING SESSION...'
+                    ? strings.monitor.controls.saving
                     : sensitivityLoaded
-                      ? 'START MONITORING'
-                      : 'LOADING SETTINGS...'}
+                      ? strings.monitor.controls.start
+                      : strings.monitor.controls.loading}
               </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Stop monitoring and save this drive"
-              accessibilityHint="Ends camera monitoring and saves the local session summary"
+              accessibilityLabel={strings.monitor.controls.stopAccessibilityLabel}
+              accessibilityHint={strings.monitor.controls.stopHint}
               style={s.stopBtn}
               onPress={() => {
                 void handleStop();
               }}
             >
               <Ionicons name="stop-circle" size={22} color="#fff" />
-              <Text style={s.stopTxt}>STOP</Text>
+              <Text style={s.stopTxt}>{strings.monitor.controls.stop}</Text>
             </TouchableOpacity>
           )
         }
@@ -273,7 +268,7 @@ export function MonitorPresentation({
         <View
           accessibilityLiveRegion="polite"
           accessibilityRole="text"
-          accessibilityLabel={`Monitoring status: ${monitorStatusLabel}`}
+          accessibilityLabel={formatString(strings.monitor.status.accessibilityLabel, { status: monitorStatusLabel })}
           style={s.pill}
         >
           <View style={[s.dot, { backgroundColor: monitorStatusColor }]} />
@@ -282,19 +277,19 @@ export function MonitorPresentation({
         {sensorFault && (
           <View style={s.sensorFault} accessibilityRole="alert">
             <Text style={s.sensorFaultTitle}>
-              {recoveryRequired ? 'RECOVERY REQUIRED' : 'CAMERA ANALYSIS STOPPED'}
+              {recoveryRequired ? strings.monitor.status.recoveryRequired : strings.monitor.status.cameraStopped}
             </Text>
             <Text style={s.sensorFaultText}>{sensorFault}</Text>
             {recoveryRequired && (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel="Return Home to recover the previous drive"
-                accessibilityHint="Leaves monitoring and starts the interrupted-drive recovery check"
+                accessibilityLabel={strings.monitor.controls.recoveryHomeAccessibilityLabel}
+                accessibilityHint={strings.monitor.controls.recoveryHomeHint}
                 onPress={onRecoveryHome}
                 style={s.recoveryHomeButton}
               >
                 <Ionicons name="arrow-back" size={16} color="#fee2e2" />
-                <Text style={s.recoveryHomeButtonText}>RETURN HOME TO RECOVER</Text>
+                <Text style={s.recoveryHomeButtonText}>{strings.monitor.controls.recoveryHome}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -330,15 +325,15 @@ export function MonitorPresentation({
         {isRunning && alertCount > 0 && (
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Find a safe place to stop"
-            accessibilityHint="Open parked-only rest area, gas, food, and coffee options"
+            accessibilityLabel={strings.monitor.safeStop.title}
+            accessibilityHint={strings.monitor.safeStop.openHint}
             style={s.safeStopBtn}
             onPress={() => setSafeStopOpen(true)}
           >
             <Ionicons name="navigate-circle" size={23} color="#082f49" />
             <View style={s.safeStopBtnTextWrap}>
-              <Text style={s.safeStopBtnText}>FIND A SAFE STOP</Text>
-              <Text style={s.safeStopBtnSub}>Rest area · Gas · Food or coffee</Text>
+              <Text style={s.safeStopBtnText}>{strings.monitor.safeStop.open}</Text>
+              <Text style={s.safeStopBtnSub}>{strings.monitor.safeStop.kinds}</Text>
             </View>
           </TouchableOpacity>
         )}
@@ -346,8 +341,8 @@ export function MonitorPresentation({
         {isRunning && (
           <Text style={s.awakeNote}>
             {cameraLoadPolicy.mode === 'reduced'
-              ? 'Battery and heat saver active · Keep app in foreground'
-              : 'Screen kept on · Keep app in foreground'}
+              ? strings.monitor.awake.reduced
+              : strings.monitor.awake.normal}
           </Text>
         )}
       </MonitorLayout>

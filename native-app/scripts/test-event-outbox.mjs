@@ -10,6 +10,7 @@ import { createAsyncMutationQueue } from '../lib/asyncMutationQueue.ts';
 import { createCachedBooleanPreference } from '../lib/cachedBooleanPreference.ts';
 import { createSessionSummaryOutbox } from '../lib/sessionSummaryOutbox.ts';
 import { pinnedSupabaseConfig, SUPABASE_ORIGIN } from '../lib/supabaseHost.ts';
+import { strings } from '../lib/strings.ts';
 
 const OWNER = '11111111-1111-4111-8111-111111111111', LOGIN = '22222222-2222-4222-8222-222222222222';
 const SESSION = '33333333-3333-4333-8333-333333333333', META = 'occulert.native-event-outbox.lifecycle.v1';
@@ -169,7 +170,7 @@ function cloudFixture({ enabled = true, capability = true, expiresIn = 3600, log
   } };
   const exports = {}, body = source.replace(/^import[\s\S]*?;\s*/gm, '').replace(/^export /gm, '');
   vm.runInNewContext(`${stripTypeScriptTypes(body)}\nObject.assign(exports,{beginCloudSession,logCloudAlert,queueNativeCloudAlert,stopNativeCloudEvents,signOutOfCloud,setCloudSyncEnabled,signInToCloud,nativeCloudEventRetryStatus,refreshIfNeeded,nativeEventLogin});`, {
-    exports, SIMULATOR_TRACE: simulatorTrace, process: { env: { EXPO_PUBLIC_EVENT_OUTBOX: enabled ? '1' : undefined } }, Date: Clock, AbortController,
+    exports, strings, SIMULATOR_TRACE: simulatorTrace, process: { env: { EXPO_PUBLIC_EVENT_OUTBOX: enabled ? '1' : undefined } }, Date: Clock, AbortController,
     createNativeEventOutbox, createAsyncMutationQueue, createCachedBooleanPreference, createSessionSummaryOutbox, pinnedSupabaseConfig,
     uuid: { v4: () => { const id = uuid(); f.uuids.push(id); return id; } }, Platform: { OS: 'ios', Version: 'test' },
     AppState: Object.assign(f.appState, { addEventListener: (_name, callback) => { listeners.push(callback); return { remove() {} }; } }),

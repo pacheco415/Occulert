@@ -2,8 +2,8 @@
 
 These are dated snapshots. Source, deployment, build availability and device tests are separate.
 
-- Inspected source (origin/main): `a39bf4a8fbe9fff57a9214893eb3c0e29b009217`.
-- Source commit date: 2026-11-14T18:50:06Z.
+- Inspected source (origin/main): `7fc0aec86ba678207aefa36260e2331493b7e6a6`.
+- Source commit date: 2026-11-14T21:10:39Z.
 
 - Production website: Deployment receipts are kept private; no current receipt is published here.
 
@@ -12,15 +12,15 @@ These are dated snapshots. Source, deployment, build availability and device tes
 - Build completed: 2026-11-04T05:05:40.475Z; saved dashboard receipt records internal availability as of 2026-11-11T02:46:45Z.
 - Current Apple availability, replacement upload and remote build counter: Not checked.
 - Physical acceptance for build 60: Not recorded.
-- Native changes waiting for a build: 10 files differ from the TestFlight source.
+- Native changes waiting for a build: 75 files differ from the TestFlight source.
+  - native-app/app/\_layout.tsx
+  - native-app/app/history.tsx
   - native-app/app/index.tsx
-  - native-app/components/CloudSyncCard.tsx
-  - native-app/lib/cloudSync.ts
-  - native-app/lib/strings.ts
-  - native-app/package-lock.json
-  - 5 more; inspect the source comparison before preparing a binary.
+  - native-app/app/monitor.tsx
+  - native-app/app/pre-drive.tsx
+  - 70 more; inspect the source comparison before preparing a binary.
 
-- Open PRs (2026-11-14T18:53:41Z): 13 total; 11 Codex, 2 Dependabot, 0 other; 3 draft.
+- Open PRs (2026-11-14T21:16:57Z): 10 total; 8 Codex, 2 Dependabot, 0 other; 3 draft.
 - Production migrations: Operational receipts are kept private; no ledger or access-control details are published here.
 
 Next steps:

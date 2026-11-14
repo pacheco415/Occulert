@@ -1,3 +1,4 @@
+import { strings, formatString } from './strings.ts';
 import type {
   AlertAssessment,
   SessionTestConditions,
@@ -40,15 +41,15 @@ export interface PilotCoverageSummary {
 }
 
 const ISSUE_LABELS: Record<PilotIssueAssessment, string> = {
-  false_alert: 'False alerts',
-  missed_alert: 'Missed alerts',
-  late_alert: 'Late alerts',
+  false_alert: strings.history.insights.falseAlerts,
+  missed_alert: strings.history.insights.missedAlerts,
+  late_alert: strings.history.insights.lateAlerts,
 };
 
 const SENSITIVITY_LABELS: Array<{ value: SensitivityLevel; label: string }> = [
-  { value: 'low', label: 'Low sensitivity' },
-  { value: 'medium', label: 'Medium sensitivity' },
-  { value: 'high', label: 'High sensitivity' },
+  { value: 'low', label: strings.history.insights.lowSensitivity },
+  { value: 'medium', label: strings.history.insights.mediumSensitivity },
+  { value: 'high', label: strings.history.insights.highSensitivity },
 ];
 
 const CONDITION_LABELS: Array<{
@@ -56,14 +57,14 @@ const CONDITION_LABELS: Array<{
   value: NonNullable<SessionTestConditions[keyof SessionTestConditions]>;
   label: string;
 }> = [
-  { key: 'lighting', value: 'daylight', label: 'Daylight' },
-  { key: 'lighting', value: 'low_light', label: 'Low light' },
-  { key: 'eyewear', value: 'none', label: 'No eyewear' },
-  { key: 'eyewear', value: 'glasses', label: 'Glasses' },
-  { key: 'eyewear', value: 'sunglasses', label: 'Sunglasses' },
-  { key: 'phonePosition', value: 'high', label: 'High phone' },
-  { key: 'phonePosition', value: 'center', label: 'Center phone' },
-  { key: 'phonePosition', value: 'low', label: 'Low phone' },
+  { key: 'lighting', value: 'daylight', label: strings.history.common.daylight },
+  { key: 'lighting', value: 'low_light', label: strings.history.common.lowLight },
+  { key: 'eyewear', value: 'none', label: strings.history.insights.noEyewear },
+  { key: 'eyewear', value: 'glasses', label: strings.history.common.glasses },
+  { key: 'eyewear', value: 'sunglasses', label: strings.history.common.sunglasses },
+  { key: 'phonePosition', value: 'high', label: strings.history.insights.highPhone },
+  { key: 'phonePosition', value: 'center', label: strings.history.insights.centerPhone },
+  { key: 'phonePosition', value: 'low', label: strings.history.insights.lowPhone },
 ];
 
 const PILOT_COVERAGE_CONDITIONS: Array<{
@@ -71,14 +72,14 @@ const PILOT_COVERAGE_CONDITIONS: Array<{
   label: string;
   matches: (session: PilotInsightSession) => boolean;
 }> = [
-  { id: 'daylight', label: 'Daylight', matches: session => session.testConditions?.lighting === 'daylight' },
-  { id: 'low-light', label: 'Low light', matches: session => session.testConditions?.lighting === 'low_light' },
-  { id: 'no-eyewear', label: 'No eyewear', matches: session => session.testConditions?.eyewear === 'none' },
-  { id: 'glasses', label: 'Glasses', matches: session => session.testConditions?.eyewear === 'glasses' },
-  { id: 'sunglasses', label: 'Sunglasses', matches: session => session.testConditions?.eyewear === 'sunglasses' },
-  { id: 'high-phone', label: 'High phone', matches: session => session.testConditions?.phonePosition === 'high' },
-  { id: 'center-phone', label: 'Center phone', matches: session => session.testConditions?.phonePosition === 'center' },
-  { id: 'low-phone', label: 'Low phone', matches: session => session.testConditions?.phonePosition === 'low' },
+  { id: 'daylight', label: strings.history.common.daylight, matches: session => session.testConditions?.lighting === 'daylight' },
+  { id: 'low-light', label: strings.history.common.lowLight, matches: session => session.testConditions?.lighting === 'low_light' },
+  { id: 'no-eyewear', label: strings.history.insights.noEyewear, matches: session => session.testConditions?.eyewear === 'none' },
+  { id: 'glasses', label: strings.history.common.glasses, matches: session => session.testConditions?.eyewear === 'glasses' },
+  { id: 'sunglasses', label: strings.history.common.sunglasses, matches: session => session.testConditions?.eyewear === 'sunglasses' },
+  { id: 'high-phone', label: strings.history.insights.highPhone, matches: session => session.testConditions?.phonePosition === 'high' },
+  { id: 'center-phone', label: strings.history.insights.centerPhone, matches: session => session.testConditions?.phonePosition === 'center' },
+  { id: 'low-phone', label: strings.history.insights.lowPhone, matches: session => session.testConditions?.phonePosition === 'low' },
 ];
 
 function countMatching(
@@ -126,7 +127,7 @@ export function summarizePilotIssues(sessions: PilotInsightSession[]): PilotIssu
 }
 
 export function formatPilotCounts(counts: PilotCount[]): string {
-  return counts.map(item => `${item.count} ${item.label.toLowerCase()}`).join(' · ');
+  return counts.map(item => formatString(strings.history.pilot.issueCount, { count: item.count, label: item.label.toLowerCase() })).join(' · ');
 }
 
 export function summarizePilotCoverage(sessions: PilotInsightSession[]): PilotCoverageSummary {

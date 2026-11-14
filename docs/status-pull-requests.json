@@ -1,36 +1,21 @@
 {
-  "observedAt": "2026-11-14T18:53:41Z",
+  "observedAt": "2026-11-14T21:16:57Z",
   "complete": true,
   "pullRequests": [
+    {
+      "number": 438,
+      "headRefName": "codex/status-refresh-2026-11",
+      "isDraft": false
+    },
     {
       "number": 437,
       "headRefName": "codex/profile-write-quota",
       "isDraft": false
     },
     {
-      "number": 436,
-      "headRefName": "codex/native-localization",
-      "isDraft": false
-    },
-    {
-      "number": 435,
-      "headRefName": "codex/native-release-2026-11",
-      "isDraft": false
-    },
-    {
-      "number": 434,
-      "headRefName": "codex/native-session-labels",
-      "isDraft": false
-    },
-    {
       "number": 433,
       "headRefName": "codex/cached-identity-review",
       "isDraft": true
-    },
-    {
-      "number": 432,
-      "headRefName": "codex/csp-image-media-hosts",
-      "isDraft": false
     },
     {
       "number": 430,
