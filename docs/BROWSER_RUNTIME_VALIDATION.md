@@ -9,9 +9,9 @@ its runtime assertions to stable 1.65.0. This refresh continues
 dependency work from [Dependabot #273](https://github.com/pacheco415/Occulert/pull/273).
 It preserves current main's fresh-workspace ownership guards, form probe, full
 suite, retry policy, browser-process diagnostics, action pins and verification
-artifacts. It does not change the application or service worker. Keep both PRs
-open until the coordinated runtime passes its acceptance gates; do not merge
-the old dependency-only PR separately.
+artifacts. It does not change the application or service worker. Evaluate the
+coordinated runtime in PR #324; the original dependency-only proposal is
+historical context, not a separate upgrade to merge.
 
 The [upstream issue](https://github.com/microsoft/playwright/issues/42803)
 identifies a libsoup 3.6.5 use-after-free in Playwright 1.63.0's Linux WebKit
@@ -151,16 +151,46 @@ and the tagged base as merge base. The complete tagged
 `filteredBackdrops` identifiers. These source checks do not show the known
 remedy included and do not independently certify final browser behavior.
 
-**The upgrade remains draft and is not ready for merge.** Acceptance still
-requires rendering-remedy evidence, the exact loaded network-process library
-mapping/hash and remedy content, and the unchanged Linux form probe, complete
-browser matrix and twenty offline repetitions on the refreshed PR head. Keep
-first-attempt failures, retry reports and source/environment receipts. A stable
-tag, a library version, or a passing retry alone does not satisfy those gates.
+At the November 10 review, the upgrade remained draft under acceptance gates
+requiring rendering-remedy evidence, the exact loaded network-process library
+mapping/hash and remedy content, and hosted browser results. The November 14
+owner decision below supersedes those evidence gates; this historical review
+does not claim that either underlying defect has been proved fixed.
 
 The preparation environment has no Docker or Podman. Prior local browser
 launch and pinned download attempts were blocked; this refresh does not repeat
 those attempts or claim a local engine pass. Portable checks and test collection
-can validate the prepared source, but hosted execution and the outstanding
-runtime evidence are still required. Historical macOS results do not resolve
-the Linux-specific acceptance failure.
+can validate the prepared source, but hosted execution remains required.
+Historical macOS results do not resolve the Linux-specific acceptance failure.
+
+## November 14 owner acceptance criteria
+
+The owner explicitly waived proof of the loaded network-process library
+mapping and source proof of the WebKit rendering fix for this test-only
+dependency. Acceptance now depends on the unchanged test results, without a
+claim that a particular upstream defect caused or resolved Occulert's failures.
+The separate evidence-collector PR #424 remains draft and is not a prerequisite
+for evaluating this candidate.
+
+This refresh merges main `04020f81d9a84415291fcb541b82de6c6317fe44` into the
+existing runtime-upgrade branch without rebasing or force-pushing. Its diff
+against main remains limited to the six runtime-upgrade paths. Application
+assets, browser projects, existing assertions, timeouts and retry counts are
+unchanged.
+
+Before marking #324 ready for review, collect **three separate hosted Browser
+Smoke Tests runs on the same refreshed PR head**. Each run must complete with:
+
+- No terminal failure in either complete browser suite.
+- The Linux WebKit form probe passing **7 of 7** cases.
+- The independent offline repetition job passing **20 of 20** cases with its
+  existing `--retries=0` setting.
+
+Record the exact head, all run IDs and attempts, direct pass counts and every
+recovered-after-retry case in the PR beside main's last three browser runs.
+Preserve initial failure logs, retry reports and source/environment receipts;
+do not describe recovered tests as first-attempt passes. A failed run stays in
+the record. Marking the PR ready for review does not authorize its merge.
+
+The refreshed-head results belong in the PR's validation record so collecting
+or documenting the three runs does not change the commit being evaluated.
