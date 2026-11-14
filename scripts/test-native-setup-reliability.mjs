@@ -229,6 +229,8 @@ test('native screens wire setup preview and recovery without changing detection 
   const monitorOwners = readNativeMonitorSourceOwners();
   const monitor = monitorOwners.screen;
   const home = read('native-app/app/index.tsx');
+  // Home copy lives in the native string catalog (Vision Task 6.1).
+  const homeCopy = read('native-app/lib/strings.ts');
   const historyOwners = readHistorySourceOwners(read);
   const history = historyOwners.screen;
   const historyPreferences = read('native-app/lib/historyPreferences.ts');
@@ -254,16 +256,20 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(recoveryStorage, /hasConflictingActiveSessionCheckpoint\(stored, checkpoint\.sessionId\)/);
   assert.match(recoveryStorage, /throw new ActiveSessionCheckpointConflictError\(\)/);
   assert.match(home, /recoveredSessionFromCheckpoint/);
-  assert.match(home, /Previous drive recovered/);
+  assert.match(home, /\{copy\.recoveryRecovered\.title\}/);
+  assert.match(homeCopy, /title: 'Previous drive recovered'/);
   assert.match(home, /prependRecoveredSession\(sessions, recovered\)/);
   assert.match(home, /must never replace the complete record with an older partial copy/);
   assert.match(home, /setRecoveryState\('error'\)/, 'a failed recovery check must become visible');
-  assert.match(home, /accessibilityLabel="Retry previous drive recovery"/, 'failed recovery must provide an accessible retry');
+  assert.match(home, /accessibilityLabel=\{copy\.recoveryError\.retryAccessibilityLabel\}/, 'failed recovery must provide an accessible retry');
+  assert.match(homeCopy, /retryAccessibilityLabel: 'Retry previous drive recovery'/);
   assert.match(home, /recoveryState === 'checking' \|\| recoveryState === 'error'/, 'unresolved recovery must block a new session');
   assert.match(home, /disabled=\{recoveryBlocksStart\}/, 'the pre-drive action must stay disabled until recovery resolves');
   assert.match(home, /busy: recoveryState === 'checking'/, 'the recovery check must expose its pending state');
-  assert.match(home, /Checking the previous drive/);
-  assert.match(home, /Retry previous drive recovery before starting another session/);
+  assert.match(home, /\{copy\.recoveryChecking\.title\}/);
+  assert.match(homeCopy, /title: 'Checking the previous drive'/);
+  assert.match(home, /copy\.start\.errorHint/);
+  assert.match(homeCopy, /errorHint: 'Retry previous drive recovery before starting another session'/);
   assert.doesNotMatch(home, /recoverInterruptedDrive\(\)\.catch\(\(\) => \{\}\)/, 'recovery failures must not be silently swallowed');
   assert.match(historyOwners.card, /Recovered local checkpoint/);
   assert.match(historyOwners.viewModel, /sessions\.filter\(item => !item\.recoveredFromInterruption\)/);

@@ -7,7 +7,9 @@ import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistor
 import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
 export const start = startMonitoring;
 export const stop = stopMonitoring;
-export const EXPERIMENT_HELPER_INTEGRITY = "sha256-UsKS/z/z68s17TdfXai4h9HOCJqJlny+opCCxBF4+rk=";
+// Generated from the final driver asset mapping by the release tool.
+export const WEB_APP_VERSION = 'web-v125';
+export const EXPERIMENT_HELPER_INTEGRITY = "sha256-Hf2msYDcgvAiU9WqDGZAonEMh6FND4vEIuc/iKDNR2k=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
     try {
@@ -600,7 +602,7 @@ export function loadExperimentController() {
     }
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/detection-experiments.v6.js';
+        script.src = '/detection-experiments.v13.js';
         script.integrity = EXPERIMENT_HELPER_INTEGRITY;
         script.crossOrigin = 'anonymous';
         const timer = setTimeout(() => { script.remove(); reject(Error('Parked helper timed out')); }, 7000);

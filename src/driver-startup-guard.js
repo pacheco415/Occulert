@@ -1,7 +1,7 @@
 /* global MutationObserver, location */
 
 (() => {
-  const corePath = '/driver-app.v124.js';
+  const corePath = '/driver-app.v125.js';
   let state = 'loading';
   const byId = id => document.getElementById(id);
   const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };

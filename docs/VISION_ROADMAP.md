@@ -84,6 +84,8 @@ Every task also inherits `AGENTS.md` and `RELEASING.md`:
 - Add new API routes to the dispatcher in `api/[endpoint].js`. `scripts/test-vercel-function-budget.mjs` enforces the twelve-function limit.
 - Derive identity from verified bearer tokens. Ignore client claims of driver or fleet authority.
 
+Each merged task carries a **State** line naming its pull request; a task with no State line has not merged. State lines were last checked on November 14, 2026 against `main` at `b6c9151605028f0c0511da40de483892bddba921`. Add or update the line in the pull request that changes a task's state.
+
 A merged task reaches **Implemented source** at most. Device acceptance, pilot results and labeled-data evaluation are separate evidence. Steps marked **Owner** need relevant owner input or physical access; account operations may be carried out through tools when the active task authorizes them. Source preparation cannot substitute for devices, participant consent or professional judgment.
 
 ## Phase 0 — Finish in-flight work
@@ -93,7 +95,7 @@ A merged task reaches **Implemented source** at most. Device acceptance, pilot r
 
 ### Task 0.1 — Index this roadmap
 
-- **State:** this source-only refresh includes the links described below; merging it does not select later tasks.
+- **State:** merged as [#352](https://github.com/pacheco415/Occulert/pull/352). That source-only refresh added the links described below; merging it selected no later task.
 - **Branch:** `codex/vision-roadmap-index`
 - **Change:** link `docs/VISION_ROADMAP.md` from `docs/README.md` and from "Remaining evidence and later work" in `docs/APP_ROADMAP.md`.
 - **Do not:** change any code or asset.
@@ -105,6 +107,7 @@ Proposal: evaluate bounded, cancelable delivery changes while retaining current 
 
 ### Task 1.1 — Watch repeats critical haptics until the eyes reopen
 
+- **State:** merged as [#376](https://github.com/pacheco415/Occulert/pull/376). The foreground Watch repeats the critical pattern every 4 s while fresh status reports closed eyes, capped at 60 s per episode. No physical Watch acceptance is recorded.
 - **Branch:** `codex/watch-escalation-ladder`
 - **Change:** `native-app/targets/occulert-watch/AlertReceiver.swift`. Keep the authoritative repeat/cancel policy in Swift, with tests exercising that actual policy; a new TypeScript timing table must not become a divergent second implementation.
 - **Behavior:** after a fresh `critical` alert, the Watch repeats the existing critical pattern while all of these hold: the Watch app is active, the latest `occulert-status` is fresh (under the existing 12 s window) and reports `closed`. Candidate values for later review: repeat every 4 s, cap a continuous closed-eye episode at 60 s and leave a "Pull over safely" message. Repeated alert messages must not renew that episode cap. The values are proposals, not approved defaults. Stop at once on `open`, `stopped`, stale status, loss of foreground, receiver disposal, a lower level or a replacement alert. A replacement message cannot revive canceled stale work or reset the continuous-episode cap. The `alert` level keeps its current two taps.
@@ -123,6 +126,7 @@ Proposal: evaluate bounded, cancelable delivery changes while retaining current 
 
 ### Task 1.3 — Emergency-readiness guidance
 
+- **State:** merged as [#372](https://github.com/pacheco415/Occulert/pull/372). An optional card in Settings, linked from Pre-drive for review while parked, opens five official Apple guides. It reads no setting and activates nothing.
 - **Branch:** `codex/emergency-readiness-card`
 - **Change:** a parked-only informational card in `native-app/app/settings.tsx` (and linked from `native-app/app/pre-drive.tsx`). It links to current official setup guidance for Medical ID, emergency contacts and supported Apple emergency/haptic features. Verify model, region and OS availability when implementing; do not present Crash Detection, Siren or any setting as universally available.
 - **Do not:** claim Occulert can trigger Siren, SOS, Crash Detection or emergency services. Do not read or infer those settings, and add no permissions.
@@ -140,6 +144,7 @@ independent evaluation precede selection of a send workflow.
 
 ### Task 2.1 — Unanswered-alert observation model
 
+- **State:** merged as [#370](https://github.com/pacheco415/Occulert/pull/370). The observer is off by default and stores aggregate candidate counts in local History only; see [Unanswered-alert observation](UNANSWERED_ALERT_OBSERVATION.md). Device acceptance and independently labeled evaluation remain open, and nothing is sent.
 - **Branch:** `codex/unanswered-alert-observation`
 - **Change:** a pure model, `native-app/lib/unansweredAlertPolicy.ts`, fed from `native-app/app/monitor.tsx`. A candidate occurs when a `critical` alert was delivered and the face stays tracked with eyes `closed` for a further 6 s (provisional constant). Any `open` sample resets it. `noFace` or `tracking` never produces a candidate. Record motion availability separately. Unknown, stale, denied or unavailable motion never authorizes escalation. Any later send path requires an explicitly reviewed gate; observation-only fixtures may still count separately labeled unknown-gate candidates. Store only candidate counts in the session's local History diagnostics, the way `native-app/lib/sensorFusionObservation.ts` stores coincidences.
 - **Do not:** send anything, change alerts, or add cloud fields. Keep the observer off by default and absent from ordinary-session collection; store no raw motion or eye timeline in History.
@@ -148,6 +153,7 @@ independent evaluation precede selection of a send workflow.
 
 ### Task 2.2 — In-vehicle motion gate
 
+- **State:** merged as [#371](https://github.com/pacheco415/Occulert/pull/371). A default-off Apple-only module reports Core Motion activity estimates to the Task 2.1 observer. They establish neither speed nor verified movement and authorize no escalation. No physical-drive check is recorded.
 - **Branch:** `codex/in-vehicle-gate`
 - **Prerequisite:** verify current official Core Motion API semantics. Apple documents that [automotive and stationary classifications can overlap](https://developer.apple.com/documentation/coremotion/cmmotionactivity). Automotive activity is not a speed measurement or proof that a vehicle is moving; do not label it as verified motion. Establish freshness, confidence and stationary/unknown handling before defining a gate.
 - **Change:** a local Expo module (pattern: `native-app/modules/occulert-headphone-motion/`) that reports the supported activity evidence and its timestamp/confidence without inventing a movement state that the API cannot establish. Update `NSMotionUsageDescription` in `native-app/app.json` to cover this use truthfully.
@@ -202,6 +208,7 @@ Goal: on iPhones that support simultaneous front and rear capture, the rear came
 
 ### Task 3.1 — Dual-capture architecture decision
 
+- **State:** merged as [#368](https://github.com/pacheco415/Occulert/pull/368). [Road camera architecture](ROAD_CAMERA_ARCHITECTURE.md) recommends evaluating a single VisionCamera session first, with a bespoke capture owner as the fallback, and lists the proof still missing. No runtime code changed.
 - **Branch:** `codex/road-camera-architecture`
 - **Change:** `docs/ROAD_CAMERA_ARCHITECTURE.md` only. Today the driver stream runs on VisionCamera's single capture session, while the parked stability test builds its own `AVCaptureMultiCamSession` in `native-app/modules/occulert-device-condition/`. Compare two paths: (a) a native dual-capture module that feeds ML Kit natively for the driver and a road model for the rear camera, or (b) a camera version selected through a refreshed compatibility review, if official APIs actually support the required multi-camera sessions. The [October 4 upgrade plan](VISION_CAMERA_UPGRADE_PLAN.md) is historical; its Expo/RN baseline is not the current dependency set. Cover frame ownership, thermal fallback, interruption handling and the Duo camera-identity rules.
 - **Do not:** change runtime code.
@@ -209,6 +216,7 @@ Goal: on iPhones that support simultaneous front and rear capture, the rear came
 
 ### Task 3.2 — Road-stream load policy
 
+- **State:** merged as [#369](https://github.com/pacheco415/Occulert/pull/369). The pure policy helper has no runtime consumer; driver capture cadence and the critical-heat stop are unchanged.
 - **Branch:** `codex/road-stream-load-policy`
 - **Change:** extend `native-app/lib/captureLoadPolicy.ts` with a road-stream tier. A candidate low road-frame rate (5 fps for evaluation, not an approved default) turns off first at `serious` thermal state or high system pressure. A pure policy addition must remain unused until the road architecture is selected; it must not change current driver capture cadence or lifecycle, including the existing critical-heat stop. Reuse the `driverOnlyFallback` meaning from the stability test.
 - **Tests:** extend `native-app/scripts/test-capture-load.mjs`.
@@ -216,6 +224,7 @@ Goal: on iPhones that support simultaneous front and rear capture, the rear came
 
 ### Task 3.3 — Road model evaluation harness
 
+- **State:** merged as [#374](https://github.com/pacheco415/Occulert/pull/374), the synthetic-only milestone. The harness scores supplied predictions on authored fixtures; no model, licensed clip or device latency has been evaluated, so the owner step below remains open.
 - **Branch:** `codex/road-model-benchmark`
 - **Change:** under `benchmark/`, a harness that scores candidate on-device lane and lead-vehicle models on authorized, labeled road clips. It records license, model size, latency, and misses by lighting and weather. Follow `benchmark/provenance.mjs`.
 - **Owner:** choose clips whose license permits commercial evaluation. Record consent for any clips you record yourself.
@@ -236,7 +245,7 @@ Goal: decide with evidence whether headphone nods, Watch heart data or road obse
 
 ### Task 4.1 — Corroboration replay benchmark
 
-- **State:** a fixture runner, a released web scoring-replay adapter and the timeline contract are in [Corroboration replay](CORROBORATION_REPLAY.md). No labeled data has been evaluated; the owner prerequisite below remains open.
+- **State:** merged as [#386](https://github.com/pacheco415/Occulert/pull/386) and [#387](https://github.com/pacheco415/Occulert/pull/387). A fixture runner, a released web scoring-replay adapter and the timeline contract are in [Corroboration replay](CORROBORATION_REPLAY.md). No labeled data has been evaluated; the owner prerequisite below remains open.
 - **Branch:** `codex/corroboration-replay`
 - **Change:** compose the existing `benchmark/replay-scoring.mjs` and event scorer to replay compatible exported session timelines under two policies: camera-only and camera plus corroborating signals. Report false alerts, missed events, latency and coverage, split by which accessories were present.
 - **Prerequisite:** define a consented, minimal, compatible observation timeline. Existing aggregate fusion/road candidate counts cannot reconstruct when corroboration occurred; do not invent event timestamps from totals or assume the browser trace contains native accessory samples.
@@ -272,6 +281,7 @@ Pricing hypothesis for owner review: retain standalone monitoring and existing s
 
 ### Task 5.1 — Active-driver count
 
+- **State:** merged as [#385](https://github.com/pacheco415/Occulert/pull/385) with migration `20261107160000_fleet_monthly_activity.sql`. The fleet dashboard shows the server-derived count for the current Pacific calendar month, or reports it unavailable. Billing, entitlements and driver access are unchanged.
 - **Selected definition (owner, November 7, 2026):** count a driver once when at least one monitoring session completes in the calendar month. The owner selected Pacific calendar months (`America/Los_Angeles`); the candidate uses completion time and stored session fleet attribution; see [the count contract](FLEET_MONTHLY_ACTIVITY.md). Source validation and deployment remain separate.
 
 - **Branch:** `codex/active-driver-count`
@@ -298,6 +308,7 @@ Pricing hypothesis for owner review: retain standalone monitoring and existing s
 
 ### Task 6.1 — Native localization
 
+- **State:** Home screen copy is in the English catalog `native-app/lib/strings.ts`, guarded by `npm run test:strings` in native verify. Other screens and components still hard-code copy; no translation exists.
 - **Branch:** `codex/native-localization`
 - **Change:** extract native UI strings into a typed catalog and add the web app's languages (`en es fr pt de ar zh ja`), including right-to-left layout for Arabic. Record spoken cues per language or keep English with a visible note.
 - **Tests:** a missing-key check and the existing monitor layout fixtures at large text in Arabic. Preserve alert meaning and consent text; fluent human review and physical accessibility acceptance remain required for translated release copy.
