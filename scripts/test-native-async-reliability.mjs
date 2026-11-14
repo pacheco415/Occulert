@@ -26,6 +26,7 @@ import { HeadNodDetector } from '../native-app/lib/headNodDetector.ts';
 import * as simulatorTraceModel from '../native-app/lib/simulatorTraceModel.ts';
 import { createUnansweredAlertObservation } from '../native-app/lib/unansweredAlertObservation.ts';
 import { createMotionActivityObservation } from '../native-app/lib/motionActivityObservation.ts';
+import { strings, formatString } from '../native-app/lib/strings.ts';
 
 // Execute the production TS logic with native bridges replaced. Removing imports
 // and JSX presentation avoids requiring a device, Expo, or a TS compiler in CI.
@@ -36,7 +37,7 @@ function load(source, names, bindings) {
     .replace(/^export (?:default )?/gm, '');
   const exports = {};
   vm.runInNewContext(`${stripTypeScriptTypes(body)}\nObject.assign(exports, {${names.join(',')}});`,
-    { exports, AbortController, Date, console, ...bindings }, { timeout: 1000 });
+    { exports, AbortController, Date, console, ...bindings, strings, formatString }, { timeout: 1000 });
   return exports;
 }
 const deferred = () => {

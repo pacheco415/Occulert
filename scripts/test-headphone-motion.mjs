@@ -1,3 +1,5 @@
+import ts from 'typescript';
+import { strings } from '../native-app/lib/strings.ts';
 import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -7,6 +9,24 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
+
+// Bind the real source to its catalog entry and pin the released English contract.
+function assertCatalogCopy(source, key, expected) {
+  const file = ts.createSourceFile('native-copy.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const imported = file.statements.some(node => ts.isImportDeclaration(node)
+    && /(?:^|\/)strings(?:\.ts)?$/.test(node.moduleSpecifier.text)
+    && !node.importClause?.isTypeOnly
+    && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+    && node.importClause.namedBindings.elements.some(item => !item.isTypeOnly && item.name.text === 'strings' && !item.propertyName));
+  let bound = false;
+  function visit(node) {
+    if (ts.isPropertyAccessExpression(node) && node.getText(file) === `strings.${key}`) bound = true;
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  assert.ok(imported && bound, `${key}: use the actual catalog binding`);
+  assert.equal(key.split('.').reduce((value, part) => value?.[part], strings), expected, `${key}: preserve released English`);
+}
 
 test('the iOS module uses the read-only headphone motion API with bounded updates', () => {
   const swift = read('native-app/modules/occulert-headphone-motion/ios/OcculertHeadphoneMotionModule.swift');
@@ -40,9 +60,9 @@ test('headphone candidates remain separate, local aggregates and never enter ale
   assert.match(monitor, /headphoneMotionSamples/);
   assert.match(monitor, /headphoneMotionStatus/);
   assert.match(monitor, /headphone motion never changes the fatigue score or alerts/);
-  assert.match(historyOwners.diagnostics, /EXPERIMENTAL HEAD-MOTION DIAGNOSTICS/);
-  assert.match(historyOwners.diagnostics, /Saved locally as aggregate observations only and included only if you choose Send session feedback/);
-  assert.match(historyOwners.diagnostics, /Does not trigger alerts or change scores/);
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.headMotionTitle", "EXPERIMENTAL HEAD-MOTION DIAGNOSTICS");
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.headMotionCaution", "Saved locally as aggregate observations only and included only if you choose Send session feedback. Does not trigger alerts or change scores.");
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.headMotionCaution", "Saved locally as aggregate observations only and included only if you choose Send session feedback. Does not trigger alerts or change scores.");
   assert.doesNotMatch(cloud, /headphoneHeadNodObservations|headphoneMotionSamples|headphoneMotionStatus/);
   assert.doesNotMatch(alerts, /headphoneMotion|headphoneHeadNod/);
 });

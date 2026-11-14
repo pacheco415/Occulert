@@ -1,3 +1,4 @@
+import { strings, formatString } from '../../lib/strings';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import type { LayoutChangeEvent } from 'react-native';
@@ -5,7 +6,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { cloudSummaryPresentation } from '../../lib/cloudSummaryPresentation';
 import type { PendingCloudSummaryState } from '../../lib/cloudSync';
 import { hasHistoryAlertAssessment } from '../../lib/historyPreferences';
-import { fmtDate, sensitivityLabel, sessionHistoryDate } from '../../lib/historyPresentation';
+import { fmtDate, historyTextValue, sensitivityLabel, sessionHistoryDate } from '../../lib/historyPresentation';
 import type { SessionOperation, SessionRecord } from '../../lib/historyRecord';
 import { historyReviewInput, sessionRecordKey } from '../../lib/historyReviewModel';
 import { formatSessionAlertCount } from '../../lib/sessionAlertCount';
@@ -62,26 +63,24 @@ export function HistorySessionCard({ item, index: i, sessionOperations, expanded
             </View>
             <View style={s.stats}>
               <View style={s.stat}>
-                <Text style={alertCountLabel === 'Not recorded' ? s.statValSmall : s.statVal}>{alertCountLabel}</Text>
-                <Text style={s.statLbl}>Alerts</Text>
+                <Text style={alertCountLabel === strings.history.common.notRecorded ? s.statValSmall : s.statVal}>{alertCountLabel}</Text>
+                <Text style={s.statLbl}>{strings.history.card.alerts}</Text>
               </View>
               <View style={s.stat}>
-                <Text style={fatigueLabel === 'Not recorded' ? s.statValSmall : s.statVal}>{fatigueLabel}</Text>
-                <Text style={s.statLbl}>Avg Fatigue</Text>
+                <Text style={fatigueLabel === strings.history.common.notRecorded ? s.statValSmall : s.statVal}>{fatigueLabel}</Text>
+                <Text style={s.statLbl}>{strings.history.card.fatigue}</Text>
               </View>
               <View style={s.stat}>
                 <Text style={s.statValSmall}>{sensitivityLabel(item.sensitivity)}</Text>
-                <Text style={s.statLbl}>Sensitivity</Text>
+                <Text style={s.statLbl}>{strings.history.card.sensitivity}</Text>
               </View>
             </View>
             {item.recoveredFromInterruption && (
               <View accessibilityRole="alert" style={s.recoveryNote}>
                 <Ionicons name="refresh-circle-outline" size={16} color="#86efac" />
                 <View style={s.recoveryNoteCopy}>
-                  <Text style={s.recoveryNoteTitle}>Recovered local checkpoint</Text>
-                  <Text style={s.recoveryNoteText}>
-                    Monitoring ended unexpectedly. This partial summary may not include the final moments of the drive.
-                  </Text>
+                  <Text style={s.recoveryNoteTitle}>{strings.history.card.recoveredTitle}</Text>
+                  <Text style={s.recoveryNoteText}>{strings.history.card.recoveredDetail}</Text>
                 </View>
               </View>
             )}
@@ -95,9 +94,10 @@ export function HistorySessionCard({ item, index: i, sessionOperations, expanded
                 {cloudSummaryPresentation(item,pendingCloudSummaryStateIsCurrent(pendingCloud)?pendingCloud.localIds:[]).label}
               </Text>
             </View>
-            <Text style={s.buildInfo}>
-              App {item.appVersion || 'not recorded'} · Build {item.appBuildNumber || 'not recorded'}
-            </Text>
+            <Text style={s.buildInfo}>{formatString(strings.history.card.build, {
+              version: historyTextValue(item.appVersion || strings.history.common.notRecordedLower),
+              build: historyTextValue(item.appBuildNumber || strings.history.common.notRecordedLower),
+            })}</Text>
             <HistorySessionDiagnostics item={item} isExpanded={isExpanded} />
             <View style={s.reviewSummary}>
               <View style={[
@@ -117,18 +117,18 @@ export function HistorySessionCard({ item, index: i, sessionOperations, expanded
                   ]}
                 >
                   {sessionOperation === 'saving'
-                    ? 'Saving changes…'
+                    ? strings.history.card.saving
                     : sessionOperation === 'deleting'
-                      ? 'Deleting session…'
+                      ? strings.history.card.deleting
                       : sessionOperation === 'feedback'
-                        ? 'Opening feedback…'
-                        : reviewComplete ? 'Review complete' : hasHistoryAlertAssessment(item.alertAssessment) ? 'Rating saved' : 'Needs review'}
+                        ? strings.history.card.openingFeedback
+                        : reviewComplete ? strings.history.common.reviewComplete : hasHistoryAlertAssessment(item.alertAssessment) ? strings.history.card.ratingSaved : strings.history.common.needsReview}
                 </Text>
               </View>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={isExpanded ? 'Hide session review details' : 'Show session review details'}
-                accessibilityHint="Shows test conditions, device impact, and local diagnostics"
+                accessibilityLabel={isExpanded ? strings.history.card.hideAccessibilityLabel : strings.history.card.showAccessibilityLabel}
+                accessibilityHint={strings.history.card.detailsHint}
                 accessibilityState={{ expanded: isExpanded }}
                 style={s.reviewToggle}
                 onPress={() => setExpandedSessions(current => ({
@@ -136,21 +136,21 @@ export function HistorySessionCard({ item, index: i, sessionOperations, expanded
                   [sessionKey]: !(current[sessionKey] ?? false),
                 }))}
               >
-                <Text style={s.reviewToggleText}>{isExpanded ? 'Hide details' : 'Show details'}</Text>
+                <Text style={s.reviewToggleText}>{isExpanded ? strings.history.card.hideDetails : strings.history.card.showDetails}</Text>
                 <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={15} color="#93c5fd" />
               </TouchableOpacity>
             </View>
             <View
               accessible
               accessibilityLabel={reviewComplete
-                ? 'Review complete, 3 of 3 steps complete'
-                : `Review incomplete, ${reviewProgress.completedSteps} of ${reviewProgress.totalSteps} steps complete. ${reviewProgress.missingSummary}`}
+                ? strings.history.card.reviewCompleteAccessibilityLabel
+                : formatString(strings.history.card.reviewIncompleteAccessibilityLabel, { completed: reviewProgress.completedSteps, total: reviewProgress.totalSteps, missing: reviewProgress.missingSummary })}
               accessibilityLiveRegion="polite"
               style={[s.reviewProgress, reviewComplete && s.reviewProgressComplete]}
             >
               <View style={s.reviewProgressHeader}>
                 <Text style={[s.reviewProgressTitle, reviewComplete && s.reviewProgressTitleComplete]}>
-                  {reviewComplete ? 'Review checklist complete' : 'Finish this review'}
+                  {reviewComplete ? strings.history.card.checklistComplete : strings.history.card.finishReview}
                 </Text>
                 <Text style={s.reviewProgressCount}>
                   {reviewProgress.completedSteps}/{reviewProgress.totalSteps}
@@ -171,7 +171,7 @@ export function HistorySessionCard({ item, index: i, sessionOperations, expanded
                       <View style={s.reviewChecklistCopy}>
                         <Text style={s.reviewChecklistLabel}>{step.label}</Text>
                         {!step.complete && (
-                          <Text style={s.reviewChecklistMissing}>Add {step.missing.join(', ')}</Text>
+                          <Text style={s.reviewChecklistMissing}>{formatString(strings.history.card.addMissing, { items: step.missing.join(', ') })}</Text>
                         )}
                       </View>
                     </View>
@@ -184,26 +184,26 @@ export function HistorySessionCard({ item, index: i, sessionOperations, expanded
               saveTestCondition={saveTestCondition} saveDeviceImpact={saveDeviceImpact} />
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Send feedback about this session"
+              accessibilityLabel={strings.history.card.feedbackAccessibilityLabel}
               accessibilityState={{ disabled: sessionBusy, busy: sessionBusy }}
               disabled={sessionBusy}
               style={[s.feedbackBtn, sessionBusy && s.operationDisabled]}
               onPress={() => { void sendSessionFeedback(item, i); }}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={16} color="#93c5fd" />
-              <Text style={s.feedbackTxt}>Send session feedback</Text>
+              <Text style={s.feedbackTxt}>{strings.history.card.feedback}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={`Delete session from ${fmtDate(sessionHistoryDate(item))}`}
-              accessibilityHint="Permanently removes this local session after confirmation"
+              accessibilityLabel={formatString(strings.history.card.deleteAccessibilityLabel, { date: fmtDate(sessionHistoryDate(item)) })}
+              accessibilityHint={strings.history.card.deleteHint}
               accessibilityState={{ disabled: sessionBusy, busy: sessionBusy }}
               disabled={sessionBusy}
               style={[s.deleteBtn, sessionBusy && s.operationDisabled]}
               onPress={() => confirmDeleteSession(item, i)}
             >
               <Ionicons name="trash-outline" size={16} color="#fca5a5" />
-              <Text style={s.deleteTxt}>Delete local session</Text>
+              <Text style={s.deleteTxt}>{strings.history.card.delete}</Text>
             </TouchableOpacity>
           </View>
   );

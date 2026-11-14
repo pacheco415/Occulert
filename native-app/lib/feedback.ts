@@ -1,4 +1,5 @@
 import { Alert, AppState, Linking, Platform, Share } from 'react-native';
+import { strings } from './strings.ts';
 import type { SensitivityLevel } from '../constants/thresholds';
 import { currentAppBuildInfo } from './appBuildInfo';
 import { formatSessionAlertCount } from './sessionAlertCount';
@@ -139,12 +140,12 @@ export async function openFeedbackWithFallback(
   await new Promise<void>(resolve => {
     let choiceMade = false;
     Alert.alert(
-      'Mail is unavailable',
-      'Your feedback draft is ready. Share it with an app you choose, then review it before sending to hello@occulert.com. Nothing is sent automatically.',
+      strings.settings.feedback.mailUnavailableTitle,
+      strings.settings.feedback.mailUnavailableDetail,
       [
-        { text: 'Cancel', style: 'cancel', onPress: () => { choiceMade = true; resolve(); } },
+        { text: strings.settings.common.cancel, style: 'cancel', onPress: () => { choiceMade = true; resolve(); } },
         {
-          text: 'Share draft',
+          text: strings.settings.feedback.shareDraft,
           onPress: () => {
             choiceMade = true;
             if (!current()) { resolve(); return; }
@@ -156,7 +157,7 @@ export async function openFeedbackWithFallback(
                 });
               } catch {
                 if (current()) {
-                  Alert.alert('Feedback draft unavailable', 'The share sheet could not open. Try again, or email hello@occulert.com from your preferred email app.');
+                  Alert.alert(strings.settings.feedback.draftUnavailableTitle, strings.settings.feedback.draftUnavailableDetail);
                 }
               } finally {
                 resolve();

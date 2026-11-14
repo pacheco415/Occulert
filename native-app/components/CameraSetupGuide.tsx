@@ -1,3 +1,4 @@
+import { strings, formatString } from '../lib/strings.ts';
 import React, { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,7 +41,14 @@ export const CameraSetupGuide = memo(function CameraSetupGuide({
         accessible
         accessibilityLiveRegion="polite"
         accessibilityRole="summary"
-        accessibilityLabel={`${assessment.title}. ${assessment.detail}${active ? ` Face framed ${assessment.faceCentered && assessment.faceSized ? 'ready' : 'needs adjustment'}. Mount aimed ${assessment.facingCamera ? 'ready' : 'needs adjustment'}. Eyes visible ${assessment.eyesVisible ? 'ready' : 'needs adjustment'}.` : ''}`}
+        accessibilityLabel={formatString(strings.monitor.cameraCheck.assessment, {
+          title: assessment.title, detail: assessment.detail,
+          checks: active ? ' ' + formatString(strings.monitor.cameraCheck.checkSummary, {
+            face: assessment.faceCentered && assessment.faceSized ? strings.monitor.cameraCheck.ready : strings.monitor.cameraCheck.needsAdjustment,
+            mount: assessment.facingCamera ? strings.monitor.cameraCheck.ready : strings.monitor.cameraCheck.needsAdjustment,
+            eyes: assessment.eyesVisible ? strings.monitor.cameraCheck.ready : strings.monitor.cameraCheck.needsAdjustment,
+          }) : '',
+        })}
       >
         <View style={styles.header}>
           <View style={[styles.icon, assessment.ready && styles.iconReady]}>
@@ -51,7 +59,7 @@ export const CameraSetupGuide = memo(function CameraSetupGuide({
             />
           </View>
           <View style={styles.copy}>
-            <Text style={styles.eyebrow}>PARKED CAMERA CHECK</Text>
+            <Text style={styles.eyebrow}>{strings.monitor.cameraCheck.eyebrow}</Text>
             <Text style={styles.title}>{assessment.title}</Text>
             <Text style={styles.detail}>{assessment.detail}</Text>
           </View>
@@ -59,19 +67,19 @@ export const CameraSetupGuide = memo(function CameraSetupGuide({
 
         {active && (
           <View style={styles.checks}>
-            <SetupCheck complete={assessment.faceCentered && assessment.faceSized} label="Face framed" />
-            <SetupCheck complete={assessment.facingCamera} label="Mount aimed" />
-            <SetupCheck complete={assessment.eyesVisible} label="Eyes visible" />
+            <SetupCheck complete={assessment.faceCentered && assessment.faceSized} label={strings.monitor.cameraCheck.face} />
+            <SetupCheck complete={assessment.facingCamera} label={strings.monitor.cameraCheck.mount} />
+            <SetupCheck complete={assessment.eyesVisible} label={strings.monitor.cameraCheck.eyes} />
           </View>
         )}
       </View>
 
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel={active ? 'Pause parked camera check' : 'Start parked camera check'}
+        accessibilityLabel={active ? strings.monitor.cameraCheck.pauseAccessibilityLabel : strings.monitor.cameraCheck.startAccessibilityLabel}
         accessibilityHint={active
-          ? 'Stops the parked camera setup preview'
-          : 'Starts a private on-device camera preview for positioning the mounted phone'}
+          ? strings.monitor.cameraCheck.pauseHint
+          : strings.monitor.cameraCheck.startHint}
         accessibilityState={{ disabled }}
         activeOpacity={0.8}
         disabled={disabled}
@@ -79,7 +87,7 @@ export const CameraSetupGuide = memo(function CameraSetupGuide({
         style={[styles.button, disabled && styles.buttonDisabled]}
       >
         <Ionicons name={active ? 'pause' : 'camera-outline'} size={17} color="#dff4ff" />
-        <Text style={styles.buttonText}>{active ? 'PAUSE CAMERA CHECK' : 'START CAMERA CHECK'}</Text>
+        <Text style={styles.buttonText}>{active ? strings.monitor.cameraCheck.pause : strings.monitor.cameraCheck.start}</Text>
       </TouchableOpacity>
     </View>
   );

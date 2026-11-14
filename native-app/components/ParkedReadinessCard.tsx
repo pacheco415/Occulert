@@ -1,3 +1,4 @@
+import { strings, formatString } from '../lib/strings.ts';
 import React, { useCallback, useRef, useState } from 'react';
 import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -15,22 +16,22 @@ import {
 
 function describeStabilityResult(result: MultiCamStabilityResult) {
   const seconds = (result.elapsedMs / 1_000).toFixed(1);
-  const measurements = `${result.frontFrames} driver frames and ${result.roadFrames} road frames in ${seconds}s. Peak camera pressure ${result.maxPressureLevel}; phone heat ${result.thermalState}.`;
+  const measurements = formatString(strings.preDrive.readiness.stability.measurements, { driverFrames: String(result.frontFrames), roadFrames: String(result.roadFrames), seconds, pressure: String(result.maxPressureLevel), thermalState: String(result.thermalState) });
   switch (result.state) {
   case 'passed':
-    return { status: 'Live streams passed', detail: measurements, attention: false };
+    return { status: strings.preDrive.readiness.stability.passedStatus, detail: measurements, attention: false };
   case 'driverOnlyFallback':
-    return { status: 'Driver camera protected', detail: `Occulert disabled or withheld the road stream while preserving driver frames. ${measurements}`, attention: true };
+    return { status: strings.preDrive.readiness.stability.driverProtectedStatus, detail: formatString(strings.preDrive.readiness.stability.driverProtectedDetail, { measurements }), attention: true };
   case 'driverStreamFailed':
-    return { status: 'Driver stream failed', detail: `The protected driver stream produced no frames. Road monitoring remains disabled. ${measurements}`, attention: true };
+    return { status: strings.preDrive.readiness.stability.driverFailedStatus, detail: formatString(strings.preDrive.readiness.stability.driverFailedDetail, { measurements }), attention: true };
   case 'overBudget':
-    return { status: 'Test blocked', detail: 'Apple’s resource budget was exceeded before live capture. Road monitoring remains disabled.', attention: true };
+    return { status: strings.preDrive.readiness.stability.blockedStatus, detail: strings.preDrive.readiness.stability.blockedDetail, attention: true };
   case 'permissionRequired':
-    return { status: 'Camera access needed', detail: 'Grant camera access before running the parked stability test.', attention: true };
+    return { status: strings.preDrive.readiness.stability.accessNeededStatus, detail: strings.preDrive.readiness.stability.accessNeededDetail, attention: true };
   case 'unsupported':
-    return { status: 'Not supported', detail: 'This phone does not expose a supported front-and-rear camera pair.', attention: true };
+    return { status: strings.preDrive.readiness.stability.unsupportedStatus, detail: strings.preDrive.readiness.stability.unsupportedDetail, attention: true };
   default:
-    return { status: 'Test could not finish', detail: 'Both camera streams were stopped. Close other camera apps and try again while parked.', attention: true };
+    return { status: strings.preDrive.readiness.stability.errorStatus, detail: strings.preDrive.readiness.stability.errorDetail, attention: true };
   }
 }
 
@@ -100,11 +101,11 @@ export function ParkedReadinessCard() {
   };
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Your devices before this drive</Text>
-      <Text style={styles.description}>Check while parked. Optional accessories are not required for camera monitoring.</Text>
+      <Text style={styles.title}>{strings.preDrive.readiness.title}</Text>
+      <Text style={styles.description}>{strings.preDrive.readiness.detail}</Text>
       <View accessibilityLiveRegion="polite">
-        {busy ? <Text style={styles.description}>Checking saved settings and connections…</Text> : null}
-        {!busy && !snapshot ? <Text style={styles.description}>Refresh while parked to check your devices.</Text> : null}
+        {busy ? <Text style={styles.description}>{strings.preDrive.readiness.checking}</Text> : null}
+        {!busy && !snapshot ? <Text style={styles.description}>{strings.preDrive.readiness.empty}</Text> : null}
         {rows.map(row => (
           <View key={row.id} style={styles.row}>
             <Text style={styles.rowTitle}>{row.title}</Text>
@@ -112,13 +113,13 @@ export function ParkedReadinessCard() {
             <Text style={styles.detail}>{row.detail}</Text>
           </View>
         ))}
-        {snapshot ? <Text style={styles.note}>Snapshot only; refresh if you change devices or settings.</Text> : null}
+        {snapshot ? <Text style={styles.note}>{strings.preDrive.readiness.snapshotLimit}</Text> : null}
       </View>
       {stabilityEligible ? (
         <View style={styles.row} accessibilityLiveRegion="polite">
-          <Text style={styles.rowTitle}>Live dual-camera test · parked</Text>
-          <Text style={styles.detail}>Runs both cameras for five seconds, counts frames, then stops. No images or video are saved.</Text>
-          {stabilityBusy ? <Text style={styles.status}>Testing both camera streams…</Text> : null}
+          <Text style={styles.rowTitle}>{strings.preDrive.readiness.stability.title}</Text>
+          <Text style={styles.detail}>{strings.preDrive.readiness.stability.detail}</Text>
+          {stabilityBusy ? <Text style={styles.status}>{strings.preDrive.readiness.stability.testing}</Text> : null}
           {stabilityDescription ? (
             <>
               <Text style={[styles.status, stabilityDescription.attention && styles.attention]}>{stabilityDescription.status}</Text>
@@ -127,38 +128,38 @@ export function ParkedReadinessCard() {
           ) : null}
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel={stabilityBusy ? 'Testing both camera streams' : 'Run parked dual-camera test'}
-            accessibilityHint="Starts both cameras for five seconds and stops automatically"
+            accessibilityLabel={stabilityBusy ? strings.preDrive.readiness.stability.busyAccessibility : strings.preDrive.readiness.stability.accessibility}
+            accessibilityHint={strings.preDrive.readiness.stability.hint}
             accessibilityState={{ disabled: controlsBusy, busy: stabilityBusy }}
             disabled={controlsBusy}
             onPress={() => { void runStabilityTest(); }}
             style={[styles.testButton, controlsBusy && styles.disabled]}
           >
-            <Text style={styles.buttonText}>{stabilityBusy ? 'Testing for 5 seconds…' : 'Run parked camera test'}</Text>
+            <Text style={styles.buttonText}>{stabilityBusy ? strings.preDrive.readiness.stability.busyAction : strings.preDrive.readiness.stability.action}</Text>
           </TouchableOpacity>
         </View>
       ) : null}
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel={busy ? 'Checking connected devices' : 'Refresh connected device check'}
-        accessibilityHint="Checks saved settings and current optional device connections while parked"
+        accessibilityLabel={busy ? strings.preDrive.readiness.refreshBusyAccessibility : strings.preDrive.readiness.refreshAccessibility}
+        accessibilityHint={strings.preDrive.readiness.refreshHint}
         accessibilityState={{ disabled: controlsBusy, busy }}
         disabled={controlsBusy}
         onPress={() => refreshRef.current()}
         style={[styles.button, controlsBusy && styles.disabled]}
       >
-        <Text style={styles.buttonText}>{busy ? 'Checking…' : 'Refresh device check'}</Text>
+        <Text style={styles.buttonText}>{busy ? strings.preDrive.readiness.refreshBusy : strings.preDrive.readiness.refreshAction}</Text>
       </TouchableOpacity>
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel="Check phone and Watch alerts while parked"
-        accessibilityHint="Opens settings where you can play a phone alert and send an optional Watch alert"
+        accessibilityLabel={strings.preDrive.readiness.alertCheckAccessibility}
+        accessibilityHint={strings.preDrive.readiness.alertCheckHint}
         onPress={() => router.push('/settings')}
         style={styles.secondaryButton}
       >
-        <Text style={styles.secondaryText}>Check alert sound, vibration, and Watch</Text>
+        <Text style={styles.secondaryText}>{strings.preDrive.readiness.alertCheckAction}</Text>
       </TouchableOpacity>
-      <Text style={styles.note}>While parked, confirm you actually hear or feel a phone alert through your current audio setup. A Watch delivery acknowledgment does not prove an alert was noticed. This check does not test fatigue or confirm it is safe to drive.</Text>
+      <Text style={styles.note}>{strings.preDrive.readiness.alertCheckLimits}</Text>
     </View>
   );
 }

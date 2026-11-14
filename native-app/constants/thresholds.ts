@@ -1,3 +1,4 @@
+import { strings } from '../lib/strings.ts';
 /**
  * Occulert Sensitivity Thresholds
  *
@@ -24,20 +25,20 @@ export const SENSITIVITY_PRESETS: Record<SensitivityLevel, SensitivityPreset> = 
     low: {
           eyeClosedThreshold: 0.15,
           eyeWatchThreshold: 0.19,
-          label: 'Low',
-          description: 'Triggers only on sustained eye closure. Fewer false alerts, may miss brief events.',
+          label: strings.settings.sensitivity.presets.low.label,
+          description: strings.settings.sensitivity.presets.low.description,
     },
     medium: {
           eyeClosedThreshold: 0.18,
           eyeWatchThreshold: 0.22,
-          label: 'Medium',
-          description: 'Balanced detection. Recommended for most drivers. (Default)',
+          label: strings.settings.sensitivity.presets.medium.label,
+          description: strings.settings.sensitivity.presets.medium.description,
     },
     high: {
           eyeClosedThreshold: 0.21,
           eyeWatchThreshold: 0.25,
-          label: 'High',
-          description: 'Triggers earlier. More sensitive. May produce more false alerts in some conditions.',
+          label: strings.settings.sensitivity.presets.high.label,
+          description: strings.settings.sensitivity.presets.high.description,
     },
 };
 

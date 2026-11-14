@@ -1,3 +1,4 @@
+import { strings, formatString } from '../lib/strings.ts';
 import React from 'react';
 import { Alert, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,20 +28,20 @@ export function SensitivitySlider({ value, onChange }: Props) {
       apply: onChange,
       onError: () => {
         Alert.alert(
-          'Could not save sensitivity',
-          'Your previous sensitivity setting is still active. Please try again.',
+          strings.settings.sensitivity.errorTitle,
+          strings.settings.sensitivity.errorDetail,
         );
       },
     });
   };
   return (
     <View style={s.wrap}>
-      <Text style={s.label}>Alert sensitivity</Text>
+      <Text style={s.label}>{strings.settings.sensitivity.title}</Text>
       <Text style={s.desc}>{SENSITIVITY_PRESETS[value].description}</Text>
       <View
         accessibilityRole="radiogroup"
-        accessibilityLabel="Alert sensitivity"
-        accessibilityHint="Choose when fatigue warnings begin"
+        accessibilityLabel={strings.settings.sensitivity.title}
+        accessibilityHint={strings.settings.sensitivity.hint}
         style={s.row}
       >
         {LEVELS.map(l => (
@@ -49,7 +50,7 @@ export function SensitivitySlider({ value, onChange }: Props) {
             style={[s.btn, value===l && s.active]}
             onPress={() => press(l)}
             accessibilityRole="radio"
-            accessibilityLabel={`${SENSITIVITY_PRESETS[l].label} sensitivity`}
+            accessibilityLabel={formatString(strings.settings.sensitivity.optionAccessibility, { level: SENSITIVITY_PRESETS[l].label })}
             accessibilityHint={SENSITIVITY_PRESETS[l].description}
             accessibilityState={{ selected: value===l }}
           >
@@ -59,7 +60,7 @@ export function SensitivitySlider({ value, onChange }: Props) {
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={s.thresh}>Changes when warnings begin. It does not make driving while tired safe.</Text>
+      <Text style={s.thresh}>{strings.settings.sensitivity.limits}</Text>
     </View>
   );
 }

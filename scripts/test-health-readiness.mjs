@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { strings } from '../native-app/lib/strings.ts';
 import {
   createHealthReadinessSnapshot,
   isHealthReadinessSnapshot,
@@ -87,8 +88,8 @@ test('HealthKit source is read-only, foreground-only, local-only, and disclosed'
   assert.doesNotMatch(healthSource, /toShare/);
   assert.match(healthSource, /SecureStore\.setItemAsync/);
   assert.match(healthSource, /SecureStore\.deleteItemAsync/);
-  assert.match(preDrive, /Informational only/);
-  assert.match(preDrive, /do not calculate medical or driving fitness/);
-  assert.match(preDrive, /change fatigue scoring, or affect alerts/);
+  assert.match(preDrive, /\{strings\.preDrive\.health\.limits\}/);
+  assert.equal(strings.preDrive.health.limits,
+    'Informational only. These values do not calculate medical or driving fitness, change fatigue scoring, or affect alerts.');
   assert.doesNotMatch(cloudSync, /sleepMinutes24h|latestHrvMs|apple-health/i);
 });

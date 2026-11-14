@@ -12,6 +12,7 @@ import * as capturePolicy from '../../lib/captureLoadPolicy.ts';
 import { canRestartStalledCamera, shouldRestartCamera } from '../../lib/cameraResilience.ts';
 import { MULTITASKING_CAMERA_MESSAGE, unknownCameraInterruption } from '../../lib/cameraInterruptions.ts';
 import { createMonitorPerformanceTracker } from '../../lib/monitorPerformance.ts';
+import { strings } from '../../lib/strings.ts';
 
 const require = createRequire(import.meta.url);
 const cameraRoot = path.dirname(require.resolve('react-native-vision-camera/package.json'));
@@ -114,6 +115,7 @@ export function createCaptureWatchdogFixture({ readInterruption = async () => un
   };
   class Clock extends Date { static now() { return now; } }
   const context = vm.createContext({
+    strings,
     ...state, exports: {}, Date: Clock, isRunning: true, canRestartStalledCamera, shouldRestartCamera,
     device: { id: 'front' }, getCameraInterruptionState: readInterruption, MULTITASKING_CAMERA_MESSAGE,
     setSetupPreviewActive() {}, setCameraSetup() {}, initialCameraSetupAssessment: () => ({}),

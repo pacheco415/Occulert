@@ -3,6 +3,8 @@ import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import ts from 'typescript';
+import { strings } from '../native-app/lib/strings.ts';
 import {
   assessCameraSetup,
   initialCameraSetupAssessment,
@@ -26,6 +28,24 @@ import {
 } from '../native-app/lib/accessibilityPreferencesModel.ts';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+// Require the actual source binding and the released value, not text that only
+// happens to exist elsewhere in a catalog or a comment.
+function assertCatalogCopy(source, key, expected, message = key) {
+  const file = ts.createSourceFile('native-copy.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const imported = file.statements.some(node => ts.isImportDeclaration(node)
+    && /(?:^|\/)strings(?:\.ts)?$/.test(node.moduleSpecifier.text)
+    && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+    && node.importClause.namedBindings.elements.some(item => !item.isTypeOnly && item.name.text === 'strings' && !item.propertyName));
+  let bound = false;
+  function visit(node) {
+    if (ts.isPropertyAccessExpression(node) && node.getText(file) === `strings.${key}`) bound = true;
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  assert.ok(imported && bound, `${message}: use the actual catalog binding`);
+  assert.equal(key.split('.').reduce((value, part) => value?.[part], strings), expected, `${message}: preserve released English`);
+}
 
 const READY_SAMPLE = {
   faceFound: true,
@@ -184,7 +204,7 @@ test('checkpoint reads, writes, and scoped cleanup preserve unreadable data', ()
   assert.match(storage, /if \(error instanceof ActiveSessionCheckpointUnreadableError\)/);
   assert.match(home, /setRecoveryUnreadable\(error instanceof ActiveSessionCheckpointUnreadableError\)/);
   assert.match(settings, /checkpointResult\.reason instanceof ActiveSessionCheckpointUnreadableError/);
-  assert.match(settings, /Discard unreadable recovery data\?/);
+  assertCatalogCopy(settings, "settings.localData.recovery.discardTitle", "Discard unreadable recovery data?");
   assert.match(settings, /discardUnreadableActiveSessionCheckpoint\(\)/);
   assert.match(settings, /clearActiveSessionCheckpoint\(recoverySessionId\)/);
 });
@@ -247,8 +267,8 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(monitor, /await saveActiveSessionCheckpoint\(\{/,
     'monitoring must reserve recovery storage before camera startup');
   assert.match(monitor, /ActiveSessionCheckpointConflictError/);
-  assert.match(monitorOwners.view, /RECOVERY REQUIRED/);
-  assert.match(monitorOwners.view, /accessibilityLabel="Return Home to recover the previous drive"/);
+  assertCatalogCopy(monitorOwners.view, 'monitor.status.recoveryRequired', 'RECOVERY REQUIRED');
+  assertCatalogCopy(monitorOwners.view, 'monitor.controls.recoveryHomeAccessibilityLabel', 'Return Home to recover the previous drive');
   assert.match(monitor, /router\.replace\('\/'\)/,
     'blocked direct navigation must provide a clear route back through recovery');
   assert.match(monitor, /reservedSessionId && !monitoringStarted/,
@@ -271,41 +291,47 @@ test('native screens wire setup preview and recovery without changing detection 
   assert.match(home, /copy\.start\.errorHint/);
   assert.match(homeCopy, /errorHint: 'Retry previous drive recovery before starting another session'/);
   assert.doesNotMatch(home, /recoverInterruptedDrive\(\)\.catch\(\(\) => \{\}\)/, 'recovery failures must not be silently swallowed');
-  assert.match(historyOwners.card, /Recovered local checkpoint/);
+  assertCatalogCopy(historyOwners.card, "history.card.recoveredTitle", "Recovered local checkpoint");
   assert.match(historyOwners.viewModel, /sessions\.filter\(item => !item\.recoveredFromInterruption\)/);
-  assert.match(historyOwners.pilot, /Recovered partial sessions are excluded/);
+  assertCatalogCopy(historyOwners.pilot, "history.pilot.checkpointNote", "Only complete reviewed sessions recorded on Medium count here. Recovered partial sessions are excluded. Ratings stay on this iPhone.");
   assert.match(historyPreferences, /type HistoryFilter = 'all' \| 'needs-review' \| 'reviewed' \| 'recovered'/);
   assert.match(historyOwners.filters, /accessibilityState=\{\{ selected \}\}/, 'history filters must expose their selected state');
   assert.match(history, /group\.sessions\.map\(\(\{ item, index: i \}\)/, 'grouped filtered edits must retain their original stored index');
-  assert.match(history, /accessibilityLabel=\{`\$\{group\.label\}, \$\{group\.sessions\.length\}/, 'date groups must announce their label and session count');
+  assert.match(history, /accessibilityLabel=\{formatString\(strings\.history\.screen\.groupAccessibilityLabel, \{ group: group\.label, count: group\.sessions\.length, sessions: group\.sessions\.length === 1 \? strings\.history\.common\.session : strings\.history\.common\.sessions \}\)\}/, 'date groups must announce their label and session count');
+  assertCatalogCopy(history, 'history.screen.groupAccessibilityLabel', '{group}, {count} {sessions}');
+  assertCatalogCopy(history, 'history.common.session', 'session');
+  assertCatalogCopy(history, 'history.common.sessions', 'sessions');
   assert.match(historyOwners.card, /cardNeedsReview/);
   assert.match(historyOwners.card, /cardRecovered/);
   assert.match(historyOwners.viewModel, /const visibleReviewQueue = historyReviewQueue\(filteredSessions\)/);
   assert.match(historyOwners.viewModel, /const nextReviewSession = visibleReviewQueue\[0\]/);
   assert.match(history, /chooseHistoryFilter\('needs-review'\)/);
   assert.match(history, /setExpandedSessions\(current => \(\{ \.\.\.current, \[key\]: true \}\)\)/);
-  assert.match(historyOwners.filters, /Continue reviewing the next shown unfinished session/);
+  assertCatalogCopy(historyOwners.filters, "history.filters.continueAccessibilityLabel", "Continue reviewing the next shown unfinished session from {date}");
   assert.match(historyOwners.viewModel, /item\.sensitivity === 'medium' && hasCompleteHistoryReview\(item\)/, 'pilot progress must count only complete Medium reviews');
   assert.match(historyOwners.card, /getSessionReviewProgress\(historyReviewInput\(item\)\)/, 'each session must calculate guided review progress');
-  assert.match(historyOwners.card, /Finish this review/);
+  assertCatalogCopy(historyOwners.card, "history.card.finishReview", "Finish this review");
   assert.match(historyOwners.card, /reviewProgress\.missingSummary/);
   assert.match(historyOwners.card, /accessibilityLiveRegion="polite"/, 'review progress changes must be announced');
   assert.match(historyOwners.reviewModel, /const unfinished = incompleteSessionReviewQueue\(/);
   assert.match(history, /const queue = currentReviewQueue\(index\)/);
-  assert.match(history, /text: 'Review Next'/);
+  assert.match(history, /text: strings\.history\.alerts\.reviewNext/);
+  assertCatalogCopy(history, 'history.alerts.reviewNext', 'Review Next');
   assert.match(history, /chooseHistoryFilter\('needs-review'\)/);
   assert.match(history, /pendingReviewScrollRef\.current = key/);
   assert.match(historyOwners.card, /accessibilityRole="alert" style=\{s\.reviewQueueMessage\}/);
   assert.match(history, /commitSucceeded = await commitSessionHistoryEdit/);
   assert.match(history, /operationCompleted && commitSucceeded && completesReview/);
   assert.match(historyOwners.viewModel, /summarizePilotCoverage\(reviewedMedium\)/);
-  assert.match(historyOwners.pilot, /Still needed: \$\{pilotCoverage\.missingLabels\.join\(', '\)\}/);
-  assert.match(historyOwners.pilot, /one session in a condition is not enough to establish accuracy/i);
+  assert.match(historyOwners.pilot, /formatString\(strings\.history\.progress\.stillNeeded, \{ items: pilotCoverage\.missingLabels\.join\(', '\) \}\)/);
+  assertCatalogCopy(historyOwners.pilot, 'history.progress.stillNeeded', 'Still needed: {items}');
+  assertCatalogCopy(historyOwners.pilot, "history.pilot.coverageCaution", "Coverage prevents obvious gaps; one session in a condition is not enough to establish accuracy.");
   assert.match(historyOwners.share, /buildPilotProgressExport\(sessions\.map\(historyReviewInput\), CHECKPOINT_TARGET\)/);
-  assert.match(historyOwners.pilot, /Share pilot progress/);
-  assert.match(historyOwners.pilot, /aggregate counts only · no session or driver identifiers/i);
-  assert.match(historyOwners.filters, /Showing \{filteredSessions\.length\} of \{periodSessions\.length\} sessions in this period/);
-  assert.match(history, /No sessions match these filters/);
+  assertCatalogCopy(historyOwners.pilot, "history.pilot.shareTitle", "Share pilot progress");
+  assertCatalogCopy(historyOwners.pilot, "history.pilot.shareDetail", "All history · aggregate counts only · no session or driver identifiers");
+  assert.match(historyOwners.filters, /formatString\(strings\.history\.filters\.results, \{ scope: selectedScope, shown: filteredSessions\.length, period: periodSessions\.length, recovered: shownRecoveredCount, saved: sessionCount \}\)/);
+  assertCatalogCopy(historyOwners.filters, 'history.filters.results', '{scope} · Showing {shown} of {period} sessions in this period · {recovered} shown recovered partial sessions · {saved} saved overall');
+  assertCatalogCopy(history, "history.screen.emptyFiltersTitle", "No sessions match these filters");
   assert.match(history, /AsyncStorage\.setItem\(HISTORY_FILTER_KEY, filter\)/);
   assert.match(historyOwners.viewModel, /sortIndexedSessions\(sessions, historyView\.sort\)/);
   assert.match(history, /filterRevisionRef\.current === filterRevision/, 'a late preference load must not replace a newer filter choice');
@@ -316,15 +342,16 @@ test('native screens wire setup preview and recovery without changing detection 
 test('pre-drive and Settings explain required versus optional setup', () => {
   const preDrive = read('native-app/app/pre-drive.tsx');
   const settings = read('native-app/app/settings.tsx');
-  assert.match(preDrive, /FINAL SAFETY CONFIRMATION/);
+  assertCatalogCopy(preDrive, "preDrive.confirmations.eyebrow", "FINAL SAFETY CONFIRMATION");
   assert.match(preDrive, /checked\.filter\(Boolean\)\.length/);
-  assert.match(preDrive, /it never decides whether you are safe to drive/);
+  assertCatalogCopy(preDrive, "preDrive.health.description", "Optional context from recent sleep and heart rate variability. Only a small summary is kept in this iPhone's protected storage; it never decides whether you are safe to drive.");
   assert.match(preDrive, /accessibilityLabel=\{healthSnapshot \?/);
-  assert.match(preDrive, /accessibilityLabel="Continue to monitoring"/);
+  assert.match(preDrive, /accessibilityLabel=\{strings\.preDrive\.continueAction\.accessibility\}/);
+  assertCatalogCopy(preDrive, 'preDrive.continueAction.accessibility', 'Continue to monitoring');
   assert.match(preDrive, /accessibilityHint=\{ready \?/);
   assert.match(preDrive, /healthMetrics: \{ flexDirection: 'row', flexWrap: 'wrap'/);
-  assert.match(settings, /The iPhone camera and at least one phone alert are the primary setup/);
-  assert.match(settings, /Watch, headphones, Health, and cloud sync are optional additions/);
+  assertCatalogCopy(settings, "settings.screen.priorityDetail", "The iPhone camera and at least one phone alert are the primary setup. Watch, headphones, Health, and cloud sync are optional additions.");
+  assertCatalogCopy(settings, "settings.screen.priorityDetail", "The iPhone camera and at least one phone alert are the primary setup. Watch, headphones, Health, and cloud sync are optional additions.");
 });
 
 test('Settings exposes scoped local-data controls without implying cloud deletion', () => {
@@ -332,14 +359,15 @@ test('Settings exposes scoped local-data controls without implying cloud deletio
   const historyStorage = read('native-app/lib/sessionHistory.ts');
   const recoveryStorage = read('native-app/lib/sessionRecovery.ts');
 
-  assert.match(settings, /PRIVACY &amp; LOCAL DATA/);
-  assert.match(settings, /Deleting local data here does not delete cloud records/);
-  assert.match(settings, /Delete all local session history/);
-  assert.match(settings, /Review or export local history/);
-  assert.match(settings, /share a privacy-limited text copy before deleting anything/);
-  assert.match(settings, /\{ text: 'Review First', onPress: \(\) => router\.push\('\/history'\) \}/);
-  assert.match(settings, /Clear interrupted-drive recovery data/);
-  assert.match(settings, /This cannot be undone/);
+  assertCatalogCopy(settings, "settings.localData.title", "PRIVACY & LOCAL DATA");
+  assertCatalogCopy(settings, "settings.localData.cloudDetail", "Cloud session summaries are separate and sync only when you enable cloud sync while signed in. Deleting local data here does not delete cloud records.");
+  assertCatalogCopy(settings, "settings.localData.delete.accessibility", "Delete all local session history");
+  assertCatalogCopy(settings, "settings.localData.review.title", "Review or export local history");
+  assertCatalogCopy(settings, "settings.localData.review.detail", "Open saved summaries and share a privacy-limited text copy before deleting anything.");
+  assert.match(settings, /\{ text: strings\.settings\.localData\.delete\.reviewFirst, onPress: \(\) => router\.push\('\/history'\) \}/);
+  assertCatalogCopy(settings, 'settings.localData.delete.reviewFirst', 'Review First');
+  assertCatalogCopy(settings, "settings.localData.recovery.accessibility", "Clear interrupted-drive recovery data");
+  assertCatalogCopy(settings, "settings.localData.delete.confirmDetail", "This permanently removes every local session summary, review, and diagnostic from this iPhone. You can review or share a privacy-limited text copy first. Cloud records are not changed. This cannot be undone.");
   assert.match(settings, /clearSessionHistory\(\)/);
   assert.match(settings, /clearActiveSessionCheckpoint\(recoverySessionId\)/);
   assert.doesNotMatch(settings, /AsyncStorage\.clear/);
@@ -354,8 +382,9 @@ test('Settings fails closed when local-data status is unavailable and offers ret
   assert.match(settings, /setRecoveryDataPresent\(null\)/);
   assert.match(settings, /localSessionCount === null/);
   assert.match(settings, /recoverySessionId === null && !recoveryDataUnreadable/);
-  assert.match(settings, /Destructive controls stay unavailable until Occulert confirms/);
-  assert.match(settings, /accessibilityLabel="Retry local data status check"/);
+  assertCatalogCopy(settings, "settings.localData.unconfirmedDetail", "Destructive controls stay unavailable until Occulert confirms what is stored on this iPhone.");
+  assert.match(settings, /accessibilityLabel=\{strings\.settings\.localData\.retryAccessibility\}/);
+  assertCatalogCopy(settings, 'settings.localData.retryAccessibility', 'Retry local data status check');
   assert.match(settings, /disabled=\{localHistoryDeleteDisabled\}/);
   assert.match(settings, /disabled=\{recoveryDeleteDisabled\}/);
 });
@@ -410,20 +439,28 @@ test('reusable setup controls expose labels, states, hints, and large-text layou
   assert.match(sensitivity, /row:\s+\{ flexDirection:'row', flexWrap:'wrap'/);
   assert.match(sensitivity, /minHeight:48/);
 
-  assert.match(cloud, /accessibilityLabel="Checking cloud sync status"/);
-  assert.match(cloud, /accessibilityLabel=\{busy \? 'Signing in to cloud account'/);
+  assert.match(cloud, /accessibilityLabel=\{strings\.settings\.cloud\.checkingAccessibility\}/);
+  assertCatalogCopy(cloud, 'settings.cloud.checkingAccessibility', 'Checking cloud sync status');
+  assert.match(cloud, /accessibilityLabel=\{busy \? strings\.settings\.cloud\.signIn\.busyAccessibility/);
+  assertCatalogCopy(cloud, 'settings.cloud.signIn.busyAccessibility', 'Signing in to cloud account');
   assert.match(cloud, /accessibilityState=\{\{ disabled: busy \|\| !state\.available, busy \}\}/);
-  assert.match(cloud, /accessibilityHint="Signs out on this device without deleting local history"/);
-  assert.match(cloud, /accessibilityHint="Controls protected cloud syncing; local history remains available when off"/);
+  assert.match(cloud, /accessibilityHint=\{strings\.settings\.cloud\.signOut\.hint\}/);
+  assertCatalogCopy(cloud, 'settings.cloud.signOut.hint', 'Signs out on this device without deleting local history');
+  assert.match(cloud, /accessibilityHint=\{strings\.settings\.cloud\.sharing\.hint\}/);
+  assertCatalogCopy(cloud, 'settings.cloud.sharing.hint', 'Controls protected cloud syncing; local history remains available when off');
   assert.doesNotMatch(cloud, /numberOfLines=\{1\}/);
   assert.match(cloud, /titleRow: \{ minHeight: 48[^\n]+flexWrap: 'wrap'/);
   assert.match(cloud, /linkBtn: \{ minHeight: 44/);
 
-  assert.match(readiness, /accessibilityLabel=\{stabilityBusy \? 'Testing both camera streams'/);
-  assert.match(readiness, /accessibilityLabel=\{busy \? 'Checking connected devices'/);
-  assert.match(readiness, /accessibilityLabel="Check phone and Watch alerts while parked"/);
+  assert.match(readiness, /accessibilityLabel=\{stabilityBusy \? strings\.preDrive\.readiness\.stability\.busyAccessibility/);
+  assertCatalogCopy(readiness, 'preDrive.readiness.stability.busyAccessibility', 'Testing both camera streams');
+  assert.match(readiness, /accessibilityLabel=\{busy \? strings\.preDrive\.readiness\.refreshBusyAccessibility/);
+  assertCatalogCopy(readiness, 'preDrive.readiness.refreshBusyAccessibility', 'Checking connected devices');
+  assert.match(readiness, /accessibilityLabel=\{strings\.preDrive\.readiness\.alertCheckAccessibility\}/);
+  assertCatalogCopy(readiness, 'preDrive.readiness.alertCheckAccessibility', 'Check phone and Watch alerts while parked');
   assert.match(cameraSetup, /accessibilityRole="summary"/);
-  assert.match(cameraSetup, /accessibilityLabel=\{active \? 'Pause parked camera check'/);
+  assert.match(cameraSetup, /accessibilityLabel=\{active \? strings\.monitor\.cameraCheck\.pauseAccessibilityLabel/);
+  assertCatalogCopy(cameraSetup, 'monitor.cameraCheck.pauseAccessibilityLabel', 'Pause parked camera check');
   assert.match(cameraSetup, /copy: \{ minWidth: 0, flex: 1 \}/);
   assert.match(cameraSetup, /buttonText:[^\n]+textAlign: 'center'/);
 });
@@ -431,9 +468,11 @@ test('reusable setup controls expose labels, states, hints, and large-text layou
 test('safe-stop choices remain readable and accessible at larger text sizes', () => {
   const monitorOwners = readNativeMonitorSourceOwners();
   const monitor = monitorOwners.screen;
-  assert.match(monitorOwners.view, /accessibilityLabel="Safe stop options"/);
+  assert.match(monitorOwners.view, /accessibilityLabel=\{strings\.monitor\.safeStop\.accessibilityLabel\}/);
+  assertCatalogCopy(monitorOwners.view, 'monitor.safeStop.accessibilityLabel', 'Safe stop options');
   assert.match(monitorOwners.view, /accessibilityViewIsModal/);
-  assert.match(monitorOwners.view, /accessibilityHint=\{`\$\{option\.detail\}/);
+  assert.match(monitorOwners.view, /accessibilityHint=\{formatString\(strings\.monitor\.safeStop\.optionHint, \{ detail: option\.detail \}\)\}/);
+  assertCatalogCopy(monitorOwners.view, 'monitor.safeStop.optionHint', '{detail}. Ends monitoring, saves this drive, then opens Maps.');
   assert.match(monitorOwners.styles, /safeStopOption: \{\s*minHeight: 64/);
   assert.match(monitorOwners.styles, /safeStopCancel: \{ minHeight: 44/);
 });
@@ -441,7 +480,7 @@ test('safe-stop choices remain readable and accessible at larger text sizes', ()
 test('connected-device readiness refresh remains single-flight', () => {
   const settings = read('native-app/app/settings.tsx');
   assert.match(settings, /deviceRefreshRunnerRef\.current\.run/);
-  assert.match(settings, /REFRESH CONNECTIONS/);
+  assertCatalogCopy(settings, "settings.connections.refreshAction", "REFRESH CONNECTIONS");
   assert.match(settings, /Promise\.all\(\[\s*getWatchStatus\(\),\s*getWatchAlertsEnabled\(true\),\s*getHeadphoneMotionStatus\(\)/);
 });
 
@@ -480,7 +519,7 @@ test('live parked test is bounded, counts both streams, and protects the driver 
   assert.match(stabilityFunction, /frontCounter\.count == 0/);
   assert.match(stabilityFunction, /roadStreamStayedEnabled/);
   assert.match(nativeProbe, /OcculertFrameCounter/);
-  assert.match(readinessCard, /Run parked camera test/);
-  assert.match(readinessCard, /No images or video are saved/);
-  assert.match(readinessCard, /Testing for 5 seconds/);
+  assertCatalogCopy(readinessCard, "preDrive.readiness.stability.action", "Run parked camera test");
+  assertCatalogCopy(readinessCard, "preDrive.readiness.stability.detail", "Runs both cameras for five seconds, counts frames, then stops. No images or video are saved.");
+  assertCatalogCopy(readinessCard, "preDrive.readiness.stability.busyAction", "Testing for 5 seconds…");
 });

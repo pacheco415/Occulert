@@ -1,3 +1,4 @@
+import { strings, formatString } from './strings.ts';
 import type { FeedbackSession } from './feedback';
 
 export type SessionReviewStepId = 'assessment' | 'conditions' | 'device-impact';
@@ -26,32 +27,32 @@ export function getSessionReviewProgress(session: FeedbackSession): SessionRevie
   const steps: SessionReviewStep[] = [
     {
       id: 'assessment',
-      label: 'Alert rating',
+      label: strings.history.progress.alertRating,
       complete: Boolean(session.alertAssessment),
-      missing: session.alertAssessment ? [] : ['alert rating'],
+      missing: session.alertAssessment ? [] : [strings.history.progress.missingAlertRating],
     },
     {
       id: 'conditions',
-      label: 'Test conditions',
+      label: strings.history.common.testConditions,
       complete: Boolean(
         session.testConditions?.lighting
         && session.testConditions?.eyewear
         && session.testConditions?.phonePosition,
       ),
       missing: [
-        !session.testConditions?.lighting && 'lighting',
-        !session.testConditions?.eyewear && 'eyewear',
-        !session.testConditions?.phonePosition && 'phone position',
-      ].filter((value): value is string => Boolean(value)),
+        !session.testConditions?.lighting && strings.history.progress.missingLighting,
+        !session.testConditions?.eyewear && strings.history.progress.missingEyewear,
+        !session.testConditions?.phonePosition && strings.history.progress.missingPhonePosition,
+      ].filter((value): value is Exclude<typeof value, false> => Boolean(value)),
     },
     {
       id: 'device-impact',
-      label: 'Device impact',
+      label: strings.history.common.deviceImpact,
       complete: Boolean(session.deviceImpact?.batteryImpact && session.deviceImpact?.phoneHeat),
       missing: [
-        !session.deviceImpact?.batteryImpact && 'battery use',
-        !session.deviceImpact?.phoneHeat && 'phone heat',
-      ].filter((value): value is string => Boolean(value)),
+        !session.deviceImpact?.batteryImpact && strings.history.progress.missingBatteryUse,
+        !session.deviceImpact?.phoneHeat && strings.history.progress.missingPhoneHeat,
+      ].filter((value): value is Exclude<typeof value, false> => Boolean(value)),
     },
   ];
   const completedSteps = steps.filter(step => step.complete).length;
@@ -62,7 +63,7 @@ export function getSessionReviewProgress(session: FeedbackSession): SessionRevie
     completedSteps,
     totalSteps: steps.length,
     complete: completedSteps === steps.length,
-    missingSummary: missing.length === 0 ? 'Nothing missing' : `Still needed: ${missing.join(', ')}`,
+    missingSummary: missing.length === 0 ? strings.history.progress.nothingMissing : formatString(strings.history.progress.stillNeeded, { items: missing.join(', ') }),
   };
 }
 

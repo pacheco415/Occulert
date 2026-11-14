@@ -1,3 +1,4 @@
+import { strings } from '../lib/strings.ts';
 import React, { useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -388,10 +389,10 @@ export function AlertSystem({
 }
 
 const CONFIGS: Record<Exclude<AlertLevel,'none'>, { bg:string;border:string;color:string;subColor:string;icon:string;title:string;sub:string }> = {
-  tracking: { bg:'rgba(55,31,8,0.96)', border:'#f59e0b', color:'#fbbf24', subColor:'#fef3c7', icon:'📷', title:'TRACKING LOST', sub:'Pull over safely before adjusting the phone or camera.' },
-  watch:    { bg:'rgba(45,35,4,0.92)', border:'#ca8a04', color:'#fde047', subColor:'#fef3c7', icon:'👁',  title:'Eyes drooping',       sub:'Drowsiness may be starting. Plan a safe stop.' },
-  alert:    { bg:'rgba(55,8,12,0.94)', border:'#ef4444', color:'#fda4af', subColor:'#ffe4e6', icon:'⚠️', title:'DROWSINESS DETECTED', sub:'Pull over at the next safe place.' },
-  critical: { bg:'rgba(55,8,12,0.96)', border:'#ff3344', color:'#ff8a91', subColor:'#fff1f2', icon:'🚨', title:'PULL OVER NOW',       sub:'High fatigue detected. Pull over safely and rest now.' },
+  tracking: { bg:'rgba(55,31,8,0.96)', border:'#f59e0b', color:'#fbbf24', subColor:'#fef3c7', icon:'📷', title:strings.monitor.alerts.tracking.title, sub:strings.monitor.alerts.tracking.detail },
+  watch:    { bg:'rgba(45,35,4,0.92)', border:'#ca8a04', color:'#fde047', subColor:'#fef3c7', icon:'👁',  title:strings.monitor.alerts.watch.title,       sub:strings.monitor.alerts.watch.detail },
+  alert:    { bg:'rgba(55,8,12,0.94)', border:'#ef4444', color:'#fda4af', subColor:'#ffe4e6', icon:'⚠️', title:strings.monitor.alerts.alert.title, sub:strings.monitor.alerts.alert.detail },
+  critical: { bg:'rgba(55,8,12,0.96)', border:'#ff3344', color:'#ff8a91', subColor:'#fff1f2', icon:'🚨', title:strings.monitor.alerts.critical.title,       sub:strings.monitor.alerts.critical.detail },
 };
 
 const s = StyleSheet.create({
