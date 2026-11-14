@@ -8,6 +8,7 @@ import { join, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { runSessionStartQuotaConcurrency } from './lib/session-start-quota-concurrency.mjs';
+import { runAccountWriteQuotaConcurrency } from './lib/account-write-quota-concurrency.mjs';
 const runtime=process.env.OCCULERT_PG_TEST_RUNTIME;
 if(!runtime||!isAbsolute(runtime))throw new Error('Set OCCULERT_PG_TEST_RUNTIME to an absolute local directory containing pinned pg (and embedded PostgreSQL unless OCCULERT_PG_BIN is set). No remote database is supported.');
 const require=createRequire(join(runtime,'package.json'));
@@ -48,6 +49,7 @@ try{
  await admin.query(read('../supabase/migrations/20261022120000_revoke_direct_table_access.sql'));
  await admin.query(read('../supabase/migrations/20261026164040_atomic_event_idempotency.sql'));
  await admin.query(read('../supabase/migrations/20261031192453_session_start_quota.sql'));
+ await admin.query(read('../supabase/migrations/20261114183018_account_write_quota.sql'));
  await admin.query('grant usage on schema public to service_role');
  const worker=await Promise.all(Array.from({length:12},()=>connect(true)));
  const reset=async()=>admin.query(`truncate auth.users cascade;insert into auth.users values('${owner}'),('${other}');insert into drivers(id,user_id,name) values('${driver}','${owner}','Fixture');insert into sessions(id,driver_id,started_at) values('${session}','${driver}',clock_timestamp()-interval '1 hour'),('${second}','${driver}',clock_timestamp()-interval '1 hour');`);
@@ -107,6 +109,8 @@ try{
  await runSessionStartQuotaConcurrency({admin,worker,connect,waitFor,pass});
  serverVersion=(await admin.query('show server_version')).rows[0].server_version;
  assert.equal(scenarios.length,12);
+ await runAccountWriteQuotaConcurrency({admin,worker,connect,waitFor,pass});
+ assert.equal(scenarios.length,19);
  console.log('Local PostgreSQL version:',serverVersion);
 }catch(error){
  try{console.error(readFileSync(join(root,'postgres.log'),'utf8'));}catch{}
@@ -130,10 +134,12 @@ if(receiptDirectory){
  mkdirSync(receiptDirectory,{recursive:true});
  const migration=read('../supabase/migrations/20261026164040_atomic_event_idempotency.sql');
  const sessionStartMigration=read('../supabase/migrations/20261031192453_session_start_quota.sql');
+ const accountWriteMigration=read('../supabase/migrations/20261114183018_account_write_quota.sql');
  writeFileSync(join(receiptDirectory,'event-concurrency.json'),JSON.stringify({
   status:'passed',commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
   node:process.version,postgres:serverVersion,migrationSha256:createHash('sha256').update(migration).digest('hex'),
   sessionStartQuotaMigrationSha256:createHash('sha256').update(sessionStartMigration).digest('hex'),
+  accountWriteQuotaMigrationSha256:createHash('sha256').update(accountWriteMigration).digest('hex'),
   isolation:'private-unix-socket-tcp-disabled-synthetic-fixtures',scenarios,completedAt:new Date().toISOString()
  },null,2)+'\n');
 }

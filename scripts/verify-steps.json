@@ -101,6 +101,7 @@
     "test:event-outbox",
     "test:event-idempotency",
     "test:legacy-event-quota",
+    "test:account-write-quota",
     "test:event-outbox-transport",
     "test:offline-cache-diagnostics",
     "test:stale-branches",

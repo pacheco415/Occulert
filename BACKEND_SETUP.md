@@ -89,6 +89,29 @@ for response, concurrency and rollout details.
 that flag does not enable the web/native retry outbox. Once the quota routes
 are deployed, keeping the flag off does not disable their unkeyed event limits.
 
+### Profile and fleet write quotas
+
+`POST /api/profile` reserves at most **60 write attempts per verified account
+per one-hour window**. New-fleet creation through `POST /api/fleets` has a
+separate **10-attempt one-hour window**. Existing-owned fleet responses are
+read-only and remain free. These durable reservations count admitted attempts,
+including a later failed mutation or a concurrent-creation loser; they are not
+refunded or automatically retried. Rejections return 429
+`account_write_rate_limited` with an integer `Retry-After` from 1 to 3,600 seconds.
+
+**Deployment prerequisite:** apply
+`20261114183018_account_write_quota.sql` once, with the project owner's approval,
+and verify the `reserve_account_write(uuid,text)` definition and service-only
+EXECUTE ACL, `account_write_rate_limits` RLS/CRUD grants, fixed account/operation
+key, and auth-user deletion cascade **before deploying either dependent POST
+route**. A missing or invalid quota response stops the write; there is no
+unlimited fallback. The repository disables automatic Vercel deployments for
+`codex/profile-write-quota` while this prerequisite is pending. Main still
+deploys automatically, so keep the source PR unmerged until the migration is
+applied and independently verified. Local tests do not establish live readiness.
+See [the account write quota contract](docs/ACCOUNT_WRITE_QUOTAS.md) for exact
+counting, race, validation and verification behavior.
+
 ## 2. Collect your keys
 
 From Project Settings -> API, copy:

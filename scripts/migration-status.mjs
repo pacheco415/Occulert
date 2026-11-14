@@ -26,6 +26,7 @@ const dependencies = {
   '20260929010000': { routes: ['billing-webhook'], purpose: 'Durable acknowledgment of ignored Stripe test webhook events.' },
   '20261022120000': { routes: [], purpose: 'Security hardening: revokes browser-role access to the six original tables and grants the service role explicitly. No API route depends on it.' },
   '20261023010000': { routes: ['pilot-leads'], purpose: 'Bounded cleanup of idle pilot-form rate-limit rows; same function signature and grants.' },
+  '20261114183018': { routes: ['profile', 'fleets'], purpose: 'Service-only durable per-account profile/fleet write-attempt quotas; apply and verify before deploying either dependent POST route.' },
 };
 
 export function statusReport(ledger, { inventory = migrationInventory(), source = 'offline_ledger_export' } = {}) {

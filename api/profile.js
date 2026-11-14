@@ -8,6 +8,7 @@ const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const { validJsonBody, storableText } = require("./_lib/validation");
+const { allowAccountWrite } = require("./_lib/account-write-quota");
 
 const { json } = require("./_lib/responses");
 
@@ -41,6 +42,7 @@ module.exports = async function handler(request, response) {
     // Only a supplied string can update this field; an empty string is an
     // intentional clear from the account form, while non-text input is missing.
     if (Object.hasOwn(body, "vehicle") && typeof body.vehicle === "string") updates.vehicle_id = vehicleId;
+    if (!await allowAccountWrite(pgFetch, response, user.id, "profile")) return;
     const existing = await pgFetch("drivers", {
       params: { select: "id,user_id,name,email,vehicle_id,fleet_id,active", user_id: "eq." + user.id, limit: "1" },
     });
