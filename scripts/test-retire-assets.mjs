@@ -25,6 +25,30 @@ function fixture(t, date = '2026-09-01T00:00:00Z') {
 }
 const day = n => Date.parse('2026-09-01T00:00:00Z') + n*86400000;
 const silent = () => {};
+test('write mode needs every origin branch; dry run and check do not', t => {
+ const {root,git}=fixture(t);
+ // The fetch rule a --depth 1 or --single-branch clone keeps, even after --unshallow.
+ git(['remote','add','-t','main','origin','https://example.invalid/occulert.git']);
+ assert.equal(git(['config','--get-all','remote.origin.fetch']).trim(),'+refs/heads/main:refs/remotes/origin/main');
+ assert.deepEqual(retireAssets({root,now:day(14),log:silent}),['old.v1.js']);
+ assert.deepEqual(retireAssets({root,now:day(14),check:true,failWithinDays:1,log:silent}),['old.v1.js']);
+ const before=name=>readFileSync(join(root,name),'utf8');
+ const [integrity,headers,worker]=['asset-integrity.json','vercel.json','sw.js'].map(before);
+ assert.throws(()=>retireAssets({root,now:day(14),write:true,log:silent}),error=>{
+  assert.match(error.message,/Fetch every origin branch before choosing a new service-worker cache name/);
+  assert.match(error.message,/remote\.origin\.fetch = \+refs\/heads\/main:refs\/remotes\/origin\/main\)/);
+  assert.match(error.message,/git remote set-branches origin '\*'/);
+  return true;
+ });
+ assert.ok(existsSync(join(root,'old.v1.js')),'a refused cleanup must not delete files');
+ assert.deepEqual(['asset-integrity.json','vercel.json','sw.js'].map(before),[integrity,headers,worker]);
+ // An empty cleanup chooses no cache name, so it stays a no-op in any checkout.
+ assert.deepEqual(retireAssets({root,now:day(13),write:true,log:silent}),[]);
+ git(['remote','set-branches','origin','*']);
+ assert.deepEqual(retireAssets({root,now:day(14),write:true,log:silent}),['old.v1.js']);
+ assert.ok(!existsSync(join(root,'old.v1.js')));
+ assert.match(readFileSync(join(root,'sw.js'),'utf8'),/occulert-v4/);
+});
 test('minimum window, dry run, complete cleanup and second write no-op', t => {
  const {root}=fixture(t);
  assert.deepEqual(retireAssets({root,now:day(13),write:true,log:silent}),[]);

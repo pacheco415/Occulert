@@ -3,6 +3,10 @@ import {prepareDetectorPage} from './helpers/detector-runtime.mjs';
 import {createReleasedScoringOracle,initialScoringState,syntheticScoringTrace,SCORING_EPOCH} from '../benchmark/released-scoring-oracle.mjs';
 import {landmarks,scoringGeometryInitScript} from './helpers/scoring-replay-geometry.mjs';
 import {replayScoring} from '../benchmark/replay-scoring.mjs';
+import {readFileSync} from 'node:fs';
+import {driverAppVersion} from '../scripts/lib/app-version-stamp.mjs';
+
+const appVersion=driverAppVersion(JSON.parse(readFileSync(new URL('../asset-versions.json',import.meta.url))));
 
 test.beforeEach(async({page})=>{await prepareDetectorPage(page);await page.addInitScript({content:scoringGeometryInitScript});});
 const fields=['fatigue','confidence','maxFatigue','fatigueSampleSum','fatigueSampleCount','eyesClosedSince','microsleeps','lastMicro','turnedSince','totalDistractionMs','noFaceSince','lastFaceSeen','calibrating','calibrated','baselineEAR','baseClosedThreshold','baseWatchThreshold','eyeClosedThreshold','eyeWatchThreshold','lastAlert','lastNod','headNods'];
@@ -72,5 +76,5 @@ test('calibration-only flag is non-primary, identified and blocks actual cloud e
     const result=await page.evaluate(async()=>{cloudConsent.checked=true;cloudReady=true;running=true;sessionStart=Date.now();
         const id=await beginBackendSession();queueBackendEvent('drowsy');await pushFleet(true,{});await initCloud();
         return {id,minimum:calibrationMinimumSamples,primary:experimentFlags.primary,names:experimentFlags.names,cloudReady,version:fleetPayload().detectorVersion};});
-    expect(result).toEqual({id:null,minimum:12,primary:false,names:['calibrationMin'],cloudReady:false,version:'web-v81:parked:calibrationMin'});expect(calls).toEqual([]);
+    expect(result).toEqual({id:null,minimum:12,primary:false,names:['calibrationMin'],cloudReady:false,version:appVersion+':parked:calibrationMin'});expect(calls).toEqual([]);
 });

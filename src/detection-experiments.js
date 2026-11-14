@@ -730,7 +730,7 @@ if(typeof module==='object'&&module.exports)module.exports=api;else root.Occuler
 
 // The mounted helper shares these reviewed classic-script driver bindings.
 /* global running, starting, localSessionId, CALIBRATION_MS, LEFT, RIGHT,
-  EXPERIMENT_HELPER_INTEGRITY, video, canvas, ctx, cloudConsent, calHint,
+  EXPERIMENT_HELPER_INTEGRITY, WEB_APP_VERSION, video, canvas, ctx, cloudConsent, calHint,
   faceStateEl, perclosEl, microsleepsEl, distractionEl, calibrationEl, calibrationFill,
   applySensitivity, resetContinuousObservations, updateCalibration, updateEyeMetrics,
   calcEAR, smooth, headTurn, detectHeadNod, log, updateTrackingState, drawEyes,
@@ -760,7 +760,7 @@ function createMountedController(flags){
  ui:{face:has=>{faceStateEl.textContent=has?'OK':'NO'},perclos:value=>{perclosEl.textContent=value===null?'--':Math.round(value)+'%'},microsleeps:n=>{microsleepsEl.textContent=n},distraction:n=>{distractionEl.textContent=n+'s'},
  calibration:(label,hint)=>{calibrationEl.textContent=label;calibrationFill.style.width=label==='DONE'||label==='DEFAULT'?'100%':label;if(calHint)calHint.textContent=hint;const rb=document.getElementById('recalBtn');if(rb)rb.style.display=label==='DONE'||label==='DEFAULT'?'block':'none'},tasks:value=>{const el=document.getElementById('experimentStatus');if(el)el.textContent='Parked experiment · local only · Tasks '+value},observer:()=>refreshObserverPanel()},
  captureCanvas:input=>{const snapshot=capturedCanvas??=document.createElement('canvas');snapshot.width=input.videoWidth;snapshot.height=input.videoHeight;const context=snapshot.getContext('2d');if(!context||!snapshot.width||!snapshot.height)throw Error('No capture');context.drawImage(input,0,0);return snapshot},
- createTasks:options=>api.createTasks(options),detectorVersion:()=> 'web-v81:parked:'+flags.names.join('+'),provenance:()=>({runtimeVersion:'1.0.1-occulert.1',runtimePins:api.tasksPins,modelIntegrity:api.tasksPins.find(pin=>pin.url.endsWith('.task')).integrity,helperIntegrity:EXPERIMENT_HELPER_INTEGRITY,poseConvention:'column-major Rz Ry Rx metric-coordinate degrees; physical orientation unvalidated'})
+ createTasks:options=>api.createTasks(options),detectorVersion:()=> WEB_APP_VERSION+':parked:'+flags.names.join('+'),provenance:()=>({runtimeVersion:'1.0.1-occulert.1',runtimePins:api.tasksPins,modelIntegrity:api.tasksPins.find(pin=>pin.url.endsWith('.task')).integrity,helperIntegrity:EXPERIMENT_HELPER_INTEGRITY,poseConvention:'column-major Rz Ry Rx metric-coordinate degrees; physical orientation unvalidated'})
  },flags);
  function refreshObserverPanel(){
   if(!flags.observer)return;

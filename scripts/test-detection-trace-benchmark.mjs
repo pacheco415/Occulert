@@ -8,7 +8,40 @@ import {readFileSync,mkdtempSync,writeFileSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {execFileSync} from 'node:child_process';
+import {validateParkedAppVersionSources} from './lib/app-version-stamp.mjs';
 const models=createRequire(import.meta.url)('../'+JSON.parse(readFileSync('asset-versions.json','utf8'))['detection-experiments.js']);
+test('trace source provenance validates the derived stamp and both actual unshadowed consumers',()=>{
+ const versions=JSON.parse(readFileSync('asset-versions.json','utf8'));
+ const core=readFileSync(versions['driver-app.js'],'utf8'),helper=readFileSync(versions['detection-experiments.js'],'utf8');
+ assert.equal(validateParkedAppVersionSources(core,helper,versions),traceContract.detectorPrefix);
+ for(const [target,before,after] of [
+  ['core',"const WEB_APP_VERSION='"+traceContract.detectorPrefix.replace(':parked:','')+"';","const WEB_APP_VERSION='web-v999999';"],
+  ['core',"const WEB_APP_VERSION='"+traceContract.detectorPrefix.replace(':parked:','')+"';",''],
+  ['core',"detectorVersion:WEB_APP_VERSION+':parked:'","detectorVersion:'web-v81:parked:'"],
+  ['core','function fleetPayload(){',"function fleetPayload(){const WEB_APP_VERSION='web-v999999';"],
+  ['helper',"detectorVersion:()=> WEB_APP_VERSION+':parked:'","detectorVersion:()=> 'web-v81:parked:'"],
+  ['helper','function createMountedController(flags){',"function createMountedController(flags){const WEB_APP_VERSION='web-v999999';"],
+ ]){
+  const original=target==='core'?core:helper,changed=original.replace(before,after);
+  assert.notEqual(changed,original,'mutation must change the actual owned program');
+  assert.throws(()=>validateParkedAppVersionSources(target==='core'?changed:core,target==='helper'?changed:helper,versions),/stamp|consumer/);
+ }
+});
+test('trace source provenance rejects duplicate detector version keys in either owned consumer',()=>{
+ const versions=JSON.parse(readFileSync('asset-versions.json','utf8'));
+ const core=readFileSync(versions['driver-app.js'],'utf8'),helper=readFileSync(versions['detection-experiments.js'],'utf8');
+ for(const [target,expression] of [
+  ['core',"detectorVersion:WEB_APP_VERSION+':parked:'+experimentFlags.names.join('+')"],
+  ['helper',"detectorVersion:()=> WEB_APP_VERSION+':parked:'+flags.names.join('+')"],
+ ]){
+  for(const key of ['detectorVersion',"'detectorVersion'","['detectorVersion']"]){
+   const original=target==='core'?core:helper;
+   const changed=original.replace(expression,expression+','+key+":'web-v999999:parked:'");
+   assert.notEqual(changed,original,'mutation must override the actual owned consumer');
+   assert.throws(()=>validateParkedAppVersionSources(target==='core'?changed:core,target==='helper'?changed:helper,versions),/consumer is missing or ambiguous/);
+  }
+ }
+});
 function fixture(){const trace=models.createTraceStore();
  for(let i=0;i<6;i++)trace.add({frameId:i+1,atMs:i===5?2000:i*135,mediaTime:i/30,rawEar:.3,smoothedEar:.3,
   eyeBlinkLeft:0,eyeBlinkRight:0,jawOpen:null,pitchDeg:null,yawDeg:null,legacyInferenceMs:10,tasksInferenceMs:7,combinedFrameMs:20,
