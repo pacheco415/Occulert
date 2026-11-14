@@ -20,12 +20,16 @@ const summaryBody = (entitlements, { count = entitlements?.usage?.active_drivers
   fleet: { id: 'fixture-fleet', company_name: 'Fixture Freight' }, drivers: [], sessions: [], events: [],
   monthly_activity: count === null ? null : monthly(count), ...(omit ? {} : { entitlements }),
 });
+// The fixture reaches the page as data through an init script, and the stand-in
+// backend below is a fixed string, so no script is ever built from a fixture value.
+const MOCK_BACKEND = `(()=>{const responses=window.__planUsageResponses;let calls=0;
+  window.OcculertBackend={currentUser:()=>({id:'fixture-owner'}),getSession:async()=>({user:{id:'fixture-owner'}}),
+    getFleetSummary:async()=>{const next=responses[Math.min(calls++,responses.length-1)];
+      return next.ok===false?next:{ok:true,status:200,body:next}}};})();`;
 async function mockBackend(page, responses) {
+  await page.addInitScript(value => { window.__planUsageResponses = value; }, responses);
   await page.route(`**/${assetByStem('occulert-backend.js')}`, route => route.fulfill({
-    contentType: 'application/javascript', body: `(()=>{const responses=${JSON.stringify(responses)};let calls=0;
-      window.OcculertBackend={currentUser:()=>({id:'fixture-owner'}),getSession:async()=>({user:{id:'fixture-owner'}}),
-        getFleetSummary:async()=>{const next=responses[Math.min(calls++,responses.length-1)];
-          return next.ok===false?next:{ok:true,status:200,body:next}}};})();`,
+    contentType: 'application/javascript', body: MOCK_BACKEND,
   }));
 }
 async function openDashboard(page, responses) {
