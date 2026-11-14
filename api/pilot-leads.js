@@ -171,7 +171,8 @@ module.exports = async function handler(request, response) {
     return json(response, 413, { ok: false, error: "payload_too_large" });
   }
 
-  if (clean(body.website, 120)) {
+  const honeypot = body.website;
+  if (honeypot != null && honeypot !== "") {
     return json(response, 400, { ok: false, error: "invalid_lead" });
   }
 

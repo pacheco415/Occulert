@@ -1033,11 +1033,26 @@ for (const value of [...nonTextValues, [validLead.startedAt], undefined, ""]) {
   assert.equal(result.body.error, "invalid_lead");
   assert.equal(strictLeadWrite, undefined);
 }
-for (const value of nonTextValues) {
+for (const value of [...nonTextValues.filter(value => value !== null), "https://spam.example", "   ", "\t\n", "\0"]) {
   strictLeadWrite = undefined;
   const result = await invoke(strictLeads, request("POST", { ...validLead, website: value }));
-  assert.equal(result.status, 200, "a non-text optional honeypot field is missing");
-  assert.ok(strictLeadWrite);
+  assert.equal(result.status, 400, `a filled honeypot ${JSON.stringify(value)} must be rejected without coercion or cleaning`);
+  assert.equal(result.body.error, "invalid_lead");
+  assert.equal(strictLeadWrite, undefined, "a filled honeypot must not reach storage");
+}
+const leadWithoutWebsite = { ...validLead };
+delete leadWithoutWebsite.website;
+for (const [label, lead] of [
+  ["missing", leadWithoutWebsite],
+  ["undefined", { ...validLead, website: undefined }],
+  ["null", { ...validLead, website: null }],
+  ["empty string", { ...validLead, website: "" }],
+]) {
+  strictLeadWrite = undefined;
+  const result = await invoke(strictLeads, request("POST", lead));
+  assert.equal(result.status, 200, `a ${label} honeypot must remain accepted`);
+  assert.equal(result.body.stored, true);
+  assert.ok(strictLeadWrite, "an accepted lead must reach storage");
 }
 for (const field of ["name", "company", ...Object.keys(optionalLeadFields)]) {
   const result = await invoke(strictLeads, request("POST", { ...validLead, [field]: "  José\u0000 🚚  " }));
