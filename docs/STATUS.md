@@ -2,25 +2,25 @@
 
 These are dated snapshots. Source, deployment, build availability and device tests are separate.
 
-- Inspected source (origin/main): `0373418636440865b5aa417984c9524f5e2710d7`.
-- Source commit date: 2026-11-08T14:52:48-08:00.
+- Inspected source (origin/main): `7fc0aec86ba678207aefa36260e2331493b7e6a6`.
+- Source commit date: 2026-11-14T21:10:39Z.
 
 - Production website: Deployment receipts are kept private; no current receipt is published here.
 
-- Historical TestFlight receipt: 1.0.0 (56); observed Apple VALID, internal IN_BETA_TESTING.
-- TestFlight source: `0d11ad22b66baab61ea9db6456bfaed837871537`.
-- Build completed: 2026-10-03T23:44:38.728Z; availability observed 2026-10-03T23:49:49.617533+00:00.
+- Historical TestFlight dashboard receipt: 1.0.0 (60); observed Ready to Submit, upload Complete; internal group assigned.
+- TestFlight source: `21ab21cd02666a7c825ba6b037f543133481eb3a`.
+- Build completed: 2026-11-04T05:05:40.475Z; saved dashboard receipt records internal availability as of 2026-11-11T02:46:45Z.
 - Current Apple availability, replacement upload and remote build counter: Not checked.
-- Physical acceptance for build 56: Not recorded.
-- Native changes waiting for a build: 123 files differ from the TestFlight source.
-  - native-app/app.config.js
-  - native-app/app.json
+- Physical acceptance for build 60: Not recorded.
+- Native changes waiting for a build: 75 files differ from the TestFlight source.
   - native-app/app/\_layout.tsx
   - native-app/app/history.tsx
+  - native-app/app/index.tsx
   - native-app/app/monitor.tsx
-  - 118 more; inspect the source comparison before preparing a binary.
+  - native-app/app/pre-drive.tsx
+  - 70 more; inspect the source comparison before preparing a binary.
 
-- Open PRs (2026-11-08T22:53:32Z): 7 total; 6 Codex, 1 Dependabot, 0 other; 3 draft.
+- Open PRs (2026-11-14T21:16:57Z): 10 total; 8 Codex, 2 Dependabot, 0 other; 3 draft.
 - Production migrations: Operational receipts are kept private; no ledger or access-control details are published here.
 
 Next steps:

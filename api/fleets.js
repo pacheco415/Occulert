@@ -10,6 +10,7 @@ const pgFetch = supabaseLib.pgFetch;
 const verifyAccessToken = supabaseLib.verifyAccessToken;
 const bearerToken = supabaseLib.bearerToken;
 const { validJsonBody, storableText } = require("./_lib/validation");
+const { allowAccountWrite } = require("./_lib/account-write-quota");
 const MAX_BODY_LENGTH = 2048;
 
 const { json } = require("./_lib/responses");
@@ -44,6 +45,7 @@ module.exports = async function handler(request, response) {
   }
 
   let user;
+  let creationAttempted = false;
   try {
     user = await verifyAccessToken(bearerToken(request), { freshUser: true });
     if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
@@ -61,7 +63,9 @@ module.exports = async function handler(request, response) {
 
     const companyName = clean(request.body && request.body.company_name, 160);
     if (companyName.length < 2) return json(response, 400, { ok: false, error: "invalid_company_name" });
+    if (!await allowAccountWrite(pgFetch, response, user.id, "fleet")) return;
 
+    creationAttempted = true;
     const rows = await pgFetch("fleets", {
       method: "POST",
       params: { select: "id,company_name,plan,created_at" },
@@ -73,7 +77,7 @@ module.exports = async function handler(request, response) {
       id: saved.id, company_name: saved.company_name, plan: saved.plan, created_at: saved.created_at,
     } });
   } catch (error) {
-    if (error && error.details && error.details.code === "23505") {
+    if (creationAttempted && error && error.details && error.details.code === "23505") {
       try {
         const fleet = await ownedFleet(user.id);
         if (fleet) return json(response, 200, { ok: true, created: false, fleet: fleet });

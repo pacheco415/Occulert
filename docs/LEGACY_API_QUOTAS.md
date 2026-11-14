@@ -6,6 +6,10 @@ database receipt or permission to activate a feature flag.
 
 ## Accepted writes
 
+Profile and fleet routes use separately counted admitted attempts; see the
+[account write quota contract](ACCOUNT_WRITE_QUOTAS.md). Their new prerequisite
+does not replace or replay the event/session migrations below.
+
 | Operation | Limit | Counting and reset |
 | --- | --- | --- |
 | New events, keyed and unkeyed combined | 60 per verified user per 60-second window | Existing `event_rate_limits` counter and SQL function; a rejected event spends no unit |

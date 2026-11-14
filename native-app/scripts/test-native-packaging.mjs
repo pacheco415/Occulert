@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +44,60 @@ function androidManifest(services = []) {
 
 const androidPermissions = manifest => manifest.manifest['uses-permission'].map(entry => entry.$['android:name']).sort();
 const expectedAudioPermissions = ['CAMERA', 'VIBRATE', 'WAKE_LOCK', 'MODIFY_AUDIO_SETTINGS'].map(name => 'android.permission.' + name).sort();
+
+test('the installed Apple-targets generator includes the elapsed-timer privacy manifest in the Watch target root', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'occulert-watch-privacy-'));
+  const targetDirectory = join(directory, 'targets', 'occulert-watch');
+  const projectPath = join(directory, 'ios', 'HelloWorld.xcodeproj', 'project.pbxproj');
+  const appleTargets = dirname(require.resolve('@bacons/apple-targets/package.json'));
+  const { XcodeProject, PBXNativeTarget, PBXResourcesBuildPhase, PBXFileSystemSynchronizedRootGroup } = require('@bacons/xcode');
+  try {
+    cpSync(join(app, 'targets', 'occulert-watch'), targetDirectory, { recursive: true });
+    mkdirSync(dirname(projectPath), { recursive: true });
+    writeFileSync(projectPath, execFileSync('tar', ['-xOf', join(appleTargets, 'prebuild-blank.tgz'),
+      'package/ios/HelloWorld.xcodeproj/project.pbxproj']));
+    // Execute the real target discovery/configuration and Xcode mod from its
+    // bundled template. A child preserves the generator's project-root cwd.
+    execFileSync(process.execPath, ['-e', `
+      const { createRequire } = require('node:module');
+      const { join } = require('node:path');
+      const appRequire = createRequire(${JSON.stringify(join(app, 'package.json'))});
+      const withTargets = appRequire('@bacons/apple-targets/app.plugin.js');
+      const configuration = withTargets({ ...appRequire('./app.json').expo,
+        _internal: { projectRoot: process.cwd() } });
+      configuration.mods.ios.xcodeProjectBeta2({ ...configuration, modRequest: {
+        projectRoot: process.cwd(), platformProjectRoot: join(process.cwd(), 'ios'),
+        platform: 'ios', modName: 'xcodeProjectBeta2', introspect: false,
+      } }).catch(error => { console.error(error); process.exitCode = 1; });
+    `], { cwd: directory, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, EXPO_NO_TELEMETRY: '1' } });
+    const project = XcodeProject.open(projectPath);
+    const watch = project.rootObject.props.targets.find(target => PBXNativeTarget.is(target) && target.isWatchOSTarget());
+    assert.ok(watch, 'the actual target generator must create the Watch executable');
+    assert.equal(watch.props.name, 'OcculertWatch');
+    assert.ok(watch.props.buildPhases.some(phase => PBXResourcesBuildPhase.is(phase)));
+    const groups = watch.props.fileSystemSynchronizedGroups;
+    assert.equal(groups.length, 1, 'Watch resources must belong to its own synchronized target group');
+    const group = groups[0];
+    assert.ok(PBXFileSystemSynchronizedRootGroup.is(group));
+    const parent = project.rootObject.props.mainGroup.getChildGroups().find(candidate => candidate.props.children.includes(group));
+    assert.ok(parent);
+    const resourceDirectory = resolve(project.getProjectRoot(), parent.props.path, group.props.path);
+    assert.equal(resourceDirectory, targetDirectory);
+    assert.deepEqual(group.props.explicitFileTypes, {}, 'Xcode must recognize the privacy resource by its xcprivacy extension');
+    assert.deepEqual(group.props.explicitFolders, []);
+    const exclusions = group.props.exceptions.filter(exception => exception.props.target === watch);
+    assert.equal(exclusions.length, 1);
+    assert.deepEqual(exclusions[0].props.membershipExceptions, ['Info.plist', 'expo-target.config.js']);
+    const manifestPath = join(resourceDirectory, 'PrivacyInfo.xcprivacy');
+    assert.equal(lstatSync(manifestPath).isSymbolicLink(), false);
+    assert.deepEqual(require('@expo/plist').default.parse(readFileSync(manifestPath, 'utf8')), {
+      NSPrivacyTracking: false, NSPrivacyTrackingDomains: [], NSPrivacyCollectedDataTypes: [],
+      NSPrivacyAccessedAPITypes: [{ NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategorySystemBootTime',
+        NSPrivacyAccessedAPITypeReasons: ['35F9.1'] }],
+    });
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 
 function permissionPlugins(includeCamera) {
   const installed = {
@@ -195,7 +249,8 @@ test('the EAS ignore policy retains every Git exclusion and admits only the inte
   assert.ok(policy.split(/\r?\n/).includes('.git'), 'the EAS shallow clone must explicitly exclude Git metadata');
   const allowed = ['native-app/package.json', 'native-app/package-lock.json', 'native-app/metro.config.js',
     'native-app/app/monitor.tsx', 'native-app/modules/fixture/android/src/main/Fixture.kt',
-    'native-app/modules/fixture/ios/Fixture.swift', 'native-app/targets/occulert-watch/index.swift', 'lib/event-outbox.ts'];
+    'native-app/modules/fixture/ios/Fixture.swift', 'native-app/targets/occulert-watch/index.swift',
+    'native-app/targets/occulert-watch/PrivacyInfo.xcprivacy', 'lib/event-outbox.ts'];
   const excluded = ['api/events.js', 'src/cloud-sync.js', 'package.json', 'lib/other.ts', 'lib/nested/engine.ts',
     'lib/event-outbox.ts.map', '.env', 'native-app/.env.production', 'native-app/.npmrc',
     'native-app/credentials.json', 'native-app/signing.p8', 'native-app/signing.p12', 'native-app/signing.key',

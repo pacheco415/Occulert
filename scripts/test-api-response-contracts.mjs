@@ -39,7 +39,13 @@ function report() {
 function fixture(options = {}) {
   const calls = [], authCalls = [], deleted = [], network = [], modules = new Map();
   const fixtureEnv = { ...env, ...options.env };
-  const defaultPg = async table => {
+  const defaultPg = async (table, query = {}) => {
+    if (table === 'rpc/reserve_account_write') {
+      assert.equal(query.method, 'POST');
+      assert.equal(query.body.p_user_id, OWNER);
+      assert.ok(['profile', 'fleet'].includes(query.body.p_operation));
+      return { allowed: true, user_id: OWNER, operation: query.body.p_operation };
+    }
     if (table === 'fleets') return [fleet];
     if (table === 'drivers') return [{ id: DRIVER, fleet_id: FLEET, name: 'Fixture driver', active: true }];
     if (table === 'rpc/check_pilot_lead_rate_limit') return { allowed: true, retry_after_seconds: 0 };
@@ -56,7 +62,7 @@ function fixture(options = {}) {
     },
     pgFetch: async (table, query = {}) => {
       calls.push({ table, query });
-      return options.pgFetch ? options.pgFetch(table, query, defaultPg) : defaultPg(table);
+      return options.pgFetch ? options.pgFetch(table, query, defaultPg) : defaultPg(table, query);
     },
     deleteAuthUser: async id => { deleted.push(id); },
     serverStorageConfigured: () => Boolean(fixtureEnv.SUPABASE_URL && fixtureEnv.SUPABASE_SERVICE_ROLE_KEY),

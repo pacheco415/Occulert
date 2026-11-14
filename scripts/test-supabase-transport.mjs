@@ -246,7 +246,8 @@ for (const operation of ['account deletion', 'fleet conflict recovery']) for (co
       calls++;
       if (calls === 1) return json(user);
       if (calls === 2) return json([]);
-      if (operation === 'fleet conflict recovery' && calls === 3) return json({ code: '23505' }, 409);
+      if (operation === 'fleet conflict recovery' && calls === 3) return json({ allowed: true, user_id: user.id, operation: 'fleet' });
+      if (operation === 'fleet conflict recovery' && calls === 4) return json({ code: '23505' }, 409);
       return fail();
     });
     const account = operation === 'account deletion';
@@ -260,8 +261,12 @@ for (const operation of ['account deletion', 'fleet conflict recovery']) for (co
     await pending;
     assert.equal(response.statusCode, status);
     assert.equal(response.body.error, account ? 'account_deletion_failed' : 'supabase_error');
-    assert.equal(b.calls.length, account ? 3 : 4);
-    assert.equal(b.calls.filter(call => ['POST', 'DELETE', 'PATCH'].includes(call.options.method)).length, 1);
+    assert.equal(b.calls.length, account ? 3 : 5);
+    assert.equal(b.calls.filter(call => ['POST', 'DELETE', 'PATCH'].includes(call.options.method)).length, account ? 1 : 2);
+    if (!account) {
+      assert.equal(b.calls.filter(call => new URL(call.url).pathname === '/rest/v1/rpc/reserve_account_write').length, 1);
+      assert.equal(b.calls.filter(call => new URL(call.url).pathname === '/rest/v1/fleets' && call.options.method === 'POST').length, 1);
+    }
     assert.equal(b.timers.size, 0);
   });
 }
