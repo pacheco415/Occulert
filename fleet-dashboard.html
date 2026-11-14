@@ -79,6 +79,9 @@
   #driverDetailList{margin:12px 0 0;padding:0;list-style:none}
   .driver-detail-session{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,1fr));gap:8px 12px;align-items:baseline;border-top:1px solid #344d72;padding:10px 0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
   @media(max-width:720px){.driver-detail-session{grid-template-columns:1fr 1fr}.driver-detail-session strong{grid-column:1/-1}}
+  #planUsage[hidden]{display:none}
+  #planUsage{margin:16px 0}
+  #planUsageNote{margin:12px 0 0}
   #fleetFollowups[hidden]{display:none}
   .followup-item{border-top:1px solid #344d72;padding:18px 0;margin-top:16px}
   .followup-item h3{margin:0;font-size:16px;color:#f5f7fa;overflow-wrap:anywhere}
@@ -213,6 +216,11 @@
       </aside>
     </section>
     <p class="sub" id="monthlyActivity" hidden aria-live="polite"></p>
+    <section class="card" id="planUsage" aria-labelledby="planUsageTitle" hidden>
+      <div class="section-title"><h2 id="planUsageTitle">Plan and usage (test mode)</h2><a class="btn" href="/fleet-pricing.html">View proposed plans</a></div>
+      <div class="ops-list" id="planUsageSummary"></div>
+      <p class="sub" id="planUsageNote"></p>
+    </section>
     <section class="grid dashboard-kpis" aria-label="Fleet summary metrics">
       <div class="card"><div class="label">Active roster drivers</div><div class="kpi" id="kpiDrivers">0</div><div class="sub" id="kpiDriversSub">waiting</div></div>
       <div class="card"><div class="label">Fleet Safety Score</div><div class="kpi green" id="kpiScore">--</div><div class="sub" id="kpiScoreSub">no sessions</div></div>
@@ -250,6 +258,6 @@
   </main>
   <div class="toast" id="toast"></div>
   <footer class="footer"><a href="/">Occulert</a> &nbsp;·&nbsp; <a href="/app.html">Driver App</a> &nbsp;·&nbsp; <a href="/privacy.html">Privacy</a><div style="margin-top:8px">© 2026 Occulert. Prototype only — not a certified safety, medical, emergency, or compliance device.</div></footer>
-<script src="/fleet-dashboard.v11.js" defer></script>
+<script src="/fleet-dashboard.v13.js" defer></script>
 </body>
 </html>

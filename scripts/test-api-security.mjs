@@ -726,10 +726,21 @@ const fleetSummary = loadHandler("../api/fleet-summary.js", async (table, option
     longitude: -122.4194,
     created_at: "2026-08-01T17:00:00.000Z",
   }];
+  if (table === "fleet_billing_test") return [{ plan: "growth", status: "active", stripe_customer_id: "cus_private" }];
   throw new Error(`unexpected fleet summary call: ${table}`);
 });
 const fleetSummaryResult = await invoke(fleetSummary, request("GET"));
 assert.equal(fleetSummaryResult.status, 200);
+// The test-mode plan summary reads two columns for the server-owned fleet and
+// returns no Stripe identifier. Usage is unknown here, so it is neither within
+// nor over the limit, and nothing is enforced by default.
+assert.deepEqual(fleetSummaryCalls.find(call => call.table === "fleet_billing_test").options,
+  { params: { select: "plan,status", fleet_id: "eq.fleet-1", limit: "1" } });
+assert.equal(fleetSummaryResult.body.entitlements.plan, "growth");
+assert.equal(fleetSummaryResult.body.entitlements.enforced, false);
+assert.equal(fleetSummaryResult.body.entitlements.usage, null);
+assert.equal(fleetSummaryResult.body.entitlements.within_limit, null);
+assert.doesNotMatch(JSON.stringify(fleetSummaryResult.body), /cus_private|stripe/i);
 assert.equal(fleetSummaryCalls[0].options.params.owner_user_id, "eq.user-1");
 assert.equal(fleetSummaryCalls[1].options.params.fleet_id, "eq.fleet-1");
 assert.equal(fleetSummaryCalls[1].options.params.limit, "500");
@@ -757,14 +768,19 @@ const lightweightSummary = loadHandler("../api/fleet-summary.js", async (table) 
   if (table === "drivers") return [];
   if (table === "sessions") return [{ id: fleetSessionId, driver_id: "driver-1" }];
   if (table === "rpc/fleet_monthly_activity") return null;
+  if (table === "fleet_billing_test") return [];
   throw new Error("a lightweight fleet refresh must not query events");
 });
 const lightweightRequest = request("GET");
 lightweightRequest.url = "/api/fleet-summary?include_events=0";
 const lightweightResult = await invoke(lightweightSummary, lightweightRequest);
 assert.equal(lightweightResult.status, 200);
-assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions", "rpc/fleet_monthly_activity"]);
+// The plan summary adds exactly one bounded read to every refresh.
+assert.deepEqual(lightweightSummaryCalls, ["fleets", "drivers", "sessions", "rpc/fleet_monthly_activity", "fleet_billing_test"]);
 assert.equal(lightweightResult.body.monthly_activity, null);
+assert.equal(lightweightResult.body.entitlements.plan, "trial");
+assert.equal(lightweightResult.body.entitlements.plan_source, "no_subscription");
+assert.equal(lightweightResult.body.entitlements.usage, null);
 assert.equal(lightweightResult.body.events_included, false);
 assert.deepEqual(lightweightResult.body.events, []);
 
