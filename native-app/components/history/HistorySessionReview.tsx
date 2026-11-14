@@ -1,3 +1,4 @@
+import { strings, formatString } from '../../lib/strings';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, TouchableOpacity, View } from 'react-native';
 import type { AlertAssessment } from '../../lib/feedback';
@@ -23,11 +24,9 @@ interface HistorySessionReviewProps extends HistoryReviewActions {
 export function HistorySessionReview({ item, index: i, isExpanded, sessionBusy, saveAssessment, removeAssessment, saveTestCondition, saveDeviceImpact }: HistorySessionReviewProps) {
   return <>
             <View style={s.review}>
-              <Text style={s.reviewTitle}>How did the alerts feel?</Text>
+              <Text style={s.reviewTitle}>{strings.history.review.title}</Text>
               {hasHistoryAlertAssessment(item.alertAssessment) && (
-                <Text accessibilityLiveRegion="polite" style={s.reviewPrivacy}>
-                  Saved: {ASSESSMENT_OPTIONS.find(option => option.value === item.alertAssessment)?.label}
-                </Text>
+                <Text accessibilityLiveRegion="polite" style={s.reviewPrivacy}>{formatString(strings.history.review.saved, { value: ASSESSMENT_OPTIONS.find(option => option.value === item.alertAssessment)?.label ?? '' })}</Text>
               )}
               <View style={s.reviewOptions}>
                 {ASSESSMENT_OPTIONS.map((option) => {
@@ -53,30 +52,28 @@ export function HistorySessionReview({ item, index: i, isExpanded, sessionBusy, 
               {hasHistoryAlertAssessment(item.alertAssessment) && (
                 <TouchableOpacity
                   accessibilityRole="button"
-                  accessibilityLabel="Remove this session's alert assessment"
-                  accessibilityHint="Returns the rating to Not assessed while keeping the session summary, test conditions, and device observations"
+                  accessibilityLabel={strings.history.review.removeAccessibilityLabel}
+                  accessibilityHint={strings.history.review.removeHint}
                   accessibilityState={{ disabled: sessionBusy, busy: sessionBusy }}
                   disabled={sessionBusy}
                   style={[s.removeAssessmentButton, sessionBusy && s.operationDisabled]}
                   onPress={() => { void removeAssessment(i); }}
                 >
                   <Ionicons name="remove-circle-outline" size={16} color="#93c5fd" />
-                  <Text style={s.removeAssessmentText}>Remove assessment · keep session</Text>
+                  <Text style={s.removeAssessmentText}>{strings.history.review.remove}</Text>
                 </TouchableOpacity>
               )}
-              <Text style={s.reviewPrivacy}>
-                This alert rating stays only on this iPhone. Choose the best match after parking. It is included only if you choose to send feedback.
-              </Text>
+              <Text style={s.reviewPrivacy}>{strings.history.review.ratingPrivacy}</Text>
             </View>
             {isExpanded && (
               <>
             <View style={s.conditions}>
-              <Text style={s.conditionsTitle}>Test conditions</Text>
-              <Text style={s.conditionsSafety}>Record only after you are safely parked.</Text>
+              <Text style={s.conditionsTitle}>{strings.history.common.testConditions}</Text>
+              <Text style={s.conditionsSafety}>{strings.history.review.conditionsSafety}</Text>
               {TEST_CONDITION_GROUPS.map(group => (
                 <View key={group.key} style={s.conditionGroup}>
                   <Text style={s.conditionLabel}>{group.label}</Text>
-                  <Text style={s.reviewPrivacy}>Saved: {group.options.find(option => option.value === item.testConditions?.[group.key])?.label || 'Not recorded'}</Text>
+                  <Text style={s.reviewPrivacy}>{formatString(strings.history.review.saved, { value: group.options.find(option => option.value === item.testConditions?.[group.key])?.label || strings.history.common.notRecorded })}</Text>
                   <View style={s.conditionOptions}>
                     {group.options.map(option => {
                       const selected = item.testConditions?.[group.key] === option.value;
@@ -84,7 +81,7 @@ export function HistorySessionReview({ item, index: i, isExpanded, sessionBusy, 
                         <TouchableOpacity
                           key={option.value}
                           accessibilityRole="button"
-                          accessibilityLabel={`${group.label}: ${option.label}`}
+                          accessibilityLabel={formatString(strings.history.common.labelValue, { label: group.label, value: option.label })}
                           accessibilityState={{ selected, disabled: sessionBusy, busy: sessionBusy }}
                           disabled={sessionBusy}
                           style={[s.conditionOption, selected && s.conditionOptionSelected, sessionBusy && s.operationDisabled]}
@@ -99,19 +96,15 @@ export function HistorySessionReview({ item, index: i, isExpanded, sessionBusy, 
                   </View>
                 </View>
               ))}
-              <Text style={s.conditionsPrivacy}>
-                Conditions stay on this iPhone and are included only if you choose Send session feedback. No location or media is attached.
-              </Text>
+              <Text style={s.conditionsPrivacy}>{strings.history.review.conditionsPrivacy}</Text>
             </View>
             <View style={s.deviceImpact}>
-              <Text style={s.conditionsTitle}>Device impact</Text>
-              <Text style={s.deviceImpactNote}>
-                Record after safely parking. These are tester observations, not device measurements.
-              </Text>
+              <Text style={s.conditionsTitle}>{strings.history.common.deviceImpact}</Text>
+              <Text style={s.deviceImpactNote}>{strings.history.review.deviceNote}</Text>
               {DEVICE_IMPACT_GROUPS.map(group => (
                 <View key={group.key} style={s.conditionGroup}>
                   <Text style={s.conditionLabel}>{group.label}</Text>
-                  <Text style={s.reviewPrivacy}>Saved: {group.options.find(option => option.value === item.deviceImpact?.[group.key])?.label || 'Not recorded'}</Text>
+                  <Text style={s.reviewPrivacy}>{formatString(strings.history.review.saved, { value: group.options.find(option => option.value === item.deviceImpact?.[group.key])?.label || strings.history.common.notRecorded })}</Text>
                   <View style={s.conditionOptions}>
                     {group.options.map(option => {
                       const selected = item.deviceImpact?.[group.key] === option.value;
@@ -119,7 +112,7 @@ export function HistorySessionReview({ item, index: i, isExpanded, sessionBusy, 
                         <TouchableOpacity
                           key={option.value}
                           accessibilityRole="button"
-                          accessibilityLabel={`${group.label}: ${option.label}, tester-reported`}
+                          accessibilityLabel={formatString(strings.history.review.deviceOptionAccessibilityLabel, { label: group.label, value: option.label })}
                           accessibilityState={{ selected, disabled: sessionBusy, busy: sessionBusy }}
                           disabled={sessionBusy}
                           style={[s.conditionOption, selected && s.conditionOptionSelected, sessionBusy && s.operationDisabled]}
@@ -134,12 +127,8 @@ export function HistorySessionReview({ item, index: i, isExpanded, sessionBusy, 
                   </View>
                 </View>
               ))}
-              <Text style={s.deviceWarning}>
-                If iPhone shows a temperature warning, stop using Occulert and let the phone cool before another session.
-              </Text>
-              <Text style={s.conditionsPrivacy}>
-                Device-impact observations stay on this iPhone unless you choose Send session feedback.
-              </Text>
+              <Text style={s.deviceWarning}>{strings.history.review.temperatureWarning}</Text>
+              <Text style={s.conditionsPrivacy}>{strings.history.review.devicePrivacy}</Text>
             </View>
               </>
             )}

@@ -1,9 +1,10 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { strings } from '../lib/strings';
 
 export function SimulatorTraceBanner() {
   return <View style={styles.banner}>
-    <Text accessibilityRole="header" style={styles.title}>SIMULATOR TRACE</Text>
-    <Text style={styles.detail}>Synthetic input · Cloud disabled · Not for driving</Text>
+    <Text accessibilityRole="header" style={styles.title}>{strings.simulator.title}</Text>
+    <Text style={styles.detail}>{strings.simulator.detail}</Text>
   </View>;
 }
 const styles = StyleSheet.create({

@@ -6,6 +6,7 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import ts from 'typescript';
 import { createSingleFlightActionRunner } from '../lib/singleFlightAction.ts';
+import { strings, formatString } from '../lib/strings.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const filename = new URL('../components/CloudSyncCard.tsx', import.meta.url);
@@ -28,6 +29,7 @@ async function mount(status, options = {}) {
       nativeCloudEventRetryStatus: () => status,
     };
     if (name === '../lib/singleFlightAction') return { createSingleFlightActionRunner };
+    if (name === '../lib/strings.ts') return { strings, formatString };
     if (name === '../constants/theme') return { colors: {}, radii: {} };
     assert.fail('Unexpected UI dependency: ' + name);
   } });

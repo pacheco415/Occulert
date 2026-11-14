@@ -80,20 +80,20 @@ and [Node 24 crypto](https://nodejs.org/download/release/v24.19.0/docs/api/crypt
 
 ## November 14 configured-lifetime review
 
-**The production access-token lifetime remains unverified.** On November 14,
-2026, the connected project was confirmed as `wbsynfcjpwlgdzioqpoa`, matching
-the web and native project pins. The available project metadata does not expose
-Auth configuration, and the project's JWT settings page required a new dashboard
-sign-in. No production JWT-expiry setting was read or changed. A documented
-Supabase default, a test token's lifetime or a public API key's expiration is
-not evidence of this project's configured access-token lifetime.
+**The production access-token lifetime was verified as 3,600 seconds.** At
+**2026-11-14T21:03Z**, the signed-in Supabase dashboard for
+the intended production project, matching the web and native project pins,
+showed **Authentication > Sessions > Access Tokens > Access token expiry time**
+set to **3600** seconds. **Save changes** was disabled; no authentication setting
+was changed. This observation closes W7's configured-lifetime acceptance
+criterion and does not require a reduction from the observed value.
 
-To finish this review, an authenticated owner must record the **JWT expiry
-limit** in the project's **JWT Keys > Legacy JWT Secret** settings, together
-with the observation date. Supabase's [session documentation](https://supabase.com/docs/guides/auth/sessions)
-describes that setting separately from refresh-token reuse and maximum-session
-or inactivity timeouts. Do not record any signing secret, API key, access token
-or refresh token in the repository or review evidence.
+The observation records the project's actual configured lifetime, rather than
+a documented default, a test token's lifetime or a public API key's expiration.
+Supabase's [session documentation](https://supabase.com/docs/guides/auth/sessions)
+describes access-token expiry separately from refresh-token reuse and
+maximum-session or inactivity timeouts. Do not record any signing secret, API
+key, access token or refresh token in the repository or review evidence.
 
 The practical boundaries differ:
 
@@ -111,14 +111,12 @@ The practical boundaries differ:
   review neither enables cached verification for another route nor changes
   token, key-cache or recent-sign-in timing.
 
-If the observed JWT expiry limit exceeds **3,600 seconds**, propose reducing it
-to **3,600 seconds** for owner review; do not enable the change as part of this
-task. Supabase discourages values over one hour and advises against going below
-five minutes. Validate web/native refresh, loss of connectivity and recovery
-before approving a different limit. Changing a configured lifetime must not be
-presented as retroactively shortening the `exp` claim of already issued tokens.
-Until the live value is recorded, W7's configured-lifetime acceptance criterion
-is open and the review stays draft.
+If a future observation finds an access-token lifetime above **3,600 seconds**,
+propose reducing it to **3,600 seconds** for owner review. Supabase discourages
+values over one hour and advises against going below five minutes. Validate
+web/native refresh, loss of connectivity and recovery before approving a
+different limit. Changing a configured lifetime must not be presented as
+retroactively shortening the `exp` claim of already issued tokens.
 
 ## Validation
 

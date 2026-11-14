@@ -1,3 +1,4 @@
+import { strings, formatString } from '../lib/strings.ts';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -129,8 +130,8 @@ export function CloudSyncCard() {
         invalidateStatus();
         setStatusError(true);
         Alert.alert(
-          'Cloud sync unavailable',
-          'Occulert could not complete or confirm that change. Please check your connection and try again.',
+          strings.settings.cloud.unavailableTitle,
+          strings.settings.cloud.unavailableDetail,
         );
       },
     });
@@ -143,7 +144,7 @@ export function CloudSyncCard() {
       setPassword('');
       const confirmed = await refresh();
       if (confirmed && visible()) {
-        Alert.alert(result.ok ? 'Signed in' : 'Sign-in unavailable', result.message);
+        Alert.alert(result.ok ? strings.settings.cloud.signedInTitle : strings.settings.cloud.signInUnavailableTitle, result.message);
       }
     });
   };
@@ -161,7 +162,7 @@ export function CloudSyncCard() {
       setPassword('');
       const confirmed = await refresh();
       if (incomplete && visible() && (!confirmed || stateRef.current?.signOutIncomplete)) {
-        Alert.alert('Sign-out incomplete', 'Sharing is off in this open app, but saved sign-in or sharing settings could not be fully cleared. They may return after restarting. Retry sign-out before closing the app.');
+        Alert.alert(strings.settings.cloud.signOutIncompleteTitle, strings.settings.cloud.signOutIncompleteDetail);
       }
     });
   };
@@ -172,7 +173,7 @@ export function CloudSyncCard() {
       if (!mountedRef.current) return;
       await refresh();
       if (!saved && visible()) {
-        Alert.alert('Cloud sync unavailable', 'Sign in again or check your connection, then try once more.');
+        Alert.alert(strings.settings.cloud.unavailableTitle, strings.settings.cloud.retrySignInDetail);
       }
     });
   };
@@ -185,11 +186,11 @@ export function CloudSyncCard() {
       return;
     }
     Alert.alert(
-      'Share session summaries?',
-      'Occulert will send timestamps, fatigue scores, and alert counts to your protected account. Camera images, video, audio, location, and alert ratings stay off the server.',
+      strings.settings.cloud.consent.title,
+      strings.settings.cloud.consent.detail,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Enable', onPress: () => {
+        { text: strings.settings.cloud.consent.cancel, style: 'cancel' },
+        { text: strings.settings.cloud.consent.enable, onPress: () => {
           if (visible() && stateRef.current === confirmedState && !actionBusyRef.current && !statusBusyRef.current) applyConsent(true);
         } },
       ],
@@ -210,41 +211,41 @@ export function CloudSyncCard() {
       // Use the same bounded recovery message as an unsupported link.
     }
     if (visible()) {
-      Alert.alert('Account page unavailable', 'Open ' + url.replace('https://www.', '') + ' in your browser. Browser sign-in is separate from this iPhone.');
+      Alert.alert(strings.settings.cloud.accountPageUnavailableTitle, formatString(strings.settings.cloud.accountPageUnavailableDetail, { address: url.replace('https://www.', '') }));
     }
   };
 
   return (
     <View style={s.card}>
       <View style={s.titleRow}>
-        <Text style={s.cardTitle}>CLOUD SESSION SYNC</Text>
+        <Text style={s.cardTitle}>{strings.settings.cloud.title}</Text>
         {busy
-          ? <ActivityIndicator accessibilityLabel="Checking cloud sync status" size="small" color="#60a5fa" />
+          ? <ActivityIndicator accessibilityLabel={strings.settings.cloud.checkingAccessibility} size="small" color="#60a5fa" />
           : <Text accessibilityLiveRegion="polite" accessibilityRole="text" style={[s.status, state?.signedIn && s.statusOn]}>
-              {state?.signOutIncomplete ? 'SIGN-OUT INCOMPLETE' : state?.signedIn ? 'SIGNED IN' : state ? 'OPTIONAL' : 'UNCONFIRMED'}
+              {state?.signOutIncomplete ? strings.settings.cloud.status.signOutIncomplete : state?.signedIn ? strings.settings.cloud.status.signedIn : state ? strings.settings.cloud.status.optional : strings.settings.cloud.status.unconfirmed}
             </Text>}
       </View>
 
       {!state && (
         <View accessibilityRole={statusError ? 'alert' : 'text'} accessibilityLiveRegion="polite" style={s.statusCheck}>
-          <Text style={s.label}>{statusError ? 'Account status could not be confirmed' : 'Checking saved cloud settings…'}</Text>
+          <Text style={s.label}>{statusError ? strings.settings.cloud.readState.errorTitle : strings.settings.cloud.readState.checkingTitle}</Text>
           <Text style={s.statusDetail}>
             {statusError
-              ? 'This status check does not clear saved sign-in or change sharing. Retry to read the current choices before making changes. Monitoring and local history remain available.'
-              : 'Reading the sign-in and sharing choice saved on this iPhone. Monitoring and local history do not require cloud sync.'}
+              ? strings.settings.cloud.readState.errorDetail
+              : strings.settings.cloud.readState.checkingDetail}
           </Text>
           {statusError && (
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Retry saved cloud account status"
-              accessibilityHint="Reads local sign-in and sharing settings without changing them"
+              accessibilityLabel={strings.settings.cloud.readState.retryAccessibility}
+              accessibilityHint={strings.settings.cloud.readState.retryHint}
               accessibilityState={{ disabled: busy, busy }}
               disabled={busy}
               onPress={() => { if (!statusBusyRef.current && !actionBusyRef.current) void refresh(); }}
               style={[s.retryBtn, busy && s.disabled]}
             >
               <Ionicons name="refresh" size={16} color="#93c5fd" />
-              <Text style={s.linkText}>Retry account status</Text>
+              <Text style={s.linkText}>{strings.settings.cloud.readState.retryAction}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -252,32 +253,28 @@ export function CloudSyncCard() {
 
       {state?.signOutIncomplete && (
         <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={s.statusCheck}>
-          <Text style={s.label}>Finish signing out</Text>
-          <Text style={s.statusDetail}>
-            Sharing is off in this open app. Saved sign-in or sharing settings could not be fully cleared and may return after restarting. Retry before closing the app.
-          </Text>
+          <Text style={s.label}>{strings.settings.cloud.incomplete.title}</Text>
+          <Text style={s.statusDetail}>{strings.settings.cloud.incomplete.detail}</Text>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Retry incomplete cloud sign-out"
-            accessibilityHint="Retries removing saved sign-in and sharing settings from this device"
+            accessibilityLabel={strings.settings.cloud.incomplete.retryAccessibility}
+            accessibilityHint={strings.settings.cloud.incomplete.retryHint}
             accessibilityState={{ disabled: busy, busy }}
             disabled={busy}
             onPress={signOut}
             style={[s.retryBtn, busy && s.disabled]}
           >
-            <Text style={s.linkText}>Retry sign-out</Text>
+            <Text style={s.linkText}>{strings.settings.cloud.incomplete.retryAction}</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {state && !state.signedIn && !state.signOutIncomplete && (
         <View style={s.form}>
-          <Text style={s.formIntro}>
-            Sign in with an existing Occulert driver account and its password. Monitoring and local history work without an account.
-          </Text>
+          <Text style={s.formIntro}>{strings.settings.cloud.signIn.detail}</Text>
           <TextInput
-            accessibilityLabel="Cloud account email"
-            accessibilityHint="Enter the email for your existing Occulert driver account"
+            accessibilityLabel={strings.settings.cloud.signIn.emailAccessibility}
+            accessibilityHint={strings.settings.cloud.signIn.emailHint}
             accessibilityState={{ disabled: busy || !state.available }}
             autoCapitalize="none"
             autoComplete="email"
@@ -285,7 +282,7 @@ export function CloudSyncCard() {
             keyboardType="email-address"
             onChangeText={setEmail}
             onSubmitEditing={() => passwordInputRef.current?.focus()}
-            placeholder="Driver email"
+            placeholder={strings.settings.cloud.signIn.emailPlaceholder}
             placeholderTextColor="#4a7a8a"
             returnKeyType="next"
             submitBehavior="submit"
@@ -293,15 +290,15 @@ export function CloudSyncCard() {
             value={email}
           />
           <TextInput
-            accessibilityLabel="Cloud account password"
-            accessibilityHint="Enter your Occulert account password"
+            accessibilityLabel={strings.settings.cloud.signIn.passwordAccessibility}
+            accessibilityHint={strings.settings.cloud.signIn.passwordHint}
             accessibilityState={{ disabled: busy || !state.available }}
             autoCapitalize="none"
             autoComplete="current-password"
             editable={!busy && state.available}
             onChangeText={setPassword}
             onSubmitEditing={signIn}
-            placeholder="Password"
+            placeholder={strings.settings.cloud.signIn.passwordPlaceholder}
             placeholderTextColor="#4a7a8a"
             ref={passwordInputRef}
             returnKeyType="done"
@@ -311,15 +308,15 @@ export function CloudSyncCard() {
           />
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel={busy ? 'Signing in to cloud account' : 'Sign in to cloud account'}
-            accessibilityHint="Signs in without enabling session sharing"
+            accessibilityLabel={busy ? strings.settings.cloud.signIn.busyAccessibility : strings.settings.cloud.signIn.accessibility}
+            accessibilityHint={strings.settings.cloud.signIn.hint}
             accessibilityState={{ disabled: busy || !state.available, busy }}
             disabled={busy || !state.available}
             onPress={signIn}
             style={[s.primaryBtn, (busy || !state.available) && s.disabled]}
           >
             <Ionicons name="log-in-outline" size={17} color="#fff" />
-            <Text style={s.primaryText}>SIGN IN</Text>
+            <Text style={s.primaryText}>{strings.settings.cloud.signIn.action}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -327,19 +324,19 @@ export function CloudSyncCard() {
         <>
           <View style={s.accountRow}>
             <View style={s.accountText}>
-              <Text style={s.label}>Protected account</Text>
+              <Text style={s.label}>{strings.settings.cloud.accountTitle}</Text>
               <Text style={s.sub}>{state.email}</Text>
             </View>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={busy ? 'Signing out of cloud account' : 'Sign out of cloud account'}
-              accessibilityHint="Signs out on this device without deleting local history"
+              accessibilityLabel={busy ? strings.settings.cloud.signOut.busyAccessibility : strings.settings.cloud.signOut.accessibility}
+              accessibilityHint={strings.settings.cloud.signOut.hint}
               accessibilityState={{ disabled: busy, busy }}
               disabled={busy}
               onPress={signOut}
               style={[s.signOutBtn, busy && s.disabled]}
             >
-              <Text style={s.signOutText}>Sign Out</Text>
+              <Text style={s.signOutText}>{strings.settings.cloud.signOut.action}</Text>
             </TouchableOpacity>
           </View>
           <View style={s.div} />
@@ -347,13 +344,13 @@ export function CloudSyncCard() {
             <View style={s.rowL}>
               <Ionicons name="cloud-upload-outline" size={18} color="#60a5fa" />
               <View style={s.accountText}>
-                <Text style={s.label}>Share session summaries</Text>
-                <Text style={s.sub}>Off by default · local history remains available</Text>
+                <Text style={s.label}>{strings.settings.cloud.sharing.title}</Text>
+                <Text style={s.sub}>{strings.settings.cloud.sharing.detail}</Text>
               </View>
             </View>
             <Switch
-              accessibilityLabel="Share session summaries"
-              accessibilityHint="Controls protected cloud syncing; local history remains available when off"
+              accessibilityLabel={strings.settings.cloud.sharing.title}
+              accessibilityHint={strings.settings.cloud.sharing.hint}
               accessibilityState={{ disabled: busy, busy }}
               disabled={busy}
               onValueChange={changeConsent}
@@ -370,55 +367,51 @@ export function CloudSyncCard() {
           <>
             <TouchableOpacity
               accessibilityRole="link"
-              accessibilityLabel="Forgot Occulert account password"
-              accessibilityHint="Opens password reset in your browser without sending your email or password in the link"
+              accessibilityLabel={strings.settings.cloud.links.forgotPasswordAccessibility}
+              accessibilityHint={strings.settings.cloud.links.forgotPasswordHint}
               onPress={() => { void openAccountPage('reset'); }}
               style={s.linkBtn}
             >
-              <Text style={s.linkText}>Forgot password?</Text>
+              <Text style={s.linkText}>{strings.settings.cloud.links.forgotPassword}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="link"
-              accessibilityLabel="Create an Occulert account on the website"
-              accessibilityHint="Opens browser sign-in and account creation"
+              accessibilityLabel={strings.settings.cloud.links.createAccountAccessibility}
+              accessibilityHint={strings.settings.cloud.links.createAccountHint}
               onPress={() => { void openAccountPage('create'); }}
               style={s.linkBtn}
             >
-              <Text style={s.linkText}>Create an account on occulert.com</Text>
+              <Text style={s.linkText}>{strings.settings.cloud.links.createAccount}</Text>
             </TouchableOpacity>
           </>
         )}
         <TouchableOpacity
           accessibilityRole="link"
-          accessibilityLabel="Manage Occulert cloud account"
-          accessibilityHint="Opens website account settings for password, email, and account deletion; browser sign-in is separate"
+          accessibilityLabel={strings.settings.cloud.links.manageAccountAccessibility}
+          accessibilityHint={strings.settings.cloud.links.manageAccountHint}
           onPress={() => { void openAccountPage('manage'); }}
           style={s.linkBtn}
         >
-          <Text style={s.linkText}>Manage account on occulert.com</Text>
+          <Text style={s.linkText}>{strings.settings.cloud.links.manageAccount}</Text>
         </TouchableOpacity>
-        <Text style={s.statusDetail}>
-          Browser sign-in is separate from this iPhone. If you created your account with a passkey or email link, sign in on the website, open Account, and choose Change Password to set a password for native sign-in. Sharing stays off after a new native sign-in until you enable it here.
-        </Text>
+        <Text style={s.statusDetail}>{strings.settings.cloud.links.signInDetail}</Text>
       </View>
 
       {eventRetry && (
         <View accessibilityRole="text" style={s.statusCheck}>
-          <Text style={s.label}>Alert delivery attempts</Text>
+          <Text style={s.label}>{strings.settings.cloud.alertRetry.title}</Text>
           <Text style={s.statusDetail}>
             {eventRetry.unavailable
-              ? 'Alert retries are paused because local delivery state could not be confirmed.'
-              : `${eventRetry.pending} pending; ${eventRetry.capacityRejected} rejected at capacity; ${eventRetry.expired} expired; ${eventRetry.permanentRejected} rejected; ${eventRetry.exhausted} exhausted; ${eventRetry.stopped} discarded at Stop.`}
+              ? strings.settings.cloud.alertRetry.unavailable
+              : formatString(strings.settings.cloud.alertRetry.counts, { pending: String(eventRetry.pending), capacityRejected: String(eventRetry.capacityRejected), expired: String(eventRetry.expired), permanentRejected: String(eventRetry.permanentRejected), exhausted: String(eventRetry.exhausted), stopped: String(eventRetry.stopped) })}
           </Text>
-          <Text style={s.statusDetail}>This local snapshot does not confirm cloud synchronization. Monitoring and local alerts continue independently.</Text>
+          <Text style={s.statusDetail}>{strings.settings.cloud.alertRetry.limits}</Text>
         </View>
       )}
 
       <View style={s.privacy}>
         <Ionicons name="shield-checkmark-outline" size={14} color="#4a7a8a" />
-        <Text style={s.privacyText}>
-          Sign-in tokens use protected device storage. No camera images, video, audio, GPS location, or alert ratings are uploaded.
-        </Text>
+        <Text style={s.privacyText}>{strings.settings.cloud.privacyDetail}</Text>
       </View>
     </View>
   );

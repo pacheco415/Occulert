@@ -1,3 +1,5 @@
+import ts from 'typescript';
+import { strings } from '../native-app/lib/strings.ts';
 import { readHistorySourceOwners } from './lib/history-source-owners.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -8,6 +10,24 @@ import {
 } from '../native-app/lib/sensorFusionObservation.ts';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+// Bind the real source to its catalog entry and pin the released English contract.
+function assertCatalogCopy(source, key, expected) {
+  const file = ts.createSourceFile('native-copy.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const imported = file.statements.some(node => ts.isImportDeclaration(node)
+    && /(?:^|\/)strings(?:\.ts)?$/.test(node.moduleSpecifier.text)
+    && !node.importClause?.isTypeOnly
+    && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+    && node.importClause.namedBindings.elements.some(item => !item.isTypeOnly && item.name.text === 'strings' && !item.propertyName));
+  let bound = false;
+  function visit(node) {
+    if (ts.isPropertyAccessExpression(node) && node.getText(file) === `strings.${key}`) bound = true;
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  assert.ok(imported && bound, `${key}: use the actual catalog binding`);
+  assert.equal(key.split('.').reduce((value, part) => value?.[part], strings), expected, `${key}: preserve released English`);
+}
 
 test('fusion observation stores bounded aggregates without producing a score', () => {
   const tracker = createSensorFusionObservationTracker();
@@ -106,6 +126,6 @@ test('native wiring keeps fusion diagnostics local and outside scoring and alert
   assert.doesNotMatch(cloudSync, /sensorFusion/i);
   assert.doesNotMatch(historyExport, /sensorFusion/i);
   assert.doesNotMatch(feedback, /sensorFusion/i);
-  assert.match(historyOwners.diagnostics, /OBSERVATION-ONLY SENSOR FUSION/);
-  assert.match(historyOwners.diagnostics, /does not change fatigue scores or alerts/);
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.fusionTitle", "OBSERVATION-ONLY SENSOR FUSION");
+  assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.fusionCaution", "Local aggregate context only. It does not change fatigue scores or alerts and is not included in cloud sync, exports, or session feedback.");
 });

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { strings } from '../native-app/lib/strings.ts';
 import {
   nextAlertAudioChannel,
   parseInEarAlertPattern,
@@ -95,8 +96,11 @@ test('the alert engine and Settings wire the preference without weakening urgent
   assert.match(alertSystem, /ALERT_SOUND_LEFT/);
   assert.match(alertSystem, /ALERT_SOUND_RIGHT/);
   assert.match(alertSystem, /nextAlertAudioChannel/);
-  assert.match(settings, /Alternate L\/R/);
-  assert.match(settings, /Critical and tracking-loss alerts stay centered/);
+  assert.match(settings, /\['alternating',\s*strings\.settings\.headphones\.pattern\.alternating\]/);
+  assert.equal(strings.settings.headphones.pattern.alternating, 'Alternate L/R');
+  assert.match(settings, /\{strings\.settings\.headphones\.patternLimits\}/);
+  assert.equal(strings.settings.headphones.patternLimits,
+    'Both ears remain audible. Critical and tracking-loss alerts stay centered.');
 });
 
 test('Settings can verify the current audio route and headphone-motion readiness while parked', () => {
@@ -109,10 +113,14 @@ test('Settings can verify the current audio route and headphone-motion readiness
     /audioTestPlayer = useAudioPlayer\(ALERT_SOUND,\s*\{\s*keepAudioSessionActive:\s*true/,
   );
   assert.match(settings, /configureAlertAudioMode/);
-  assert.match(settings, /TEST CURRENT AUDIO OUTPUT/);
-  assert.match(settings, /Use only while parked/);
-  assert.match(settings, /does not change your alert setting/);
+  assert.match(settings, /strings\.settings\.audioTest\.action/);
+  assert.equal(strings.settings.audioTest.action, 'TEST CURRENT AUDIO OUTPUT');
+  assert.match(settings, /\{strings\.settings\.audioTest\.parkedDetail\}/);
+  assert.equal(strings.settings.audioTest.parkedDetail,
+    'Use only while parked. This plays the selected sound as the centered three-tone critical sequence and does not change your alert setting.');
   assert.match(settings, /getHeadphoneMotionStatus/);
-  assert.match(settings, /Compatible headphone motion/);
-  assert.match(settings, /starts automatically with monitoring/);
+  assert.match(settings, /\{strings\.settings\.headphoneMotion\.title\}/);
+  assert.equal(strings.settings.headphoneMotion.title, 'Compatible headphone motion');
+  assert.match(settings, /:\s*strings\.settings\.headphoneMotion\.description\.available/);
+  assert.equal(strings.settings.headphoneMotion.description.available, 'Available — starts automatically with monitoring');
 });

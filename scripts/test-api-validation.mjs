@@ -11,6 +11,14 @@ test('stored text is trimmed, bounded and always acceptable to Postgres',()=>{
  assert.equal(storableText('x\uD800y',10),'x\uFFFDy');
  for(const value of ['abc\u{1F600}','\uDC00','x\uD800'])assert.equal(storableText(value,4).isWellFormed(),true);
 });
+test('stored text treats non-strings as missing without invoking conversion hooks',()=>{
+ for(const value of [undefined,null,{},[],['Fleet'],17,0,true,false,new String('Fleet'),Symbol('Fleet'),1n]){
+  assert.equal(storableText(value,160),'');
+ }
+ assert.equal(storableText({toString(){throw new Error('must not coerce')}},160),'');
+ assert.equal(storableText('  ',160),'');
+ assert.equal(storableText('  José\u0000 🚚  ',160),'José 🚚');
+});
 test('UUID validation never coerces client values',()=>{
  assert.equal(isUuid('f89d1cf9-893f-4fb6-a924-6669b4568221'),true);assert.equal(isUuid('F89D1CF9-893F-4FB6-A924-6669B4568221'),true);
  for(const value of [null,undefined,{},[],1,'','not-a-uuid',' f89d1cf9-893f-4fb6-a924-6669b4568221'])assert.equal(isUuid(value),false);

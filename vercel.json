@@ -38,7 +38,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' https://wbsynfcjpwlgdzioqpoa.supabase.co wss://wbsynfcjpwlgdzioqpoa.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self' https://wbsynfcjpwlgdzioqpoa.supabase.co wss://wbsynfcjpwlgdzioqpoa.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     },
@@ -146,7 +146,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' https://wbsynfcjpwlgdzioqpoa.supabase.co wss://wbsynfcjpwlgdzioqpoa.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self' https://wbsynfcjpwlgdzioqpoa.supabase.co wss://wbsynfcjpwlgdzioqpoa.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     },

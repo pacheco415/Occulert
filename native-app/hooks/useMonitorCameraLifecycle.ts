@@ -1,3 +1,4 @@
+import { strings } from '../lib/strings.ts';
 import React, { useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { type CameraRuntimeError } from 'react-native-vision-camera';
@@ -95,7 +96,7 @@ export function useMonitorCameraLifecycle({
     if (active) deliverMonitoringPausedCue();
     if (isRunningRef.current || startingRef.current) {
       void handleStopRef.current({ deferCloudFinalization: true }).catch(() => {
-        Alert.alert('Drive may not be fully saved', 'Camera monitoring is paused. Occulert could not finish saving this drive.');
+        Alert.alert(strings.monitor.dialogs.incompleteSaveTitle, strings.monitor.dialogs.incompleteSaveCamera);
       });
     }
   }, [deliverMonitoringPausedCue]);
@@ -181,7 +182,7 @@ export function useMonitorCameraLifecycle({
       if (interruption === 'ready' && captureTransitionRef.current.shouldDefer(checkedAt, lastSampleAtRef.current)) return;
       performanceTrackerRef.current.recordCameraStall();
       if (interruption === 'ready' && attemptCameraRecovery()) return;
-      const message = 'Monitoring stopped: camera analysis stalled. Pull over safely before checking the phone or restarting.';
+      const message = strings.monitor.faults.analysisStalled;
       setSensorFault(message);
       deliverMonitoringPausedCue();
       void handleStopRef.current();
@@ -200,7 +201,7 @@ export function useMonitorCameraLifecycle({
       baselineGenerationRef.current += 1;baselineCollectorRef.current.reset();
       setupPreviewActiveRef.current = false;
       setSetupPreviewActive(false);
-      setSensorFault('Camera preview could not start. Close other camera apps and try the setup check again.');
+      setSensorFault(strings.monitor.faults.previewFailed);
       return;
     }
     if (!isRunningRef.current || stoppingRef.current) return;
@@ -211,7 +212,7 @@ export function useMonitorCameraLifecycle({
       && attemptCameraRecovery()
     ) return;
     setSensorFault(
-      'Monitoring stopped: the camera became unavailable. Pull over safely before checking the phone or restarting.',
+      strings.monitor.faults.cameraUnavailable,
     );
     deliverMonitoringPausedCue();
     void handleStopRef.current();
@@ -220,7 +221,7 @@ export function useMonitorCameraLifecycle({
   useEffect(() => {
     if (!isRunning || cameraLoadPolicy.mode !== 'stop') return;
     setSensorFault(
-      'Monitoring stopped because the iPhone became too hot. Pull over safely and let the phone cool before restarting.',
+      strings.monitor.faults.overheated,
     );
     deliverMonitoringPausedCue();
     void handleStopRef.current();

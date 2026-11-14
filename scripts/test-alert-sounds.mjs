@@ -7,6 +7,7 @@ import {
   configureAlertSound,
   parseAlertSound,
 } from '../native-app/lib/alertSound.ts';
+import { strings } from '../native-app/lib/strings.ts';
 
 test('alert sound choices have a safe default and distinct audible profiles', () => {
   assert.equal(parseAlertSound(null), 'classic');
@@ -22,15 +23,18 @@ test('the selected sound is wired through Settings and phone alert playback', ()
   const alertSystem = readFileSync(new URL('../native-app/components/AlertSystem.tsx', import.meta.url), 'utf8');
   const soundModule = readFileSync(new URL('../native-app/lib/alertSound.ts', import.meta.url), 'utf8');
   assert.match(settings, /ALERT_SOUND_PREFERENCE_KEY/);
-  assert.match(settings, /Alert sound/);
+  assert.match(settings, /strings\.settings\.alerts\.soundTitle/);
+  assert.equal(strings.settings.alerts.soundTitle, 'Alert sound');
   assert.match(settings, /ALERT_SOUND_OPTIONS/);
-  assert.match(soundModule, /Classic/);
-  assert.match(soundModule, /Lower/);
-  assert.match(soundModule, /Higher/);
+  for (const [value, label] of [['classic', 'Classic'], ['lower', 'Lower'], ['higher', 'Higher']]) {
+    assert.ok(soundModule.includes(`label: strings.settings.alertSounds.${value}.label`));
+    assert.equal(alertSoundProfile(value).label, label);
+  }
   assert.match(settings, /configureAlertSound\(audioTestPlayer, alertSound\)/);
   assert.match(alertSystem, /preferences\.alertSound/);
   assert.match(alertSystem, /configureAlertSound\(player, preferences.alertSound\)/);
-  assert.match(settings, /centered three-tone critical sequence/);
+  assert.match(settings, /strings\.settings\.audioTest\.parkedDetail/);
+  assert.match(strings.settings.audioTest.parkedDetail, /centered three-tone critical sequence/);
 });
 
 test('native pitch algorithm is selected before rate changes, including return to Classic', () => {
