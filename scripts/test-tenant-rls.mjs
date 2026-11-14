@@ -96,6 +96,12 @@ try {
   const context = { module: { exports: {} }, process: { env: { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-role' } }, require(name) {
     if (name !== './_lib/supabase') return require(name.startsWith('./_lib/') ? '../api/' + name.slice(2) : name);
     return { verifyAccessToken: async () => ({ id: concurrentUser, email: 'concurrent@example.com' }), bearerToken: () => 'fixture-token', async pgFetch(table, options) {
+      if (table === 'rpc/reserve_account_write') {
+        assert.equal(options.method, 'POST');
+        assert.deepEqual(JSON.parse(JSON.stringify(options.body)), { p_user_id: concurrentUser, p_operation: 'profile' });
+        return (await db.query('select public.reserve_account_write($1::uuid,$2::text) as result',
+          [options.body.p_user_id, options.body.p_operation])).rows[0].result;
+      }
       assert.equal(table, 'drivers');
       if (!options.method) {
         assert.equal(options.params.user_id, 'eq.' + concurrentUser);
@@ -125,6 +131,8 @@ try {
   assert.equal(profiles[0].body.driver.id, profiles[1].body.driver.id);
   const ownProfile = (await db.query('select * from drivers where user_id=$1', [concurrentUser])).rows;
   assert.equal(ownProfile.length, 1); assert.equal(ownProfile[0].fleet_id, null);
+  assert.equal((await db.query("select write_count from public.account_write_rate_limits where user_id=$1 and operation='profile'", [concurrentUser])).rows[0].write_count, 2,
+    'both admitted creation attempts are charged, including the recovered insert conflict');
   assert.equal((await db.query('select name,fleet_id from drivers where user_id=$1', [driverB])).rows[0].name, 'B');
   assert.equal((await db.query('select name,fleet_id from drivers where user_id=$1', [driverB])).rows[0].fleet_id, fleetB);
 

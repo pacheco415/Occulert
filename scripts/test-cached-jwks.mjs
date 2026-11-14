@@ -276,7 +276,13 @@ test('actual email gates reject editable confirmation metadata and profile refre
     assert.equal(result.statusCode, 403, route); assert.equal(result.body.error, 'email_not_verified');
   }
   const updates = [], f = networkFixture(async () => Response.json({ id: subject, email: 'current@example.com' }));
-  f.lib.pgFetch = async (table, options = {}) => { assert.equal(table, 'drivers');
+  f.lib.pgFetch = async (table, options = {}) => {
+    if (table === 'rpc/reserve_account_write') {
+      assert.equal(options.method, 'POST');
+      assert.deepEqual(JSON.parse(JSON.stringify(options.body)), { p_user_id: subject, p_operation: 'profile' });
+      return { allowed: true, user_id: subject, operation: 'profile' };
+    }
+    assert.equal(table, 'drivers');
     if (!options.method) return [{ id: subject, user_id: subject, name: 'Saved', vehicle_id: 'TRK-7', active: false }];
     updates.push(options.body); return [{ id: subject, ...options.body }]; };
   const result = await invoke(f.load('profile.js'), protectedRequest('profile', liveJwt(), 'POST'));
