@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, realpathSync, statfsSync, writeFileSync } from
 import { constants } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { startLibraryEvidence } from './lib/browser-library-evidence.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const STDERR_TAIL_BYTES = 2 * 1024 * 1024;
@@ -40,7 +41,7 @@ export function snapshotResources({ platform = process.platform, procRoot = '/pr
 
 // The exported runner lets regressions exercise real child exits without launching a browser.
 // The command-line entry point below accepts only the three fixed browser modes.
-export async function runProcessWithDiagnostics({ command, args, mode, cwd = root, diagnosticDirectory = join(root, 'playwright-report/browser-process'), probeOptions, stdout = process.stdout, stderr = process.stderr }) {
+export async function runProcessWithDiagnostics({ command, args, mode, cwd = root, diagnosticDirectory = join(root, 'playwright-report/browser-process'), probeOptions, libraryProbeOptions, stdout = process.stdout, stderr = process.stderr }) {
   if (!Object.hasOwn(modes, mode)) throw new Error('Expected browser mode: onboarding, chromium or webkit');
   const receipt = {
     schema: 1, mode, startedAt: new Date().toISOString(), state: 'running',
@@ -48,14 +49,14 @@ export async function runProcessWithDiagnostics({ command, args, mode, cwd = roo
     before: snapshotResources(probeOptions), after: null,
     exit: null, forwardedSignals: [],
     stderr: { maximumRetainedBytes: STDERR_TAIL_BYTES, totalBytes: 0, retainedBytes: 0, truncated: false },
-    diagnosticErrors: [],
+    diagnosticErrors: [], libraries: null,
   };
   const save = (name, contents) => {
     try { mkdirSync(diagnosticDirectory, { recursive: true }); writeFileSync(join(diagnosticDirectory, name), contents); }
     catch (error) { receipt.diagnosticErrors.push({ file: name, error: errorCode(error) }); }
   };
   save(`${mode}.json`, JSON.stringify(receipt, null, 2) + '\n');
-  let tail = Buffer.alloc(0), child;
+  let tail = Buffer.alloc(0), child, libraryEvidence;
   try {
     child = spawn(command, args, { cwd, env: { ...process.env, DEBUG: 'pw:browser' }, stdio: ['inherit', 'pipe', 'pipe'] });
   } catch (error) {
@@ -77,16 +78,19 @@ export async function runProcessWithDiagnostics({ command, args, mode, cwd = roo
           : Buffer.concat([tail.subarray(Math.max(0, tail.length + chunk.length - STDERR_TAIL_BYTES)), chunk]);
       });
       child.stderr.pipe(stderr, { end: false });
+      libraryEvidence = startLibraryEvidence({ ...probeOptions, ...libraryProbeOptions, rootPid: child.pid });
       receipt.exit = await new Promise(resolveExit => {
         let spawnError = null;
         child.once('error', error => { spawnError = errorCode(error); });
         child.once('close', (code, signal) => resolveExit({ code: spawnError ? 1 : code, signal, spawnError }));
       });
     } finally {
+      receipt.libraries = libraryEvidence?.stop() || null;
       process.off('SIGINT', interrupt);
       process.off('SIGTERM', terminate);
     }
   }
+  if (!receipt.libraries) receipt.libraries = startLibraryEvidence({ ...probeOptions, rootPid: null }).stop();
   receipt.state = 'finished';
   receipt.finishedAt = new Date().toISOString();
   receipt.after = snapshotResources(probeOptions);
