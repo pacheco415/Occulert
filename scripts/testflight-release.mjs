@@ -10,6 +10,7 @@ import {
   validateRun, newestRun, validateJobs, mergedPull, validateFlags,
   validateSourceConfig, validateResolvedConfig, validateEnvironmentList,
   validateProjectInfo, buildSummary, validateReceipt, validateArchiveReview,
+  validateRecoverableRun, matchQueuedBuild, matchReceiptInputs,
 } from './lib/testflight-policy.mjs';
 import { inspectArchive } from './lib/testflight-archive.mjs';
 
@@ -87,34 +88,39 @@ export async function sourceProof({ client, context, input, isAncestor, readMerg
   phase = 'protected main and exact source checks';
   const main = await client.request('/branches/main');
   validateContext(context, main, input);
-  assert.equal(await isAncestor(input.sourceSha, main.commit.sha), true, 'Source is not an ancestor of protected main.');
-  assert.equal(/\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]|(?:^|\n)skip-checks:\s*true\s*(?:\n|$)/i.test(await readMergeMessage(input.sourceSha)), false, 'Source merge message contains a CI skip token.');
+  async function proveCommit(sourceSha) {
+  assert.equal(await isAncestor(sourceSha, main.commit.sha), true, 'Source is not an ancestor of protected main.');
+  assert.equal(/\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]|(?:^|\n)skip-checks:\s*true\s*(?:\n|$)/i.test(await readMergeMessage(sourceSha)), false, 'Source merge message contains a CI skip token.');
   const checks = [];
   for (const [workflow, names] of Object.entries(REQUIRED_WORKFLOWS)) {
-    const runs = await client.pages(`/actions/workflows/${workflow}/runs?head_sha=${input.sourceSha}&event=push&branch=main`, 'workflow_runs');
+    const runs = await client.pages(`/actions/workflows/${workflow}/runs?head_sha=${sourceSha}&event=push&branch=main`, 'workflow_runs');
     const run = newestRun(runs);
-    const proof = validateRun(run, { sourceSha: input.sourceSha, workflow });
+    const proof = validateRun(run, { sourceSha, workflow });
     const jobs = await client.pages(`/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`, 'jobs');
     validateJobs(jobs, run, names);
     checks.push(proof);
   }
   // pull_request_target checks belong to the PR head, not the resulting merge.
-  const pull = mergedPull(await client.pages(`/commits/${input.sourceSha}/pulls`), input.sourceSha);
+  const pull = mergedPull(await client.pages(`/commits/${sourceSha}/pulls`), sourceSha);
   const policyRuns = await client.pages(`/actions/workflows/ci-policy.yml/runs?head_sha=${pull.head.sha}&event=pull_request_target`, 'workflow_runs');
   const policy = newestRun(policyRuns);
   let mergedPolicyEvidence;
   if (Array.isArray(policy.pull_requests) && policy.pull_requests.length === 0) {
     const currentPull = await client.request(`/pulls/${pull.number}`);
     const commits = await client.pages(`/pulls/${pull.number}/commits`);
-    mergedPolicyEvidence = { sourceSha: input.sourceSha, listedPull: pull, currentPull, commits };
+    mergedPolicyEvidence = { sourceSha, listedPull: pull, currentPull, commits };
   }
   checks.push(validateRun(policy, { sourceSha: pull.head.sha, workflow: 'ci-policy.yml', event: 'pull_request_target',
     pullNumber: pull.number, mergedPolicyEvidence }));
   validateJobs(await client.pages(`/actions/runs/${policy.id}/attempts/${policy.run_attempt}/jobs`, 'jobs'), policy, ['Reject CI skip tokens']);
+  return { sourceSha, mergedPull: pull.number, checks };
+  }
+  const source = await proveCommit(input.sourceSha);
+  const control = context.workflowSha === input.sourceSha ? source : await proveCommit(context.workflowSha);
   const currentMain = await client.request('/branches/main');
   validateContext(context, currentMain, input);
   assert.equal(currentMain.commit.sha, main.commit.sha, 'Main advanced while source checks were read.');
-  return { mainSha: main.commit.sha, mergedPull: pull.number, checks };
+  return { mainSha: main.commit.sha, mergedPull: source.mergedPull, checks: source.checks, control };
 }
 
 function contextFromEnv(env = process.env) {
@@ -197,24 +203,77 @@ function readSourceConfig(source) {
   return { app, eas };
 }
 
-async function getReceipt(client, input, state, temporaryRoot) {
-  const run = await client.request(`/actions/runs/${input.evidenceRunId}`);
-  validateRun(run, { sourceSha: input.sourceSha, workflow: 'testflight-release.yml', event: 'workflow_dispatch', runId: input.evidenceRunId, attempt: 1 });
-  const mode = input.mode === 'build' ? 'preflight' : 'build';
-  const artifacts = await client.pages(`/actions/runs/${input.evidenceRunId}/artifacts`, 'artifacts');
-  const matching = artifacts.filter(artifact => artifact.name === `testflight-${mode}-${input.evidenceRunId}`);
+export async function readEvidenceArtifact({ client, run, mode, source, temporaryRoot, artifacts }) {
+  assert.ok(['preflight', 'build-queued', 'build', 'recover'].includes(mode), 'Unknown evidence artifact mode.');
+  artifacts ??= await client.pages(`/actions/runs/${run.id}/artifacts`, 'artifacts');
+  const queued = mode === 'build-queued';
+  const matching = artifacts.filter(artifact => artifact.name === `testflight-${queued ? 'queued' : mode}-${run.id}`);
   assert.equal(matching.length, 1, 'The exact successful evidence artifact is required.');
   const artifact = matching[0];
   assert.equal(artifact.expired, false, 'Evidence artifact has expired.');
-  assert.ok(Number.isSafeInteger(artifact.id) && artifact.id > 0 && artifact.size_in_bytes <= 128 * 1024, 'Invalid evidence artifact.');
+  assert.ok(Number.isSafeInteger(artifact.id) && artifact.id > 0
+    && Number.isSafeInteger(artifact.size_in_bytes) && artifact.size_in_bytes > 0 && artifact.size_in_bytes <= 128 * 1024, 'Invalid evidence artifact.');
   assert.equal(artifact.workflow_run?.id, run.id, 'Artifact belongs to another run.');
-  assert.equal(artifact.workflow_run?.head_sha, input.sourceSha, 'Artifact source differs.');
-  const zip = resolve(temporaryRoot, 'prior-receipt.zip');
-  writeFileSync(zip, await client.request(`/actions/artifacts/${artifact.id}/zip`, { binary: true }), { mode: 0o600 });
+  assert.equal(artifact.workflow_run?.head_sha, run.head_sha, 'Artifact control source differs.');
+  assert.equal(artifact.workflow_run?.repository_id, RELEASE.repositoryId, 'Artifact repository differs.');
+  assert.equal(artifact.workflow_run?.head_repository_id, RELEASE.repositoryId, 'Artifact head repository differs.');
+  const zip = resolve(temporaryRoot, `evidence-${mode}-${run.id}.zip`);
+  const bytes = await client.request(`/actions/artifacts/${artifact.id}/zip`, { binary: true });
+  assert.ok(Buffer.isBuffer(bytes) && bytes.length === artifact.size_in_bytes, 'Evidence artifact size differs.');
+  assert.equal(artifact.digest, `sha256:${hash(bytes)}`, 'Evidence artifact digest differs.');
+  writeFileSync(zip, bytes, { mode: 0o600 });
   const members = execFileSync('unzip', ['-Z1', zip], { encoding: 'utf8', maxBuffer: 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  assert.equal(members, 'receipt.json', 'Evidence archive contains unexpected files.');
-  const raw = execFileSync('unzip', ['-p', zip, 'receipt.json'], { encoding: 'utf8', maxBuffer: 32768, stdio: ['ignore', 'pipe', 'pipe'] });
-  return validateReceipt(JSON.parse(raw), { mode, run, source: state });
+  const member = queued ? 'queued.json' : 'receipt.json';
+  assert.equal(members, member, 'Evidence archive contains unexpected files.');
+  const raw = execFileSync('unzip', ['-p', zip, member], { encoding: 'utf8', maxBuffer: 32768, stdio: ['ignore', 'pipe', 'pipe'] });
+  return validateReceipt(JSON.parse(raw), { mode, run, source });
+}
+
+export async function getQueuedOrigin({ client, runId, source, temporaryRoot }) {
+  const run = await client.request(`/actions/runs/${runId}`);
+  assert.ok(Number.isSafeInteger(run?.id) && String(run.id) === runId, 'Original run identity differs.');
+  const jobs = await client.pages(`/actions/runs/${run.id}/attempts/1/jobs`, 'jobs');
+  validateRecoverableRun(run, jobs, { sourceSha: source.sourceSha, runId });
+  const artifacts = await client.pages(`/actions/runs/${run.id}/artifacts`, 'artifacts');
+  assert.ok(!artifacts.some(artifact => ['build', 'recover'].some(mode => artifact.name === `testflight-${mode}-${run.id}`)),
+    'A final receipt makes failed-run recovery ambiguous.');
+  const queued = await readEvidenceArtifact({ client, run, mode: 'build-queued', source, temporaryRoot, artifacts });
+  const preflightRun = await client.request(`/actions/runs/${queued.preflightRunId}`);
+  validateRun(preflightRun, { sourceSha: source.sourceSha, workflow: 'testflight-release.yml', event: 'workflow_dispatch',
+    runId: queued.preflightRunId, attempt: 1 });
+  const preflight = await readEvidenceArtifact({ client, run: preflightRun, mode: 'preflight', source, temporaryRoot });
+  matchReceiptInputs(queued, preflight);
+  return queued;
+}
+
+export async function getReceipt(client, input, state, temporaryRoot, isAncestor) {
+  if (input.mode === 'recover') {
+    const queued = await getQueuedOrigin({ client, runId: input.evidenceRunId, source: state, temporaryRoot });
+    assert.equal(queued.build.idSha256, input.buildIdSha256, 'Recovery fingerprint differs from the original queue.');
+    return queued;
+  }
+  const run = await client.request(`/actions/runs/${input.evidenceRunId}`);
+  // A successful recovery workflow may be newer than the original app source.
+  // Its head is checked independently and must still belong to protected main.
+  assert.match(run.head_sha ?? '', SHA, 'Evidence control identity is malformed.');
+  validateRun(run, { sourceSha: run.head_sha, workflow: 'testflight-release.yml', event: 'workflow_dispatch',
+    runId: input.evidenceRunId, attempt: 1 });
+  assert.equal(await isAncestor(run.head_sha, state.proof.mainSha), true, 'Evidence control is outside protected main history.');
+  assert.equal(await isAncestor(input.sourceSha, run.head_sha), true, 'Evidence control does not descend from the original source.');
+  const artifacts = await client.pages(`/actions/runs/${run.id}/artifacts`, 'artifacts');
+  const modes = input.mode === 'build' ? ['preflight'] : ['build', 'recover'];
+  const matchingModes = modes.filter(mode => artifacts.some(artifact => artifact.name === `testflight-${mode}-${run.id}`));
+  assert.equal(matchingModes.length, 1, 'Successful evidence mode is missing or ambiguous.');
+  const mode = matchingModes[0];
+  if (mode !== 'recover') assert.equal(run.head_sha, input.sourceSha, 'Build/preflight control must match its app source.');
+  const receipt = await readEvidenceArtifact({ client, run, mode, source: state, temporaryRoot, artifacts });
+  if (mode === 'recover') {
+    const queued = await getQueuedOrigin({ client, runId: receipt.queuedBuildRunId, source: state, temporaryRoot });
+    assert.equal(receipt.preflightRunId, queued.preflightRunId, 'Recovery preflight origin differs.');
+    matchReceiptInputs(receipt, queued);
+    matchQueuedBuild(receipt.build, queued.build);
+  }
+  return receipt;
 }
 
 export function runCaptured(command, args, { cwd, env, timeout = 120000, maxBytes = 8 * 1024 * 1024 } = {}) {
@@ -294,6 +353,7 @@ export function publicReceipt(state, context, mode, detail = {}) {
     nativeTree: state.nativeTree, sharedBlob: state.sharedBlob, easignoreBlob: state.easignoreBlob,
     easVersion: RELEASE.easVersion, createdAt: new Date().toISOString(),
     sourceChecks: state.proof.checks.map(({ workflow, runId, attempt }) => ({ workflow, runId, attempt })),
+    controlChecks: (state.proof.control?.checks ?? state.proof.checks).map(({ workflow, runId, attempt }) => ({ workflow, runId, attempt })),
     sourceArchive: { files: state.preflight.sourceArchive.files, sha256: state.preflight.sourceArchive.sha256 },
     productionEnvironmentVerified: state.preflight.productionEnvironmentVerified,
     productionEnvironmentSha256: state.preflight.productionEnvironmentSha256 };
@@ -307,11 +367,19 @@ export function publicReceipt(state, context, mode, detail = {}) {
     };
   }
   if (detail.artifact) receipt.artifact = { sha256: detail.artifact.sha256, bytes: detail.artifact.bytes };
-  if (mode === 'build' || mode === 'submit') receipt.archiveReview = validateArchiveReview(detail.archiveReview,
+  if (mode === 'build' || mode === 'recover' || mode === 'submit') receipt.archiveReview = validateArchiveReview(detail.archiveReview,
     { source: state, build: receipt.build, artifact: receipt.artifact });
   if (mode === 'build' || mode === 'build-queued') receipt.preflightRunId = detail.evidenceRunId;
+  if (mode === 'recover') {
+    receipt.queuedBuildRunId = state.prior.runId;
+    receipt.preflightRunId = state.prior.preflightRunId;
+  }
   if (mode === 'submit') {
-    receipt.buildRunId = detail.evidenceRunId;
+    if (state.prior?.mode === 'recover') {
+      receipt.recoveryRunId = detail.evidenceRunId;
+      receipt.queuedBuildRunId = state.prior.queuedBuildRunId;
+      receipt.preflightRunId = state.prior.preflightRunId;
+    } else receipt.buildRunId = detail.evidenceRunId;
     receipt.archiveReviewed = true;
     receipt.submissionCommandCompleted = true;
     receipt.appleProcessingAndTesterAvailability = 'not verified by this workflow';
@@ -319,52 +387,105 @@ export function publicReceipt(state, context, mode, detail = {}) {
   return receipt;
 }
 
-export async function ipaDigest(build, fetchImpl = fetch, privatePath) {
-  let url = new URL(build.artifacts?.applicationArchiveUrl ?? '');
+const DOWNLOAD_CODES = new Set(['IPA_URL_MISSING', 'IPA_URL_INVALID', 'IPA_SCHEME', 'IPA_AUTHORITY',
+  'IPA_HOST', 'IPA_FETCH', 'IPA_TIMEOUT', 'IPA_REDIRECT', 'IPA_REDIRECT_LIMIT', 'IPA_STATUS',
+  'IPA_LENGTH', 'IPA_EMPTY', 'IPA_STREAM', 'IPA_ENCODING_STREAM', 'IPA_TOO_LARGE', 'IPA_SIGNATURE',
+  'IPA_LENGTH_MISMATCH', 'IPA_FILE_OPEN', 'IPA_FILE_WRITE', 'IPA_FILE_CLOSE', 'IPA_FILE_CLEANUP']);
+const HOST_CLASSES = ['unknown', 'expo', 'eas-cdn', 'google-storage', 'other'];
+const ENCODINGS = ['absent', 'identity', 'gzip', 'br', 'deflate', 'other'];
+
+export class IpaDownloadError extends Error {
+  constructor(code, details = {}) {
+    assert.ok(DOWNLOAD_CODES.has(code), 'Unknown bounded download code.');
+    super(`IPA download stopped: ${code}.`);
+    this.diagnostic = { schema: 1, code };
+    for (const key of ['redirects', 'status', 'declaredBytes', 'receivedBytes']) {
+      const maximum = key === 'redirects' ? 6 : key === 'status' ? 599 : MAX_IPA + 1;
+      if (Number.isSafeInteger(details[key]) && details[key] >= 0 && details[key] <= maximum) this.diagnostic[key] = details[key];
+    }
+    if (HOST_CLASSES.includes(details.hostClass)) this.diagnostic.hostClass = details.hostClass;
+    if (ENCODINGS.includes(details.encoding)) this.diagnostic.encoding = details.encoding;
+  }
+}
+
+export function downloadDiagnostic(error) {
+  return error instanceof IpaDownloadError && DOWNLOAD_CODES.has(error.diagnostic?.code)
+    ? new IpaDownloadError(error.diagnostic.code, error.diagnostic).diagnostic : null;
+}
+
+export async function ipaDigest(build, fetchImpl = fetch, privatePath, io = { openSync, writeSync, closeSync, rmSync }) {
+  const details = { redirects: 0, hostClass: 'unknown', receivedBytes: 0 };
+  const fail = code => new IpaDownloadError(code, details);
+  const rawUrl = build.artifacts?.applicationArchiveUrl;
+  if (typeof rawUrl !== 'string' || !rawUrl.trim()) throw fail('IPA_URL_MISSING');
+  let url;
+  try { url = new URL(rawUrl); } catch { throw fail('IPA_URL_INVALID'); }
   for (let redirect = 0; redirect <= 5; redirect++) {
-    assert.equal(url.protocol, 'https:', 'IPA download must use HTTPS.');
-    assert.ok(!url.username && !url.password && !url.port, 'Unexpected IPA artifact URL.');
-    assert.ok(['expo.dev', 'artifacts.eascdn.net', 'storage.googleapis.com'].includes(url.hostname)
-      || url.hostname.endsWith('.storage.googleapis.com'), 'Unexpected Expo artifact host.');
+    details.redirects = redirect;
+    details.hostClass = url.hostname === 'expo.dev' ? 'expo' : url.hostname === 'artifacts.eascdn.net' ? 'eas-cdn'
+      : url.hostname === 'storage.googleapis.com' || url.hostname.endsWith('.storage.googleapis.com') ? 'google-storage' : 'other';
+    if (url.protocol !== 'https:') throw fail('IPA_SCHEME');
+    if (url.username || url.password || url.port) throw fail('IPA_AUTHORITY');
+    if (details.hostClass === 'other') throw fail('IPA_HOST');
     // Artifact storage never receives EXPO_TOKEN or GITHUB_TOKEN.
-    const response = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(300000) });
+    let response;
+    try { response = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(300000) }); }
+    catch (error) { throw fail(['TimeoutError', 'AbortError'].includes(error?.name) ? 'IPA_TIMEOUT' : 'IPA_FETCH'); }
+    details.status = response.status;
     if ([301, 302, 303, 307, 308].includes(response.status)) {
-      url = new URL(response.headers.get('location'), url);
+      const location = response.headers.get('location');
+      if (!location) throw fail('IPA_REDIRECT');
+      try { url = new URL(location, url); } catch { throw fail('IPA_REDIRECT'); }
       continue;
     }
-    assert.equal(response.status, 200, 'IPA download failed.');
+    if (response.status !== 200) throw fail('IPA_STATUS');
+    const encoding = response.headers.get('content-encoding');
+    details.encoding = encoding === null ? 'absent' : ENCODINGS.includes(encoding.toLowerCase()) ? encoding.toLowerCase() : 'other';
     const length = response.headers.get('content-length');
-    assert.ok(length === null || (/^[0-9]+$/.test(length) && Number(length) > 0 && Number(length) <= MAX_IPA), 'IPA exceeds the download bound.');
-    assert.ok(response.body, 'IPA download was empty.');
+    if (length !== null) {
+      if (!/^[0-9]+$/.test(length) || !Number.isSafeInteger(Number(length)) || Number(length) <= 0) throw fail('IPA_LENGTH');
+      details.declaredBytes = Math.min(Number(length), MAX_IPA + 1);
+      if (Number(length) > MAX_IPA) throw fail('IPA_TOO_LARGE');
+    }
+    if (!response.body) throw fail('IPA_EMPTY');
     const digest = createHash('sha256');
     let bytes = 0, signature = Buffer.alloc(0), descriptor;
     try {
-      if (privatePath) descriptor = openSync(privatePath, 'wx', 0o600);
+      if (privatePath) {
+        try { descriptor = io.openSync(privatePath, 'wx', 0o600); } catch { throw fail('IPA_FILE_OPEN'); }
+      }
       for await (const chunk of response.body) {
         bytes += chunk.length;
-        assert.ok(bytes <= MAX_IPA, 'IPA exceeds the download bound.');
+        details.receivedBytes = Math.min(bytes, MAX_IPA + 1);
+        if (bytes > MAX_IPA) throw fail('IPA_TOO_LARGE');
         if (signature.length < 4) signature = Buffer.concat([signature, chunk]).subarray(0, 4);
         digest.update(chunk);
         if (descriptor !== undefined) {
           let offset = 0;
           while (offset < chunk.length) {
-            const written = writeSync(descriptor, chunk, offset, chunk.length - offset);
-            assert.ok(written > 0, 'Private IPA write did not progress.');
+            let written;
+            try { written = io.writeSync(descriptor, chunk, offset, chunk.length - offset); }
+            catch { throw fail('IPA_FILE_WRITE'); }
+            if (!Number.isSafeInteger(written) || written <= 0 || written > chunk.length - offset) throw fail('IPA_FILE_WRITE');
             offset += written;
           }
         }
       }
-      assert.ok(bytes > 0 && signature.equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])), 'Artifact is not an IPA ZIP archive.');
-      if (length !== null) assert.equal(bytes, Number(length), 'IPA download is incomplete.');
+      if (!(bytes > 0 && signature.equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])))) throw fail('IPA_SIGNATURE');
+      if (length !== null && bytes !== Number(length)) throw fail('IPA_LENGTH_MISMATCH');
       return { bytes, sha256: digest.digest('hex') };
     } catch (error) {
-      if (descriptor !== undefined) rmSync(privatePath, { force: true });
-      throw error;
+      if (descriptor !== undefined) {
+        try { io.rmSync(privatePath, { force: true }); } catch { throw fail('IPA_FILE_CLEANUP'); }
+      }
+      throw error instanceof IpaDownloadError ? error : fail(details.encoding === 'absent' || details.encoding === 'identity' ? 'IPA_STREAM' : 'IPA_ENCODING_STREAM');
     } finally {
-      if (descriptor !== undefined) closeSync(descriptor);
+      if (descriptor !== undefined) {
+        try { io.closeSync(descriptor); } catch { throw fail('IPA_FILE_CLOSE'); }
+      }
     }
   }
-  throw new Error('Too many IPA artifact redirects.');
+  throw fail('IPA_REDIRECT_LIMIT');
 }
 
 export async function queueBuild({ run, input, context, recheck }) {
@@ -378,7 +499,7 @@ export async function queueBuild({ run, input, context, recheck }) {
   return { privateBuildId: output[0].id, build: buildSummary(output[0], { sourceSha: input.sourceSha, finished: false }) };
 }
 
-export async function resolveBuildId({ run, sourceSha, build }) {
+export async function resolveBuildId({ run, sourceSha, build, queued = false }) {
   assert.match(build.idSha256 ?? '', DIGEST, 'Build fingerprint is missing.');
   assert.match(build.appBuildVersion ?? '', /^[1-9][0-9]{0,8}$/, 'Recorded build number is invalid.');
   const matches = [], seen = new Set();
@@ -396,7 +517,9 @@ export async function resolveBuildId({ run, sourceSha, build }) {
       assert.ok(!seen.has(value.id), 'Repeated build identity makes pagination ambiguous.');
       seen.add(value.id);
       if (hash(value.id) === build.idSha256) {
-        assert.deepEqual(buildSummary(value, { sourceSha }), build, 'Resolved build differs from the trusted receipt.');
+        const completed = buildSummary(value, { sourceSha });
+        if (queued) matchQueuedBuild(completed, build);
+        else assert.deepEqual(completed, build, 'Resolved build differs from the trusted receipt.');
         matches.push(value.id);
       }
     }
@@ -406,6 +529,34 @@ export async function resolveBuildId({ run, sourceSha, build }) {
     }
   }
   throw new Error('EAS build inventory exceeded its pagination bound.');
+}
+
+export function matchFreshPreflight(preflight, prior) {
+  assert.equal(preflight?.productionEnvironmentVerified, true, 'A completed preflight is required.');
+  assert.deepEqual(preflight.sourceArchive, prior.sourceArchive, 'Fresh source archive differs from trusted evidence.');
+  assert.equal(preflight.productionEnvironmentSha256, prior.productionEnvironmentSha256, 'Fresh production environment differs from trusted evidence.');
+}
+
+export async function recoverBuild({ run, input, prior, preflight, recheck, inspect, digest = ipaDigest }) {
+  assert.equal(input.mode, 'recover', 'Recovery is a separate read-only operation.');
+  assert.equal(prior.mode, 'build-queued', 'Recovery requires original queued evidence.');
+  assert.equal(prior.runId, input.evidenceRunId, 'Recovery run differs from original queued evidence.');
+  assert.equal(prior.build.idSha256, input.buildIdSha256, 'Recovery fingerprint differs.');
+  assert.equal(typeof inspect, 'function', 'Actual archive inspection is required.');
+  matchFreshPreflight(preflight, prior);
+  await recheck();
+  phase = 'resolve the exact completed queued build';
+  const privateBuildId = await resolveBuildId({ run, sourceSha: input.sourceSha, build: prior.build, queued: true });
+  const metadata = JSON.parse(await run(['build:view', privateBuildId, '--json']));
+  const summary = buildSummary(metadata, { sourceSha: input.sourceSha, buildId: privateBuildId });
+  matchQueuedBuild(summary, prior.build);
+  phase = 'download and hash the recovered IPA privately';
+  const artifact = await digest(metadata);
+  phase = 'inspect the actual recovered phone and Watch archive';
+  const archiveReview = validateArchiveReview(await inspect(artifact, summary), { source: prior, build: summary, artifact });
+  // No receipt exists until both the inspector and fresh source/control proof pass.
+  await recheck();
+  return { build: summary, artifact, archiveReview };
 }
 
 export async function submitBuild({ run, input, prior, recheck, inspect, digest = ipaDigest }) {
@@ -450,7 +601,8 @@ export async function runRelease(command) {
     git(['worktree', 'add', '--detach', paths.source, input.sourceSha]);
     const state = { ...sourceIdentity(input.sourceSha, paths.source), proof };
     readSourceConfig(paths.source);
-    if (input.mode !== 'preflight') state.prior = await getReceipt(client, input, state, paths.root);
+    if (input.mode !== 'preflight') state.prior = await getReceipt(client, input, state, paths.root,
+      (candidate, main) => { try { git(['merge-base', '--is-ancestor', candidate, main]); return true; } catch { return false; } });
     writeJson(paths.state, state);
     console.log(`Verified reviewed main source ${input.sourceSha}; mode ${input.mode}.`);
     return;
@@ -465,9 +617,8 @@ export async function runRelease(command) {
     state.preflight = await easPreflight({ run, source: paths.source, sourceSha: input.sourceSha,
       archiveRoot: resolve(paths.root, 'preflight-archive'), config });
     sourceIdentity(input.sourceSha, paths.source);
-    if (input.mode === 'build') {
-      assert.deepEqual(state.preflight.sourceArchive, state.prior.sourceArchive, 'Source archive differs from preflight.');
-      assert.equal(state.preflight.productionEnvironmentSha256, state.prior.productionEnvironmentSha256, 'Production environment changed since preflight.');
+    if (input.mode === 'build' || input.mode === 'recover' || input.mode === 'submit') {
+      matchFreshPreflight(state.preflight, state.prior);
     }
     writeJson(paths.state, state);
     if (input.mode === 'preflight') writeJson(paths.receipt, publicReceipt(state, context, 'preflight'));
@@ -518,6 +669,24 @@ export async function runRelease(command) {
     }
     throw new Error('Build wait expired. Preserve the queued build ID; do not rerun the build job.');
   }
+  if (command === 'recover') {
+    assert.ok(client, 'Fresh source and control evidence is required for recovery.');
+    assert.equal(state.preflight?.productionEnvironmentVerified, true, 'A completed preflight is required.');
+    assert.deepEqual(state.preflight.sourceArchive, state.prior.sourceArchive, 'Recovery archive differs.');
+    assert.equal(state.preflight.productionEnvironmentSha256, state.prior.productionEnvironmentSha256, 'Recovery environment differs.');
+    const ipaPath = resolve(paths.root, 'private-build.ipa');
+    const completed = await recoverBuild({ run, input, prior: state.prior, preflight: state.preflight,
+      digest: metadata => ipaDigest(metadata, fetch, ipaPath),
+      inspect: (artifact, build) => inspectArchive({ sourceRoot: paths.source, temporaryRoot: paths.root,
+        source: state, build, artifact, ipaPath, execute: runCaptured, env: publicEnvironment() }),
+      recheck: async () => {
+        state.proof = await refreshProof(client, context, input, paths.source);
+        sourceIdentity(input.sourceSha, paths.source);
+      } });
+    writeJson(paths.receipt, publicReceipt(state, context, 'recover', completed));
+    console.log(`Recovered build fingerprint ${completed.build.idSha256}; IPA SHA-256 ${completed.artifact.sha256}. No build, version-counter or submission operation was performed.`);
+    return;
+  }
   if (command === 'submit') {
     assert.ok(client, 'Fresh GitHub evidence is required before a release mutation.');
     assert.equal(state.preflight?.productionEnvironmentVerified, true, 'A completed preflight is required.');
@@ -539,10 +708,15 @@ export async function runRelease(command) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { await runRelease(process.argv[2]); }
-  catch {
+  catch (error) {
     // Provider output, environment values, signed artifact URLs and secrets must
     // never enter logs, summaries or uploaded receipts, including failure paths.
     console.error(`TestFlight control stopped during ${phase}. No automatic retry will occur. Raw provider output is withheld; retain any queued-build receipt.`);
+    const diagnostic = downloadDiagnostic(error);
+    if (diagnostic) {
+      console.error(`Bounded download diagnostic: ${JSON.stringify(diagnostic)}`);
+      try { writeJson(resolve(pathsFromEnv().root, 'download-diagnostic.json'), diagnostic); } catch { /* Do not print filesystem paths or secondary failures. */ }
+    }
     process.exitCode = 1;
   }
 }

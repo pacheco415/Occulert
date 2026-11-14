@@ -10,12 +10,14 @@ import {
   RELEASE, REQUIRED_WORKFLOWS, OFF_FLAGS, ABSENT_FLAGS,
   parseInputs, validateContext, validateSourceConfig, validateResolvedConfig,
   validateEnvironmentList, validateProjectInfo, buildSummary, validateReceipt, validateArchiveReview,
+  validateRecoverableRun, matchQueuedBuild, matchReceiptInputs,
 } from './lib/testflight-policy.mjs';
 import { archiveContract } from './lib/testflight-archive.mjs';
 import {
   sourceProof, sourceIdentity, verifySourceArchive, easPreflight, queueBuild,
   submitBuild, ipaDigest, githubClient, boundedBody, runCaptured,
   publicEnvironment, pathsFromEnv, publicReceipt, resolveBuildId,
+  getQueuedOrigin, getReceipt, readEvidenceArtifact, recoverBuild, IpaDownloadError, downloadDiagnostic,
 } from './testflight-release.mjs';
 import { auditWorkflowPolicy } from './lib/workflow-policy.mjs';
 
@@ -29,8 +31,8 @@ const context = { repository: RELEASE.repository, eventName: 'workflow_dispatch'
   workflowSha: sha, sha };
 const main = { name: 'main', protected: true, commit: { sha } };
 const input = mode => parseInputs({ mode, sourceSha: sha,
-  evidenceRunId: mode === 'preflight' ? '' : '123',
-  buildIdSha256: mode === 'submit' ? buildFingerprint : '', archiveSha256: mode === 'submit' ? digest : '',
+  evidenceRunId: mode === 'preflight' ? '' : mode === 'recover' ? '321' : '123',
+  buildIdSha256: ['recover', 'submit'].includes(mode) ? buildFingerprint : '', archiveSha256: mode === 'submit' ? digest : '',
   archiveReviewed: mode === 'submit' ? 'true' : 'false' });
 const source = { sourceSha: sha, sourceTree: other, nativeTree: other, sharedBlob: other, easignoreBlob: other };
 const config = {
@@ -117,7 +119,7 @@ const prove = fixture => sourceProof({ client: fixture.client, context, input: i
   isAncestor: async () => true, readMergeMessage: async () => 'Merge reviewed source' });
 
 test('manual inputs enforce exact identities and distinct operations', () => {
-  for (const mode of ['preflight', 'build', 'submit']) assert.equal(input(mode).mode, mode);
+  for (const mode of ['preflight', 'build', 'recover', 'submit']) assert.equal(input(mode).mode, mode);
   for (const fields of [
     { mode: 'other' }, { sourceSha: 'main' }, { sourceSha: sha.toUpperCase() },
     { sourceSha: `${sha}; touch /tmp/unwanted` }, { evidenceRunId: '123' },
@@ -137,6 +139,7 @@ test('workflow context rejects branch dispatches, reruns, unprotected or advance
   assert.throws(() => validateContext(context, { ...main, commit: { sha: other } }, input('build')));
   assert.throws(() => validateContext(context, main, { ...input('build'), sourceSha: other }));
   validateContext(context, main, { ...input('submit'), sourceSha: other });
+  validateContext(context, main, { ...input('recover'), sourceSha: other });
 });
 
 test('complete source proof uses main push checks and the exact merged PR head policy', async () => {
@@ -459,6 +462,7 @@ test('every public receipt path allowlists fields and excludes private IDs, prov
   const privateValues = [buildId, RELEASE.projectId, RELEASE.appleTeamId, RELEASE.ascAppId,
     'private-account-id', 'https://storage.googleapis.com/private.ipa?secret-signature'];
   const state = { ...source, privateBuildId: buildId, proof: { checks: [{ workflow: 'site-audit.yml', runId: '99', attempt: 1, account: privateValues[4] }] },
+    prior: { mode: 'recover', runId: '321', queuedBuildRunId: '321', preflightRunId: '122' },
     preflight: { sourceArchive: { files: 200, sha256: digest, signedUrl: privateValues[5] },
       productionEnvironmentVerified: true, productionEnvironmentSha256: digest, privateConfig: privateValues }, privateValues };
   const detail = { evidenceRunId: '123', build: { ...receipt('build').build, id: buildId,
@@ -468,7 +472,7 @@ test('every public receipt path allowlists fields and excludes private IDs, prov
     archiveReview: { ...archiveReview(), signedUrl: privateValues[5], provider: privateValues,
       phone: { ...archiveReview().phone, teamIdentifier: RELEASE.appleTeamId },
       privacy: { ...archiveReview().privacy, domains: privateValues } } };
-  for (const mode of ['preflight', 'build-queued', 'build', 'submit']) {
+  for (const mode of ['preflight', 'build-queued', 'build', 'recover', 'submit']) {
     const value = publicReceipt(state, context, mode, mode === 'preflight' ? {} : detail);
     const text = JSON.stringify(value);
     for (const secret of privateValues) assert.equal(text.includes(secret), false, `${mode} public receipt exposed private metadata`);
@@ -661,12 +665,320 @@ test('workflow connects tested controls, isolates secrets, pins actions and neve
   assert.doesNotMatch(workflow, /permissions:[\s\S]*?write\b|--auto-submit|--latest|createComment|release\/testflight\s*$/m);
   const steps = workflow.split(/^      - /m).slice(1);
   const secretSteps = steps.filter(step => step.includes('EXPO_TOKEN:'));
-  assert.equal(secretSteps.length, 4);
+  assert.equal(secretSteps.length, 5);
   for (const step of secretSteps) {
-    assert.match(step, /run: node scripts\/testflight-release\.mjs (?:preflight|queue|finish|submit)\s*$/m);
+    assert.match(step, /run: node scripts\/testflight-release\.mjs (?:preflight|queue|finish|recover|submit)\s*$/m);
     assert.doesNotMatch(step, /npm ci|npm install|upload-artifact/);
   }
-  for (const command of ['source', 'preflight', 'queue', 'finish', 'submit']) assert.match(workflow, new RegExp(`run: node scripts/testflight-release\\.mjs ${command}\\s*$`, 'm'));
+  for (const command of ['source', 'preflight', 'queue', 'finish', 'recover', 'submit']) assert.match(workflow, new RegExp(`run: node scripts/testflight-release\\.mjs ${command}\\s*$`, 'm'));
+  assert.match(steps.find(step => step.includes('testflight-release.mjs recover')), /if: inputs.mode == 'recover'/);
+  assert.match(steps.find(step => step.includes('testflight-release.mjs queue')), /if: inputs.mode == 'build'/);
+  assert.match(steps.find(step => step.includes('testflight-release.mjs submit')), /if: inputs.mode == 'submit'/);
+  const runner = readFileSync(resolve(root, 'scripts/testflight-release.mjs'), 'utf8');
+  const recovery = runner.slice(runner.indexOf("if (command === 'recover')"), runner.indexOf("if (command === 'submit')"));
+  assert.ok(recovery.indexOf('await recoverBuild(') < recovery.indexOf('writeJson(paths.receipt'));
+  assert.match(recovery, /publicReceipt\(state, context, 'recover', completed\)/);
   const manifest = JSON.parse(readFileSync(resolve(root, 'scripts/verify-steps.json'), 'utf8'));
   assert.equal(manifest.steps.filter(name => name === 'test:testflight-control').length, 1);
+});
+
+const checkInventory = () => [...Object.keys(REQUIRED_WORKFLOWS), 'ci-policy.yml']
+  .map((workflow, index) => ({ workflow, runId: String(10 + index), attempt: 1 }));
+const queuedReceipt = () => ({ ...receipt('preflight'), mode: 'build-queued', runId: '321', preflightRunId: '123',
+  sourceChecks: checkInventory(), build: buildSummary({ ...metadata(), status: 'NEW' }, { sourceSha: sha, finished: false }) });
+const releaseRun = (id, head = sha, conclusion = 'success') => ({ id, repository, path: RELEASE.workflow,
+  event: 'workflow_dispatch', head_sha: head, head_branch: 'main', status: 'completed', conclusion, run_attempt: 1 });
+const failedReleaseJob = () => ({ name: 'release', run_id: 321, head_sha: sha, status: 'completed', conclusion: 'failure',
+  steps: [
+    ['Require a new manual main dispatch before checkout', 'success', 2],
+    ['Validate reviewed source and prior workflow evidence', 'success', 5],
+    ['Install the pinned release CLI and exact source dependencies without credentials', 'success', 6],
+    ['Read-only Expo preflight and complete source archive comparison', 'success', 7],
+    ['Recheck source gates and queue exactly one production build', 'success', 8],
+    ['Preserve the public queued build fingerprint before waiting', 'success', 9],
+    ['Wait for that exact build and inspect the private phone and Watch archive', 'failure', 10],
+    ['Recheck the inspected exact build and submit it to TestFlight', 'skipped', 11],
+  ].map(([name, conclusion, number]) => ({ name, conclusion, number, status: 'completed' })) });
+
+function recoveryEvidence() {
+  const directory = mkdtempSync(resolve(tmpdir(), 'occulert-recovery-evidence-'));
+  const queued = queuedReceipt(), preflight = receipt('preflight');
+  const recovered = { ...receipt('build'), mode: 'recover', runId: '456', workflowSha: other,
+    queuedBuildRunId: '321', preflightRunId: '123', sourceChecks: checkInventory(), controlChecks: checkInventory() };
+  const runs = new Map([[123, releaseRun(123)], [321, releaseRun(321, sha, 'failure')], [456, releaseRun(456, other)]]);
+  const bodies = new Map([[123, preflight], [321, queued], [456, recovered]]);
+  const artifacts = new Map(), archives = new Map(), jobs = [failedReleaseJob()], calls = [];
+  function repack(id, member = id === 321 ? 'queued.json' : 'receipt.json') {
+    const bytes = execFileSync('python3', ['-c',
+      'import io,json,sys,zipfile\np=json.load(sys.stdin);b=io.BytesIO()\nwith zipfile.ZipFile(b,"w",zipfile.ZIP_DEFLATED) as z:z.writestr(p["member"],json.dumps(p["body"]))\nsys.stdout.buffer.write(b.getvalue())'],
+    { input: JSON.stringify({ member, body: bodies.get(id) }), maxBuffer: 128 * 1024 });
+    archives.set(id + 1000, bytes);
+    artifacts.set(id, [{ id: id + 1000, name: `testflight-${id === 321 ? 'queued' : id === 456 ? 'recover' : 'preflight'}-${id}`,
+      expired: false, size_in_bytes: bytes.length, digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+      workflow_run: { id, head_sha: runs.get(id).head_sha, repository_id: RELEASE.repositoryId, head_repository_id: RELEASE.repositoryId } }]);
+  }
+  for (const id of runs.keys()) repack(id);
+  const client = {
+    async request(path, options) {
+      calls.push(path);
+      const artifact = path.match(/^\/actions\/artifacts\/(\d+)\/zip$/);
+      if (artifact) { assert.equal(options.binary, true); return archives.get(Number(artifact[1])); }
+      const run = path.match(/^\/actions\/runs\/(\d+)$/);
+      assert.ok(run, 'Unexpected evidence request'); return runs.get(Number(run[1]));
+    },
+    async pages(path, field) {
+      calls.push(path);
+      if (path === '/actions/runs/321/attempts/1/jobs') { assert.equal(field, 'jobs'); return jobs; }
+      const run = path.match(/^\/actions\/runs\/(\d+)\/artifacts$/);
+      assert.ok(run, 'Unexpected evidence list'); assert.equal(field, 'artifacts'); return artifacts.get(Number(run[1]));
+    },
+  };
+  return { directory, queued, preflight, recovered, runs, bodies, artifacts, archives, jobs, calls, client, repack,
+    load: () => getQueuedOrigin({ client, runId: '321', source, temporaryRoot: directory }),
+    cleanup: () => rmSync(directory, { recursive: true, force: true }) };
+}
+
+test('recover inputs demand the queued fingerprint and cannot attest or submit an IPA', () => {
+  for (const patch of [{ buildIdSha256: '' }, { buildIdSha256: buildId }, { evidenceRunId: '' },
+    { archiveSha256: digest }, { archiveReviewed: 'true' }]) {
+    assert.throws(() => parseInputs({ ...input('recover'), archiveReviewed: 'false', ...patch }));
+  }
+});
+
+function distinctControlEvidence() {
+  const original = evidence(), control = evidence(), controlHead = 'e'.repeat(40);
+  control.pull = { ...control.pull, number: 100, merge_commit_sha: other, head: { sha: controlHead } };
+  for (const [workflow, list] of control.runs) {
+    const run = list[0], oldId = run.id;
+    run.id += 100;
+    run.head_sha = workflow === 'ci-policy.yml' ? controlHead : other;
+    if (workflow === 'ci-policy.yml') run.pull_requests = [{ number: 100, head: { sha: controlHead }, base: { ref: 'main', repo: repository } }];
+    control.jobs.set(run.id, control.jobs.get(oldId).map(job => ({ ...job, run_id: run.id, head_sha: run.head_sha })));
+    control.jobs.delete(oldId);
+  }
+  const calls = [], ancestry = []; let branchReads = 0, advance = false;
+  const client = {
+    async request(path) {
+      calls.push(path); assert.equal(path, '/branches/main'); branchReads++;
+      return { ...main, commit: { sha: advance && branchReads === 2 ? prHead : other } };
+    },
+    async pages(path) {
+      calls.push(path);
+      if (path.startsWith('/actions/workflows/')) {
+        const workflow = path.split('/')[3], head = new URL('https://fixture.invalid' + path).searchParams.get('head_sha');
+        const fixture = head === sha || head === prHead ? original : control;
+        assert.equal(head, workflow === 'ci-policy.yml' ? fixture === original ? prHead : controlHead : fixture === original ? sha : other);
+        return fixture.runs.get(workflow);
+      }
+      if (path.startsWith('/actions/runs/')) {
+        const id = Number(path.split('/')[3]); return (id < 100 ? original : control).jobs.get(id);
+      }
+      if (path === `/commits/${sha}/pulls`) return [original.pull];
+      assert.equal(path, `/commits/${other}/pulls`); return [control.pull];
+    },
+  };
+  return { original, control, calls, ancestry, advance: () => { advance = true; },
+    prove: () => sourceProof({ client, context: { ...context, workflowSha: other, sha: other }, input: input('recover'),
+      isAncestor: (from, to) => { ancestry.push([from, to]); return true; }, readMergeMessage: () => 'Reviewed merge' }) };
+}
+
+test('historical app source and current control both require complete exact checks with final main reread', async () => {
+  const fixture = distinctControlEvidence();
+  const proof = await fixture.prove();
+  assert.equal(proof.checks.length, 6); assert.equal(proof.control.checks.length, 6);
+  assert.equal(proof.mergedPull, 99); assert.equal(proof.control.mergedPull, 100);
+  assert.equal(proof.control.sourceSha, other);
+  assert.deepEqual(fixture.ancestry, [[sha, other], [other, other]]);
+  assert.equal(fixture.calls.filter(path => path.includes('/actions/workflows/')).length, 12);
+  assert.equal(fixture.calls.filter(path => path === '/branches/main').length, 2);
+  assert.equal(fixture.calls.at(-1), '/branches/main');
+});
+
+test('newest bad current-control or original-source checks and advancing main stop recovery before provider lookup', async () => {
+  for (const failure of ['pending-control', 'failed-control', 'policy-control', 'failed-source', 'advanced-main']) {
+    const fixture = distinctControlEvidence();
+    if (failure === 'advanced-main') fixture.advance();
+    else if (failure === 'policy-control') fixture.control.runs.get('ci-policy.yml')[0].conclusion = 'failure';
+    else {
+      const group = failure === 'failed-source' ? fixture.original : fixture.control;
+      const old = group.runs.get('site-audit.yml')[0];
+      group.runs.set('site-audit.yml', [old, { ...old, id: old.id + 1000, created_at: '2026-11-14T22:00:00Z',
+        status: failure === 'pending-control' ? 'in_progress' : 'completed', conclusion: failure === 'pending-control' ? null : 'failure' }]);
+    }
+    const calls = [];
+    await assert.rejects(() => recoverBuild({ input: input('recover'), prior: queuedReceipt(), preflight: receipt('preflight'),
+      run: async args => { calls.push(args); }, recheck: fixture.prove, inspect: async () => archiveReview() }));
+    assert.deepEqual(calls, []);
+  }
+});
+
+test('recovery loads actual queued.json ZIP plus its exact linked successful preflight', async () => {
+  const fixture = recoveryEvidence();
+  try {
+    assert.deepEqual(await fixture.load(), fixture.queued);
+    assert.ok(fixture.calls.includes('/actions/runs/123') && fixture.calls.includes('/actions/artifacts/1123/zip'));
+    const prior = await getReceipt(fixture.client, { ...input('recover'), evidenceRunId: '321' },
+      { ...source, proof: { mainSha: other } }, fixture.directory, async () => true);
+    assert.deepEqual(prior, fixture.queued);
+  } finally { fixture.cleanup(); }
+});
+
+test('failed-run recovery rejects ambiguous phase, run, ZIP and linked preflight evidence', async t => {
+  const changes = [
+    ['rerun', f => { f.runs.get(321).run_attempt = 2; }],
+    ['cancelled', f => { f.runs.get(321).conclusion = 'cancelled'; }],
+    ['incomplete', f => { f.runs.get(321).status = 'in_progress'; }],
+    ['wrong repository', f => { f.runs.get(321).repository = { ...repository, id: 7 }; }],
+    ['wrong original source', f => { f.runs.get(321).head_sha = other; }],
+    ['wrong trigger', f => { f.runs.get(321).event = 'push'; }],
+    ['wrong workflow', f => { f.runs.get(321).path = '.github/workflows/other.yml'; }],
+    ['wrong branch', f => { f.runs.get(321).head_branch = 'feature'; }],
+    ['queue failed', f => { f.jobs[0].steps[4].conclusion = 'failure'; }],
+    ['upload failed', f => { f.jobs[0].steps[5].conclusion = 'failure'; }],
+    ['source skipped', f => { f.jobs[0].steps[1].conclusion = 'skipped'; }],
+    ['submit ran', f => { f.jobs[0].steps[7].conclusion = 'success'; }],
+    ['duplicate phase', f => { f.jobs[0].steps.push({ ...f.jobs[0].steps[4] }); }],
+    ['phase reordered', f => { f.jobs[0].steps[5].number = 1; }],
+    ['extra job', f => { f.jobs.push({ ...f.jobs[0] }); }],
+    ['missing queued artifact', f => { f.artifacts.set(321, []); }],
+    ['duplicate queued artifact', f => { f.artifacts.get(321).push({ ...f.artifacts.get(321)[0] }); }],
+    ['final receipt exists', f => { f.artifacts.get(321).push({ name: 'testflight-build-321' }); }],
+    ['expired queue', f => { f.artifacts.get(321)[0].expired = true; }],
+    ['wrong artifact head', f => { f.artifacts.get(321)[0].workflow_run.head_sha = other; }],
+    ['wrong ZIP member', f => f.repack(321, 'receipt.json')],
+    ['wrong ZIP digest', f => { f.artifacts.get(321)[0].digest = `sha256:${digest}`; }],
+    ['wrong ZIP length', f => { f.artifacts.get(321)[0].size_in_bytes++; }],
+    ['preflight failed', f => { f.runs.get(123).conclusion = 'failure'; }],
+    ['preflight rerun', f => { f.runs.get(123).run_attempt = 2; }],
+    ['different linked environment', f => { f.preflight.productionEnvironmentSha256 = 'e'.repeat(64); f.repack(123); }],
+    ['different linked archive', f => { f.preflight.sourceArchive.files++; f.repack(123); }],
+    ['missing environment digest', f => { delete f.queued.productionEnvironmentSha256; f.repack(321); }],
+    ['untyped queued completion', f => { f.queued.build.completedAt = metadata().completedAt; f.repack(321); }],
+  ];
+  for (const [name, mutate] of changes) await t.test(name, async () => {
+    const fixture = recoveryEvidence();
+    try { mutate(fixture); await assert.rejects(fixture.load); }
+    finally { fixture.cleanup(); }
+  });
+});
+
+test('read-only recovery permits only completion of the identical queued build', async () => {
+  const commands = [], order = [], prior = queuedReceipt();
+  const result = await recoverBuild({ input: input('recover'), prior, preflight: receipt('preflight'),
+    run: async args => { commands.push(args); order.push(args[0]); return JSON.stringify(args[0] === 'build:list' ? [metadata()] : metadata()); },
+    digest: async () => { order.push('digest'); return receipt('build').artifact; },
+    inspect: async () => { order.push('inspect'); return archiveReview(); }, recheck: async () => order.push('proof') });
+  assert.deepEqual(order, ['proof', 'build:list', 'build:view', 'digest', 'inspect', 'proof']);
+  assert.deepEqual(result.build, receipt('build').build);
+  assert.ok(commands.every(args => ['build:list', 'build:view'].includes(args[0])));
+  for (const key of ['idSha256', 'sourceSha', 'createdAt', 'appBuildVersion', 'appVersion', 'profile', 'simulator']) {
+    const changed = structuredClone(result.build); changed[key] = key === 'simulator' ? true : 'changed';
+    assert.throws(() => matchQueuedBuild(changed, prior.build));
+  }
+});
+
+test('download, inspector, final proof and changed fresh metadata never complete recovery', async () => {
+  for (const failure of ['fresh-environment', 'fresh-archive', 'initial-proof', 'metadata', 'download', 'inspect', 'final-proof']) {
+    let proofCalls = 0, completed = false; const commands = [];
+    const preflight = receipt('preflight');
+    if (failure === 'fresh-environment') preflight.productionEnvironmentSha256 = 'e'.repeat(64);
+    if (failure === 'fresh-archive') preflight.sourceArchive.files++;
+    await assert.rejects(async () => {
+      await recoverBuild({ input: input('recover'), prior: queuedReceipt(), preflight,
+        run: async args => { commands.push(args[0]); const value = metadata();
+          if (failure === 'metadata' && args[0] === 'build:view') value.createdAt = '2026-11-14T20:59:59Z';
+          return JSON.stringify(args[0] === 'build:list' ? [value] : value); },
+        digest: async () => { if (failure === 'download') throw new Error('private provider detail'); return receipt('build').artifact; },
+        inspect: async () => { if (failure === 'inspect') throw new Error('private profile'); return archiveReview(); },
+        recheck: async () => { proofCalls++; if (failure === 'initial-proof' || failure === 'final-proof' && proofCalls === 2) throw new Error('Source advanced'); } });
+      completed = true;
+    });
+    assert.equal(completed, false);
+    assert.ok(commands.every(command => ['build:list', 'build:view'].includes(command)));
+    if (['fresh-environment', 'fresh-archive', 'initial-proof'].includes(failure)) assert.deepEqual(commands, []);
+  }
+});
+
+test('submit accepts a typed successful recovery only after revalidating its original queue/preflight chain', async () => {
+  const fixture = recoveryEvidence(), ancestors = [];
+  const state = { ...source, proof: { mainSha: prHead } };
+  try {
+    const load = () => getReceipt(fixture.client, { ...input('submit'), evidenceRunId: '456' }, state,
+      fixture.directory, async (from, to) => { ancestors.push([from, to]); return true; });
+    assert.deepEqual(await load(), fixture.recovered);
+    assert.deepEqual(ancestors, [[other, prHead], [sha, other]]);
+    assert.ok(fixture.calls.includes('/actions/runs/321/attempts/1/jobs') && fixture.calls.includes('/actions/runs/123'));
+    fixture.queued.build.createdAt = '2026-11-14T20:59:59Z'; fixture.repack(321);
+    await assert.rejects(load);
+    await assert.rejects(() => getReceipt(fixture.client, { ...input('submit'), evidenceRunId: '456' }, state,
+      fixture.directory, async () => false));
+    fixture.runs.get(456).head_sha = '--help';
+    await assert.rejects(load, /malformed/);
+  } finally { fixture.cleanup(); }
+});
+
+test('recovery receipt binds its successful control and all four explicit inspection limits', () => {
+  const state = { ...source, prior: queuedReceipt(), proof: { checks: checkInventory(), control: { checks: checkInventory() } },
+    preflight: receipt('preflight') };
+  const result = publicReceipt(state, { ...context, workflowSha: other }, 'recover',
+    { build: receipt('build').build, artifact: receipt('build').artifact, archiveReview: archiveReview() });
+  assert.equal(result.workflowSha, other); assert.equal(result.sourceSha, sha);
+  assert.equal(result.queuedBuildRunId, '321'); assert.equal(result.preflightRunId, '123');
+  validateReceipt(result, { mode: 'recover', run: { id: Number(context.runId), head_sha: other }, source });
+  for (const key of ['javascriptCompileFlagsVerifiedFromBinary', 'appleProcessingAndDeviceAcceptanceVerified',
+    'appleCertificateTrustIndependentlyVerified', 'resolvedNativeDependencyLockAvailableInIpa']) assert.equal(result.archiveReview[key], false);
+  assert.equal(Object.hasOwn(result, 'submissionCommandCompleted'), false);
+  assert.throws(() => validateReceipt({ ...result, controlChecks: [] }, { mode: 'recover', run: { id: Number(context.runId), head_sha: other }, source }));
+});
+
+test('download failures expose only fixed codes and bounded transport facts', async () => {
+  const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 1]);
+  const cases = [
+    ['IPA_URL_MISSING', { ...metadata(), artifacts: { buildUrl: metadata().artifacts.applicationArchiveUrl } }, null],
+    ['IPA_URL_INVALID', { ...metadata(), artifacts: { applicationArchiveUrl: 'private-invalid-url' } }, null],
+    ['IPA_HOST', { ...metadata(), artifacts: { applicationArchiveUrl: 'https://private.example/secret?token=value' } }, null],
+    ['IPA_SCHEME', { ...metadata(), artifacts: { applicationArchiveUrl: 'http://expo.dev/private' } }, null],
+    ['IPA_AUTHORITY', { ...metadata(), artifacts: { applicationArchiveUrl: 'https://user:secret@expo.dev/private' } }, null],
+    ['IPA_REDIRECT', metadata(), new Response(null, { status: 302 })],
+    ['IPA_STATUS', metadata(), new Response('private body', { status: 403 })],
+    ['IPA_LENGTH', metadata(), new Response(zip, { headers: { 'content-length': 'private' } })],
+    ['IPA_TOO_LARGE', metadata(), new Response(zip, { headers: { 'content-length': '1073741825' } })],
+    ['IPA_SIGNATURE', metadata(), new Response('private body')],
+    ['IPA_LENGTH_MISMATCH', metadata(), new Response(zip, { headers: { 'content-length': '7', 'content-encoding': 'gzip' } })],
+  ];
+  for (const [code, build, response] of cases) {
+    let calls = 0;
+    await assert.rejects(() => ipaDigest(build, async () => { calls++; return response; }), error => {
+      const diagnostic = downloadDiagnostic(error);
+      assert.equal(diagnostic.code, code);
+      assert.ok(!JSON.stringify(diagnostic).includes('private') && !JSON.stringify(diagnostic).includes('secret'));
+      if (code === 'IPA_LENGTH_MISMATCH') assert.equal(diagnostic.encoding, 'gzip');
+      return true;
+    });
+    if (response === null) assert.equal(calls, 0);
+  }
+  await assert.rejects(() => ipaDigest(metadata(), async () => { throw new Error('https://private.example/signed'); }), error => downloadDiagnostic(error).code === 'IPA_FETCH');
+  await assert.rejects(() => ipaDigest(metadata(), async () => new Response(null, { status: 302,
+    headers: { location: 'https://expo.dev/again?secret' } })), error => downloadDiagnostic(error).code === 'IPA_REDIRECT_LIMIT');
+  const injected = new IpaDownloadError('IPA_STATUS', { status: 403, hostClass: 'other', receivedBytes: 2, rawUrl: 'private' });
+  injected.diagnostic.rawUrl = 'private';
+  assert.equal(JSON.stringify(downloadDiagnostic(injected)).includes('private'), false);
+  assert.equal(downloadDiagnostic(new Error('private')), null);
+});
+
+test('private-write failures and encoded stream failures have bounded diagnostics and cleanup', async () => {
+  const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 1]);
+  for (const failure of ['open', 'write', 'close']) {
+    let removed = 0;
+    const io = { openSync: () => { if (failure === 'open') throw new Error('/private/path'); return 1; },
+      writeSync: () => { if (failure === 'write') throw new Error('private disk error'); return zip.length; },
+      closeSync: () => { if (failure === 'close') throw new Error('private close'); }, rmSync: () => { removed++; } };
+    await assert.rejects(() => ipaDigest(metadata(), async () => new Response(zip), '/private/file', io),
+      error => downloadDiagnostic(error).code === `IPA_FILE_${failure.toUpperCase()}`);
+    if (failure === 'write') assert.equal(removed, 1);
+    if (failure === 'open') assert.equal(removed, 0);
+  }
+  await assert.rejects(() => ipaDigest(metadata(), async () => ({ status: 200, headers: new Headers({ 'content-encoding': 'br' }),
+    body: { async *[Symbol.asyncIterator]() { yield zip; throw new Error('private response'); } } })),
+  error => downloadDiagnostic(error).code === 'IPA_ENCODING_STREAM');
 });
