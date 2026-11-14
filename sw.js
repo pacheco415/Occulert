@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v208';
+const CACHE = 'occulert-v210';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
@@ -168,6 +168,48 @@ function matchOfflineResponse(request) {
   return key ? caches.match(key) : Promise.resolve(undefined);
 }
 
+function singleByteRange(value) {
+  const match = /^bytes=[\t ]*(\d*)-(\d*)[\t ]*$/i.exec(value);
+  if (!match || (!match[1] && !match[2])) return null;
+  // Range positions can exceed Number's integer precision. Convert to Number
+  // only after bounding the selected offsets by the actual cached byte length.
+  const first = match[1] ? BigInt(match[1]) : null;
+  const last = match[2] ? BigInt(match[2]) : null;
+  if (first !== null && last !== null && last < first) return null;
+  return { first, last };
+}
+
+async function cachedAlertAudioRange(request, asset, range) {
+  try {
+    const cached = await matchOfflineResponse(request);
+    if (cached?.status === 200 && !cached.headers.has('content-range')) {
+      const bytes = await cached.arrayBuffer();
+      const hash = await crypto.subtle.digest('SHA-256', bytes);
+      let binary = '';
+      for (const byte of new Uint8Array(hash)) binary += String.fromCharCode(byte);
+      if ('sha256-' + btoa(binary) === asset.integrity) {
+        const length = BigInt(bytes.byteLength);
+        const start = range.first === null ? (range.last >= length ? 0n : length - range.last) : range.first;
+        const end = range.first !== null && range.last !== null && range.last < length ? range.last : length - 1n;
+        const headers = new Headers({ 'Accept-Ranges': 'bytes' });
+        if (start >= length) {
+          headers.set('Content-Range', `bytes */${length}`);
+          headers.set('Content-Length', '0');
+          return new Response(null, { status: 416, headers });
+        }
+        headers.set('Content-Range', `bytes ${start}-${end}/${length}`);
+        headers.set('Content-Length', String(end - start + 1n));
+        const contentType = cached.headers.get('content-type');
+        if (contentType) headers.set('Content-Type', contentType);
+        return new Response(bytes.slice(Number(start), Number(end + 1n)), { status: 206, headers });
+      }
+    }
+  } catch (_) {}
+  // A missing, partial or unverifiable cache entry keeps the original network
+  // semantics. In particular, never persist a ranged network response.
+  return fetch(request);
+}
+
 function settleWithin(promise, timeoutMs, fallback = null) {
   return new Promise(resolve => {
     let settled = false;
@@ -322,10 +364,19 @@ self.addEventListener('message',event=>{
 self.addEventListener('fetch', event => {
   const req = event.request;
 
-  if (req.method !== 'GET' || req.headers?.has('authorization') || req.headers?.has('range')) return;
+  if (req.method !== 'GET' || req.headers?.has('authorization')) return;
   const url = new URL(req.url);
   // Let the browser handle foreign requests without consulting the app cache.
   if (url.origin !== self.location.origin) return;
+  if (req.headers?.has('range')) {
+    // If-Range validators and every other ranged resource remain on the network.
+    if (url.pathname === '/audio/alert.v1.wav' && !url.search && !url.hash && !req.headers.has('if-range')) {
+      const asset = ALERT_AUDIO_ASSETS.find(asset => asset.url === url.pathname);
+      const range = singleByteRange(req.headers.get('range'));
+      if (asset && range) event.respondWith(cachedAlertAudioRange(req, asset, range));
+    }
+    return;
+  }
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
   if(url.origin===self.location.origin&&OPTIONAL_PATHS.has(url.pathname)){event.respondWith(verifiedOptionalResponse(req,url.pathname));return}
   if (url.origin === self.location.origin && NETWORK_ONLY_DOCUMENTS.has(url.pathname)) {

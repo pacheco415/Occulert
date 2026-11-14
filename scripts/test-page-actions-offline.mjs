@@ -156,6 +156,121 @@ test('credentialed and partial requests bypass the offline cache', async () => {
   }
 });
 
+const alertAudioURL = 'https://www.occulert.com/audio/alert.v1.wav';
+const alertAudioBytes = readFileSync('audio/alert.v1.wav');
+const alertAudioType = 'audio/wav; fixture=cache';
+const hugeRangeInteger = '900719925474099300000000000000000000000';
+
+for (const [label, range, start, end] of [
+  ['Safari initial probe', 'bytes=0-1', 0, 1],
+  ['open-ended range', 'bytes=5-', 5, alertAudioBytes.length - 1],
+  ['suffix range', 'bytes=-5', alertAudioBytes.length - 5, alertAudioBytes.length - 1],
+  ['case-insensitive unit and optional whitespace', 'ByTeS=\t0-1 \t', 0, 1],
+  ['end clamped to the cached length', `bytes=2-${alertAudioBytes.length + 9}`, 2, alertAudioBytes.length - 1],
+  ['last byte', `bytes=${alertAudioBytes.length - 1}-${alertAudioBytes.length - 1}`, alertAudioBytes.length - 1, alertAudioBytes.length - 1],
+  ['huge end without numeric overflow', `bytes=0-${hugeRangeInteger}`, 0, alertAudioBytes.length - 1],
+  ['huge suffix covering the complete file', `bytes=-${hugeRangeInteger}`, 0, alertAudioBytes.length - 1],
+  ['leading zeros', 'bytes=000-001', 0, 1],
+]) {
+  test(`pinned offline alert audio serves ${label} with exact partial bytes and headers`, async () => {
+    const worker = workerFetchHarness();
+    worker.entries.set(alertAudioURL, new Response(alertAudioBytes, { headers: {
+      'Content-Type': alertAudioType, 'Content-Length': String(alertAudioBytes.length),
+    } }));
+    worker.setNetwork(async () => { throw Error('Offline'); });
+    const request = new Request(alertAudioURL, { headers: { Range: range } });
+    const response = await worker.dispatch(alertAudioURL, { request });
+    assert.equal(response.status, 206);
+    assert.equal(response.headers.get('content-range'), `bytes ${start}-${end}/${alertAudioBytes.length}`);
+    assert.equal(response.headers.get('content-length'), String(end - start + 1));
+    assert.equal(response.headers.get('accept-ranges'), 'bytes');
+    assert.equal(response.headers.get('content-type'), alertAudioType);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), alertAudioBytes.subarray(start, end + 1));
+    assert.deepEqual(worker.activity, { interceptions: 1, lifetimes: 0, fetches: 0, cacheReads: 1, cacheOpens: 0, cacheWrites: 0 });
+    assert.deepEqual(Buffer.from(await worker.entries.get(alertAudioURL).arrayBuffer()), alertAudioBytes,
+      'a partial response must not replace the full pinned cache entry');
+  });
+}
+
+for (const [label, range] of [
+  ['start at the cached length', `bytes=${alertAudioBytes.length}-`],
+  ['start beyond the cached length', `bytes=${alertAudioBytes.length + 5}-${alertAudioBytes.length + 10}`],
+  ['huge start without numeric overflow', `bytes=${hugeRangeInteger}-`],
+  ['zero-byte suffix', 'bytes=-0'],
+]) {
+  test(`pinned offline alert audio returns 416 for ${label}`, async () => {
+    const worker = workerFetchHarness();
+    worker.entries.set(alertAudioURL, new Response(alertAudioBytes, { headers: { 'Content-Type': alertAudioType } }));
+    worker.setNetwork(async () => { throw Error('Offline'); });
+    const request = new Request(alertAudioURL, { headers: { Range: range } });
+    const response = await worker.dispatch(alertAudioURL, { request });
+    assert.equal(response.status, 416);
+    assert.equal(response.headers.get('content-range'), `bytes */${alertAudioBytes.length}`);
+    assert.equal(response.headers.get('content-length'), '0');
+    assert.equal(response.headers.get('accept-ranges'), 'bytes');
+    assert.equal((await response.arrayBuffer()).byteLength, 0);
+    assert.deepEqual(worker.activity, { interceptions: 1, lifetimes: 0, fetches: 0, cacheReads: 1, cacheOpens: 0, cacheWrites: 0 });
+  });
+}
+
+for (const [label, url, options] of [
+  ['multiple ranges', alertAudioURL, { headers: { Range: 'bytes=0-1,4-5' } }],
+  ['an unknown range unit', alertAudioURL, { headers: { Range: 'items=0-1' } }],
+  ['an empty range', alertAudioURL, { headers: { Range: 'bytes=-' } }],
+  ['reversed endpoints', alertAudioURL, { headers: { Range: 'bytes=5-1' } }],
+  ['non-decimal offsets', alertAudioURL, { headers: { Range: 'bytes=0x1-2' } }],
+  ['spaces inside the byte range', alertAudioURL, { headers: { Range: 'bytes=0 -1' } }],
+  ['an authenticated range', alertAudioURL, { headers: { Range: 'bytes=0-1', Authorization: 'Bearer fixture' } }],
+  ['an empty Authorization header', alertAudioURL, { headers: { Range: 'bytes=0-1', Authorization: '' } }],
+  ['an ETag If-Range condition', alertAudioURL, { headers: { Range: 'bytes=0-1', 'If-Range': '"fixture"' } }],
+  ['a date If-Range condition', alertAudioURL, { headers: { Range: 'bytes=0-1', 'If-Range': 'Fri, 13 Nov 2026 00:00:00 GMT' } }],
+  ['a HEAD request', alertAudioURL, { method: 'HEAD' }],
+  ['a POST request', alertAudioURL, { method: 'POST' }],
+  ['a query-bearing URL', alertAudioURL + '?variant=1', {}],
+  ['a foreign audio origin', 'https://example.net/audio/alert.v1.wav', {}],
+  ['a different audio path', 'https://www.occulert.com/audio/alert.v2.wav', {}],
+]) {
+  test(`alert audio leaves ${label} on the browser network without touching caches`, async () => {
+    const worker = workerFetchHarness();
+    worker.entries.set(alertAudioURL, new Response(alertAudioBytes));
+    const request = new Request(url, { headers: { Range: 'bytes=0-1' }, ...options });
+    assert.equal(await worker.dispatch(url, { request }), undefined);
+    assert.deepEqual(worker.activity, { interceptions: 0, lifetimes: 0, fetches: 0, cacheReads: 0, cacheOpens: 0, cacheWrites: 0 });
+  });
+}
+
+for (const [label, cachedResponse] of [
+  ['missing', () => undefined],
+  ['corrupted', () => {
+    const bytes = Buffer.from(alertAudioBytes); bytes[0] ^= 1;
+    return new Response(bytes, { headers: { 'Content-Type': alertAudioType } });
+  }],
+  ['partial-status', () => new Response(alertAudioBytes, { status: 206, headers: { 'Content-Type': alertAudioType } })],
+  ['partial-content-range', () => new Response(alertAudioBytes, { headers: {
+    'Content-Type': alertAudioType, 'Content-Range': `bytes 0-${alertAudioBytes.length - 1}/${alertAudioBytes.length}`,
+  } })],
+]) {
+  for (const range of ['bytes=0-1', `bytes=${alertAudioBytes.length}-`]) {
+    test(`${label} alert audio cache uses the original network request for ${range} without caching its reply`, async () => {
+      const worker = workerFetchHarness(), cached = cachedResponse();
+      if (cached) worker.entries.set(alertAudioURL, cached);
+      const request = new Request(alertAudioURL, { headers: { Range: range, 'X-Range-Fixture': 'preserve' } });
+      const networkResponse = new Response('network range bytes', { status: 206 });
+      worker.setNetwork(async original => {
+        assert.equal(original, request, 'cache fallback must forward the exact original request');
+        assert.equal(original.headers.get('range'), range);
+        assert.equal(original.headers.get('x-range-fixture'), 'preserve');
+        assert.equal(original.integrity, '', 'the complete-file SRI pin must not be applied to a network partial response');
+        return networkResponse;
+      });
+      assert.equal(await worker.dispatch(alertAudioURL, { request }), networkResponse,
+        'neither 206 nor 416 can be synthesized before the full cached bytes are verified');
+      assert.equal(worker.entries.get(alertAudioURL), cached);
+      assert.deepEqual(worker.activity, { interceptions: 1, lifetimes: 0, fetches: 1, cacheReads: 1, cacheOpens: 0, cacheWrites: 0 });
+    });
+  }
+}
+
 test('optional runtime query variants verify canonical cached bytes and ignore query-bearing poison', async () => {
   for (const logical of ['driver-i18n.js', 'detection-experiments.js']) {
     const worker = workerFetchHarness(), path = assetByStem(logical);

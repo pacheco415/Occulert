@@ -38,8 +38,9 @@ module.exports = async function handler(request, response) {
     // Empty onboarding requests refresh identity without erasing display fields.
     const updates = { email: email || null };
     if (Object.hasOwn(body, "name") && clean(body.name, 160)) updates.name = clean(body.name, 160);
-    // A supplied empty vehicle is an intentional clear from the account form.
-    if (Object.hasOwn(body, "vehicle")) updates.vehicle_id = vehicleId;
+    // Only a supplied string can update this field; an empty string is an
+    // intentional clear from the account form, while non-text input is missing.
+    if (Object.hasOwn(body, "vehicle") && typeof body.vehicle === "string") updates.vehicle_id = vehicleId;
     const existing = await pgFetch("drivers", {
       params: { select: "id,user_id,name,email,vehicle_id,fleet_id,active", user_id: "eq." + user.id, limit: "1" },
     });

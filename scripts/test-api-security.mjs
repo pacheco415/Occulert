@@ -450,6 +450,49 @@ assert.equal(insertedProfile.user_id, "user-1");
 assert.equal(insertedProfile.fleet_id, null, "drivers must not self-assign fleet membership");
 assert.equal(Object.hasOwn(insertedProfile, "role"), false, "privileged roles must not be accepted from the browser");
 
+// Parsed JSON fields must never become display text through String coercion.
+const nonTextValues = [{}, { toString: "not callable" }, ["Coerced label"], [], 17, 0, true, false, null];
+for (const field of ["name", "vehicle"]) {
+  for (const value of nonTextValues) {
+    insertedProfile = undefined;
+    const result = await invoke(profile, request("POST", { name: "Valid Driver", vehicle: "TRK-7", [field]: value }));
+    assert.equal(result.status, 200, `${field} ${JSON.stringify(value)} is missing during onboarding`);
+    assert.equal(insertedProfile.name, field === "name" ? "manager" : "Valid Driver");
+    assert.equal(insertedProfile.vehicle_id, field === "vehicle" ? null : "TRK-7");
+  }
+}
+await invoke(profile, request("POST", { name: "  José\u0000 🚚  ", vehicle: "  Camión\u0000 7  " }));
+assert.equal(insertedProfile.name, "José 🚚");
+assert.equal(insertedProfile.vehicle_id, "Camión 7");
+
+// Invalid input is an omitted update, including the concurrent-insert fallback.
+for (const race of [false, true]) {
+  for (const field of ["name", "vehicle"]) {
+    for (const value of nonTextValues) {
+      let row = { id: "driver-1", user_id: "user-1", name: "Existing Driver", vehicle_id: "TRK-7", fleet_id: "fleet-1", active: false };
+      let raced = false, patch;
+      const update = loadHandler("../api/profile.js", async (table, options = {}) => {
+        assert.equal(table, "drivers");
+        if (!options.method) return race && !raced ? [] : [row];
+        if (options.method === "POST") { raced = true; throw { details: { code: "23505" } }; }
+        assert.equal(options.method, "PATCH");
+        assert.equal(options.params.user_id, "eq.user-1");
+        patch = options.body;
+        row = { ...row, ...patch };
+        return [row];
+      });
+      const result = await invoke(update, request("POST", { [field]: value }));
+      assert.equal(result.status, 200);
+      assert.deepEqual(patch, { email: verifiedUser.email }, `${field} must not overwrite a saved field; insert race=${race}`);
+      assert.equal(row.name, "Existing Driver");
+      assert.equal(row.vehicle_id, "TRK-7");
+      assert.equal(row.fleet_id, "fleet-1");
+      assert.equal(row.active, false);
+      assert.equal(raced, race);
+    }
+  }
+}
+
 // Native onboarding sends {} repeatedly, including during a concurrent insert.
 for (const race of [false, true]) {
   let row = { id: "driver-1", user_id: "user-1", name: "John Smith", email: "old@example.com", vehicle_id: "TRK-7", fleet_id: "fleet-1", active: false };
@@ -508,6 +551,16 @@ assert.equal(insertedFleet.plan, "trial", "browser callers must not choose privi
 assert.equal(Object.hasOwn(insertedFleet, "role"), false, "browser callers must not create privileged roles");
 assert.deepEqual(Object.keys(createdFleet.body.fleet).sort(), ["company_name", "created_at", "id", "plan"],
   "fleet creation must answer with the same fields as the owner's fleet lookup");
+for (const value of [...nonTextValues, undefined, "", "   "]) {
+  insertedFleet = undefined;
+  const result = await invoke(fleets, request("POST", { company_name: value }));
+  assert.equal(result.status, 400, `company_name ${JSON.stringify(value)} must be missing`);
+  assert.equal(result.body.error, "invalid_company_name");
+  assert.equal(insertedFleet, undefined, "invalid company names must not reach storage");
+}
+const unicodeFleet = await invoke(fleets, request("POST", { company_name: "  Flota\u0000 José 🚚  " }));
+assert.equal(unicodeFleet.status, 201);
+assert.equal(insertedFleet.company_name, "Flota José 🚚");
 
 const unverifiedFleet = loadHandler("../api/fleets.js", async () => {
   throw new Error("database must not be called for an unverified owner");
@@ -944,6 +997,70 @@ for (const [index, email] of [truncatable, "driver\0@example.com"].entries()) {
 assert.equal((await invoke(pilotLeads, request("POST", { ...validLead, email: ` ${longestAllowed.toUpperCase()} ` }, "203.0.113.42"))).status, 200);
 assert.equal(storedLead.email, longestAllowed);
 assert.equal(storedLead.source, "pilot-signup-page", "browser callers must not choose arbitrary lead sources");
+// Keep this field matrix independent of the separate rate-window fixture.
+// Only the verified storage boundary is mocked; real field validation runs.
+let strictLeadWrite;
+const strictLeads = loadHandler("../api/pilot-leads.js", async (table, options = {}) => {
+  if (table === "rpc/check_pilot_lead_rate_limit") return [{ allowed: true }];
+  assert.equal(table, "pilot_leads");
+  assert.equal(options.method, "POST");
+  strictLeadWrite = options.body;
+  return [{ id: "lead-strict", ...options.body }];
+});
+const optionalLeadFields = { role: "role", phone: "phone", fleet: "fleet", useCase: "use_case", message: "message" };
+for (const field of ["name", "company", "email", ...Object.keys(optionalLeadFields)]) {
+  // An array containing a valid email would pass the old String() path.
+  for (const value of [...nonTextValues, [validLead[field] || "Valid label"], undefined, "", "   "]) {
+    strictLeadWrite = undefined;
+    const result = await invoke(strictLeads, request("POST", { ...validLead, [field]: value }));
+    if (Object.hasOwn(optionalLeadFields, field)) {
+      assert.equal(result.status, 200, `${field} ${JSON.stringify(value)} is an omitted optional field`);
+      assert.equal(strictLeadWrite[optionalLeadFields[field]], null);
+      assert.equal(strictLeadWrite.name, validLead.name);
+      assert.equal(strictLeadWrite.company, validLead.company);
+      assert.equal(strictLeadWrite.email, validLead.email);
+    } else {
+      assert.equal(result.status, 400, `${field} ${JSON.stringify(value)} is a missing required field`);
+      assert.equal(result.body.error, "invalid_lead");
+      assert.equal(strictLeadWrite, undefined, "missing required lead fields must not reach storage");
+    }
+  }
+}
+for (const value of [...nonTextValues, [validLead.startedAt], undefined, ""]) {
+  strictLeadWrite = undefined;
+  const result = await invoke(strictLeads, request("POST", { ...validLead, startedAt: value }));
+  assert.equal(result.status, 400, "non-text timing metadata must not pass through array coercion");
+  assert.equal(result.body.error, "invalid_lead");
+  assert.equal(strictLeadWrite, undefined);
+}
+for (const value of [...nonTextValues.filter(value => value !== null), "https://spam.example", "   ", "\t\n", "\0"]) {
+  strictLeadWrite = undefined;
+  const result = await invoke(strictLeads, request("POST", { ...validLead, website: value }));
+  assert.equal(result.status, 400, `a filled honeypot ${JSON.stringify(value)} must be rejected without coercion or cleaning`);
+  assert.equal(result.body.error, "invalid_lead");
+  assert.equal(strictLeadWrite, undefined, "a filled honeypot must not reach storage");
+}
+const leadWithoutWebsite = { ...validLead };
+delete leadWithoutWebsite.website;
+for (const [label, lead] of [
+  ["missing", leadWithoutWebsite],
+  ["undefined", { ...validLead, website: undefined }],
+  ["null", { ...validLead, website: null }],
+  ["empty string", { ...validLead, website: "" }],
+]) {
+  strictLeadWrite = undefined;
+  const result = await invoke(strictLeads, request("POST", lead));
+  assert.equal(result.status, 200, `a ${label} honeypot must remain accepted`);
+  assert.equal(result.body.stored, true);
+  assert.ok(strictLeadWrite, "an accepted lead must reach storage");
+}
+for (const field of ["name", "company", ...Object.keys(optionalLeadFields)]) {
+  const result = await invoke(strictLeads, request("POST", { ...validLead, [field]: "  José\u0000 🚚  " }));
+  assert.equal(result.status, 200);
+  assert.equal(strictLeadWrite[optionalLeadFields[field] || field], "José 🚚");
+}
+await invoke(strictLeads, request("POST", { ...validLead, email: "  DRIVER@EXAMPLE.COM  " }));
+assert.equal(strictLeadWrite.email, "driver@example.com", "valid email normalization must remain unchanged");
 const originalNotifyFetch = globalThis.fetch;
 try {
   process.env.LEAD_NOTIFY_WEBHOOK_URL = 'https://notify.example.invalid/hook';

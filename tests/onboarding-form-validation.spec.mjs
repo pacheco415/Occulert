@@ -1,5 +1,55 @@
 import { assetByStem } from '../scripts/lib/current-assets.mjs';
 import { test, expect } from '@playwright/test';
+import { availableParallelism, freemem, totalmem } from 'node:os';
+
+// Observe paint callbacks without waiting for them or changing actionability.
+// A populated DOM alone cannot diagnose a renderer that has stopped painting.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const probe = window.__occulertFormRenderDiagnostics = {
+      startedAt: performance.now(), frames: 0, firstFrameAt: null, lastFrameAt: null, maxGapMs: 0,
+    };
+    requestAnimationFrame(function sample(at) {
+      probe.frames++;
+      probe.firstFrameAt ??= at;
+      if (probe.lastFrameAt !== null) probe.maxGapMs = Math.max(probe.maxGapMs, at - probe.lastFrameAt);
+      probe.lastFrameAt = at;
+      requestAnimationFrame(sample);
+    });
+  });
+});
+
+test.afterEach(async ({ page, browserName }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  let deadline;
+  const pageReport = await Promise.race([
+    page.evaluate(() => {
+      const label = document.querySelector('label[for="name"]');
+      const style = label && getComputedStyle(label);
+      const rect = label?.getBoundingClientRect();
+      const filters = [...document.querySelectorAll('*')].flatMap(element => {
+        const computed = getComputedStyle(element);
+        const active = [computed.backdropFilter, computed.webkitBackdropFilter].find(value => value && value !== 'none');
+        return active ? [{ tag: element.tagName, id: element.id, filter: active }] : [];
+      });
+      return {
+        readyState: document.readyState, elapsedMs: performance.now() - (window.__occulertFormRenderDiagnostics?.startedAt ?? 0),
+        rendering: window.__occulertFormRenderDiagnostics,
+        viewport: { width: innerWidth, height: innerHeight, devicePixelRatio },
+        fonts: document.fonts.status,
+        nameLabel: label ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+          display: style.display, visibility: style.visibility, opacity: style.opacity } : null,
+        backdropFilterCount: filters.length, backdropFilters: filters.slice(0, 20),
+      };
+    }).catch(error => ({ unavailable: error.name })),
+    new Promise(resolve => { deadline = setTimeout(() => resolve({ unavailable: 'diagnostic_deadline' }), 2_000); }),
+  ]);
+  clearTimeout(deadline);
+  const report = { browserName, retry: testInfo.retry, status: testInfo.status,
+    runner: { platform: process.platform, architecture: process.arch, availableCpus: availableParallelism(), freeBytes: freemem(), totalBytes: totalmem() }, page: pageReport };
+  console.log('Native form rendering diagnostics:', JSON.stringify(report));
+  await testInfo.attach('native-form-rendering', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
+});
 
 async function invitationFixture(page, signedIn = false) {
   const unexpected = [];
