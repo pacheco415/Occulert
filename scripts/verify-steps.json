@@ -73,6 +73,7 @@
     "test:migration-grants",
     "test:asset-lineage",
     "test:workflow-policy",
+    "test:testflight-control",
     "test:browser-retry-report",
     "test:browser-process-diagnostics",
     "test:deployment-ignore",

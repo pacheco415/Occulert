@@ -81,6 +81,7 @@
     "test:verify-runner": "node --test scripts/test-verify-runner.mjs scripts/test-verify-coverage.mjs",
     "test:asset-lineage": "node --test scripts/test-asset-lineage.mjs",
     "test:workflow-policy": "node --test scripts/test-workflow-policy.mjs",
+    "test:testflight-control": "node --test scripts/test-testflight-control.mjs",
     "test:browser-retry-report": "node --test scripts/test-browser-retry-report.mjs",
     "test:browser-process-diagnostics": "node --test scripts/test-browser-process-diagnostics.mjs",
     "test:deployment-ignore": "node --test scripts/test-deployment-ignore.mjs",
