@@ -1,6 +1,6 @@
 # Controlled private TestFlight release
 
-The **Controlled TestFlight** GitHub workflow provides three separate manual
+The **Controlled TestFlight** GitHub workflow provides four separate manual
 operations using the existing repository `EXPO_TOKEN`. It never runs on a push,
 updates `release/testflight`, posts comments, or activates a paid plan. Its
 submission destination is the existing Occulert App Store Connect app;
@@ -21,19 +21,23 @@ The workflow deliberately rejects reruns before it can access Expo credentials.
 | --- | --- | --- |
 | `preflight` | Full reviewed current-main `source_sha`; all other inputs empty/false | Verifies protected main, exact source checks, token/project access, production configuration/flags and every admitted source archive file. No build, signing mutation, submission, or remote version-counter operation. |
 | `build` | The same current-main SHA and the successful preflight's numeric `evidence_run_id` | Repeats preflight, compares the source archive/environment with its receipt, rechecks source gates, queues one production iOS build, waits for that exact private UUID, then hashes and inspects the actual phone/Watch IPA. Does not submit. |
-| `submit` | Original build-source SHA; successful build run's numeric `evidence_run_id`; its `build_id_sha256` fingerprint; reviewed report's `archive_sha256`; `archive_reviewed=true` | Retrieves the trusted build receipt, privately resolves the exact UUID, checks fresh metadata and IPA hash, repeats archive inspection, rechecks source gates, then submits only that UUID. |
+| `recover` | Original build-source SHA; failed original build run's numeric `evidence_run_id`; its queued `build_id_sha256` fingerprint; IPA digest empty and archive review false | Verifies the narrowly supported failed-run shape, queued artifact and linked successful preflight; repeats both source/control checks and original-source preflight; resolves the exact completed build and performs the full private IPA inspection. Never queues or submits. |
+| `submit` | Original build-source SHA; successful build or recovery run's numeric `evidence_run_id`; its `build_id_sha256` fingerprint; reviewed report's `archive_sha256`; `archive_reviewed=true` | Retrieves the trusted final receipt, revalidates its origin chain, privately resolves the exact UUID, checks fresh metadata and IPA hash, repeats archive inspection, rechecks source/control gates, then submits only that UUID. |
 
 The run ID is the numeric part of the GitHub run URL, not a build number. The
 source SHA must contain all 40 lowercase hexadecimal characters. The build UUID's
-SHA-256 fingerprint and IPA SHA-256 appear in the successful build run's summary and `receipt.json`
-artifact. Do not infer the next build number from the dated Build 60 handoff;
+SHA-256 fingerprint and IPA SHA-256 appear in the successful build or recovery
+run's summary and `receipt.json` artifact. A failed build's earlier `queued.json`
+contains the fingerprint needed for recovery. Do not infer the next build number from the dated Build 60 handoff;
 EAS remains the remote version authority and increments only in `build` mode.
 
 Preflight and build require the source SHA to equal current protected main.
 If main advances before a build is queued, refresh the source review and start
-a new preflight. A later submit may use the successfully built source if it
-remains an ancestor of current protected main. Submission uses that original
-source's `eas.json`, not newer-main submission settings.
+a new preflight. Recovery and later submission may use the original build
+source if it remains an ancestor of current protected main. They separately
+prove the original app source and the current release-control commit; the
+receipt keeps `sourceSha` and `workflowSha` distinct. Submission uses the
+original source's `eas.json`.
 
 ## Source and credential gates
 
@@ -55,8 +59,10 @@ applies the same skip-token rule to the current title and every commit message.
 This is exact-head policy success plus independent exact-PR revalidation; it
 does not invent a historical run-to-PR-number association. Nonempty conflicting
 associations, truncated lists and PRs beyond the REST API's 250-commit bound
-fail closed. Main is read again after all evidence and immediately before an
-EAS mutation. GitHub read access is limited to contents, Actions and pull
+fail closed. When app source and release-control source differ, the complete
+five main-workflow checks and merged-PR policy proof run for each commit. Main
+is read again after both proofs and immediately before an EAS mutation.
+GitHub read access is limited to contents, Actions and pull
 requests. Checkout does not persist its token.
 
 The existing Expo secret is present only on the EAS command steps. It is not
@@ -98,7 +104,7 @@ selected source, remain hidden and English remains the runtime language.
 
 ## Inspect before submitting
 
-Review the successful build run's summary and `receipt.json → archiveReview`.
+Review the successful build or recovery run's summary and `receipt.json → archiveReview`.
 The runner downloads the actual IPA into private temporary storage, enforces
 download/extraction bounds, rejects traversal, duplicate paths, symlinks and
 unexpected app targets, and binds its report to the source SHA/native tree,
@@ -131,11 +137,15 @@ acceptance require their own observations. Use the exact-source handoff and
 forward as evidence for a new binary.
 
 After reviewing this report, source and applicable release gates, dispatch
-`submit` with the exact build run, UUID fingerprint, IPA digest and archive-review
+`submit` with the exact successful build or recovery run, UUID fingerprint, IPA digest and archive-review
 checkbox. Never enter a raw UUID in
-the public workflow. An arbitrary JSON file cannot replace the successful build artifact: the control downloads the
-receipt from this workflow's successful first-attempt build run and verifies
-its repository, source and input identities. An authenticated EAS inventory is
+the public workflow. An arbitrary JSON file cannot replace a trusted artifact:
+the control downloads the receipt from this workflow's successful first-attempt
+build or recovery run and verifies its repository, app source, control source
+and input identities. A recovery receipt also requires its original failed-build
+and successful-preflight chain to validate again. Its control commit must
+descend from the original app source and remain in protected main history.
+An authenticated EAS inventory is
 scoped to the receipt's exact source, app version/build number, iOS/store/profile
 and bundle. It reads bounded pages and requires exactly one UUID matching the
 fingerprint; missing, duplicate or truncated inventory fails closed. Fresh EAS metadata must show
@@ -156,16 +166,55 @@ repair or a paid upgrade.
 
 Artifacts are retained for 14 days. Build mode uploads `testflight-queued-RUN_ID`
 as soon as it has a private UUID, recording only its public fingerprint before waiting, then uploads the final
-`testflight-build-RUN_ID` receipt after completion and successful IPA inspection. Preflight
-and submit have correspondingly named artifacts. Only a successful completed
-run and its final receipt can authorize the next mode.
+`testflight-build-RUN_ID` receipt after completion and successful IPA inspection.
+Preflight, recovery and submit have correspondingly named artifacts. Only a
+successful completed build or recovery run and its final receipt can authorize
+submission. Failed-run queued evidence authorizes only the read-only recovery
+path described below.
+
+Recovery supports one explicit failure boundary: an original first-attempt
+manual main build with exactly one completed failed release job. Source checks,
+dependency installation, preflight, queueing and queued-artifact upload must
+have succeeded; the wait/inspection phase must be the only failed phase and
+submission must be skipped. Cancelled, incomplete, rerun, differently failed or
+ambiguous runs are rejected. The run must have exactly one matching queued
+artifact, no final build/recovery artifact, and an independently successful
+linked first-attempt preflight. Artifact repository/run/head identities, exact
+ZIP byte size and SHA-256, and the sole expected member (`queued.json` or
+`receipt.json`) are verified before the receipt is consumed.
+
+The queued and preflight receipts must agree on the original source/native
+trees, shared source and ignore-file blobs, source archive, pinned CLI and
+production environment fingerprint. A fresh preflight of that same source must
+match again. The authenticated inventory must resolve exactly one completed
+build with the queued UUID fingerprint; source, creation time, platform,
+distribution, profile, simulator state, app version and build number must all
+remain unchanged. Only completion status and completion time may be added.
+Recovery does not issue a build, cancellation, submission or version-counter
+command. It privately downloads and hashes the actual IPA, runs the same full
+macOS archive inspector, then rechecks both source/control proofs and source
+bytes before writing a final `testflight-recover-RUN_ID` receipt. An inspection
+or final-proof failure produces no final recovery receipt. The successful
+receipt retains the original queued-build and preflight run IDs; it does not
+represent the failed build workflow as successful.
 
 If a command fails or the runner is interrupted after a remote request, do not
 rerun the job or blindly queue another build/submission. Preserve the queued
 fingerprint/run and inspect its private remote state. EAS may have accepted a request before
 a connection failed. This control deliberately does not refund, retry, cancel,
-or adopt an ambiguous remote operation; resolve that exact operation through a
-reviewed recovery step. A GitHub timeout does not establish remote failure.
+or adopt an ambiguous remote operation. Use `recover` only when the original
+evidence satisfies its exact supported boundary and the recorded remote build
+is complete. A GitHub timeout does not establish remote failure.
+
+IPA transport failures emit a fixed diagnostic code and, where observed,
+bounded numeric status, redirect count and byte counts, plus fixed host and
+encoding classifications. The small `testflight-diagnostic-RUN_ID` artifact
+contains the same allowlisted data. No raw hostname, URL, response body,
+provider exception or local path is included. Codes distinguish a missing
+archive URL, rejected URL/redirect, HTTP status, length/encoding/stream/signature
+failure, and private-file failures. The provider URL field and allowed download
+hosts are unchanged; diagnostics establish evidence for a later correction,
+not permission to try another URL field, broaden hosts or queue a new build.
 
 After `submit` completes, separately verify Apple processing and availability
 to the existing internal TestFlight group. The workflow's success is an upload
@@ -176,12 +225,17 @@ does not activate an App Store production version.
 
 Run `npm ci && npm run verify`. The registered `test:testflight-control` suite
 exercises source/CI correlation, denied/malformed evidence, all mode boundaries,
-production flags/config, archive bytes, exact build binding, receipt provenance,
+production flags/config, archive bytes, exact build binding, failed-run and
+linked-artifact provenance, separate original-source/current-control proofs,
 bounded downloads and credential/output isolation without contacting Expo or
 queuing a build. It includes real ZIP/binary-plist fixtures, malformed archive
 boundaries, exact permission/identity checks, profile allowlists and signer
-membership, private report serialization and a failed fresh-inspection submit
-barrier. Linux tests inject only Apple's command results; actual `codesign` and
+membership, private report serialization, read-only recovery completion/failure
+barriers and a failed fresh-inspection submit barrier. The report's four explicit
+false limitations remain unchanged: Apple certificate-chain trust, Apple
+processing/device acceptance, binary proof of JavaScript flags, and an embedded
+resolved Podfile lock are not claimed. Linux tests inject only Apple's command
+results; actual `codesign` and
 `security` execution is a mandatory macOS release-runner gate. Normal PR and
 resulting-main release checks still apply.
 

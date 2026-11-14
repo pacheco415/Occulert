@@ -36,17 +36,18 @@ const isoDate = value => typeof value === 'string'
 export function parseInputs(input) {
   assert.ok(Object.keys(input).every(key => ['mode', 'sourceSha', 'evidenceRunId', 'buildIdSha256', 'archiveSha256', 'archiveReviewed'].includes(key)), 'Unknown release input.');
   const { mode, sourceSha, evidenceRunId = '', buildIdSha256 = '', archiveSha256 = '', archiveReviewed = 'false' } = input;
-  assert.ok(['preflight', 'build', 'submit'].includes(mode), 'Choose preflight, build, or submit.');
+  assert.ok(['preflight', 'build', 'recover', 'submit'].includes(mode), 'Choose preflight, build, recover, or submit.');
   assert.match(sourceSha ?? '', SHA, 'Source must be a full lowercase commit SHA.');
   assert.ok(archiveReviewed === 'true' || archiveReviewed === 'false', 'Archive review must be a boolean.');
   if (mode === 'preflight') assert.equal(evidenceRunId, '', 'Preflight does not consume an earlier run.');
-  else assert.match(evidenceRunId, ID, 'A successful evidence run ID is required.');
+  else assert.match(evidenceRunId, ID, 'An evidence run ID is required.');
+  if (mode === 'recover' || mode === 'submit') {
+    assert.match(buildIdSha256, DIGEST, 'Recovery and submission require the exact build UUID fingerprint.');
+  } else assert.equal(buildIdSha256, '', 'Only recovery and submission accept a build fingerprint.');
   if (mode === 'submit') {
-    assert.match(buildIdSha256, DIGEST, 'Submit requires the exact build UUID fingerprint.');
     assert.match(archiveSha256, DIGEST, 'Submit requires the inspected IPA SHA-256.');
     assert.equal(archiveReviewed, 'true', 'Inspect the exact archive before submitting it.');
   } else {
-    assert.equal(buildIdSha256, '', 'Only submit accepts a build fingerprint.');
     assert.equal(archiveSha256, '', 'Only submit accepts an IPA digest.');
     assert.equal(archiveReviewed, 'false', 'Only submit accepts archive review.');
   }
@@ -66,9 +67,96 @@ export function validateContext(context, main, input) {
   assert.equal(main?.protected, true, 'Main must remain protected.');
   assert.match(main?.commit?.sha ?? '', SHA, 'Cannot verify the main commit.');
   assert.equal(context.workflowSha, main.commit.sha, 'Main advanced; dispatch again from the reviewed current main.');
-  if (input.mode !== 'submit') {
+  if (input.mode !== 'submit' && input.mode !== 'recover') {
     assert.equal(input.sourceSha, main.commit.sha, 'Preflight and build require the exact current main SHA.');
   }
+}
+
+// A failed build is evidence only for read-only recovery, never submit authority.
+// Keep this separate from validateRun's successful-run requirement.
+export function validateRecoverableRun(run, jobs, { sourceSha, runId }) {
+  assert.ok(record(run), 'Missing original build run.');
+  assert.equal(run.repository?.id, RELEASE.repositoryId, 'Original run repository differs.');
+  assert.equal(run.repository?.full_name, RELEASE.repository, 'Original run repository differs.');
+  assert.equal(run.path, RELEASE.workflow, 'Original run workflow differs.');
+  assert.equal(run.event, 'workflow_dispatch', 'Original build must be a manual dispatch.');
+  assert.equal(run.head_branch, 'main', 'Original build must run on main.');
+  assert.equal(run.head_sha, sourceSha, 'Original build source differs.');
+  assert.ok(Number.isSafeInteger(run.id) && run.id > 0, 'Original run identity is malformed.');
+  assert.equal(String(run.id), runId, 'Original run identity differs.');
+  assert.equal(run.run_attempt, 1, 'Rerun builds cannot be adopted.');
+  assert.equal(run.status, 'completed', 'Original run is incomplete.');
+  assert.equal(run.conclusion, 'failure', 'Only the completed failed build path can be recovered.');
+  assert.ok(Array.isArray(jobs) && jobs.length === 1, 'Original build must have exactly one release job.');
+  const job = jobs[0];
+  assert.equal(job.name, 'release', 'Original release job differs.');
+  assert.equal(job.run_id, run.id, 'Original job run differs.');
+  assert.equal(job.head_sha, sourceSha, 'Original job source differs.');
+  assert.equal(job.status, 'completed', 'Original job is incomplete.');
+  assert.equal(job.conclusion, 'failure', 'Original release job must have failed.');
+  assert.ok(Array.isArray(job.steps) && job.steps.length <= 50, 'Original step evidence is missing.');
+  const required = [
+    ['Require a new manual main dispatch before checkout', 'success'],
+    ['Validate reviewed source and prior workflow evidence', 'success'],
+    ['Install the pinned release CLI and exact source dependencies without credentials', 'success'],
+    ['Read-only Expo preflight and complete source archive comparison', 'success'],
+    ['Recheck source gates and queue exactly one production build', 'success'],
+    ['Preserve the public queued build fingerprint before waiting', 'success'],
+    ['Wait for that exact build and inspect the private phone and Watch archive', 'failure'],
+    ['Recheck the inspected exact build and submit it to TestFlight', 'skipped'],
+  ];
+  let previous = 0;
+  for (const [name, conclusion] of required) {
+    const matches = job.steps.filter(step => step.name === name);
+    assert.equal(matches.length, 1, 'Original build phase is missing or ambiguous.');
+    const step = matches[0];
+    assert.equal(step.status, 'completed', 'Original build phase is incomplete.');
+    assert.equal(step.conclusion, conclusion, 'Original build stopped outside the recoverable phase.');
+    assert.ok(Number.isSafeInteger(step.number) && step.number > previous, 'Original build phase order differs.');
+    previous = step.number;
+  }
+  assert.equal(job.steps.filter(step => step.conclusion === 'failure').length, 1, 'Original build has another failed phase.');
+  assert.ok(job.steps.every(step => step.status === 'completed' && ['success', 'failure', 'skipped'].includes(step.conclusion)),
+    'Original build has an ambiguous phase result.');
+  return run;
+}
+
+const immutableBuildFields = ['idSha256', 'sourceSha', 'platform', 'distribution', 'profile',
+  'simulator', 'appVersion', 'appBuildVersion', 'createdAt'];
+
+export function validatePublicBuild(build, { sourceSha, queued = false }) {
+  assert.ok(record(build), 'Public build identity is missing.');
+  const keys = [...immutableBuildFields, 'status', ...(queued ? [] : ['completedAt'])];
+  assert.deepEqual(Object.keys(build).sort(), keys.sort(), 'Public build identity has unexpected fields.');
+  assert.match(build.idSha256 ?? '', DIGEST, 'Build fingerprint is invalid.');
+  assert.match(build.sourceSha ?? '', SHA, 'Build source is invalid.');
+  assert.equal(build.sourceSha, sourceSha, 'Build source differs.');
+  assert.equal(build.platform, 'IOS');
+  assert.equal(build.distribution, 'STORE');
+  assert.equal(build.profile, 'production');
+  assert.equal(build.simulator, false);
+  assert.equal(build.appVersion, RELEASE.appVersion);
+  assert.match(build.appBuildVersion ?? '', /^[1-9][0-9]{0,8}$/, 'Build number is invalid.');
+  assert.ok(isoDate(build.createdAt), 'Build creation time is invalid.');
+  if (queued) assert.ok(['NEW', 'IN_QUEUE', 'IN_PROGRESS', 'FINISHED'].includes(build.status), 'Queued build state is invalid.');
+  else {
+    assert.equal(build.status, 'FINISHED', 'Build is not finished.');
+    assert.ok(isoDate(build.completedAt) && Date.parse(build.completedAt) >= Date.parse(build.createdAt), 'Build completion time is invalid.');
+  }
+  return build;
+}
+
+export function matchQueuedBuild(completed, queued) {
+  validatePublicBuild(queued, { sourceSha: queued?.sourceSha, queued: true });
+  validatePublicBuild(completed, { sourceSha: queued.sourceSha });
+  for (const key of immutableBuildFields) assert.equal(completed[key], queued[key], 'Completed build differs from its queued identity.');
+  return completed;
+}
+
+export function matchReceiptInputs(left, right) {
+  for (const key of ['sourceSha', 'sourceTree', 'nativeTree', 'sharedBlob', 'easignoreBlob', 'easVersion',
+    'productionEnvironmentVerified', 'productionEnvironmentSha256']) assert.equal(left[key], right[key], 'Linked evidence inputs differ.');
+  assert.deepEqual(left.sourceArchive, right.sourceArchive, 'Linked source archive differs.');
 }
 
 export function validateRun(run, { sourceSha, workflow, event = 'push', pullNumber, runId, attempt, mergedPolicyEvidence } = {}) {
@@ -372,6 +460,7 @@ export function validateArchiveReview(report, { source, build, artifact }) {
 }
 
 export function validateReceipt(receipt, { mode, run, source }) {
+  assert.ok(['preflight', 'build-queued', 'build', 'recover'].includes(mode), 'Unsupported evidence receipt mode.');
   assert.ok(record(receipt) && JSON.stringify(receipt).length <= 32768, 'Release receipt is missing or oversized.');
   assert.equal(receipt.schema, 1, 'Unknown release receipt schema.');
   assert.equal(receipt.mode, mode, 'Wrong evidence mode.');
@@ -389,10 +478,30 @@ export function validateReceipt(receipt, { mode, run, source }) {
     assert.equal(Object.hasOwn(receipt, field), false, 'Private provider identifiers must not enter public receipts.');
   }
   assert.equal(receipt.productionEnvironmentVerified, true, 'Production environment was not verified.');
+  assert.match(receipt.productionEnvironmentSha256 ?? '', DIGEST, 'Production environment fingerprint is missing.');
   assert.match(receipt.sourceArchive?.sha256 ?? '', DIGEST, 'Missing source archive manifest digest.');
   assert.ok(Number.isSafeInteger(receipt.sourceArchive?.files) && receipt.sourceArchive.files > 0, 'Missing source archive inventory.');
   assert.ok(isoDate(receipt.createdAt), 'Receipt timestamp is missing.');
-  if (mode === 'build') {
+  if (mode === 'build-queued' || mode === 'recover') {
+    for (const field of mode === 'recover' ? ['sourceChecks', 'controlChecks'] : ['sourceChecks']) {
+      const checks = receipt[field];
+      const workflows = [...Object.keys(REQUIRED_WORKFLOWS), 'ci-policy.yml'].sort();
+      assert.ok(Array.isArray(checks) && checks.length === workflows.length, 'Typed receipt checks are incomplete.');
+      assert.deepEqual(checks.map(check => check.workflow).sort(), workflows, 'Typed receipt workflow inventory differs.');
+      for (const check of checks) {
+        assert.match(check.runId ?? '', ID, 'Typed receipt check run is malformed.');
+        assert.ok(Number.isSafeInteger(check.attempt) && check.attempt > 0, 'Typed receipt check attempt is malformed.');
+      }
+    }
+  }
+  if (mode === 'build-queued') {
+    validatePublicBuild(receipt.build, { sourceSha: source.sourceSha, queued: true });
+    assert.match(receipt.preflightRunId ?? '', ID, 'Queued evidence has no linked preflight.');
+    assert.notEqual(receipt.preflightRunId, receipt.runId, 'Queued evidence cannot link itself.');
+    for (const key of ['artifact', 'archiveReview', 'submissionCommandCompleted']) assert.ok(!Object.hasOwn(receipt, key), 'Queued evidence cannot claim completion.');
+  }
+  if (mode === 'build' || mode === 'recover') {
+    validatePublicBuild(receipt.build, { sourceSha: source.sourceSha });
     assert.match(receipt.build?.idSha256 ?? '', DIGEST, 'Build receipt has no UUID fingerprint.');
     for (const field of ['id', 'projectId', 'bundleIdentifier', 'app', 'artifacts']) {
       assert.equal(Object.hasOwn(receipt.build, field), false, 'Private provider metadata must not enter public receipts.');
@@ -402,6 +511,14 @@ export function validateReceipt(receipt, { mode, run, source }) {
     assert.match(receipt.artifact?.sha256 ?? '', DIGEST, 'Build receipt has no IPA digest.');
     assert.ok(Number.isSafeInteger(receipt.artifact?.bytes) && receipt.artifact.bytes > 0, 'Build receipt has no IPA size.');
     validateArchiveReview(receipt.archiveReview, { source, build: receipt.build, artifact: receipt.artifact });
+  }
+  if (mode === 'recover') {
+    for (const key of ['queuedBuildRunId', 'preflightRunId']) {
+      assert.match(receipt[key] ?? '', ID, 'Recovery origin is missing.');
+      assert.notEqual(receipt[key], receipt.runId, 'Recovery evidence cannot link itself.');
+    }
+    assert.notEqual(receipt.queuedBuildRunId, receipt.preflightRunId, 'Recovery origin is ambiguous.');
+    assert.ok(!Object.hasOwn(receipt, 'submissionCommandCompleted'), 'Recovery cannot claim submission.');
   }
   return receipt;
 }

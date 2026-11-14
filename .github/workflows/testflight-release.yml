@@ -8,19 +8,19 @@ on:
       mode:
         description: Separate operation to perform
         type: choice
-        options: [preflight, build, submit]
+        options: [preflight, build, recover, submit]
         default: preflight
         required: true
       source_sha:
-        description: Full reviewed main commit SHA (40 lowercase hex characters)
+        description: Full reviewed source SHA (recover/submit preserve the original build source)
         type: string
         required: true
       evidence_run_id:
-        description: Build requires a successful preflight run ID; submit requires its successful build run ID
+        description: Build uses successful preflight; recover uses original failed build; submit uses successful build or recover run ID
         type: string
         default: ''
       build_id_sha256:
-        description: Submit only — build UUID SHA-256 fingerprint from the successful build receipt (never enter a raw UUID)
+        description: Recover/submit — exact build UUID SHA-256 from the trusted receipt (never enter a raw UUID)
         type: string
         default: ''
       archive_sha256:
@@ -37,7 +37,7 @@ permissions:
   actions: read
   pull-requests: read
 
-# All three modes share a production lock. A new dispatch must not cancel a
+# All modes share a production lock. A new dispatch must not cancel a
 # command that may already have created a build or submission remotely.
 concurrency:
   group: occulert-testflight-production
@@ -110,12 +110,26 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: node scripts/testflight-release.mjs submit
+      - name: Recover and inspect the recorded completed build without queueing
+        if: inputs.mode == 'recover'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: node scripts/testflight-release.mjs recover
       - name: Preserve the bounded release receipt
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: testflight-${{ inputs.mode }}-${{ github.run_id }}
           path: ${{ runner.temp }}/occulert-testflight-control/receipt.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Preserve bounded download failure diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: testflight-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/occulert-testflight-control/download-diagnostic.json
           if-no-files-found: ignore
           retention-days: 14
       - name: Summarize verified release evidence
