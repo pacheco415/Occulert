@@ -30,6 +30,68 @@ function receipts(sourceCommit) {
     migrations: { state: 'unknown', observedAt: at, summary: 'Authentication failed; production schema is unknown.' },
   };
 }
+function dashboardReceipt(sourceCommit) {
+  return {
+    receiptType: 'dashboard_observation', sourceCommit, version: '1.0.0', buildNumber: '60',
+    completedAt: '2026-11-04T05:05:40.475Z', observedAt: '2026-11-11T02:46:45Z',
+    dashboardState: 'Ready to Submit', uploadState: 'Complete', internalGroupAssigned: true,
+    internalAvailabilityObserved: true,
+    physicalAcceptance: 'not_recorded',
+  };
+}
+
+test('a saved dashboard receipt reports dated internal availability without inventing API states or device acceptance', () => {
+  const facts = {
+    schemaVersion: 1,
+    production: { visibility: 'private' },
+    testFlight: dashboardReceipt('b'.repeat(40)),
+    migrations: { visibility: 'private' },
+  };
+  const output = renderStatus({
+    git: { ref: 'origin/main', sourceCommit: 'a'.repeat(40), committedAt: '2026-11-14T00:00:00Z', native: { state: 'unchanged' } },
+    observations: facts,
+  });
+  assert.match(output, /Historical TestFlight dashboard receipt: 1\.0\.0 \(60\); observed Ready to Submit, upload Complete; internal group assigned/);
+  assert.ok(output.includes(`TestFlight source: \`${'b'.repeat(40)}\``));
+  assert.match(output, /Build completed: 2026-11-04T05:05:40\.475Z; saved dashboard receipt records internal availability as of 2026-11-11T02:46:45Z/);
+  assert.match(output, /Current Apple availability, replacement upload and remote build counter: Not checked/);
+  assert.match(output, /Physical acceptance for build 60: Not recorded/);
+  assert.doesNotMatch(output, /\bVALID\b|IN_BETA_TESTING|physical acceptance.*passed/i);
+  assert.match(output, /Deployment receipts are kept private/);
+  assert.match(output, /Operational receipts are kept private/);
+  assert.ok(output.trimEnd().split('\n').length <= 60);
+});
+
+test('dashboard receipts require exact observed labels and reject mixed API states, private identifiers and incomplete evidence', () => {
+  const original = { schemaVersion: 1, testFlight: dashboardReceipt('a'.repeat(40)) };
+  assert.equal(validateObservations(original), original);
+  for (const update of [
+    b => { delete b.receiptType; },
+    b => { b.receiptType = 'inferred_api'; },
+    b => { delete b.observedAt; },
+    b => { b.observedAt = '2026-11-31'; },
+    b => { b.sourceCommit = '21ab21cd'; },
+    b => { delete b.dashboardState; },
+    b => { b.dashboardState = 'VALID'; },
+    b => { b.uploadState = 'Uploading'; },
+    b => { delete b.internalGroupAssigned; },
+    b => { b.internalGroupAssigned = false; },
+    b => { delete b.internalAvailabilityObserved; },
+    b => { b.internalAvailabilityObserved = false; },
+    b => { b.processingState = 'VALID'; },
+    b => { b.internalState = 'IN_BETA_TESTING'; },
+    b => { b.groupId = 'private-group-identifier'; },
+    b => { b.submissionId = 'private-submission-identifier'; },
+    b => { b.physicalAcceptance = 'passed'; },
+  ]) {
+    const facts = structuredClone(original);
+    update(facts.testFlight);
+    assert.throws(() => validateObservations(facts));
+  }
+  const mixedApi = receipts('a'.repeat(40));
+  mixedApi.testFlight.dashboardState = 'Ready to Submit';
+  assert.throws(() => validateObservations(mixedApi), /explicit dashboard receiptType/);
+});
 
 test('default source stays on origin/main while an unbuilt feature branch changes', () => {
   const f = fixture();

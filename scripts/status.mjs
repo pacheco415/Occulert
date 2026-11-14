@@ -58,7 +58,17 @@ export function validateObservations(input) {
     date(b.completedAt, 'Native build completion date');
     date(b.observedAt, 'TestFlight observation date');
     if (!/^\d+\.\d+\.\d+$/.test(b.version) || !/^\d+$/.test(b.buildNumber)) throw new Error('TestFlight version and build number must be explicit strings.');
-    if (b.processingState !== 'VALID' || b.internalState !== 'IN_BETA_TESTING') throw new Error('This snapshot must identify an observed valid internal TestFlight build.');
+    if (b.receiptType === 'dashboard_observation') {
+      const publicFields = new Set(['receiptType', 'sourceCommit', 'version', 'buildNumber', 'completedAt', 'observedAt', 'dashboardState', 'uploadState', 'internalGroupAssigned', 'internalAvailabilityObserved', 'physicalAcceptance']);
+      if (Object.keys(b).some(key => !publicFields.has(key))) throw new Error('A dashboard TestFlight receipt may contain only its explicit public observation fields, without API states or operational identifiers.');
+      if (b.dashboardState !== 'Ready to Submit' || b.uploadState !== 'Complete' || b.internalGroupAssigned !== true || b.internalAvailabilityObserved !== true) {
+        throw new Error('A dashboard TestFlight receipt requires observed Ready to Submit, Complete, internal group assignment and explicit internal availability.');
+      }
+    } else {
+      if (b.receiptType !== undefined) throw new Error('Unsupported TestFlight receiptType.');
+      if (['dashboardState', 'uploadState', 'internalGroupAssigned', 'internalAvailabilityObserved'].some(key => Object.hasOwn(b, key))) throw new Error('Dashboard observations require an explicit dashboard receiptType.');
+      if (b.processingState !== 'VALID' || b.internalState !== 'IN_BETA_TESTING') throw new Error('This snapshot must identify an observed valid internal TestFlight build.');
+    }
     // Availability is not a physical test; acceptance belongs in exact-build device receipts.
     if (b.physicalAcceptance !== 'not_recorded') throw new Error('Physical acceptance must be tracked in a separate device receipt.');
   }
@@ -130,7 +140,12 @@ export function renderStatus({ git, observations = { schemaVersion: 1 }, pullReq
   lines.push('');
   if (facts.testFlight) {
     const b = facts.testFlight;
-    lines.push(`- Historical TestFlight receipt: ${b.version} (${b.buildNumber}); observed Apple VALID, internal IN_BETA_TESTING.`, `- TestFlight source: \`${b.sourceCommit}\`.`, `- Build completed: ${b.completedAt}; availability observed ${b.observedAt}.`, '- Current Apple availability, replacement upload and remote build counter: Not checked.', `- Physical acceptance for build ${b.buildNumber}: Not recorded.`);
+    if (b.receiptType === 'dashboard_observation') {
+      lines.push(`- Historical TestFlight dashboard receipt: ${b.version} (${b.buildNumber}); observed Ready to Submit, upload Complete; internal group assigned.`, `- TestFlight source: \`${b.sourceCommit}\`.`, `- Build completed: ${b.completedAt}; saved dashboard receipt records internal availability as of ${b.observedAt}.`);
+    } else {
+      lines.push(`- Historical TestFlight receipt: ${b.version} (${b.buildNumber}); observed Apple VALID, internal IN_BETA_TESTING.`, `- TestFlight source: \`${b.sourceCommit}\`.`, `- Build completed: ${b.completedAt}; availability observed ${b.observedAt}.`);
+    }
+    lines.push('- Current Apple availability, replacement upload and remote build counter: Not checked.', `- Physical acceptance for build ${b.buildNumber}: Not recorded.`);
   } else lines.push('- TestFlight: Unknown; no build receipt supplied.');
   if (git.native.state === 'unchanged') lines.push('- Native changes waiting for a build: None in the inspected source; pending PRs are separate.');
   else if (git.native.state === 'changed') {
