@@ -436,6 +436,37 @@ The installed face detector requires Android API 26 (Android 8.0) or later.
 `expo-build-properties` sets that minimum during managed prebuild. Older Android
 versions are unsupported; do not override the detector's manifest requirement.
 
+### Watch privacy manifest packaging
+
+The phone and Watch have separate root privacy manifests. `ios.privacyManifests`
+initializes the phone's generated manifest before the Watch target is created.
+`./plugins/with-watch-privacy` must precede `@bacons/apple-targets` in the plugin
+list: its mod runs after target generation and explicitly registers the Watch's
+own manifest while excluding that file from implicit synchronized-folder copying.
+This lets React Native's CocoaPods privacy aggregation recognize both resources
+and aggregate phone dependencies only into the generated phone file. The local
+mod also removes obsolete phone-manifest membership from an existing Watch target.
+The tracked Watch manifest and its SystemBootTime reason `35F9.1` remain intact.
+
+`npm run test:packaging` exercises real Expo introspection without an `ios/`
+directory and clean/repeated clean prebuilds. The required macOS Watch workflow also
+runs `node --test scripts/test-watch-privacy-xcode.mjs`: it uses the installed
+React Native Ruby aggregation with real Xcodeproj objects, reproduces the old
+duplicate-output failure, and builds both the locally repaired and cleanly
+generated Watch targets without signing to inspect their copied manifests.
+These checks do not establish signed-archive
+acceptance or TestFlight availability; the release inspector still checks the
+actual completed IPA before submission. The simulator profile excludes the
+Watch target and its packaging plugin.
+
+Use clean native generation for this release; its EAS archive excludes `ios/`.
+The pinned Expo 58 CLI defaults to clean generation. Full `--no-clean` currently
+fails in `@bacons/apple-targets` 5.0.0 while replacing an existing target's build
+configuration list, before the local privacy mod executes. The same failure
+occurs with the legacy configuration without this mod. The regression tests
+therefore distinguish the local mod's repair of the actual RN-created graph
+from complete clean Expo generation; they do not claim full soft-prebuild support.
+
 ### Camera location and microphone permissions
 
 The VisionCamera config plugin explicitly sets `enableLocation: false` and

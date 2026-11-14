@@ -13,6 +13,6 @@ module.exports = ({ config: base }) => {
     },
     extra: { ...base.extra, simulatorTrace: true },
     // A layout/scoring simulator does not embed the production Watch target.
-    plugins: [...base.plugins.filter(plugin => plugin !== '@bacons/apple-targets'), './plugins/with-simulator-trace'],
+    plugins: [...base.plugins.filter(plugin => !['@bacons/apple-targets', './plugins/with-watch-privacy'].includes(plugin)), './plugins/with-simulator-trace'],
   };
 };

@@ -15,6 +15,7 @@
     "ios": {
       "icon": "./assets/icon.png",
       "supportsTablet": false,
+      "privacyManifests": {},
       "appleTeamId": "W3W6Z8U68C",
       "bundleIdentifier": "com.occulert.app",
       "infoPlist": {
@@ -39,6 +40,7 @@
       ]
     },
     "plugins": [
+      "./plugins/with-watch-privacy",
       "@bacons/apple-targets",
       [
         "expo-router",
