@@ -78,6 +78,48 @@ Primary references: [Supabase JWT verification](https://supabase.com/docs/guides
 [current user lookup](https://supabase.com/docs/reference/javascript/auth-getuser),
 and [Node 24 crypto](https://nodejs.org/download/release/v24.19.0/docs/api/crypto.html).
 
+## November 14 configured-lifetime review
+
+**The production access-token lifetime remains unverified.** On November 14,
+2026, the connected project was confirmed as `wbsynfcjpwlgdzioqpoa`, matching
+the web and native project pins. The available project metadata does not expose
+Auth configuration, and the project's JWT settings page required a new dashboard
+sign-in. No production JWT-expiry setting was read or changed. A documented
+Supabase default, a test token's lifetime or a public API key's expiration is
+not evidence of this project's configured access-token lifetime.
+
+To finish this review, an authenticated owner must record the **JWT expiry
+limit** in the project's **JWT Keys > Legacy JWT Secret** settings, together
+with the observation date. Supabase's [session documentation](https://supabase.com/docs/guides/auth/sessions)
+describes that setting separately from refresh-token reuse and maximum-session
+or inactivity timeouts. Do not record any signing secret, API key, access token
+or refresh token in the repository or review evidence.
+
+The practical boundaries differ:
+
+- **Sign-out:** a copied, unexpired access token can still pass local signature
+  verification while its owned database rows remain. These callers do not
+  query `auth.sessions`, so sign-out is not an immediate server-side denial
+  guarantee. Acceptance is bounded by that token's `exp` claim plus the existing
+  30-second skew allowance, independently of the ten-minute JWKS cache.
+- **Account deletion:** the canonical account-deletion cascade removes the
+  owner's fleet. A request that observes the removed fleet cannot read its
+  protected reports even if its signature and expiry remain valid. The three
+  fleet reporting handlers return `403 fleet_not_found`. This does not promise
+  to cancel a response already authorized before the deletion commits.
+- **Sensitive operations:** the fresh-Auth policy above remains in force. This
+  review neither enables cached verification for another route nor changes
+  token, key-cache or recent-sign-in timing.
+
+If the observed JWT expiry limit exceeds **3,600 seconds**, propose reducing it
+to **3,600 seconds** for owner review; do not enable the change as part of this
+task. Supabase discourages values over one hour and advises against going below
+five minutes. Validate web/native refresh, loss of connectivity and recovery
+before approving a different limit. Changing a configured lifetime must not be
+presented as retroactively shortening the `exp` claim of already issued tokens.
+Until the live value is recorded, W7's configured-lifetime acceptance criterion
+is open and the review stays draft.
+
 ## Validation
 
 `npm run test:cached-jwks` exercises actual RSA/EC signatures, strict claims and
@@ -86,3 +128,13 @@ body limits, abort-ignoring deadline failures and actual sensitive/id-only API
 handlers. The existing transport, provider-budget and recent-auth regressions
 remain in root verification. Fixtures isolate the HTTP boundary; they do not
 claim a production signing-key or physical-network experiment.
+
+The deleted-owner regression replays the canonical schema and migrations into
+local PGlite, successfully reads an owned fleet with a real signed token, then
+deletes only the local `auth.users` fixture. It confirms the fleet cascade,
+preserves an unrelated owner's fleet, and verifies the same token still passes
+cryptographic validation. The actual fleet-summary, fleet-session-history and
+fleet-period-report handlers must then return `403 fleet_not_found` after only
+the current ownership lookup, without reading protected roster/session/event
+data or invoking the report RPC. No production account is deleted and no
+production migration or authentication setting is changed by these tests.

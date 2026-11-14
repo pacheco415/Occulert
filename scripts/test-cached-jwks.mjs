@@ -4,6 +4,8 @@ import { generateKeyPairSync, sign, createHmac } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { PGlite } from '@electric-sql/pglite';
+import { initializeTestSchema } from './lib/test-schema.mjs';
 
 const require = createRequire(import.meta.url);
 const { createCachedJwtVerifier } = require('../api/_lib/cached-jwks.js');
@@ -313,6 +315,84 @@ test('actual id-only session start uses signed identity and current owned driver
   const result = await invoke(f.load('sessions.js'), protectedRequest('sessions', liveJwt(), 'POST', { driver_id: 'forged', fleet_id: 'forged' }));
   assert.equal(result.statusCode, 200); assert.equal(queries.length, 2); assert.equal(f.calls.length, 1);
   assert.equal(result.body.session.driver_id, subject);
+});
+
+test('deleted fleet owner with an unexpired signed token gets fleet_not_found after the actual database cascade', async () => {
+  const db = new PGlite();
+  const fleetId = '10000000-0000-4000-8000-000000000001';
+  const otherOwner = '00000000-0000-4000-8000-000000000002';
+  const otherFleet = '10000000-0000-4000-8000-000000000002';
+  // Keep token time fixed: denial must come from current ownership, not expiry.
+  class TokenDate extends Date { static now() { return clockStart; } }
+  const token = jwt();
+  try {
+    const migrations = await initializeTestSchema(db);
+    assert.ok(migrations.includes('20260912170153_atomic_account_deletion.sql'));
+    await db.query('insert into auth.users(id) values($1),($2)', [subject, otherOwner]);
+    await db.query(`insert into fleets(id,company_name,owner_user_id) values
+      ($1,'Deleted owner fleet',$2),($3,'Unrelated fleet',$4)`, [fleetId, subject, otherFleet, otherOwner]);
+    const f = networkFixture(async (rawUrl, options) => {
+      const url = new URL(rawUrl), params = url.searchParams;
+      if (url.pathname === '/auth/v1/.well-known/jwks.json') return Response.json({ keys: [jwk('ec')] });
+      // Keep real pgFetch, token verification and handlers. Only the HTTP
+      // boundary maps their scoped queries into the isolated PostgreSQL fixture.
+      assert.equal(options.headers.Authorization, 'Bearer fixture-service-key');
+      if (url.pathname === '/rest/v1/fleets') {
+        assert.equal(options.method, 'GET');
+        assert.ok(['id,company_name,plan', 'id,company_name'].includes(params.get('select')));
+        assert.equal(params.get('owner_user_id'), 'eq.' + subject);
+        assert.equal(params.get('limit'), '1');
+        return Response.json((await db.query('select id,company_name,plan from fleets where owner_user_id=$1 limit 1',
+          [params.get('owner_user_id').slice(3)])).rows);
+      }
+      if (url.pathname === '/rest/v1/drivers' || url.pathname === '/rest/v1/sessions') {
+        assert.equal(options.method, 'GET');
+        assert.equal(params.get('fleet_id'), 'eq.' + fleetId);
+        const sql = url.pathname.endsWith('/drivers')
+          ? 'select id,name,active,vehicle_id from drivers where fleet_id=$1 order by id limit 500'
+          : 'select id,driver_id,started_at,ended_at from sessions where fleet_id=$1 order by started_at desc,id desc limit 50';
+        return Response.json((await db.query(sql, [params.get('fleet_id').slice(3)])).rows);
+      }
+      if (url.pathname === '/rest/v1/rpc/fleet_monthly_activity') {
+        const body = JSON.parse(options.body);
+        assert.equal(options.method, 'POST');
+        assert.deepEqual(body, { p_actor_id: subject, p_fleet_id: fleetId });
+        return Response.json((await db.query('select fleet_monthly_activity($1::uuid,$2::uuid) as value',
+          [body.p_actor_id, body.p_fleet_id])).rows[0].value);
+      }
+      assert.fail('Unexpected request: ' + url.pathname);
+    }, { Date: TokenDate });
+    await db.exec('set role service_role');
+    const summary = f.load('fleet-summary.js');
+    const before = await invoke(summary, protectedRequest('fleet-summary', token, 'GET'));
+    assert.equal(before.statusCode, 200);
+    assert.equal(before.body.fleet.id, fleetId, 'the same signed token initially accesses its existing fleet');
+
+    // Delete the local Auth fixture, never the fleet directly. The production
+    // migration's foreign key must remove only that owner's fleet atomically.
+    await db.exec('reset role');
+    await db.query('delete from auth.users where id=$1', [subject]);
+    assert.deepEqual((await db.query('select id,owner_user_id from fleets')).rows,
+      [{ id: otherFleet, owner_user_id: otherOwner }]);
+    assert.equal((await db.query('select id from auth.users where id=$1', [subject])).rows.length, 0);
+    await db.exec('set role service_role');
+    assert.ok(JSON.parse(Buffer.from(token.split('.')[1], 'base64url')).exp > TokenDate.now() / 1000);
+    assert.equal((await f.lib.verifyAccessToken(token, { cachedIdentity: true })).id, subject,
+      'account deletion does not turn a valid cached signature into token revocation');
+
+    for (const route of ['fleet-summary', '_lib/routes/fleet-session-history', '_lib/routes/fleet-period-report']) {
+      const start = f.calls.length;
+      const request = protectedRequest(route.split('/').at(-1), token, 'GET');
+      if (route.endsWith('fleet-period-report')) { request.url += '?days=30'; request.query.days = '30'; }
+      const result = await invoke(f.load(route + '.js'), request);
+      assert.equal(result.statusCode, 403, route);
+      assert.deepEqual(result.body, { ok: false, error: 'fleet_not_found' }, route);
+      assert.deepEqual(f.calls.slice(start).map(call => new URL(call.url).pathname), ['/rest/v1/fleets'],
+        'denied owners must not reach roster, session, event or report queries');
+    }
+    assert.equal(f.calls.filter(call => new URL(call.url).pathname.startsWith('/auth/')).length, 1,
+      'the original JWKS refresh is the only Auth request; the warm valid identity is not revalidated over Auth');
+  } finally { await db.close(); }
 });
 
 test('JWKS response streaming is capped at 64KiB and cancellation never blocks safe Auth fallback', async () => {
