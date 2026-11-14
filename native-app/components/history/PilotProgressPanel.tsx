@@ -1,3 +1,4 @@
+import { strings, formatString } from '../../lib/strings';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { CHECKPOINT_TARGET } from '../../lib/historyReviewModel';
@@ -11,17 +12,15 @@ export function PilotProgressPanel({ model, sharePilotProgress }: { model: Histo
           <View style={s.checkpoint}>
             <View style={s.checkpointHeader}>
               <View style={s.checkpointHeaderCopy}>
-                <Text style={s.checkpointEyebrow}>ALL HISTORY · DRIVE REVIEW PROGRESS</Text>
-                <Text style={s.checkpointTitle}>
-                  {checkpointProgress} of {CHECKPOINT_TARGET} Medium sessions reviewed
-                </Text>
+                <Text style={s.checkpointEyebrow}>{strings.history.pilot.eyebrow}</Text>
+                <Text style={s.checkpointTitle}>{formatString(strings.history.pilot.checkpointTitle, { count: checkpointProgress, target: CHECKPOINT_TARGET })}</Text>
               </View>
               <Text style={s.checkpointPercent}>
                 {Math.round((checkpointProgress / CHECKPOINT_TARGET) * 100)}%
               </Text>
             </View>
             <View
-              accessibilityLabel={`${checkpointProgress} of ${CHECKPOINT_TARGET} Medium sensitivity sessions reviewed`}
+              accessibilityLabel={formatString(strings.history.pilot.progressAccessibilityLabel, { count: checkpointProgress, target: CHECKPOINT_TARGET })}
               accessibilityRole="progressbar"
               accessibilityValue={{ min: 0, max: CHECKPOINT_TARGET, now: checkpointProgress }}
               style={s.progressTrack}
@@ -34,27 +33,21 @@ export function PilotProgressPanel({ model, sharePilotProgress }: { model: Histo
               />
             </View>
             <View style={s.checkpointStats}>
-              <Text style={s.checkpointStat}>{accurateCount} felt right</Text>
-              <Text style={s.checkpointStat}>{falseAlertCount} false</Text>
-              <Text style={s.checkpointStat}>{missedAlertCount} missed</Text>
-              <Text style={s.checkpointStat}>{lateAlertCount} late</Text>
+              <Text style={s.checkpointStat}>{formatString(strings.history.pilot.feltRight, { count: accurateCount })}</Text>
+              <Text style={s.checkpointStat}>{formatString(strings.history.pilot.falseAlerts, { count: falseAlertCount })}</Text>
+              <Text style={s.checkpointStat}>{formatString(strings.history.pilot.missedAlerts, { count: missedAlertCount })}</Text>
+              <Text style={s.checkpointStat}>{formatString(strings.history.pilot.lateAlerts, { count: lateAlertCount })}</Text>
             </View>
-            <Text style={s.checkpointNote}>
-              Only complete reviewed sessions recorded on Medium count here. Recovered partial sessions are excluded. Ratings stay on this iPhone.
-            </Text>
+            <Text style={s.checkpointNote}>{strings.history.pilot.checkpointNote}</Text>
             <View style={s.coverageSummary}>
-              <Text style={s.coverageTitle}>TEST CONDITION COVERAGE</Text>
-              <Text style={s.coverageCopy}>
-                {completeConditionCount} of {reviewedMedium.length} reviewed sessions include lighting, eyewear, and phone position.
-              </Text>
-              <Text style={s.coverageStats}>
-                {pilotCoverage.coveredCount} of {pilotCoverage.totalCount} planned condition variants represented
-              </Text>
+              <Text style={s.coverageTitle}>{strings.history.pilot.coverageTitle}</Text>
+              <Text style={s.coverageCopy}>{formatString(strings.history.pilot.conditionsRecorded, { count: completeConditionCount, total: reviewedMedium.length })}</Text>
+              <Text style={s.coverageStats}>{formatString(strings.history.pilot.conditionCoverage, { count: pilotCoverage.coveredCount, total: pilotCoverage.totalCount })}</Text>
               <View style={s.coverageGrid}>
                 {pilotCoverage.items.map(item => (
                   <View
                     accessible
-                    accessibilityLabel={`${item.label}, ${item.count} reviewed ${item.count === 1 ? 'session' : 'sessions'}`}
+                    accessibilityLabel={formatString(strings.history.pilot.conditionAccessibilityLabel, { label: item.label, count: item.count, sessions: item.count === 1 ? strings.history.common.session : strings.history.common.sessions })}
                     key={item.id}
                     style={[s.coverageItem, item.count > 0 && s.coverageItemCovered]}
                   >
@@ -63,9 +56,7 @@ export function PilotProgressPanel({ model, sharePilotProgress }: { model: Histo
                       size={14}
                       color={item.count > 0 ? '#86efac' : '#fbbf24'}
                     />
-                    <Text style={[s.coverageItemText, item.count > 0 && s.coverageItemTextCovered]}>
-                      {item.label} · {item.count}
-                    </Text>
+                    <Text style={[s.coverageItemText, item.count > 0 && s.coverageItemTextCovered]}>{formatString(strings.history.filters.labelCount, { label: item.label, count: item.count })}</Text>
                   </View>
                 ))}
               </View>
@@ -74,55 +65,41 @@ export function PilotProgressPanel({ model, sharePilotProgress }: { model: Histo
                 style={pilotCoverage.missingLabels.length > 0 ? s.coverageMissing : s.coverageComplete}
               >
                 {pilotCoverage.missingLabels.length > 0
-                  ? `Still needed: ${pilotCoverage.missingLabels.join(', ')}`
-                  : 'Every planned lighting, eyewear, and phone-position variant is represented.'}
+                  ? formatString(strings.history.progress.stillNeeded, { items: pilotCoverage.missingLabels.join(', ') })
+                  : strings.history.pilot.coverageComplete}
               </Text>
-              <Text style={s.coverageStats}>
-                {completeDeviceImpactCount} include battery-use and phone-heat observations
-              </Text>
-              <Text style={s.coverageCaution}>
-                Coverage prevents obvious gaps; one session in a condition is not enough to establish accuracy.
-              </Text>
+              <Text style={s.coverageStats}>{formatString(strings.history.pilot.deviceCoverage, { count: completeDeviceImpactCount })}</Text>
+              <Text style={s.coverageCaution}>{strings.history.pilot.coverageCaution}</Text>
             </View>
             {issueSessionCount > 0 && (
               <View style={s.patternSummary}>
-                <Text style={s.coverageTitle}>ALERT PATTERNS</Text>
-                <Text style={s.patternIntro}>
-                  All reviewed sensitivities are included. Counts stay on this iPhone.
-                </Text>
+                <Text style={s.coverageTitle}>{strings.history.pilot.patternsTitle}</Text>
+                <Text style={s.patternIntro}>{strings.history.pilot.patternsIntro}</Text>
                 {issueInsights.map(insight => (
                   <View key={insight.assessment} style={s.patternGroup}>
-                    <Text style={s.patternTitle}>{insight.total} {insight.label.toLowerCase()}</Text>
+                    <Text style={s.patternTitle}>{formatString(strings.history.pilot.issueCount, { count: insight.total, label: insight.label.toLowerCase() })}</Text>
                     {insight.total === 0 ? (
-                      <Text style={s.patternCopy}>None in reviewed sessions.</Text>
+                      <Text style={s.patternCopy}>{strings.history.pilot.noPatterns}</Text>
                     ) : (
                       <>
-                        <Text style={s.patternCopy}>
-                          Sensitivity: {formatPilotCounts(insight.sensitivities) || 'not recorded'}
-                        </Text>
-                        <Text style={s.patternCopy}>
-                          Conditions: {formatPilotCounts(insight.conditions) || 'not recorded'}
-                        </Text>
+                        <Text style={s.patternCopy}>{formatString(strings.history.pilot.sensitivities, { counts: formatPilotCounts(insight.sensitivities) || strings.history.common.notRecordedLower })}</Text>
+                        <Text style={s.patternCopy}>{formatString(strings.history.pilot.conditions, { counts: formatPilotCounts(insight.conditions) || strings.history.common.notRecordedLower })}</Text>
                         {insight.completeConditionCount < insight.total && (
-                          <Text style={s.patternMissing}>
-                            {insight.total - insight.completeConditionCount} missing one or more test conditions
-                          </Text>
+                          <Text style={s.patternMissing}>{formatString(strings.history.pilot.incompleteConditions, { count: insight.total - insight.completeConditionCount })}</Text>
                         )}
                       </>
                     )}
                   </View>
                 ))}
-                <Text style={s.patternCaution}>
-                  These are observations, not error rates. Compare patterns only after each condition has enough reviewed sessions.
-                </Text>
+                <Text style={s.patternCaution}>{strings.history.pilot.patternsCaution}</Text>
               </View>
             )}
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={sessionOperationsBusy
-                ? 'Wait for session changes before sharing pilot progress'
-                : 'Share aggregate pilot progress'}
-              accessibilityHint="Opens the iPhone share sheet with condition coverage and aggregate review counts"
+                ? strings.history.pilot.shareBusy
+                : strings.history.pilot.shareAccessibilityLabel}
+              accessibilityHint={strings.history.pilot.shareHint}
               accessibilityState={{ disabled: sessionOperationsBusy, busy: sessionOperationsBusy }}
               disabled={sessionOperationsBusy}
               onPress={() => { void sharePilotProgress(); }}
@@ -130,8 +107,8 @@ export function PilotProgressPanel({ model, sharePilotProgress }: { model: Histo
             >
               <Ionicons name="document-text-outline" size={17} color="#bfdbfe" />
               <View style={s.pilotExportCopy}>
-                <Text style={s.pilotExportTitle}>Share pilot progress</Text>
-                <Text style={s.pilotExportDetail}>All history · aggregate counts only · no session or driver identifiers</Text>
+                <Text style={s.pilotExportTitle}>{strings.history.pilot.shareTitle}</Text>
+                <Text style={s.pilotExportDetail}>{strings.history.pilot.shareDetail}</Text>
               </View>
               <Ionicons name="share-outline" size={16} color="#93c5fd" />
             </TouchableOpacity>

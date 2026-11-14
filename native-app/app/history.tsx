@@ -1,3 +1,4 @@
+import { strings, formatString } from '../lib/strings';
 import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, SafeAreaView, TouchableOpacity, Alert, Share, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -192,7 +193,7 @@ export default function HistoryScreen() {
         if (focusedRef.current && historyLoadAttemptRef.current === attempt) await load(true);
       },
       onBusyChange: busy => { retryCloudBusyRef.current=busy; if (focusedRef.current) setRetryCloudBusy(busy); },
-      onError: () => { if (focusedRef.current) Alert.alert('Cloud completion not confirmed', 'Your local summaries remain saved. Refresh and try again when connected.'); },
+      onError: () => { if (focusedRef.current) Alert.alert(strings.history.alerts.cloudTitle, strings.history.alerts.cloudDetail); },
     });
   };
 
@@ -208,7 +209,7 @@ export default function HistoryScreen() {
       .then(() => AsyncStorage.setItem(HISTORY_FILTER_KEY, filter))
       .catch(() => {
         if (filterRevisionRef.current === revision) {
-          Alert.alert('Could not remember this view', 'The filter still works now, but it may reset next time.');
+          Alert.alert(strings.history.alerts.viewTitle, strings.history.alerts.filterDetail);
         }
       });
   };
@@ -225,7 +226,7 @@ export default function HistoryScreen() {
       .then(() => AsyncStorage.setItem(HISTORY_PERIOD_KEY, period))
       .catch(() => {
         if (periodRevisionRef.current === revision) {
-          Alert.alert('Could not remember this period', 'The date view still works now, but it may reset next time.');
+          Alert.alert(strings.history.alerts.periodTitle, strings.history.alerts.periodDetail);
         }
       });
   };
@@ -242,7 +243,7 @@ export default function HistoryScreen() {
       .then(() => AsyncStorage.setItem(HISTORY_ASSESSMENT_KEY, assessment))
       .catch(() => {
         if (assessmentRevisionRef.current === revision) {
-          Alert.alert('Could not remember this feedback view', 'The feedback filter still works now, but it may reset next time.');
+          Alert.alert(strings.history.alerts.feedbackViewTitle, strings.history.alerts.feedbackViewDetail);
         }
       });
   };
@@ -259,7 +260,7 @@ export default function HistoryScreen() {
       .then(() => AsyncStorage.setItem(HISTORY_VIEW_KEY, JSON.stringify(view)))
       .catch(() => {
         if (recordedViewRevisionRef.current === revision) {
-          Alert.alert('Could not remember this view', 'These filters and sorting still work now, but may reset next time.');
+          Alert.alert(strings.history.alerts.viewTitle, strings.history.alerts.viewDetail);
         }
       });
   };
@@ -338,8 +339,8 @@ export default function HistoryScreen() {
       const selectedScope = historyScopeLabel(historyPeriodRef.current, historyFilterRef.current, historyAssessmentRef.current, historyViewRef.current);
       if (queue.length === 0) {
         Alert.alert(
-          'Review queue complete',
-          `No unfinished completed-session reviews remain in the selected view: ${selectedScope}. Your saved ratings remain on this iPhone. Other views may have unfinished reviews.`,
+          strings.history.alerts.queueCompleteTitle,
+          formatString(strings.history.alerts.queueCompleteDetail, { scope: selectedScope }),
         );
         return;
       }
@@ -349,12 +350,12 @@ export default function HistoryScreen() {
       const queueViewRevision = viewRevisionRef.current;
       const queueHistoryRevision = historyRevisionRef.current;
       Alert.alert(
-        'Review complete',
-        `${queue.length} unfinished ${queue.length === 1 ? 'session remains' : 'sessions remain'} in the selected view: ${selectedScope}.`,
+        strings.history.common.reviewComplete,
+        formatString(strings.history.alerts.queueRemaining, { count: queue.length, remaining: queue.length === 1 ? strings.history.alerts.oneSessionRemaining : strings.history.alerts.sessionsRemaining, scope: selectedScope }),
         [
-          { text: 'Done', style: 'cancel' },
+          { text: strings.history.alerts.done, style: 'cancel' },
           {
-            text: 'Review Next',
+            text: strings.history.alerts.reviewNext,
             onPress: () => {
               if (queueViewRevision !== viewRevisionRef.current || queueHistoryRevision !== historyRevisionRef.current) return;
               const currentQueue = currentReviewQueue(index);
@@ -366,7 +367,7 @@ export default function HistoryScreen() {
               setExpandedSessions(current => ({ ...current, [key]: true }));
               setReviewQueueMessage({
                 key,
-                text: `Next unfinished review · ${currentQueue.length} ${currentQueue.length === 1 ? 'session' : 'sessions'} remaining with all selected filters and sorting`,
+                text: formatString(strings.history.alerts.nextQueue, { count: currentQueue.length, sessions: currentQueue.length === 1 ? strings.history.common.session : strings.history.common.sessions }),
               });
             },
           },
@@ -380,8 +381,8 @@ export default function HistoryScreen() {
     await saveSessionChanges(
       index,
       item => ({ ...item, alertAssessment: value, assessmentUpdatedAt: updatedAt }),
-      'Could not save review',
-      'Please try rating this session again.',
+      strings.history.alerts.saveReviewTitle,
+      strings.history.alerts.saveReviewDetail,
     );
   };
 
@@ -394,8 +395,8 @@ export default function HistoryScreen() {
         delete updated.assessmentUpdatedAt;
         return updated;
       },
-      'Could not remove assessment',
-      'The saved rating remains unchanged. Please try again.',
+      strings.history.alerts.removeAssessmentTitle,
+      strings.history.alerts.removeAssessmentDetail,
     );
   };
 
@@ -408,8 +409,8 @@ export default function HistoryScreen() {
         testConditions: { ...item.testConditions, [key]: value } as SessionTestConditions,
         conditionsUpdatedAt: updatedAt,
       }),
-      'Could not save conditions',
-      'Please try recording these test conditions again.',
+      strings.history.alerts.saveConditionsTitle,
+      strings.history.alerts.saveConditionsDetail,
     );
   };
 
@@ -422,8 +423,8 @@ export default function HistoryScreen() {
         deviceImpact: { ...item.deviceImpact, [key]: value } as SessionDeviceImpact,
         deviceImpactUpdatedAt: updatedAt,
       }),
-      'Could not save device impact',
-      'Please try recording the device impact again.',
+      strings.history.alerts.saveImpactTitle,
+      strings.history.alerts.saveImpactDetail,
     );
   };
 
@@ -432,22 +433,22 @@ export default function HistoryScreen() {
 
     try {
       await Share.share({
-        title: 'Occulert session summaries',
+        title: strings.history.screen.shareTitle,
         message: buildHistoryShareMessage(items, historyPeriod, historyFilter, historyAssessment, historyView),
       });
     } catch {
-      Alert.alert('Could not share summaries', 'Please try exporting the session summaries again.');
+      Alert.alert(strings.history.alerts.shareTitle, strings.history.alerts.shareDetail);
     }
   };
 
   const sharePilotProgress = async () => {
     try {
       await Share.share({
-        title: 'Occulert pilot progress',
+        title: strings.history.screen.pilotShareTitle,
         message: buildHistoryPilotProgressMessage(sessions),
       });
     } catch {
-      Alert.alert('Could not share pilot progress', 'Please try exporting the aggregate pilot report again.');
+      Alert.alert(strings.history.alerts.pilotShareTitle, strings.history.alerts.pilotShareDetail);
     }
   };
 
@@ -464,17 +465,17 @@ export default function HistoryScreen() {
         sessionsRef.current = updated;
         setSessions(updated);
       },
-      () => Alert.alert('Could not delete session', 'The session remains saved. Please try again.'),
+      () => Alert.alert(strings.history.alerts.deleteTitle, strings.history.alerts.deleteDetail),
     );
   };
 
   const confirmDeleteSession = (target: SessionRecord, index: number) => {
     Alert.alert(
-      'Delete this session?',
-      'This permanently removes the local session summary from this iPhone. This cannot be undone.',
+      strings.history.alerts.deleteConfirmTitle,
+      strings.history.alerts.deleteConfirmDetail,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => { void deleteSession(target, index); } },
+        { text: strings.history.alerts.cancel, style: 'cancel' },
+        { text: strings.history.alerts.delete, style: 'destructive', onPress: () => { void deleteSession(target, index); } },
       ],
     );
   };
@@ -492,7 +493,7 @@ export default function HistoryScreen() {
         && sessionsRef.current.some((item, storedIndex) => sessionRecordKey(item, storedIndex) === key)
       )),
       () => {
-        if (focusedRef.current) Alert.alert('Could not open feedback', 'Please try opening the session draft again.');
+        if (focusedRef.current) Alert.alert(strings.history.alerts.feedbackTitle, strings.history.alerts.feedbackDetail);
       },
     );
   };
@@ -517,7 +518,7 @@ export default function HistoryScreen() {
     setExpandedSessions(current => ({ ...current, [key]: true }));
     setReviewQueueMessage({
       key,
-      text: `${currentQueue.length} unfinished ${currentQueue.length === 1 ? 'session' : 'sessions'} with all selected filters and sorting`,
+      text: formatString(strings.history.screen.queue, { count: currentQueue.length, sessions: currentQueue.length === 1 ? strings.history.common.session : strings.history.common.sessions }),
     });
   };
 
@@ -534,10 +535,8 @@ export default function HistoryScreen() {
     <SafeAreaView style={s.bg}>
       <AmbientBackground />
       <ScrollView ref={scrollRef} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <Text style={s.title}>Session History</Text>
-        <Text style={s.periodNote}>
-          This iPhone keeps up to 50 recent local session summaries. Choose Share shown summaries to keep a copy elsewhere. Cloud sharing remains your separate account choice.
-        </Text>
+        <Text style={s.title}>{strings.history.screen.title}</Text>
+        <Text style={s.periodNote}>{strings.history.screen.retentionNote}</Text>
         <HistoryLoadState sessionCount={sessions.length} loaded={loaded} historyLoadError={historyLoadError}
           historyLoadBusy={historyLoadBusy} sessionOperationsBusy={sessionOperationsBusy} retryCloudBusy={retryCloudBusy}
           pendingCloud={pendingCloud} pendingCloudSummaryStateIsCurrent={pendingCloudSummaryStateIsCurrent}
@@ -567,17 +566,15 @@ export default function HistoryScreen() {
         {loaded && !historyLoadError && sessions.length === 0 && (
           <View style={s.empty}>
             <Ionicons name="time-outline" size={40} color="#4a7a8a" />
-            <Text style={s.emptyTitle}>No sessions yet</Text>
-            <Text style={s.emptySub}>
-              Completed monitoring sessions will appear here.
-            </Text>
+            <Text style={s.emptyTitle}>{strings.history.screen.emptyTitle}</Text>
+            <Text style={s.emptySub}>{strings.history.screen.emptyDetail}</Text>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Start a new monitoring session"
+              accessibilityLabel={strings.history.screen.startAccessibilityLabel}
               style={s.cta}
               onPress={() => router.push('/pre-drive')}
             >
-              <Text style={s.ctaTxt}>Start Monitoring</Text>
+              <Text style={s.ctaTxt}>{strings.history.screen.start}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -589,17 +586,17 @@ export default function HistoryScreen() {
           <View style={s.filteredEmpty}>
             <Ionicons name="filter-outline" size={32} color="#4a7a8a" />
             <Text style={s.emptyTitle}>
-              {periodSessions.length === 0 ? 'No sessions in this period' : 'No sessions match these filters'}
+              {periodSessions.length === 0 ? strings.history.screen.emptyPeriodTitle : strings.history.screen.emptyFiltersTitle}
             </Text>
             <Text style={s.emptySub}>
               {periodSessions.length === 0
-                ? 'Your saved history is unchanged. Choose All time to see older sessions and sessions with unrecorded or future dates.'
-                : `No saved sessions match ${selectedScope}. Your saved history is unchanged. Change a filter or choose Show all sessions.`}
+                ? strings.history.screen.emptyPeriodDetail
+                : formatString(strings.history.screen.emptyFiltersDetail, { scope: selectedScope })}
             </Text>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Show all saved sessions"
-              accessibilityHint="Clears all applied filters while keeping the selected sort order"
+              accessibilityLabel={strings.history.screen.showAllAccessibilityLabel}
+              accessibilityHint={strings.history.screen.showAllHint}
               style={s.clearFilterButton}
               onPress={() => {
                 chooseHistoryFilter('all'); chooseHistoryPeriod('all'); chooseHistoryAssessment('all');
@@ -608,7 +605,7 @@ export default function HistoryScreen() {
                 setCustomDateError(null);
               }}
             >
-              <Text style={s.clearFilterText}>Show all sessions</Text>
+              <Text style={s.clearFilterText}>{strings.history.screen.showAll}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -618,7 +615,7 @@ export default function HistoryScreen() {
             <View
               accessible
               accessibilityRole="header"
-              accessibilityLabel={`${group.label}, ${group.sessions.length} ${group.sessions.length === 1 ? 'session' : 'sessions'}`}
+              accessibilityLabel={formatString(strings.history.screen.groupAccessibilityLabel, { group: group.label, count: group.sessions.length, sessions: group.sessions.length === 1 ? strings.history.common.session : strings.history.common.sessions })}
               style={s.dateGroupHeader}
             >
               <Text style={s.dateGroupTitle}>{group.label}</Text>

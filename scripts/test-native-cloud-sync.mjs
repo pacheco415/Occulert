@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
+import ts from 'typescript';
+import { strings, formatString } from '../native-app/lib/strings.ts';
 import { createSingleFlightActionRunner } from '../native-app/lib/singleFlightAction.ts';
 import { createAsyncMutationQueue } from '../native-app/lib/asyncMutationQueue.ts';
 import { createCachedBooleanPreference } from '../native-app/lib/cachedBooleanPreference.ts';
@@ -17,6 +19,21 @@ import { SUPABASE_HOST as WEB_SUPABASE_HOST } from './lib/csp-policy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
+function assertCatalogCopy(source, key, expected) {
+  const file = ts.createSourceFile('native-copy.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const imported = file.statements.some(node => ts.isImportDeclaration(node)
+    && /(?:^|\/)strings(?:\.ts)?$/.test(node.moduleSpecifier.text)
+    && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+    && node.importClause.namedBindings.elements.some(item => !item.isTypeOnly && item.name.text === 'strings' && !item.propertyName));
+  let bound = false;
+  function visit(node) {
+    if (ts.isPropertyAccessExpression(node) && node.getText(file) === `strings.${key}`) bound = true;
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  assert.ok(imported && bound, `${key}: use the actual catalog binding`);
+  assert.equal(key.split('.').reduce((value, part) => value?.[part], strings), expected, `${key}: preserve released English`);
+}
 
 const cloud = read('native-app/lib/cloudSync.ts');
 const monitorOwners = readNativeMonitorSourceOwners();
@@ -198,11 +215,11 @@ assert.match(
 assert.match(monitorOwners.analysis, /headNodObservationsRef\.current \+= 1/);
 assert.match(cloud, /Candidate head-nod observations remain local until device validation/);
 assert.match(settings, /<CloudSyncCard \/>/);
-assert.match(historyOwners.review, /This alert rating stays only on this iPhone/);
-assert.match(historyOwners.diagnostics, /Does not trigger alerts/);
+assertCatalogCopy(historyOwners.review, "history.review.ratingPrivacy", "This alert rating stays only on this iPhone. Choose the best match after parking. It is included only if you choose to send feedback.");
+assertCatalogCopy(historyOwners.diagnostics, "history.diagnostics.headMotionCaution", "Saved locally as aggregate observations only and included only if you choose Send session feedback. Does not trigger alerts or change scores.");
 
 assert.match(cloudCard, /createSingleFlightActionRunner/);
-assert.match(cloudCard, /could not complete or confirm that change/);
+assertCatalogCopy(cloudCard, "settings.cloud.unavailableDetail", "Occulert could not complete or confirm that change. Please check your connection and try again.");
 assert.doesNotMatch(cloudCard, /applyConsent\([^)]*\)\.catch\(\(\) => \{\}\)/);
 assert.match(cloudCard, /backgroundColor: colors\.blueStrong/);
 assert.ok(
@@ -389,7 +406,7 @@ function signOutFixture(initial = cloudAuth()) {
   vm.runInNewContext(`${stripTypeScriptTypes(body)}\nObject.assign(exports, {
     getCloudState, signInToCloud, signOutOfCloud, setCloudSyncEnabled, loadAuth, refreshIfNeeded, cloudSessionScopes, logCloudAlert,
     snapshot: () => ({ auth: authCache, authVersion: authMutationVersion, consent: consentRuntimeOverride }),
-  });`, { exports, AbortController, Date, ...bindings }, { timeout: 1000 });
+  });`, { exports, AbortController, Date, ...bindings, strings, formatString }, { timeout: 1000 });
   fixture.api = exports;
   fixture.api.cloudSessionScopes.set('old-session', { ownerId: 'old', consentVersion: 0 });
   fixture.expire = async () => {

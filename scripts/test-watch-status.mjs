@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { strings } from '../native-app/lib/strings.ts';
 import {
   hardenedUserInfoErrorCallback,
   patchWatchConnectivitySource,
@@ -343,7 +344,9 @@ test('background Watch alerts use an authorized notification instead of a silent
   assert.match(contentView, /Enable background alerts/);
   assert.match(contentView, /iPhone alert is primary/);
   assert.match(contentView, /refreshNotificationAuthorization/);
-  assert.match(settingsScreen, /Background delivery may be delayed/);
+  assert.match(settingsScreen, /strings\.settings\.watch\.test\.backupDetail/);
+  assert.equal(strings.settings.watch.test.backupDetail,
+    'Background delivery may be delayed. Open Occulert on your Apple Watch for live wrist alerts; the iPhone remains primary.');
   assert.match(settingsScreen, /result\.roundTripMs/);
 });
 

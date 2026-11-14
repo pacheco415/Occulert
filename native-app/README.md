@@ -137,7 +137,8 @@ native-app/
 |   |-- history*Model.ts    # Pure review/filter models; original record indices retained
 |   |-- historyShareMessage.ts # Existing summary and aggregate export whitelists
 |   |-- sessionHistory.ts   # Serialized local session storage
-|   |-- strings.ts          # English UI copy catalog (Home so far) + key-parity helpers
+|   |-- strings.ts          # Released English UI catalog + key-parity helpers
+|   |-- strings/            # Domain copy, named formatter, hidden language drafts
 |   `-- watchBridge.ts      # iPhone-to-Watch alert delivery
 |-- constants/
 |   `-- thresholds.ts       # Native sensitivity presets
@@ -150,15 +151,24 @@ native-app/
 
 ## UI copy
 
-User-facing native copy is moving into `lib/strings.ts`, the first step of
+Home, Monitor, History, Settings and Pre-drive now read their UI copy from the
+typed `lib/strings.ts` catalog, including navigation, accessibility text,
+dialogs and their presentation helpers. This advances
 [Vision Task 6.1](../docs/VISION_ROADMAP.md#task-61--native-localization).
-The Home screen (`app/index.tsx`) reads all of its text from the catalog; the
-other screens and components still hard-code theirs. The catalog is English
-only. `npm run test:strings` fails if a file listed in
-`scripts/test-native-strings.mjs` hard-codes JSX text, a copy prop or `Alert`
-text, and its key-parity helper reports missing or extra keys for a future
-language. Moving copy must keep released wording byte-for-byte. Translated
-safety, alert and consent copy needs fluent human review before release.
+Released wording remains English. Named templates preserve the existing
+numeric/date formatting and History export output.
+
+The seven other web-driver languages (`es`, `fr`, `pt`, `de`, `ar`, `zh`, `ja`)
+each have a complete **unreviewed native translation draft**. They are hidden:
+the released catalog imports none of these drafts, only English is available,
+and unknown or unreviewed locale requests resolve to English. There is no
+language selector, automatic system-locale selection or RTL activation.
+
+`npm run test:strings` checks migrated files for hard-coded JSX, copy properties,
+alert configurations and confirmation text. It also checks every draft key,
+named placeholder, non-empty value, hidden-language gate and selected exact
+English safety contracts. See [native localization](docs/LOCALIZATION.md) for
+catalog structure, validation and the required fluent review before release.
 
 ## Phase Milestones
 

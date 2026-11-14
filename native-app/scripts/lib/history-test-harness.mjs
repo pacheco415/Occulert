@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import React from 'react';
@@ -7,6 +7,7 @@ import { act, create } from 'react-test-renderer';
 import ts from 'typescript';
 import babel from '@babel/core';
 import { createRequire } from 'node:module';
+import * as nativeStrings from '../../lib/strings.ts';
 
 const require = createRequire(import.meta.url);
 const nativeRoot = new URL('../../', import.meta.url).pathname;
@@ -70,6 +71,9 @@ export function createHistoryFixture({ sessions = [], sourceOverride = null, fai
   function load(filename) {
     filename = path.resolve(filename);
     if (cache.has(filename)) return cache.get(filename).exports;
+    // Use the production catalog and formatter; do not fabricate translated copy
+    // or spend the parent module's VM deadline transpiling its static catalogs.
+    if (filename === path.join(nativeRoot, 'lib/strings.ts')) return nativeStrings;
     if (filename === path.join(nativeRoot, 'components/GlassSurface.tsx')) return { AmbientBackground: 'AmbientBackground' };
     if (filename === path.join(nativeRoot, 'lib/cloudSync.ts')) return {
       getPendingCloudSummaryState: async () => pendingCloud,
@@ -94,10 +98,13 @@ export function createHistoryFixture({ sessions = [], sourceOverride = null, fai
       if (Object.hasOwn(bridges, specifier)) return bridges[specifier];
       assert.ok(specifier.startsWith('.'), 'unexpected platform dependency: ' + specifier);
       const bare = path.resolve(path.dirname(filename), specifier);
-      const resolved = [bare, bare + '.ts', bare + '.tsx', bare + '.js'].find(candidate => existsSync(candidate));
+      const resolved = [bare, bare + '.ts', bare + '.tsx', bare + '.js'].find(candidate => existsSync(candidate) && statSync(candidate).isFile());
       assert.ok(resolved, 'resolve actual local source: ' + specifier);
       return load(resolved);
     };
+    // Transpile and initialize real static dependencies before starting this
+    // module's execution deadline. Nested compilation is harness work, not UI work.
+    for (const [, , specifier] of code.matchAll(/\brequire\((['"])([^'"]+)\1\)/g)) localRequire(specifier);
     vm.runInNewContext(code, { module, exports: module.exports, require: localRequire, Date: ClockDate, console, setTimeout, clearTimeout, URL, URLSearchParams }, { filename, timeout: 1000 });
     return module.exports;
   }

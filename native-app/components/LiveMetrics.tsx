@@ -1,3 +1,4 @@
+import { strings } from '../lib/strings.ts';
 import React, { memo, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { EyeMetrics } from '../hooks/useEyeTracking';
@@ -49,14 +50,14 @@ export const LiveMetrics = memo(function LiveMetrics({
   }, [isRunning, sessionEndedAt, sessionStartedAt]);
 
   const trackingMessage = cameraRecovering
-    ? 'Camera reconnecting. Fatigue alerts may be missed until tracking resumes.'
+    ? strings.monitor.metrics.reconnecting
     : metrics.state === 'noFace'
-      ? 'Camera tracking unavailable. Alerts may be missed. Pull over before adjusting the phone.'
+      ? strings.monitor.metrics.unavailable
       : metrics.state === 'closed'
-        ? 'Drowsiness alert. Pull over safely and rest.'
+        ? strings.monitor.metrics.drowsiness
         : metrics.state === 'watch'
-          ? 'Eye closure is being checked. Prepare to stop if you feel tired.'
-          : 'Camera tracking active. Alerts can still miss drowsiness.';
+          ? strings.monitor.metrics.checking
+          : strings.monitor.metrics.tracking;
   const needsAttention = cameraRecovering || metrics.state !== 'open';
 
   return (
@@ -68,9 +69,9 @@ export const LiveMetrics = memo(function LiveMetrics({
         {trackingMessage}
       </Text>
       <View style={styles.metrics}>
-        <MetricCard label="TIME" value={formatSessionTime(elapsedSeconds)} color="#c8e8f0" />
+        <MetricCard label={strings.monitor.metrics.time} value={formatSessionTime(elapsedSeconds)} color="#c8e8f0" />
         <MetricCard
-          label="ALERTS"
+          label={strings.monitor.metrics.alerts}
           value={String(alertCount)}
           color={alertCount > 0 ? '#fbbf24' : '#c8e8f0'}
         />

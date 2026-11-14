@@ -1,3 +1,4 @@
+import { strings, formatString } from '../lib/strings.ts';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -26,33 +27,33 @@ import { ParkedReadinessCard } from '../components/ParkedReadinessCard';
 
 const CHECKS = [
   {
-    title: 'I am safely parked',
-    detail: 'I will mount and position the phone before the vehicle moves.',
+    title: strings.preDrive.confirmations.parked.title,
+    detail: strings.preDrive.confirmations.parked.detail,
   },
   {
-    title: 'I understand the limits',
-    detail: 'Occulert is a supplemental prototype. It can miss drowsiness or issue false alerts and is not a certified safety, medical, emergency, or compliance device.',
+    title: strings.preDrive.confirmations.limits.title,
+    detail: strings.preDrive.confirmations.limits.detail,
   },
   {
-    title: 'I will not touch the app while driving',
-    detail: 'I will keep the screen on and Occulert in the foreground, and will only make changes after pulling over safely.',
+    title: strings.preDrive.confirmations.foreground.title,
+    detail: strings.preDrive.confirmations.foreground.detail,
   },
   {
-    title: 'I will stop if I feel drowsy or unsafe',
-    detail: 'An Occulert alert never makes it safe to continue driving. I will pull over and rest or arrange other transportation.',
+    title: strings.preDrive.confirmations.rest.title,
+    detail: strings.preDrive.confirmations.rest.detail,
   },
 ] as const;
 
 function formatSleep(minutes: number | null): string {
-  if (minutes === null) return 'No recent sample';
+  if (minutes === null) return strings.preDrive.health.noRecentSample;
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
-  return hours > 0 ? `${hours}h ${remainder}m` : `${remainder}m`;
+  return hours > 0 ? formatString(strings.preDrive.health.sleepHoursMinutes, { hours: String(hours), minutes: String(remainder) }) : formatString(strings.preDrive.health.sleepMinutes, { minutes: String(remainder) });
 }
 
 function formatUpdated(value: string): string {
   const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return 'Unknown';
+  if (!Number.isFinite(date.getTime())) return strings.preDrive.health.unknownUpdated;
   return date.toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',
@@ -105,11 +106,11 @@ export default function PreDriveScreen() {
       if (!healthMountedRef.current || request !== healthRequestRef.current) return;
       setHealthSnapshot(result.snapshot);
       setHealthNotice(result.status === 'no_data'
-        ? 'Apple Health returned no recent sleep or HRV samples. This can mean no data or limited access.'
-        : 'Apple Health context updated on this iPhone.');
+        ? strings.preDrive.health.noDataNotice
+        : strings.preDrive.health.updatedNotice);
     } catch {
       if (!healthMountedRef.current || request !== healthRequestRef.current) return;
-      setHealthNotice('Apple Health could not be read. Check Health access for Occulert and try again.');
+      setHealthNotice(strings.preDrive.health.readError);
     } finally {
       if (healthMountedRef.current && request === healthRequestRef.current) setHealthLoading(false);
     }
@@ -121,10 +122,10 @@ export default function PreDriveScreen() {
       await clearStoredHealthReadiness();
       if (!healthMountedRef.current || request !== healthRequestRef.current) return;
       setHealthSnapshot(null);
-      setHealthNotice('The local Apple Health summary was removed. Manage future access in iOS Health settings.');
+      setHealthNotice(strings.preDrive.health.removedNotice);
     } catch {
       if (!healthMountedRef.current || request !== healthRequestRef.current) return;
-      setHealthNotice('The local Apple Health summary could not be removed. Try again.');
+      setHealthNotice(strings.preDrive.health.removeError);
     } finally {
       if (healthMountedRef.current && request === healthRequestRef.current) setHealthLoading(false);
     }
@@ -138,17 +139,13 @@ export default function PreDriveScreen() {
           <GlassSurface style={styles.iconWrap} tintColor="rgba(251, 191, 36, 0.18)">
             <Ionicons name="shield-checkmark" size={34} color="#fbbf24" />
           </GlassSurface>
-          <Text style={styles.title}>Confirm your safe setup</Text>
-          <Text style={styles.subtitle}>
-            Complete this check while parked before every monitoring session.
-          </Text>
+          <Text style={styles.title}>{strings.preDrive.screen.title}</Text>
+          <Text style={styles.subtitle}>{strings.preDrive.screen.subtitle}</Text>
         </View>
 
         <View style={styles.warning} accessibilityRole="alert">
           <Ionicons name="warning" size={20} color="#fbbf24" />
-          <Text style={styles.warningText}>
-            Never begin or configure Occulert while operating a vehicle.
-          </Text>
+          <Text style={styles.warningText}>{strings.preDrive.screen.warning}</Text>
         </View>
 
         <ParkedReadinessCard />
@@ -156,13 +153,13 @@ export default function PreDriveScreen() {
         {Platform.OS === 'ios' && (
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Review Apple emergency-readiness guidance"
-            accessibilityHint="Opens optional setup guides in Settings. Review only while safely parked."
+            accessibilityLabel={strings.preDrive.emergency.accessibility}
+            accessibilityHint={strings.preDrive.emergency.hint}
             style={styles.emergencyGuidanceLink}
             onPress={() => router.push('/settings')}
           >
-            <Text style={styles.emergencyGuidanceTitle}>Apple emergency setup guides</Text>
-            <Text style={styles.emergencyGuidanceDetail}>Optional reference to review while parked in Settings.</Text>
+            <Text style={styles.emergencyGuidanceTitle}>{strings.preDrive.emergency.title}</Text>
+            <Text style={styles.emergencyGuidanceDetail}>{strings.preDrive.emergency.detail}</Text>
           </TouchableOpacity>
         )}
 
@@ -173,25 +170,23 @@ export default function PreDriveScreen() {
                 <Ionicons name="heart" size={18} color="#fb7185" />
               </View>
               <View style={styles.healthHeadingCopy}>
-                <Text style={styles.healthEyebrow}>APPLE HEALTH · OPTIONAL</Text>
-                <Text style={styles.healthTitle}>Pre-drive context</Text>
+                <Text style={styles.healthEyebrow}>{strings.preDrive.health.eyebrow}</Text>
+                <Text style={styles.healthTitle}>{strings.preDrive.health.title}</Text>
               </View>
             </View>
 
-            <Text style={styles.healthDescription}>
-              Optional context from recent sleep and heart rate variability. Only a small summary is kept in this iPhone's protected storage; it never decides whether you are safe to drive.
-            </Text>
+            <Text style={styles.healthDescription}>{strings.preDrive.health.description}</Text>
 
             {healthSnapshot && (
               <View style={styles.healthMetrics}>
                 <View style={styles.healthMetric}>
-                  <Text style={styles.healthMetricLabel}>SLEEP · PAST 24H</Text>
+                  <Text style={styles.healthMetricLabel}>{strings.preDrive.health.sleepLabel}</Text>
                   <Text style={styles.healthMetricValue}>{formatSleep(healthSnapshot.sleepMinutes24h)}</Text>
                 </View>
                 <View style={styles.healthMetric}>
-                  <Text style={styles.healthMetricLabel}>HRV (SDNN) · PAST 7D</Text>
+                  <Text style={styles.healthMetricLabel}>{strings.preDrive.health.hrvLabel}</Text>
                   <Text style={styles.healthMetricValue}>
-                    {healthSnapshot.latestHrvMs === null ? 'No recent sample' : `${healthSnapshot.latestHrvMs} ms`}
+                    {healthSnapshot.latestHrvMs === null ? strings.preDrive.health.noRecentSample : formatString(strings.preDrive.health.hrvMilliseconds, { milliseconds: String(healthSnapshot.latestHrvMs) })}
                   </Text>
                   {healthSnapshot.latestHrvAt && (
                     <Text style={styles.healthMetricTime}>{formatUpdated(healthSnapshot.latestHrvAt)}</Text>
@@ -201,16 +196,16 @@ export default function PreDriveScreen() {
             )}
 
             {healthSnapshot && (
-              <Text style={styles.healthUpdated}>Updated {formatUpdated(healthSnapshot.capturedAt)}</Text>
+              <Text style={styles.healthUpdated}>{formatString(strings.preDrive.health.updated, { time: formatUpdated(healthSnapshot.capturedAt) })}</Text>
             )}
 
             {healthAvailable === false ? (
-              <Text style={styles.healthNotice}>Apple Health is unavailable on this device or build.</Text>
+              <Text style={styles.healthNotice}>{strings.preDrive.health.unavailable}</Text>
             ) : (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={healthSnapshot ? 'Refresh Apple Health context' : 'Connect Apple Health context'}
-                accessibilityHint="Reads optional recent sleep and heart rate variability while you are parked"
+                accessibilityLabel={healthSnapshot ? strings.preDrive.health.refreshAccessibility : strings.preDrive.health.connectAccessibility}
+                accessibilityHint={strings.preDrive.health.readHint}
                 accessibilityState={{ disabled: healthAvailable !== true || healthLoading, busy: healthLoading }}
                 disabled={healthAvailable !== true || healthLoading}
                 activeOpacity={0.8}
@@ -224,7 +219,7 @@ export default function PreDriveScreen() {
                   ? <ActivityIndicator size="small" color="#fff" />
                   : <Ionicons name="refresh" size={16} color="#fff" />}
                 <Text style={styles.healthButtonText}>
-                  {healthSnapshot ? 'REFRESH APPLE HEALTH' : 'CONNECT APPLE HEALTH'}
+                  {healthSnapshot ? strings.preDrive.health.refreshAction : strings.preDrive.health.connectAction}
                 </Text>
               </TouchableOpacity>
             )}
@@ -233,28 +228,26 @@ export default function PreDriveScreen() {
             {healthSnapshot && (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel="Remove local Apple Health summary"
-                accessibilityHint="Removes the saved summary from this iPhone but does not change Apple Health permissions"
+                accessibilityLabel={strings.preDrive.health.removeAccessibility}
+                accessibilityHint={strings.preDrive.health.removeHint}
                 activeOpacity={0.75}
                 onPress={removeHealthSummary}
                 style={styles.healthRemoveButton}
               >
-                <Text style={styles.healthRemoveText}>REMOVE LOCAL HEALTH SUMMARY</Text>
+                <Text style={styles.healthRemoveText}>{strings.preDrive.health.removeAction}</Text>
               </TouchableOpacity>
             )}
-            <Text style={styles.healthLimit}>
-              Informational only. These values do not calculate medical or driving fitness, change fatigue scoring, or affect alerts.
-            </Text>
+            <Text style={styles.healthLimit}>{strings.preDrive.health.limits}</Text>
           </View>
         )}
 
         <View style={styles.confirmationHeader}>
           <View style={styles.confirmationCopy}>
-            <Text style={styles.confirmationEyebrow}>FINAL SAFETY CONFIRMATION</Text>
-            <Text style={styles.confirmationTitle}>Confirm all four before continuing</Text>
+            <Text style={styles.confirmationEyebrow}>{strings.preDrive.confirmations.eyebrow}</Text>
+            <Text style={styles.confirmationTitle}>{strings.preDrive.confirmations.title}</Text>
           </View>
           <Text accessibilityLiveRegion="polite" style={styles.confirmationCount}>
-            {checked.filter(Boolean).length} / {CHECKS.length}
+            {formatString(strings.preDrive.confirmations.progress, { checked: checked.filter(Boolean).length, total: CHECKS.length })}
           </Text>
         </View>
 
@@ -290,8 +283,8 @@ export default function PreDriveScreen() {
         >
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Continue to monitoring"
-            accessibilityHint={ready ? 'Opens the parked camera setup before monitoring starts' : 'Complete all four safety confirmations first'}
+            accessibilityLabel={strings.preDrive.continueAction.accessibility}
+            accessibilityHint={ready ? strings.preDrive.continueAction.readyHint : strings.preDrive.continueAction.incompleteHint}
             accessibilityState={{ disabled: !ready }}
             disabled={!ready}
             activeOpacity={0.85}
@@ -302,23 +295,21 @@ export default function PreDriveScreen() {
             style={styles.continueButton}
           >
             <Ionicons name="eye" size={22} color="#fff" />
-            <Text style={styles.continueText}>CONTINUE TO MONITORING</Text>
+            <Text style={styles.continueText}>{strings.preDrive.continueAction.label}</Text>
           </TouchableOpacity>
         </GlassSurface>
 
         <TouchableOpacity
           accessibilityRole="link"
-          accessibilityHint="Opens the full Occulert safety information in your browser"
+          accessibilityHint={strings.preDrive.safety.fullInformationHint}
           onPress={() => Linking.openURL('https://www.occulert.com/safety.html')}
           style={styles.safetyLink}
         >
-          <Text style={styles.safetyLinkText}>Read full safety information</Text>
+          <Text style={styles.safetyLinkText}>{strings.preDrive.safety.fullInformation}</Text>
           <Ionicons name="open-outline" size={14} color="#60a5fa" />
         </TouchableOpacity>
 
-        <Text style={styles.footer}>
-          This confirmation is required before each monitoring session and is not a substitute for attentive driving or adequate rest.
-        </Text>
+        <Text style={styles.footer}>{strings.preDrive.safety.limit}</Text>
       </ScrollView>
     </SafeAreaView>
   );

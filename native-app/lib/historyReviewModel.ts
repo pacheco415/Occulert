@@ -1,3 +1,4 @@
+import { strings, formatString } from './strings.ts';
 import type { Ionicons } from '@expo/vector-icons';
 import type React from 'react';
 import type { AlertAssessment } from './feedback';
@@ -12,37 +13,37 @@ export const ASSESSMENT_OPTIONS: Array<{
   label: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
 }> = [
-  { value: 'accurate', label: 'Felt right', icon: 'checkmark-circle-outline' },
-  { value: 'false_alert', label: 'Unnecessary', icon: 'alert-circle-outline' },
-  { value: 'missed_alert', label: 'Missed alert', icon: 'eye-off-outline' },
-  { value: 'late_alert', label: 'Too late', icon: 'time-outline' },
+  { value: 'accurate', label: strings.history.common.feltRight, icon: 'checkmark-circle-outline' },
+  { value: 'false_alert', label: strings.history.options.unnecessary, icon: 'alert-circle-outline' },
+  { value: 'missed_alert', label: strings.history.common.missedAlert, icon: 'eye-off-outline' },
+  { value: 'late_alert', label: strings.history.common.tooLate, icon: 'time-outline' },
 ];
 
 export const TEST_CONDITION_GROUPS: TestConditionGroup[] = [
   {
     key: 'lighting',
-    label: 'Lighting',
+    label: strings.history.common.lighting,
     options: [
-      { value: 'daylight', label: 'Daylight' },
-      { value: 'low_light', label: 'Low light' },
+      { value: 'daylight', label: strings.history.common.daylight },
+      { value: 'low_light', label: strings.history.common.lowLight },
     ],
   },
   {
     key: 'eyewear',
-    label: 'Eyewear',
+    label: strings.history.common.eyewear,
     options: [
-      { value: 'none', label: 'None' },
-      { value: 'glasses', label: 'Glasses' },
-      { value: 'sunglasses', label: 'Sunglasses' },
+      { value: 'none', label: strings.history.common.none },
+      { value: 'glasses', label: strings.history.common.glasses },
+      { value: 'sunglasses', label: strings.history.common.sunglasses },
     ],
   },
   {
     key: 'phonePosition',
-    label: 'Phone position',
+    label: strings.history.common.phonePosition,
     options: [
-      { value: 'high', label: 'High' },
-      { value: 'center', label: 'Center' },
-      { value: 'low', label: 'Low' },
+      { value: 'high', label: strings.history.common.high },
+      { value: 'center', label: strings.history.common.center },
+      { value: 'low', label: strings.history.common.low },
     ],
   },
 ];
@@ -50,36 +51,36 @@ export const TEST_CONDITION_GROUPS: TestConditionGroup[] = [
 export const DEVICE_IMPACT_GROUPS: DeviceImpactGroup[] = [
   {
     key: 'batteryImpact',
-    label: 'Battery use',
+    label: strings.history.common.batteryUse,
     options: [
-      { value: 'low', label: 'Low' },
-      { value: 'noticeable', label: 'Noticeable' },
-      { value: 'high', label: 'High' },
+      { value: 'low', label: strings.history.common.low },
+      { value: 'noticeable', label: strings.history.common.noticeable },
+      { value: 'high', label: strings.history.common.high },
     ],
   },
   {
     key: 'phoneHeat',
-    label: 'Phone heat',
+    label: strings.history.common.phoneHeat,
     options: [
-      { value: 'cool', label: 'Cool' },
-      { value: 'warm', label: 'Warm' },
-      { value: 'hot', label: 'Hot' },
+      { value: 'cool', label: strings.history.common.cool },
+      { value: 'warm', label: strings.history.common.warm },
+      { value: 'hot', label: strings.history.common.hot },
     ],
   },
 ];
 
 export const HISTORY_FILTERS: Array<{ value: HistoryFilter; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'needs-review', label: 'Needs review' },
-  { value: 'reviewed', label: 'Reviewed' },
-  { value: 'recovered', label: 'Recovered' },
+  { value: 'all', label: strings.history.common.all },
+  { value: 'needs-review', label: strings.history.common.needsReview },
+  { value: 'reviewed', label: strings.history.common.reviewed },
+  { value: 'recovered', label: strings.history.common.recovered },
 ];
 
 export const HISTORY_PERIODS: Array<{ value: HistoryPeriod; label: string }> = [
-  { value: 'all', label: 'All time' },
-  { value: '7-days', label: 'Last 7 days' },
-  { value: '30-days', label: 'Last 30 days' },
-  { value: 'custom', label: 'Custom dates' },
+  { value: 'all', label: strings.history.common.allTime },
+  { value: '7-days', label: strings.history.options.last7Days },
+  { value: '30-days', label: strings.history.options.last30Days },
+  { value: 'custom', label: strings.history.options.customDates },
 ];
 
 export const HISTORY_RECORDED_FILTERS: Array<{
@@ -87,34 +88,34 @@ export const HISTORY_RECORDED_FILTERS: Array<{
   label: string;
   options: Array<{ value: string; label: string }>;
 }> = [
-  { key: 'sensitivity', label: 'Saved sensitivity', options: [
-    { value: 'all', label: 'All' }, { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' },
-    { value: 'unknown', label: 'Not recorded' },
+  { key: 'sensitivity', label: strings.history.options.savedSensitivity, options: [
+    { value: 'all', label: strings.history.common.all }, { value: 'low', label: strings.history.common.low },
+    { value: 'medium', label: strings.history.common.medium }, { value: 'high', label: strings.history.common.high },
+    { value: 'unknown', label: strings.history.common.notRecorded },
   ] },
-  { key: 'lighting', label: 'Saved lighting', options: [
-    { value: 'all', label: 'All' }, { value: 'daylight', label: 'Daylight' },
-    { value: 'low_light', label: 'Low light' }, { value: 'unknown', label: 'Not recorded' },
+  { key: 'lighting', label: strings.history.options.savedLighting, options: [
+    { value: 'all', label: strings.history.common.all }, { value: 'daylight', label: strings.history.common.daylight },
+    { value: 'low_light', label: strings.history.common.lowLight }, { value: 'unknown', label: strings.history.common.notRecorded },
   ] },
-  { key: 'eyewear', label: 'Saved eyewear', options: [
-    { value: 'all', label: 'All' }, { value: 'none', label: 'None' },
-    { value: 'glasses', label: 'Glasses' }, { value: 'sunglasses', label: 'Sunglasses' },
-    { value: 'unknown', label: 'Not recorded' },
+  { key: 'eyewear', label: strings.history.options.savedEyewear, options: [
+    { value: 'all', label: strings.history.common.all }, { value: 'none', label: strings.history.common.none },
+    { value: 'glasses', label: strings.history.common.glasses }, { value: 'sunglasses', label: strings.history.common.sunglasses },
+    { value: 'unknown', label: strings.history.common.notRecorded },
   ] },
 ];
 
 export const HISTORY_SORTS: Array<{ value: HistorySort; label: string }> = [
-  { value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' },
-  { value: 'duration', label: 'Longest first' }, { value: 'alerts', label: 'Most alerts first' },
+  { value: 'newest', label: strings.history.common.newestFirst }, { value: 'oldest', label: strings.history.options.oldestFirst },
+  { value: 'duration', label: strings.history.options.longestFirst }, { value: 'alerts', label: strings.history.options.mostAlertsFirst },
 ];
 
 export const HISTORY_ASSESSMENTS: Array<{ value: HistoryAssessmentFilter; label: string }> = [
-  { value: 'all', label: 'All feedback' },
-  { value: 'accurate', label: 'Felt right' },
-  { value: 'false_alert', label: 'Unnecessary alert' },
-  { value: 'missed_alert', label: 'Missed alert' },
-  { value: 'late_alert', label: 'Too late' },
-  { value: 'not-assessed', label: 'Not assessed' },
+  { value: 'all', label: strings.history.common.allFeedback },
+  { value: 'accurate', label: strings.history.common.feltRight },
+  { value: 'false_alert', label: strings.history.options.unnecessaryAlert },
+  { value: 'missed_alert', label: strings.history.common.missedAlert },
+  { value: 'late_alert', label: strings.history.common.tooLate },
+  { value: 'not-assessed', label: strings.history.common.notAssessed },
 ];
 
 export function historyReviewInput(item: SessionRecord): SessionRecord {
@@ -167,14 +168,14 @@ export function historyScopeLabel(
   view: HistoryViewPreferences,
 ): string {
   const periodLabel = period === 'custom' && view.range
-    ? `${view.range.start} through ${view.range.end}`
-    : HISTORY_PERIODS.find(option => option.value === period)?.label || 'All time';
-  const filterLabel = HISTORY_FILTERS.find(option => option.value === filter)?.label || 'All';
-  const assessmentLabel = HISTORY_ASSESSMENTS.find(option => option.value === assessment)?.label || 'All feedback';
+    ? formatString(strings.history.options.customRange, { start: view.range.start, end: view.range.end })
+    : HISTORY_PERIODS.find(option => option.value === period)?.label || strings.history.common.allTime;
+  const filterLabel = HISTORY_FILTERS.find(option => option.value === filter)?.label || strings.history.common.all;
+  const assessmentLabel = HISTORY_ASSESSMENTS.find(option => option.value === assessment)?.label || strings.history.common.allFeedback;
   const recordedLabels = HISTORY_RECORDED_FILTERS.map(group => (
-    `${group.label}: ${group.options.find(option => option.value === view[group.key])?.label || 'All'}`
+    formatString(strings.history.common.labelValue, { label: group.label, value: group.options.find(option => option.value === view[group.key])?.label || strings.history.common.all })
   ));
-  const sortLabel = HISTORY_SORTS.find(option => option.value === view.sort)?.label || 'Newest first';
+  const sortLabel = HISTORY_SORTS.find(option => option.value === view.sort)?.label || strings.history.common.newestFirst;
   return [periodLabel, filterLabel, assessmentLabel, ...recordedLabels, sortLabel].join(' · ');
 }
 

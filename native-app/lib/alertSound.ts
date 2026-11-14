@@ -1,3 +1,4 @@
+import { strings } from './strings.ts';
 export const DEFAULT_ALERT_SOUND = 'classic' as const;
 
 export type AlertSound = 'classic' | 'lower' | 'higher';
@@ -15,20 +16,20 @@ export interface AlertSoundProfile {
  */
 export const ALERT_SOUND_OPTIONS: readonly [AlertSound, AlertSoundProfile][] = [
   ['classic', {
-    label: 'Classic',
-    description: 'Current Occulert tone',
+    label: strings.settings.alertSounds.classic.label,
+    description: strings.settings.alertSounds.classic.description,
     playbackRate: 1,
     shouldCorrectPitch: true,
   }],
   ['lower', {
-    label: 'Lower',
-    description: 'Deeper alert tone',
+    label: strings.settings.alertSounds.lower.label,
+    description: strings.settings.alertSounds.lower.description,
     playbackRate: 0.84,
     shouldCorrectPitch: false,
   }],
   ['higher', {
-    label: 'Higher',
-    description: 'Brighter alert tone',
+    label: strings.settings.alertSounds.higher.label,
+    description: strings.settings.alertSounds.higher.description,
     playbackRate: 1.18,
     shouldCorrectPitch: false,
   }],

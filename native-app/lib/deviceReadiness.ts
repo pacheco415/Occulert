@@ -1,3 +1,4 @@
+import { strings, formatString } from './strings.ts';
 import type { HeadphoneMotionStatus } from './headphoneMotion';
 import type { WatchStatus } from './watchBridge';
 import type { FrontPhysicalCamera, MultiCamConfigurationProbe } from './deviceCondition';
@@ -81,16 +82,16 @@ export function isReadinessStale(snapshot: DeviceReadinessSnapshot, now: number)
 
 export function describeDeviceReadiness(snapshot: DeviceReadinessSnapshot, now: number): ReadinessRow[] {
   const titles = {
-    camera: 'Front camera',
-    roadCamera: 'Road camera · planned',
-    outputs: 'Phone alerts',
-    watch: 'Apple Watch · optional',
-    motion: 'Headphone motion · optional',
+    camera: strings.preDrive.devices.title.camera,
+    roadCamera: strings.preDrive.devices.title.roadCamera,
+    outputs: strings.preDrive.devices.title.outputs,
+    watch: strings.preDrive.devices.title.watch,
+    motion: strings.preDrive.devices.title.motion,
   };
   if (isReadinessStale(snapshot, now)) {
     return (Object.keys(titles) as ReadinessRow['id'][]).map(id => ({
-      id, title: titles[id], status: 'Check again',
-      detail: 'Connections or settings may have changed. Refresh while parked.', attention: true,
+      id, title: titles[id], status: strings.preDrive.devices.stale.status,
+      detail: strings.preDrive.devices.stale.detail, attention: true,
     }));
   }
   const { camera, outputs, watch, motion } = snapshot;
@@ -98,65 +99,65 @@ export function describeDeviceReadiness(snapshot: DeviceReadinessSnapshot, now: 
     id, title: titles[id], status, detail, attention,
   });
   const cameraRow = !camera
-    ? row('camera', 'Not confirmed', 'Camera status could not be read. Refresh or check camera setup.', true)
+    ? row('camera', strings.preDrive.devices.status.unconfirmed, strings.preDrive.devices.camera.unconfirmed, true)
     : !camera.frontAvailable
-      ? row('camera', 'Not found', 'A front camera is required. Check again on a supported phone.', true)
+      ? row('camera', strings.preDrive.devices.camera.notFoundStatus, strings.preDrive.devices.camera.notFoundDetail, true)
       : camera.permission !== 'granted'
-        ? row('camera', 'Access needed', 'Camera access is not granted. Continue to camera setup to review access.', true)
-        : row('camera', 'Access granted', 'Check framing and eye visibility in the camera preview before starting.');
+        ? row('camera', strings.preDrive.devices.camera.accessNeededStatus, strings.preDrive.devices.camera.accessNeededDetail, true)
+        : row('camera', strings.preDrive.devices.camera.accessGrantedStatus, strings.preDrive.devices.camera.accessGrantedDetail);
   const multiCamCostDetail = camera
     && camera.multiCamProbe.hardwareCost != null
     && camera.multiCamProbe.systemPressureCost != null
-    ? ` Hardware ${Math.round(camera.multiCamProbe.hardwareCost * 100)}%; pressure ${Math.round(camera.multiCamProbe.systemPressureCost * 100)}%.`
+    ? formatString(strings.preDrive.devices.roadCamera.costDetail, { hardwarePercent: String(Math.round(camera.multiCamProbe.hardwareCost * 100)), pressurePercent: String(Math.round(camera.multiCamProbe.systemPressureCost * 100)) })
     : '';
   const roadCameraRow = !camera
-    ? row('roadCamera', 'Not confirmed', 'Road-camera compatibility could not be read. Driver monitoring remains independent.')
+    ? row('roadCamera', strings.preDrive.devices.status.unconfirmed, strings.preDrive.devices.roadCamera.unconfirmed)
     : !camera.backAvailable
-      ? row('roadCamera', 'Unavailable', 'No rear camera was reported. Front-camera driver monitoring remains available.')
+      ? row('roadCamera', strings.preDrive.devices.status.unavailable, strings.preDrive.devices.roadCamera.unavailable)
       : camera.frontBackMultiCamSupported === true
         ? camera.multiCamProbe.state === 'withinBudget'
           ? row(
               'roadCamera',
-              'Load check passed',
-              `Apple accepted a front-and-rear configuration within its resource budgets.${multiCamCostDetail} Road monitoring is still planned and was not activated.`,
+              strings.preDrive.devices.roadCamera.passedStatus,
+              formatString(strings.preDrive.devices.roadCamera.passedDetail, { costDetail: multiCamCostDetail }),
             )
           : camera.multiCamProbe.state === 'overBudget'
-            ? row('roadCamera', 'Over budget', 'The front-and-rear configuration exceeded Apple’s current camera resource budget. Driver monitoring keeps priority.', true)
+            ? row('roadCamera', strings.preDrive.devices.roadCamera.overBudgetStatus, strings.preDrive.devices.roadCamera.overBudgetDetail, true)
             : camera.multiCamProbe.state === 'configurationFailed'
-              ? row('roadCamera', 'Load check failed', 'Apple reports compatible cameras, but a front-and-rear configuration could not be prepared. Driver monitoring remains available.', true)
+              ? row('roadCamera', strings.preDrive.devices.roadCamera.failedStatus, strings.preDrive.devices.roadCamera.failedDetail, true)
               : row(
                   'roadCamera',
-                  'Hardware capable',
-                  `${camera.backPhysicalDevices.length || 1} rear camera type${camera.backPhysicalDevices.length === 1 ? '' : 's'} reported. A parked load result is not available yet; road monitoring is not active.`,
+                  strings.preDrive.devices.roadCamera.hardwareCapableStatus,
+                  formatString(camera.backPhysicalDevices.length === 1 ? strings.preDrive.devices.roadCamera.hardwareCapableOne : strings.preDrive.devices.roadCamera.hardwareCapableMany, { count: camera.backPhysicalDevices.length || 1 }),
                 )
         : camera.multiCamSupported === false || camera.frontBackMultiCamSupported === false
-          ? row('roadCamera', 'Single camera only', 'This iPhone does not report Apple simultaneous multi-camera support. Driver monitoring keeps priority.')
-          : row('roadCamera', 'Support unknown', 'A rear camera is available, but simultaneous Apple multi-camera support was not confirmed.');
+          ? row('roadCamera', strings.preDrive.devices.roadCamera.singleCameraStatus, strings.preDrive.devices.roadCamera.singleCameraDetail)
+          : row('roadCamera', strings.preDrive.devices.roadCamera.unknownStatus, strings.preDrive.devices.roadCamera.unknownDetail);
   const outputRow = !outputs
-    ? row('outputs', 'Not confirmed', 'Saved alert settings could not be read. Check Settings before starting.', true)
+    ? row('outputs', strings.preDrive.devices.status.unconfirmed, strings.preDrive.devices.outputs.unconfirmed, true)
     : !outputs.audio && !outputs.haptic
-      ? row('outputs', 'Both off', 'Phone sound and vibration are disabled. Review alert settings; the Watch is optional.', true)
-      : row('outputs', outputs.audio && outputs.haptic ? 'Sound + vibration' : outputs.audio ? 'Sound only' : 'Vibration only',
-        'Saved settings only. Test the current audio output in Settings while parked.');
+      ? row('outputs', strings.preDrive.devices.outputs.offStatus, strings.preDrive.devices.outputs.offDetail, true)
+      : row('outputs', outputs.audio && outputs.haptic ? strings.preDrive.devices.outputs.soundAndVibration : outputs.audio ? strings.preDrive.devices.outputs.soundOnly : strings.preDrive.devices.outputs.vibrationOnly,
+        strings.preDrive.devices.outputs.testDetail);
   const watchRow = !outputs
-    ? row('watch', 'Not confirmed', 'The saved Watch alert setting could not be read.', true)
+    ? row('watch', strings.preDrive.devices.status.unconfirmed, strings.preDrive.devices.watch.settingUnconfirmed, true)
     : !outputs.watch
-      ? row('watch', 'Alerts off', 'Optional wrist alerts are off. You can enable and test them in Settings.')
+      ? row('watch', strings.preDrive.devices.watch.offStatus, strings.preDrive.devices.watch.offDetail)
       : !watch || !watch.moduleAvailable
-        ? row('watch', 'Not confirmed', 'The Watch connection could not be checked in this build. Phone alerts remain available.', true)
+        ? row('watch', strings.preDrive.devices.status.unconfirmed, strings.preDrive.devices.watch.connectionUnconfirmed, true)
         : !watch.paired || !watch.appInstalled
-          ? row('watch', 'Open Watch app', 'Open Occulert on your Watch, then refresh this check. If it is still not found, verify the companion installation.', true)
+          ? row('watch', strings.preDrive.devices.watch.openStatus, strings.preDrive.devices.watch.openDetail, true)
         : !watch.reachable
-          ? row('watch', 'Not reachable', 'Open Occulert on your Watch and test it. Background delivery can be delayed.', true)
-          : row('watch', 'Reachable', 'Wrist alerts are enabled. A connection does not confirm that you felt an alert; test while parked.');
+          ? row('watch', strings.preDrive.devices.watch.unreachableStatus, strings.preDrive.devices.watch.unreachableDetail, true)
+          : row('watch', strings.preDrive.devices.watch.reachableStatus, strings.preDrive.devices.watch.reachableDetail);
   const motionRow = !motion || motion.state === 'error'
-    ? row('motion', 'Not confirmed', 'Motion status could not be read. Phone camera monitoring remains independent.')
+    ? row('motion', strings.preDrive.devices.status.unconfirmed, strings.preDrive.devices.motion.unconfirmed)
     : motion.state === 'denied' || motion.authorization === 'denied' || motion.authorization === 'restricted'
-      ? row('motion', 'Access off', 'Motion access is unavailable. Headphone audio can still work independently.')
+      ? row('motion', strings.preDrive.devices.motion.accessOffStatus, strings.preDrive.devices.motion.accessOffDetail)
       : !motion.isAvailable || motion.state === 'not-built' || motion.state === 'unavailable'
-        ? row('motion', 'Unavailable', 'Compatible motion support is not available here. This does not test the audio connection.')
+        ? row('motion', strings.preDrive.devices.status.unavailable, strings.preDrive.devices.motion.unavailable)
         : motion.authorization !== 'authorized'
-          ? row('motion', 'Permission pending', 'Motion access may be requested when monitoring starts. This check does not request it.')
-          : row('motion', 'Available', 'Experimental head-motion observations only; they do not change fatigue scores or alerts.');
+          ? row('motion', strings.preDrive.devices.motion.permissionPendingStatus, strings.preDrive.devices.motion.permissionPendingDetail)
+          : row('motion', strings.preDrive.devices.motion.availableStatus, strings.preDrive.devices.motion.availableDetail);
   return [cameraRow, roadCameraRow, outputRow, watchRow, motionRow];
 }

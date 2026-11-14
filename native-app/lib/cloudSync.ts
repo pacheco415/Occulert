@@ -1,3 +1,4 @@
+import { strings } from './strings.ts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { AppState, Platform } from 'react-native';
@@ -485,18 +486,18 @@ function authErrorText(result: ApiResult<AuthResponse>): string {
 function authMessage(result: ApiResult<AuthResponse>): string {
   const text = authErrorText(result);
   if (text.includes('invalid_credentials') || text.includes('invalid login credentials')) {
-    return 'Email or password is incorrect.';
+    return strings.settings.cloud.auth.invalidCredentials;
   }
   if (text.includes('email_not_confirmed') || text.includes('email not confirmed')) {
-    return 'Confirm your email, then return and sign in.';
+    return strings.settings.cloud.auth.emailUnconfirmed;
   }
   if (text.includes('cloud_not_configured')) {
-    return 'Cloud sign-in is not configured yet. Monitoring still works locally.';
+    return strings.settings.cloud.auth.unconfigured;
   }
   if (text.includes('cloud_unavailable')) {
-    return 'Occulert could not reach the sign-in service. Check your connection and try again.';
+    return strings.settings.cloud.auth.networkError;
   }
-  return 'Sign-in failed. Check your email and password, then try again.';
+  return strings.settings.cloud.auth.failed;
 }
 
 async function refreshAuth(previous: StoredAuth, expectedVersion: number): Promise<StoredAuth | null> {
@@ -650,16 +651,16 @@ export async function signInToCloud(email: string, password: string): Promise<Cl
   void pendingAlertRemoval.catch(() => {});
   const normalizedEmail = email.trim().toLowerCase();
   if (!await secureStoreAvailable()) {
-    return { ok: false, message: 'Secure sign-in storage is unavailable on this device.' };
+    return { ok: false, message: strings.settings.cloud.auth.secureStorageUnavailable };
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || password.length < 6) {
-    return { ok: false, message: 'Enter a valid email and password.' };
+    return { ok: false, message: strings.settings.cloud.auth.invalidInput };
   }
   const result = await authFetch('/token?grant_type=password', {
     email: normalizedEmail,
     password,
   });
-  const changedMessage = 'Sign-in was cancelled because the account changed. Please sign in again.';
+  const changedMessage = strings.settings.cloud.auth.accountChanged;
   if (signInVersion !== authMutationVersion) return { ok: false, message: changedMessage };
   if (result.ok) {
     // A new password login must not inherit another account's sharing choice.
@@ -671,7 +672,7 @@ export async function signInToCloud(email: string, password: string): Promise<Cl
       await sessionOutbox.clear();
       await pendingAlertRemoval;
     } catch {
-      return { ok: false, message: 'Cloud sharing could not be switched off. Sign-in was not saved. Please try again.' };
+      return { ok: false, message: strings.settings.cloud.auth.disableSharingFailed };
     }
     if (signInVersion !== authMutationVersion) return { ok: false, message: changedMessage };
   }
@@ -685,8 +686,8 @@ export async function signInToCloud(email: string, password: string): Promise<Cl
   return {
     ok: true,
     message: profileReady
-      ? 'Signed in. Cloud sync stays off until you enable it.'
-      : 'Signed in. Driver profile setup will retry when you start a synced session.',
+      ? strings.settings.cloud.auth.signedIn
+      : strings.settings.cloud.auth.profileRetry,
   };
 }
 
@@ -706,7 +707,7 @@ export async function signOutOfCloud(): Promise<void> {
     // Keep the incomplete marker until actual cleanup or a new login succeeds.
   }
   if (!complete) {
-    throw new Error('Sign-out could not be fully saved. Retry before closing the app.');
+    throw new Error(strings.settings.cloud.auth.signOutIncomplete);
   }
 }
 

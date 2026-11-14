@@ -6,6 +6,7 @@ import test from 'node:test';
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import ts from 'typescript';
+import { strings, formatString } from '../lib/strings.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -14,7 +15,7 @@ function load(source, names, bindings) {
   const body = source.replace(/^import[\s\S]*?;\s*/gm, '').replace(/^export /gm, '');
   const exports = {};
   vm.runInNewContext(`${stripTypeScriptTypes(body, { mode: 'transform' })}\nObject.assign(exports, {${names.join(',')}});`,
-    { exports, ...React, ...bindings }, { timeout: 1000 });
+    { exports, ...React, ...bindings, strings, formatString }, { timeout: 1000 });
   return exports;
 }
 
@@ -224,6 +225,7 @@ async function alertSystemFixture({
   class AnimatedValue { stopAnimation() {} setValue() {} }
   const bridges = {
     react: React,
+    '../lib/strings.ts': { strings, formatString },
     'react-native': { View: 'View', Text: 'Text', StyleSheet: { create: value => value },
       Animated: { Value: AnimatedValue, View: 'AnimatedView',
         timing: () => ({}), sequence: () => ({ start() {} }) } },

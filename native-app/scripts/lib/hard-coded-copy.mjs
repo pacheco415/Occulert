@@ -9,11 +9,15 @@ const NON_COPY_PROPS = new Set([
   'tintColor', 'style', 'testID', 'nativeID', 'activeOpacity', 'keyboardType', 'autoCapitalize',
   'autoComplete', 'textContentType', 'returnKeyType', 'pointerEvents', 'resizeMode',
   'importantForAccessibility', 'ellipsizeMode', 'mode', 'animationType', 'presentationStyle',
-  'behavior', 'contentInsetAdjustmentBehavior',
+  'behavior', 'contentInsetAdjustmentBehavior', 'glassEffectStyle', 'attentionKey', 'key', 'pixelFormat',
+  'keyboardShouldPersistTaps', 'keyboardDismissMode', 'submitBehavior', 'trackColor', 'thumbColor',
+  'placeholderTextColor',
 ]);
+const COPY_PROPERTIES = new Set(['title', 'subtitle', 'label', 'message', 'detail', 'description',
+  'text', 'hint', 'accessibilityLabel', 'accessibilityHint', 'headerBackTitle', 'placeholder']);
 const EQUALITY = new Set([ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken,
   ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken]);
-const hasWords = text => /[A-Za-z]{2,}/.test(text);
+const hasWords = text => /\p{L}{2,}/u.test(text);
 
 function literalText(node) {
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
@@ -66,6 +70,12 @@ export function hardCodedCopy(fileName, code) {
         const text = literalText(argument);
         if (text !== null && hasWords(text)) found.push({ text, line: at(argument) });
       }
+    } else if (ts.isPropertyAssignment(node) && COPY_PROPERTIES.has(
+      ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) ? node.name.text : '')) {
+      // Configuration objects and Alert button arrays contain rendered copy too.
+      // Inspect only the value, never protocol keys or nested style objects.
+      const text = literalText(node.initializer);
+      if (text !== null && hasWords(text)) found.push({ text, line: at(node.initializer) });
     }
     ts.forEachChild(node, visit);
   };

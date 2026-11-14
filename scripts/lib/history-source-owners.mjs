@@ -14,6 +14,8 @@ export const HISTORY_SOURCE_PATHS = Object.freeze({
   share: 'native-app/lib/historyShareMessage.ts',
   presentation: 'native-app/lib/historyPresentation.ts',
   styles: 'native-app/components/history/historyStyles.ts',
+  strings: 'native-app/lib/strings.ts',
+  catalog: 'native-app/lib/strings/history.ts',
 });
 
 /** Read the real owners only after proving their production import/render chain. */
@@ -48,6 +50,13 @@ export function readHistorySourceOwners(read) {
   assert.match(sources.screen, /import\s*\{\s*historyStyles as s\s*\}\s*from\s*['"]\.\.\/components\/history\/historyStyles['"]/);
   for (const name of ['load', 'filters', 'fusion', 'pilot', 'card', 'review', 'diagnostics']) {
     assert.match(sources[name], /import\s*\{\s*historyStyles as s\s*\}\s*from\s*['"]\.\/historyStyles['"]/);
+  }
+  assert.match(sources.strings, /import\s*\{\s*historyStrings\s*\}\s*from\s*['"]\.\/strings\/history\.ts['"]/);
+  assert.match(sources.strings, /history:\s*historyStrings\b/);
+  assert.match(sources.catalog, /export const historyStrings\s*=/);
+  for (const name of ['screen', 'load', 'filters', 'fusion', 'pilot', 'card', 'review', 'diagnostics', 'reviewModel', 'viewModel', 'share', 'presentation']) {
+    assert.match(sources[name], /import\s*\{[^}]*\bstrings\b[^}]*\}\s*from\s*['"](?:\.\.\/lib\/strings|\.\.\/\.\.\/lib\/strings|\.\/strings\.ts)['"]/, `${name} must import the production English catalog`);
+    assert.match(sources[name], /\bstrings\.history\./, `${name} must use History copy from that catalog`);
   }
   return sources;
 }

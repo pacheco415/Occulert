@@ -1,7 +1,8 @@
+import { strings } from './strings.ts';
 import type { FrontCameraIdentity, FrontCameraKind } from './deviceCondition';
 
-export const INNER_CAMERA_SETUP_MESSAGE = 'Fold your iPhone Duo to drive. The outer camera sees your eyes better, especially at night.';
-export const INNER_CAMERA_MONITOR_MESSAGE = 'Inner camera - lower confidence';
+export const INNER_CAMERA_SETUP_MESSAGE = strings.monitor.frontCamera.innerSetup;
+export const INNER_CAMERA_MONITOR_MESSAGE = strings.monitor.frontCamera.innerMonitoring;
 
 export interface FrontCameraSwitchState {
   lastKnownId: string | null;
