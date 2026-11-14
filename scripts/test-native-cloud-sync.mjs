@@ -344,7 +344,7 @@ const cloudToken = (owner, access_token = `${owner}-fresh-access`) => ({
 });
 const logoutRequests = fixture => fixture.requests.filter(({ url }) => new URL(url).pathname === '/auth/v1/logout');
 const refreshRequests = fixture => fixture.requests.filter(({ url }) => url.includes('grant_type=refresh_token'));
-function signOutFixture(initial = cloudAuth()) {
+function signOutFixture(initial = cloudAuth(), platform = { OS: 'ios', Version: '27.1' }) {
   const secure = new Map(initial ? [[signOutAuthKey, JSON.stringify(initial)]] : []);
   const storage = new Map([[signOutConsentKey, 'true'], [SESSION_SUMMARY_OUTBOX_KEY, JSON.stringify({ old: [] })]]);
   const requests = [], timers = new Map(), events = [];
@@ -370,7 +370,7 @@ function signOutFixture(initial = cloudAuth()) {
       removeItem: async key => { events.push('outbox-clear'); storage.delete(key); },
     },
     createAsyncMutationQueue, createCachedBooleanPreference, createSessionSummaryOutbox, pinnedSupabaseConfig,
-    updateSessionHistory: async () => {}, Platform: { OS: 'ios', Version: '27.1' },
+    updateSessionHistory: async () => {}, Platform: platform,
     currentAppBuildInfo: () => ({}), formatAppBuildLabel: () => 'test',
     setTimeout: (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId; },
     clearTimeout: id => timers.delete(id),
@@ -387,7 +387,7 @@ function signOutFixture(initial = cloudAuth()) {
   const body = cloud.replace(/^import[\s\S]*?;\s*/gm, '').replace(/^export /gm, '');
   const exports = {};
   vm.runInNewContext(`${stripTypeScriptTypes(body)}\nObject.assign(exports, {
-    getCloudState, signInToCloud, signOutOfCloud, setCloudSyncEnabled, loadAuth, refreshIfNeeded, cloudSessionScopes, logCloudAlert,
+    getCloudState, signInToCloud, signOutOfCloud, setCloudSyncEnabled, loadAuth, refreshIfNeeded, cloudSessionScopes, beginCloudSession, logCloudAlert,
     snapshot: () => ({ auth: authCache, authVersion: authMutationVersion, consent: consentRuntimeOverride }),
   });`, { exports, AbortController, Date, ...bindings }, { timeout: 1000 });
   fixture.api = exports;
@@ -404,6 +404,29 @@ function signOutFixture(initial = cloudAuth()) {
 
 const eventRequests = fixture => fixture.requests.filter(({ url }) => url.endsWith('/api/events'));
 const eventBodies = fixture => eventRequests(fixture).map(({ init }) => JSON.parse(init.body));
+
+for (const [platform, expectedDevice, expectedBrowser] of [
+  [{ OS: 'ios', Version: '27.1' }, 'ios 27.1', 'Occulert native app (ios)'],
+  [{ OS: 'android', Version: 36 }, 'android 36', 'Occulert native app (android)'],
+]) {
+  test(`native ${platform.OS} session transport sends plain-string device and browser labels`, async () => {
+    const f = signOutFixture(cloudAuth(), platform);
+    f.transport = async url => {
+      assert.equal(new URL(url).pathname, '/api/sessions');
+      return cloudResponse(200, { session: { id: 'created-session' } });
+    };
+
+    assert.equal(await f.api.beginCloudSession(), 'created-session');
+    const requests = f.requests.filter(({ url }) => new URL(url).pathname === '/api/sessions');
+    assert.equal(requests.length, 1, 'session creation must send one actual request');
+    assert.equal(requests[0].init.method, 'POST');
+    const body = JSON.parse(requests[0].init.body);
+    assert.equal(typeof body.device, 'string');
+    assert.equal(typeof body.browser, 'string');
+    assert.equal(body.device, expectedDevice);
+    assert.equal(body.browser, expectedBrowser);
+  });
+}
 
 for (const wait of ['session creation', 'an earlier event']) {
   test(`native monitor captures occurrence time before waiting for ${wait}`, async () => {
