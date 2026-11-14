@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, unlinkSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inspectRetiredAssets, retentionMs, warningMs } from './lib/retired-assets.mjs';
+import { assertEveryBranchFetched } from './lib/branch-fetch-guard.mjs';
 
 const dayMs = 86400000;
 
@@ -40,6 +41,10 @@ export function retireAssets({ root = process.cwd(), now = Date.now(), write = f
     if (due.length) throw new Error(`Retired asset cleanup required: ${due.length} file(s) are within ${noticeDays} days of their day-21 audit failure or overdue.`);
   }
   if (!write || !files.length) return files;
+  // Write mode picks the next cache name from fetched history, so it needs the
+  // same view of every origin branch as a release. Dry runs and --check choose
+  // no name and stay usable in any full-history checkout.
+  assertEveryBranchFetched(root, 'choosing a new service-worker cache name');
   const read = file => readFileSync(join(root, file), 'utf8');
   const integrity = JSON.parse(read('asset-integrity.json'));
   for (const file of files) delete integrity[file];

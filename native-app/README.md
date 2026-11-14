@@ -137,6 +137,7 @@ native-app/
 |   |-- history*Model.ts    # Pure review/filter models; original record indices retained
 |   |-- historyShareMessage.ts # Existing summary and aggregate export whitelists
 |   |-- sessionHistory.ts   # Serialized local session storage
+|   |-- strings.ts          # English UI copy catalog (Home so far) + key-parity helpers
 |   `-- watchBridge.ts      # iPhone-to-Watch alert delivery
 |-- constants/
 |   `-- thresholds.ts       # Native sensitivity presets
@@ -146,6 +147,18 @@ native-app/
 |-- app.json                # Expo config
 `-- tsconfig.json
 ```
+
+## UI copy
+
+User-facing native copy is moving into `lib/strings.ts`, the first step of
+[Vision Task 6.1](../docs/VISION_ROADMAP.md#task-61--native-localization).
+The Home screen (`app/index.tsx`) reads all of its text from the catalog; the
+other screens and components still hard-code theirs. The catalog is English
+only. `npm run test:strings` fails if a file listed in
+`scripts/test-native-strings.mjs` hard-codes JSX text, a copy prop or `Alert`
+text, and its key-parity helper reports missing or extra keys for a future
+language. Moving copy must keep released wording byte-for-byte. Translated
+safety, alert and consent copy needs fluent human review before release.
 
 ## Phase Milestones
 
