@@ -63,7 +63,8 @@ function clean(value, max = MAX_FIELD_LENGTH) {
 // Contact addresses are refused, never shortened: a cut-down address can be a
 // different, valid inbox.
 function cleanEmail(value) {
-  const email = String(value || "").trim().toLowerCase();
+  if (typeof value !== "string") return "";
+  const email = value.trim().toLowerCase();
   return email.length <= 240 && !email.includes("\0") && email.isWellFormed() ? email : "";
 }
 
@@ -174,7 +175,7 @@ module.exports = async function handler(request, response) {
     return json(response, 400, { ok: false, error: "invalid_lead" });
   }
 
-  const startedAt = Date.parse(String(body.startedAt || ""));
+  const startedAt = typeof body.startedAt === "string" ? Date.parse(body.startedAt) : NaN;
   const ageMs = Date.now() - startedAt;
   if (!Number.isFinite(startedAt) || ageMs < 2000 || ageMs > 2 * 60 * 60 * 1000) {
     return json(response, 400, { ok: false, error: "invalid_lead" });
