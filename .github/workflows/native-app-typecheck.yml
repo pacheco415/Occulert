@@ -91,6 +91,10 @@ jobs:
         working-directory: native-app
         run: npm run test:camera-interruptions
 
+      - name: Verify Watch privacy aggregation and unsigned Xcode packaging
+        working-directory: native-app
+        run: node --test scripts/test-watch-privacy-xcode.mjs
+
       - name: Save source and environment verification evidence
         if: ${{ !cancelled() }}
         run: node scripts/write-verification-receipt.mjs watch-notification '${{ job.status }}'

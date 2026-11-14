@@ -49,6 +49,7 @@ test('simulator profile requires all build gates; production cannot select the s
   environment(simulator, () => {
     const result = config({ config: base }); assert.equal(result.ios.bundleIdentifier, BUNDLE_ID); assert.equal(result.extra.simulatorTrace, true);
     assert.equal(result.plugins.includes('@bacons/apple-targets'), false); assert.equal(result.ios.infoPlist.OcculertSimulatorTrace, true);
+    assert.equal(result.plugins.includes('./plugins/with-watch-privacy'), false);
   });
   const eas = JSON.parse(readFileSync(join(root, 'eas.json')));
   assert.deepEqual(eas.build.production, { autoIncrement: true, ios: { image: 'sdk-58' } });
@@ -91,6 +92,7 @@ test('canonical Expo config and caller Symbol metadata survive both profiles wit
         assert.equal(result.ios.bundleIdentifier, BUNDLE_ID);
         assert.equal(result.extra.simulatorTrace, true);
         assert.equal(result.plugins.includes('@bacons/apple-targets'), false);
+        assert.equal(result.plugins.includes('./plugins/with-watch-privacy'), false);
       }
       assert.deepEqual(input, expected, 'neither profile may mutate the canonical input or its nested data');
     });
