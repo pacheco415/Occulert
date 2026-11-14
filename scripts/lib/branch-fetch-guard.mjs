@@ -17,7 +17,17 @@ export const fetchEveryBranchCommands = Object.freeze([
 export function fetchRulesCoverEveryBranch(rules) {
   const trimmed = rules.map(rule => String(rule).trim()).filter(Boolean);
   const fetchesAll = trimmed.some(rule => /^\+?refs\/(?:heads\/)?\*:/.test(rule));
-  const dropsBranches = trimmed.some(rule => /^\^refs\/(?:\*|heads\/)/.test(rule));
+  const branchPrefix = 'refs/heads/';
+  const dropsBranches = trimmed.some(rule => {
+    if (!rule.startsWith('^')) return false;
+    const source = rule.slice(1);
+    const wildcard = source.indexOf('*');
+    if (wildcard === -1) return source.startsWith(branchPrefix);
+    // The wildcard can begin inside "refs/heads/", as in ^refs/hea*main.
+    // Either compatible fixed prefix can still hide a prepared branch.
+    const prefix = source.slice(0, wildcard);
+    return branchPrefix.startsWith(prefix) || prefix.startsWith(branchPrefix);
+  });
   return fetchesAll && !dropsBranches;
 }
 

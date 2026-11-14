@@ -155,12 +155,50 @@ test('merge-resolution-only filenames and caches stay reserved after removal', (
 
 test('fetch rules must cover every origin branch', () => {
   const all = '+refs/heads/*:refs/remotes/origin/*';
-  for (const rules of [[all], ['refs/heads/*:refs/remotes/origin/*'], ['+refs/*:refs/*'], ['+refs/heads/main:refs/remotes/origin/main', all], [all, '+refs/pull/*/head:refs/remotes/pr/*'], [all, '^refs/tags/nightly']]) {
+  for (const rules of [[all], ['refs/heads/*:refs/remotes/origin/*'], ['+refs/*:refs/*'], ['+refs/heads/main:refs/remotes/origin/main', all], [all, '+refs/pull/*/head:refs/remotes/pr/*'], [all, '^refs/tags/nightly'], [all, '^refs/tags/*'], [all, '^refs/pull/*']]) {
     assert.equal(fetchRulesCoverEveryBranch(rules), true, rules.join(' '));
   }
-  for (const rules of [[], ['+refs/heads/main:refs/remotes/origin/main'], ['+refs/heads/main:refs/remotes/origin/main', '+refs/heads/codex/topic:refs/remotes/origin/codex/topic'], ['+refs/heads/codex/*:refs/remotes/origin/codex/*'], ['+refs/pull/*/head:refs/remotes/pr/*'], [all, '^refs/heads/codex/*'], [all, '^refs/*']]) {
+  for (const rules of [[], ['+refs/heads/main:refs/remotes/origin/main'], ['+refs/heads/main:refs/remotes/origin/main', '+refs/heads/codex/topic:refs/remotes/origin/codex/topic'], ['+refs/pull/*/head:refs/remotes/pr/*'], [all, '^refs/heads/main'], [all, '^refs/heads/codex/*'], [all, '^refs/*'], [all, '^refs/hea*'], [all, '^refs/h*'], [all, '^refs/hea*main']]) {
     assert.equal(fetchRulesCoverEveryBranch(rules), false, rules.join(' ') || 'no rules');
   }
+});
+
+test('negative fetch patterns that exclude real branch refs are refused', () => {
+  const base = mkdtempSync(join(tmpdir(), 'occulert-negative-fetch-'));
+  const origin = join(base, 'origin');
+  const branches = ['main', 'prepared-main', 'retained'];
+  const cases = [
+    { negative: '^refs/hea*', retained: [] },
+    { negative: '^refs/h*', retained: [] },
+    { negative: '^refs/hea*main', retained: ['retained'] },
+    { negative: '^refs/heads/*main', retained: ['retained'] },
+    { negative: '^refs/heads/main', retained: ['prepared-main', 'retained'] },
+    { negative: '^refs/tags/nightly', retained: branches },
+    { negative: '^refs/tags/*', retained: branches },
+    { negative: '^refs/pull/*', retained: branches },
+    { negative: '^main', retained: branches },
+    { negative: '^h*', retained: branches },
+  ];
+  try {
+    mkdirSync(origin);
+    fixtureGit(origin, ['init', '-q', '--initial-branch=main']);
+    fixtureGit(origin, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'Fixture branches']);
+    for (const branch of branches.slice(1)) fixtureGit(origin, ['branch', branch]);
+    for (const [index, { negative, retained }] of cases.entries()) {
+      fixtureGit(origin, ['check-ref-format', '--allow-onelevel', '--refspec-pattern', negative.slice(1)]);
+      const clone = join(base, `clone-${index}`);
+      mkdirSync(clone);
+      fixtureGit(clone, ['init', '-q']);
+      fixtureGit(clone, ['remote', 'add', 'origin', pathToFileURL(origin).href]);
+      fixtureGit(clone, ['config', '--add', 'remote.origin.fetch', negative]);
+      fixtureGit(clone, ['fetch', '-q', '--no-tags', 'origin']);
+      // Git may also create origin/HEAD, a symbolic default-branch pointer.
+      const fetched = fixtureGit(clone, ['for-each-ref', '--format=%(refname)', 'refs/remotes/origin/']).toString().trim().split('\n').filter(ref => ref && ref !== 'refs/remotes/origin/HEAD');
+      assert.deepEqual(fetched, retained.map(branch => `refs/remotes/origin/${branch}`), negative);
+      if (retained.length === branches.length) assertEveryBranchFetched(clone);
+      else assert.throws(() => assertEveryBranchFetched(clone), /Fetch every origin branch/, negative);
+    }
+  } finally { rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
 });
 
 test('a single-branch clone is refused until every origin branch is fetched', () => {
