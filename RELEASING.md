@@ -58,6 +58,16 @@ is an exact no-op; it does not reserve another URL or cache name. Fetch and
 integrate `origin/main` first. Finish or discard an existing unpublished release
 before starting another source release.
 
+The generated `WEB_APP_VERSION` constant in `src/ui.js` identifies the released
+driver, for example `web-v108` for `driver-app.v108.js`. Source release and
+dependency importer bumps derive the value from the final asset mapping and
+recompile the staged source before the atomic write. Do not set this stamp by
+hand. The backend reads the loaded driver's constant when starting a session;
+a retained driver without a stamp sends `null` instead of claiming a newer
+build. The optional parked helper and local metrics use that same binding.
+The detector algorithm version remains separate, and stored sessions keep
+their original provenance.
+
 `npm run audit:source-assets` compares each registered source with its active
 immutable output. Driver bundle mode compiles the actual graph with pinned
 esbuild and checks source, binding and effect identity before release. Existing

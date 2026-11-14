@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { auditSourceAssets, synchronizeSourceEntry } from './lib/source-assets.mjs';
+import { assertDriverAppVersion } from './lib/app-version-stamp.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const read = (cwd, name) => readFileSync(join(cwd, name), 'utf8');
 const json = (cwd, name) => JSON.parse(read(cwd, name));
@@ -24,6 +25,7 @@ function fixture(body) {
   try {
     const paths = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
     paths.add('scripts/lib/driver-catalog-assets.mjs');
+    paths.add('scripts/lib/app-version-stamp.mjs');
     // Include new reviewable source and release outputs before Git staging.
     for (const entry of Object.values(json(root, 'source-assets.json').assets)) paths.add(entry.source);
     const contract = json(root, 'source-driver-contract.json');
@@ -73,6 +75,7 @@ test('a real module edit releases compiled output and guard while pending work b
   const pending = snapshot(cwd); assert.throws(() => run(cwd, 'detection-experiments.js'), /Pending source edits/); assert.deepEqual(snapshot(cwd), pending);
   const plan = JSON.parse(run(cwd, '--release', '--dry-run')); assert.equal(plan.sources[0].changed, true); assert.deepEqual(snapshot(cwd), pending);
   run(cwd, '--release'); const active = json(cwd, 'asset-versions.json')['driver-app.js'];
+  assertDriverAppVersion(read(cwd, active), json(cwd, 'asset-versions.json'), { required: true });
   assert.ok(read(cwd, active).includes("'READY'")); assert.equal(read(cwd, 'src/driver-app.js'), entry); assert.deepEqual(auditSourceAssets(cwd).map(entry=>entry.logical),Object.keys(json(root,'source-assets.json').assets));
   for (const [name, digest] of Object.entries(prior)) assert.equal(hash(readFileSync(join(cwd, name))), digest);
 }));
@@ -85,6 +88,7 @@ test('real helper bump and unpublished refresh synchronize modules and exact com
     const helper = readFileSync(join(cwd, manifest['detection-experiments.js'])), pin = 'sha256-' + createHash('sha256').update(helper).digest('base64');
     assert.ok(read(cwd, 'src/ui.js').includes(manifest['detection-experiments.js'])); assert.ok(read(cwd, 'src/ui.js').includes(pin));
     assert.equal(read(cwd, 'src/driver-app.js'), entry); assert.ok(read(cwd, manifest['driver-app.js']).includes(pin));
+    assertDriverAppVersion(read(cwd, manifest['driver-app.js']), manifest, { required: true });
     assert.deepEqual(auditSourceAssets(cwd).map(entry=>entry.logical),Object.keys(json(root,'source-assets.json').assets));
     const hashes = json(cwd, 'asset-integrity.json'); for (const [name, digest] of Object.entries(hashes)) assert.equal(hash(readFileSync(join(cwd, name))), digest);
   };
