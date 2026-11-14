@@ -33,6 +33,38 @@ result. These observations help investigate process or storage loss; a passing
 retry or an empty OOM counter does not establish its cause. Keep the first
 attempt's traces and retry report when assessing an intermittent failure.
 
+The wrapper also samples Linux loaded-library evidence in an isolated worker.
+It follows the launched test runner and its descendants, including children of
+each process's threads, and keeps only executable `libsoup` mappings, bounded
+process identities, and recognized WebKit executable names. It does not read
+arguments, environment variables or process memory, never scans unrelated
+process trees, and does not retain complete memory maps. The `libraries` receipt records a SHA-256
+only after the opened backing file's device/inode matches the mapping and the
+process ancestry, start times, mapping and file metadata survive rechecking.
+Deleted, replaced, oversized or unreadable files retain an explicit unavailable
+reason without a hash.
+
+Sampling stops after a verified WebKit network-process library, 120 one-second
+samples, 16 records, or child exit. Each sample is capped at 64 processes,
+64 tasks per process, 512 proc probes, 8 MiB of proc text and a 500 ms budget
+checked between reads. Maps are capped at 1 MiB and each library hash at 8 MiB. The collector runs off
+the test runner's event loop and is terminated without waiting when the child
+closes. Missing permissions, process races, unsupported platforms, caps and
+short-lived processes remain visible as unavailable, limited or not-observed
+evidence; they never turn a failed test into a pass.
+`not_observed` requires an issue-free, complete sampled traversal. If no library
+was captured and descendants could not be inspected, the result is unavailable.
+If process identity or ancestry cannot be revalidated, the collector discards
+the mapping itself and keeps only a sanitized failure code.
+
+This observes an on-disk backing file for a live mapping, not the process's
+in-memory bytes or the semantic content of an upstream remedy. Use the exact
+CI receipt with the pinned image/source evidence when investigating #324; a
+library filename, hash, passing retry or synthetic mmap fixture alone does not
+establish the rendering/queue-lifetime remedies or explain cache loss. Physical
+Safari acceptance remains separate. The [Linux proc documentation](https://docs.kernel.org/filesystems/proc.html)
+describes the process and mapping interfaces used by this best-effort probe.
+
 Keep superseded assets for at least 14 days so cached older pages can still
 load. After that grace period, remove a file only after checking references in
 HTML, runtime JS, `sw.js`, `asset-versions.json`, `asset-integrity.json`, and
