@@ -212,36 +212,17 @@ encoding classifications. The small `testflight-diagnostic-RUN_ID` artifact
 contains the same allowlisted data. No raw hostname, URL, response body,
 provider exception or local path is included. Codes distinguish a missing
 archive URL, rejected URL/redirect, HTTP status, length/encoding/stream/signature
-failure, and private-file failures. The provider URL field and allowed download
-hosts are unchanged; diagnostics establish evidence for a later correction,
-not permission to try another URL field, broaden hosts or queue a new build.
-
-### Temporary sealed hostname evidence
-
-An `IPA_HOST` rejection can additionally contain `sealedHost`, with exactly
-`algorithm`, `keySha256` and `ciphertext`. This temporary diagnostic encrypts
-only the rejected WHATWG URL's canonical ASCII hostname, bounded to 253 bytes,
-after the existing HTTPS and authority checks. It never encrypts or publishes
-the URL, path, query, credentials, response body or provider exception. The
-rejected destination is still never fetched.
-
-The fixed recipient is an ephemeral RSA-3072 public key whose DER SPKI SHA-256
-is `bd181dacd81c33d5d99083b65f6f517dca926985d0bbbe48ea48a3325dff327b`.
-Encryption uses explicit RSA-OAEP with SHA-256 (including MGF1) and the fixed
-label `occulert-testflight-redirect-host-v1`. The public diagnostic identifies
-the algorithm as `RSA-OAEP-SHA256` and contains exactly 384 ciphertext bytes,
-encoded as 512 base64 characters. There is no dispatch/environment recipient
-override and no plaintext fallback: invalid keys or encryption failures leave
-the original `IPA_HOST` rejection and omit the optional sealed field.
-
-The release owner retains the private key outside Git and Actions. Verify the
-diagnostic artifact's run/source identity and digest before decrypting it in
-that private environment; do not put the private key or decrypted host in a
-public log, artifact or repository. A decrypted hostname is evidence for a
-separate review, not an automatic permission to change download policy. Remove
-this temporary envelope and retire its recipient key after the specific
-redirect investigation is resolved. All source, recovery, archive-inspection
-and submission gates remain in effect.
+failure, and private-file failures. The provider URL field remains
+`applicationArchiveUrl`. The HTTPS host allowlist includes the exact `expo.dev`
+and `api.expo.dev` hosts, `artifacts.eascdn.net`, and the existing Google Storage
+hosts. Expo documents `api.expo.dev` as its
+[Services API host](https://docs.expo.dev/eas/workflows/rest-api/); the actual
+private download diagnostic established that the artifact redirect uses this
+exact host. The temporary encrypted-host diagnostic has been retired. No
+wildcard Expo subdomains, URL-field fallback or credential forwarding is allowed.
+Each redirect is checked before requesting it, with the same redirect, byte,
+signature, hash and provenance limits. These diagnostics do not authorize a new
+build or an unreviewed download destination.
 
 After `submit` completes, separately verify Apple processing and availability
 to the existing internal TestFlight group. The workflow's success is an upload
@@ -258,10 +239,7 @@ bounded downloads and credential/output isolation without contacting Expo or
 queuing a build. It includes real ZIP/binary-plist fixtures, malformed archive
 boundaries, exact permission/identity checks, profile allowlists and signer
 membership, private report serialization, read-only recovery completion/failure
-barriers and a failed fresh-inspection submit barrier. Sealed-host tests use an
-independently generated fixture key for actual OAEP encryption/decryption,
-exercise the pinned production public key, and require rejection before any
-request to an unapproved redirect host. The report's four explicit
+barriers and a failed fresh-inspection submit barrier. The report's four explicit
 false limitations remain unchanged: Apple certificate-chain trust, Apple
 processing/device acceptance, binary proof of JavaScript flags, and an embedded
 resolved Podfile lock are not claimed. Linux tests inject only Apple's command
