@@ -471,7 +471,7 @@ export async function ipaDigest(build, fetchImpl = fetch, privatePath, io = { op
   try { url = new URL(rawUrl); } catch { throw fail('IPA_URL_INVALID'); }
   for (let redirect = 0; redirect <= 5; redirect++) {
     details.redirects = redirect;
-    details.hostClass = ['expo.dev', 'api.expo.dev'].includes(url.hostname) ? 'expo' : url.hostname === 'artifacts.eascdn.net' ? 'eas-cdn'
+    details.hostClass = ['expo.dev', 'api.expo.dev'].includes(url.hostname) ? 'expo' : ['artifacts.eascdn.net', 'wf-artifacts.eascdn.net'].includes(url.hostname) ? 'eas-cdn'
       : url.hostname === 'storage.googleapis.com' || url.hostname.endsWith('.storage.googleapis.com') ? 'google-storage' : 'other';
     if (url.protocol !== 'https:') throw fail('IPA_SCHEME');
     if (url.username || url.password || url.port) throw fail('IPA_AUTHORITY');

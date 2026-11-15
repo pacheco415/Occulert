@@ -566,6 +566,58 @@ test('IPA downloads follow the exact Expo API hop without forwarding credentials
   assert.deepEqual(actual, { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') });
 });
 
+test('the observed Expo API to workflow-artifacts hop hashes the complete ZIP without credentials', async () => {
+  const bytes = execFileSync('python3', ['-c', [
+    'import io,sys,zipfile',
+    'b=io.BytesIO()',
+    'with zipfile.ZipFile(b,"w",zipfile.ZIP_DEFLATED) as z:z.writestr("Payload/Fixture.app/Info.plist",b"Transport fixture only")',
+    'sys.stdout.buffer.write(b.getvalue())',
+  ].join('\n')]);
+  const calls = [];
+  const actual = await ipaDigest(metadata(), async (url, options) => {
+    calls.push({ hostname: url.hostname, options });
+    if (calls.length === 1) return new Response(null, { status: 307, headers: { location: 'https://api.expo.dev/artifacts/fixture?private-api-query' } });
+    if (calls.length === 2) return new Response(null, { status: 307, headers: { location: 'https://wf-artifacts.eascdn.net/fixture.ipa?private-artifact-query' } });
+    assert.equal(url.hostname, 'wf-artifacts.eascdn.net');
+    return new Response(bytes, { status: 200, headers: { 'content-length': String(bytes.length) } });
+  }, undefined, undefined, () => assert.fail('Allowed exact hosts must not reach hostname sealing'));
+  assert.deepEqual(calls.map(call => call.hostname), ['expo.dev', 'api.expo.dev', 'wf-artifacts.eascdn.net']);
+  assert.ok(calls.every(call => call.options.headers === undefined && call.options.redirect === 'manual'));
+  assert.deepEqual(actual, { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') });
+});
+
+test('workflow-artifacts lookalikes and unsafe redirects are rejected before requesting their destination', async () => {
+  const cases = [
+    ['https://wf-artifacts.eascdn.net.evil.example/private', 'IPA_HOST'],
+    ['https://sub.wf-artifacts.eascdn.net/private', 'IPA_HOST'],
+    ['https://evilwf-artifacts.eascdn.net/private', 'IPA_HOST'],
+    ['https://wf-artifacts-eascdn.net/private', 'IPA_HOST'],
+    ['https://wf-artifacts.eascdn.net./private', 'IPA_HOST'],
+    ['https://other.eascdn.net/private', 'IPA_HOST'],
+    ['http://wf-artifacts.eascdn.net/private', 'IPA_SCHEME'],
+    ['https://user:secret@wf-artifacts.eascdn.net/private', 'IPA_AUTHORITY'],
+    ['https://wf-artifacts.eascdn.net:8443/private', 'IPA_AUTHORITY'],
+  ];
+  for (const [location, code] of cases) for (const viaCdn of [false, true]) {
+    const calls = [];
+    await assert.rejects(() => ipaDigest(metadata(), async (url, options) => {
+      calls.push(url.hostname);
+      assert.equal(options.headers, undefined); assert.equal(options.redirect, 'manual');
+      const next = calls.length === 1 ? 'https://api.expo.dev/fixture'
+        : viaCdn && calls.length === 2 ? 'https://wf-artifacts.eascdn.net/fixture' : location;
+      return new Response(null, { status: 307, headers: { location: next } });
+    }), error => {
+      const diagnostic = downloadDiagnostic(error);
+      assert.equal(diagnostic.code, code); assert.equal(diagnostic.redirects, viaCdn ? 3 : 2);
+      assert.equal(diagnostic.status, 307); assert.equal(diagnostic.receivedBytes, 0);
+      assert.equal(JSON.stringify(diagnostic).includes(location), false);
+      assert.equal(Object.hasOwn(diagnostic, 'sealedHost'), code === 'IPA_HOST');
+      return true;
+    });
+    assert.deepEqual(calls, viaCdn ? ['expo.dev', 'api.expo.dev', 'wf-artifacts.eascdn.net'] : ['expo.dev', 'api.expo.dev']);
+  }
+});
+
 test('Expo API lookalikes and unsafe onward redirects stop before the rejected request', async () => {
   const cases = [
     ['https://api.expo.dev.evil.example/private', 'IPA_HOST'],
@@ -1099,7 +1151,7 @@ test('only unknown HTTPS hosts without credentials or ports reach sealed diagnos
   const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 1]);
   let sealCalls = 0;
   const seal = () => { sealCalls++; throw new Error('Must not seal an allowed or invalid authority'); };
-  for (const host of ['expo.dev', 'api.expo.dev', 'artifacts.eascdn.net', 'storage.googleapis.com', 'bucket.storage.googleapis.com']) {
+  for (const host of ['expo.dev', 'api.expo.dev', 'artifacts.eascdn.net', 'wf-artifacts.eascdn.net', 'storage.googleapis.com', 'bucket.storage.googleapis.com']) {
     const build = { ...metadata(), artifacts: { applicationArchiveUrl: `https://${host}/app.ipa` } };
     assert.deepEqual(await ipaDigest(build, async () => new Response(zip), undefined, undefined, seal),
       { bytes: zip.length, sha256: createHash('sha256').update(zip).digest('hex') });

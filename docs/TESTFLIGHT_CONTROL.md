@@ -213,22 +213,26 @@ contains the same allowlisted data. No raw hostname, URL, response body,
 provider exception or local path is included. Codes distinguish a missing
 archive URL, rejected URL/redirect, HTTP status, length/encoding/stream/signature
 failure, and private-file failures. The provider URL field remains
-`applicationArchiveUrl`. The HTTPS host allowlist includes the exact `expo.dev`
-and `api.expo.dev` hosts, `artifacts.eascdn.net`, and the existing Google Storage
-hosts. Expo documents `api.expo.dev` as its
+`applicationArchiveUrl`. The HTTPS host allowlist includes the exact `expo.dev`,
+`api.expo.dev`, `artifacts.eascdn.net` and `wf-artifacts.eascdn.net` hosts, plus the
+existing Google Storage hosts. Expo documents `api.expo.dev` as its
 [Services API host](https://docs.expo.dev/eas/workflows/rest-api/); the actual
 private download diagnostic established that the artifact redirect uses this
-exact host. A later recovery passed that hop and rejected an unknown second
-redirect before fetching its destination. No wildcard Expo subdomains, URL-field
-fallback or credential forwarding is allowed.
+exact host. A later recovery passed that hop and rejected the next destination.
+After checking the authenticated build provenance and diagnostic artifact's
+identity and digest, the release owner privately decrypted that sealed hostname
+as exactly `wf-artifacts.eascdn.net`. This observed redirect supports the single
+exact-host addition; it makes no broader claim about Expo's infrastructure.
+No wildcard Expo or EAS CDN subdomains, URL-field fallback or credential
+forwarding is allowed.
 Each redirect is checked before requesting it, with the same redirect, byte,
 signature, hash and provenance limits. These diagnostics do not authorize a new
 build or an unreviewed download destination.
 
 ### Temporary sealed hostname evidence
 
-The reviewed sealed-host diagnostic is restored for the still-unknown second
-redirect. An `IPA_HOST` rejection can additionally contain `sealedHost`, with exactly
+The reviewed sealed-host diagnostic remains until the complete download chain
+is established. Any further `IPA_HOST` rejection can contain `sealedHost`, with exactly
 `algorithm`, `keySha256` and `ciphertext`. This temporary diagnostic encrypts
 only the rejected WHATWG URL's canonical ASCII hostname, bounded to 253 bytes,
 after the existing HTTPS and authority checks. It never encrypts or publishes
@@ -246,8 +250,8 @@ the original `IPA_HOST` rejection and omit the optional sealed field.
 
 The release owner retains the private key outside Git and Actions. Verify the
 diagnostic artifact's run/source identity and digest before decrypting it in
-that private environment; do not put the private key or decrypted host in a
-public log, artifact or repository. A decrypted hostname is evidence for a
+that private environment; do not put the private key or unreviewed decrypted
+values in a public log, artifact or repository. A decrypted hostname is evidence for a
 separate review, not an automatic permission to change download policy. Remove
 this temporary envelope and retire its recipient key only after the complete
 redirect chain is established and its destinations have received separate review.
