@@ -1,5 +1,5 @@
 import "./camera.js";
-import { signalDetectionResult } from "./detector.js";
+import { signalDetectionResult, DETECTION_RESULT_TIMEOUT_MS } from "./detector.js";
 import { updateCalibration } from "./calibration.js";
 import { scoringSmooth, scoringNodHistory, scoringNodDetected, scoringResetContinuity, scoringNoFace, scoringCalibrationFrame, scoringConfidence, scoringEyeMetrics, scoringTrackedFrame, scoringYawn, scoringDistractionSeconds, scoringAlertCandidate, scoringDistractionMatured } from "./scoring-core.js";
 import { alerts, escalationLevel, tone, trigger, speak, triggerBreakCheck, playRestoredCue, clearRestoredCue } from "./alerts.js";
@@ -7,6 +7,69 @@ import "./storage-history.js";
 import { queueBackendEvent } from "./cloud-sync.js";
 import { uiText, set_eyeLoss } from "./ui.js";
 import { WEB_APP_VERSION, experimentFlags, experimentController, experimentSessionSummary, video, canvas, ctx, faceStateEl, nodsEl, gpsEl, locationEl, perclosEl, microsleepsEl, distractionEl, gpsConsent, cloudConsent, running, fatigue, confidence, earHistory, maxFatigue, fatigueSampleSum, fatigueSampleCount, noseYHistory, headNods, lastNod, driverId, gpsWatch, lastPosition, routePoints, distanceMeters, perclosWindow, eyesClosedSince, microsleeps, lastMicro, turnedSince, totalDistractionMs, calibrating, calibrated, eyeClosedThreshold, eyeWatchThreshold, noFaceSince, lastFaceSeen, LEFT, RIGHT, log, render, drawEyes, yawnCount, lastYawn, _marHist, _mouthOpenSince, MAR_YAWN_THRESH, YAWN_HOLD_MS, YAWN_COOLDOWN_MS, _lastLightCheck, _trackLostSince, _lastTrackingWarning, TRACKING_WARNING_DELAY_MS, TRACKING_WARNING_COOLDOWN_MS, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_lastNod, set_gpsWatch, set_lastPosition, set_routePoints, set_distanceMeters, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_lastMicro, set_turnedSince, set_totalDistractionMs, set_noFaceSince, set_lastFaceSeen, set_yawnCount, set_lastYawn, set__marHist, set__mouthOpenSince, set__lastLightCheck, set__trackLostSince, set__lastTrackingWarning } from "./ui.js";
+// Local elapsed-time accounting, independent of scoring and delayed badge text.
+// A detected sample expires at the detector's existing result timeout.
+export function createEyeCoverageTracker(startedAt, freshnessMs) {
+    const validTime = value => Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
+    if (!validTime(startedAt) || !validTime(freshnessMs) || !freshnessMs)
+        throw new RangeError('Invalid eye coverage clock');
+    let active = true, last = startedAt, calibration = true, detectedUntil = null, detectedMs = 0, monitoredMs = 0;
+    function advance(at) {
+        if (!active || !validTime(at) || at < last)
+            return false;
+        if (!calibration) {
+            monitoredMs += at - last;
+            if (detectedUntil !== null)
+                detectedMs += Math.max(0, Math.min(at, detectedUntil) - last);
+        }
+        last = at;
+        return true;
+    }
+    function setCalibration(at, value) {
+        if (!advance(at))
+            return false;
+        if (calibration !== !!value) {
+            calibration = !!value;
+            detectedUntil = null;
+        }
+        return true;
+    }
+    function snapshot() {
+        return { detectedMs, monitoredMs, percent: monitoredMs > 0 ? Math.round(detectedMs / monitoredMs * 100) : null };
+    }
+    return {
+        calibration: setCalibration,
+        observe(at, detected, isCalibrating) {
+            if (setCalibration(at, isCalibrating))
+                detectedUntil = detected === true && !calibration ? Math.min(Number.MAX_SAFE_INTEGER, at + freshnessMs) : null;
+        },
+        stop(at) { advance(at); active = false; return snapshot(); },
+        snapshot,
+    };
+}
+let sessionEyeCoverage = null;
+export function beginEyeCoverage() {
+    sessionEyeCoverage = createEyeCoverageTracker(performance.now(), DETECTION_RESULT_TIMEOUT_MS);
+}
+export function setEyeCoverageCalibration(value) {
+    sessionEyeCoverage?.calibration(performance.now(), value);
+}
+export function stopEyeCoverage() {
+    return sessionEyeCoverage?.stop(performance.now()) ?? null;
+}
+export function observeEyeCoverage(hasFace, hasGoodEAR) {
+    if (running && !document.hidden)
+        sessionEyeCoverage?.observe(performance.now(), !!(hasFace && hasGoodEAR), calibrating);
+}
+export function eyeCoveragePercentage(summary) {
+    if (!summary || typeof summary !== 'object' || Array.isArray(summary))
+        return null;
+    const raw = summary.percent;
+    if (!(typeof raw === 'number' || typeof raw === 'string' && raw.trim()))
+        return null;
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 && value <= 100 ? Math.round(value) : null;
+}
 export function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 export function calcEAR(lm, idx) {
     if (experimentFlags.pixels)
@@ -306,6 +369,7 @@ export function warnTrackingLoss(now) {
 export function updateTrackingState(hasFace, hasGoodEAR, reason = hasFace ? 'eyes-not-visible' : 'no-face') {
     const detected = hasFace && hasGoodEAR;
     set_eyeLoss(detected ? null : reason);
+    observeEyeCoverage(hasFace, hasGoodEAR);
     const b = document.getElementById('trackingBadge');
     if (!b)
         return;

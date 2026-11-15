@@ -58,6 +58,7 @@
     "test:tenant-rls": "node scripts/test-tenant-rls.mjs",
     "test:watch-notification": "node --test scripts/test-watch-notification.mjs",
     "test:driver-observation-gaps": "node --test scripts/test-driver-observation-gaps.mjs",
+    "test:eye-coverage": "node --test scripts/test-eye-coverage-summary.mjs",
     "test:dashboard-demo-storage": "node --test scripts/test-dashboard-demo-storage.mjs",
     "test:account-ui-races": "node --test scripts/test-account-ui-races.mjs",
     "test:theme-storage": "node --test scripts/test-theme-storage.mjs",

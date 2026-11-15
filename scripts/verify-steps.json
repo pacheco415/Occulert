@@ -58,6 +58,7 @@
     "test:fleet-invitations",
     "test:tenant-rls",
     "test:driver-observation-gaps",
+    "test:eye-coverage",
     "test:dashboard-demo-storage",
     "test:account-ui-races",
     "test:theme-storage",

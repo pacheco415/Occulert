@@ -14,6 +14,19 @@ const uiDependencies = ['uiText','uiState','pauseUi'].map(name => {
   assert.equal(matches.length,1,`Execute the real extracted ${name} dependency`);
   return driver.slice(matches[0].start,matches[0].end);
 }).join('\n');
+const coverageDependencies = ['createEyeCoverageTracker','beginEyeCoverage','stopEyeCoverage',
+  'eyeCoveragePercentage','appendEyeCoverageSummary'].map(name => {
+  const matches = driverProgram.body.filter(node => node.type==='FunctionDeclaration' && node.id.name===name);
+  assert.equal(matches.length,1,`Execute the real extracted ${name} dependency`);
+  return driver.slice(matches[0].start,matches[0].end);
+}).join('\n');
+const coverageState = ['DETECTION_RESULT_TIMEOUT_MS','sessionEyeCoverage'].map(name => {
+  const matches = driverProgram.body.filter(node => node.type==='VariableDeclaration')
+    .flatMap(node => node.declarations.filter(declaration => declaration.id.name===name)
+      .map(declaration => `${node.kind} ${driver.slice(declaration.start,declaration.end)};`));
+  assert.equal(matches.length,1,`Execute the real extracted ${name} state`);
+  return matches[0];
+}).join('\n');
 const triggerDependencies = driverProgram.body.filter(node => node.type==='FunctionDeclaration'
   && ['scoringReadWallClock','scoringTriggerEligible'].includes(node.id.name));
 assert.equal(triggerDependencies.length,2,'Execute both real extracted eligibility/clock dependencies');
@@ -244,8 +257,9 @@ test('a scheduled low pulse is discarded if the context interrupts before delive
 });
 
 function attachDriverLifecycle(h) {
-  const output = {}, screenClasses = new Set();
+  const output = {}, screenClasses = new Set(), reportChildren = [];
   h.document.getElementById = id => id === 'alertCheckResult' ? output : null;
+  h.document.createElement = () => ({ style: {}, dataset: {} });
   Object.assign(h.context, {
     startupAllowsMonitoring: () => true, starting: false, running: false,
     detectorFailureStopping: false, cameraFailureStopping: false, startCancelled: false,
@@ -256,7 +270,9 @@ function attachDriverLifecycle(h) {
     stopTimer() {}, clearCameraTrackGuards() {}, wakeLock: null, raf: null, stopGPS() {},
     ctx: { clearRect() {} }, canvas: { width: 1, height: 1 }, refreshCameraChoices: async () => [],
     fleetPayload: () => ({ status: 'WATCH', safetyScore: 0, perclos: 0, distractionSeconds: 0, avgFatigue: 0, maxFatigue: 0, gpsEnabled: false, distanceMiles: 0 }),
-    saveLocalSessionHistory: payload => payload, sessionStart: 0, pushFleet() {}, reportEl: { style: {} },
+    saveLocalSessionHistory: payload => payload, sessionStart: 0, pushFleet() {},
+    reportEl: { style: {}, appendChild: node => reportChildren.push(node) },
+    performance: { now: () => 0 },
     calibrated: false, baselineEAR: .28, eyeClosedThreshold: .18,
     alerts: 0, headNods: 0, microsleeps: 0, escalationLevel: 0,
     cloudConsent: { checked: false }, cloudReady: false, Date,
@@ -267,16 +283,17 @@ function attachDriverLifecycle(h) {
   const start = driver.slice(driver.indexOf('async function start(){'), driver.indexOf('async function stop('));
   const stop = driver.slice(driver.indexOf('async function stop('), driver.indexOf('const startLocalSession=start;'));
   const demo = driver.slice(driver.indexOf('function demoAlert(){'), driver.indexOf('\nfunction onResults'));
-  vm.runInContext(`${start}\n${stop}\n${demo}`, h.context);
-  return { screenClasses };
+  vm.runInContext(`${coverageState}\n${coverageDependencies}\n${start}\n${stop}\n${demo}`, h.context);
+  return { screenClasses, reportChildren };
 }
 
 test('actual Stop restores prior routing, cancels fallback and disables all later tap recovery', async () => {
   const h = harness({ noContext: true, session: { type: 'ambient' } });
-  attachDriverLifecycle(h);
+  const lifecycle = attachDriverLifecycle(h);
   h.run('running=true;beginAlertAudioScope();tone(880,450,.2);');
   assert.equal(h.session.type, 'playback');
   await h.run('stop();');
+  assert.equal(lifecycle.reportChildren[0].textContent,'Eyes detected: Unknown');
   assert.equal(h.context.startBtn.textContent,'START MONITORING');
   assert.deepEqual(JSON.parse(h.context.startBtn.dataset.driverText),['start.start',null]);
   assert.equal(h.session.type, 'ambient');

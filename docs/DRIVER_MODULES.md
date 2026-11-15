@@ -31,9 +31,9 @@ that actually triggered its five-second warning, once per recovered loss; start,
 stop and a new loss cancel its owned feedback. See [EYES_RESTORED_CUE.md](EYES_RESTORED_CUE.md)
 for timing, validation and the measured release budget.
 
-The separately pinned copy source `src/driver-i18n.js` owns 95 ordinary keys in
+The separately pinned copy source `src/driver-i18n.js` owns 97 ordinary keys in
 English, Spanish, French, Portuguese, German, Arabic, Chinese and Japanese. Its
-306-key English source also records 211 protected English entries, including the
+308-key English source also records 211 protected English entries, including the
 language notice. `uiText` in the core publishes explicit keys and parameters for
 current start, voice, feedback-validation and generated camera-caption states.
 It also reads the keyed optional catalog at call time, accepts only nonempty
@@ -44,8 +44,11 @@ labels; the external overview source publishes its own current state metadata.
 The optional renderer never reverse-matches English phrases, translates device
 names, reads user data as copy, or changes input values or numeric formatting.
 In particular, PERCLOS digits and `%` remain ASCII because fleet telemetry reads
-them back. The report formatter, event selection, thresholds and existing safety voice cues
-are unchanged.
+them back. The existing report fields stay English; its new local eye-coverage
+line uses its own ordinary key and numeric parameter. The line can update after
+a language change or late catalog load without translating the report's safety
+text or rewriting saved measurements. See [the accounting convention](BROWSER_SUMMARY_VALUES.md#local-eye-coverage).
+Coverage leaves event selection, thresholds and voice cues unchanged.
 
 Eye visibility has separate keyed badges and headings for detected eyes, a face
 with unreadable eye measurements, and no face. `onResults` passes the loss reason

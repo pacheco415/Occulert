@@ -9,7 +9,7 @@ const {english,locales,text,eyesDetectedCue} = context.module.exports;
 const slots = value => [...value.matchAll(/\{(\w+)\}/g)].map(match=>match[1]);
 test('eight ordinary locale catalogs have exact key and placeholder parity with English',()=>{
   assert.deepEqual(Object.keys(locales),['en','es','fr','pt','de','ar','zh','ja']);
-  assert.equal(Object.keys(locales.en).length,95);assert.equal(Object.keys(english).length,306);
+  assert.equal(Object.keys(locales.en).length,97);assert.equal(Object.keys(english).length,308);
   for(const values of Object.values(locales)) {
     assert.deepEqual(Object.keys(values),Object.keys(locales.en));
     for(const [key,value] of Object.entries(values)) {
@@ -124,7 +124,7 @@ test('actual onResults distinguishes absent face and invalid EAR without changin
 
 test('actual tracking badge retains its three-second loss delay, exact colors and immediate recovery in every locale',()=>{
   for(const locale of Object.keys(locales)) {
-    const badge={textContent:'',dataset:{},style:{}},context={now:10000,_trackLostSince:0,eyeLoss:null,document:{getElementById:()=>badge},Date:{now:()=>context.now},window:{OcculertDriverI18n:{get:key=>text(locale,key)}},set_eyeLoss:value=>context.eyeLoss=value,set__trackLostSince:value=>context._trackLostSince=value,warnTrackingLoss(){},warnedLoss:0,clearRestoredCue(){},resetTrackingCue(){context.warnedLoss=0;},playRestoredCue(){}};
+    const badge={textContent:'',dataset:{},style:{}},context={now:10000,_trackLostSince:0,eyeLoss:null,document:{getElementById:()=>badge},Date:{now:()=>context.now},window:{OcculertDriverI18n:{get:key=>text(locale,key)}},set_eyeLoss:value=>context.eyeLoss=value,set__trackLostSince:value=>context._trackLostSince=value,warnTrackingLoss(){},warnedLoss:0,observeEyeCoverage(){},clearRestoredCue(){},resetTrackingCue(){context.warnedLoss=0;},playRestoredCue(){}};
     vm.runInNewContext(sourceFunctions('src/ui.js',['uiText'])+'\n'+sourceFunctions('src/metrics.js',['updateTrackingState']),context);
     context.updateTrackingState(true,true,null);
     assert.equal(badge.textContent,text(locale,'badge.eyesDetected'));assert.equal(badge.style.color,'#00ff88');
