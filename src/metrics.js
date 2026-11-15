@@ -2,7 +2,7 @@ import "./camera.js";
 import { signalDetectionResult } from "./detector.js";
 import { updateCalibration } from "./calibration.js";
 import { scoringSmooth, scoringNodHistory, scoringNodDetected, scoringResetContinuity, scoringNoFace, scoringCalibrationFrame, scoringConfidence, scoringEyeMetrics, scoringTrackedFrame, scoringYawn, scoringDistractionSeconds, scoringAlertCandidate, scoringDistractionMatured } from "./scoring-core.js";
-import { alerts, escalationLevel, tone, trigger, speak, triggerBreakCheck } from "./alerts.js";
+import { alerts, escalationLevel, tone, trigger, speak, triggerBreakCheck, playRestoredCue, clearRestoredCue } from "./alerts.js";
 import "./storage-history.js";
 import { queueBackendEvent } from "./cloud-sync.js";
 import { WEB_APP_VERSION, experimentFlags, experimentController, experimentSessionSummary, video, canvas, ctx, faceStateEl, nodsEl, gpsEl, locationEl, perclosEl, microsleepsEl, distractionEl, gpsConsent, cloudConsent, running, fatigue, confidence, earHistory, maxFatigue, fatigueSampleSum, fatigueSampleCount, noseYHistory, headNods, lastNod, driverId, gpsWatch, lastPosition, routePoints, distanceMeters, perclosWindow, eyesClosedSince, microsleeps, lastMicro, turnedSince, totalDistractionMs, calibrating, calibrated, eyeClosedThreshold, eyeWatchThreshold, noFaceSince, lastFaceSeen, LEFT, RIGHT, log, setTextIfChanged, render, drawEyes, yawnCount, lastYawn, _marHist, _mouthOpenSince, MAR_YAWN_THRESH, YAWN_HOLD_MS, YAWN_COOLDOWN_MS, _lastLightCheck, _trackLostSince, _lastTrackingWarning, TRACKING_WARNING_DELAY_MS, TRACKING_WARNING_COOLDOWN_MS, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_lastNod, set_gpsWatch, set_lastPosition, set_routePoints, set_distanceMeters, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_lastMicro, set_turnedSince, set_totalDistractionMs, set_noFaceSince, set_lastFaceSeen, set_yawnCount, set_lastYawn, set__marHist, set__mouthOpenSince, set__lastLightCheck, set__trackLostSince, set__lastTrackingWarning } from "./ui.js";
@@ -282,12 +282,23 @@ export function checkLightLevel(videoEl) {
     }
     catch (e) { }
 }
+let warnedLoss = 0, trackingEpoch = 0;
+export function resetTrackingCue() {
+    warnedLoss = 0;
+    trackingEpoch++;
+    clearRestoredCue();
+}
 export function warnTrackingLoss(now) {
     if (!running || !_trackLostSince || now - _trackLostSince < TRACKING_WARNING_DELAY_MS || now - _lastTrackingWarning < TRACKING_WARNING_COOLDOWN_MS)
         return;
     set__lastTrackingWarning(now);
+    const epoch = ++trackingEpoch;
+    warnedLoss = _trackLostSince;
     tone(660, 260, .2);
-    setTimeout(() => tone(440, 320, .2), 320);
+    setTimeout(() => {
+        if (running && epoch === trackingEpoch && _trackLostSince === warnedLoss)
+            tone(440, 320, .2);
+    }, 320);
     speak('Camera view lost. Pull over safely before repositioning the phone.');
     log('Tracking lost - pull over safely before adjusting the camera');
 }
@@ -297,8 +308,10 @@ export function updateTrackingState(hasFace, hasGoodEAR) {
         return;
     const now = Date.now();
     if (!hasFace || !hasGoodEAR) {
-        if (!_trackLostSince)
+        if (!_trackLostSince) {
+            clearRestoredCue();
             set__trackLostSince(now);
+        }
         if (now - _trackLostSince > 3000) {
             setTextIfChanged(b, '⚠️ Tracking Unavailable');
             b.style.color = '#ffaa00';
@@ -307,7 +320,12 @@ export function updateTrackingState(hasFace, hasGoodEAR) {
         warnTrackingLoss(now);
     }
     else {
-        set__trackLostSince(0);
+        if (_trackLostSince) {
+            const warned = warnedLoss === _trackLostSince;
+            resetTrackingCue();
+            set__trackLostSince(0);
+            if (warned) playRestoredCue();
+        }
         setTextIfChanged(b, '✓ Tracking Active');
         b.style.color = '#00ff88';
         b.style.display = 'inline-flex';

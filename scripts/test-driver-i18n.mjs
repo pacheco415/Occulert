@@ -5,11 +5,11 @@ import test from 'node:test';
 import {parse} from 'acorn';
 const read = name => readFileSync(new URL('../'+name,import.meta.url),'utf8');
 const context = {module:{exports:{}}};vm.runInNewContext(read('src/driver-i18n.js'),context);
-const {english,locales,text} = context.module.exports;
+const {english,locales,text,eyesDetectedCue} = context.module.exports;
 const slots = value => [...value.matchAll(/\{(\w+)\}/g)].map(match=>match[1]);
 test('eight ordinary locale catalogs have exact key and placeholder parity with English',()=>{
   assert.deepEqual(Object.keys(locales),['en','es','fr','pt','de','ar','zh','ja']);
-  assert.equal(Object.keys(locales.en).length,88);assert.equal(Object.keys(english).length,299);
+  assert.equal(Object.keys(locales.en).length,89);assert.equal(Object.keys(english).length,300);
   for(const values of Object.values(locales)) {
     assert.deepEqual(Object.keys(values),Object.keys(locales.en));
     for(const [key,value] of Object.entries(values)) {
@@ -26,7 +26,7 @@ test('protected English source never resolves from ordinary translations',()=>{
     const params=Object.fromEntries(slots(value).map(key=>[key,key]));
     assert.equal(text(locale,key,params),value.replace(/\{(\w+)\}/g,(_,key)=>key));
   }
-  assert.equal(english['driver.language.englishNotice'],'Safety guidance and voice cues remain in English.');
+  assert.equal(english['driver.language.englishNotice'],'Safety guidance and safety alert voice cues remain in English.');
 });
 test('unsupported locales, keys, bad values and parameters retain safe source fallbacks',()=>{
   assert.equal(text('xx','start.start'),'START MONITORING');
@@ -63,7 +63,8 @@ test('raw telemetry, device identifiers and safety decisions remain outside cata
   assert.match(read('src/metrics.js'),/Number\(perclosEl.textContent.replace\('%', ''\)\)/);
   assert.equal(source.includes("['#perclos','"),false);
   assert.equal(source.includes('Intl.NumberFormat'),false);
-  assert.equal(read('src/alerts.js').includes("u.lang = 'en-US'"),true);
+  assert.match(read('src/alerts.js'),/function speak\(msg, language = 'en-US'\)/);
+  assert.match(read('src/alerts.js'),/u.lang = language/);
   assert.match(read('src/detector.js'),/uiText\(startBtn, 'start.start', 'START MONITORING'\)/);
   assert.match(read('src/camera.js'),/if \(!String\(device.label \|\| ''\).trim\(\)\) uiText/);
 });
@@ -77,4 +78,15 @@ test('core keyed reads tolerate absent, malformed and throwing optional APIs',()
     assert.equal(element.textContent,api?.get?.toString?.().includes('Iniciar')?'Iniciar':'START MONITORING');
     assert.deepEqual(JSON.parse(element.dataset.driverText),['start.start',null]);
   }
+});
+
+
+test('the informational eyes-detected cue has matching text and speech language in every supported locale',()=>{
+  const expected={en:'Eyes detected.',es:'Ojos detectados.',fr:'Yeux détectés.',pt:'Olhos detectados.',de:'Augen erkannt.',ar:'تم رصد العينين.',zh:'已检测到眼睛。',ja:'目を検出しました。'};
+  for(const [lang,message] of Object.entries(expected)) {
+    assert.equal(english['driver.voice.cue.eyesDetected'],'Eyes detected.');
+    assert.equal(locales[lang]['driver.voice.cue.eyesDetected'],message);
+    assert.deepEqual({...eyesDetectedCue(lang)},{text:message,lang});
+  }
+  assert.deepEqual({...eyesDetectedCue('unsupported')},{text:'Eyes detected.',lang:'en'});
 });

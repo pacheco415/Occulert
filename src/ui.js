@@ -1,14 +1,14 @@
 import { setCameraControlsDisabled, refreshCameraChoices, openSelectedCamera, clearCameraTrackGuards, attachCameraTrackGuards, cameraRecoveryGuidance, beginCameraViewportObservation, endCameraViewportObservation } from "./camera.js";
 import { detectorFailureStopping, discardFaceMesh, initModel, verifyFirstInference, loop, framePerformanceSnapshot, set_processingFrame, set_detectorFailureStopping, set_consecutiveInferenceFailures, set_lastDetectionResultAt } from "./detector.js";
 import "./calibration.js";
-import { startGPS, stopGPS, riskText, fleetPayload } from "./metrics.js";
+import { startGPS, stopGPS, riskText, fleetPayload, resetTrackingCue } from "./metrics.js";
 import { alerts, escalationLevel, _alertTestOwner, beginAlertAudioScope, releaseAlertAudioScope, clearParkedAlertTest, resetBreakReminder, dismissBreak, triggerBreakCheck, set_alerts, set_lastAlert, set_escalationLevel } from "./alerts.js";
 import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistory, setMonitoringUi } from "./storage-history.js";
 import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
 export const start = startMonitoring;
 export const stop = stopMonitoring;
 // Generated from the final driver asset mapping by the release tool.
-export const WEB_APP_VERSION = 'web-v125';
+export const WEB_APP_VERSION = 'web-v132';
 export const EXPERIMENT_HELPER_INTEGRITY = "sha256-Hf2msYDcgvAiU9WqDGZAonEMh6FND4vEIuc/iKDNR2k=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
@@ -269,6 +269,7 @@ export function createLocalLifecycleOperations() {
             return;
         if (starting || detectorFailureStopping || cameraFailureStopping || experimentFlags.any && experimentStopping)
             return;
+        resetTrackingCue();
         clearParkedAlertTest(_alertTestOwner);
         const audioOwner = beginAlertAudioScope();
         starting = true;
@@ -431,6 +432,7 @@ export function createLocalLifecycleOperations() {
         if (experimentFlags.any && experimentStopping)
             return;
         running = false;
+        resetTrackingCue();
         let experimentalClose = null;
         if (experimentFlags.any) {
             experimentStopping = true;
