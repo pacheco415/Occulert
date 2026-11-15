@@ -27,9 +27,9 @@ independent of the device's preferred language. Existing English alert, tracking
 camera, detector and rest-stop wording stays unchanged. Translated voice and
 safety wording requires fluent human review.
 
-The separately pinned copy source `src/driver-i18n.js` owns 88 ordinary keys in
+The separately pinned copy source `src/driver-i18n.js` owns 90 ordinary keys in
 English, Spanish, French, Portuguese, German, Arabic, Chinese and Japanese. Its
-299-key English source also records 211 protected English entries, including the
+301-key English source also records 211 protected English entries, including the
 language notice. `uiText` in the core publishes explicit keys and parameters for
 current start, voice, feedback-validation and generated camera-caption states.
 It also reads the keyed optional catalog at call time, accepts only nonempty
@@ -40,8 +40,11 @@ labels; the external overview source publishes its own current state metadata.
 The optional renderer never reverse-matches English phrases, translates device
 names, reads user data as copy, or changes input values or numeric formatting.
 In particular, PERCLOS digits and `%` remain ASCII because fleet telemetry reads
-them back. The report formatter, event selection, thresholds and all voice cues
-are unchanged.
+them back. The existing report fields stay English; its new local eye-coverage
+line uses its own ordinary key and numeric parameter. The line can update after
+a language change or late catalog load without translating the report's safety
+text or rewriting saved measurements. See [the accounting convention](BROWSER_SUMMARY_VALUES.md#local-eye-coverage).
+Event selection, thresholds and all voice cues are unchanged.
 
 The parked eight-language picker keeps its selection in memory if storage is
 unavailable. Arabic sets page RTL; ordinary fields carry their chosen language

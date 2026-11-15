@@ -9,7 +9,7 @@ const {english,locales,text} = context.module.exports;
 const slots = value => [...value.matchAll(/\{(\w+)\}/g)].map(match=>match[1]);
 test('eight ordinary locale catalogs have exact key and placeholder parity with English',()=>{
   assert.deepEqual(Object.keys(locales),['en','es','fr','pt','de','ar','zh','ja']);
-  assert.equal(Object.keys(locales.en).length,88);assert.equal(Object.keys(english).length,299);
+  assert.equal(Object.keys(locales.en).length,90);assert.equal(Object.keys(english).length,301);
   for(const values of Object.values(locales)) {
     assert.deepEqual(Object.keys(values),Object.keys(locales.en));
     for(const [key,value] of Object.entries(values)) {
