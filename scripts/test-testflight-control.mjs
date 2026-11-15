@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { constants, createHash, createPublicKey, generateKeyPairSync, privateDecrypt, publicEncrypt } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import {
   RELEASE, REQUIRED_WORKFLOWS, OFF_FLAGS, ABSENT_FLAGS,
   parseInputs, validateContext, validateSourceConfig, validateResolvedConfig,
@@ -18,7 +18,6 @@ import {
   submitBuild, ipaDigest, githubClient, boundedBody, runCaptured,
   publicEnvironment, pathsFromEnv, publicReceipt, resolveBuildId,
   getQueuedOrigin, getReceipt, readEvidenceArtifact, recoverBuild, IpaDownloadError, downloadDiagnostic,
-  HOST_DIAGNOSTIC, sealRejectedHostname,
 } from './testflight-release.mjs';
 import { auditWorkflowPolicy } from './lib/workflow-policy.mjs';
 
@@ -580,7 +579,7 @@ test('the observed Expo API to workflow-artifacts hop hashes the complete ZIP wi
     if (calls.length === 2) return new Response(null, { status: 307, headers: { location: 'https://wf-artifacts.eascdn.net/fixture.ipa?private-artifact-query' } });
     assert.equal(url.hostname, 'wf-artifacts.eascdn.net');
     return new Response(bytes, { status: 200, headers: { 'content-length': String(bytes.length) } });
-  }, undefined, undefined, () => assert.fail('Allowed exact hosts must not reach hostname sealing'));
+  });
   assert.deepEqual(calls.map(call => call.hostname), ['expo.dev', 'api.expo.dev', 'wf-artifacts.eascdn.net']);
   assert.ok(calls.every(call => call.options.headers === undefined && call.options.redirect === 'manual'));
   assert.deepEqual(actual, { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') });
@@ -611,7 +610,7 @@ test('workflow-artifacts lookalikes and unsafe redirects are rejected before req
       assert.equal(diagnostic.code, code); assert.equal(diagnostic.redirects, viaCdn ? 3 : 2);
       assert.equal(diagnostic.status, 307); assert.equal(diagnostic.receivedBytes, 0);
       assert.equal(JSON.stringify(diagnostic).includes(location), false);
-      assert.equal(Object.hasOwn(diagnostic, 'sealedHost'), code === 'IPA_HOST');
+      assert.equal(Object.hasOwn(diagnostic, 'sealedHost'), false);
       return true;
     });
     assert.deepEqual(calls, viaCdn ? ['expo.dev', 'api.expo.dev', 'wf-artifacts.eascdn.net'] : ['expo.dev', 'api.expo.dev']);
@@ -1081,80 +1080,17 @@ test('private-write failures and encoded stream failures have bounded diagnostic
   error => downloadDiagnostic(error).code === 'IPA_ENCODING_STREAM');
 });
 
-let hostFixtureKeys;
-function hostCipherFixture() {
-  // This independently generated fixture never reads the release owner's key.
-  hostFixtureKeys ??= generateKeyPairSync('rsa', { modulusLength: 3072 });
-  const plaintexts = [];
-  return {
-    plaintexts,
-    seal: hostname => sealRejectedHostname(hostname, { encrypt: (options, plaintext) => {
-      assert.equal(options.padding, constants.RSA_PKCS1_OAEP_PADDING);
-      assert.equal(options.oaepHash, 'sha256');
-      assert.equal(options.oaepLabel.toString('ascii'), 'occulert-testflight-redirect-host-v1');
-      assert.equal(createHash('sha256').update(options.key.export({ type: 'spki', format: 'der' })).digest('hex'), HOST_DIAGNOSTIC.keySha256);
-      plaintexts.push(Buffer.from(plaintext));
-      // Substitute only the crypto adapter's recipient so the actual OAEP
-      // operation can be decrypted by this test, using the production options.
-      return publicEncrypt({ ...options, key: hostFixtureKeys.publicKey }, plaintext);
-    } }),
-    decrypt: sealed => privateDecrypt({ key: hostFixtureKeys.privateKey,
-      padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256',
-      oaepLabel: Buffer.from('occulert-testflight-redirect-host-v1', 'ascii') }, Buffer.from(sealed.ciphertext, 'base64')),
-  };
-}
-
-test('temporary host diagnostic pins the supplied public RSA3072 recipient and uses randomized bounded ciphertext', () => {
-  const key = createPublicKey(HOST_DIAGNOSTIC.publicKey);
-  assert.equal(key.type, 'public');
-  assert.equal(key.asymmetricKeyType, 'rsa');
-  assert.equal(key.asymmetricKeyDetails.modulusLength, 3072);
-  assert.equal(createHash('sha256').update(key.export({ format: 'der', type: 'spki' })).digest('hex'),
-    'bd181dacd81c33d5d99083b65f6f517dca926985d0bbbe48ea48a3325dff327b');
-  assert.equal(Object.isFrozen(HOST_DIAGNOSTIC), true);
-  const first = sealRejectedHostname('rejected.example'), second = sealRejectedHostname('rejected.example');
-  assert.equal(first.algorithm, 'RSA-OAEP-SHA256');
-  assert.equal(first.keySha256, HOST_DIAGNOSTIC.keySha256);
-  assert.match(first.ciphertext, /^[A-Za-z0-9+/]{512}$/);
-  assert.equal(Buffer.from(first.ciphertext, 'base64').length, 384);
-  assert.notEqual(first.ciphertext, second.ciphertext);
-  assert.equal(JSON.stringify(first).includes('rejected.example'), false);
-  assert.equal(HOST_DIAGNOSTIC.publicKey.includes('PRIVATE KEY'), false);
-});
-
-test('a rejected redirect seals only its canonical hostname with real OAEP and never fetches that destination', async () => {
-  const fixture = hostCipherFixture(), requests = [];
-  const location = `https://Private.Storage.Example/opaque/${buildId}/app.ipa?token=PRIVATE_QUERY_VALUE#PRIVATE_FRAGMENT`;
-  await assert.rejects(() => ipaDigest(metadata(), async (url, options) => {
-    requests.push({ url: String(url), options });
-    return new Response(null, { status: 307, headers: { location } });
-  }, undefined, undefined, fixture.seal), error => {
-    const result = downloadDiagnostic(error);
-    assert.equal(result.code, 'IPA_HOST');
-    assert.equal(result.redirects, 1); assert.equal(result.status, 307);
-    assert.equal(result.receivedBytes, 0); assert.equal(result.hostClass, 'other');
-    assert.equal(fixture.decrypt(result.sealedHost).toString('ascii'), 'private.storage.example');
-    const serialized = JSON.stringify(result);
-    for (const value of ['private.storage.example', location, buildId, '/opaque/', 'PRIVATE_QUERY_VALUE', 'PRIVATE_FRAGMENT', RELEASE.projectId]) {
-      assert.equal(serialized.includes(value), false);
-    }
-    assert.deepEqual(fixture.plaintexts, [Buffer.from('private.storage.example', 'ascii')]);
-    return true;
-  });
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].url, metadata().artifacts.applicationArchiveUrl);
-  assert.equal(requests[0].options.redirect, 'manual');
-  assert.equal(requests[0].options.headers, undefined);
-});
-
-test('only unknown HTTPS hosts without credentials or ports reach sealed diagnostics', async () => {
+test('known artifact hosts remain accepted and unsafe unknown authorities stop before fetching', async () => {
   const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 1]);
-  let sealCalls = 0;
-  const seal = () => { sealCalls++; throw new Error('Must not seal an allowed or invalid authority'); };
-  for (const host of ['expo.dev', 'api.expo.dev', 'artifacts.eascdn.net', 'wf-artifacts.eascdn.net', 'storage.googleapis.com', 'bucket.storage.googleapis.com']) {
-    const build = { ...metadata(), artifacts: { applicationArchiveUrl: `https://${host}/app.ipa` } };
-    assert.deepEqual(await ipaDigest(build, async () => new Response(zip), undefined, undefined, seal),
-      { bytes: zip.length, sha256: createHash('sha256').update(zip).digest('hex') });
+  for (const host of ['expo.dev', 'api.expo.dev', 'artifacts.eascdn.net', 'wf-artifacts.eascdn.net',
+    'storage.googleapis.com', 'bucket.storage.googleapis.com']) {
+    const build = { ...metadata(), artifacts: { applicationArchiveUrl: 'https://' + host + '/app.ipa' } };
+    assert.deepEqual(await ipaDigest(build, async (url, options) => {
+      assert.equal(url.hostname, host);
+      assert.equal(options.headers, undefined);
+      assert.equal(options.redirect, 'manual');
+      return new Response(zip);
+    }), { bytes: zip.length, sha256: createHash('sha256').update(zip).digest('hex') });
   }
   for (const [location, code] of [
     ['http://rejected.example/private', 'IPA_SCHEME'],
@@ -1164,123 +1100,64 @@ test('only unknown HTTPS hosts without credentials or ports reach sealed diagnos
     let calls = 0;
     await assert.rejects(() => ipaDigest(metadata(), async () => {
       calls++; return new Response(null, { status: 307, headers: { location } });
-    }, undefined, undefined, seal), error => {
-      const result = downloadDiagnostic(error);
-      assert.equal(result.code, code); assert.equal(Object.hasOwn(result, 'sealedHost'), false);
-      assert.equal(JSON.stringify(result).includes('PRIVATE_PASSWORD'), false);
+    }), error => {
+      assert.deepEqual(downloadDiagnostic(error), {
+        schema: 1, code, redirects: 1, status: 307, receivedBytes: 0, hostClass: 'other',
+      });
       return true;
     });
     assert.equal(calls, 1);
   }
-  assert.equal(sealCalls, 0);
-  let fetches = 0, host;
-  await assert.rejects(() => ipaDigest({ ...metadata(), artifacts: { applicationArchiveUrl: 'https://rejected.example/app.ipa' } },
-    async () => { fetches++; }, undefined, undefined, value => { host = value; return sealRejectedHostname(value); }),
-  error => downloadDiagnostic(error).code === 'IPA_HOST');
-  assert.equal(fetches, 0); assert.equal(host, 'rejected.example');
 });
 
-test('hostname sealing bounds plaintext before crypto and preserves the exact maximum ASCII hostname', () => {
-  let encryptions = 0;
-  for (const hostname of [undefined, null, {}, 42, '', 'a'.repeat(254), 'bücher.example',
-    'https://example.com', 'example.com/private', 'example.com?query', 'example.com#fragment',
-    'user:password@example.com', 'example.com:8443', 'example.com\n', 'Mixed.Example']) {
-    assert.equal(sealRejectedHostname(hostname, { encrypt: () => { encryptions++; } }), undefined);
-  }
-  assert.equal(encryptions, 0);
-  const maximum = ['a'.repeat(63), 'b'.repeat(63), 'c'.repeat(63), 'd'.repeat(61)].join('.');
-  assert.equal(maximum.length, 253);
-  const fixture = hostCipherFixture();
-  assert.equal(fixture.decrypt(fixture.seal(maximum)).toString('ascii'), maximum);
-  const punycode = new URL('https://bücher.example/private').hostname;
-  assert.equal(fixture.decrypt(fixture.seal(punycode)).toString('ascii'), punycode);
-});
-
-test('invalid recipient and crypto failures preserve host rejection without plaintext or alternate requests', async () => {
-  const fixture = hostCipherFixture();
-  const wrongSize = generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey;
-  const wrongType = generateKeyPairSync('ed25519').publicKey;
-  const adapters = [
-    { createKey: () => { throw new Error('PRIVATE_KEY_PARSE_FAILURE'); } },
-    { createKey: () => wrongSize },
-    { createKey: () => wrongType },
-    { createKey: () => hostFixtureKeys.privateKey },
-    { createKey: () => hostFixtureKeys.publicKey },
-    { encrypt: () => { throw new Error('PRIVATE_PROVIDER_EXCEPTION https://rejected.example/private'); } },
-    { encrypt: () => Buffer.alloc(383) },
-    { encrypt: () => Buffer.alloc(385) },
-    { encrypt: () => 'PRIVATE_PLAINTEXT' },
+test('unknown artifact hosts at every observed hop remain unfetched and emit only bounded facts', async () => {
+  const rejected = 'https://Private.Storage.Example/opaque/' + buildId + '/app.ipa?token=PRIVATE_QUERY_VALUE#PRIVATE_FRAGMENT';
+  const allowed = [
+    metadata().artifacts.applicationArchiveUrl,
+    'https://api.expo.dev/artifacts/fixture?PRIVATE_API_QUERY',
+    'https://wf-artifacts.eascdn.net/fixture?PRIVATE_CDN_QUERY',
   ];
-  assert.ok(fixture);
-  for (const adapter of adapters) {
-    let calls = 0;
-    await assert.rejects(() => ipaDigest(metadata(), async () => {
-      calls++; return new Response(null, { status: 307, headers: { location: 'https://rejected.example/private?secret' } });
-    }, undefined, undefined, hostname => sealRejectedHostname(hostname, adapter)), error => {
+  for (let hops = 0; hops <= allowed.length; hops++) {
+    const chain = [...allowed.slice(0, hops), rejected], requests = [];
+    const build = { ...metadata(), artifacts: { applicationArchiveUrl: chain[0] } };
+    await assert.rejects(() => ipaDigest(build, async (url, options) => {
+      assert.ok(requests.length < hops, 'Rejected destination must never be fetched.');
+      assert.equal(String(url), chain[requests.length]);
+      requests.push(String(url));
+      assert.equal(options.headers, undefined); assert.equal(options.redirect, 'manual');
+      return new Response(null, { status: 307, headers: { location: chain[requests.length] } });
+    }), error => {
       const result = downloadDiagnostic(error);
-      assert.deepEqual(result, { schema: 1, code: 'IPA_HOST', redirects: 1, status: 307, receivedBytes: 0, hostClass: 'other' });
+      assert.deepEqual(result, { schema: 1, code: 'IPA_HOST', redirects: hops,
+        ...(hops ? { status: 307 } : {}), receivedBytes: 0, hostClass: 'other' });
+      const serialized = JSON.stringify(result);
+      for (const value of ['sealedHost', 'ciphertext', 'private.storage.example', rejected, buildId,
+        '/opaque/', 'PRIVATE_API_QUERY', 'PRIVATE_CDN_QUERY', 'PRIVATE_QUERY_VALUE', 'PRIVATE_FRAGMENT', RELEASE.projectId]) {
+        assert.equal(serialized.includes(value), false);
+      }
       return true;
     });
-    assert.equal(calls, 1);
+    assert.deepEqual(requests, allowed.slice(0, hops));
   }
-  await assert.rejects(() => ipaDigest({ ...metadata(), artifacts: { applicationArchiveUrl: 'https://rejected.example/private' } },
-    async () => assert.fail('Rejected host must not be fetched'), undefined, undefined,
-    () => { throw new Error('PRIVATE_SEALER_FAILURE'); }), error => {
-    assert.equal(downloadDiagnostic(error).code, 'IPA_HOST');
-    assert.equal(Object.hasOwn(downloadDiagnostic(error), 'sealedHost'), false);
-    return true;
-  });
 });
 
-test('public sealed diagnostics re-allowlist only the pinned algorithm, key digest and exact ciphertext size', () => {
-  const sealed = sealRejectedHostname('rejected.example');
-  const error = new IpaDownloadError('IPA_HOST', { hostClass: 'other', sealedHost: sealed });
+test('public download diagnostics discard retired envelopes and injected provider details without reading them', () => {
+  const sealedHost = {
+    algorithm: 'RSA-OAEP-SHA256', keySha256: 'e'.repeat(64), ciphertext: 'A'.repeat(512),
+    toJSON: () => assert.fail('Retired diagnostic data must not be serialized.'),
+  };
+  const details = { redirects: 2, status: 307, receivedBytes: 0, hostClass: 'other',
+    sealedHost, hostname: 'PRIVATE_HOST', rawUrl: 'PRIVATE_URL' };
+  const expected = { schema: 1, code: 'IPA_HOST', redirects: 2, status: 307, receivedBytes: 0, hostClass: 'other' };
+  const error = new IpaDownloadError('IPA_HOST', details);
+  assert.deepEqual(error.diagnostic, expected);
+  error.diagnostic.sealedHost = sealedHost;
   error.diagnostic.hostname = 'PRIVATE_HOST';
-  error.diagnostic.sealedHost.rawUrl = 'PRIVATE_URL';
-  error.diagnostic.sealedHost.toJSON = () => ({ privateKey: 'PRIVATE_KEY' });
-  const result = downloadDiagnostic(error);
-  assert.deepEqual(Object.keys(result.sealedHost).sort(), ['algorithm', 'ciphertext', 'keySha256']);
-  assert.equal(JSON.stringify(result).includes('PRIVATE_'), false);
-  assert.notEqual(result.sealedHost, error.diagnostic.sealedHost);
-  for (const changed of [
-    { ...sealed, algorithm: 'RSA-OAEP-SHA1' }, { ...sealed, keySha256: 'e'.repeat(64) },
-    { ...sealed, ciphertext: sealed.ciphertext.slice(1) }, { ...sealed, ciphertext: sealed.ciphertext + 'A' },
-    { ...sealed, ciphertext: '='.repeat(512) }, { ...sealed, ciphertext: 'é'.repeat(512) },
-    { ...sealed, ciphertext: Buffer.alloc(384) }, ['PRIVATE_HOST'], null,
-  ]) {
-    const diagnostic = downloadDiagnostic(new IpaDownloadError('IPA_HOST', { hostClass: 'other', sealedHost: changed }));
-    assert.equal(Object.hasOwn(diagnostic, 'sealedHost'), false);
-  }
-  assert.equal(Object.hasOwn(downloadDiagnostic(new IpaDownloadError('IPA_STATUS', { hostClass: 'other', sealedHost: sealed })), 'sealedHost'), false);
-  assert.equal(Object.hasOwn(downloadDiagnostic(new IpaDownloadError('IPA_HOST', { hostClass: 'expo', sealedHost: sealed })), 'sealedHost'), false);
-});
-
-
-test('an unknown second redirect seals only that host after the exact Expo API hop and stops before storage', async () => {
-  const fixture = hostCipherFixture(), requests = [];
-  const location = `https://Private.Storage.Example/opaque/${buildId}/app.ipa?token=PRIVATE_QUERY_VALUE#PRIVATE_FRAGMENT`;
-  await assert.rejects(() => ipaDigest(metadata(), async (url, options) => {
-    requests.push({ hostname: url.hostname, options });
-    return new Response(null, { status: 307, headers: {
-      location: requests.length === 1 ? 'https://api.expo.dev/artifacts/fixture?PRIVATE_API_QUERY' : location,
-    } });
-  }, undefined, undefined, fixture.seal), error => {
-    const result = downloadDiagnostic(error);
-    assert.equal(result.code, 'IPA_HOST');
-    assert.equal(result.redirects, 2); assert.equal(result.status, 307);
-    assert.equal(result.receivedBytes, 0); assert.equal(result.hostClass, 'other');
-    assert.deepEqual(Object.keys(result.sealedHost).sort(), ['algorithm', 'ciphertext', 'keySha256']);
-    assert.equal(result.sealedHost.ciphertext.length, 512);
-    assert.equal(Buffer.from(result.sealedHost.ciphertext, 'base64').length, 384);
-    assert.equal(fixture.decrypt(result.sealedHost).toString('ascii'), 'private.storage.example');
-    assert.deepEqual(fixture.plaintexts, [Buffer.from('private.storage.example', 'ascii')]);
-    const serialized = JSON.stringify(result);
-    for (const value of ['private.storage.example', location, buildId, '/opaque/',
-      'PRIVATE_API_QUERY', 'PRIVATE_QUERY_VALUE', 'PRIVATE_FRAGMENT', RELEASE.projectId]) {
-      assert.equal(serialized.includes(value), false);
-    }
-    return true;
-  });
-  assert.deepEqual(requests.map(call => call.hostname), ['expo.dev', 'api.expo.dev']);
-  assert.ok(requests.every(call => call.options.headers === undefined && call.options.redirect === 'manual'));
+  error.diagnostic.rawUrl = 'PRIVATE_URL';
+  assert.deepEqual(downloadDiagnostic(error), expected);
+  assert.equal(JSON.stringify(downloadDiagnostic(error)).includes('PRIVATE_'), false);
+  Object.defineProperty(details, 'sealedHost', { get: () => assert.fail('Do not read a retired envelope.') });
+  Object.defineProperty(error.diagnostic, 'sealedHost', { get: () => assert.fail('Do not read an injected envelope.') });
+  assert.deepEqual(new IpaDownloadError('IPA_HOST', details).diagnostic, expected);
+  assert.deepEqual(downloadDiagnostic(error), expected);
 });

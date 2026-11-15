@@ -229,34 +229,22 @@ Each redirect is checked before requesting it, with the same redirect, byte,
 signature, hash and provenance limits. These diagnostics do not authorize a new
 build or an unreviewed download destination.
 
-### Temporary sealed hostname evidence
+### Retired hostname diagnostic
 
-The reviewed sealed-host diagnostic remains until the complete download chain
-is established. Any further `IPA_HOST` rejection can contain `sealedHost`, with exactly
-`algorithm`, `keySha256` and `ciphertext`. This temporary diagnostic encrypts
-only the rejected WHATWG URL's canonical ASCII hostname, bounded to 253 bytes,
-after the existing HTTPS and authority checks. It never encrypts or publishes
-the URL, path, query, credentials, response body or provider exception. The
-rejected destination is still never fetched.
+The complete artifact download and archive inspection succeeded after review
+of the exact allowed hosts. The temporary sealed-host envelope and its pinned
+public recipient key are retired from the release control. An unknown host
+still stops with `IPA_HOST` before any request to that destination; the public
+diagnostic contains only the fixed code, bounded numeric transport facts and
+fixed host/encoding classifications. It includes neither hostname text nor an
+encrypted hostname, even when an older envelope is injected into an error.
 
-The fixed recipient is an ephemeral RSA-3072 public key whose DER SPKI SHA-256
-is `bd181dacd81c33d5d99083b65f6f517dca926985d0bbbe48ea48a3325dff327b`.
-Encryption uses explicit RSA-OAEP with SHA-256 (including MGF1) and the fixed
-label `occulert-testflight-redirect-host-v1`. The public diagnostic identifies
-the algorithm as `RSA-OAEP-SHA256` and contains exactly 384 ciphertext bytes,
-encoded as 512 base64 characters. There is no dispatch/environment recipient
-override and no plaintext fallback: invalid keys or encryption failures leave
-the original `IPA_HOST` rejection and omit the optional sealed field.
-
-The release owner retains the private key outside Git and Actions. Verify the
-diagnostic artifact's run/source identity and digest before decrypting it in
-that private environment; do not put the private key or unreviewed decrypted
-values in a public log, artifact or repository. A decrypted hostname is evidence for a
-separate review, not an automatic permission to change download policy. Remove
-this temporary envelope and retire its recipient key only after the complete
-redirect chain is established and its destinations have received separate review.
-Recognizing one intermediate host does not establish the remaining chain. All source, recovery, archive-inspection
-and submission gates remain in effect.
+A future unexpected host requires a separate evidence review before any
+allowlist change. The exact allowed hosts, HTTPS/authority checks, redirect and
+byte limits, hashing, source proofs, archive inspection and submission gates
+remain in effect. Historical diagnostic artifacts are not rewritten by this
+source cleanup, and retiring the public recipient does not delete the release
+owner's privately held key.
 
 After `submit` completes, separately verify Apple processing and availability
 to the existing internal TestFlight group. The workflow's success is an upload
@@ -273,11 +261,11 @@ bounded downloads and credential/output isolation without contacting Expo or
 queuing a build. It includes real ZIP/binary-plist fixtures, malformed archive
 boundaries, exact permission/identity checks, profile allowlists and signer
 membership, private report serialization, read-only recovery completion/failure
-barriers and a failed fresh-inspection submit barrier. Sealed-host tests use an
-independently generated fixture key for real OAEP encryption/decryption and
-exercise the pinned production public key. They preserve the exact Expo API
-hop tests and prove that a two-redirect chain seals only the second rejected
-host, stops before its destination, and exposes no URL or credential text.
+barriers and a failed fresh-inspection submit barrier. Host-rejection regressions preserve
+the exact Expo API and workflow-artifacts hop tests and prove that unknown
+hosts stop before a request at every observed hop. Public diagnostics discard
+retired envelopes and injected provider fields without reading or serializing
+them. URL, credential and encrypted-host data remain absent.
 The report's four explicit
 false limitations remain unchanged: Apple certificate-chain trust, Apple
 processing/device acceptance, binary proof of JavaScript flags, and an embedded
