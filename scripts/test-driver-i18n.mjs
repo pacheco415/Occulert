@@ -9,7 +9,7 @@ const {english,locales,text,eyesDetectedCue} = context.module.exports;
 const slots = value => [...value.matchAll(/\{(\w+)\}/g)].map(match=>match[1]);
 test('eight ordinary locale catalogs have exact key and placeholder parity with English',()=>{
   assert.deepEqual(Object.keys(locales),['en','es','fr','pt','de','ar','zh','ja']);
-  assert.equal(Object.keys(locales.en).length,89);assert.equal(Object.keys(english).length,300);
+  assert.equal(Object.keys(locales.en).length,95);assert.equal(Object.keys(english).length,306);
   for(const values of Object.values(locales)) {
     assert.deepEqual(Object.keys(values),Object.keys(locales.en));
     for(const [key,value] of Object.entries(values)) {
@@ -80,6 +80,87 @@ test('core keyed reads tolerate absent, malformed and throwing optional APIs',()
   }
 });
 
+function sourceFunctions(path, names) {
+  const source=read(path),ast=parse(source,{ecmaVersion:2022,sourceType:'module'});
+  return names.map(name=>{
+    const node=ast.body.map(node=>node.declaration||node).find(node=>node.type==='FunctionDeclaration'&&node.id.name===name);
+    assert.ok(node,`${path}: actual ${name} declaration`);
+    return source.slice(node.start,node.end);
+  }).join('\n');
+}
+
+test('all eight catalogs expose distinct eye visibility labels without translating the driving-safety hint',()=>{
+  const labels={
+    'badge.eyesDetected':'✓ Eyes detected',
+    'badge.eyesNotVisible':"⚠️ Can't see your eyes",
+    'badge.noFace':'⚠️ No face in view',
+    'state.eyesDetected':'EYES DETECTED',
+    'state.eyesNotVisible':'EYES NOT VISIBLE',
+    'state.noFace':'NO FACE',
+  };
+  for(const [key,value] of Object.entries(labels))assert.equal(text('en',key),value);
+  for(const locale of Object.keys(locales)) {
+    for(const [key,value] of Object.entries(labels)) {
+      assert.equal(text(locale,key),locales[locale]['driver.'+key]);
+      if(locale!=='en')assert.notEqual(text(locale,key),value,`${locale}: translated ${key}`);
+    }
+    assert.equal(new Set(Object.keys(labels).filter(key=>key.startsWith('state.')).map(key=>text(locale,key))).size,3);
+    assert.equal(text(locale,'hint.active'),'Camera tracking is active. Stay alert; this does not mean it is safe to drive.');
+  }
+});
+
+test('actual onResults distinguishes absent face and invalid EAR without changing the strict EAR bounds',()=>{
+  const calls=[],context={signalDetectionResult(){},running:true,experimentController:null,experimentFlags:{},ctx:{clearRect(){}},canvas:{width:10,height:10},updateScore(){},updateTrackingState:(...args)=>calls.push(args),render(){},LEFT:[],RIGHT:[],calcEAR:()=>context.ear,smooth:value=>value,headTurn:()=>false,detectHeadNod:()=>false,calibrating:false,detectYawn(){},document:{getElementById:()=>null,querySelector:()=>null},drawEyes(){},fatigue:0,confidence:0,turnedSince:0,scoringAlertCandidate:()=>null};
+  vm.runInNewContext(sourceFunctions('src/metrics.js',['onResults']),context);
+  context.onResults({multiFaceLandmarks:[]});
+  assert.deepEqual(calls.pop(),[false,false,'no-face']);
+  for(const ear of [NaN,Infinity,-Infinity,.05,.65,0,.7,.0501,.28,.6499]) {
+    context.ear=ear;context.onResults({multiFaceLandmarks:[[{},{},{},{},{y:.5}]]});
+    const valid=Number.isFinite(ear)&&ear>.05&&ear<.65;
+    assert.deepEqual(calls.pop(),[true,valid,valid?null:'eyes-not-visible']);
+  }
+  context.running=false;context.onResults({multiFaceLandmarks:[]});assert.equal(calls.length,0);
+});
+
+test('actual tracking badge retains its three-second loss delay, exact colors and immediate recovery in every locale',()=>{
+  for(const locale of Object.keys(locales)) {
+    const badge={textContent:'',dataset:{},style:{}},context={now:10000,_trackLostSince:0,eyeLoss:null,document:{getElementById:()=>badge},Date:{now:()=>context.now},window:{OcculertDriverI18n:{get:key=>text(locale,key)}},set_eyeLoss:value=>context.eyeLoss=value,set__trackLostSince:value=>context._trackLostSince=value,warnTrackingLoss(){},warnedLoss:0,clearRestoredCue(){},resetTrackingCue(){context.warnedLoss=0;},playRestoredCue(){}};
+    vm.runInNewContext(sourceFunctions('src/ui.js',['uiText'])+'\n'+sourceFunctions('src/metrics.js',['updateTrackingState']),context);
+    context.updateTrackingState(true,true,null);
+    assert.equal(badge.textContent,text(locale,'badge.eyesDetected'));assert.equal(badge.style.color,'#00ff88');
+    context.now=11000;context.updateTrackingState(true,false,'eyes-not-visible');
+    assert.equal(context.eyeLoss,'eyes-not-visible');assert.equal(badge.textContent,text(locale,'badge.eyesDetected'));
+    context.now=14000;context.updateTrackingState(true,false,'eyes-not-visible');
+    assert.equal(badge.textContent,text(locale,'badge.eyesDetected'),'exactly three seconds is still delayed');
+    context.now=14001;context.updateTrackingState(true,false,'eyes-not-visible');
+    assert.equal(badge.textContent,text(locale,'badge.eyesNotVisible'));assert.equal(badge.style.color,'#ffaa00');assert.equal(badge.style.display,'inline-flex');
+    context.now=14002;context.updateTrackingState(false,false,'no-face');
+    assert.equal(badge.textContent,text(locale,'badge.noFace'));assert.equal(context._trackLostSince,11000,'a changed loss reason does not restart the delay');
+    context.updateTrackingState(true,true,null);
+    assert.equal(context.eyeLoss,null);assert.equal(context._trackLostSince,0);assert.equal(badge.textContent,text(locale,'badge.eyesDetected'));assert.equal(badge.style.color,'#00ff88');
+    context.now=15000;context.updateTrackingState(false,false);
+    context.now=18001;context.updateTrackingState(false,false);
+    assert.equal(badge.textContent,text(locale,'badge.noFace'),'two-argument experimental bridge stays compatible');
+    context.document.getElementById=()=>null;context.updateTrackingState(true,false,'eyes-not-visible');
+    assert.equal(context.eyeLoss,'eyes-not-visible','display state is recorded even without a badge element');
+  }
+});
+
+test('actual state rendering preserves fatigue, calibration and observer priorities and clears stale translated bindings',()=>{
+  const element=()=>({textContent:'',dataset:{},style:{},lang:'',dir:''});
+  const context={startupAllowsMonitoring:()=>true,Date:{now:()=>10000},lastRender:0,RENDER_INTERVAL:0,fatigue:0,confidence:80,calibrated:true,calibrating:false,running:true,noFaceSince:0,eyeLoss:null,cloudConsent:{checked:false},cloudReady:false,escalationLevel:0,experimentFlags:{observer:false},window:{OcculertDriverI18n:{get:key=>text('es',key)}},pushFleet(){}};
+  for(const name of ['fatigueEl','fatigueFill','confidenceEl','confidenceFill','earEl','calibrationEl','calibrationFill','faceStateEl','riskEl','riskDetailEl','syncEl','escalationEl','driveStateEl','driveHintEl','statusEl','stateCard'])context[name]=element();
+  vm.runInNewContext(sourceFunctions('src/ui.js',['uiText','uiState','render'])+'\n'+sourceFunctions('src/metrics.js',['riskText']),context);
+  context.render(.28);assert.equal(context.driveStateEl.textContent,text('es','state.eyesDetected'));assert.equal(context.statusEl.textContent,text('es','state.eyesDetected'));assert.match(context.driveHintEl.textContent,/does not mean it is safe to drive/);
+  for(const [fatigue,label] of [[40,'WATCH'],[65,'HIGH'],[85,'ALERT']]) {
+    context.fatigue=fatigue;context.render(.28);assert.equal(context.driveStateEl.textContent,label);assert.equal(context.driveStateEl.dataset.driverText,undefined);assert.equal(context.driveStateEl.lang,'en');
+  }
+  context.fatigue=0;context.calibrating=true;context.render(.28);assert.equal(context.driveStateEl.textContent,'CALIBRATING');
+  context.calibrating=false;context.experimentFlags.observer=true;context.render(.28);assert.equal(context.driveStateEl.textContent,'PARKED OBSERVER SESSION');
+  context.experimentFlags.observer=false;context.eyeLoss='eyes-not-visible';context.render(.001);assert.equal(context.driveStateEl.textContent,text('es','state.eyesNotVisible'));assert.match(context.driveHintEl.textContent,/Alerts may be missed/);
+  context.noFaceSince=9000;context.eyeLoss='no-face';context.render(.001);assert.equal(context.driveStateEl.textContent,text('es','state.noFace'));
+  context.running=false;context.render(.001);assert.equal(context.driveStateEl.textContent,'NOT MONITORING');assert.equal(context.statusEl.dataset.driverText,undefined);assert.equal(context.statusEl.lang,'en');
+});
 
 test('the informational eyes-detected cue has matching text and speech language in every supported locale',()=>{
   const expected={en:'Eyes detected.',es:'Ojos detectados.',fr:'Yeux détectés.',pt:'Olhos detectados.',de:'Augen erkannt.',ar:'تم رصد العينين.',zh:'已检测到眼睛。',ja:'目を検出しました。'};

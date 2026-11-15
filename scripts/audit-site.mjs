@@ -470,9 +470,9 @@ const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
   return total + statSync(join(root, file)).size;
 }, 0);
 // The eyes-restored cue adds bounded per-loss audio/lifecycle state to the
-// 374,374-byte baseline. Its reviewed 128.5 KB driver ceiling keeps the complete
-// static install below 376 KB; the optional language catalog is not preloaded.
-if (staticAssetBytes > 376_000) fail(`service worker install cache must remain at or below 376 KB (found ${staticAssetBytes} bytes)`);
+// 374,701-byte three-state baseline. The composed 129 KB driver ceiling keeps the complete
+// static install below 376.5 KB; the optional language catalog is not preloaded.
+if (staticAssetBytes > 376_500) fail(`service worker install cache must remain at or below 376.5 KB (found ${staticAssetBytes} bytes)`);
 if (staticAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the experimental passkey client must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the passkey client must be listed as a network-only asset");
 if (staticAssets.includes(`'/${assetByStem('supabase-loader.js')}'`)) fail("the resilient Supabase loader must not be stored in the offline static cache");

@@ -677,3 +677,14 @@ test('restoration cannot queue a stale oscillator or substitute fatigue audio wh
   assert.equal(h.spoken.filter(c=>c.text==='Eyes detected.').length,1);
  }
 });
+
+test('restored cue preserves the three eye-visibility badges across one continuous loss',()=>{
+ const h=restoredHarness();
+ const badge=()=>h.run("document.getElementById('trackingBadge').textContent");
+ h.recover();assert.equal(badge(),'✓ Eyes detected');
+ h.lose(5000);assert.equal(badge(),'⚠️ No face in view');assert.equal(h.warnings(),1);
+ h.run("updateTrackingState(true,false,'eyes-not-visible')");
+ assert.equal(badge(),"⚠️ Can't see your eyes");assert.equal(h.rises().length,0);
+ h.recover();assert.equal(badge(),'✓ Eyes detected');assert.equal(h.rises().length,1);
+ h.recover();assert.equal(h.rises().length,1);assert.equal(h.state().alerts,0);
+});

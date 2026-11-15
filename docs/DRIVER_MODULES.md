@@ -31,9 +31,9 @@ that actually triggered its five-second warning, once per recovered loss; start,
 stop and a new loss cancel its owned feedback. See [EYES_RESTORED_CUE.md](EYES_RESTORED_CUE.md)
 for timing, validation and the measured release budget.
 
-The separately pinned copy source `src/driver-i18n.js` owns 89 ordinary keys in
+The separately pinned copy source `src/driver-i18n.js` owns 95 ordinary keys in
 English, Spanish, French, Portuguese, German, Arabic, Chinese and Japanese. Its
-300-key English source also records 211 protected English entries, including the
+306-key English source also records 211 protected English entries, including the
 language notice. `uiText` in the core publishes explicit keys and parameters for
 current start, voice, feedback-validation and generated camera-caption states.
 It also reads the keyed optional catalog at call time, accepts only nonempty
@@ -46,6 +46,22 @@ names, reads user data as copy, or changes input values or numeric formatting.
 In particular, PERCLOS digits and `%` remain ASCII because fleet telemetry reads
 them back. The report formatter, event selection, thresholds and existing safety voice cues
 are unchanged.
+
+Eye visibility has separate keyed badges and headings for detected eyes, a face
+with unreadable eye measurements, and no face. `onResults` passes the loss reason
+explicitly; the optional detector bridge retains its two-argument compatibility.
+The loss badge still waits more than three seconds and uses amber; detected eyes
+restore its green badge immediately. Calibration, fatigue and observer headings
+retain their existing priority when tracking is available. The active English
+hint still says that camera tracking does not mean it is safe to drive.
+
+The eye-status wording release `driver-app.v131.js` is 127,219 raw driver bytes,
+up 327 bytes from the 126,892-byte `web-v125` baseline. Gzip measures 35,960 bytes,
+up 233 bytes. Its reviewed driver budget is 127,500 bytes. The 375,000-byte static
+install-cache limit is unchanged; cache `occulert-v212` contains 374,701 selected
+static bytes. The keyed rendering shares one badge paint and one changed-text
+helper. Compiler and proof settings, detector thresholds, alert wording and the
+optional catalog loading path are unchanged.
 
 The parked eight-language picker keeps its selection in memory if storage is
 unavailable. Arabic sets page RTL; ordinary fields carry their chosen language

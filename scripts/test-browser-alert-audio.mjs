@@ -9,7 +9,7 @@ import { parse } from 'acorn';
 
 const driver = readFileSync(assetByStem('driver-app.js'), 'utf8');
 const driverProgram = parse(driver,{ecmaVersion:2022,sourceType:'script'});
-const uiDependencies = ['setTextIfChanged','uiText','uiState','pauseUi'].map(name => {
+const uiDependencies = ['uiText','uiState','pauseUi'].map(name => {
   const matches = driverProgram.body.filter(node => node.type==='FunctionDeclaration' && node.id.name===name);
   assert.equal(matches.length,1,`Execute the real extracted ${name} dependency`);
   return driver.slice(matches[0].start,matches[0].end);
@@ -64,7 +64,7 @@ function harness({ state = 'running', noContext = false, noMedia = false, runnin
     experimentFlags: {any:false,noface:false}, experimentController: null,
     document, navigator: { audioSession: session }, window: { AudioContext: noContext ? undefined : Context, location: { search } },
     Audio: noMedia ? undefined : Media, Promise, URLSearchParams,
-    driveStateEl: {}, driveHintEl: {}, statusEl: {},
+    driveStateEl: { dataset: {} }, driveHintEl: { dataset: {} }, statusEl: { dataset: {} },
     setTimeout(callback, duration) { const id = ++timerId; timers.set(id, { callback, duration }); return id; },
     clearTimeout(id) { timers.delete(id); },
   });

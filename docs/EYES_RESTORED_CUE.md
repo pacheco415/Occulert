@@ -42,17 +42,19 @@ and language switch; this requires the released assets.
 
 ## Measured release size
 
-Against main `58454df44f4a66754d000456f237b41445c66a23`, the source-only driver
-baseline is 126,892 bytes. After integrating the release-control-only main
-`39ea2906cb91ed3fe77a9de79c9cd7689f8e5dbe`, immutable `driver-app.v132.js` is
-128,372 bytes, up 1,480 (36,238 bytes gzip). Cache `occulert-v213` contains
-375,854 selected static bytes, up from 374,374. The 771-byte catalog increase
-in `driver-i18n.v3.js` remains outside the static install list; the driver uses
-`driver-startup-guard.v53.js`. These are measured released bytes after filename
-and integrity-pin generation.
+This release composes the recovery cue with the three-state eye-status change
+from PR #447. The baseline driver is 127,219 bytes and the selected static
+install is 374,701 bytes. Generated `driver-app.v134.js` is 128,699 bytes,
+up 1,480 (36,492 bytes gzip). Cache `occulert-v215` contains 376,181 selected
+static bytes. The optional `driver-i18n.v5.js` catalog remains outside the
+static install list; the driver uses `driver-startup-guard.v55.js`.
 
-The reviewed feature ceilings are 128,500 driver bytes and 376,000 static-cache
-bytes, replacing 127,000 and 375,000 respectively. Recovery reuses the existing
-tone path; compiler settings, source identity proofs, install membership and
-optional-catalog loading policy are unchanged. These measured increases fund
-per-loss warning ownership, bounded audio cancellation and localized recovery.
+The composed feature ceilings are 129,000 driver bytes and 376,500 static-cache
+bytes. These preserve the preceding three-state wording allocation and add the
+same 1,480-byte recovery implementation measured on the original branch.
+Recovery reuses the existing tone path; compiler settings, source identity
+proofs, install membership and optional-catalog loading policy are unchanged.
+
+The composed regression follows a single warned loss through no face, face
+present with unreadable eyes, and restored valid eyes. It verifies the three
+badges, once-only recovery audio, and unchanged fatigue alert count.
