@@ -124,10 +124,10 @@ test('large text preserves the stop target and full recovery text without horizo
   await page.locator('#startBtn').click();
   await expect(page.locator('#startBtn')).toHaveText('STOP MONITORING');
   await page.evaluate(() => {
-    noFaceSince = Date.now();
-    render(.001);
+    lastRender = 0;
+    onResults({ multiFaceLandmarks: [] });
   });
-  await expect(page.locator('#driveState')).toHaveText('TRACKING UNAVAILABLE');
+  await expect(page.locator('#driveState')).toHaveText('NO FACE');
   await stopIsUsable(page, viewport);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   await page.locator('#driveHint').scrollIntoViewIfNeeded();
@@ -136,6 +136,65 @@ test('large text preserves the stop target and full recovery text without horizo
   await stopIsUsable(page, viewport);
   await page.locator('#startBtn').click();
   await expect(page.locator('#parkedControls')).toBeVisible();
+});
+
+for (const viewport of [{ width: 313, height: 626 }, { width: 568, height: 320 }]) test(`three eye states retain the badge delay and usable Stop at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+  await ready(page, viewport);
+  await page.evaluate(() => { loop = () => {}; });
+  await page.locator('#startBtn').click();
+  await expect(page.locator('#driveState')).toHaveText('CALIBRATING');
+  await page.evaluate(() => {
+    calibrating = false;
+    calibrated = true;
+    window.__eyeStatusEpoch = Date.now();
+    window.__eyeStatusNow = window.__eyeStatusEpoch;
+    Date.now = () => window.__eyeStatusNow;
+    window.__eyeStatusFrame = (elapsed, ear) => {
+      window.__eyeStatusNow = window.__eyeStatusEpoch + elapsed;
+      lastRender = 0;
+      earHistory = [];
+      if (ear === null) { onResults({ multiFaceLandmarks: [] }); return; }
+      const landmarks = Array.from({ length: 468 }, () => ({ x: .5, y: .5, z: 0 }));
+      for (const [indices, center] of [[LEFT, .62], [RIGHT, .38]]) {
+        const height = ear * .1 / 2;
+        const points = [[center-.05,.5], [center-.02,.5-height], [center+.02,.5-height],
+          [center+.05,.5], [center+.02,.5+height], [center-.02,.5+height]];
+        indices.forEach((index, i) => { landmarks[index] = { x: points[i][0], y: points[i][1], z: 0 }; });
+      }
+      landmarks[4] = { x: .5, y: .55, z: 0 };
+      landmarks[234] = { x: .25, y: .6, z: 0 };
+      landmarks[454] = { x: .75, y: .6, z: 0 };
+      onResults({ multiFaceLandmarks: [landmarks] });
+    };
+    window.__eyeStatusFrame(0, .28);
+  });
+  await expect(page.locator('#trackingBadge')).toHaveText('✓ Eyes detected');
+  await expect(page.locator('#trackingBadge')).toHaveCSS('color', 'rgb(0, 255, 136)');
+  await expect(page.locator('#driveState')).toHaveText('EYES DETECTED');
+  await expect(page.locator('#driveHint')).toContainText('does not mean it is safe to drive');
+  await page.evaluate(() => window.__eyeStatusFrame(1000, .01));
+  await expect(page.locator('#driveState')).toHaveText('EYES NOT VISIBLE');
+  await expect(page.locator('#trackingBadge')).toHaveText('✓ Eyes detected');
+  await page.evaluate(() => window.__eyeStatusFrame(4000, .01));
+  await expect(page.locator('#trackingBadge')).toHaveText('✓ Eyes detected');
+  await page.evaluate(() => window.__eyeStatusFrame(4001, .01));
+  await expect(page.locator('#trackingBadge')).toHaveText("⚠️ Can't see your eyes");
+  await expect(page.locator('#trackingBadge')).toHaveCSS('color', 'rgb(255, 170, 0)');
+  await stopIsUsable(page, viewport);
+  await inViewport(page.locator('#driveState'), viewport);
+  await page.evaluate(() => window.__eyeStatusFrame(4002, null));
+  await expect(page.locator('#trackingBadge')).toHaveText('⚠️ No face in view');
+  await expect(page.locator('#driveState')).toHaveText('NO FACE');
+  await expect(page.locator('#driveHint')).toContainText('Alerts may be missed');
+  await stopIsUsable(page, viewport);
+  await page.evaluate(() => { fatigue = 0; window.__eyeStatusFrame(4003, .28); });
+  await expect(page.locator('#trackingBadge')).toHaveText('✓ Eyes detected');
+  await expect(page.locator('#driveState')).toHaveText('EYES DETECTED');
+  await expect(page.locator('#trackingBadge')).toHaveCSS('color', 'rgb(0, 255, 136)');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+  await page.locator('#startBtn').click();
+  await expect(page.locator('#driveState')).toHaveText('NOT MONITORING');
+  expect(await page.evaluate(() => window.__compactDeviceRequests)).toBe(0);
 });
 
 test('camera disconnect exposes stopped guidance and never restarts capture', async ({ page }) => {
