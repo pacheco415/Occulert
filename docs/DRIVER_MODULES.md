@@ -22,14 +22,18 @@ so a missing persisted identity does not block readiness. Session-history storag
 and its existing failure reporting remain unchanged. Partial startup still
 keeps voice actions uninitialized until the entry restores their preference.
 
-Browser spoken cues use the shared alerts helper with explicit `en-US` language,
-independent of the device's preferred language. Existing English alert, tracking,
-camera, detector and rest-stop wording stays unchanged. Translated voice and
-safety wording requires fluent human review.
+Browser spoken safety cues use the shared alerts helper with explicit `en-US`
+language, independent of the device's preferred language. Existing English alert,
+tracking-loss, camera, detector and rest-stop wording stays unchanged. The new
+informational “Eyes detected.” recovery cue selects the current catalog language
+through that same voice preference and observer guard. It follows only a loss
+that actually triggered its five-second warning, once per recovered loss; start,
+stop and a new loss cancel its owned feedback. See [EYES_RESTORED_CUE.md](EYES_RESTORED_CUE.md)
+for timing, validation and the measured release budget.
 
-The separately pinned copy source `src/driver-i18n.js` owns 94 ordinary keys in
+The separately pinned copy source `src/driver-i18n.js` owns 95 ordinary keys in
 English, Spanish, French, Portuguese, German, Arabic, Chinese and Japanese. Its
-305-key English source also records 211 protected English entries, including the
+306-key English source also records 211 protected English entries, including the
 language notice. `uiText` in the core publishes explicit keys and parameters for
 current start, voice, feedback-validation and generated camera-caption states.
 It also reads the keyed optional catalog at call time, accepts only nonempty
@@ -40,7 +44,7 @@ labels; the external overview source publishes its own current state metadata.
 The optional renderer never reverse-matches English phrases, translates device
 names, reads user data as copy, or changes input values or numeric formatting.
 In particular, PERCLOS digits and `%` remain ASCII because fleet telemetry reads
-them back. The report formatter, event selection, thresholds and all voice cues
+them back. The report formatter, event selection, thresholds and existing safety voice cues
 are unchanged.
 
 Eye visibility has separate keyed badges and headings for detected eyes, a face

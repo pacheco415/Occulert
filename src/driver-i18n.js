@@ -195,6 +195,7 @@ const english = {
   "driver.voice.cue.drowsy": "Drowsiness detected, rest now",
   "driver.voice.cue.danger": "Danger! Pull over immediately",
   "driver.voice.on": "🔊 Voice ON",
+  "driver.voice.cue.eyesDetected": "Eyes detected.",
   "driver.break.counts": "{alerts} alert{alertSuffix}, {yawns} yawn{yawnSuffix}",
   "driver.break.banner": "🛑 Rest Stop Recommended — {minutes} min driving, {counts}. {dismissButton}",
   "driver.break.dismiss": "Dismiss",
@@ -301,7 +302,7 @@ const english = {
   "driver.experiment.status": "Parked experiment · local only · {flags}",
   "driver.report.body": "OCCULERT SESSION REPORT\n\nStatus: {status}\nDuration: {minutes} min\nSafety Score: {safetyScore}/100\n\nCalibration: {calibrationMode}\nOpen-eye EAR: {baselineEAR}\nClosed-eye threshold: {eyeClosedThreshold}\n\nAlerts Triggered: {alerts}\nEscalation Level: {escalationLevel}\nHead Nods Detected: {headNods}\nMicrosleeps Detected: {microsleeps}\nPERCLOS: {perclos}\nDistraction Time: {distractionSeconds}s\nAverage Fatigue: {avgFatigue}/100\nMax Fatigue: {maxFatigue}/100\n\nGPS Enabled: {gpsEnabled}\nDistance: {distanceMiles} mi\nLast Location: {location}\n\nSync Mode: {syncMode}\nLocal history: {localHistory}\nReport generated: {generatedAt}\n\nSafety and liability: Occulert is a supplemental prototype only. It may miss drowsiness, may trigger false alerts, and is not a certified safety, medical, emergency, legal, employment, fleet compliance, or transportation compliance device. Do not interact with the app while driving. If tired or unsafe, pull over and rest.",
   "driver.language.label": "Language",
-  "driver.language.englishNotice": "Safety guidance and voice cues remain in English.",
+  "driver.language.englishNotice": "Safety guidance and safety alert voice cues remain in English.",
   "driver.badge.eyesDetected": "✓ Eyes detected",
   "driver.badge.eyesNotVisible": "⚠️ Can't see your eyes",
   "driver.badge.noFace": "⚠️ No face in view",
@@ -389,6 +390,7 @@ const locales = {
     "driver.start.stop": "STOP MONITORING",
     "driver.start.start": "START MONITORING",
     "driver.voice.on": "🔊 Voice ON",
+    "driver.voice.cue.eyesDetected": "Eyes detected.",
     "driver.break.dismiss": "Dismiss",
     "driver.feedback.chooseReview": "Choose a review before saving.",
     "driver.camera.numberedFallback": "Camera {number}",
@@ -485,6 +487,7 @@ const locales = {
     "driver.start.stop": "DETENER MONITOREO",
     "driver.start.start": "INICIAR MONITOREO",
     "driver.voice.on": "🔊 Voz ACTIVADA",
+    "driver.voice.cue.eyesDetected": "Ojos detectados.",
     "driver.break.dismiss": "Cerrar",
     "driver.feedback.chooseReview": "Elige una evaluación antes de guardar.",
     "driver.camera.numberedFallback": "Cámara {number}",
@@ -581,6 +584,7 @@ const locales = {
     "driver.start.stop": "ARRÊTER LA SURVEILLANCE",
     "driver.start.start": "DÉMARRER LA SURVEILLANCE",
     "driver.voice.on": "🔊 Voix ACTIVÉE",
+    "driver.voice.cue.eyesDetected": "Yeux détectés.",
     "driver.break.dismiss": "Fermer",
     "driver.feedback.chooseReview": "Choisissez un avis avant d’enregistrer.",
     "driver.camera.numberedFallback": "Caméra {number}",
@@ -677,6 +681,7 @@ const locales = {
     "driver.start.stop": "PARAR MONITORAMENTO",
     "driver.start.start": "INICIAR MONITORAMENTO",
     "driver.voice.on": "🔊 Voz LIGADA",
+    "driver.voice.cue.eyesDetected": "Olhos detectados.",
     "driver.break.dismiss": "Fechar",
     "driver.feedback.chooseReview": "Escolha uma avaliação antes de salvar.",
     "driver.camera.numberedFallback": "Câmera {number}",
@@ -773,6 +778,7 @@ const locales = {
     "driver.start.stop": "ÜBERWACHUNG STOPPEN",
     "driver.start.start": "ÜBERWACHUNG STARTEN",
     "driver.voice.on": "🔊 Sprachausgabe EIN",
+    "driver.voice.cue.eyesDetected": "Augen erkannt.",
     "driver.break.dismiss": "Schließen",
     "driver.feedback.chooseReview": "Wähle vor dem Speichern eine Bewertung aus.",
     "driver.camera.numberedFallback": "Kamera {number}",
@@ -869,6 +875,7 @@ const locales = {
     "driver.start.stop": "إيقاف المراقبة",
     "driver.start.start": "بدء المراقبة",
     "driver.voice.on": "🔊 النطق مفعل",
+    "driver.voice.cue.eyesDetected": "تم رصد العينين.",
     "driver.break.dismiss": "إغلاق",
     "driver.feedback.chooseReview": "اختر تقييمًا قبل الحفظ.",
     "driver.camera.numberedFallback": "الكاميرا {number}",
@@ -965,6 +972,7 @@ const locales = {
     "driver.start.stop": "停止监测",
     "driver.start.start": "开始监测",
     "driver.voice.on": "🔊 语音开启",
+    "driver.voice.cue.eyesDetected": "已检测到眼睛。",
     "driver.break.dismiss": "关闭",
     "driver.feedback.chooseReview": "保存前请选择评价。",
     "driver.camera.numberedFallback": "摄像头 {number}",
@@ -1061,6 +1069,7 @@ const locales = {
     "driver.start.stop": "モニタリング停止",
     "driver.start.start": "モニタリング開始",
     "driver.voice.on": "🔊 音声案内 ON",
+    "driver.voice.cue.eyesDetected": "目を検出しました。",
     "driver.break.dismiss": "閉じる",
     "driver.feedback.chooseReview": "保存する前に評価を選んでください。",
     "driver.camera.numberedFallback": "カメラ {number}",
@@ -1095,7 +1104,11 @@ function text(locale, key, params = {}, fallback = '') {
   const pattern = typeof value === 'string' && value && JSON.stringify(slots(value)) === JSON.stringify(slots(source)) ? value : source;
   return format(pattern, params) ?? fallback;
 }
-const api = { english, locales, text };
+function eyesDetectedCue(value) {
+  const lang = Object.hasOwn(locales, value) ? value : 'en';
+  return {text:text(lang,'voice.cue.eyesDetected'),lang};
+}
+const api = { english, locales, text, eyesDetectedCue };
 if (typeof module === 'object' && module.exports) module.exports = api;
 if (!root.document || !document.querySelector('[data-driver-owned]')) return;
 let locale = 'en', pending = false;
@@ -1203,6 +1216,7 @@ function render() {
   } finally { observe(); }
 }
 api.get = (key,params) => text(locale,key,params);
+api.eyesDetectedCue = () => eyesDetectedCue(locale);
 api.setLang = value => { locale = Object.hasOwn(locales,value) ? value : 'en'; render(); };
 root.OcculertDriverI18n = Object.freeze(api);
 api.setLang(root.OcculertLang?.getLang() || 'en');
