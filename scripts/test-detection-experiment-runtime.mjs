@@ -240,7 +240,7 @@ test('eye visibility leaves the shipped statuses, scores and alerts identical wh
   diagnostic.run('experimentController.capture({currentTime:Date.now()/1000})');
   ordinary.frame(spec);diagnostic.frame(spec);
   assert.equal(JSON.stringify(diagnostic.state()),JSON.stringify(ordinary.state()));
-  for(const id of ['trackingBadge','status','stateLabel','stateHint'])assert.equal(diagnostic.el(id).textContent,ordinary.el(id).textContent,id);
+  for(const id of ['trackingBadge','status','driveState','driveHint'])assert.equal(diagnostic.el(id).textContent,ordinary.el(id).textContent,id);
  }
  diagnostic.run('running=false;experimentController.stop()');const trace=diagnostic.run('experimentController.exportData()');
  assert.equal(trace.samples.length,script.length);assert.ok(trace.samples.some(row=>row.eyeVisibilityCandidate===1));
