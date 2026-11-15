@@ -1,22 +1,22 @@
 import { setCameraControlsDisabled, refreshCameraChoices, openSelectedCamera, clearCameraTrackGuards, attachCameraTrackGuards, cameraRecoveryGuidance, beginCameraViewportObservation, endCameraViewportObservation } from "./camera.js";
 import { detectorFailureStopping, discardFaceMesh, initModel, verifyFirstInference, loop, framePerformanceSnapshot, set_processingFrame, set_detectorFailureStopping, set_consecutiveInferenceFailures, set_lastDetectionResultAt } from "./detector.js";
 import "./calibration.js";
-import { startGPS, stopGPS, riskText, fleetPayload, resetTrackingCue } from "./metrics.js";
+import { startGPS, stopGPS, riskText, fleetPayload, resetTrackingCue, beginEyeCoverage, setEyeCoverageCalibration, stopEyeCoverage, eyeCoveragePercentage } from "./metrics.js";
 import { alerts, escalationLevel, _alertTestOwner, beginAlertAudioScope, releaseAlertAudioScope, clearParkedAlertTest, resetBreakReminder, dismissBreak, triggerBreakCheck, set_alerts, set_lastAlert, set_escalationLevel } from "./alerts.js";
 import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistory, setMonitoringUi } from "./storage-history.js";
 import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
 export const start = startMonitoring;
 export const stop = stopMonitoring;
 // Generated from the final driver asset mapping by the release tool.
-export const WEB_APP_VERSION = 'web-v134';
-export const EXPERIMENT_HELPER_INTEGRITY = "sha256-Hf2msYDcgvAiU9WqDGZAonEMh6FND4vEIuc/iKDNR2k=";
+export const WEB_APP_VERSION = 'web-v136';
+export const EXPERIMENT_HELPER_INTEGRITY = "sha256-aO8N7QM4nmBfJK8RHW50wmPvAqHM+gBan4iGTZ/3VLM=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
     try {
         const q = new URLSearchParams(window.location?.search || ''), yes = (k, v) => q.getAll(k).length === 1 && q.get(k) === v;
-        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable'), observer: yes('observer', '1'), calibrationMin: yes('calibration-min', '12') };
+        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable'), observer: yes('observer', '1'), calibrationMin: yes('calibration-min', '12'), eyeVisibility: yes('eye-visibility', '1') };
         const names = Object.keys(f).filter(k => f[k]).sort();
-        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin'].includes(k)), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin', 'eyeVisibility'].includes(k)), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
     }
     catch (_) {
         return Object.freeze({ any: false, primary: false, names: Object.freeze([]) });
@@ -170,6 +170,16 @@ export function uiText(el, k, en, p) {
         }
         if (el.textContent !== en) el.textContent = en;
     }
+}
+export function appendEyeCoverageSummary(summary) {
+    const line = document.createElement('div'), percent = eyeCoveragePercentage(summary);
+    line.id = 'eyeCoverageSummary';
+    line.style.marginTop = '1em';
+    if (percent === null)
+        uiText(line, 'report.eyeCoverageUnknown', 'Eyes detected: Unknown');
+    else
+        uiText(line, 'report.eyeCoverage', 'Eyes detected: ' + percent + '% of session', { percent });
+    reportEl.appendChild(line);
 }
 export function uiState(l, h, key) {
     uiText(driveStateEl, key, l);
@@ -355,6 +365,7 @@ export function createLocalLifecycleOperations() {
             calibrated = false;
             calibrationSamples = [];
             calibrationUntil = Date.now() + CALIBRATION_MS;
+            beginEyeCoverage();
             beginCameraViewportObservation();
             baselineEAR = .28;
             baseClosedThreshold = .18;
@@ -438,6 +449,7 @@ export function createLocalLifecycleOperations() {
         const preserveOverlay = !!options.preserveOverlay;
         if (experimentFlags.any && experimentStopping)
             return;
+        const stoppedEyeCoverage = stopEyeCoverage();
         running = false;
         resetTrackingCue();
         let experimentalClose = null;
@@ -476,16 +488,18 @@ export function createLocalLifecycleOperations() {
         startBtn.className = 'btn primary';
         setCameraControlsDisabled(false);
         void refreshCameraChoices();
-        let p = fleetPayload();
+        let p = { ...fleetPayload(), eyeCoverage: stoppedEyeCoverage };
         p = saveLocalSessionHistory(p) || p;
         let mins = sessionStart ? ((Date.now() - sessionStart) / 60000).toFixed(1) : '0.0';
         render(.001);
-        pushFleet(true, p);
+        const { eyeCoverage, ...sharedReport } = p;
+        pushFleet(true, sharedReport);
         reportEl.style.display = 'block';
         const feedbackCard = document.getElementById('feedbackCard');
         if (feedbackCard)
             feedbackCard.hidden = !p.savedAt;
         reportEl.textContent = 'OCCULERT SESSION REPORT\n\nStatus: ' + p.status + '\nDuration: ' + mins + ' min\nSafety Score: ' + p.safetyScore + '/100\n\nCalibration: ' + (calibrated ? 'Personalized' : 'Default') + '\nOpen-eye EAR: ' + baselineEAR.toFixed(3) + '\nClosed-eye threshold: ' + eyeClosedThreshold.toFixed(3) + '\n\nAlerts Triggered: ' + alerts + '\nEscalation Level: ' + escalationLevel + '\nHead Nods Detected: ' + headNods + '\nMicrosleeps Detected: ' + microsleeps + '\nPERCLOS: ' + (p.perclos === null ? 'Unavailable' : p.perclos + '%') + '\nDistraction Time: ' + p.distractionSeconds + 's\nAverage Fatigue: ' + p.avgFatigue + '/100\nMax Fatigue: ' + p.maxFatigue + '/100\n\nGPS Enabled: ' + (p.gpsEnabled ? 'Yes' : 'No') + '\nDistance: ' + p.distanceMiles + ' mi\nLast Location: ' + (p.location ? p.location.lat + ', ' + p.location.lng : 'Not available') + '\n\nSync Mode: ' + (cloudConsent.checked && cloudReady ? 'Cloud + Local' : 'Local only') + '\nLocal history: ' + (p.savedAt ? 'Saved' : 'Not saved — copy this report before leaving') + '\nReport generated: ' + new Date().toLocaleString() + '\n\nSafety and liability: Occulert is a supplemental prototype only. It may miss drowsiness, may trigger false alerts, and is not a certified safety, medical, emergency, legal, employment, fleet compliance, or transportation compliance device. Do not interact with the app while driving. If tired or unsafe, pull over and rest.';
+        appendEyeCoverageSummary(eyeCoverage);
         log('Session ended');
         if (experimentalClose)
             await experimentalClose;
@@ -612,7 +626,7 @@ export function loadExperimentController() {
     }
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/detection-experiments.v13.js';
+        script.src = '/detection-experiments.v17.js';
         script.integrity = EXPERIMENT_HELPER_INTEGRITY;
         script.crossOrigin = 'anonymous';
         const timer = setTimeout(() => { script.remove(); reject(Error('Parked helper timed out')); }, 7000);
@@ -641,7 +655,7 @@ export function set_unavailableCameraDeviceId(value) { unavailableCameraDeviceId
 export function set_guardedCameraTrack(value) { guardedCameraTrack = value; return value; }
 export function set_cameraMuteTimer(value) { cameraMuteTimer = value; return value; }
 export function set_cameraFailureStopping(value) { cameraFailureStopping = value; return value; }
-export function set_running(value) { running = value; return value; }
+export function set_running(value) { if (!value) stopEyeCoverage(); running = value; return value; }
 /** @param {MediaStream|null} value */
 export function set_stream(value) { stream = value; return value; }
 export function set_detectionResultGeneration(value) { detectionResultGeneration = value; return value; }
@@ -675,7 +689,7 @@ export function set_microsleeps(value) { microsleeps = value; return value; }
 export function set_lastMicro(value) { lastMicro = value; return value; }
 export function set_turnedSince(value) { turnedSince = value; return value; }
 export function set_totalDistractionMs(value) { totalDistractionMs = value; return value; }
-export function set_calibrating(value) { calibrating = value; return value; }
+export function set_calibrating(value) { if (running) setEyeCoverageCalibration(value); calibrating = value; return value; }
 export function set_calibrated(value) { calibrated = value; return value; }
 export function set_calibrationUntil(value) { calibrationUntil = value; return value; }
 export function set_calibrationSamples(value) { calibrationSamples = value; return value; }
