@@ -20,10 +20,10 @@ export const traceContract=Object.freeze({detectorPrefix:corePrefix,runtimeVersi
  helperIntegrity:'sha256-'+createHash('sha256').update(helperBytes).digest('base64'),
  runtimePins:Object.freeze(runtime.files.map(({url,integrity})=>Object.freeze({url,integrity}))),
  modelIntegrity:runtime.files.find(pin=>pin.file==='face_landmarker.task').integrity});
-const knownFlags=new Set(['calibrationMin','distractionConfidence','elapsed','noface','observer','pitch','pixels','tasks','timePerclos']);
+const knownFlags=new Set(['calibrationMin','distractionConfidence','elapsed','eyeVisibility','noface','observer','pitch','pixels','tasks','timePerclos']);
 export function validateProvenance(s){
  const flags=s.experimentFlags;
- if(!Array.isArray(flags)||(!flags.includes('tasks')&&!flags.includes('observer'))||flags.some(flag=>!knownFlags.has(flag))||new Set(flags).size!==flags.length||
+ if(!Array.isArray(flags)||(!flags.includes('tasks')&&!flags.includes('observer')&&!flags.includes('eyeVisibility'))||flags.some(flag=>!knownFlags.has(flag))||new Set(flags).size!==flags.length||
    flags.join('+')!==[...flags].sort().join('+')||s.detectorVersion!==traceContract.detectorPrefix+flags.join('+')||
    s.geometryUnits!==(flags.includes('pixels')?'pixels-reference-3x4':'normalized'))throw Error('Detector and experiment flags disagree');
  if(s.runtimeVersion!==traceContract.runtimeVersion||s.helperIntegrity!==traceContract.helperIntegrity||s.modelIntegrity!==traceContract.modelIntegrity||

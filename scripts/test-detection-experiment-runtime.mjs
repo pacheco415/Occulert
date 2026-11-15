@@ -33,7 +33,7 @@ test('empty query executes exactly the released default pipeline across calibrat
 });
 
 test('all exact selected modes disable every cloud route while preserving another ordinary pending outbox',async()=>{
- for(const query of ['?fatigue-timing=elapsed','?ear-units=pixels','?detector=tasks','?noface-escalation=1','?perclos=time','?pitch-gate=1','?distraction-confidence=stable','?detector=tasks&ear-units=pixels&perclos=time&pitch-gate=1&noface-escalation=1&fatigue-timing=elapsed&distraction-confidence=stable']){
+ for(const query of ['?fatigue-timing=elapsed','?ear-units=pixels','?detector=tasks','?noface-escalation=1','?perclos=time','?pitch-gate=1','?distraction-confidence=stable','?eye-visibility=1','?detector=tasks&ear-units=pixels&perclos=time&pitch-gate=1&noface-escalation=1&fatigue-timing=elapsed&distraction-confidence=stable']){
   const calls=[];const api=new Proxy({}, {get:(_,name)=>()=>{calls.push(name);return Promise.resolve({})}});
   const h=createAppHarness({initialStorage:{'occulert-cloud-outbox':'ordinary-pending-value'},preloadSources:[helper],sandboxOverrides:{location:{search:query},URLSearchParams,OcculertBackend:api}});
   assert.equal(h.el('cloudConsent').checked,false);assert.equal(h.el('cloudConsent').disabled,true);
@@ -228,4 +228,23 @@ test('duplicate and malformed distraction-confidence flags leave the ordinary mo
   assert.equal(h.get('experimentFlags.any'),false,query);assert.equal(h.get('experimentController'),null,query);
   assert.equal(Number.isNaN(firstDistraction(fixture)),true,query);assert.equal(h.get('alerts'),0,query);
  }
+});
+
+
+test('eye visibility leaves the shipped statuses, scores and alerts identical while collecting local trace',()=>{
+ const ordinary=harness(''), diagnostic=harness('?eye-visibility=1');begin(ordinary);begin(diagnostic);
+ assert.equal(diagnostic.get('experimentFlags.primary'),false);
+ assert.equal(diagnostic.el('exportDetectionTrace').hidden,false);
+ const script=[...Array(90).fill({ear:.3}),...Array(45).fill({ear:.08}),...Array(30).fill({ear:.3,noseX:.7}),...Array(45).fill({face:false}),...Array(85).fill({ear:.3})];
+ for(const spec of script){
+  diagnostic.run('experimentController.capture({currentTime:Date.now()/1000})');
+  ordinary.frame(spec);diagnostic.frame(spec);
+  assert.equal(JSON.stringify(diagnostic.state()),JSON.stringify(ordinary.state()));
+  for(const id of ['trackingBadge','status','stateLabel','stateHint'])assert.equal(diagnostic.el(id).textContent,ordinary.el(id).textContent,id);
+ }
+ diagnostic.run('running=false;experimentController.stop()');const trace=diagnostic.run('experimentController.exportData()');
+ assert.equal(trace.samples.length,script.length);assert.ok(trace.samples.some(row=>row.eyeVisibilityCandidate===1));
+ assert.ok(trace.samples.some(row=>row.eyeVisibilityCandidate===null));assert.equal(trace.session.eyeVisibility.validated,false);
+ assert.ok(trace.scoringReplay.frames.length>0,'The ordinary scoring replay is retained for later comparison');
+ assert.equal(Object.hasOwn(ordinary.run('fleetPayload()'),'eyeVisibility'),false);
 });
