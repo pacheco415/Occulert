@@ -2,10 +2,11 @@ import "./camera.js";
 import { signalDetectionResult, DETECTION_RESULT_TIMEOUT_MS } from "./detector.js";
 import { updateCalibration } from "./calibration.js";
 import { scoringSmooth, scoringNodHistory, scoringNodDetected, scoringResetContinuity, scoringNoFace, scoringCalibrationFrame, scoringConfidence, scoringEyeMetrics, scoringTrackedFrame, scoringYawn, scoringDistractionSeconds, scoringAlertCandidate, scoringDistractionMatured } from "./scoring-core.js";
-import { alerts, escalationLevel, tone, trigger, speak, triggerBreakCheck } from "./alerts.js";
+import { alerts, escalationLevel, tone, trigger, speak, triggerBreakCheck, playRestoredCue, clearRestoredCue } from "./alerts.js";
 import "./storage-history.js";
 import { queueBackendEvent } from "./cloud-sync.js";
-import { WEB_APP_VERSION, experimentFlags, experimentController, experimentSessionSummary, video, canvas, ctx, faceStateEl, nodsEl, gpsEl, locationEl, perclosEl, microsleepsEl, distractionEl, gpsConsent, cloudConsent, running, fatigue, confidence, earHistory, maxFatigue, fatigueSampleSum, fatigueSampleCount, noseYHistory, headNods, lastNod, driverId, gpsWatch, lastPosition, routePoints, distanceMeters, perclosWindow, eyesClosedSince, microsleeps, lastMicro, turnedSince, totalDistractionMs, calibrating, calibrated, eyeClosedThreshold, eyeWatchThreshold, noFaceSince, lastFaceSeen, LEFT, RIGHT, log, setTextIfChanged, render, drawEyes, yawnCount, lastYawn, _marHist, _mouthOpenSince, MAR_YAWN_THRESH, YAWN_HOLD_MS, YAWN_COOLDOWN_MS, _lastLightCheck, _trackLostSince, _lastTrackingWarning, TRACKING_WARNING_DELAY_MS, TRACKING_WARNING_COOLDOWN_MS, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_lastNod, set_gpsWatch, set_lastPosition, set_routePoints, set_distanceMeters, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_lastMicro, set_turnedSince, set_totalDistractionMs, set_noFaceSince, set_lastFaceSeen, set_yawnCount, set_lastYawn, set__marHist, set__mouthOpenSince, set__lastLightCheck, set__trackLostSince, set__lastTrackingWarning } from "./ui.js";
+import { uiText, set_eyeLoss } from "./ui.js";
+import { WEB_APP_VERSION, experimentFlags, experimentController, experimentSessionSummary, video, canvas, ctx, faceStateEl, nodsEl, gpsEl, locationEl, perclosEl, microsleepsEl, distractionEl, gpsConsent, cloudConsent, running, fatigue, confidence, earHistory, maxFatigue, fatigueSampleSum, fatigueSampleCount, noseYHistory, headNods, lastNod, driverId, gpsWatch, lastPosition, routePoints, distanceMeters, perclosWindow, eyesClosedSince, microsleeps, lastMicro, turnedSince, totalDistractionMs, calibrating, calibrated, eyeClosedThreshold, eyeWatchThreshold, noFaceSince, lastFaceSeen, LEFT, RIGHT, log, render, drawEyes, yawnCount, lastYawn, _marHist, _mouthOpenSince, MAR_YAWN_THRESH, YAWN_HOLD_MS, YAWN_COOLDOWN_MS, _lastLightCheck, _trackLostSince, _lastTrackingWarning, TRACKING_WARNING_DELAY_MS, TRACKING_WARNING_COOLDOWN_MS, set_fatigue, set_confidence, set_earHistory, set_maxFatigue, set_fatigueSampleSum, set_fatigueSampleCount, set_noseYHistory, set_headNods, set_lastNod, set_gpsWatch, set_lastPosition, set_routePoints, set_distanceMeters, set_perclosWindow, set_eyesClosedSince, set_microsleeps, set_lastMicro, set_turnedSince, set_totalDistractionMs, set_noFaceSince, set_lastFaceSeen, set_yawnCount, set_lastYawn, set__marHist, set__mouthOpenSince, set__lastLightCheck, set__trackLostSince, set__lastTrackingWarning } from "./ui.js";
 // Local elapsed-time accounting, independent of scoring and delayed badge text.
 // A detected sample expires at the detector's existing result timeout.
 export function createEyeCoverageTracker(startedAt, freshnessMs) {
@@ -238,7 +239,7 @@ export function onResults(res) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         updateScore(0, false, false, false);
         if (typeof updateTrackingState === 'function')
-            updateTrackingState(false, false);
+            updateTrackingState(false, false, 'no-face');
         ;
         render();
         experimentController?.recordResults(res, null, null, false);
@@ -254,7 +255,7 @@ export function onResults(res) {
         checkLightLevel(videoEl);
     if (typeof updateTrackingState === 'function') {
         const earOk = ear > .05 && ear < .65;
-        updateTrackingState(true, earOk);
+        updateTrackingState(true, earOk, earOk ? null : 'eyes-not-visible');
     }
     drawEyes(lm, fatigue >= 60 ? '#ff3344' : fatigue >= 35 ? '#ffaa00' : '#00ff88');
     render(ear);
@@ -345,35 +346,50 @@ export function checkLightLevel(videoEl) {
     }
     catch (e) { }
 }
+let warnedLoss = 0, trackingEpoch = 0;
+export function resetTrackingCue() {
+    warnedLoss = 0;
+    trackingEpoch++;
+    clearRestoredCue();
+}
 export function warnTrackingLoss(now) {
     if (!running || !_trackLostSince || now - _trackLostSince < TRACKING_WARNING_DELAY_MS || now - _lastTrackingWarning < TRACKING_WARNING_COOLDOWN_MS)
         return;
     set__lastTrackingWarning(now);
+    const epoch = ++trackingEpoch;
+    warnedLoss = _trackLostSince;
     tone(660, 260, .2);
-    setTimeout(() => tone(440, 320, .2), 320);
+    setTimeout(() => {
+        if (running && epoch === trackingEpoch && _trackLostSince === warnedLoss)
+            tone(440, 320, .2);
+    }, 320);
     speak('Camera view lost. Pull over safely before repositioning the phone.');
     log('Tracking lost - pull over safely before adjusting the camera');
 }
-export function updateTrackingState(hasFace, hasGoodEAR) {
+export function updateTrackingState(hasFace, hasGoodEAR, reason = hasFace ? 'eyes-not-visible' : 'no-face') {
+    const detected = hasFace && hasGoodEAR;
+    set_eyeLoss(detected ? null : reason);
     observeEyeCoverage(hasFace, hasGoodEAR);
     const b = document.getElementById('trackingBadge');
     if (!b)
         return;
     const now = Date.now();
-    if (!hasFace || !hasGoodEAR) {
-        if (!_trackLostSince)
+    if (!detected) {
+        if (!_trackLostSince) {
+            clearRestoredCue();
             set__trackLostSince(now);
-        if (now - _trackLostSince > 3000) {
-            setTextIfChanged(b, '⚠️ Tracking Unavailable');
-            b.style.color = '#ffaa00';
-            b.style.display = 'inline-flex';
         }
-        warnTrackingLoss(now);
-    }
-    else {
+        if (now - _trackLostSince <= 3000) return;
+    } else if (_trackLostSince) {
+        const warned = warnedLoss === _trackLostSince;
+        resetTrackingCue();
         set__trackLostSince(0);
-        setTextIfChanged(b, '✓ Tracking Active');
-        b.style.color = '#00ff88';
-        b.style.display = 'inline-flex';
+        if (warned) playRestoredCue();
     }
+    const [key, label] = detected ? ['eyesDetected', '✓ Eyes detected'] : reason === 'no-face' ? ['noFace', '⚠️ No face in view'] : ['eyesNotVisible', "⚠️ Can't see your eyes"];
+    uiText(b, 'badge.' + key, label);
+    b.style.color = detected ? '#00ff88' : '#ffaa00';
+    b.style.display = 'inline-flex';
+    if (!detected)
+        warnTrackingLoss(now);
 }

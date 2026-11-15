@@ -13,29 +13,35 @@ const guard = readFileSync(new URL(`../${guardName}`, import.meta.url), 'utf8');
 
 function speechSites(source, sourceType) {
   const tree = parse(source, { ecmaVersion: 2022, sourceType });
-  const constructors = [], deliveries = [];
+  const constructors = [], deliveries = [], helperCalls = [];
   const property = node => node?.computed ? node.property?.value : node?.property?.name;
   function visit(node, ancestors = []) {
     if (!node || typeof node !== 'object') return;
     const parents = [...ancestors, node];
     if (node.type === 'NewExpression' && (node.callee.name === 'SpeechSynthesisUtterance' || property(node.callee) === 'SpeechSynthesisUtterance')) constructors.push({ node, ancestors });
     if (node.type === 'CallExpression' && property(node.callee) === 'speak' && property(node.callee.object) === 'speechSynthesis') deliveries.push({ node, ancestors });
+    if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'speak') helperCalls.push({ node, ancestors });
     for (const child of Object.values(node)) {
       if (Array.isArray(child)) child.forEach(value => visit(value, parents));
       else if (child && typeof child === 'object') visit(child, parents);
     }
   }
   visit(tree);
-  return { tree, constructors, deliveries, property };
+  return { tree, constructors, deliveries, helperCalls, property };
 }
 
-test('every source and released driver utterance receives English language before the sole speech dispatch', () => {
+test('every utterance keeps central dispatch and explicit English default with only the restoration exception', () => {
   const contract = JSON.parse(readFileSync(new URL('../source-driver-contract.json', import.meta.url), 'utf8'));
   const sources = contract.modules.map(name => readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8'));
   for (const [label, programs] of [['editable modules', sources.map(source => speechSites(source, 'module'))], ['released driver', [speechSites(driver, 'script')]]]) {
     const constructors = programs.flatMap(program => program.constructors), deliveries = programs.flatMap(program => program.deliveries);
     assert.equal(constructors.length, 1, `${label}: speech must stay in the central helper`);
     assert.equal(deliveries.length, 1, `${label}: every delivery must use the central helper`);
+    for (const call of programs.flatMap(program => program.helperCalls)) {
+      assert.ok(call.node.arguments.length === 1 || call.node.arguments.length === 2, label);
+      if (call.node.arguments.length === 2)
+        assert.equal(call.ancestors.findLast(node => node.type === 'FunctionDeclaration')?.id.name, 'playRestoredCue', `${label}: only the new informational cue can select a speech language`);
+    }
     const construction = constructors[0], delivery = deliveries[0];
     const owner = construction.ancestors.findLast(node => node.type === 'FunctionDeclaration');
     assert.equal(owner?.id.name, 'speak', label);
@@ -50,7 +56,15 @@ test('every source and released driver utterance receives English language befor
       && statement.expression.left.type === 'MemberExpression'
       && statement.expression.left.object.name === declaration.id.name
       && (statement.expression.left.computed ? statement.expression.left.property.value : statement.expression.left.property.name) === 'lang');
-    assert.equal(language?.expression.right.value, 'en-US', label);
+    assert.ok(language, label);
+    if (language.expression.right.type === 'Literal') {
+      assert.equal(language.expression.right.value, 'en-US', label);
+    } else {
+      assert.equal(language.expression.right.name, 'language', label);
+      assert.equal(owner.params[1]?.type, 'AssignmentPattern', label);
+      assert.equal(owner.params[1].left.name, 'language', label);
+      assert.equal(owner.params[1].right.value, 'en-US', label);
+    }
     assert.ok(construction.node.end < language.start && language.end < delivery.node.start, label);
     assert.equal(delivery.node.arguments[0].name, declaration.id.name, label);
   }
@@ -66,7 +80,7 @@ test('real source and released speech helpers preserve all English cues and voic
     const owner = site.ancestors.findLast(node => node.type === 'FunctionDeclaration');
     const spoken = [];
     let enabled = true;
-    const context = { experimentFlags: { observer: false }, readVoicePreference: () => enabled,
+    const context = { restoredSpeech: false, experimentFlags: { observer: false }, readVoicePreference: () => enabled,
       SpeechSynthesisUtterance: class { constructor(text) { this.text = text; this.lang = 'es-ES'; } },
       window: { speechSynthesis: { paused: false, cancel() {}, speak: cue => spoken.push({ text: cue.text, lang: cue.lang, rate: cue.rate, pitch: cue.pitch, volume: cue.volume }) } } };
     vm.runInNewContext(source.slice(owner.start, owner.end), context);

@@ -9,7 +9,7 @@ import { parse } from 'acorn';
 
 const driver = readFileSync(assetByStem('driver-app.js'), 'utf8');
 const driverProgram = parse(driver,{ecmaVersion:2022,sourceType:'script'});
-const uiDependencies = ['setTextIfChanged','uiText','uiState','pauseUi'].map(name => {
+const uiDependencies = ['uiText','uiState','pauseUi'].map(name => {
   const matches = driverProgram.body.filter(node => node.type==='FunctionDeclaration' && node.id.name===name);
   assert.equal(matches.length,1,`Execute the real extracted ${name} dependency`);
   return driver.slice(matches[0].start,matches[0].end);
@@ -34,6 +34,12 @@ const triggerDependencyCode = triggerDependencies.map(node=>driver.slice(node.st
 const audioCode = driver.slice(driver.indexOf('let _ac=null,'), driver.indexOf('function trigger(reason'));
 assert.ok(audioCode.includes('function tone('), 'Test the active driver audio implementation');
 assert.ok(audioCode.includes('function playStrongAlert('), 'Emit the strong-alert source before testing the active driver');
+const trackingState = driverProgram.body.filter(node => node.type === 'VariableDeclaration'
+  && node.declarations.some(item => item.id.name === 'warnedLoss'));
+const trackingReset = driverProgram.body.filter(node => node.type === 'FunctionDeclaration' && node.id.name === 'resetTrackingCue');
+assert.equal(trackingState.length,1,'Execute the real per-loss warning state');
+assert.equal(trackingReset.length,1,'Execute the real lifecycle reset dependency');
+const trackingCode = [...trackingState,...trackingReset].map(node=>driver.slice(node.start,node.end)).join('\n');
 
 function harness({ state = 'running', noContext = false, noMedia = false, runningAfterResume = false, rejectResume = false, neverResume = false, rejectPlay = false, rejectPrime = false, deferAudiblePlay = false, throwOnStart = false, search = '', session = {} } = {}) {
   const timers = new Map(), listeners = new Map(), contexts = [], media = [], oscillators = [], gains = [], pendingPlays = [];
@@ -71,12 +77,13 @@ function harness({ state = 'running', noContext = false, noMedia = false, runnin
     experimentFlags: {any:false,noface:false}, experimentController: null,
     document, navigator: { audioSession: session }, window: { AudioContext: noContext ? undefined : Context, location: { search } },
     Audio: noMedia ? undefined : Media, Promise, URLSearchParams,
-    driveStateEl: {}, driveHintEl: {}, statusEl: {},
+    driveStateEl: { dataset: {} }, driveHintEl: { dataset: {} }, statusEl: { dataset: {} },
     setTimeout(callback, duration) { const id = ++timerId; timers.set(id, { callback, duration }); return id; },
     clearTimeout(id) { timers.delete(id); },
   });
   vm.runInContext(uiDependencies, context);
   vm.runInContext(audioCode, context);
+  vm.runInContext(trackingCode, context);
   vm.runInContext(triggerDependencyCode, context);
   vm.runInContext('let cameraViewport={width:800,height:800};' + driver.slice(driver.indexOf('function endCameraViewportObservation('), driver.indexOf('function handleCameraViewportChange(')), context);
   return {

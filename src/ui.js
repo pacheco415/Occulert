@@ -1,14 +1,14 @@
 import { setCameraControlsDisabled, refreshCameraChoices, openSelectedCamera, clearCameraTrackGuards, attachCameraTrackGuards, cameraRecoveryGuidance, beginCameraViewportObservation, endCameraViewportObservation } from "./camera.js";
 import { detectorFailureStopping, discardFaceMesh, initModel, verifyFirstInference, loop, framePerformanceSnapshot, set_processingFrame, set_detectorFailureStopping, set_consecutiveInferenceFailures, set_lastDetectionResultAt } from "./detector.js";
 import "./calibration.js";
-import { startGPS, stopGPS, riskText, fleetPayload, beginEyeCoverage, setEyeCoverageCalibration, stopEyeCoverage, eyeCoveragePercentage } from "./metrics.js";
+import { startGPS, stopGPS, riskText, fleetPayload, resetTrackingCue, beginEyeCoverage, setEyeCoverageCalibration, stopEyeCoverage, eyeCoveragePercentage } from "./metrics.js";
 import { alerts, escalationLevel, _alertTestOwner, beginAlertAudioScope, releaseAlertAudioScope, clearParkedAlertTest, resetBreakReminder, dismissBreak, triggerBreakCheck, set_alerts, set_lastAlert, set_escalationLevel } from "./alerts.js";
 import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistory, setMonitoringUi } from "./storage-history.js";
 import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
 export const start = startMonitoring;
 export const stop = stopMonitoring;
 // Generated from the final driver asset mapping by the release tool.
-export const WEB_APP_VERSION = 'web-v133';
+export const WEB_APP_VERSION = 'web-v135';
 export const EXPERIMENT_HELPER_INTEGRITY = "sha256-Hf2msYDcgvAiU9WqDGZAonEMh6FND4vEIuc/iKDNR2k=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
@@ -153,19 +153,22 @@ export function setOverlay(title, text, hint, showGuide) {
         phoneGuide.style.display = showGuide === false ? 'none' : 'flex';
     overlay.classList.remove('hide');
 }
-export function setTextIfChanged(element, value) {
-    if (element.textContent !== value)
-        element.textContent = value;
-}
-/** @param {HTMLElement|null} el @param {string} k @param {string} en @param {object} [p] */
+/** @param {HTMLElement|null} el @param {string|null|undefined} k @param {string} en @param {object} [p] */
 export function uiText(el, k, en, p) {
     if (el) {
-        try {
-            const value = window.OcculertDriverI18n?.get(k, p);
-            if (typeof value === 'string' && value) en = value;
-        } catch (_) { }
-        el.textContent = en;
-        el.dataset.driverText = JSON.stringify([k, p]);
+        if (k) {
+            try {
+                const value = window.OcculertDriverI18n?.get(k, p);
+                if (typeof value === 'string' && value) en = value;
+            } catch (_) { }
+            const binding = JSON.stringify([k, p]);
+            if (el.dataset.driverText !== binding) el.dataset.driverText = binding;
+        } else {
+            delete el.dataset.driverText;
+            el.lang = 'en';
+            el.dir = 'ltr';
+        }
+        if (el.textContent !== en) el.textContent = en;
     }
 }
 export function appendEyeCoverageSummary(summary) {
@@ -178,10 +181,10 @@ export function appendEyeCoverageSummary(summary) {
         uiText(line, 'report.eyeCoverage', 'Eyes detected: ' + percent + '% of session', { percent });
     reportEl.appendChild(line);
 }
-export function uiState(l, h) {
-    setTextIfChanged(driveStateEl, l);
-    setTextIfChanged(driveHintEl, h);
-    setTextIfChanged(statusEl, l);
+export function uiState(l, h, key) {
+    uiText(driveStateEl, key, l);
+    uiText(statusEl, key, l);
+    uiText(driveHintEl, null, h);
 }
 export function pauseUi() {
     setOverlay('Monitoring Paused', 'Monitoring did not start because Occulert left the foreground.', 'Return to Occulert and press Start Monitoring again only when safely parked.', false);
@@ -206,9 +209,9 @@ export function render(ear) {
         calibrationFill.style.width = '0%';
         faceStateEl.textContent = '--';
     }
-    const risk = riskText();
-    riskEl.textContent = risk[0];
-    riskDetailEl.textContent = risk[0];
+    const [risk, riskClass] = riskText();
+    riskEl.textContent = risk;
+    riskDetailEl.textContent = risk;
     syncEl.textContent = cloudConsent.checked ? (cloudReady ? 'ON' : 'LOCAL') : 'LOCAL';
     escalationEl.textContent = escalationLevel;
     if (!running) {
@@ -221,22 +224,25 @@ export function render(ear) {
             calibrationEl.textContent = 'NOT STARTED';
     }
     else {
-        const trackingUnavailable = noFaceSince > 0;
-        const label = trackingUnavailable ? 'TRACKING UNAVAILABLE' : experimentFlags.observer ? 'PARKED OBSERVER SESSION' : risk[0] === 'SAFE' ? 'TRACKING ACTIVE' : risk[0];
-        const hint = trackingUnavailable
+        const lost = noFaceSince > 0 ? 'no-face' : eyeLoss, observer = experimentFlags.observer;
+        const urgent = risk === 'ALERT' || risk === 'HIGH';
+        const [label, key] = lost
+            ? lost === 'no-face' ? ['NO FACE', 'state.noFace'] : ['EYES NOT VISIBLE', 'state.eyesNotVisible']
+            : observer ? ['PARKED OBSERVER SESSION'] : risk === 'SAFE' ? ['EYES DETECTED', 'state.eyesDetected'] : [risk];
+        const hint = lost
             ? 'Camera tracking is unavailable. Alerts may be missed. Pull over safely before adjusting the phone.'
-            : experimentFlags.observer
+            : observer
                 ? 'Independent labeling. Detector feedback is hidden. Remain safely parked.'
-            : risk[0] === 'CALIBRATING'
+            : risk === 'CALIBRATING'
                 ? 'Camera is starting. Keep your face centered while parked.'
-                : risk[0] === 'ALERT' || risk[0] === 'HIGH'
+                : urgent
                     ? 'Pull over safely and rest. Do not keep driving tired.'
-                    : risk[0] === 'WATCH'
+                    : risk === 'WATCH'
                         ? 'Fatigue signs are building. Prepare to stop if needed.'
                         : 'Camera tracking is active. Stay alert; this does not mean it is safe to drive.';
-        uiState(label, hint);
-        stateCard.className = 'card state-card ' + (trackingUnavailable ? 'noface' : experimentFlags.observer ? 'observer' : risk[1]);
-        statusEl.className = 'status ' + (trackingUnavailable || !experimentFlags.observer && ['ALERT', 'HIGH'].includes(risk[0]) ? 'alert' : 'on');
+        uiState(label, hint, key);
+        stateCard.className = 'card state-card ' + (lost ? 'noface' : observer ? 'observer' : riskClass);
+        statusEl.className = 'status ' + (lost || !observer && urgent ? 'alert' : 'on');
     }
     pushFleet();
 }
@@ -279,6 +285,7 @@ export function createLocalLifecycleOperations() {
             return;
         if (starting || detectorFailureStopping || cameraFailureStopping || experimentFlags.any && experimentStopping)
             return;
+        resetTrackingCue();
         clearParkedAlertTest(_alertTestOwner);
         const audioOwner = beginAlertAudioScope();
         starting = true;
@@ -286,9 +293,9 @@ export function createLocalLifecycleOperations() {
         startCancelled = false;
         startBtn.disabled = true;
         uiText(startBtn, 'start.starting', 'STARTING...');
-        setTextIfChanged(driveStateEl, 'PREPARING MONITORING');
-        setTextIfChanged(driveHintEl, 'Stay parked while the camera and on-device model are prepared. Monitoring has not started.');
-        setTextIfChanged(statusEl, 'PREPARING');
+        uiText(driveStateEl, null, 'PREPARING MONITORING');
+        uiText(driveHintEl, null, 'Stay parked while the camera and on-device model are prepared. Monitoring has not started.');
+        uiText(statusEl, null, 'PREPARING');
         statusEl.className = 'status';
         setCameraControlsDisabled(true);
         setOverlay('Preparing Monitoring', 'Occulert is preparing the on-device model before opening the camera.', 'Stay parked until camera monitoring has started. GPS and cloud sync use the choices you made before starting.', false);
@@ -353,6 +360,7 @@ export function createLocalLifecycleOperations() {
             set_detectorFailureStopping(false);
             _trackLostSince = 0;
             _lastTrackingWarning = 0;
+            eyeLoss = null;
             calibrating = true;
             calibrated = false;
             calibrationSamples = [];
@@ -443,6 +451,7 @@ export function createLocalLifecycleOperations() {
             return;
         const stoppedEyeCoverage = stopEyeCoverage();
         running = false;
+        resetTrackingCue();
         let experimentalClose = null;
         if (experimentFlags.any) {
             experimentStopping = true;
@@ -532,6 +541,7 @@ export let yawnCount = 0, lastYawn = 0, _marHist = [], _mouthOpenSince = 0;
 export const MAR_YAWN_THRESH = 0.58, YAWN_HOLD_MS = 1200, YAWN_COOLDOWN_MS = 8000;
 export let _lastLightCheck = 0;
 export let _trackLostSince = 0, _lastTrackingWarning = 0;
+export let eyeLoss = null;
 export const TRACKING_WARNING_DELAY_MS = 5000, TRACKING_WARNING_COOLDOWN_MS = 30000;
 export let _lastBreakPrompt = 0;
 export let _sessionLog = [];
@@ -701,5 +711,6 @@ export function set__mouthOpenSince(value) { _mouthOpenSince = value; return val
 export function set__lastLightCheck(value) { _lastLightCheck = value; return value; }
 export function set__trackLostSince(value) { _trackLostSince = value; return value; }
 export function set__lastTrackingWarning(value) { _lastTrackingWarning = value; return value; }
+export function set_eyeLoss(value) { eyeLoss = value; return value; }
 export function set__lastBreakPrompt(value) { _lastBreakPrompt = value; return value; }
 export function set__sessionLog(value) { _sessionLog = value; return value; }

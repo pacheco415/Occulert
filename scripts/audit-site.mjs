@@ -469,10 +469,10 @@ const staticAssetBytes = staticAssetPaths.reduce((total, asset) => {
   const file = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");
   return total + statSync(join(root, file)).size;
 }, 0);
-// Local eye coverage adds 2,576 driver bytes to the 374,374-byte static baseline.
-// The reviewed 129.5 KB driver and 377.5 KB install ceilings retain bounded
-// headroom without preloading the optional catalog or experiment helper.
-if (staticAssetBytes > 377_500) fail(`service worker install cache must remain at or below 377.5 KB (found ${staticAssetBytes} bytes)`);
+// Local eye coverage adds elapsed-time accounting to the composed eye-status
+// and recovery-cue release. The 131.5 KB driver and 379 KB install ceilings
+// retain bounded headroom without preloading the optional catalog or helper.
+if (staticAssetBytes > 379_000) fail(`service worker install cache must remain at or below 379 KB (found ${staticAssetBytes} bytes)`);
 if (staticAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the experimental passkey client must not be stored in the offline static cache");
 if (!networkOnlyAssets.includes(`'/${assetByStem('passkey-auth.js')}'`)) fail("the passkey client must be listed as a network-only asset");
 if (staticAssets.includes(`'/${assetByStem('supabase-loader.js')}'`)) fail("the resilient Supabase loader must not be stored in the offline static cache");

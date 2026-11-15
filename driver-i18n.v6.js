@@ -197,6 +197,7 @@ const english = {
   "driver.voice.cue.drowsy": "Drowsiness detected, rest now",
   "driver.voice.cue.danger": "Danger! Pull over immediately",
   "driver.voice.on": "🔊 Voice ON",
+  "driver.voice.cue.eyesDetected": "Eyes detected.",
   "driver.break.counts": "{alerts} alert{alertSuffix}, {yawns} yawn{yawnSuffix}",
   "driver.break.banner": "🛑 Rest Stop Recommended — {minutes} min driving, {counts}. {dismissButton}",
   "driver.break.dismiss": "Dismiss",
@@ -303,7 +304,13 @@ const english = {
   "driver.experiment.status": "Parked experiment · local only · {flags}",
   "driver.report.body": "OCCULERT SESSION REPORT\n\nStatus: {status}\nDuration: {minutes} min\nSafety Score: {safetyScore}/100\n\nCalibration: {calibrationMode}\nOpen-eye EAR: {baselineEAR}\nClosed-eye threshold: {eyeClosedThreshold}\n\nAlerts Triggered: {alerts}\nEscalation Level: {escalationLevel}\nHead Nods Detected: {headNods}\nMicrosleeps Detected: {microsleeps}\nPERCLOS: {perclos}\nDistraction Time: {distractionSeconds}s\nAverage Fatigue: {avgFatigue}/100\nMax Fatigue: {maxFatigue}/100\n\nGPS Enabled: {gpsEnabled}\nDistance: {distanceMiles} mi\nLast Location: {location}\n\nSync Mode: {syncMode}\nLocal history: {localHistory}\nReport generated: {generatedAt}\n\nSafety and liability: Occulert is a supplemental prototype only. It may miss drowsiness, may trigger false alerts, and is not a certified safety, medical, emergency, legal, employment, fleet compliance, or transportation compliance device. Do not interact with the app while driving. If tired or unsafe, pull over and rest.",
   "driver.language.label": "Language",
-  "driver.language.englishNotice": "Safety guidance and voice cues remain in English."
+  "driver.language.englishNotice": "Safety guidance and safety alert voice cues remain in English.",
+  "driver.badge.eyesDetected": "✓ Eyes detected",
+  "driver.badge.eyesNotVisible": "⚠️ Can't see your eyes",
+  "driver.badge.noFace": "⚠️ No face in view",
+  "driver.state.eyesDetected": "EYES DETECTED",
+  "driver.state.eyesNotVisible": "EYES NOT VISIBLE",
+  "driver.state.noFace": "NO FACE"
 };
 const locales = {
   "en": {
@@ -387,6 +394,7 @@ const locales = {
     "driver.start.stop": "STOP MONITORING",
     "driver.start.start": "START MONITORING",
     "driver.voice.on": "🔊 Voice ON",
+    "driver.voice.cue.eyesDetected": "Eyes detected.",
     "driver.break.dismiss": "Dismiss",
     "driver.feedback.chooseReview": "Choose a review before saving.",
     "driver.camera.numberedFallback": "Camera {number}",
@@ -396,7 +404,13 @@ const locales = {
     "driver.overview.latest": "Latest saved session · {startedAt}",
     "driver.overview.empty": "No saved sessions in the last 7 days",
     "driver.overview.readUnavailable": "Local history unavailable",
-    "driver.language.label": "Language"
+    "driver.language.label": "Language",
+    "driver.badge.eyesDetected": "✓ Eyes detected",
+    "driver.badge.eyesNotVisible": "⚠️ Can't see your eyes",
+    "driver.badge.noFace": "⚠️ No face in view",
+    "driver.state.eyesDetected": "EYES DETECTED",
+    "driver.state.eyesNotVisible": "EYES NOT VISIBLE",
+    "driver.state.noFace": "NO FACE"
   },
   "es": {
     "driver.nav.skip": "Ir al contenido principal",
@@ -479,6 +493,7 @@ const locales = {
     "driver.start.stop": "DETENER MONITOREO",
     "driver.start.start": "INICIAR MONITOREO",
     "driver.voice.on": "🔊 Voz ACTIVADA",
+    "driver.voice.cue.eyesDetected": "Ojos detectados.",
     "driver.break.dismiss": "Cerrar",
     "driver.feedback.chooseReview": "Elige una evaluación antes de guardar.",
     "driver.camera.numberedFallback": "Cámara {number}",
@@ -488,7 +503,13 @@ const locales = {
     "driver.overview.latest": "Última sesión guardada · {startedAt}",
     "driver.overview.empty": "No hay sesiones guardadas en los últimos 7 días",
     "driver.overview.readUnavailable": "Historial local no disponible",
-    "driver.language.label": "Idioma"
+    "driver.language.label": "Idioma",
+    "driver.badge.eyesDetected": "✓ Ojos detectados",
+    "driver.badge.eyesNotVisible": "⚠️ No puedo ver tus ojos",
+    "driver.badge.noFace": "⚠️ No hay ningún rostro a la vista",
+    "driver.state.eyesDetected": "OJOS DETECTADOS",
+    "driver.state.eyesNotVisible": "OJOS NO VISIBLES",
+    "driver.state.noFace": "SIN ROSTRO"
   },
   "fr": {
     "driver.nav.skip": "Aller au contenu principal",
@@ -571,6 +592,7 @@ const locales = {
     "driver.start.stop": "ARRÊTER LA SURVEILLANCE",
     "driver.start.start": "DÉMARRER LA SURVEILLANCE",
     "driver.voice.on": "🔊 Voix ACTIVÉE",
+    "driver.voice.cue.eyesDetected": "Yeux détectés.",
     "driver.break.dismiss": "Fermer",
     "driver.feedback.chooseReview": "Choisissez un avis avant d’enregistrer.",
     "driver.camera.numberedFallback": "Caméra {number}",
@@ -580,7 +602,13 @@ const locales = {
     "driver.overview.latest": "Dernière session enregistrée · {startedAt}",
     "driver.overview.empty": "Aucune session enregistrée ces 7 derniers jours",
     "driver.overview.readUnavailable": "Historique local indisponible",
-    "driver.language.label": "Langue"
+    "driver.language.label": "Langue",
+    "driver.badge.eyesDetected": "✓ Yeux détectés",
+    "driver.badge.eyesNotVisible": "⚠️ Vos yeux ne sont pas visibles",
+    "driver.badge.noFace": "⚠️ Aucun visage dans le champ",
+    "driver.state.eyesDetected": "YEUX DÉTECTÉS",
+    "driver.state.eyesNotVisible": "YEUX NON VISIBLES",
+    "driver.state.noFace": "AUCUN VISAGE"
   },
   "pt": {
     "driver.nav.skip": "Ir para o conteúdo principal",
@@ -663,6 +691,7 @@ const locales = {
     "driver.start.stop": "PARAR MONITORAMENTO",
     "driver.start.start": "INICIAR MONITORAMENTO",
     "driver.voice.on": "🔊 Voz LIGADA",
+    "driver.voice.cue.eyesDetected": "Olhos detectados.",
     "driver.break.dismiss": "Fechar",
     "driver.feedback.chooseReview": "Escolha uma avaliação antes de salvar.",
     "driver.camera.numberedFallback": "Câmera {number}",
@@ -672,7 +701,13 @@ const locales = {
     "driver.overview.latest": "Última sessão salva · {startedAt}",
     "driver.overview.empty": "Nenhuma sessão salva nos últimos 7 dias",
     "driver.overview.readUnavailable": "Histórico local indisponível",
-    "driver.language.label": "Idioma"
+    "driver.language.label": "Idioma",
+    "driver.badge.eyesDetected": "✓ Olhos detectados",
+    "driver.badge.eyesNotVisible": "⚠️ Não consigo ver seus olhos",
+    "driver.badge.noFace": "⚠️ Nenhum rosto à vista",
+    "driver.state.eyesDetected": "OLHOS DETECTADOS",
+    "driver.state.eyesNotVisible": "OLHOS NÃO VISÍVEIS",
+    "driver.state.noFace": "SEM ROSTO"
   },
   "de": {
     "driver.nav.skip": "Zum Hauptinhalt springen",
@@ -755,6 +790,7 @@ const locales = {
     "driver.start.stop": "ÜBERWACHUNG STOPPEN",
     "driver.start.start": "ÜBERWACHUNG STARTEN",
     "driver.voice.on": "🔊 Sprachausgabe EIN",
+    "driver.voice.cue.eyesDetected": "Augen erkannt.",
     "driver.break.dismiss": "Schließen",
     "driver.feedback.chooseReview": "Wähle vor dem Speichern eine Bewertung aus.",
     "driver.camera.numberedFallback": "Kamera {number}",
@@ -764,7 +800,13 @@ const locales = {
     "driver.overview.latest": "Letzte gespeicherte Sitzung · {startedAt}",
     "driver.overview.empty": "Keine gespeicherten Sitzungen in den letzten 7 Tagen",
     "driver.overview.readUnavailable": "Lokaler Verlauf nicht verfügbar",
-    "driver.language.label": "Sprache"
+    "driver.language.label": "Sprache",
+    "driver.badge.eyesDetected": "✓ Augen erkannt",
+    "driver.badge.eyesNotVisible": "⚠️ Deine Augen sind nicht sichtbar",
+    "driver.badge.noFace": "⚠️ Kein Gesicht im Bild",
+    "driver.state.eyesDetected": "AUGEN ERKANNT",
+    "driver.state.eyesNotVisible": "AUGEN NICHT SICHTBAR",
+    "driver.state.noFace": "KEIN GESICHT"
   },
   "ar": {
     "driver.nav.skip": "الانتقال إلى المحتوى الرئيسي",
@@ -847,6 +889,7 @@ const locales = {
     "driver.start.stop": "إيقاف المراقبة",
     "driver.start.start": "بدء المراقبة",
     "driver.voice.on": "🔊 النطق مفعل",
+    "driver.voice.cue.eyesDetected": "تم رصد العينين.",
     "driver.break.dismiss": "إغلاق",
     "driver.feedback.chooseReview": "اختر تقييمًا قبل الحفظ.",
     "driver.camera.numberedFallback": "الكاميرا {number}",
@@ -856,7 +899,13 @@ const locales = {
     "driver.overview.latest": "آخر جلسة محفوظة · {startedAt}",
     "driver.overview.empty": "لا توجد جلسات محفوظة خلال آخر 7 أيام",
     "driver.overview.readUnavailable": "السجل المحلي غير متاح",
-    "driver.language.label": "اللغة"
+    "driver.language.label": "اللغة",
+    "driver.badge.eyesDetected": "✓ تم رصد العينين",
+    "driver.badge.eyesNotVisible": "⚠️ لا يمكن رؤية عينيك",
+    "driver.badge.noFace": "⚠️ لا يوجد وجه في مجال الرؤية",
+    "driver.state.eyesDetected": "تم رصد العينين",
+    "driver.state.eyesNotVisible": "العينان غير مرئيتين",
+    "driver.state.noFace": "لا يوجد وجه"
   },
   "zh": {
     "driver.nav.skip": "跳至主要内容",
@@ -939,6 +988,7 @@ const locales = {
     "driver.start.stop": "停止监测",
     "driver.start.start": "开始监测",
     "driver.voice.on": "🔊 语音开启",
+    "driver.voice.cue.eyesDetected": "已检测到眼睛。",
     "driver.break.dismiss": "关闭",
     "driver.feedback.chooseReview": "保存前请选择评价。",
     "driver.camera.numberedFallback": "摄像头 {number}",
@@ -948,7 +998,13 @@ const locales = {
     "driver.overview.latest": "最近保存的会话 · {startedAt}",
     "driver.overview.empty": "最近 7 天没有保存的会话",
     "driver.overview.readUnavailable": "本地历史记录不可用",
-    "driver.language.label": "语言"
+    "driver.language.label": "语言",
+    "driver.badge.eyesDetected": "✓ 已检测到眼睛",
+    "driver.badge.eyesNotVisible": "⚠️ 看不到你的眼睛",
+    "driver.badge.noFace": "⚠️ 画面中没有人脸",
+    "driver.state.eyesDetected": "已检测到眼睛",
+    "driver.state.eyesNotVisible": "眼睛不可见",
+    "driver.state.noFace": "无人脸"
   },
   "ja": {
     "driver.nav.skip": "メインコンテンツへ移動",
@@ -1031,6 +1087,7 @@ const locales = {
     "driver.start.stop": "モニタリング停止",
     "driver.start.start": "モニタリング開始",
     "driver.voice.on": "🔊 音声案内 ON",
+    "driver.voice.cue.eyesDetected": "目を検出しました。",
     "driver.break.dismiss": "閉じる",
     "driver.feedback.chooseReview": "保存する前に評価を選んでください。",
     "driver.camera.numberedFallback": "カメラ {number}",
@@ -1040,7 +1097,13 @@ const locales = {
     "driver.overview.latest": "最後に保存したセッション · {startedAt}",
     "driver.overview.empty": "過去 7 日間の保存済みセッションはありません",
     "driver.overview.readUnavailable": "ローカル履歴を利用できません",
-    "driver.language.label": "言語"
+    "driver.language.label": "言語",
+    "driver.badge.eyesDetected": "✓ 目を検出しました",
+    "driver.badge.eyesNotVisible": "⚠️ 目が見えません",
+    "driver.badge.noFace": "⚠️ 顔が映っていません",
+    "driver.state.eyesDetected": "目を検出",
+    "driver.state.eyesNotVisible": "目が見えません",
+    "driver.state.noFace": "顔なし"
   }
 };
 for (const values of Object.values(locales)) Object.freeze(values);
@@ -1059,7 +1122,11 @@ function text(locale, key, params = {}, fallback = '') {
   const pattern = typeof value === 'string' && value && JSON.stringify(slots(value)) === JSON.stringify(slots(source)) ? value : source;
   return format(pattern, params) ?? fallback;
 }
-const api = { english, locales, text };
+function eyesDetectedCue(value) {
+  const lang = Object.hasOwn(locales, value) ? value : 'en';
+  return {text:text(lang,'voice.cue.eyesDetected'),lang};
+}
+const api = { english, locales, text, eyesDetectedCue };
 if (typeof module === 'object' && module.exports) module.exports = api;
 if (!root.document || !document.querySelector('[data-driver-owned]')) return;
 let locale = 'en', pending = false;
@@ -1167,6 +1234,7 @@ function render() {
   } finally { observe(); }
 }
 api.get = (key,params) => text(locale,key,params);
+api.eyesDetectedCue = () => eyesDetectedCue(locale);
 api.setLang = value => { locale = Object.hasOwn(locales,value) ? value : 'en'; render(); };
 root.OcculertDriverI18n = Object.freeze(api);
 api.setLang(root.OcculertLang?.getLang() || 'en');

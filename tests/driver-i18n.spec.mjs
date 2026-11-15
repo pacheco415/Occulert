@@ -17,6 +17,68 @@ async function ready(page,locale='en',storageDenied=false,url='/app.html') {
   },{locale,storageDenied});
   await page.goto(url);await expect(page.locator('#startBtn')).toBeEnabled();
 }
+
+for(const locale of ['en','es','fr','pt','de','ar','zh','ja'])test(`${locale} shows three distinct eye states while retaining English safety and risk priority`,async({page})=>{
+  await page.setViewportSize({width:320,height:568});
+  await ready(page,locale);
+  await expect(page.locator('#driverPanelTitle')).toHaveText(t(locale,'panel.title'));
+  await page.evaluate(()=>{running=true;calibrating=false;calibrated=true;fatigue=0;confidence=80;noFaceSince=0;cloudConsent.checked=false;});
+  for(const state of [
+    {hasFace:true,hasGoodEAR:true,reason:null,key:'eyesDetected',color:'rgb(0, 255, 136)'},
+    {hasFace:true,hasGoodEAR:false,reason:'eyes-not-visible',key:'eyesNotVisible',color:'rgb(255, 170, 0)'},
+    {hasFace:false,hasGoodEAR:false,reason:'no-face',key:'noFace',color:'rgb(255, 170, 0)'},
+  ]) {
+    await page.evaluate(state=>{_trackLostSince=Date.now()-3001;updateTrackingState(state.hasFace,state.hasGoodEAR,state.reason);render(.28);},state);
+    await expect(page.locator('#trackingBadge')).toHaveText(t(locale,'badge.'+state.key));
+    await expect(page.locator('#driveState')).toHaveText(t(locale,'state.'+state.key));
+    await expect(page.locator('#status')).toHaveText(t(locale,'state.'+state.key));
+    await expect(page.locator('#trackingBadge')).toHaveCSS('color',state.color);
+    for(const id of ['trackingBadge','driveState','status']) {
+      await expect(page.locator('#'+id)).toHaveAttribute('lang',locale);
+      await expect(page.locator('#'+id)).toHaveAttribute('dir',locale==='ar'?'rtl':'ltr');
+    }
+    await expect(page.locator('#driveHint')).toHaveAttribute('lang','en');
+    await expect(page.locator('#driveHint')).toContainText(state.reason?'Alerts may be missed':'does not mean it is safe to drive');
+  }
+  await page.evaluate(()=>{updateTrackingState(true,true,null);calibrating=true;render(.28);});
+  await expect(page.locator('#driveState')).toHaveText('CALIBRATING');
+  await expect(page.locator('#driveState')).toHaveAttribute('lang','en');
+  await page.evaluate(()=>{calibrating=false;fatigue=65;render(.28);});
+  await expect(page.locator('#driveState')).toHaveText('HIGH');
+  await expect(page.locator('#driveHint')).toHaveText('Pull over safely and rest. Do not keep driving tired.');
+  await page.evaluate(value=>OcculertLang.setLang(value),locale==='es'?'ar':'es');
+  await page.evaluate(value=>OcculertLang.setLang(value),locale);
+  await expect(page.locator('#driveState')).toHaveText('HIGH');
+  await expect(page.locator('#driveState')).toHaveAttribute('lang','en');
+  await page.evaluate(()=>{running=false;render(.28);});
+  await expect(page.locator('#driveState')).toHaveText('NOT MONITORING');
+  await expect(page.locator('#driverSafetyNotice')).toContainText('supplemental prototype only');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});
+
+test('late catalog renders the latest loss reason and cannot resurrect it after monitoring stops',async({page})=>{
+  let release;const gate=new Promise(resolve=>release=resolve);
+  await page.route('**'+catalog,async route=>{await gate;await route.continue();});
+  await page.addInitScript(()=>localStorage.setItem('occulert_lang','ar'));
+  try {
+    await page.goto('/app.html',{waitUntil:'domcontentloaded'});await expect(page.locator('#startBtn')).toBeEnabled();
+    await page.evaluate(()=>{
+      running=true;calibrating=false;calibrated=true;noFaceSince=0;
+      _trackLostSince=Date.now()-3001;updateTrackingState(true,false,'eyes-not-visible');render(.28);
+      updateTrackingState(false,false,'no-face');render(.28);
+    });
+    await expect(page.locator('#driveState')).toHaveText('NO FACE');
+    await expect(page.locator('#trackingBadge')).toHaveText('⚠️ No face in view');
+  } finally {release();}
+  await expect(page.locator('#driveState')).toHaveText(t('ar','state.noFace'));
+  await expect(page.locator('#trackingBadge')).toHaveText(t('ar','badge.noFace'));
+  await page.evaluate(()=>{running=false;render(.28);});
+  await page.evaluate(()=>OcculertLang.setLang('es'));
+  await expect(page.locator('#driveState')).toHaveText('NOT MONITORING');
+  await expect(page.locator('#status')).toHaveText('NOT MONITORING');
+  await expect(page.locator('#driveHint')).toHaveText('Press Start Monitoring only when safely parked.');
+});
+
 for(const locale of ['es','ar'])test(`${locale} ordinary UI, attributes, dynamic states and repeated switches at mobile width`,async({page})=>{
   await page.setViewportSize({width:390,height:844});
   await ready(page,locale);
@@ -310,4 +372,33 @@ test('raw frame metrics and logs never trigger a catalog binding sweep',async({p
     } finally {document.querySelector=original;}
   });
   expect(counts.positive).toBeGreaterThan(0);expect(counts.raw).toBe(0);expect(counts.perclos).toBe('9%');
+});
+
+test('a warned eye-loss recovery uses the current catalog once while safety speech stays English',async({page})=>{
+  await page.addInitScript(()=>{
+    window.__restoredSpeech=[];
+    Object.defineProperty(window,'AudioContext',{configurable:true,value:undefined});
+    Object.defineProperty(window,'webkitAudioContext',{configurable:true,value:undefined});
+    Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{paused:false,resume(){},cancel(){},speak(cue){window.__restoredSpeech.push({text:cue.text,lang:cue.lang});}}});
+    window.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};
+  });
+  await ready(page,'ar');await expect(page.locator('#driverPanelTitle')).toHaveText(t('ar','panel.title'));
+  await page.locator('#voiceToggleBtn').click();
+  for(const locale of ['ar','es']) {
+    if(locale==='es')await page.locator('#driverLanguage').selectOption(locale);
+    await expect(page.locator('#driverPanelTitle')).toHaveText(t(locale,'panel.title'));
+    const cues=await page.evaluate(()=>{
+      window.__restoredSpeech=[];running=true;resetTrackingCue();_lastTrackingWarning=0;
+      _trackLostSince=Date.now()-4999;updateTrackingState(true,true);
+      const brief=window.__restoredSpeech.length;
+      _trackLostSince=Date.now()-5000;warnTrackingLoss(Date.now());
+      updateTrackingState(true,true);updateTrackingState(true,true);running=false;
+      return {brief,spoken:window.__restoredSpeech,alerts};
+    });
+    expect(cues.brief).toBe(0);expect(cues.alerts).toBe(0);
+    expect(cues.spoken).toEqual([
+      {text:'Camera view lost. Pull over safely before repositioning the phone.',lang:'en-US'},
+      {text:t(locale,'voice.cue.eyesDetected'),lang:locale},
+    ]);
+  }
 });
