@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { constants, createHash, createPublicKey, publicEncrypt } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { closeSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { resolve, relative, sep } from 'node:path';
@@ -394,6 +394,53 @@ const DOWNLOAD_CODES = new Set(['IPA_URL_MISSING', 'IPA_URL_INVALID', 'IPA_SCHEM
 const HOST_CLASSES = ['unknown', 'expo', 'eas-cdn', 'google-storage', 'other'];
 const ENCODINGS = ['absent', 'identity', 'gzip', 'br', 'deflate', 'other'];
 
+// Temporary, pinned recipient for the rejected-host diagnostic only. The
+// matching private key stays with the release owner, outside Git and Actions.
+export const HOST_DIAGNOSTIC = Object.freeze({
+  algorithm: 'RSA-OAEP-SHA256',
+  keySha256: 'bd181dacd81c33d5d99083b65f6f517dca926985d0bbbe48ea48a3325dff327b',
+  label: 'occulert-testflight-redirect-host-v1',
+  publicKey: `-----BEGIN PUBLIC KEY-----
+MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA6gU+Kh5j8gnI44+xveDi
+nz2caY+3GvvPGADurQtsFG8PrC3Lp6zwPmOL4Wu61kLfT+X/5+rEzOmEE0p/hExV
+V0yrf1jbwdyNV3Mi+0ZrVNSwUYBZTEY8k7Xr/vSPKDWfyJRbLUI9oay31IbL1cOG
+kiUOGDcMHZtPrJW20P3LXk4A01of05lw5kFt3IWTAX+0JR8Lntq+PkrfDq4ZKFHw
+38GSXmpWHGnAxLEo0fbuNMMibkqRby0HStYr+1bTb4GbdLIFUpQRx7K4g3RA7bZ+
+786oBJ3IkuWvpiNh6FfsJR+eNpqE1bTvklCWcr29BSOzT8Gy+n5fA2d8ifMg677r
+fXkE5i3Le1OmPVXmE7ncNiIeZ0OjV1Sr2qAWPfonr4V/2mMVW3pZPY3ZHWm88edp
+i0lHqzqUbJZZwyesDbwedZgij/dA3law10NcecbJ3LJp8gYjETmp8Bty19S7t8Hg
+ykvYetT9UigoHRzPnu2p+DtdCFd06pf3Oejb83f6TzotAgMBAAE=
+-----END PUBLIC KEY-----
+`,
+});
+
+export function sealRejectedHostname(hostname, { createKey = createPublicKey, encrypt = publicEncrypt } = {}) {
+  try {
+    // Only the WHATWG URL's canonical hostname is admissible, never a URL,
+    // Location header, path, query, credential, or arbitrary provider text.
+    if (typeof hostname !== 'string' || !/^[\x21-\x7e]{1,253}$/.test(hostname)
+      || new URL(`https://${hostname}`).hostname !== hostname) return undefined;
+    const key = createKey(HOST_DIAGNOSTIC.publicKey);
+    if (key.type !== 'public' || key.asymmetricKeyType !== 'rsa' || key.asymmetricKeyDetails?.modulusLength !== 3072
+      || hash(key.export({ format: 'der', type: 'spki' })) !== HOST_DIAGNOSTIC.keySha256) return undefined;
+    const ciphertext = encrypt({ key, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256',
+      oaepLabel: Buffer.from(HOST_DIAGNOSTIC.label, 'ascii') }, Buffer.from(hostname, 'ascii'));
+    if (!Buffer.isBuffer(ciphertext) || ciphertext.length !== 384) return undefined;
+    return { algorithm: HOST_DIAGNOSTIC.algorithm, keySha256: HOST_DIAGNOSTIC.keySha256,
+      ciphertext: ciphertext.toString('base64') };
+  } catch {
+    // A diagnostic must never change the host rejection or expose a crypto error.
+    return undefined;
+  }
+}
+
+function boundedSealedHost(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || value.algorithm !== HOST_DIAGNOSTIC.algorithm || value.keySha256 !== HOST_DIAGNOSTIC.keySha256
+    || typeof value.ciphertext !== 'string' || !/^[A-Za-z0-9+/]{512}$/.test(value.ciphertext)) return undefined;
+  return { algorithm: HOST_DIAGNOSTIC.algorithm, keySha256: HOST_DIAGNOSTIC.keySha256, ciphertext: value.ciphertext };
+}
+
 export class IpaDownloadError extends Error {
   constructor(code, details = {}) {
     assert.ok(DOWNLOAD_CODES.has(code), 'Unknown bounded download code.');
@@ -405,6 +452,8 @@ export class IpaDownloadError extends Error {
     }
     if (HOST_CLASSES.includes(details.hostClass)) this.diagnostic.hostClass = details.hostClass;
     if (ENCODINGS.includes(details.encoding)) this.diagnostic.encoding = details.encoding;
+    const sealedHost = code === 'IPA_HOST' && details.hostClass === 'other' ? boundedSealedHost(details.sealedHost) : undefined;
+    if (sealedHost) this.diagnostic.sealedHost = sealedHost;
   }
 }
 
@@ -413,7 +462,7 @@ export function downloadDiagnostic(error) {
     ? new IpaDownloadError(error.diagnostic.code, error.diagnostic).diagnostic : null;
 }
 
-export async function ipaDigest(build, fetchImpl = fetch, privatePath, io = { openSync, writeSync, closeSync, rmSync }) {
+export async function ipaDigest(build, fetchImpl = fetch, privatePath, io = { openSync, writeSync, closeSync, rmSync }, sealHost = sealRejectedHostname) {
   const details = { redirects: 0, hostClass: 'unknown', receivedBytes: 0 };
   const fail = code => new IpaDownloadError(code, details);
   const rawUrl = build.artifacts?.applicationArchiveUrl;
@@ -426,7 +475,10 @@ export async function ipaDigest(build, fetchImpl = fetch, privatePath, io = { op
       : url.hostname === 'storage.googleapis.com' || url.hostname.endsWith('.storage.googleapis.com') ? 'google-storage' : 'other';
     if (url.protocol !== 'https:') throw fail('IPA_SCHEME');
     if (url.username || url.password || url.port) throw fail('IPA_AUTHORITY');
-    if (details.hostClass === 'other') throw fail('IPA_HOST');
+    if (details.hostClass === 'other') {
+      try { details.sealedHost = sealHost(url.hostname); } catch { /* Preserve IPA_HOST without plaintext fallback. */ }
+      throw fail('IPA_HOST');
+    }
     // Artifact storage never receives EXPO_TOKEN or GITHUB_TOKEN.
     let response;
     try { response = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(300000) }); }
