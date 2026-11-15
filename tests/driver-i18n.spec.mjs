@@ -373,3 +373,32 @@ test('raw frame metrics and logs never trigger a catalog binding sweep',async({p
   });
   expect(counts.positive).toBeGreaterThan(0);expect(counts.raw).toBe(0);expect(counts.perclos).toBe('9%');
 });
+
+test('a warned eye-loss recovery uses the current catalog once while safety speech stays English',async({page})=>{
+  await page.addInitScript(()=>{
+    window.__restoredSpeech=[];
+    Object.defineProperty(window,'AudioContext',{configurable:true,value:undefined});
+    Object.defineProperty(window,'webkitAudioContext',{configurable:true,value:undefined});
+    Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{paused:false,resume(){},cancel(){},speak(cue){window.__restoredSpeech.push({text:cue.text,lang:cue.lang});}}});
+    window.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};
+  });
+  await ready(page,'ar');await expect(page.locator('#driverPanelTitle')).toHaveText(t('ar','panel.title'));
+  await page.locator('#voiceToggleBtn').click();
+  for(const locale of ['ar','es']) {
+    if(locale==='es')await page.locator('#driverLanguage').selectOption(locale);
+    await expect(page.locator('#driverPanelTitle')).toHaveText(t(locale,'panel.title'));
+    const cues=await page.evaluate(()=>{
+      window.__restoredSpeech=[];running=true;resetTrackingCue();_lastTrackingWarning=0;
+      _trackLostSince=Date.now()-4999;updateTrackingState(true,true);
+      const brief=window.__restoredSpeech.length;
+      _trackLostSince=Date.now()-5000;warnTrackingLoss(Date.now());
+      updateTrackingState(true,true);updateTrackingState(true,true);running=false;
+      return {brief,spoken:window.__restoredSpeech,alerts};
+    });
+    expect(cues.brief).toBe(0);expect(cues.alerts).toBe(0);
+    expect(cues.spoken).toEqual([
+      {text:'Camera view lost. Pull over safely before repositioning the phone.',lang:'en-US'},
+      {text:t(locale,'voice.cue.eyesDetected'),lang:locale},
+    ]);
+  }
+});

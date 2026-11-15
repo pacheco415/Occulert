@@ -2,7 +2,7 @@ import "./camera.js";
 import { signalDetectionResult } from "./detector.js";
 import { updateCalibration } from "./calibration.js";
 import { scoringSmooth, scoringNodHistory, scoringNodDetected, scoringResetContinuity, scoringNoFace, scoringCalibrationFrame, scoringConfidence, scoringEyeMetrics, scoringTrackedFrame, scoringYawn, scoringDistractionSeconds, scoringAlertCandidate, scoringDistractionMatured } from "./scoring-core.js";
-import { alerts, escalationLevel, tone, trigger, speak, triggerBreakCheck } from "./alerts.js";
+import { alerts, escalationLevel, tone, trigger, speak, triggerBreakCheck, playRestoredCue, clearRestoredCue } from "./alerts.js";
 import "./storage-history.js";
 import { queueBackendEvent } from "./cloud-sync.js";
 import { uiText, set_eyeLoss } from "./ui.js";
@@ -283,12 +283,23 @@ export function checkLightLevel(videoEl) {
     }
     catch (e) { }
 }
+let warnedLoss = 0, trackingEpoch = 0;
+export function resetTrackingCue() {
+    warnedLoss = 0;
+    trackingEpoch++;
+    clearRestoredCue();
+}
 export function warnTrackingLoss(now) {
     if (!running || !_trackLostSince || now - _trackLostSince < TRACKING_WARNING_DELAY_MS || now - _lastTrackingWarning < TRACKING_WARNING_COOLDOWN_MS)
         return;
     set__lastTrackingWarning(now);
+    const epoch = ++trackingEpoch;
+    warnedLoss = _trackLostSince;
     tone(660, 260, .2);
-    setTimeout(() => tone(440, 320, .2), 320);
+    setTimeout(() => {
+        if (running && epoch === trackingEpoch && _trackLostSince === warnedLoss)
+            tone(440, 320, .2);
+    }, 320);
     speak('Camera view lost. Pull over safely before repositioning the phone.');
     log('Tracking lost - pull over safely before adjusting the camera');
 }
@@ -300,10 +311,17 @@ export function updateTrackingState(hasFace, hasGoodEAR, reason = hasFace ? 'eye
         return;
     const now = Date.now();
     if (!detected) {
-        if (!_trackLostSince)
+        if (!_trackLostSince) {
+            clearRestoredCue();
             set__trackLostSince(now);
+        }
         if (now - _trackLostSince <= 3000) return;
-    } else set__trackLostSince(0);
+    } else if (_trackLostSince) {
+        const warned = warnedLoss === _trackLostSince;
+        resetTrackingCue();
+        set__trackLostSince(0);
+        if (warned) playRestoredCue();
+    }
     const [key, label] = detected ? ['eyesDetected', '✓ Eyes detected'] : reason === 'no-face' ? ['noFace', '⚠️ No face in view'] : ['eyesNotVisible', "⚠️ Can't see your eyes"];
     uiText(b, 'badge.' + key, label);
     b.style.color = detected ? '#00ff88' : '#ffaa00';
