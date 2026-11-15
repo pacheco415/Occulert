@@ -11,10 +11,41 @@
     const selected = { elapsed: matches('fatigue-timing', 'elapsed'), pixels: matches('ear-units', 'pixels'),
       tasks: matches('detector', 'tasks'), noface: matches('noface-escalation', '1'),
       timePerclos: matches('perclos', 'time'), pitch: matches('pitch-gate', '1'),
-      distractionConfidence: matches('distraction-confidence', 'stable'), observer: matches('observer', '1'), calibrationMin: matches('calibration-min', '12') };
+      distractionConfidence: matches('distraction-confidence', 'stable'), observer: matches('observer', '1'), calibrationMin: matches('calibration-min', '12'), eyeVisibility: matches('eye-visibility', '1') };
     const names = Object.keys(selected).filter(key => selected[key]).sort();
     return Object.freeze({ ...selected, names: Object.freeze(names), any: names.length > 0,
-      primary: names.some(name => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin'].includes(name)), delegate: matches('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+      primary: names.some(name => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin', 'eyeVisibility'].includes(name)), delegate: matches('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+  }
+
+  // An unvalidated observation, not a covered-eye classifier. Open, still eyes
+  // can have the same variance as inferred landmarks behind sunglasses.
+  const eyeVisibilityConfig = Object.freeze({ method: 'ear-variance-v1', windowMs: 10000,
+    minWindowMs: 8000, minSamples: 40, maxGapMs: 1000, capacity: 1024,
+    varianceThreshold: .000004, validated: false, changesStatusOrAlerts: false });
+  function createEyeVisibility() {
+    const c = eyeVisibilityConfig, times = new Float64Array(c.capacity), ears = new Float64Array(c.capacity);
+    let head = 0, size = 0, previous = null, sum = 0, squares = 0;
+    function reset() { head = size = sum = squares = 0; previous = null; }
+    function drop() { sum -= ears[head]; squares -= ears[head] ** 2; head = (head + 1) % c.capacity; size--; }
+    function snapshot() {
+      const span = size ? previous - times[head] : 0, ready = size >= c.minSamples && span >= c.minWindowMs;
+      const variance = ready ? Math.max(0, squares / size - (sum / size) ** 2) : null;
+      return { eyeVisibilitySamples: size, eyeVisibilityWindowMs: span,
+        eyeVisibilityVariance: variance, eyeVisibilityCandidate: ready ? Number(variance < c.varianceThreshold) : null };
+    }
+    function add(at, ear, usable) {
+      if (!finite(at) || at < 0 || !usable || !finite(ear) || ear <= .05 || ear >= .65) {
+        reset(); return snapshot();
+      }
+      if (previous !== null && at <= previous) { reset(); return snapshot(); }
+      if (previous !== null && at - previous > c.maxGapMs) reset();
+      while (size && at - times[head] > c.windowMs) drop();
+      if (size === c.capacity) drop();
+      const index = (head + size++) % c.capacity;
+      times[index] = previous = at; ears[index] = ear; sum += ear; squares += ear ** 2;
+      return snapshot();
+    }
+    return Object.freeze({ add, snapshot, reset });
   }
 
   function eyeEAR(landmarks, indices, width, height) {
@@ -253,10 +284,11 @@
     'tasksInferenceMs', 'combinedFrameMs', 'perclos', 'observedMs', 'closedMs', 'fatigue',
     'confidence', 'legacyUsable', 'tasksUsable', 'calibrating', 'pitchDown']);
   const BOOLEAN_FIELDS = new Set(['legacyUsable', 'tasksUsable', 'calibrating', 'pitchDown']);
-  function createTraceStore({ capacity = 2400, alertCapacity = 256 } = {}) {
+  function createTraceStore({ capacity = 2400, alertCapacity = 256, eyeVisibility = false } = {}) {
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 20000 ||
         !Number.isInteger(alertCapacity) || alertCapacity < 1 || alertCapacity > 4096) throw new Error('Invalid trace bounds');
-    const data = new Float64Array(capacity * TRACE_FIELDS.length), alertTimes = new Float64Array(alertCapacity), alertKinds = new Uint8Array(alertCapacity);
+    const fields = eyeVisibility ? [...TRACE_FIELDS, 'eyeVisibilitySamples', 'eyeVisibilityWindowMs', 'eyeVisibilityVariance', 'eyeVisibilityCandidate'] : TRACE_FIELDS;
+    const data = new Float64Array(capacity * fields.length), alertTimes = new Float64Array(alertCapacity), alertKinds = new Uint8Array(alertCapacity);
     let head = 0, size = 0, total = 0, validLegacy = 0, validTasks = 0, droppedFrames = 0;
     let alertHead = 0, alertSize = 0, droppedAlerts = 0, lastFrame = 0, lastAt = -1, lastMediaTime = null;
     function add(row) {
@@ -266,9 +298,9 @@
       lastFrame = row.frameId; lastAt = row.atMs;
       lastMediaTime = finite(row.mediaTime) ? row.mediaTime : null;
       if (size === capacity) { head = (head + 1) % capacity; size--; droppedFrames++; }
-      const offset = ((head + size++) % capacity) * TRACE_FIELDS.length;
-      for (let column = 0; column < TRACE_FIELDS.length; column++) {
-        const name = TRACE_FIELDS[column], value = row[name];
+      const offset = ((head + size++) % capacity) * fields.length;
+      for (let column = 0; column < fields.length; column++) {
+        const name = fields[column], value = row[name];
         data[offset + column] = BOOLEAN_FIELDS.has(name) ? Number(value === true) : finite(value) ? value : NaN;
       }
       total++; if (row.legacyUsable === true) validLegacy++; if (row.tasksUsable === true) validTasks++;
@@ -285,9 +317,9 @@
     function samples() {
       const result = [];
       for (let i = 0; i < size; i++) {
-        const offset = ((head + i) % capacity) * TRACE_FIELDS.length, row = {};
-        for (let j = 0; j < TRACE_FIELDS.length; j++) {
-          const name = TRACE_FIELDS[j], value = data[offset + j];
+        const offset = ((head + i) % capacity) * fields.length, row = {};
+        for (let j = 0; j < fields.length; j++) {
+          const name = fields[j], value = data[offset + j];
           row[name] = BOOLEAN_FIELDS.has(name) ? value === 1 : Number.isFinite(value) ? value : null;
         }
         result.push(row);
@@ -303,7 +335,7 @@
       return result;
     }
     function summary() {
-      const firstOffset = head * TRACE_FIELDS.length, lastOffset = ((head + size - 1) % capacity) * TRACE_FIELDS.length;
+      const firstOffset = head * fields.length, lastOffset = ((head + size - 1) % capacity) * fields.length;
       return { totalFrames: total, legacyUsableFrames: validLegacy, tasksUsableFrames: validTasks,
         retainedFrames: size, capacity, droppedFrames, retainedAlerts: alertSize, droppedAlerts,
         retainedStartMs: size ? data[firstOffset + 1] : null, retainedEndMs: size ? data[lastOffset + 1] : null,
@@ -314,7 +346,7 @@
   }
 
   const api = Object.freeze({ parseFlags, eyeEAR, createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline,
-    createNoFaceEvidence, matrixPose, parseTasksResult, createTraceStore, createObserverEpisodes });
+    createNoFaceEvidence, matrixPose, parseTasksResult, createTraceStore, createObserverEpisodes, createEyeVisibility, eyeVisibilityConfig });
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.OcculertDetectionExperiments = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -333,6 +365,7 @@
     let trace = models.createTraceStore(), lastTrace = null, invalidatedFrames = 0, skippedRepeatedFrames = 0;
     let scoringReplay = null, scoringWallStart = 0, scoringOrder = 0;
     const observer = flags.observer ? models.createObserverEpisodes() : null;
+    const visibility = flags.eyeVisibility ? models.createEyeVisibility() : null;
     let lastObserverCsv = null;
     const units = value => flags.pixels ? value * 4 / 3 : value;
     const now = () => b.now();
@@ -368,6 +401,7 @@
       distractionAt = null; previousDistracted = false; lossEpisode = null; lossRequested = false;
     }
     function resetCalibration() {
+      visibility?.reset();
       baseline.reset(); pitchBaseline = null; calibration = null; calibrationDeadline = null;
       perclos.reset(); resetContinuity(); pitchDown = false; calibrationRevision++;
       const s = b.read();
@@ -390,14 +424,15 @@
     function begin() {
       stop(); active = true; generation++; startedAt = now(); geometry = '';
       previousFrameAt = null; frameSequence = invalidatedFrames = skippedRepeatedFrames = 0;
-      trace = models.createTraceStore(); lastTrace = null; calibrationRevision = 0;
+      trace = models.createTraceStore({ eyeVisibility: flags.eyeVisibility }); lastTrace = null; calibrationRevision = 0;
       observer?.reset(); lastObserverCsv = null;
+      visibility?.reset();
       perclos.reset(); rates.reset(); baseline.reset(); evidence.reset();
       pitchBaseline = calibration = null; pitchDown = pitchUnknownLast = false; calibrationDeadline = null;
       previousNose = distractionAt = null; previousDistracted = false; lossEpisode = null; lossRequested = false;
       if (flags.pixels || flags.pitch) resetCalibration();
       scoringReplay = null; scoringOrder = 0;
-      if ((flags.tasks || flags.observer) && typeof b.scoringState === 'function' && typeof b.scoringSettings === 'function') {
+      if ((flags.tasks || flags.observer || flags.eyeVisibility) && typeof b.scoringState === 'function' && typeof b.scoringSettings === 'function') {
         scoringWallStart = b.wallNow();
         scoringReplay = { version: 2, epochMs: 1700000000000, initialState: scoringSnapshot(),
           initialSettings: { ...b.scoringSettings() }, frames: [], controls: [], droppedFrames: 0, droppedControls: 0 };
@@ -586,7 +621,7 @@
       return frame;
     }
     function recordResults(res, rawEar, smoothedEar, turned) {
-      if (!active || (!flags.tasks && !flags.observer) || !frame || frame.recorded || frame.generation !== generation) return;
+      if (!active || (!flags.tasks && !flags.observer && !flags.eyeVisibility) || !frame || frame.recorded || frame.generation !== generation) return;
       if (frame.calibrationRevision !== calibrationRevision) { invalidatedFrames++; frame.recorded = true; return; }
       const time = now(), s = b.read();
       let parsed = models.parseTasksResult(null), tasksMs = null;
@@ -595,8 +630,11 @@
         if (sample) { parsed = models.parseTasksResult(sample.result); tasksMs = sample.inferenceMs; }
       }
       const end = now(), support = flags.timePerclos ? perclos.snapshot() : null;
+      const eyeVisibility = visibility?.add(frame.at, rawEar,
+        !!res.multiFaceLandmarks?.[0] && !frame.calibrating && !s.calibrating && !turned && !pitchDown &&
+        (!flags.pitch || pitchBaseline === null || models.pitchRatio(res.multiFaceLandmarks?.[0]) !== null));
       trace.add({ frameId: frame.frameId, atMs: frame.at - startedAt, mediaTime: frame.mediaTime,
-        rawEar, smoothedEar, ...parsed, legacyUsable: (frame.paired || flags.observer && !flags.tasks) && Number.isFinite(rawEar) && !frame.calibrating && !s.calibrating && !turned && !pitchDown && (!flags.pitch || pitchBaseline === null || models.pitchRatio(res.multiFaceLandmarks?.[0]) !== null),
+        rawEar, smoothedEar, ...parsed, ...eyeVisibility, legacyUsable: (frame.paired || (flags.observer || flags.eyeVisibility) && !flags.tasks) && Number.isFinite(rawEar) && !frame.calibrating && !s.calibrating && !turned && !pitchDown && (!flags.pitch || pitchBaseline === null || models.pitchRatio(res.multiFaceLandmarks?.[0]) !== null),
         tasksUsable: frame.paired && parsed.tasksUsable && !frame.calibrating && !s.calibrating,
         legacyInferenceMs: frame.legacyEndedAt === null ? null : Math.max(0, frame.legacyEndedAt - frame.inferenceStartedAt), tasksInferenceMs: tasksMs,
         combinedFrameMs: Math.max(0, end - frame.at), perclos: support?.perclos ?? null,
@@ -610,6 +648,7 @@
     }
     function recalibrate() {
       if (!active) return;
+      visibility?.reset();
       if (flags.pixels || flags.pitch) resetCalibration(); else { resetContinuity(); perclos.reset(); calibrationRevision++; }
       if (scoringReplay) {
         if (scoringReplay.controls.length === 256) { scoringReplay.controls.shift(); scoringReplay.droppedControls++; }
@@ -619,7 +658,7 @@
     }
     function qualifiedLoss(context) { return active && flags.noface && context === lossEpisode && context?.qualified && !b.read().calibrating; }
     function legacyResult() { if (active && frame && frame.generation === generation) frame.legacyEndedAt = now(); }
-    function recordAlert(reason) { if (active && (flags.tasks || flags.observer)) trace.recordAlert(now() - startedAt, reason); }
+    function recordAlert(reason) { if (active && (flags.tasks || flags.observer || flags.eyeVisibility)) trace.recordAlert(now() - startedAt, reason); }
     function markObserver(label) {
       const marked = !!observer && active && observer.mark(label, Math.max(0, now() - startedAt));
       if (marked) b.ui.observer?.();
@@ -637,6 +676,7 @@
         calibration, geometryUnits: flags.pixels ? 'pixels-reference-3x4' : 'normalized',
         timePerclos: flags.timePerclos ? perclos.snapshot(now()) : null,
         ...trace.summary(), invalidatedFrames, skippedRepeatedFrames,
+        ...(visibility ? { eyeVisibility: models.eyeVisibilityConfig } : {}),
         ...(observer ? { observerEpisodes: observer.summary().episodes, observerRejected: observer.summary().rejected } : {}) };
     }
     function exportData() {
@@ -663,6 +703,7 @@
       b.ui.observer?.();
       if (collector) { collector.stop(); collector = null; }
       rates.reset(); baseline.reset(); evidence.reset(); previousNose = null;
+      visibility?.reset();
       return lastTrace?.session ?? null;
     }
     return Object.freeze({ begin, stop, score, results, observeGeometry, finishCalibration, capture, recordResults,
@@ -799,7 +840,7 @@ function createMountedController(flags){
  }
  cloudConsent.checked=false;cloudConsent.disabled=true;
  const status=document.getElementById('experimentStatus');if(status){status.hidden=false;status.textContent='Parked experiment · local only · '+flags.names.join(', ')}
- const exportBtn=document.getElementById('exportDetectionTrace');if(exportBtn){exportBtn.hidden=!flags.tasks&&!flags.observer;exportBtn.addEventListener('click',()=>{
+ const exportBtn=document.getElementById('exportDetectionTrace');if(exportBtn){exportBtn.hidden=!flags.tasks&&!flags.observer&&!flags.eyeVisibility;exportBtn.addEventListener('click',()=>{
   if(running||starting)return;const data=controller.exportData();if(!data){log('Run and stop a parked comparison first.');return}
   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='occulert-parked-detection.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  })}

@@ -133,3 +133,18 @@ test('comparison validation keeps participant splits and detector versions separ
  const groups=comparisonByDetector(rows,[...result.sessions,second]);assert.equal(groups.overall,null);assert.equal(Object.keys(groups.detectors).length,2);
  assert.equal(comparisonByDetector(rows,result.sessions).overall.retainedFrames,result.comparison.length);
 });
+
+test('eye visibility trace provenance is accepted without using its candidate as a decision or label',()=>{
+ const ordinary=fixture(), diagnostic=fixture();
+ diagnostic.session.experimentFlags=['eyeVisibility','tasks'];
+ diagnostic.session.detectorVersion=traceContract.detectorPrefix+'eyeVisibility+tasks';
+ for(const row of diagnostic.samples)Object.assign(row,{eyeVisibilityCandidate:1,eyeVisibilityVariance:0,eyeVisibilitySamples:81,eyeVisibilityWindowMs:8000});
+ const options={participant:'P001',split:'test',episodes:labels};
+ const before=adaptTrace(ordinary,options), after=adaptTrace(diagnostic,options);
+ assert.deepEqual(after.tracking,before.tracking);assert.deepEqual(after.alerts,before.alerts);assert.deepEqual(after.episodes,before.episodes);
+ assert.deepEqual(after.comparison,before.comparison,'Diagnostic candidates are deliberately excluded from event metrics');
+ assert.equal(after.summary.tasksEventMetricsAvailable,false);
+ diagnostic.session.experimentFlags=['eyeVisibility'];diagnostic.session.detectorVersion=traceContract.detectorPrefix+'eyeVisibility';
+ for(const row of diagnostic.samples){row.tasksUsable=false;for(const key of ['eyeBlinkLeft','eyeBlinkRight','jawOpen','pitchDeg','yawDeg','tasksInferenceMs'])row[key]=null}
+ assert.equal(adaptTrace(diagnostic,options).summary.tasksEventMetricsAvailable,false);
+});

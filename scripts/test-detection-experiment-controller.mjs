@@ -148,3 +148,22 @@ test('malformed observer identity cannot block Stop or create an injectable CSV'
  assert.doesNotThrow(()=>h.c.stop());assert.equal(h.c.exportObserverEpisodes(),null);
  assert.equal(h.c.observerState().collecting,false);
 });
+
+
+test('eye visibility records only parked diagnostic scalars and resets calibration/loss continuity', () => {
+ const h=fixture('?eye-visibility=1',observerModels), before=JSON.stringify(h.state);
+ const frame=(at,{ear=.3,face=true,turned=false}={})=>{h.at(at);h.c.capture({currentTime:at/1000});h.c.recordResults({multiFaceLandmarks:face?[[]]:[]},ear,ear,turned)};
+ for(let at=0;at<=8000;at+=100)frame(at);
+ assert.equal(JSON.stringify(h.state),before,'Trace observation cannot mutate detector state');
+ assert.equal(h.requests.length,0);assert.throws(()=>h.c.exportData(),/Stop monitoring/);
+ h.state.calibrating=true;frame(8100);h.state.calibrating=false;frame(8200);
+ h.c.recalibrate();frame(8300);frame(8400,{face:false});frame(8500,{turned:true});frame(8600);
+ h.state.running=false;h.c.stop();const trace=h.c.exportData();
+ assert.equal(trace.samples[80].eyeVisibilityCandidate,1);
+ assert.ok(trace.samples.slice(81).every(row=>row.eyeVisibilityCandidate===null));
+ assert.equal(trace.session.eyeVisibility.method,'ear-variance-v1');assert.equal(trace.session.eyeVisibility.changesStatusOrAlerts,false);
+ assert.equal(trace.session.eyeVisibility.validated,false);assert.equal(trace.legacyAlerts.length,0);
+ assert.equal(trace.samples[80].tasksUsable,false);assert.equal(trace.samples[80].legacyUsable,true);
+ h.state.running=true;h.c.begin();frame(9000);h.state.running=false;h.c.stop();
+ assert.equal(h.c.exportData().samples[0].eyeVisibilityCandidate,null,'New sessions cannot inherit the old window');
+});

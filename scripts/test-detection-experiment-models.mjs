@@ -302,3 +302,69 @@ test('trace retains only bounded scalar measurements with honest unknowns, uniqu
   assert.equal(summary.backingBytes,2*22*8+2*9);assert.equal(summary.tasksEventMetricsAvailable,false);
   assert.equal(JSON.stringify({rows,summary}).includes('private'),false);
 });
+
+
+test('eye visibility selection is exact, default off and never selects primary scoring', () => {
+  const m = observerModels;
+  const selected = m.parseFlags('?eye-visibility=1');
+  assert.equal(selected.eyeVisibility, true); assert.equal(selected.any, true); assert.equal(selected.primary, false);
+  assert.deepEqual(selected.names, ['eyeVisibility']);
+  for (const query of ['', '?eye-visibility=0', '?eye-visibility=true', '?eye-visibility=1&eye-visibility=1', '?eye-visibility=1&eye-visibility=0'])
+    assert.equal(m.parseFlags(query).any, false, query);
+  assert.equal(m.parseFlags('?eye-visibility=1&perclos=time').primary, true);
+});
+
+test('eye visibility variance is unknown until enough distinct supported time and samples', () => {
+  const signal = observerModels.createEyeVisibility();
+  assert.equal(signal.snapshot().eyeVisibilityCandidate, null);
+  for (let at = 0; at < 8000; at += 100) assert.equal(signal.add(at, .3, true).eyeVisibilityCandidate, null);
+  const ready = signal.add(8000, .3, true);
+  assert.equal(ready.eyeVisibilitySamples, 81); assert.equal(ready.eyeVisibilityWindowMs, 8000);
+  assert.ok(ready.eyeVisibilityVariance < 1e-12); assert.equal(ready.eyeVisibilityCandidate, 1);
+  signal.reset();
+  for (let at = 0; at <= 10000; at += 1000) assert.equal(signal.add(at, .3, true).eyeVisibilityCandidate, null);
+});
+
+test('eye visibility uses population variance over the retained window, with fixed memory bounds', () => {
+  const signal = observerModels.createEyeVisibility(), rows = [];
+  for (let i = 0; i <= 240; i++) {
+    const at = i * 100, ear = i % 2 ? .28 : .32;
+    rows.push({ at, ear }); while (rows[0].at < at - 10000) rows.shift();
+    const actual = signal.add(at, ear, true);
+    if (at >= 8000) {
+      const mean = rows.reduce((sum, row) => sum + row.ear, 0) / rows.length;
+      const variance = rows.reduce((sum, row) => sum + (row.ear - mean) ** 2, 0) / rows.length;
+      assert.ok(Math.abs(actual.eyeVisibilityVariance - variance) < 1e-12);
+      assert.equal(actual.eyeVisibilityCandidate, 0);
+    }
+    assert.equal(actual.eyeVisibilitySamples, rows.length);
+  }
+  signal.reset();
+  for (let i = 0; i < 3000; i++) signal.add(i * 2, .3, true);
+  assert.equal(signal.snapshot().eyeVisibilitySamples, 1024);
+  assert.equal(signal.snapshot().eyeVisibilityCandidate, null, 'A full buffer is not enough elapsed support');
+});
+
+test('eye visibility drops support on calibration, loss, malformed EAR, duplicate/backward time and long gaps', () => {
+  for (const change of [[8001, .3, false], [8001, null, true], [8001, NaN, true], [8001, .05, true], [8001, .65, true],
+    [8000, .3, true], [7900, .3, true], [-1, .3, true], [NaN, .3, true], [9001, .3, true]]) {
+    const signal = observerModels.createEyeVisibility();
+    for (let at = 0; at <= 8000; at += 100) signal.add(at, .3, true);
+    const result = signal.add(...change);
+    assert.equal(result.eyeVisibilityCandidate, null); assert.equal(result.eyeVisibilityVariance, null);
+    assert.ok(result.eyeVisibilitySamples <= 1);
+  }
+});
+
+test('eye visibility trace fields are opt-in scalars and never retain image or landmark inputs', () => {
+  const m = observerModels, extra = m.createEyeVisibility().add(0, .3, true);
+  for (const selected of [false, true]) {
+    const trace = m.createTraceStore({ capacity: 2, eyeVisibility: selected });
+    trace.add({ frameId: 1, atMs: 0, mediaTime: 0, ...extra, image: {}, landmarks: [], coveredEyes: true });
+    const row = trace.samples()[0];
+    assert.equal(Object.hasOwn(row, 'eyeVisibilityCandidate'), selected);
+    for (const key of ['image', 'landmarks', 'coveredEyes']) assert.equal(Object.hasOwn(row, key), false);
+    if (selected) assert.equal(row.eyeVisibilityCandidate, null);
+  }
+  assert.equal(m.eyeVisibilityConfig.validated, false); assert.equal(m.eyeVisibilityConfig.changesStatusOrAlerts, false);
+});
