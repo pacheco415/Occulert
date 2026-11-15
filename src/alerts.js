@@ -26,6 +26,30 @@ export const strongAlertPattern = (() => {
 })();
 let strongTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null), strongRevision = 0;
 let strongOscillator = /** @type {OscillatorNode|null} */ (null), strongGain = /** @type {GainNode|null} */ (null);
+let restoredStop = /** @type {(()=>void)|null} */ (null), restoredSpeech = false;
+export function clearRestoredCue() {
+    restoredStop?.();
+    restoredStop = null;
+    if (restoredSpeech) {
+        restoredSpeech = false;
+        try { window.speechSynthesis?.cancel(); } catch (_) { }
+    }
+}
+export function playRestoredCue() {
+    if (!running || document.hidden || experimentFlags.observer) return;
+    clearRestoredCue();
+    // A quiet rise is distinct from both the descending loss pair and alarm.
+    restoredStop = tone(740, 220, .12, 1480) || null;
+    let text = 'Eyes detected.', lang = 'en-US';
+    try {
+        const cue = window.OcculertDriverI18n?.eyesDetectedCue?.();
+        if (cue && typeof cue === 'object' && 'text' in cue && 'lang' in cue
+            && typeof cue.text === 'string' && cue.text
+            && typeof cue.lang === 'string' && /^(en|es|fr|pt|de|ar|zh|ja)$/.test(cue.lang))
+            ({ text, lang } = cue);
+    } catch (_) { }
+    restoredSpeech = !!speak(text, lang);
+}
 function stopStrongOscillator() {
     const oscillator = strongOscillator, gain = strongGain;
     strongOscillator = null;
@@ -112,6 +136,7 @@ export function requestAlertPlaybackSession() {
 /** @returns {AudioScopeOwner} */
 export function beginAlertAudioScope() {
     cancelStrongAlert();
+    clearRestoredCue();
     const owner = ++_alertAudioOwner;
     if (experimentFlags.observer)
         return owner;
@@ -126,6 +151,7 @@ export function releaseAlertAudioScope(owner = _alertAudioOwner) {
     _alertAudioOwner++;
     _alertAudioRequested = false;
     cancelStrongAlert();
+    clearRestoredCue();
     cancelFallbackAlert();
     const held = _alertAudioSession;
     _alertAudioSession = null;
@@ -247,19 +273,16 @@ export function playFallbackAlert(dur, gain, repeat = false) {
         cancelFallbackAlert();
     }
 }
-/** @param {number} freq @param {number} dur @param {number} gain */
-export function tone(freq, dur, gain) {
-    if (experimentFlags.observer)
-        return;
-    if (!_alertAudioRequested || document.hidden)
-        return;
+/** @param {number} freq @param {number} dur @param {number} gain @param {number} [rise] */
+export function tone(freq, dur, gain, rise = 0) {
+    if (experimentFlags.observer || !_alertAudioRequested || document.hidden) return;
     try {
         const ac = getAC();
-        if (ac && (ac.state === 'suspended' || ac.state === 'interrupted'))
+        if (!rise && ac && (ac.state === 'suspended' || ac.state === 'interrupted'))
             primeAlertAudio();
         // Do not schedule an oscillator that could play much later after recovery.
         if (!ac || ac.state !== 'running') {
-            playFallbackAlert(dur, gain);
+            if (!rise) playFallbackAlert(dur, gain);
             return;
         }
         const o = ac.createOscillator(), g = ac.createGain();
@@ -267,16 +290,21 @@ export function tone(freq, dur, gain) {
         g.connect(ac.destination);
         o.frequency.value = freq;
         g.gain.value = gain;
+        if (rise) {
+            o.frequency.setValueAtTime(freq, ac.currentTime);
+            o.frequency.linearRampToValueAtTime(rise, ac.currentTime + .18);
+            g.gain.setValueAtTime(gain, ac.currentTime);
+            g.gain.linearRampToValueAtTime(0, ac.currentTime + dur / 1000);
+        }
         o.start();
-        setTimeout(() => {
-            try {
-                o.stop();
-            }
-            catch (e) { }
-        }, dur);
+        const halt = () => { try { o.stop(); } catch (_) { } };
+        if (rise) o.stop(ac.currentTime + dur / 1000);
+        else setTimeout(halt, dur);
+        return halt;
     }
     catch (e) {
-        playFallbackAlert(dur, gain);
+        // Restoration is informational; never substitute the fatigue WAV.
+        if (!rise) playFallbackAlert(dur, gain);
     }
 }
 document.addEventListener('visibilitychange', () => {
@@ -424,20 +452,24 @@ function readVoicePreference() {
     return _voiceEnabled;
 }
 export const VOICE_MSGS = ['Pull over safely', 'Take a break, you are tired', 'Drowsiness detected, rest now', 'Danger! Pull over immediately'];
-/** @param {string} msg */
-export function speak(msg) {
+/** @param {string} msg @param {string} [language] */
+export function speak(msg, language = 'en-US') {
     if (experimentFlags.observer || !readVoicePreference() || !window.speechSynthesis)
         return;
     try {
         if (window.speechSynthesis.paused)
             window.speechSynthesis.resume();
+        // A later safety message owns speech; cancelling the restoration cue
+        // must not subsequently cancel that newer message.
+        restoredSpeech = false;
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(msg);
-        u.lang = 'en-US';
+        u.lang = language;
         u.rate = 0.9;
         u.pitch = 1.0;
         u.volume = 1.0;
         window.speechSynthesis.speak(u);
+        return u;
     }
     catch (e) { }
 }

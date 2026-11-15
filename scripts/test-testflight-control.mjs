@@ -552,6 +552,51 @@ test('IPA downloads are bounded, hashed and never receive credentials', async ()
   }
 });
 
+test('IPA downloads follow the exact Expo API hop without forwarding credentials', async () => {
+  const bytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 1, 2, 3]);
+  const calls = [];
+  const actual = await ipaDigest(metadata(), async (url, options) => {
+    calls.push({ url, options });
+    if (calls.length === 1) return new Response(null, { status: 307, headers: { location: 'https://api.expo.dev/artifacts/fixture?private-token' } });
+    if (calls.length === 2) return new Response(null, { status: 307, headers: { location: 'https://storage.googleapis.com/eas/fixture.ipa?private-signature' } });
+    return new Response(bytes, { headers: { 'content-length': String(bytes.length) } });
+  });
+  assert.deepEqual(calls.map(call => call.url.hostname), ['expo.dev', 'api.expo.dev', 'storage.googleapis.com']);
+  assert.ok(calls.every(call => call.options.headers === undefined && call.options.redirect === 'manual'));
+  assert.deepEqual(actual, { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') });
+});
+
+test('Expo API lookalikes and unsafe onward redirects stop before the rejected request', async () => {
+  const cases = [
+    ['https://api.expo.dev.evil.example/private', 'IPA_HOST'],
+    ['https://evilapi.expo.dev/private', 'IPA_HOST'],
+    ['https://sub.api.expo.dev/private', 'IPA_HOST'],
+    ['https://api2.expo.dev/private', 'IPA_HOST'],
+    ['http://api.expo.dev/private', 'IPA_SCHEME'],
+    ['https://user:secret@api.expo.dev/private', 'IPA_AUTHORITY'],
+    ['https://api.expo.dev:8443/private', 'IPA_AUTHORITY'],
+  ];
+  for (const [location, code] of cases) {
+    for (const viaApi of [false, true]) {
+      let calls = 0;
+      await assert.rejects(() => ipaDigest(metadata(), async (url, options) => {
+        calls++;
+        assert.equal(options.headers, undefined);
+        assert.equal(options.redirect, 'manual');
+        assert.equal(url.hostname, calls === 1 ? 'expo.dev' : 'api.expo.dev');
+        return new Response(null, { status: 307, headers: { location: viaApi && calls === 1 ? 'https://api.expo.dev/fixture' : location } });
+      }), error => {
+        const diagnostic = downloadDiagnostic(error);
+        assert.equal(diagnostic.code, code);
+        assert.equal(diagnostic.receivedBytes, 0);
+        assert.equal(JSON.stringify(diagnostic).includes('private'), false);
+        return true;
+      });
+      assert.equal(calls, viaApi ? 2 : 1);
+    }
+  }
+});
+
 test('private IPA download preserves exact bytes, restrictive permissions and failed-download cleanup', async () => {
   const directory = mkdtempSync(resolve(tmpdir(), 'occulert-private-ipa-'));
   const path = resolve(directory, 'private.ipa');
@@ -1054,7 +1099,7 @@ test('only unknown HTTPS hosts without credentials or ports reach sealed diagnos
   const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 1]);
   let sealCalls = 0;
   const seal = () => { sealCalls++; throw new Error('Must not seal an allowed or invalid authority'); };
-  for (const host of ['expo.dev', 'artifacts.eascdn.net', 'storage.googleapis.com', 'bucket.storage.googleapis.com']) {
+  for (const host of ['expo.dev', 'api.expo.dev', 'artifacts.eascdn.net', 'storage.googleapis.com', 'bucket.storage.googleapis.com']) {
     const build = { ...metadata(), artifacts: { applicationArchiveUrl: `https://${host}/app.ipa` } };
     assert.deepEqual(await ipaDigest(build, async () => new Response(zip), undefined, undefined, seal),
       { bytes: zip.length, sha256: createHash('sha256').update(zip).digest('hex') });
@@ -1156,4 +1201,34 @@ test('public sealed diagnostics re-allowlist only the pinned algorithm, key dige
   }
   assert.equal(Object.hasOwn(downloadDiagnostic(new IpaDownloadError('IPA_STATUS', { hostClass: 'other', sealedHost: sealed })), 'sealedHost'), false);
   assert.equal(Object.hasOwn(downloadDiagnostic(new IpaDownloadError('IPA_HOST', { hostClass: 'expo', sealedHost: sealed })), 'sealedHost'), false);
+});
+
+
+test('an unknown second redirect seals only that host after the exact Expo API hop and stops before storage', async () => {
+  const fixture = hostCipherFixture(), requests = [];
+  const location = `https://Private.Storage.Example/opaque/${buildId}/app.ipa?token=PRIVATE_QUERY_VALUE#PRIVATE_FRAGMENT`;
+  await assert.rejects(() => ipaDigest(metadata(), async (url, options) => {
+    requests.push({ hostname: url.hostname, options });
+    return new Response(null, { status: 307, headers: {
+      location: requests.length === 1 ? 'https://api.expo.dev/artifacts/fixture?PRIVATE_API_QUERY' : location,
+    } });
+  }, undefined, undefined, fixture.seal), error => {
+    const result = downloadDiagnostic(error);
+    assert.equal(result.code, 'IPA_HOST');
+    assert.equal(result.redirects, 2); assert.equal(result.status, 307);
+    assert.equal(result.receivedBytes, 0); assert.equal(result.hostClass, 'other');
+    assert.deepEqual(Object.keys(result.sealedHost).sort(), ['algorithm', 'ciphertext', 'keySha256']);
+    assert.equal(result.sealedHost.ciphertext.length, 512);
+    assert.equal(Buffer.from(result.sealedHost.ciphertext, 'base64').length, 384);
+    assert.equal(fixture.decrypt(result.sealedHost).toString('ascii'), 'private.storage.example');
+    assert.deepEqual(fixture.plaintexts, [Buffer.from('private.storage.example', 'ascii')]);
+    const serialized = JSON.stringify(result);
+    for (const value of ['private.storage.example', location, buildId, '/opaque/',
+      'PRIVATE_API_QUERY', 'PRIVATE_QUERY_VALUE', 'PRIVATE_FRAGMENT', RELEASE.projectId]) {
+      assert.equal(serialized.includes(value), false);
+    }
+    return true;
+  });
+  assert.deepEqual(requests.map(call => call.hostname), ['expo.dev', 'api.expo.dev']);
+  assert.ok(requests.every(call => call.options.headers === undefined && call.options.redirect === 'manual'));
 });

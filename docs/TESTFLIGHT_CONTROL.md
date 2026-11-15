@@ -212,13 +212,23 @@ encoding classifications. The small `testflight-diagnostic-RUN_ID` artifact
 contains the same allowlisted data. No raw hostname, URL, response body,
 provider exception or local path is included. Codes distinguish a missing
 archive URL, rejected URL/redirect, HTTP status, length/encoding/stream/signature
-failure, and private-file failures. The provider URL field and allowed download
-hosts are unchanged; diagnostics establish evidence for a later correction,
-not permission to try another URL field, broaden hosts or queue a new build.
+failure, and private-file failures. The provider URL field remains
+`applicationArchiveUrl`. The HTTPS host allowlist includes the exact `expo.dev`
+and `api.expo.dev` hosts, `artifacts.eascdn.net`, and the existing Google Storage
+hosts. Expo documents `api.expo.dev` as its
+[Services API host](https://docs.expo.dev/eas/workflows/rest-api/); the actual
+private download diagnostic established that the artifact redirect uses this
+exact host. A later recovery passed that hop and rejected an unknown second
+redirect before fetching its destination. No wildcard Expo subdomains, URL-field
+fallback or credential forwarding is allowed.
+Each redirect is checked before requesting it, with the same redirect, byte,
+signature, hash and provenance limits. These diagnostics do not authorize a new
+build or an unreviewed download destination.
 
 ### Temporary sealed hostname evidence
 
-An `IPA_HOST` rejection can additionally contain `sealedHost`, with exactly
+The reviewed sealed-host diagnostic is restored for the still-unknown second
+redirect. An `IPA_HOST` rejection can additionally contain `sealedHost`, with exactly
 `algorithm`, `keySha256` and `ciphertext`. This temporary diagnostic encrypts
 only the rejected WHATWG URL's canonical ASCII hostname, bounded to 253 bytes,
 after the existing HTTPS and authority checks. It never encrypts or publishes
@@ -239,8 +249,9 @@ diagnostic artifact's run/source identity and digest before decrypting it in
 that private environment; do not put the private key or decrypted host in a
 public log, artifact or repository. A decrypted hostname is evidence for a
 separate review, not an automatic permission to change download policy. Remove
-this temporary envelope and retire its recipient key after the specific
-redirect investigation is resolved. All source, recovery, archive-inspection
+this temporary envelope and retire its recipient key only after the complete
+redirect chain is established and its destinations have received separate review.
+Recognizing one intermediate host does not establish the remaining chain. All source, recovery, archive-inspection
 and submission gates remain in effect.
 
 After `submit` completes, separately verify Apple processing and availability
@@ -259,9 +270,11 @@ queuing a build. It includes real ZIP/binary-plist fixtures, malformed archive
 boundaries, exact permission/identity checks, profile allowlists and signer
 membership, private report serialization, read-only recovery completion/failure
 barriers and a failed fresh-inspection submit barrier. Sealed-host tests use an
-independently generated fixture key for actual OAEP encryption/decryption,
-exercise the pinned production public key, and require rejection before any
-request to an unapproved redirect host. The report's four explicit
+independently generated fixture key for real OAEP encryption/decryption and
+exercise the pinned production public key. They preserve the exact Expo API
+hop tests and prove that a two-redirect chain seals only the second rejected
+host, stops before its destination, and exposes no URL or credential text.
+The report's four explicit
 false limitations remain unchanged: Apple certificate-chain trust, Apple
 processing/device acceptance, binary proof of JavaScript flags, and an embedded
 resolved Podfile lock are not claimed. Linux tests inject only Apple's command

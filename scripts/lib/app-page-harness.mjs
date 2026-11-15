@@ -73,10 +73,11 @@ function makeElement(id) {
 }
 
 export function createAppHarness({ startAt = 1_700_000_000_000, initialStorage = {}, sandboxOverrides = {}, preloadSources = [], sourceOverride = null } = {}) {
+  let monotonicNow = 0;
   const clock = {
     now: startAt,
-    advance(ms) { this.now += ms; },
-    set(t) { this.now = t; },
+    advance(ms) { this.now += ms; monotonicNow += Math.max(0, ms); },
+    set(t) { monotonicNow += Math.max(0, t - this.now); this.now = t; },
   };
 
   class FakeDate extends Date {
@@ -123,6 +124,7 @@ export function createAppHarness({ startAt = 1_700_000_000_000, initialStorage =
     localStorage,
     navigator: { userAgent: 'occulert-harness', platform: 'harness', maxTouchPoints: 0 },
     Date: FakeDate,
+    performance: { now: () => monotonicNow },
     setInterval: () => 0,
     clearInterval: () => {},
     setTimeout: () => 0,

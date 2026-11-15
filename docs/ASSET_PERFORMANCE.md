@@ -46,3 +46,20 @@ moves from 342 KB to 375 KB, which also accommodates the 125 KB driver ceiling.
 This selected total excludes separately budgeted runtime/model resources. These
 are local compression measurements, not device
 startup, network latency or operational rollout evidence.
+
+The local eye-coverage summary composes with the three-state wording and
+recovery cue, raising the driver review ceiling from 129,000 to 131,500 raw
+bytes and the selected static install-cache ceiling from 376,500 to 379,000
+bytes. Baseline `driver-app.v134.js` measures 128,699 raw / 36,492 gzip /
+30,456 Brotli bytes. Released `driver-app.v135.js` measures
+131,275 / 37,271 / 30,996 bytes: increases of 2,576 raw, 779 gzip and
+540 Brotli bytes. The added bytes implement bounded elapsed-time accounting,
+calibration and lifecycle boundaries, unknown-value handling, and the local
+report/storage boundary.
+
+The selected static baseline is 376,181 bytes; the immutable release measures
+378,757 bytes, below its ceiling. The release also uses catalog v6, startup
+guard v56 and cache `occulert-v216`. These narrow increases preserve readable
+source and compiler proofs. The locale catalog remains outside the default
+install cache, and other per-asset ceilings are unchanged. Compression figures
+are local measurements and do not establish device startup performance.

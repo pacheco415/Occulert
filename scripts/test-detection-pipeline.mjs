@@ -9,6 +9,7 @@
 // accuracy, missed-alert / false-alert rates.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { buildDriverArtifact } from './lib/driver-build.mjs';
@@ -563,4 +564,127 @@ test('compiled foreground stop announces immediately and cannot overwrite a rest
  h.run('releaseOldEvent()');await hidden;
  assert.equal(h.get('running'),true);assert.equal(h.el('driveState').textContent,restartedState);
  assert.notEqual(restartedState,'MONITORING STOPPED');
+});
+
+const cueCatalogContext = {module:{exports:{}}};
+vm.runInNewContext(readFileSync(new URL('../src/driver-i18n.js',import.meta.url),'utf8'),cueCatalogContext);
+const cueCatalog = cueCatalogContext.module.exports;
+function restoredHarness({voice=true,observer=false,locale='en',audioState='running',catalog=true}={}) {
+ const oscillators=[],spoken=[],timers=[],contexts=[];
+ let cancellations=0;
+ const parameter=()=>({value:0,events:[],setValueAtTime(value,at){this.events.push({kind:'set',value,at});},linearRampToValueAtTime(value,at){this.events.push({kind:'rise',value,at});}});
+ class Context {
+  constructor(){this.state=audioState;this.currentTime=7;this.destination={};contexts.push(this);}
+  resume(){return Promise.resolve();}
+  createOscillator(){const o={frequency:parameter(),ends:[],connect(){},start(){o.started=true;},stop(at){o.ends.push(at);if(at===undefined||at<=7)o.stops=(o.stops||0)+1;}};oscillators.push(o);return o;}
+  createGain(){return {gain:parameter(),connect(){}};}
+ }
+ const h=createAppHarness({sourceOverride:preferenceDriver,initialStorage:{'occulert-voice':String(voice)},sandboxOverrides:{
+  AudioContext:Context,URLSearchParams,location:{search:observer?'?observer=1':''},
+  SpeechSynthesisUtterance:class {constructor(text){this.text=text;}},
+  speechSynthesis:{paused:false,resume(){},cancel(){cancellations++;},speak(cue){spoken.push(cue);}},
+  OcculertDriverI18n:catalog?{get:key=>cueCatalog.text(locale,key),eyesDetectedCue:()=>cueCatalog.eyesDetectedCue(locale)}:undefined,
+  setTimeout(callback,duration){timers.push({callback,duration});return timers.length;},clearTimeout(){},
+ }});
+ h.startSession();h.run('calibrating=false;resetTrackingCue();_trackLostSince=0;_lastTrackingWarning=0;beginAlertAudioScope();');
+ return {...h,oscillators,spoken,timers,contexts,cancellations:()=>cancellations,
+  rises:()=>oscillators.filter(o=>o.frequency.events.some(e=>e.kind==='rise'&&e.value===1480)),
+  warnings:()=>h.run("document.getElementById('log').children.filter(entry=>entry.textContent.includes('Tracking lost')).length"),
+  lose(ms=5000){h.run('updateTrackingState(false,false)');h.clock.advance(ms);h.run('updateTrackingState(false,false)');},
+  recover(){h.run('updateTrackingState(true,true)');},
+ };
+}
+
+test('restored cue requires a warning for this exact loss and fires once per recovery',()=>{
+ const h=restoredHarness();
+ h.recover();assert.equal(h.rises().length,0);
+ h.lose(4999);h.recover();assert.equal(h.warnings(),0);assert.equal(h.rises().length,0);assert.equal(h.spoken.length,0);
+ h.lose(5000);assert.equal(h.warnings(),1);
+ const loss=h.oscillators.find(o=>o.frequency.value===660);assert.ok(loss);
+ h.timers.filter(t=>t.duration===320).at(-1).callback();
+ assert.equal(h.oscillators.filter(o=>o.frequency.value===440).length,1);
+ h.recover();h.recover();h.frame({ear:OPEN});
+ assert.equal(h.rises().length,1);assert.equal(h.spoken.filter(c=>c.text==='Eyes detected.').length,1);
+ const rise=h.rises()[0];assert.equal(rise.frequency.value,740);
+ assert.deepEqual(rise.frequency.events,[{kind:'set',value:740,at:7},{kind:'rise',value:1480,at:7.18}]);
+ assert.deepEqual(rise.ends,[7.22]);assert.equal(h.state().alerts,0);
+ // A different five-second loss inside the warning cooldown never qualifies.
+ h.lose(5000);h.recover();assert.equal(h.warnings(),1);assert.equal(h.rises().length,1);
+ h.clock.advance(30000);h.lose(5000);h.recover();assert.equal(h.warnings(),2);assert.equal(h.rises().length,2);
+ assert.equal(h.spoken.filter(c=>c.text==='Eyes detected.').length,2);
+});
+
+test('continuous warned loss recovers once and requires both face and valid eye landmarks',()=>{
+ const h=restoredHarness();h.lose();const firstTail=h.timers.filter(t=>t.duration===320).at(-1);
+ h.clock.advance(30000);h.run('updateTrackingState(true,false)');
+ firstTail.callback();assert.equal(h.oscillators.filter(o=>o.frequency.value===440).length,0);
+ assert.equal(h.warnings(),2);assert.equal(h.rises().length,0);
+ h.run('updateTrackingState(false,true)');assert.equal(h.rises().length,0);
+ h.frame({ear:OPEN});h.frame({ear:OPEN});assert.equal(h.rises().length,1);
+ assert.equal(h.spoken.filter(c=>c.text==='Eyes detected.').length,1);
+ assert.equal(h.state().alerts,0);
+});
+
+test('aged loss state without an accepted warning never speaks or plays restoration',()=>{
+ const h=restoredHarness();h.run('_trackLostSince=Date.now()-6000');h.recover();
+ assert.equal(h.warnings(),0);assert.equal(h.spoken.length,0);assert.equal(h.rises().length,0);
+});
+
+test('restored speech follows each actual catalog language and existing voice/observer guards',()=>{
+ for(const locale of Object.keys(cueCatalog.locales)) {
+  const h=restoredHarness({locale});h.lose();h.recover();
+  const cue=h.spoken.at(-1);assert.equal(cue.text,cueCatalog.eyesDetectedCue(locale).text);assert.equal(cue.lang,locale);
+  assert.deepEqual({rate:cue.rate,pitch:cue.pitch,volume:cue.volume},{rate:.9,pitch:1,volume:1});
+  assert.equal(h.rises().length,1);
+ }
+ const muted=restoredHarness({voice:false});muted.lose();muted.recover();assert.equal(muted.spoken.length,0);assert.equal(muted.rises().length,1);
+ const observer=restoredHarness({observer:true});observer.lose();observer.recover();assert.equal(observer.spoken.length,0);assert.equal(observer.oscillators.length,0);
+});
+
+test('missing or malformed optional speech catalog falls back without changing English safety cues',()=>{
+ for(const api of ['undefined','{}','{eyesDetectedCue:42}','{eyesDetectedCue:()=>null}','{eyesDetectedCue:()=>({text:42,lang:"es"})}','{eyesDetectedCue:()=>({text:"",lang:"es"})}','{eyesDetectedCue:()=>({text:"Hola",lang:"unsupported"})}','{eyesDetectedCue:()=>{throw Error("Unavailable")}}']) {
+  const h=restoredHarness({catalog:false});h.run(`window.OcculertDriverI18n=${api}`);h.lose();h.recover();
+  assert.equal(h.spoken.at(-1).text,'Eyes detected.');assert.equal(h.spoken.at(-1).lang,'en-US');
+  h.run("speak('Pull over safely')");assert.equal(h.spoken.at(-1).lang,'en-US');assert.equal(h.spoken.at(-1).text,'Pull over safely');
+ }
+});
+
+test('recovery and actual stop/start invalidate old delayed loss tones and recovery eligibility',async()=>{
+ const h=restoredHarness();h.lose();
+ const delayed=h.timers.filter(t=>t.duration===320).at(-1);assert.ok(delayed);
+ h.recover();delayed.callback();assert.equal(h.oscillators.filter(o=>o.frequency.value===440).length,0);
+ assert.equal(h.rises().length,1);
+ h.clock.advance(30000);h.lose();const oldTail=h.timers.filter(t=>t.duration===320).at(-1);
+ await h.run('stop()');oldTail.callback();assert.equal(h.oscillators.filter(o=>o.frequency.value===440).length,0);
+ await startRealSession(h);h.frame({ear:OPEN});oldTail.callback();assert.equal(h.rises().length,1);
+ assert.equal(h.spoken.filter(c=>c.text==='Eyes detected.').length,1);
+});
+
+test('new loss and lifecycle reset stop only the owned recovery feedback',async()=>{
+ const h=restoredHarness();h.lose();h.recover();const first=h.rises()[0],before=h.cancellations();
+ h.run('updateTrackingState(false,false)');assert.ok(first.stops);assert.equal(h.cancellations(),before+1);
+ h.clock.advance(30000);h.run('updateTrackingState(false,false)');h.recover();const second=h.rises()[1];
+ h.run("speak('Pull over safely')");const safetyCancellations=h.cancellations();
+ await h.run('stop()');assert.ok(second.stops);assert.equal(h.cancellations(),safetyCancellations,'stopping the old cue must not cancel a newer safety message');
+});
+
+test('restoration cannot queue a stale oscillator or substitute fatigue audio when audio is unavailable',()=>{
+ for(const audioState of ['suspended','interrupted','closed']) {
+  const h=restoredHarness({audioState});h.lose();
+  let fallback=0;h.run('playFallbackAlert=()=>{window.__restoredFallback++}');h.set('__restoredFallback',fallback);
+  h.recover();assert.equal(h.rises().length,0);assert.equal(h.get('__restoredFallback'),0);
+  for(const ac of h.contexts)ac.state='running';h.recover();assert.equal(h.rises().length,0);
+  assert.equal(h.spoken.filter(c=>c.text==='Eyes detected.').length,1);
+ }
+});
+
+test('restored cue preserves the three eye-visibility badges across one continuous loss',()=>{
+ const h=restoredHarness();
+ const badge=()=>h.run("document.getElementById('trackingBadge').textContent");
+ h.recover();assert.equal(badge(),'✓ Eyes detected');
+ h.lose(5000);assert.equal(badge(),'⚠️ No face in view');assert.equal(h.warnings(),1);
+ h.run("updateTrackingState(true,false,'eyes-not-visible')");
+ assert.equal(badge(),"⚠️ Can't see your eyes");assert.equal(h.rises().length,0);
+ h.recover();assert.equal(badge(),'✓ Eyes detected');assert.equal(h.rises().length,1);
+ h.recover();assert.equal(h.rises().length,1);assert.equal(h.state().alerts,0);
 });

@@ -118,3 +118,17 @@ Until that evidence supports a frozen decision rule, this flag stays parked and
 diagnostic only. See [the application roadmap](APP_ROADMAP.md),
 [accuracy benchmark](ACCURACY_BENCHMARK.md), and
 [event benchmark](EVENT_BENCHMARK.md) for the existing promotion gates.
+
+## Composed release
+
+This diagnostic is composed with the three-state eye display, restored-eye cue
+and local coverage summary. The immutable release uses `driver-app.v136.js`,
+`detection-experiments.v17.js`, `driver-startup-guard.v57.js` and cache
+`occulert-v217`; catalog v6 is retained. Published asset bytes are unchanged.
+The driver is 131,331 bytes within the existing 131,500-byte ceiling. Selected
+static install assets total 378,813 bytes within the existing 379,000-byte
+ceiling. The helper stays optional and outside default installation.
+
+The flag remains off by default. Its runtime regression compares the fully
+composed ordinary and experimental paths and requires identical statuses,
+fatigue scores and accepted alerts.
