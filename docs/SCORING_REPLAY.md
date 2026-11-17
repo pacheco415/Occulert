@@ -59,6 +59,13 @@ gaps and no-face evidence use their real models. Offline composition imports
 the same live pure phases from `scoring-core.js` but stays outside the bundle.
 Tasks remains measurement-only; there is no invented Tasks alert policy.
 
+The parked trace records bilateral Tasks blink coefficients during setup when
+paired face inference succeeds. Every setup row, including the row that ends
+calibration, has `calibrating=1` and `tasks_usable=0`. The first eligible
+decision row follows setup. A replay that requires `tasks_usable=1` for both
+baseline estimation and decisions therefore has no setup baseline in these
+exports. This also holds after recalibration.
+
 All variants consume the recorded accepted-yawn event after their frame score
 and before alert eligibility. This event is a fixed observed input, including
 when a variant's calibration state differs from the recording policy. The

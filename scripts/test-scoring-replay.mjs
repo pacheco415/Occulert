@@ -9,6 +9,26 @@ import { adaptTrace } from '../benchmark/parked-detection-trace.mjs';
 import { createReleasedScoringOracle, initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../benchmark/released-scoring-oracle.mjs';
 import { parseFile } from '../benchmark/run-event-benchmark.mjs';
 
+test('paired blink measurements in the parked setup window have no Tasks scoring support', () => {
+    const frames = [0, 1600, 3200, 3300].map(atMs => ({atMs, hasFace:true, ear:.3, turned:false}));
+    const tasksSample = () => ({
+        inferenceMs: 1,
+        result: {
+            faceLandmarks: [[{x:.5, y:.5, z:0}]],
+            faceBlendshapes: [{categories: [
+                {categoryName:'eyeBlinkLeft', score:.1},
+                {categoryName:'eyeBlinkRight', score:.2},
+            ]}],
+        },
+    });
+    const {trace} = recordScoringFixture({frames, query:'?detector=tasks', tasksSample});
+    const {comparison} = adaptTrace(trace, {participant:'SyntheticSetup', split:'train', episodes:[]});
+    assert.deepEqual(comparison.map(row => [row.at_ms, row.calibrating, row.tasks_usable]), [
+        [0, 1, 0], [1600, 1, 0], [3200, 1, 0], [3300, 0, 1],
+    ]);
+    assert.ok(comparison.every(row => row.eye_blink_left === .1 && row.eye_blink_right === .2));
+});
+
 for (const fps of [3,7,15]) for (const clockStepMs of [0,1]) test(`actual live v3 export replays released decisions and score state at ${fps}fps/${clockStepMs}ms clock steps`, () => {
     const captured = recordScoringFixture({fps,clockStepMs});
     assert.equal(captured.trace.version,3);
