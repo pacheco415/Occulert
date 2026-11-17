@@ -1,0 +1,36 @@
+name: Parked Tasks replay verification
+run-name: Verify parked replay at b0d1fe3
+on:
+  push:
+    branches: [codex/verify-tasks-blink-replay]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: b0d1fe35f7bf00083aea5a8e6361696562de1d27
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install and verify the capture-revision source
+        run: |
+          test "$(git rev-parse HEAD)" = "b0d1fe35f7bf00083aea5a8e6361696562de1d27"
+          npm ci
+          npm run test:scoring-replay
+          npm run test:detection-experiments
+      - name: Assemble disposable immutable assets with current release reservations
+        run: |
+          git remote set-branches origin '*'
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' '+refs/pull/*/head:refs/remotes/pr/*'
+          npm run asset:release
+          git add --all
+          git diff --cached --check
+      - name: Run the full site verification
+        run: npm run verify
