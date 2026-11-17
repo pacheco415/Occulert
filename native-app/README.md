@@ -74,6 +74,19 @@ mounted History interactions using the actual TSX components with React. The
 History fixtures substitute native storage, navigation and sharing bridges;
 they do not establish physical device or signed-binary acceptance.
 
+The native lockfile temporarily pins `glob` 14.0.6 for Apple target generation
+and Expo configuration, and `minimatch` 11.0.9 for Expo fingerprinting. These
+scoped overrides address GHSA-3g3m-2fjr-6pw4 (cancelled traversal continues)
+and GHSA-g3hv-75wg-m249 (pattern preprocessing amplification) while preserving
+the Expo 58, React Native and Apple target versions. They cross the upstream
+consumers' declared major-version ranges, so updating or removing them requires
+the dependency regressions, Expo configuration/autolinking checks, complete
+native verification and macOS Watch generation/packaging gate. The regressions
+exercise normal patterns, fingerprint exclusions/re-inclusions, cancellation
+through every glob consumer and bounded rejection of hostile patterns.
+Keep the dependency audit report and npm 10.9.8 EAS install check; do not replace
+compatibility validation with an automatic major SDK downgrade.
+
 The [unanswered-alert observer](../docs/UNANSWERED_ALERT_OBSERVATION.md) is a
 default-off local experiment. It counts only aggregate candidates following
 accepted critical phone software output and further fresh closed-eye samples;

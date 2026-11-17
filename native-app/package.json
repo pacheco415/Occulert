@@ -78,6 +78,18 @@
   },
   "private": true,
   "overrides": {
+    "@bacons/apple-targets": {
+      "glob": "14.0.6"
+    },
+    "@expo/config": {
+      "glob": "14.0.6"
+    },
+    "@expo/config-plugins": {
+      "glob": "14.0.6"
+    },
+    "@expo/fingerprint": {
+      "minimatch": "11.0.9"
+    },
     "@bacons/xcode": {
       "uuid": "11.1.1"
     },

@@ -134,7 +134,61 @@ for (const [consumer, intermediates] of [
   });
 }
 
-for (const consumer of ['@expo/config', '@expo/config-plugins']) {
+for (const [consumer, viaGlob] of [
+  ['@bacons/apple-targets', true],
+  ['@expo/config', true],
+  ['@expo/config-plugins', true],
+  ['@expo/fingerprint', false],
+]) {
+  test(`${consumer} minimatch preserves file patterns and bounds globparts amplification`, { timeout: 8000 }, async () => {
+    let consumerRequire = createRequire(require.resolve(consumer));
+    if (viaGlob) consumerRequire = createRequire(consumerRequire.resolve('glob'));
+    const worker = new Worker(`
+      const { parentPort, workerData } = require('node:worker_threads');
+      const { Minimatch } = require(workerData.entry);
+      const normal = new Minimatch('targets/*/expo-target.config.@(js|json)', { dot: true });
+      const matches = ['targets/watch/expo-target.config.js', 'targets/.watch/expo-target.config.json',
+        'targets/watch/expo-target.config.ts', 'targets/watch/nested/expo-target.config.js'].map(path => normal.match(path));
+      // GHSA-g3hv-75wg-m249: repeated globstar/parent segments amplified
+      // the preprocessing work at optimization level 2 in minimatch 7–10.
+      let rejected = false;
+      try { new Minimatch('a/**/../'.repeat(24) + 'target', { optimizationLevel: 2 }); }
+      catch (error) {
+        if (!(error instanceof RangeError) || !/too many patterns/.test(error.message)) throw error;
+        rejected = true;
+      }
+      parentPort.postMessage({ matches, rejected });
+    `, {
+      eval: true, workerData: { entry: consumerRequire.resolve('minimatch') },
+      resourceLimits: { maxOldGenerationSizeMb: 64, maxYoungGenerationSizeMb: 16 },
+    });
+    try {
+      const result = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(Error('Glob preprocessing stalled')), 5000);
+        worker.once('message', value => { clearTimeout(timer); resolve(value); });
+        worker.once('error', error => { clearTimeout(timer); reject(error); });
+        worker.once('exit', code => { if (code) { clearTimeout(timer); reject(Error(`Glob worker exited ${code}`)); } });
+      });
+      assert.deepEqual(result, { matches: [true, true, false, false], rejected: true });
+    } finally { await worker.terminate(); }
+  });
+}
+
+test('Expo fingerprint ignore rules preserve hidden files, re-inclusions and directory pruning', () => {
+  const fingerprintRoot = dirname(require.resolve('@expo/fingerprint/package.json'));
+  const { buildPathMatchObjects, buildDirMatchObjects, isIgnoredPathWithMatchObjects } = require(join(fingerprintRoot, 'build/utils/Path.js'));
+  const matches = buildPathMatchObjects(['**/node_modules/**', 'build/**', '!build/keep.txt', '.expo/**']);
+  for (const [path, ignored] of [
+    ['node_modules/pkg/file.js', true], ['../node_modules/pkg/file.js', true],
+    ['build/output.txt', true], ['build/keep.txt', false],
+    ['.expo/settings.json', true], ['app/index.tsx', false],
+  ]) assert.equal(isIgnoredPathWithMatchObjects(path, matches), ignored, path);
+  const directories = buildDirMatchObjects(matches);
+  assert.equal(isIgnoredPathWithMatchObjects('build', directories), false, 'a re-included child prevents pruning its parent');
+  assert.equal(isIgnoredPathWithMatchObjects('.expo', directories), true);
+});
+
+for (const consumer of ['@bacons/apple-targets', '@expo/config', '@expo/config-plugins']) {
   test(`${consumer} glob stops filesystem traversal when an AbortSignal fires`, { timeout: 5000 }, async () => {
     const consumerRequire = createRequire(require.resolve(consumer));
     const { glob } = consumerRequire('glob');
