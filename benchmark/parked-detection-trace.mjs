@@ -72,6 +72,26 @@ export function adaptTrace(trace,{participant,split,episodes}={}){
    tasksEventMetricsAvailable:false,tasksEventRecall:null,tasksFalseAlertsPerTrackedHour:null,tasksAlertDelayMs:null,
    reason:'Tasks records measurements only; no frozen independently validated Tasks decision pipeline or Tasks alerts exist.'}};
 }
+// The comparison table predates accepted-yawn recording. Preserve its schema
+// and carry recorded event evidence separately for offline feature extraction.
+export function acceptedYawnFrames(trace) {
+ const recorded = new Map();
+ if (trace.version === 3 && trace.scoringReplay) {
+  if (!Array.isArray(trace.scoringReplay.frames) || trace.scoringReplay.frames.length > 2400) {
+   throw Error('Invalid recorded accepted-yawn frame history');
+  }
+  for (const frame of trace.scoringReplay.frames) {
+   if (!Number.isSafeInteger(frame.frameId) || frame.frameId < 1 || recorded.has(frame.frameId) ||
+       typeof frame.yawn !== 'boolean' || (frame.yawn && frame.hasFace !== true)) {
+    throw Error('Invalid recorded accepted-yawn evidence');
+   }
+   recorded.set(frame.frameId, Number(frame.yawn));
+  }
+ }
+ return trace.samples.map(sample => ({ session_id: trace.session.sessionId,
+  frame_id: sample.frameId, accepted_yawn: recorded.get(sample.frameId) ?? null }));
+}
+
 export {comparisonSummary} from './detection-comparison.mjs';
 import {comparisonSummary} from './detection-comparison.mjs';
 export {columns as comparisonColumns};
@@ -79,9 +99,12 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const arg=name=>{const i=process.argv.indexOf(name);return i<0?undefined:process.argv[i+1]};
  if(!arg('--trace')||!arg('--episodes')||!arg('--participant')||!arg('--split')||!arg('--out'))throw Error('Usage: --trace local.json --episodes independently-labeled.csv --participant pseudonym --split train|test --out directory');
  const raw=await readFile(arg('--trace')),labels=await readFile(arg('--episodes'));
- const result=adaptTrace(JSON.parse(raw),{participant:arg('--participant'),split:arg('--split'),episodes:parseFile(labels.toString(),'episodes')});
+ const trace=JSON.parse(raw);
+ const result=adaptTrace(trace,{participant:arg('--participant'),split:arg('--split'),episodes:parseFile(labels.toString(),'episodes')});
+ const yawnFrames=acceptedYawnFrames(trace);
  await mkdir(arg('--out'),{recursive:true});
  const headers={sessions:['session_id','participant','platform','detector_version','duration_ms','split'],tracking:['session_id','start_ms','end_ms'],episodes:['session_id','start_ms','end_ms','label'],alerts:['session_id','at_ms'],comparison:columns};
  for(const [name,fields]of Object.entries(headers))await writeFile(join(arg('--out'),name+'.csv'),toCsv(fields,result[name])+'\n');
+ await writeFile(join(arg('--out'),'accepted-yawns.csv'),toCsv(['session_id','frame_id','accepted_yawn'],yawnFrames)+'\n');
  await writeFile(join(arg('--out'),'trace-provenance.json'),JSON.stringify({...result.summary,...sourceSnapshot(['parked-detection-trace.mjs','run-event-benchmark.mjs']),traceSha256:contentSha256(raw),independentEpisodesSha256:contentSha256(labels),...comparisonSummary(result.comparison)},null,2)+'\n');
 }

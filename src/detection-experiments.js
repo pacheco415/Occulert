@@ -48,6 +48,111 @@
     return Object.freeze({ add, snapshot, reset });
   }
 
+  const fatigueFeatureConfig = Object.freeze({
+    version: 'fatigue-windows-v1', stepMs: 1000, windowsMs: Object.freeze([30000, 60000]),
+    minUsableFraction: .5, maxGapMs: 1000, closedEar: .18, maxBlinkMs: 500,
+    fields: Object.freeze(['usable_fraction', 'perclos', 'ear_mean', 'ear_min', 'blink_count',
+      'blinks_per_usable_minute', 'closure_mean_ms', 'closure_max_ms', 'tasks_blink_mean',
+      'tasks_blink_max', 'yawn_count', 'pitch_down_fraction']),
+  });
+
+  // A session-local feature extractor. Call at(endMs) before adding a frame
+  // at or beyond that boundary. The final interval is never extrapolated.
+  function createFatigueFeatureWindow({ pixels = false, pitch = false } = {}) {
+    const config = fatigueFeatureConfig;
+    let frames = [], last = null, lastBoundary = 0, closureStart = null;
+    function add(sample) {
+      if (!Number.isSafeInteger(sample.frame_id) || sample.frame_id < 1 ||
+          !finite(sample.at_ms) || sample.at_ms < lastBoundary ||
+          (last && (sample.frame_id <= last.frame_id || sample.at_ms <= last.at_ms))) {
+        throw new Error('Feature frames must be ordered and outside completed windows');
+      }
+      if (![sample.legacy_usable, sample.tasks_usable, sample.pitch_down, sample.calibrating].every(v => v === 0 || v === 1) ||
+          (sample.accepted_yawn != null && sample.accepted_yawn !== 0 && sample.accepted_yawn !== 1)) {
+        throw new Error('Invalid feature evidence flag');
+      }
+      const ear = pixels && finite(sample.smoothed_ear) ? sample.smoothed_ear * .75 : sample.smoothed_ear;
+      const usable = sample.legacy_usable === 1;
+      if (usable && (!finite(ear) || ear < 0 || sample.calibrating || sample.pitch_down)) {
+        throw new Error('Invalid usable EAR observation');
+      }
+      if (sample.tasks_usable && (![sample.eye_blink_left, sample.eye_blink_right]
+          .every(v => finite(v) && v >= 0 && v <= 1) || sample.calibrating)) {
+        throw new Error('Invalid usable Tasks observation');
+      }
+      const connected = !!last && sample.frame_id === last.frame_id + 1 && sample.at_ms - last.at_ms <= config.maxGapMs;
+      const closed = usable && ear < config.closedEar;
+      let closureMs = null;
+      if (!connected || !last.usable || !usable) closureStart = null;
+      else if (!last.closed && closed) closureStart = sample.at_ms;
+      else if (!closed && closureStart !== null) {
+        closureMs = sample.at_ms - closureStart;
+        closureStart = null;
+      }
+      const point = { frame_id: sample.frame_id, at_ms: sample.at_ms, connected, closed, ear, usable, closureMs,
+        tasks: sample.tasks_usable ? (sample.eye_blink_left + sample.eye_blink_right) / 2 : null,
+        yawn: sample.accepted_yawn, down: sample.pitch_down === 1, pitchKnown: pitch && !sample.calibrating &&
+          (usable || sample.pitch_down === 1) };
+      frames.push(point);
+      last = point;
+    }
+
+    function measure(start, end) {
+      let observed = 0, closedTime = 0, pitchTime = 0, downTime = 0, ears = 0, earSum = 0, minEar = Infinity;
+      let tasks = 0, taskSum = 0, taskMax = 0, blinks = 0, closures = 0, closureSum = 0, closureMax = 0;
+      let yawns = 0, yawnsKnown = true;
+      for (let i = 0; i < frames.length; i++) {
+        const frame = frames[i];
+        if (frame.at_ms < start) continue;
+        if (frame.usable) { ears++; earSum += frame.ear; minEar = Math.min(minEar, frame.ear); }
+        if (frame.tasks !== null) { tasks++; taskSum += frame.tasks; taskMax = Math.max(taskMax, frame.tasks); }
+        if (frame.yawn == null) yawnsKnown = false;
+        else if (frame.yawn) yawns++;
+        // Count only completed, continuously observed closures within this window.
+        if (frame.closureMs !== null && frame.at_ms - frame.closureMs >= start) {
+          closures++; closureSum += frame.closureMs; closureMax = Math.max(closureMax, frame.closureMs);
+          if (frame.closureMs <= config.maxBlinkMs) blinks++;
+        }
+        const previous = frames[i - 1];
+        if (!previous || !frame.connected) continue;
+        const duration = frame.at_ms - Math.max(previous.at_ms, start);
+        if (frame.usable && previous.usable) {
+          observed += duration;
+          if (previous.closed) closedTime += duration;
+        }
+        if (frame.pitchKnown && previous.pitchKnown) {
+          pitchTime += duration;
+          if (previous.down) downTime += duration;
+        }
+      }
+      return { usable_fraction: observed / (end - start), perclos: observed ? 100 * closedTime / observed : null,
+        ear_mean: ears ? earSum / ears : null, ear_min: ears ? minEar : null, blink_count: blinks,
+        blinks_per_usable_minute: observed ? 60000 * blinks / observed : null,
+        closure_mean_ms: closures ? closureSum / closures : null, closure_max_ms: closures ? closureMax : null,
+        tasks_blink_mean: tasks ? taskSum / tasks : null, tasks_blink_max: tasks ? taskMax : null,
+        yawn_count: yawnsKnown && frames.some(frame => frame.at_ms >= start) ? yawns : null,
+        pitch_down_fraction: pitchTime ? downTime / pitchTime : null };
+    }
+
+    function at(end) {
+      if (!Number.isSafeInteger(end) || end <= lastBoundary || end % config.stepMs || (last && last.at_ms >= end)) {
+        throw new Error('Feature boundary must use strictly earlier frames');
+      }
+      lastBoundary = end;
+      // Keep the predecessor so the oldest supported interval can be clipped.
+      const first = frames.findIndex(frame => frame.at_ms >= end - 60000);
+      if (first === -1) frames = frames.slice(-1);
+      else if (first > 1) frames = frames.slice(first - 1);
+      const features = {};
+      for (const ms of config.windowsMs) {
+        const values = measure(end - ms, end);
+        for (const field of config.fields) features[field + '_' + ms / 1000 + 's'] = values[field];
+      }
+      return features;
+    }
+    return Object.freeze({ add, at });
+  }
+
   function eyeEAR(landmarks, indices, width, height) {
     if (!Array.isArray(landmarks) || !Array.isArray(indices) || indices.length !== 6 ||
         !finite(width) || !finite(height) || width <= 0 || height <= 0 || width > 16384 || height > 16384) return NaN;
@@ -346,7 +451,8 @@
   }
 
   const api = Object.freeze({ parseFlags, eyeEAR, createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline,
-    createNoFaceEvidence, matrixPose, parseTasksResult, createTraceStore, createObserverEpisodes, createEyeVisibility, eyeVisibilityConfig });
+    createNoFaceEvidence, matrixPose, parseTasksResult, createTraceStore, createObserverEpisodes, createEyeVisibility, eyeVisibilityConfig,
+    createFatigueFeatureWindow, fatigueFeatureConfig });
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.OcculertDetectionExperiments = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
