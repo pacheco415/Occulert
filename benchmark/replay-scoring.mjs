@@ -22,6 +22,7 @@ export const scoringVariants = Object.freeze([
     { name: 'distraction-confidence-stable', query: '?distraction-confidence=stable' },
     { name: 'turn-fatigue-hold', query: '?turn-fatigue=hold' },
     { name: 'perclos-turn-exclude', query: '?perclos-turn=exclude' },
+    { name: 'tasks-blink-v1', replayOnly: true },
 ].map(Object.freeze));
 const stateKeys = ['fatigue','confidence','maxFatigue','fatigueSampleSum','fatigueSampleCount','perclosWindow','eyesClosedSince','microsleeps','lastMicro','turnedSince','totalDistractionMs','noFaceSince','lastFaceSeen','calibrating','calibrated','calibrationUntil','calibrationSamples','baselineEAR','baseClosedThreshold','baseWatchThreshold','eyeClosedThreshold','eyeWatchThreshold','lastAlert','earHistory','noseYHistory','lastNod','headNods'];
 const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -103,9 +104,12 @@ function loadModels() {
     vm.runInNewContext(bytes.toString('utf8'), sandbox);
     return { models: sandbox.module.exports, path: name, sha256: contentSha256(bytes) };
 }
-function runVariant(initial, initialSettings, timeline, variant, models) {
+function runVariant(initial, initialSettings, timeline, variant, models, tasksSamples) {
     let state = structuredClone(initial), mono = 0, wall = REPLAY_EPOCH_MS, sensitivity = initialSettings.sensitivity, currentRow = null;
     const flags = models.parseFlags(variant.query), alerts = [], samples = [], minimumSamples = variant.minimumSamples ?? 1;
+    const blink = tasksSamples ? models.createTasksBlinkPolicy() : null;
+    const noBaseline = { status: 'unavailable', reason: 'No paired bilateral Tasks baseline was captured in the parked setup window.' };
+    let usableBlinkFrames = 0, setupComplete = false;
     const clockFallbacks = {};
     const point = phase => {
         const captured = currentRow?.clocks?.[phase];
@@ -134,6 +138,7 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
         currentRow = row;
         mono = row.atMs; wall = REPLAY_EPOCH_MS + row.wallMs;
         if (row.kind === 'recalibrate') {
+            if (blink) { blink.reset(); setupComplete = false; state.eyesClosedSince = 0; }
             sensitivity = row.settings.sensitivity;
             for (const key of ['calibrating','calibrated','calibrationUntil','calibrationSamples','baselineEAR','baseClosedThreshold','baseWatchThreshold']) state[key] = structuredClone(row.state[key]);
             state.earHistory = []; applySensitivity();
@@ -141,11 +146,35 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
             if (flags.any) controller.recalibrate();
             continue;
         }
+        let eyeClosed;
+        if (blink) {
+            const sample = tasksSamples[row.frameId - 1];
+            if (typeof sample.calibrating !== 'boolean' || typeof sample.tasksUsable !== 'boolean' ||
+                (sample.calibrating && sample.tasksUsable)) {
+                return { status: 'unavailable', reason: 'Invalid Tasks calibration or usability markers.' };
+            }
+            state.calibrating = sample.calibrating;
+            if (state.calibrating) {
+                if (setupComplete) return { status: 'unavailable', reason: 'Tasks setup resumed without a recorded recalibration.' };
+                blink.addSetup(sample);
+                state.eyesClosedSince = 0;
+            } else if (blink.threshold() === null) {
+                return noBaseline;
+            } else setupComplete = true;
+            state.calibrated = !state.calibrating && blink.threshold() !== null;
+            eyeClosed = blink.closed(sample);
+            if (sample.tasksUsable && eyeClosed === null) {
+                return { status: 'unavailable', reason: 'Usable Tasks frame lacks paired bilateral blink measurements.' };
+            }
+            if (row.hasFace && eyeClosed !== null) usableBlinkFrames++;
+        }
         if (sensitivity !== row.sensitivity) { sensitivity = row.sensitivity; applySensitivity(); }
         if (flags.primary) controller.prepareObservation(mono,row.hasFace,row.faceMissing);
-        let ear = 0, nod = false;
+        let ear = blink ? null : 0, nod = false;
         if (row.hasFace) {
-            const smooth = scoringSmooth(state.earHistory,row.rawEar); state.earHistory = smooth.samples; ear = smooth.ear;
+            if (!blink) {
+                const smooth = scoringSmooth(state.earHistory,row.rawEar); state.earHistory = smooth.samples; ear = smooth.ear;
+            }
             if (!state.calibrating) {
                 state.noseYHistory = scoringNodHistory(state.noseYHistory,row.noseY,point('nodSample').wall);
                 const nodTime = state.noseYHistory.length >= 8 ? point('nodDecision').wall : wall;
@@ -154,10 +183,10 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
             }
         }
         if (flags.primary) controller.score(ear,row.turned,nod,row.hasFace,null,row.noseY,row.faceMissing,true);
-        else state = scoringReplayFrame(state,{ear,turned:row.turned,nod,hasFace:row.hasFace,
+        else state = scoringReplayFrame(state,{ear,eyeClosed,turned:row.turned,nod,hasFace:row.hasFace,
             ...(row.hasFace && state.calibrating ? { calibrationNowMs: point('calibration').wall } : {}),
             ...(row.hasFace && !state.calibrating ? { eyeNowMs: point('eye').wall } : {})},wall,
-            { minimumSamples, sensitivityOffset: offset(sensitivity), stableDistraction: flags.distractionConfidence, holdTurnFatigue: flags.turnFatigue, excludeTurned: flags.perclosTurn });
+            { minimumSamples, sensitivityOffset: offset(sensitivity), stableDistraction: flags.distractionConfidence, holdTurnFatigue: flags.turnFatigue, excludeTurned: flags.perclosTurn, tasksBlink: !!blink });
         if (row.yawn) state = scoringYawn(state);
         const candidate = row.hasFace && scoringAlertCandidate(state);
         const reason = candidate === 'Distraction' ? scoringDistractionMatured(state,point('eligibility').wall) && candidate : candidate;
@@ -165,20 +194,28 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
         samples.push({ frame_id: row.frameId, at_ms: mono, fatigue: state.fatigue, confidence: state.confidence,
             calibrated: state.calibrated, perclos_samples: state.perclosWindow.length });
     }
+    if (blink && blink.threshold() === null) return noBaseline;
+    if (blink && !usableBlinkFrames) return { status: 'unavailable', reason: 'No usable Tasks closure observations after setup.' };
     return { alerts, samples, finalState: state, clockFallbacks };
 }
 
 export function replayScoring(trace) {
     const support = capability(trace);
     const source = loadModels();
-    const variants = scoringVariants.map(variant => support.reason
-        ? { ...variant, status: 'unavailable', reason: support.reason }
-        : { ...variant, status: 'available', ...runVariant(support.replay.initialState,support.replay.initialSettings,support.timeline,variant,source.models) });
+    const variants = scoringVariants.map(variant => {
+        const tasks = variant.name === source.models.tasksBlinkConfig.method;
+        const entry = tasks ? { ...variant, tasksBlinkConfig: source.models.tasksBlinkConfig, validated: false } : variant;
+        if (support.reason) return { ...entry, status: 'unavailable', reason: support.reason };
+        if (tasks && !trace.session.experimentFlags.includes('tasks'))
+            return { ...entry, status: 'unavailable', reason: 'The trace did not capture Tasks measurements.' };
+        return { ...entry, status: 'available', ...runVariant(support.replay.initialState, support.replay.initialSettings,
+            support.timeline, variant, source.models, tasks ? trace.samples : null) };
+    });
     return { schema: 'occulert.scoring-replay', version: 1, sessionId: trace.session.sessionId,
         decisionClock: 'recorded named phase clocks where observed; monotonic at_ms, normalized nonzero wall-clock epoch with zero sentinels preserved',
         counterfactualTimingLimit: 'A phase absent under the recording rules uses that observation clock and is counted in clockFallbacks. Exact sub-frame timing is not known for those counterfactual decisions.',
         acceptedYawnPolicy: 'Apply each recorded accepted-yawn event after frame scoring and before alert eligibility in every variant, even when counterfactual calibration differs. These inputs preserve observed detector decisions; they do not reconstruct MAR, smoothing, hold time or cooldown under alternative rules.',
-        signalPolicy: 'raw normalized EAR and nose/turn observations; per-variant six-frame smoothing, nod history and continuity; no interpolation',
+        signalPolicy: 'EAR variants use normalized EAR and six-frame smoothing. Tasks uses calibrated bilateral blink on supported observations. Both use recorded nose/turn observations, nod history and continuity without interpolation.',
         labelsGenerated: false, promotion: 'none', helper: { path: source.path, sha256: source.sha256 }, variants };
 }
 
