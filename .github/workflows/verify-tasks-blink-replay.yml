@@ -1,5 +1,5 @@
 name: Parked Tasks replay verification
-run-name: Verify parked replay at b0d1fe3
+run-name: Verify parked replay at 9ebf994
 on:
   push:
     branches: [codex/verify-tasks-blink-replay]
@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: b0d1fe35f7bf00083aea5a8e6361696562de1d27
+          ref: 9ebf994135062dd3d507049e250d3b2fc164ea49
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
@@ -21,7 +21,7 @@ jobs:
           cache: npm
       - name: Install and verify the capture-revision source
         run: |
-          test "$(git rev-parse HEAD)" = "b0d1fe35f7bf00083aea5a8e6361696562de1d27"
+          test "$(git rev-parse HEAD)" = "9ebf994135062dd3d507049e250d3b2fc164ea49"
           npm ci
           npm run test:scoring-replay
           npm run test:detection-experiments
