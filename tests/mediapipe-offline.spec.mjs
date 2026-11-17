@@ -47,6 +47,7 @@ for (const upgrade of [false, true]) {
         : state.old && path === '/driver-app.v47.css' ? resolve('tests/fixtures/driver-app.v47.css')
         : state.old && path === '/liquid-glass.v47.css' ? resolve('tests/fixtures/liquid-glass.v47.css')
         : state.old && path === '/portal.v47.css' ? resolve('tests/fixtures/portal.v47.css')
+        : state.old && path === '/lang.v47.js' ? resolve('tests/fixtures/lang.v47.js')
         : resolve(root, path === '/' ? 'index.html' : path.slice(1));
       if (!file.startsWith(root + '/') || !existsSync(file)) { response.statusCode = 404; response.end(); return; }
       response.setHeader('Content-Type', types[extname(file)] || 'application/octet-stream');
