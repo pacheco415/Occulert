@@ -60,7 +60,12 @@ export function scoringConfidence(state, turned, stableDistraction = false) {
 }
 
 export function scoringEyeMetrics(state, ear, turned, nowMs, excludeTurned = false) {
-    const next = { ...state }, closed = ear < state.eyeClosedThreshold, sampled = !excludeTurned || !turned;
+    const closed = excludeTurned && turned ? null : ear < state.eyeClosedThreshold;
+    return scoringObservedEyeMetrics(state, closed, turned, nowMs);
+}
+
+export function scoringObservedEyeMetrics(state, closed, turned, nowMs) {
+    const next = { ...state }, sampled = closed !== null;
     next.perclosWindow = (sampled ? [...state.perclosWindow, { t: nowMs, closed }] : state.perclosWindow).filter(row => nowMs - row.t < 60000);
     const perclos = next.perclosWindow.length ? Math.round(next.perclosWindow.filter(row => row.closed).length / next.perclosWindow.length * 100) : 0;
     next.eyesClosedSince = closed && sampled ? next.eyesClosedSince || nowMs : 0;
@@ -83,6 +88,15 @@ export function scoringDistractionSeconds(state, nowMs) {
 }
 
 export function scoringTrackedFrame(state, frame, nowMs, holdTurnFatigue = false) {
+    const eye = frame.ear < state.eyeClosedThreshold * .82 ? 'deeply-closed'
+        : frame.ear < state.eyeClosedThreshold ? 'closed'
+        : frame.ear < state.eyeWatchThreshold ? 'watch' : 'open';
+    return scoringTrackedEvidence(state, frame, nowMs, holdTurnFatigue, eye);
+}
+
+// The released adapter always supplies one of its four EAR bands. Offline
+// binary evidence can supply open, ordinary closed, or null for unknown.
+export function scoringTrackedEvidence(state, frame, nowMs, holdTurnFatigue, eye) {
     const next = { ...state };
     if (frame.turned) {
         next.confidence = Math.max(35, next.confidence - 5);
@@ -93,14 +107,10 @@ export function scoringTrackedFrame(state, frame, nowMs, holdTurnFatigue = false
     } else {
         if (frame.nod)
             next.fatigue += 18;
-        if (frame.ear < next.eyeClosedThreshold * .82)
-            next.fatigue += 9;
-        else if (frame.ear < next.eyeClosedThreshold)
-            next.fatigue += 6;
-        else if (frame.ear < next.eyeWatchThreshold)
-            next.fatigue += 2;
-        else
-            next.fatigue -= 3;
+        if (eye === 'deeply-closed') next.fatigue += 9;
+        else if (eye === 'closed') next.fatigue += 6;
+        else if (eye === 'watch') next.fatigue += 2;
+        else if (eye === 'open') next.fatigue -= 3;
         if (frame.perclos > 45)
             next.fatigue += 8;
         else if (frame.perclos > 30)
