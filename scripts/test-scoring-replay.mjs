@@ -170,6 +170,31 @@ test('25-second open-eye turn replays released and parked hold policies against 
     assert.equal(result.promotion, 'none');
 });
 
+test('turned low-EAR replay excludes only turned eye observations and resumes microsleep timing after recovery', () => {
+    const fixture=JSON.parse(readFileSync(new URL('../benchmark/fixtures/turned-eye-evidence.json',import.meta.url),'utf8'));
+    const state=initialScoringState(fixture.initialState),frames=fixture.frames;
+    const captured=recordScoringFixture({frames,state}),result=replayScoring(captured.trace);
+    const released=result.variants.find(row=>row.name==='released'),excluded=result.variants.find(row=>row.name==='perclos-turn-exclude');
+    const live=recordScoringFixture({frames,state,query:'?observer=1&perclos-turn=exclude'});
+    const oracle=createReleasedScoringOracle({state});let independent;
+    for(const frame of frames)independent=oracle.step({...frame,rawEar:frame.ear,noseY:.55});
+    assert.equal(JSON.stringify(released.finalState),JSON.stringify(captured.finalState));
+    assert.deepEqual(released.finalState,independent,'The disabled policy matches the immutable scoring oracle');
+    assert.deepEqual(released.alerts,oracle.alerts.map(({atMs,reason})=>({at_ms:atMs,reason})));
+    assert.deepEqual(excluded.finalState,live.finalState);
+    assert.deepEqual(excluded.alerts,live.decisions);
+    const turnedCount=frames.filter(row=>row.turned).length;
+    assert.equal(released.finalState.perclosWindow.length-excluded.finalState.perclosWindow.length,turnedCount);
+    assert.ok(excluded.finalState.perclosWindow.every(row=>row.t<SCORING_EPOCH+2000||row.t>=SCORING_EPOCH+27000));
+    assert.ok(released.finalState.microsleeps>excluded.finalState.microsleeps);
+    assert.equal(excluded.finalState.microsleeps,1);
+    assert.equal(excluded.finalState.lastMicro,SCORING_EPOCH+28650,'Recovery requires a new >1500 ms closure');
+    for(const key of ['confidence','turnedSince','totalDistractionMs','calibrated'])assert.equal(excluded.finalState[key],released.finalState[key],key);
+    const adapted=adaptTrace(live.trace,{participant:'SyntheticTurnEyes',split:'test',episodes:[]});
+    assert.deepEqual(adapted.summary.experimentFlags,['observer','perclosTurn']);
+    assert.equal(result.labelsGenerated,false);assert.equal(result.promotion,'none');
+});
+
 test('variant replay preserves real recalibration, sensitivity changes and unknown processing gaps', () => {
     const frames=syntheticScoringTrace(3).filter(row=>row.atMs<=15000||row.atMs>=17000).map(row=>({...row,
         noseY:.5+(row.atMs%3000<1000?0:row.atMs%3000<2000?.06:.01),recalibrate:row.atMs===20000,

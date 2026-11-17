@@ -31,6 +31,19 @@ policy keeps fatigue at zero while preserving the existing distraction alert
 and cooldown times. This is software evidence only; it does not authorize a
 default detector change or establish real-driver accuracy.
 
+## Synthetic turned-eye fixture
+
+`turned-eye-evidence.json` provides synthetic frontal open/closed observations,
+a 25-second low-EAR head turn sampled every 150 ms, and frontal closed-eye
+recovery. These scalar measurements are not independent sleep or drowsiness
+labels. The fixture contains no recordings or participant data.
+
+`npm run test:scoring-replay` runs the composed live adapters, compares default
+scoring with the immutable oracle, and replays `released` against
+`perclos-turn-exclude`. Turned frames must leave the PERCLOS denominator, and
+the returned face must establish a fresh closed-eye interval before a microsleep
+can count. This software fixture does not support promoting the experiment.
+
 ## Synthetic road-model fixture
 
 `road-model-synthetic.json` contains hand-authored scalar lane and single-lead
