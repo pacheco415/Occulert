@@ -12,7 +12,8 @@ const source = readFileSync(new URL('../native-app/targets/occulert-watch/AlertR
 const receiver = source
   .replace(/^import (?:UserNotifications|WatchConnectivity|WatchKit)\n/gm, '')
   .replace(/\bprivate func /g, 'func ')
-  .replaceAll('Task.sleep(', 'TestClock.sleep(');
+  .replaceAll('Task.sleep(', 'TestClock.sleep(')
+  .replaceAll('Task {', 'TestTasks.spawn {');
 const delegateStart = receiver.indexOf('  nonisolated func session(');
 const delegateEnd = receiver.indexOf('  func refreshNotificationAuthorization()', delegateStart);
 assert.ok(delegateStart >= 0 && delegateEnd > delegateStart, 'delegate boundary must exist');
@@ -45,6 +46,32 @@ struct Date {
   static let processInfo = ProcessInfo()
   var systemUptime: Double { TestClock.now / 1_000 }
 }
+// Count runnable receiver work before enqueueing it, including nonisolated
+// framework callbacks. A fixed number of Task.yield() calls is not a barrier.
+// These wrappers retain real Task cancellation and execute the unchanged body.
+final class TestTasks: @unchecked Sendable {
+  static let shared = TestTasks()
+  private let lock = NSLock()
+  private var runnable = 0
+  static func change(_ delta: Int) {
+    shared.lock.lock(); defer { shared.lock.unlock() }
+    shared.runnable += delta
+    precondition(shared.runnable >= 0, "unbalanced receiver task accounting")
+  }
+  static var count: Int {
+    shared.lock.lock(); defer { shared.lock.unlock() }
+    return shared.runnable
+  }
+  @discardableResult static func spawn(
+    operation: @escaping @MainActor @Sendable () async -> Void
+  ) -> Task<Void, Never> {
+    change(1)
+    return Task { @MainActor in
+      defer { change(-1) }
+      await operation()
+    }
+  }
+}
 @MainActor enum TestClock {
   struct Sleep { let due: Double; let continuation: CheckedContinuation<Void, any Error> }
   static var now = 0.0
@@ -53,15 +80,27 @@ struct Date {
     try Task.checkCancellation()
     try await withCheckedThrowingContinuation { continuation in
       pending.append(Sleep(due: now + Double(nanoseconds) / 1_000_000, continuation: continuation))
+      TestTasks.change(-1)
     }
   }
-  static func flush() async { for _ in 0..<32 { await Task.yield() } }
+  static func flush() async {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: .seconds(2))
+    while TestTasks.count > 0 {
+      precondition(clock.now < deadline, "receiver tasks did not suspend or finish")
+      await Task.yield()
+    }
+  }
   static func reset() {
     let old = pending; pending = []
-    for sleep in old { sleep.continuation.resume(throwing: CancellationError()) }
+    for sleep in old {
+      TestTasks.change(1)
+      sleep.continuation.resume(throwing: CancellationError())
+    }
     now = 0; Date.clock = 100_000
   }
   static func move(to time: Double) {
+    precondition(TestTasks.count == 0, "cannot advance time past runnable receiver work")
     precondition(time >= now)
     Date.clock += time - now; now = time
   }
@@ -70,7 +109,10 @@ struct Date {
   static func releaseDue() {
     let due = pending.filter { $0.due <= now + 0.000_01 }
     pending.removeAll { $0.due <= now + 0.000_01 }
-    for sleep in due { sleep.continuation.resume() }
+    for sleep in due {
+      TestTasks.change(1)
+      sleep.continuation.resume()
+    }
   }
   static func advance(to time: Double) async {
     await flush()
@@ -163,6 +205,18 @@ ${receiver}
     }
   }
   @MainActor static func main() async {
+    // Exercise more executor turns than the former fixed 32-yield flush.
+    // Virtual time must stay put until queued work registers its next sleep.
+    var delayedPulse: Double?
+    TestTasks.spawn {
+      for _ in 0..<256 { await Task.yield() }
+      try? await TestClock.sleep(nanoseconds: 400_000_000)
+      for _ in 0..<256 { await Task.yield() }
+      delayedPulse = TestClock.now
+    }
+    await TestClock.advance(to: 800)
+    precondition(delayedPulse == 400 && TestTasks.count == 0,
+      "clock advanced before delayed receiver work completed")
     let center = UNUserNotificationCenter.current()
     do {
       let s = fixture(); alert(s)
