@@ -12,6 +12,7 @@ const { isUuid } = require("./_lib/validation");
 const { json } = require("./_lib/responses");
 const ROSTER_LIMIT = 500;
 const { monthlyActivity } = require('./_lib/fleet-monthly-activity');
+const { entitlementSummary, testBillingState } = require('./_lib/fleet-entitlements');
 
 function shouldIncludeEvents(request) {
   let value = request.query && request.query.include_events;
@@ -104,12 +105,18 @@ module.exports = async function handler(request, response) {
 
     // Optional until the migration is deployed. Failure is unavailable, never
     // a fabricated zero or a count inferred from the bounded session snapshot.
-    let monthly = null;
-    try {
-      monthly = monthlyActivity(await pgFetch('rpc/fleet_monthly_activity', {
+    // The test-mode plan summary is optional in the same way: a failed billing
+    // read reports null and changes nothing else. Both reads run together and
+    // are scoped by the verified owner and the server-owned fleet id only.
+    const optional = async work => { try { return await work(); } catch { return undefined; } };
+    const [monthlyValue, billing] = await Promise.all([
+      optional(async () => monthlyActivity(await pgFetch('rpc/fleet_monthly_activity', {
         method: 'POST', body: { p_actor_id: user.id, p_fleet_id: fleet.id },
-      }));
-    } catch {}
+      }))),
+      optional(() => testBillingState(pgFetch, fleet.id)),
+    ]);
+    const monthly = monthlyValue ?? null;
+    const entitlements = billing === undefined ? null : entitlementSummary(billing, monthly);
 
     response.setHeader("Server-Timing", [
       "fleet;dur=" + fleetLookupMs,
@@ -127,6 +134,8 @@ module.exports = async function handler(request, response) {
       events: events,
       events_included: includeEvents,
       monthly_activity: monthly,
+      // Informational test-mode plan summary; nothing is refused because of it.
+      entitlements: entitlements,
       telemetry_trust: "unverified_client_report",
       detector_provenance_trust: "client_declared",
       privacy: {
