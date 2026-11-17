@@ -60,15 +60,15 @@ export function scoringConfidence(state, turned, stableDistraction = false) {
 }
 
 export function scoringEyeMetrics(state, ear, turned, nowMs, excludeTurned = false) {
-    const closed = excludeTurned && turned ? null : ear < state.eyeClosedThreshold;
-    return scoringObservedEyeMetrics(state, closed, turned, nowMs);
+    return scoringObservedEyeMetrics(state, excludeTurned && turned ? null : ear < state.eyeClosedThreshold, turned, nowMs);
 }
 
 export function scoringObservedEyeMetrics(state, closed, turned, nowMs) {
-    const next = { ...state }, sampled = closed !== null;
-    next.perclosWindow = (sampled ? [...state.perclosWindow, { t: nowMs, closed }] : state.perclosWindow).filter(row => nowMs - row.t < 60000);
+    const next = { ...state };
+    const window = closed === null ? state.perclosWindow : [...state.perclosWindow, { t: nowMs, closed }];
+    next.perclosWindow = window.filter(row => nowMs - row.t < 60000);
     const perclos = next.perclosWindow.length ? Math.round(next.perclosWindow.filter(row => row.closed).length / next.perclosWindow.length * 100) : 0;
-    next.eyesClosedSince = closed && sampled ? next.eyesClosedSince || nowMs : 0;
+    next.eyesClosedSince = closed ? next.eyesClosedSince || nowMs : 0;
     const microsleep = Boolean(next.eyesClosedSince && nowMs - next.eyesClosedSince > 1500 && nowMs - next.lastMicro > 3000 && next.confidence > 45);
     if (microsleep) {
         next.microsleeps++;
@@ -87,16 +87,9 @@ export function scoringDistractionSeconds(state, nowMs) {
     return Math.round((state.totalDistractionMs + (state.turnedSince ? nowMs - state.turnedSince : 0)) / 1000);
 }
 
-export function scoringTrackedFrame(state, frame, nowMs, holdTurnFatigue = false) {
-    const eye = frame.ear < state.eyeClosedThreshold * .82 ? 'deeply-closed'
-        : frame.ear < state.eyeClosedThreshold ? 'closed'
-        : frame.ear < state.eyeWatchThreshold ? 'watch' : 'open';
-    return scoringTrackedEvidence(state, frame, nowMs, holdTurnFatigue, eye);
-}
-
-// The released adapter always supplies one of its four EAR bands. Offline
-// binary evidence can supply open, ordinary closed, or null for unknown.
-export function scoringTrackedEvidence(state, frame, nowMs, holdTurnFatigue, eye) {
+// Offline replay can supply a binary observation's contribution. The driver
+// always uses the four EAR bands below.
+export function scoringTrackedFrame(state, frame, nowMs, holdTurnFatigue = false, eyePoints = null) {
     const next = { ...state };
     if (frame.turned) {
         next.confidence = Math.max(35, next.confidence - 5);
@@ -107,10 +100,11 @@ export function scoringTrackedEvidence(state, frame, nowMs, holdTurnFatigue, eye
     } else {
         if (frame.nod)
             next.fatigue += 18;
-        if (eye === 'deeply-closed') next.fatigue += 9;
-        else if (eye === 'closed') next.fatigue += 6;
-        else if (eye === 'watch') next.fatigue += 2;
-        else if (eye === 'open') next.fatigue -= 3;
+        const { ear } = frame;
+        const closed = state.eyeClosedThreshold;
+        next.fatigue += eyePoints ?? (ear < closed * .82 ? 9
+            : ear < closed ? 6
+            : ear < state.eyeWatchThreshold ? 2 : -3);
         if (frame.perclos > 45)
             next.fatigue += 8;
         else if (frame.perclos > 30)

@@ -1,5 +1,5 @@
 // Offline orchestration imports the actual pure phases; it is not shipped.
-import { scoringCalibrationSamples, scoringCalibrationThresholds, scoringSensitivityThresholds, scoringNoFace, scoringResetContinuity, scoringCalibrationFrame, scoringConfidence, scoringEyeMetrics, scoringObservedEyeMetrics, scoringTrackedFrame, scoringTrackedEvidence, scoringAlertCandidate, scoringDistractionMatured } from '../src/scoring-core.js';
+import { scoringCalibrationSamples, scoringCalibrationThresholds, scoringSensitivityThresholds, scoringNoFace, scoringResetContinuity, scoringCalibrationFrame, scoringConfidence, scoringEyeMetrics, scoringObservedEyeMetrics, scoringTrackedFrame, scoringAlertCandidate, scoringDistractionMatured } from '../src/scoring-core.js';
 
 export function scoringUpdateCalibration(state, ear, nowMs, minimumSamples, sensitivityOffset) {
     const next = { ...state, calibrationSamples: [...state.calibrationSamples] };
@@ -38,9 +38,9 @@ export function scoringReplayFrame(state, frame, nowMs, options) {
     if (options.tasksBlink) {
         const closed = frame.eyeClosed;
         const metrics = scoringObservedEyeMetrics(next, closed, frame.turned, eyeNow);
-        const eye = closed === null ? null : closed ? 'closed' : 'open';
-        return scoringTrackedEvidence(metrics.state, { ...frame, perclos: closed === null ? null : metrics.perclos },
-            nowMs, options.holdTurnFatigue, eye);
+        const eyePoints = closed === null ? 0 : closed ? 6 : -3;
+        return scoringTrackedFrame(metrics.state, { ...frame, perclos: closed === null ? null : metrics.perclos },
+            nowMs, options.holdTurnFatigue, eyePoints);
     }
     const metrics = scoringEyeMetrics(next, frame.ear, frame.turned, eyeNow, options.excludeTurned);
     return scoringTrackedFrame(metrics.state, { ...frame, perclos: metrics.perclos }, nowMs, options.holdTurnFatigue);
