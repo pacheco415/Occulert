@@ -8,15 +8,15 @@ import { beginBackendSession, detachBackendSession, finishBackendSession, pushFl
 export const start = startMonitoring;
 export const stop = stopMonitoring;
 // Generated from the final driver asset mapping by the release tool.
-export const WEB_APP_VERSION = 'web-v140';
-export const EXPERIMENT_HELPER_INTEGRITY = "sha256-znScQ6Y1IKJB6Ab5Ys5FqDWrkwYDJm15p5WACYFPvlQ=";
+export const WEB_APP_VERSION = 'web-v141';
+export const EXPERIMENT_HELPER_INTEGRITY = "sha256-1IP0MqblB5DC0Rpeyiu8cAF3wMrcUFl4WO/2FhvDHtk=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
     try {
         const q = new URLSearchParams(window.location?.search || ''), yes = (k, v) => q.getAll(k).length === 1 && q.get(k) === v;
-        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable'), observer: yes('observer', '1'), calibrationMin: yes('calibration-min', '12'), eyeVisibility: yes('eye-visibility', '1'), turnFatigue: yes('turn-fatigue', 'hold') };
+        const f = { elapsed: yes('fatigue-timing', 'elapsed'), pixels: yes('ear-units', 'pixels'), tasks: yes('detector', 'tasks'), noface: yes('noface-escalation', '1'), timePerclos: yes('perclos', 'time'), pitch: yes('pitch-gate', '1'), distractionConfidence: yes('distraction-confidence', 'stable'), observer: yes('observer', '1'), calibrationMin: yes('calibration-min', '12'), eyeVisibility: yes('eye-visibility', '1'), turnFatigue: yes('turn-fatigue', 'hold'), perclosTurn: yes('perclos-turn', 'exclude') };
         const names = Object.keys(f).filter(k => f[k]).sort();
-        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin', 'eyeVisibility', 'turnFatigue'].includes(k)), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+        return Object.freeze({ ...f, names: Object.freeze(names), any: names.length > 0, primary: names.some(k => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin', 'eyeVisibility', 'turnFatigue', 'perclosTurn'].includes(k)), delegate: yes('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
     }
     catch (_) {
         return Object.freeze({ any: false, primary: false, names: Object.freeze([]) });
@@ -641,7 +641,7 @@ export function loadExperimentController() {
     }
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/detection-experiments.v18.js';
+        script.src = '/detection-experiments.v20.js';
         script.integrity = EXPERIMENT_HELPER_INTEGRITY;
         script.crossOrigin = 'anonymous';
         const timer = setTimeout(() => { script.remove(); reject(Error('Parked helper timed out')); }, 7000);

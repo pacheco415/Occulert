@@ -50,6 +50,8 @@ zero alerts.
 | `distraction-confidence-stable` | `distraction-confidence=stable` |
 | `turn-fatigue-hold` | `turn-fatigue=hold`; remove only the mature head-turn fatigue increment |
 
+| `perclos-turn-exclude` | `perclos-turn=exclude`; omit turned eye observations and break microsleep continuity |
+
 The runner reuses the actual parked controller source for its existing variants,
 not copied decision formulas. It recomputes smoothing/nods and continuity from
 the same raw normalized EAR, nose and turn observations. Elapsed time, unknown
@@ -150,7 +152,7 @@ compared too, including an independently advancing 1 ms `Date.now` fixture.
 
 Live version-3 export to released replay tests compare captured scoring and
 decisions at all three rates with fixed and stepping wall clocks, with no
-missing phase clocks. All seven policies are also checked against actual live
+missing phase clocks. All eight policies are also checked against actual live
 helper/results paths on the same synthetic raw observations. These tests
 generate no independent labels and authorize no promotion.
 

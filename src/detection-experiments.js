@@ -11,10 +11,10 @@
     const selected = { elapsed: matches('fatigue-timing', 'elapsed'), pixels: matches('ear-units', 'pixels'),
       tasks: matches('detector', 'tasks'), noface: matches('noface-escalation', '1'),
       timePerclos: matches('perclos', 'time'), pitch: matches('pitch-gate', '1'),
-      distractionConfidence: matches('distraction-confidence', 'stable'), observer: matches('observer', '1'), calibrationMin: matches('calibration-min', '12'), eyeVisibility: matches('eye-visibility', '1'), turnFatigue: matches('turn-fatigue', 'hold') };
+      distractionConfidence: matches('distraction-confidence', 'stable'), observer: matches('observer', '1'), calibrationMin: matches('calibration-min', '12'), eyeVisibility: matches('eye-visibility', '1'), turnFatigue: matches('turn-fatigue', 'hold'), perclosTurn: matches('perclos-turn', 'exclude') };
     const names = Object.keys(selected).filter(key => selected[key]).sort();
     return Object.freeze({ ...selected, names: Object.freeze(names), any: names.length > 0,
-      primary: names.some(name => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin', 'eyeVisibility', 'turnFatigue'].includes(name)), delegate: matches('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
+      primary: names.some(name => !['tasks', 'distractionConfidence', 'observer', 'calibrationMin', 'eyeVisibility', 'turnFatigue', 'perclosTurn'].includes(name)), delegate: matches('tasks-delegate', 'cpu') ? 'CPU' : 'GPU' });
   }
 
   // An unvalidated observation, not a covered-eye classifier. Open, still eyes
@@ -484,7 +484,7 @@
       if (flags.timePerclos) percent = perclos.update(time, usable ? closed : null);
       else {
         // Pitch-gated samples are unknown, not artificially open-frame credit.
-        if (!down && !unknown) s.perclosWindow.push({ t: wall, closed: ear < s.eyeClosedThreshold });
+        if (!down && !unknown && (!flags.perclosTurn || !turned)) s.perclosWindow.push({ t: wall, closed: ear < s.eyeClosedThreshold });
         s.perclosWindow = s.perclosWindow.filter(row => wall - row.t < 60000);
         percent = s.perclosWindow.length ? s.perclosWindow.filter(row => row.closed).length / s.perclosWindow.length * 100 : null;
       }
