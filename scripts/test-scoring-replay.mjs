@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { recordScoringFixture } from './lib/scoring-replay-fixture.mjs';
 import { replayScoring, writeScoringReplay } from '../benchmark/replay-scoring.mjs';
 import { adaptTrace } from '../benchmark/parked-detection-trace.mjs';
-import { initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../benchmark/released-scoring-oracle.mjs';
+import { createReleasedScoringOracle, initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../benchmark/released-scoring-oracle.mjs';
 import { parseFile } from '../benchmark/run-event-benchmark.mjs';
 
 for (const fps of [3,7,15]) for (const clockStepMs of [0,1]) test(`actual live v3 export replays released decisions and score state at ${fps}fps/${clockStepMs}ms clock steps`, () => {
@@ -127,7 +127,7 @@ test('primary calibration accepts its existing detector events and variants reus
     assert.deepEqual(releasedReplay.alerts,[],'Normal alert calibration gating still applies');
 });
 
-test('all six replay variants match their actual live helper/results paths on the same raw observations', () => {
+test('all replay variants match their actual live helper/results paths on the same raw observations', () => {
     const captured=recordScoringFixture({fps:3}),result=replayScoring(captured.trace);
     for (const variant of result.variants) {
         const reference=recordScoringFixture({fps:3,query:variant.query,minimumSamples:variant.minimumSamples??1});
@@ -135,6 +135,39 @@ test('all six replay variants match their actual live helper/results paths on th
             reference.recorded.map(row => [row.frame_id,row.fatigue,row.confidence,row.calibrated]),variant.name);
         assert.deepEqual(variant.alerts,reference.decisions,variant.name);
     }
+});
+
+test('25-second open-eye turn replays released and parked hold policies against the actual live paths', () => {
+    const fixture = JSON.parse(readFileSync(new URL('../benchmark/fixtures/head-turn-25s.json', import.meta.url), 'utf8'));
+    const state = initialScoringState(fixture.initialState), frames = fixture.frames;
+    const captured = recordScoringFixture({ frames, state }), result = replayScoring(captured.trace);
+    const released = result.variants.find(row => row.name === 'released');
+    const held = result.variants.find(row => row.name === 'turn-fatigue-hold');
+    const liveHold = recordScoringFixture({ frames, state, query: '?observer=1&turn-fatigue=hold' });
+    const oracle = createReleasedScoringOracle({ state });
+    let independent;
+    for (const frame of frames) independent = oracle.step({...frame, rawEar:frame.ear, noseY:.55});
+    assert.equal(JSON.stringify(released.finalState), JSON.stringify(captured.finalState));
+    assert.deepEqual(released.finalState, independent, 'Flag-off scores match the immutable independent oracle');
+    assert.deepEqual(released.alerts, captured.decisions);
+    assert.deepEqual(released.alerts, oracle.alerts.map(({atMs, reason}) => ({at_ms: atMs, reason})));
+    assert.deepEqual(released.alerts.map(row => row.reason), ['Distraction', 'Fatigue']);
+    assert.equal(released.finalState.maxFatigue, 100);
+    assert.equal(released.samples.find(row => row.fatigue >= 80).at_ms, 9000);
+    assert.deepEqual(held.finalState, liveHold.finalState);
+    assert.deepEqual(held.alerts, liveHold.decisions);
+    assert.deepEqual(held.alerts, [{at_ms:6600, reason:'Distraction'}, {at_ms:18600, reason:'Distraction'}]);
+    assert.equal(held.finalState.fatigue, 0);
+    assert.equal(held.finalState.maxFatigue, 0);
+    for (const key of ['confidence','perclosWindow','eyesClosedSince','microsleeps','turnedSince','totalDistractionMs','lastAlert']) {
+        assert.deepEqual(held.finalState[key], released.finalState[key], key);
+    }
+    assert.equal(held.finalState.microsleeps, 0);
+    assert.ok(held.samples.every(row => row.fatigue === 0));
+    const adapted = adaptTrace(liveHold.trace, {participant:'SyntheticTurnFixture', split:'test', episodes:[]});
+    assert.deepEqual(adapted.summary.experimentFlags, ['observer','turnFatigue']);
+    assert.equal(result.labelsGenerated, false);
+    assert.equal(result.promotion, 'none');
 });
 
 test('variant replay preserves real recalibration, sensitivity changes and unknown processing gaps', () => {

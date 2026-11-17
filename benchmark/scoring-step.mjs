@@ -34,5 +34,5 @@ export function scoringReplayFrame(state, frame, nowMs, options) {
     }
     next.confidence = scoringConfidence(next, frame.turned, options.stableDistraction);
     const metrics = scoringEyeMetrics(next, frame.ear, frame.turned, frame.eyeNowMs ?? nowMs);
-    return scoringTrackedFrame(metrics.state, { ...frame, perclos: metrics.perclos }, nowMs);
+    return scoringTrackedFrame(metrics.state, { ...frame, perclos: metrics.perclos }, nowMs, options.holdTurnFatigue);
 }

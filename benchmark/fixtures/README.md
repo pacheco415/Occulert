@@ -17,6 +17,20 @@ ordinary immutable-asset retirement can remove those after their grace period.
 The existing deployment exclusion covers `benchmark/`; no worker list references
 this fixture. It is not an application runtime/compiler input.
 
+## Synthetic long-head-turn fixture
+
+`head-turn-25s.json` supplies a calibrated, adequately tracked open-eye turn
+lasting 25 seconds, sampled every 150 ms and followed by frontal recovery.
+Its scalar observations and initial calibration state are synthetic. It
+contains no recordings, participant data or independent labels.
+
+`npm run test:scoring-replay` records these inputs through the composed live
+driver, compares the default path with the immutable scoring oracle, and
+replays the exported trace under `released` and `turn-fatigue-hold`. The held
+policy keeps fatigue at zero while preserving the existing distraction alert
+and cooldown times. This is software evidence only; it does not authorize a
+default detector change or establish real-driver accuracy.
+
 ## Synthetic road-model fixture
 
 `road-model-synthetic.json` contains hand-authored scalar lane and single-lead

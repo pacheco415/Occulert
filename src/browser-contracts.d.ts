@@ -30,6 +30,7 @@ interface DriverExperimentFlags {
   readonly observer?: boolean;
   readonly calibrationMin?: boolean;
   readonly eyeVisibility?: boolean;
+  readonly turnFatigue?: boolean;
 }
 interface CapturedExperimentFrame {
   readonly image: HTMLVideoElement | HTMLCanvasElement;
