@@ -1,0 +1,32 @@
+name: Resolve native SDK 58 patches
+on:
+  push:
+    branches: [codex/expo-patch-lock-resolution]
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: native-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .nvmrc
+      - name: Resolve Expo compatibility patches
+        run: |
+          npm pkg set 'dependencies.expo=~58.0.26' 'dependencies.expo-dev-client=~58.0.21' 'dependencies.expo-router=~58.0.32'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --check
+          git diff -- package.json package-lock.json > "$RUNNER_TEMP/native-lock.patch"
+          sha256sum "$RUNNER_TEMP/native-lock.patch"
+          echo BEGIN_NATIVE_LOCK_PATCH
+          gzip -n -c "$RUNNER_TEMP/native-lock.patch" | base64 -w 100
+          echo END_NATIVE_LOCK_PATCH
+      - run: npm ci --include=dev
+      - run: npm run verify
