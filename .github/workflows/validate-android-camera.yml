@@ -1,0 +1,29 @@
+name: Android camera module compilation
+on:
+  push:
+    branches: [codex/verify-android-concurrent-camera-probe]
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: bae63b385388681d052c29114078db05804c7d24
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: native-app/package-lock.json
+      - name: Install locked Expo dependencies
+        run: npm ci --include=dev
+        working-directory: native-app
+      - name: Generate Android project
+        run: npx --no-install expo prebuild --platform android --no-install
+        working-directory: native-app
+      - name: Compile the Android camera module
+        run: ./gradlew --no-daemon --max-workers=2 :occulert-device-condition:compileDebugKotlin
+        working-directory: native-app/android
