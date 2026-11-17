@@ -99,6 +99,7 @@
     "lint:api",
     "typecheck:source",
     "test:driver-build",
+    "test:feature-windows",
     "test:scoring-replay",
     "test:asset-retirement",
     "test:event-outbox",
