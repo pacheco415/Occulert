@@ -1,0 +1,34 @@
+name: Verify public driver release
+on:
+  push:
+    branches: [codex/expo-patch-lock-resolution]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 6c7a95f1ba3e66235f0013b4b7e32c9bda1505ed
+          persist-credentials: false
+      - name: Compare public files and caching against the checked-out release
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, pathlib, urllib.request
+          assets = json.loads(pathlib.Path('asset-versions.json').read_text())
+          pages = ['index.html', 'app.html', 'fleet-dashboard.html', 'sw.js']
+          names = ['driver-app.js', 'driver-app.css', 'driver-startup-guard.js', 'detection-experiments.js', 'fleet-dashboard.js', 'fleet-display.js', 'fleet-display.css']
+          for path in pages + [assets[key] for key in names]:
+              url = 'https://www.occulert.com/' + ('' if path == 'index.html' else path)
+              with urllib.request.urlopen(url, timeout=15) as reply:
+                  assert reply.status == 200, (path, reply.status)
+                  expected = hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+                  digest = hashlib.sha256(reply.read()).hexdigest()
+                  assert digest == expected, (path, digest, expected)
+                  cache = reply.headers.get('Cache-Control', '').lower()
+                  assert all(token in cache for token in (['max-age=0','must-revalidate'] if path in pages else ['max-age=31536000','immutable'])), (path, cache)
+                  assert reply.headers.get('Content-Security-Policy'), path
+                  print(path, digest, cache, 'CSP present')
+          PY
