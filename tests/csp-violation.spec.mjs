@@ -86,6 +86,10 @@ const test = base.extend({
           driver_filter_complete: true, has_more: false, next_cursor: null,
           telemetry_trust: 'unverified_client_report', privacy });
       }
+      if (local && method === 'GET' && url.pathname === '/api/parked-alert-checks') {
+        return json({ ok: true, fleet_id: FLEET, active_driver_count: 1, confirmed_driver_count: 1,
+          telemetry_trust: 'unverified_client_report' });
+      }
       if (local && method === 'GET' && url.pathname === '/api/fleet-followups') return json({ ok: true, sessions: [] });
       if (local && method === 'GET' && url.pathname === '/api/fleet-period-report') {
         return json({ ok: true, fleet, report: periodReport(Number(url.searchParams.get('days'))),
@@ -172,6 +176,7 @@ test('fleet-dashboard.html loads protected data and opens driver sessions withou
   await expect(page.locator('#cloudStatus')).toContainText('Protected connection active');
   await expect(page.locator('#drivers')).toContainText(driver.name);
   await expect(page.locator('#pilotReportPrint')).toBeEnabled();
+  expect(policyFixture.calls.some(call => call.path === '/api/parked-alert-checks' && call.method === 'GET')).toBe(true);
   await page.locator('[data-driver-detail]').click();
   await expect(page.locator('#driverDetailTitle')).toHaveText(`Recent sessions: ${driver.name}`);
   await expect(page.locator('#driverDetailList li')).toHaveCount(1);
