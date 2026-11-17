@@ -8,7 +8,7 @@ import { beginBackendSession, detachBackendSession, finishBackendSession, pushFl
 export const start = startMonitoring;
 export const stop = stopMonitoring;
 // Generated from the final driver asset mapping by the release tool.
-export const WEB_APP_VERSION = 'web-v138';
+export const WEB_APP_VERSION = 'web-v140';
 export const EXPERIMENT_HELPER_INTEGRITY = "sha256-znScQ6Y1IKJB6Ab5Ys5FqDWrkwYDJm15p5WACYFPvlQ=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
@@ -204,10 +204,13 @@ export function render(ear) {
     confidenceFill.style.width = confidence + '%';
     if (ear)
         earEl.textContent = ear.toFixed(3);
+    // Face presence is a live camera reading; never keep showing it once the
+    // camera is off, whether or not the last session was calibrated.
+    if (!running)
+        faceStateEl.textContent = '--';
     if (!running && !calibrated) {
         calibrationEl.textContent = 'READY';
         calibrationFill.style.width = '0%';
-        faceStateEl.textContent = '--';
     }
     const [risk, riskClass] = riskText();
     riskEl.textContent = risk;
@@ -245,6 +248,11 @@ export function render(ear) {
         statusEl.className = 'status ' + (lost || !observer && urgent ? 'alert' : 'on');
     }
     pushFleet();
+}
+/** Render now, bypassing the throttle, without inventing an EAR reading. */
+export function forceRender() {
+    lastRender = 0;
+    render();
 }
 export function showStoppedReason(message) {
     uiState('MONITORING STOPPED', message);
@@ -373,15 +381,9 @@ export function createLocalLifecycleOperations() {
             baseWatchThreshold = .22;
             eyeClosedThreshold = .18;
             eyeWatchThreshold = .22;
-            alertsEl.textContent = '0';
-            nodsEl.textContent = '0';
-            microsleepsEl.textContent = '0';
-            const yawnCountEl = document.getElementById('yawnCountEl');
-            if (yawnCountEl)
-                yawnCountEl.textContent = '0';
-            perclosEl.textContent = '0%';
-            distractionEl.textContent = '0s';
-            escalationEl.textContent = '0';
+            // Live readings and the per-session chart also start empty instead
+            // of showing the previous session until the first new sample.
+            clearSessionDisplays();
             locationEl.textContent = '--';
             faceStateEl.textContent = '--';
             calibrationEl.textContent = '0%';
@@ -492,7 +494,8 @@ export function createLocalLifecycleOperations() {
         let p = { ...fleetPayload(), eyeCoverage: stoppedEyeCoverage };
         p = saveLocalSessionHistory(p) || p;
         let mins = sessionStart ? ((Date.now() - sessionStart) / 60000).toFixed(1) : '0.0';
-        render(.001);
+        // A placeholder EAR used to bypass the throttle was shown as 0.001.
+        forceRender();
         const { eyeCoverage, ...sharedReport } = p;
         pushFleet(true, sharedReport);
         reportEl.style.display = 'block';
@@ -554,6 +557,17 @@ export function initChart() {
     cv.width = cv.offsetWidth || 300;
     cv.height = cv.offsetHeight || 60;
     _chartCtx = cv.getContext('2d');
+}
+/** Reset the per-session readouts shared by Start and "Clear on-screen
+ * diagnostics": counters, live EAR/MAR readings and the alertness chart. */
+export function clearSessionDisplays() {
+    for (const [el, text] of [[alertsEl, '0'], [nodsEl, '0'], [microsleepsEl, '0'], [$('yawnCountEl'), '0'], [perclosEl, '0%'], [distractionEl, '0s'], [escalationEl, '0'], [earEl, '--'], [$('marEl'), '--']])
+        if (el)
+            el.textContent = text;
+    _chartData = [];
+    const cv = $('alertnessChart');
+    if (_chartCtx && cv)
+        _chartCtx.clearRect(0, 0, cv.width, cv.height);
 }
 export function updateChart(val) {
     if (!_chartCtx)

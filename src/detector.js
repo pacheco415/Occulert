@@ -244,7 +244,9 @@ export async function loop(ts) {
         lastFrame = ts;
         if (performanceSessionStart !== sessionStart)
             resetFramePerformance();
-        if (canvas.width !== video.videoWidth) {
+        // Match both dimensions; a same-width height change would otherwise
+        // stretch the eye outline overlay against the video.
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
         }
