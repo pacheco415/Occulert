@@ -128,7 +128,8 @@
     "test:road-model-benchmark": "node --test scripts/test-road-model-benchmark.mjs",
     "test:fleet-monthly-activity": "node --test scripts/test-fleet-monthly-activity.mjs",
     "test:corroboration-replay": "node --test scripts/test-corroboration-replay.mjs",
-    "test:fleet-entitlements": "node --test scripts/test-fleet-entitlements.mjs"
+    "test:fleet-entitlements": "node --test scripts/test-fleet-entitlements.mjs",
+    "test:parked-alert-checks": "node --test scripts/test-parked-alert-checks-api.mjs scripts/test-parked-alert-checks-db.mjs scripts/test-parked-alert-checks-client.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

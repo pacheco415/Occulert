@@ -8,6 +8,7 @@ const handlers = Object.freeze({
   "/api/billing-webhook": require("./_lib/routes/billing-webhook"),
   "/api/fleet-period-report": require("./_lib/routes/fleet-period-report"),
   "/api/fleet-session-history": require("./_lib/routes/fleet-session-history"),
+  "/api/parked-alert-checks": require("./_lib/routes/parked-alert-checks"),
 });
 
 module.exports = function handler(request, response) {

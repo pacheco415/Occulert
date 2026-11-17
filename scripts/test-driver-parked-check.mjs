@@ -63,6 +63,8 @@ test('parked output check leaves session telemetry untouched and is disabled whi
     alertScreen: { style: {}, classList: { add: value => classes.add(value), remove: value => classes.delete(value) } },
     nightOpacity: { value: '72' },
     beginAlertAudioScope: () => 1,
+    beginParkedAlertConfirmation: () => null,
+    showParkedAlertConfirmation: () => {},
     _alertAudioOwner: 1,
     _alertTestOwner: 0,
     releaseAlertAudioScope: () => {},

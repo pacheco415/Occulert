@@ -72,7 +72,7 @@ test('capped launch UI describes loaded data age without inventing trial dates',
   const now = Date.parse('2026-09-26T12:00:00Z'), elements = new Map();
   class ClockDate extends Date { static now() { return now; } }
   const ui = { Date: ClockDate, fleetMode: true, protectedFleetName: 'Fleet', protectedDrivers: [{ active: true }],
-    protectedSessions: [], document: { getElementById: id => {
+    protectedSessions: [], protectedParkedChecks: null, document: { getElementById: id => {
       if (!elements.has(id)) elements.set(id, { textContent: '', dataset: {} });
       return elements.get(id);
     } } };
