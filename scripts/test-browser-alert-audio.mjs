@@ -267,7 +267,7 @@ function attachDriverLifecycle(h) {
     startBtn: { dataset: {} }, setMonitoringUi() {}, setCameraControlsDisabled() {}, setOverlay() {},
     initModel: async () => { throw Error('Model not ready'); },
     cameraRecoveryGuidance: () => ({ title: 'Unavailable', text: 'Try again', hint: 'Park first' }),
-    stream: null, video: {}, render() {}, log() {},
+    stream: null, video: {}, render() {}, forceRender() {}, log() {},
     stopTimer() {}, clearCameraTrackGuards() {}, wakeLock: null, raf: null, stopGPS() {},
     ctx: { clearRect() {} }, canvas: { width: 1, height: 1 }, refreshCameraChoices: async () => [],
     fleetPayload: () => ({ status: 'WATCH', safetyScore: 0, perclos: 0, distractionSeconds: 0, avgFatigue: 0, maxFatigue: 0, gpsEnabled: false, distanceMiles: 0 }),
