@@ -1,4 +1,5 @@
 name: Android camera module compilation
+run-name: Compile parked camera module at bae63b3
 on:
   push:
     branches: [codex/verify-android-concurrent-camera-probe]
