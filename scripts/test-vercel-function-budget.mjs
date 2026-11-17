@@ -6,7 +6,7 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const routed = [
   'billing-checkout', 'billing-portal', 'billing-status', 'billing-webhook',
-  'fleet-period-report', 'fleet-session-history',
+  'fleet-period-report', 'fleet-session-history', 'parked-alert-checks',
 ];
 
 test('API fits the Vercel Hobby twelve-function deployment limit', () => {
@@ -82,11 +82,12 @@ test('fleet query validators accept Vercel path metadata but reject caller endpo
     verifyAccessToken: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
     bearerToken: () => 'fixture',
     pgFetch: async table => {
+      if (table === 'rpc/fleet_parked_alert_check_counts') return null;
       assert.equal(table, 'fleets');
       return [];
     },
   } };
-  for (const route of ['fleet-period-report', 'fleet-session-history']) {
+  for (const route of ['fleet-period-report', 'fleet-session-history', 'parked-alert-checks']) {
     delete require.cache[require.resolve(`../api/_lib/routes/${route}.js`)];
   }
   const dispatcherPath = require.resolve('../api/[endpoint].js');
@@ -106,6 +107,7 @@ test('fleet query validators accept Vercel path metadata but reject caller endpo
   }
   assert.equal((await invoke('fleet-period-report', '?days=7', { days: '7' })).statusCode, 403);
   assert.equal((await invoke('fleet-session-history')).statusCode, 403);
+  assert.equal((await invoke('parked-alert-checks')).statusCode, 403);
   assert.equal((await invoke('fleet-period-report', '?days=7&endpoint=fleet-period-report',
     { days: '7' })).statusCode, 400);
   assert.equal((await invoke('fleet-period-report', '?days=7&endpoint=unexpected',
@@ -115,4 +117,7 @@ test('fleet query validators accept Vercel path metadata but reject caller endpo
   assert.equal((await invoke('fleet-period-report', '?days=7&unknown=1',
     { days: '7' })).statusCode, 400);
   assert.equal((await invoke('fleet-session-history', '?endpoint=fleet-session-history')).statusCode, 400);
+  assert.equal((await invoke('parked-alert-checks', '?endpoint=parked-alert-checks')).statusCode, 400);
+  assert.equal((await invoke('parked-alert-checks', '?fleet_id=11111111-1111-4111-8111-111111111111',
+    { fleet_id: '11111111-1111-4111-8111-111111111111' })).statusCode, 400);
 });

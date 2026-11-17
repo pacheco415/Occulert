@@ -4,11 +4,11 @@ import "./calibration.js";
 import { startGPS, stopGPS, riskText, fleetPayload, resetTrackingCue, beginEyeCoverage, setEyeCoverageCalibration, stopEyeCoverage, eyeCoveragePercentage } from "./metrics.js";
 import { alerts, escalationLevel, _alertTestOwner, beginAlertAudioScope, releaseAlertAudioScope, clearParkedAlertTest, resetBreakReminder, dismissBreak, triggerBreakCheck, set_alerts, set_lastAlert, set_escalationLevel } from "./alerts.js";
 import { createLocalDriverId, migrateLocalDriverIdentity, saveLocalSessionHistory, setMonitoringUi } from "./storage-history.js";
-import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud } from "./cloud-sync.js";
+import { beginBackendSession, detachBackendSession, finishBackendSession, pushFleet, initCloud, clearParkedAlertConfirmation } from "./cloud-sync.js";
 export const start = startMonitoring;
 export const stop = stopMonitoring;
 // Generated from the final driver asset mapping by the release tool.
-export const WEB_APP_VERSION = 'web-v136';
+export const WEB_APP_VERSION = 'web-v137';
 export const EXPERIMENT_HELPER_INTEGRITY = "sha256-aO8N7QM4nmBfJK8RHW50wmPvAqHM+gBan4iGTZ/3VLM=";
 /** @type {Readonly<DriverExperimentFlags>} */
 export const experimentFlags = (() => {
@@ -287,6 +287,7 @@ export function createLocalLifecycleOperations() {
             return;
         resetTrackingCue();
         clearParkedAlertTest(_alertTestOwner);
+        clearParkedAlertConfirmation();
         const audioOwner = beginAlertAudioScope();
         starting = true;
         setMonitoringUi(true);
