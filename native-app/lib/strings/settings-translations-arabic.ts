@@ -404,6 +404,7 @@ export const settingsArabicTranslations = {
     "preDrive.devices.roadCamera.unknownDetail": "تتوفر كاميرا خلفية، لكن لم يُؤكَّد دعم Apple لتشغيل عدة كاميرات بالتزامن.",
     "preDrive.devices.roadCamera.costDetail": " الأجهزة {hardwarePercent}%؛ الضغط {pressurePercent}%.",
     "preDrive.devices.roadCamera.passedDetail": "قبلت Apple إعداد الكاميرتين الأمامية والخلفية ضمن حدود مواردها.{costDetail} ما زالت مراقبة الطريق مخطّطة ولم تُفعّل.",
+    "preDrive.devices.roadCamera.androidCapableDetail": "يفيد نظام Android بأن الكاميرتين الأمامية والخلفية يمكن أن تعملا معًا. مراقبة الطريق غير مفعّلة.",
     "preDrive.devices.roadCamera.hardwareCapableOne": "أُبلغ عن {count} نوع من الكاميرا الخلفية. لا تتوفر نتيجة حمل أثناء الركن بعد؛ مراقبة الطريق غير نشطة.",
     "preDrive.devices.roadCamera.hardwareCapableMany": "أُبلغ عن {count} أنواع من الكاميرا الخلفية. لا تتوفر نتيجة حمل أثناء الركن بعد؛ مراقبة الطريق غير نشطة.",
     "preDrive.devices.outputs.unconfirmed": "تعذّرت قراءة إعدادات التنبيه المحفوظة. تحقق من الإعدادات قبل البدء.",
