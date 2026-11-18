@@ -49,15 +49,32 @@ zero alerts.
 | `noface-escalation-1` | `noface-escalation=1` |
 | `distraction-confidence-stable` | `distraction-confidence=stable` |
 | `turn-fatigue-hold` | `turn-fatigue=hold`; remove only the mature head-turn fatigue increment |
-
 | `perclos-turn-exclude` | `perclos-turn=exclude`; omit turned eye observations and break microsleep continuity |
+| `tasks-blink-v1` | Replay-only, unvalidated bilateral Tasks blink rule calibrated in parked setup |
 
 The runner reuses the actual parked controller source for its existing variants,
 not copied decision formulas. It recomputes smoothing/nods and continuity from
 the same raw normalized EAR, nose and turn observations. Elapsed time, unknown
 gaps and no-face evidence use their real models. Offline composition imports
 the same live pure phases from `scoring-core.js` but stays outside the bundle.
-Tasks remains measurement-only; there is no invented Tasks alert policy.
+Tasks decisions exist only in the unvalidated offline replay.
+
+During the captured parked setup, the exporter records bilateral coefficients
+only after paired, face-qualified Tasks inference. Every setup frame, including
+the one ending calibration, has `calibrating=1` and `tasks_usable=0`. A1 uses
+those measurements solely to compute the open-eye baseline, the arithmetic
+mean of the bilateral means. Recalibration discards the preceding baseline.
+
+After setup, a tracked frame requires `tasks_usable=1` and both coefficients.
+It is closed when their mean reaches `max(0.45, baseline + 0.35)`. A binary
+closed/open observation uses the ordinary released closed/open fatigue bands.
+Missing Tasks support contributes no eye or PERCLOS points, adds no sample to
+the PERCLOS window, and breaks continuous closure. Existing samples expire
+at 60 seconds. The recorded face/turn, nod and accepted-yawn inputs and the
+released alert eligibility and 12-second cooldown still apply. An observer-only
+recording, missing setup baseline, or session without usable post-setup frames
+gets an unavailable reason and no Tasks alert CSV. The manifest records the
+frozen starting values and `validated: false`.
 
 All variants consume the recorded accepted-yawn event after their frame score
 and before alert eligibility. This event is a fixed observed input, including
@@ -87,6 +104,16 @@ Evaluate each policy separately. The sessions CSV retains capture provenance;
 the replay manifest and explicit dataset name identify the counterfactual
 decision policy. Do not concatenate variants into one detector/accuracy number.
 Tracking and labels are still the recorded inputs, not inferred from replay.
+
+For a parked Tasks comparison, pass
+`--alerts fresh-replay/tasks-blink-v1/alerts.csv --dataset scoring-replay-tasks-blink-v1`
+to the same event benchmark. A synthetic .25 setup baseline followed by bilateral
+means of .50 and then .60 produced alerts at 4,700 and 16,700 ms in the
+100 ms fixture. Threshold tuning belongs on the train split only.
+
+Run the adapter and replay from a revision with the capture's exact driver,
+optional helper and model/runtime pins. For recordings made with driver v141
+and helper v20, use the [matching offline replay revision](https://github.com/pacheco415/Occulert/commit/9ebf994135062dd3d507049e250d3b2fc164ea49).
 
 ## Trace version and capability boundary
 

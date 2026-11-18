@@ -9,7 +9,7 @@ import { landmarks } from '../../tests/helpers/scoring-replay-geometry.mjs';
 
 const compiled = await buildDriverArtifact({ sourceRoot: fileURLToPath(new URL('../../src',import.meta.url)),
     contractPath: fileURLToPath(new URL('../../source-driver-contract.json',import.meta.url)) });
-export function recordScoringFixture({ fps = 7, clockStepMs = 0, frames = syntheticScoringTrace(fps), state = initialScoringState(), query = '?observer=1', sensitivity = 'medium', minimumSamples = 1 } = {}) {
+export function recordScoringFixture({ fps = 7, clockStepMs = 0, frames = syntheticScoringTrace(fps), state = initialScoringState(), query = '?observer=1', sensitivity = 'medium', minimumSamples = 1, tasksSample } = {}) {
     const sandbox = { module:{exports:{}},URLSearchParams };
     vm.runInNewContext(readFileSync(new URL('../../src/detection-experiments.js',import.meta.url),'utf8'),sandbox);
     const models = sandbox.module.exports, flags = models.parseFlags(query);
@@ -22,6 +22,10 @@ export function recordScoringFixture({ fps = 7, clockStepMs = 0, frames = synthe
         write:value => Object.assign(context,value),scoringState:snapshot,scoringSettings:() => ({sensitivity,minimumSamples}),
         now:() => time,wallNow:phase => context.scoringReadWallClock(phase),calibrationMs:3200,
         dimensions:() => ({width:360,height:480}),applySensitivity:() => context.applySensitivity(sensitivity),
+        ...(tasksSample ? {
+            captureCanvas: video => video,
+            createTasks: () => ({sample: tasksSample, stop: noop, status: () => 'ready'}),
+        } : {}),
         resetContinuous:() => context.resetContinuousObservations(),defaultCalibration:ear => context.updateCalibration(ear),
         defaultEyeMetrics:(ear,turned) => context.updateEyeMetrics(ear,turned),alert:(reason,eligibility) => context.trigger(reason,eligibility),
         log:noop,render:noop,tracking:noop,clearEyes:noop,

@@ -5,6 +5,36 @@
 
   const finite = value => typeof value === 'number' && Number.isFinite(value);
 
+  const tasksBlinkConfig = Object.freeze({ method: 'tasks-blink-v1', minimumClosure: .45,
+    baselineOffset: .35, validated: false, changesStatusOrAlerts: false });
+
+  // The stopped trace retains these coefficients only after paired, face-qualified
+  // inference. Setup provides the baseline; it never makes a closure decision.
+  function createTasksBlinkPolicy() {
+    let sum = 0, count = 0;
+    function bilateralMean(sample) {
+      const { eyeBlinkLeft, eyeBlinkRight, tasksInferenceMs } = sample;
+      if (!finite(tasksInferenceMs) || tasksInferenceMs < 0 ||
+          ![eyeBlinkLeft, eyeBlinkRight].every(value => finite(value) && value >= 0 && value <= 1)) return null;
+      return (eyeBlinkLeft + eyeBlinkRight) / 2;
+    }
+    function reset() { sum = 0; count = 0; }
+    function addSetup(sample) {
+      if (sample.calibrating !== true) return;
+      const mean = bilateralMean(sample);
+      if (mean !== null) { sum += mean; count++; }
+    }
+    function threshold() {
+      return count ? Math.max(tasksBlinkConfig.minimumClosure, sum / count + tasksBlinkConfig.baselineOffset) : null;
+    }
+    function closed(sample) {
+      if (sample.calibrating !== false || sample.tasksUsable !== true || !count) return null;
+      const mean = bilateralMean(sample);
+      return mean === null ? null : mean >= threshold();
+    }
+    return Object.freeze({ reset, addSetup, closed, threshold });
+  }
+
   function parseFlags(search = '') {
     const query = new URLSearchParams(search);
     const matches = (key, value) => query.getAll(key).length === 1 && query.get(key) === value;
@@ -452,7 +482,8 @@
 
   const api = Object.freeze({ parseFlags, eyeEAR, createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline,
     createNoFaceEvidence, matrixPose, parseTasksResult, createTraceStore, createObserverEpisodes, createEyeVisibility, eyeVisibilityConfig,
-    createFatigueFeatureWindow, fatigueFeatureConfig });
+    createFatigueFeatureWindow, fatigueFeatureConfig,
+    createTasksBlinkPolicy, tasksBlinkConfig });
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.OcculertDetectionExperiments = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
