@@ -498,9 +498,9 @@
     return Object.freeze({ add, recordAlert, samples, alerts, summary });
   }
 
-  const api = Object.freeze({ parseFlags, eyeEAR, createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline,
+  const api = Object.freeze({ fatigueModelScore, parseFlags, eyeEAR, createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline,
     createNoFaceEvidence, matrixPose, parseTasksResult, createTraceStore, createObserverEpisodes, createEyeVisibility, eyeVisibilityConfig,
-    createFatigueFeatureWindow, fatigueFeatureConfig, fatigueModelScore,
+    createFatigueFeatureWindow, fatigueFeatureConfig,
     createTasksBlinkPolicy, tasksBlinkConfig });
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.OcculertDetectionExperiments = api;
