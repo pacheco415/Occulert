@@ -225,3 +225,33 @@ fixed observed event does not reconstruct MAR or detector decisions under
 counterfactual calibration rules.
 See [SCORING_REPLAY.md](SCORING_REPLAY.md) for commands, variant outputs, unsupported
 capabilities, timing limits and synthetic parity evidence.
+
+## Parked Tasks decision observations
+
+With `?detector=tasks`, the local export includes the unvalidated
+`tasks-blink-v1` comparison. An independent state reads the recorded frame
+clocks and accepted yawns and uses the driver's pure scoring functions. Its
+outputs exist only in the stopped-session export. Observer labeling stays
+blind to the decisions. For supported normalized geometry, capture paired,
+face-qualified bilateral eye measurements during parked setup. Recalibration
+starts a fresh baseline.
+
+Tasks captures with scoring inputs use trace version 4. Their comparison CSV
+appends four columns to the existing columns.
+
+| Column | Recorded value |
+| --- | --- |
+| `tasks_closed` | 1 for closed, 0 for open, empty without a usable calibrated measurement. |
+| `tasks_perclos` | Percentage of closed observations in the supported trailing eye window. Empty when unavailable. |
+| `tasks_fatigue` | Independent rule score from 0 to 100, including setup when supported. |
+| `tasks_alert_candidate` | 1 when a candidate clears the cooldown, 0 for an evaluated frame without a candidate, empty for unavailable decisions. |
+
+For a complete supported session the parked adapter writes `tasks-alerts.csv`
+with `session_id,at_ms`. The time is the recorded trigger-phase time where
+available and the scoring-frame time otherwise. Use this file as the event
+benchmark's `--alerts` input alongside independent observer labels.
+`alerts.csv` continues to hold the legacy onsets. A supported capture with
+zero candidates produces a header-only file. Missing calibration, insufficient
+Tasks evidence, dropped scoring history, and unsupported pixel/pitch geometry
+give an unavailable result. Versions 1–3 retain their original comparison
+columns. Use the matching source revision for each capture's asset pins.

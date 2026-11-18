@@ -89,6 +89,14 @@ test('observer hides detector cues while retaining decisions and visible lifecyc
   await expect(page.locator('#driveHint')).toContainText('Camera stopped');
 });
 
+test('combined observer and Tasks mode keeps shadow decisions off the labeling screen', async ({ page }) => {
+  await page.goto('/app.html?observer=1&detector=tasks'); await ready(page); await begin(page);
+  await expect(page.locator('#observerLabels')).toBeVisible();
+  for (const id of ['fatigue','perclos','risk','alerts','alertScreen']) await expect(page.locator('#' + id)).toBeHidden();
+  await expect(page.locator('body')).not.toContainText(/tasks_closed|tasks_perclos|tasks_fatigue|tasks_alert_candidate/);
+  await expect(page.locator('#driveState')).toHaveText('PARKED OBSERVER SESSION');
+});
+
 test('observer shortcuts preserve text entry and the keyboard Stop action', async ({ page }) => {
   await page.goto('/app.html?observer=1&perclos=time'); await ready(page); await begin(page);
   await page.evaluate(() => {
