@@ -93,7 +93,7 @@ node benchmark/run-event-benchmark.mjs \
   --comparison path/to/derived-inputs/comparison.csv --split test
 ```
 
-The adapter cannot fabricate labels or Tasks alerts. It validates bounds, unique frames, signal types, exact owned pins, and separately supplied train/test identity. The existing event runner checks participant leakage and scores legacy alert observations against independent labels. Timing/paired support is reported by detector version; **Tasks event recall, false-alert rate and delay remain unavailable/null** until a frozen validated Tasks decision replay exists. Retained trace intervals do not extrapolate over omitted frames or camera gaps.
+The adapter validates frame bounds, signal types, asset provenance and the participant split. Supply observer labels independently. The event runner scores the onset file selected with `--alerts`. For supported v4 Tasks sessions, pass `tasks-alerts.csv` to score the parked candidates; `alerts.csv` scores the legacy onsets. The timing summary itself reports paired support and leaves event metrics null. Retained intervals exclude omitted frames and camera gaps.
 
 `benchmark/prepare-dataset.mjs` also accepts `earGeometry.mode: "pixel_landmarks"` with mapped landmark/video-width/video-height columns. It calls the exact same pixel geometry helper and fingerprints its source. Obtain dataset rights independently; no new external face imagery was downloaded for these checks.
 
@@ -215,9 +215,9 @@ physical alert perception or support changing the default pattern.
 
 ## Offline scoring replay
 
-New observer/Tasks exports use trace version 3 with bounded explicit scoring inputs,
+Observer exports use trace version 3 and Tasks exports use version 4 with bounded explicit scoring inputs,
 initial state, phase clocks and actual accepted-yawn events. The measurement/episode
-adapter accepts versions 1, 2 and 3 under its existing exact owned-source provenance
+adapter accepts versions 1 through 4 under its existing exact owned-source provenance
 checks. Version 1 lacks scoring inputs, and version 2 lacks accepted-yawn history;
 both are explicitly unavailable for scoring replay. Each variant applies the
 recorded accepted event after frame scoring and before alert eligibility. This

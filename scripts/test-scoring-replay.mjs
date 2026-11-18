@@ -31,7 +31,7 @@ test('paired blink measurements in the parked setup window have no Tasks scoring
     assert.ok(comparison.every(row => row.eye_blink_left === .1 && row.eye_blink_right === .2));
 });
 
-function blinkTrace(endMs, coefficients, recalibrateAt = -1) {
+function blinkTrace(endMs, coefficients, recalibrateAt = -1, clockStepMs = 0) {
     const frames = Array.from({length: endMs / 100 + 1}, (_, i) => ({
         atMs: i * 100, hasFace: true, ear: .3, turned: false, recalibrate: i * 100 === recalibrateAt,
     }));
@@ -46,7 +46,7 @@ function blinkTrace(endMs, coefficients, recalibrateAt = -1) {
             ]}],
         }};
     };
-    return recordScoringFixture({frames, query: '?observer=1&detector=tasks', tasksSample}).trace;
+    return recordScoringFixture({frames, clockStepMs, query: '?observer=1&detector=tasks', tasksSample}).trace;
 }
 
 const blinkVariant = result => result.variants.find(row => row.name === 'tasks-blink-v1');
@@ -104,6 +104,14 @@ test('live decisions follow replay through missing observations, cooldown and re
     assert.throws(() => adaptTrace(corrupt,input),/timestamp/);
     const unsupported = blinkTrace(4200, () => null);
     assert.equal(adaptTrace(unsupported,input).tasksAlerts,null);
+});
+
+test('phase-clock offsets preserve candidate timestamp parity on the parked trace', () => {
+    const trace = blinkTrace(18000, at => at <= 3200 ? [.1,.1] : [.9,.9], -1, 1);
+    const {tasksAlerts} = adaptTrace(trace,{participant:'ClockOffsets',split:'train',episodes:[]});
+    const replay = blinkVariant(replayScoring(trace));
+    assert.ok(tasksAlerts.length >= 2);
+    assert.deepEqual(tasksAlerts.map(row=>row.at_ms),replay.alerts.map(row=>row.at_ms));
 });
 
 test('unsupported Tasks observations break closure continuity without adding PERCLOS samples', () => {
