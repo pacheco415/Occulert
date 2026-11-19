@@ -15,7 +15,7 @@ try {
   await db.exec(baseline);
   await db.exec(migration);
   await db.exec('create role anon; create role authenticated; create role service_role;');
-  await db.exec(readFileSync(new URL('../supabase/migrations/20261119010000_fleet_insight_summaries.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../supabase/migrations/20261119034729_fleet_insight_summaries.sql', import.meta.url), 'utf8'));
   await db.exec(`
     insert into auth.users values
       ('00000000-0000-0000-0000-000000000001'),
