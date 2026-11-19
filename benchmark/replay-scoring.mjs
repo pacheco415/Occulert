@@ -49,7 +49,7 @@ function stateValid(state) {
 }
 function capability(trace) {
     const session = trace?.session;
-    if (trace?.schema !== 'occulert.parked-detection-trace' || ![1,2,3].includes(trace.version)
+    if (trace?.schema !== 'occulert.parked-detection-trace' || ![1,2,3,4].includes(trace.version)
         || session?.platform !== 'web' || !/^[A-Za-z0-9_-]{1,128}$/.test(session.sessionId ?? '')
         || !finite(session.durationMs) || session.durationMs <= 0 || !Array.isArray(trace.samples) || trace.samples.length > 20000) throw Error('Invalid parked trace header');
     validateProvenance(session);

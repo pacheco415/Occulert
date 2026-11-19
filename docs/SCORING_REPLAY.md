@@ -50,14 +50,14 @@ zero alerts.
 | `distraction-confidence-stable` | `distraction-confidence=stable` |
 | `turn-fatigue-hold` | `turn-fatigue=hold`; remove only the mature head-turn fatigue increment |
 | `perclos-turn-exclude` | `perclos-turn=exclude`; omit turned eye observations and break microsleep continuity |
-| `tasks-blink-v1` | Replay-only, unvalidated bilateral Tasks blink rule calibrated in parked setup |
+| `tasks-blink-v1` | Unvalidated bilateral Tasks blink rule calibrated in parked setup; compare its replay with version 4 parked candidates |
 
 The runner reuses the actual parked controller source for its existing variants,
 not copied decision formulas. It recomputes smoothing/nods and continuity from
 the same raw normalized EAR, nose and turn observations. Elapsed time, unknown
 gaps and no-face evidence use their real models. Offline composition imports
 the same live pure phases from `scoring-core.js` but stays outside the bundle.
-Tasks decisions exist only in the unvalidated offline replay.
+Version 4 Tasks captures also record silent candidates during a parked session. Compare their timestamps with this replay using the same capture.
 
 During the captured parked setup, the exporter records bilateral coefficients
 only after paired, face-qualified Tasks inference. Every setup frame, including
@@ -117,7 +117,7 @@ and helper v20, use the [matching offline replay revision](https://github.com/pa
 
 ## Trace version and capability boundary
 
-The measurement/episode adapter accepts versions 1, 2 and 3 while keeping its
+The measurement/episode adapter accepts versions 1 through 4 while keeping its
 exact owned-helper/runtime/model provenance checks. Run it with the matching
 source revision, as before. Version 1 omits face/turn/nod, starting calibration
 and phase clocks; those fields cannot be recovered from `legacyUsable`, which
@@ -126,7 +126,7 @@ that missing capability explicitly. Version 2 lacks accepted-yawn history;
 its scoring replay is also explicitly unavailable. Missing events cannot be
 treated as `false`, since their fatigue, peak and alert effects are unknown.
 
-Version 3 uses a bounded `scoringReplay` version-2 record in deliberate local exports:
+Versions 3 and 4 use a bounded `scoringReplay` version-2 record in deliberate local exports:
 
 - An allowlisted initial scoring state, calibration/sensitivity settings and
   nonzero normalized epoch `1700000000000`. Zero timestamps remain sentinels,

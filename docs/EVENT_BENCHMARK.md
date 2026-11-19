@@ -70,4 +70,4 @@ current production session summary is not sufficient for this benchmark.
 
 ## Local parked comparison imports
 
-The [parked trace adapter](PARKED_DETECTION_EXPERIMENTS.md#independent-labels-and-reproducible-software-evidence) converts explicit scalar JSON with externally labeled episodes and a pseudonymous participant split. `--comparison comparison.csv` adds supported paired-frame/timing summaries by detector version. It does not infer labels or Tasks alerts; Tasks event recall, false alerts and delay remain `null`. Missing or truncated frames grant no tracking coverage.
+The [parked trace adapter](PARKED_DETECTION_EXPERIMENTS.md#independent-labels-and-reproducible-software-evidence) converts explicit scalar JSON with externally labeled episodes and a pseudonymous participant split. `--comparison comparison.csv` adds supported paired-frame/timing summaries by detector version. The adapter preserves independent labels. For a complete supported version 4 Tasks capture, select its separate `tasks-alerts.csv` for event scoring. The frame-timing summary leaves event recall, false alerts and delay null. Missing or truncated frames grant no tracking coverage.
