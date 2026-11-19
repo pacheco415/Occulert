@@ -153,5 +153,8 @@
   "driver-startup-guard.v64.js": "b37038c9b5256b150dc2593643f67bd50f7869170524e539dbf092c9960bb872",
   "detection-experiments.v23.js": "0a3c25798102029e222362300930f33ea78d7e141c52f47ab5c4070a0f081f95",
   "driver-app.v144.js": "ef9f34c3914b83915935f4c1fa2bb81d8d03782993c797957e476fa5e5a77ab9",
-  "driver-startup-guard.v65.js": "22afd69c3a3c4dd3ffb1282d0efd408e020454a877aacd7734a2c8c4a0da3992"
+  "driver-startup-guard.v65.js": "22afd69c3a3c4dd3ffb1282d0efd408e020454a877aacd7734a2c8c4a0da3992",
+  "detection-experiments.v24.js": "6f69dcc4ff510bba308d987680af0df590bc8ba246b3906acb7cec45510a8c29",
+  "driver-app.v145.js": "894354430aeda837ae9ab722543e85511bcdfc1ce788984a3fb4da651264261a",
+  "driver-startup-guard.v66.js": "28152f962e858aaee2cdb41c3e27872e9e81247df1cf1c459fe68e2abe75a7e1"
 }

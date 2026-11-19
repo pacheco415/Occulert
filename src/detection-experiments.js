@@ -148,6 +148,24 @@
       'tasks_blink_max', 'yawn_count', 'pitch_down_fraction']),
   });
 
+  // A null feature is mean-imputed, so its standardized contribution is zero.
+  function fatigueModelScore(model, row) {
+    const { features, means, stds, weights, bias } = model;
+    if (model.schemaVersion !== 1 || model.kind !== 'fatigue-logreg' ||
+        model.featureVersion !== fatigueFeatureConfig.version || !Array.isArray(features) ||
+        !features.length || ![means, stds, weights].every(values => Array.isArray(values) && values.length === features.length) ||
+        !finite(bias)) throw Error('Invalid fatigue model');
+    let logit = bias;
+    for (let i = 0; i < features.length; i++) {
+      const value = row[features[i]];
+      if (!finite(means[i]) || !finite(stds[i]) || stds[i] <= 0 || !finite(weights[i]) ||
+          (value !== null && !finite(value))) throw Error('Invalid fatigue feature or coefficient');
+      if (value !== null && weights[i] !== 0) logit += weights[i] * ((value - means[i]) / stds[i]);
+    }
+    if (!finite(logit)) throw Error('Non-finite fatigue model score');
+    return 1 / (1 + Math.exp(-logit));
+  }
+
   // A session-local feature extractor. Call at(endMs) before adding a frame
   // at or beyond that boundary. The final interval is never extrapolated.
   function createFatigueFeatureWindow({ pixels = false, pitch = false } = {}) {
@@ -544,7 +562,7 @@
     return Object.freeze({ add, recordAlert, samples, alerts, summary });
   }
 
-  const api = Object.freeze({ parseFlags, eyeEAR, createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline,
+  const api = Object.freeze({ fatigueModelScore, parseFlags, eyeEAR, createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline,
     createNoFaceEvidence, matrixPose, parseTasksResult, createTraceStore, createObserverEpisodes, createEyeVisibility, eyeVisibilityConfig,
     createFatigueFeatureWindow, fatigueFeatureConfig,
     createTasksBlinkPolicy, tasksBlinkConfig, createTasksObservation });

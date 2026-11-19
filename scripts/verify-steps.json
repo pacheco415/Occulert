@@ -101,6 +101,7 @@
     "typecheck:source",
     "test:driver-build",
     "test:feature-windows",
+    "test:fatigue-model",
     "test:scoring-replay",
     "test:asset-retirement",
     "test:event-outbox",
