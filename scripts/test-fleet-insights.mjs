@@ -38,9 +38,17 @@ function setup(t, { user = { id: ownerId }, fleets = [{ id: fleetId, company_nam
       assert.equal(options.params.owner_user_id, 'eq.' + ownerId);
       return fleets;
     }
-    assert.equal(path, 'rpc/fleet_period_report');
-    assert.deepEqual(options, { method: 'POST', body: { p_actor_id: ownerId, p_fleet_id: fleetId, p_days: result.days } });
-    return result;
+    const { p_actor_id, p_fleet_id, p_days } = options.body;
+    assert.deepEqual([options.method, p_actor_id, p_fleet_id, p_days], ['POST', ownerId, fleetId, result.days]);
+    if (path === 'rpc/claim_fleet_insight_summary') {
+      return { claimed: true, report_day: end.slice(0, 10), report: result };
+    }
+    assert.equal(path, 'rpc/finish_fleet_insight_summary');
+    assert.equal(options.body.p_report_day, end.slice(0, 10));
+    return { summary: options.body.p_summary, days: p_days,
+      model: process.env.OCCULERT_INSIGHTS_MODEL || 'claude-haiku-5-5',
+      window_start: options.body.p_window_start, window_end: options.body.p_window_end,
+      finished_at: new Date().toISOString() };
   });
   const fetch = t.mock.method(globalThis, 'fetch', provider);
   const logs = t.mock.method(console, 'error', () => {});

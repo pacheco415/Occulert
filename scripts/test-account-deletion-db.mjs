@@ -14,6 +14,8 @@ try {
   await db.exec('create schema auth; create table auth.users(id uuid primary key);');
   await db.exec(baseline);
   await db.exec(migration);
+  await db.exec('create role anon; create role authenticated; create role service_role;');
+  await db.exec(readFileSync(new URL('../supabase/migrations/20261119010000_fleet_insight_summaries.sql', import.meta.url), 'utf8'));
   await db.exec(`
     insert into auth.users values
       ('00000000-0000-0000-0000-000000000001'),
@@ -21,6 +23,8 @@ try {
       ('00000000-0000-0000-0000-000000000003');
     insert into fleets(id, company_name, owner_user_id) values
       ('10000000-0000-0000-0000-000000000001', 'Test fleet', '00000000-0000-0000-0000-000000000001');
+    insert into fleet_insight_summaries(fleet_id, days, report_day, model)
+      select id, 7, current_date, 'fixture' from fleets;
     insert into drivers(id, fleet_id, user_id, name)
       select ('20000000-0000-0000-0000-00000000000' || n)::uuid,
         '10000000-0000-0000-0000-000000000001',
@@ -45,17 +49,20 @@ try {
   assert.equal(await count('sessions'), 3);
   assert.equal(await count('events'), 3);
   assert.equal(await count('fleets'), 1);
+  assert.equal(await count('fleet_insight_summaries'), 1);
   assert.equal(await count('fleet_invitations'), 1);
   await db.exec('drop table deletion_blocker');
   // A member deletes only their own history; the owner and other member remain.
   await db.exec("delete from auth.users where id='00000000-0000-0000-0000-000000000002'");
   for (const table of ['auth.users', 'drivers', 'sessions', 'events']) assert.equal(await count(table), 2);
   assert.equal(await count('fleets'), 1);
+  assert.equal(await count('fleet_insight_summaries'), 1);
   assert.equal(await count('fleet_invitations'), 0);
   // Owner deletion removes their own records and fleet, preserving the final member's history.
   await db.exec("delete from auth.users where id='00000000-0000-0000-0000-000000000001'");
   for (const table of ['auth.users', 'drivers', 'sessions', 'events']) assert.equal(await count(table), 1);
   assert.equal(await count('fleets'), 0);
+  assert.equal(await count('fleet_insight_summaries'), 0);
   for (const table of ['drivers', 'sessions']) {
     assert.equal((await db.query(`select fleet_id from ${table}`)).rows[0].fleet_id, null);
   }
