@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const day = 86_400_000;
 const ago = days => new Date(Date.now() - days * day).toISOString();
@@ -196,6 +197,9 @@ test('summary is owner-requested, renders model output as text, and clears when 
   await expect(page.locator('#fleetInsightText img')).toHaveCount(0);
   await expect(page.locator('#fleetInsightDetails')).toContainText('example-model · Written');
   await expect(page.locator('#fleetInsightDetails')).toContainText('Report ending');
+  const accessibility = await new AxeBuilder({ page }).include('#fleetInsightCard')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(accessibility.violations.map(violation => violation.id)).toEqual([]);
   await page.locator('#pilotRange').selectOption('7');
   await expect(page.locator('#fleetInsightText')).toBeEmpty();
   await page.getByRole('button', { name: 'Write summary' }).click();
