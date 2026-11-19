@@ -14,7 +14,7 @@ const source = readFileSync(new URL('../src/detection-experiments.js', import.me
 const sandbox = { module: { exports: {} }, URLSearchParams };
 vm.runInNewContext(source.toString(), sandbox);
 const { createFatigueFeatureWindow, fatigueFeatureConfig: config } = sandbox.module.exports;
-const features = config.windowsMs.flatMap(ms => config.fields.map(name => name + '_' + ms / 1000 + 's'));
+export const features = config.windowsMs.flatMap(ms => config.fields.map(name => name + '_' + ms / 1000 + 's'));
 const longestWindowMs = Math.max(...config.windowsMs);
 const firstTick = longestWindowMs / config.stepMs;
 const sessionFields = ['session_id', 'participant', 'split', 'end_ms', 'label'];
@@ -65,6 +65,36 @@ async function loadDirectory(directory) {
   return { session, episodes, frames, provenance, inputHashes };
 }
 
+// Training and replay share tick boundaries, geometry conversion and coverage exclusions.
+export function visitFeatureWindows(frames, durationMs, provenance, onWindow) {
+  const extractor = createFatigueFeatureWindow({ pixels: provenance.geometryUnits === 'pixels-reference-3x4',
+    pitch: provenance.experimentFlags.includes('pitch') });
+  const ticks = Math.floor(durationMs / config.stepMs);
+  if (!Number.isSafeInteger(ticks)) throw Error('Invalid session tick count');
+  const warmup = Math.min(firstTick - 1, ticks);
+  const counts = { warmup, lowUsableFraction: 0, included: 0 };
+  let index = 0;
+  for (let tick = firstTick; tick <= ticks; tick++) {
+    const end = tick * config.stepMs;
+    while (index < frames.length && frames[index].at_ms < end) extractor.add(frames[index++]);
+    // Skip long empty spans, counting exactly the same low-coverage windows.
+    if (!index || end - frames[index - 1].at_ms > longestWindowMs) {
+      const lastEmpty = index === frames.length ? ticks : Math.min(ticks, Math.floor(frames[index].at_ms / config.stepMs));
+      counts.lowUsableFraction += lastEmpty - tick + 1;
+      tick = lastEmpty;
+      continue;
+    }
+    const featureRow = extractor.at(end);
+    if (config.windowsMs.some(ms => featureRow['usable_fraction_' + ms / 1000 + 's'] < config.minUsableFraction)) {
+      counts.lowUsableFraction++;
+      continue;
+    }
+    onWindow(end, featureRow);
+    counts.included++;
+  }
+  return counts;
+}
+
 export async function writeFeatureWindows(inputs, output) {
   if (!inputs.length) throw Error('Provide at least one parked input directory');
   const sessions = [];
@@ -75,32 +105,10 @@ export async function writeFeatureWindows(inputs, output) {
   const totals = { warmup: 0, lowUsableFraction: 0, included: 0 };
   for (const { session, episodes, frames, provenance, inputHashes } of sessions) {
     const { session_id, participant, split } = session;
-    const extractor = createFatigueFeatureWindow({ pixels: provenance.geometryUnits === 'pixels-reference-3x4',
-      pitch: provenance.experimentFlags.includes('pitch') });
-    const ticks = Math.floor(session.duration_ms / config.stepMs);
-    if (!Number.isSafeInteger(ticks)) throw Error('Invalid session tick count');
-    const warmup = Math.min(firstTick - 1, ticks);
-    const counts = { warmup, lowUsableFraction: 0, included: 0 };
-    let index = 0;
-    for (let tick = firstTick; tick <= ticks; tick++) {
-      const end = tick * config.stepMs;
-      while (index < frames.length && frames[index].at_ms < end) extractor.add(frames[index++]);
-      // Skip long empty spans, counting exactly the same low-coverage windows.
-      if (!index || end - frames[index - 1].at_ms > longestWindowMs) {
-        const lastEmpty = index === frames.length ? ticks : Math.min(ticks, Math.floor(frames[index].at_ms / config.stepMs));
-        counts.lowUsableFraction += lastEmpty - tick + 1;
-        tick = lastEmpty;
-        continue;
-      }
-      const featureRow = extractor.at(end);
-      if (config.windowsMs.some(ms => featureRow['usable_fraction_' + ms / 1000 + 's'] < config.minUsableFraction)) {
-        counts.lowUsableFraction++;
-        continue;
-      }
+    const counts = visitFeatureWindows(frames, session.duration_ms, provenance, (end, featureRow) => {
       const label = Number(episodes.some(episode => end >= episode.start_ms && end < episode.end_ms));
       rows.push({ session_id, participant, split, end_ms: end, label, ...featureRow });
-      counts.included++;
-    }
+    });
     details.push({ session_id, participant, split, detector_version: session.detector_version, inputHashes, counts });
     for (const key of Object.keys(totals)) totals[key] += counts[key];
   }

@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import vm from 'node:vm';
 import { parseTable } from './csv.mjs';
 import { contentSha256 } from './provenance.mjs';
+import { createFatigueAlertPolicy } from './fatigue-alert-policy.mjs';
 
 const sandbox = { module: { exports: {} }, URLSearchParams };
 vm.runInNewContext(readFileSync(new URL('../src/detection-experiments.js', import.meta.url), 'utf8'), sandbox);
@@ -17,7 +18,6 @@ const thresholds = [0.25, 0.35, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1];
 const streaks = [1, 2, 3, 5];
 const iterations = 200;
 const stepSize = 0.1;
-const cooldownMs = 12000;
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 
 async function loadWindows(directory) {
@@ -129,15 +129,12 @@ function choosePenalty(train) {
 // Each retained row contributes one scored second. Gaps break label runs and
 // qualifying streaks. Cooldown still follows elapsed time within a session.
 export function evaluatePolicy(rows, threshold, consecutiveWindows) {
-  let previous, streak = 0, lastAlert = -Infinity, hit = false, positives = 0, hits = 0, falseAlerts = 0;
+  let previous, isAlert, hit = false, positives = 0, hits = 0, falseAlerts = 0;
   for (const row of rows) {
-    if (row.session !== previous?.session) lastAlert = -Infinity;
+    if (row.session !== previous?.session) isAlert = createFatigueAlertPolicy(threshold, consecutiveWindows, config.stepMs);
     const adjacent = previous?.session === row.session && row.end === previous.end + config.stepMs;
-    if (!adjacent) streak = 0;
     if (row.label && (!adjacent || !previous.label)) { positives++; hit = false; }
-    streak = row.score >= threshold ? streak + 1 : 0;
-    if (streak >= consecutiveWindows && row.end - lastAlert >= cooldownMs) {
-      lastAlert = row.end;
+    if (isAlert(row.end, row.score)) {
       if (!row.label) falseAlerts++;
       else if (!hit) { hits++; hit = true; }
     }

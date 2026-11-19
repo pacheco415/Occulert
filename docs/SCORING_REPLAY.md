@@ -34,8 +34,8 @@ node benchmark/replay-scoring.mjs --trace local-trace.json --out fresh-replay
 
 The output destination must not exist. Reusing an earlier run fails before
 writing, so old alerts cannot remain beside a new unavailable manifest. Each
-available variant gets `alerts.csv` (`session_id,at_ms`) and a diagnostic
-`scoring.csv`. `replay-manifest.json` records capability, source/trace hashes,
+available variant gets `alerts.csv` (`session_id,at_ms`). Frame-scoring variants
+also write a diagnostic `scoring.csv`. `replay-manifest.json` records capability, source/trace hashes,
 the actual helper source, variant identity and missing phase-clock counts.
 Unavailable variants have a reason and no alert CSV; unavailable never means
 zero alerts.
@@ -51,6 +51,7 @@ zero alerts.
 | `turn-fatigue-hold` | `turn-fatigue=hold`; remove only the mature head-turn fatigue increment |
 | `perclos-turn-exclude` | `perclos-turn=exclude`; omit turned eye observations and break microsleep continuity |
 | `tasks-blink-v1` | Unvalidated bilateral Tasks blink rule calibrated in parked setup; compare its replay with version 4 parked candidates |
+| `model-fatigue-windows-v1` | Frozen offline logistic model over the same trailing windows used in training |
 
 The runner reuses the actual parked controller source for its existing variants,
 not copied decision formulas. It recomputes smoothing/nods and continuity from
@@ -76,7 +77,7 @@ recording, missing setup baseline, or session without usable post-setup frames
 gets an unavailable reason and no Tasks alert CSV. The manifest records the
 frozen starting values and `validated: false`.
 
-All variants consume the recorded accepted-yawn event after their frame score
+Frame-scoring variants consume the recorded accepted-yawn event after their frame score
 and before alert eligibility. This event is a fixed observed input, including
 when a variant's calibration state differs from the recording policy. The
 boolean records an actual detector acceptance; it does not reconstruct raw
@@ -111,6 +112,33 @@ to the same event benchmark. A synthetic .25 setup baseline followed by bilatera
 means of .50 and then .60 produced alerts at 4,700 and 16,700 ms in the
 100 ms fixture. Threshold tuning belongs on the train split only.
 
+### Compare a frozen fatigue model
+
+Use the `model.json` produced by the offline trainer and the `captured-inputs`
+from the adapter command above. Keep the model fixed when evaluating held-out
+sessions. The manifest records the SHA-256 of the exact model file, its threshold,
+its required streak length, window counts and `validated: false`.
+
+```sh
+node benchmark/replay-scoring.mjs --trace local-trace.json --model model.json --out model-replay
+node benchmark/run-event-benchmark.mjs --sessions captured-inputs/sessions.csv \
+  --tracking captured-inputs/tracking.csv --episodes captured-inputs/episodes.csv \
+  --alerts model-replay/model-fatigue-windows-v1/alerts.csv --split test \
+  --dataset scoring-replay-fatigue-model --json model-results.json
+```
+
+The first possible window ends at 60 seconds. Every subsequent second uses
+strictly earlier measurements in the 30- and 60-second windows. Both windows
+must meet the trainer's coverage minimum. A skipped second or a score below
+threshold breaks the streak. Qualifying streaks can emit one timestamp every
+12 seconds. Versions 1 and 2 can supply model windows from their recorded scalar
+measurements. The trainer uses mean imputation for missing yawn evidence.
+A supported session with zero candidates has a header-only alert
+CSV. An omitted model, truncated capture, or session without a qualifying
+window gets an unavailable reason. The model reads scalar measurements and
+recorded yawn evidence where available. Independent episode labels enter only
+the event benchmark.
+
 Run the adapter and replay from a revision with the capture's exact driver,
 optional helper and model/runtime pins. For recordings made with driver v141
 and helper v20, use the [matching offline replay revision](https://github.com/pacheco415/Occulert/commit/9ebf994135062dd3d507049e250d3b2fc164ea49).
@@ -121,9 +149,9 @@ The measurement/episode adapter accepts versions 1 through 4 while keeping its
 exact owned-helper/runtime/model provenance checks. Run it with the matching
 source revision, as before. Version 1 omits face/turn/nod, starting calibration
 and phase clocks; those fields cannot be recovered from `legacyUsable`, which
-also excludes calibration, turns, pitch and unpaired frames. Replay reports
-that missing capability explicitly. Version 2 lacks accepted-yawn history;
-its scoring replay is also explicitly unavailable. Missing events cannot be
+also excludes calibration, turns, pitch and unpaired frames. Frame-scoring replay reports
+that missing capability explicitly. Version 2 lacks accepted-yawn history,
+so its frame-scoring variants are also unavailable. Missing events cannot be
 treated as `false`, since their fatigue, peak and alert effects are unknown.
 
 Versions 3 and 4 use a bounded `scoringReplay` version-2 record in deliberate local exports:
