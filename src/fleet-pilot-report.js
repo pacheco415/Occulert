@@ -113,6 +113,82 @@
     reportRows: reportRows, reportNotes: reportNotes, update: update, reset: reset, refreshReviews: loadReviews };
   window.OcculertPilotReport = api;
   if (!panel || !report) return;
+  var insightCard = document.getElementById('fleetInsightCard'), insightButton = document.getElementById('writeFleetInsight');
+  var insightDays = 0, insightRequest = null, insightsDisabled = false;
+
+  function clearInsight() {
+    insightRequest?.abort(); insightRequest = null; insightDays = 0;
+    if (!insightCard) return;
+    insightCard.hidden = true;
+    insightButton.disabled = false; insightButton.textContent = 'Write summary';
+    setText('fleetInsightText', ''); setText('fleetInsightDetails', '');
+  }
+  function showInsightCard(summary) {
+    if (!insightCard) return;
+    if (!summary.available || insightsDisabled || summary.days !== insightDays) clearInsight();
+    if (!summary.available || insightsDisabled) return;
+    insightDays = summary.days;
+    insightCard.hidden = false;
+  }
+  async function writeInsight() {
+    var input = snapshot(), summary = summarize(input, review);
+    if (!summary.available || insightsDisabled || insightRequest) return;
+    var days = summary.days, version = generation, abort = new AbortController();
+    var matchesReport = function () {
+      var current = snapshot();
+      return insightRequest === abort && version === generation && current.userId === input.userId &&
+        current.fleetId === input.fleetId && Number(current.days) === days && summarize(current, review).available;
+    };
+    insightRequest = abort;
+    insightButton.disabled = true;
+    setText('fleetInsightDetails', ''); setText('fleetInsightText', 'Loading summary…');
+    var timer = setTimeout(function () {
+      if (insightRequest !== abort) return;
+      abort.abort(); insightRequest = null; insightButton.disabled = false;
+      setText('fleetInsightText', 'The request timed out. Try again.');
+      update({ skipReviewLoad: true });
+    }, 15000);
+    try {
+      var auth = await window.OcculertBackend.getSession();
+      if (!matchesReport()) return;
+      if (auth?.user?.id !== input.userId || !auth.access_token || abort.signal.aborted) throw new Error();
+      var response = await fetch('/api/fleet-insights?days=' + days, { method: 'GET', credentials: 'same-origin',
+        cache: 'no-store', signal: abort.signal, headers: { Authorization: 'Bearer ' + auth.access_token } });
+      if (!matchesReport()) return;
+      if (response.status === 501) {
+        insightsDisabled = true; clearInsight();
+        document.getElementById('pilotReviewRefresh').focus();
+        return;
+      }
+      if (response.status === 202) {
+        setText('fleetInsightText', 'Your summary is being written. Check again in a moment.');
+        insightButton.textContent = 'Check summary';
+        return;
+      }
+      if (!response.ok) throw new Error();
+      var data = await response.json();
+      if (!matchesReport()) return;
+      if (data.ok !== true || data.ai_generated !== true || data.days !== days || typeof data.summary !== 'string' ||
+          !data.summary.trim() || data.summary.length > 1200 || typeof data.model !== 'string' || !data.model.trim() ||
+          time(data.generated_at) === null || time(data.window_end) === null) throw new Error();
+      setText('fleetInsightText', data.summary);
+      setText('fleetInsightDetails', data.model + ' · Written ' + new Date(data.generated_at).toLocaleString() +
+        ' · Report ending ' + new Date(data.window_end).toLocaleString());
+      insightButton.textContent = 'Write summary';
+    } catch (_) {
+      if (matchesReport()) {
+        setText('fleetInsightText', 'Summary unavailable. Try again later.');
+        insightButton.textContent = 'Write summary';
+      }
+    } finally {
+      clearTimeout(timer);
+      if (insightRequest === abort) {
+        insightRequest = null; insightButton.disabled = false;
+        update({ skipReviewLoad: true });
+      }
+    }
+  }
+  insightButton?.addEventListener('click', writeInsight);
   function currentUserId() { return window.OcculertBackend?.currentUser()?.id || ''; }
   function snapshot() {
     var input = typeof window.getProtectedPilotSnapshot === 'function' ? window.getProtectedPilotSnapshot() : {};
@@ -145,8 +221,10 @@
       typeof requestDashboardCSVDownload !== 'function' || typeof window.OcculertSecurity?.csvCell !== 'function';
     document.getElementById('pilotReviewRefresh').disabled = !!sourceAccess(snapshot(), Date.now()) || review.status === 'loading';
     renderReport(summary);
+    showInsightCard(summary);
   }
   function reset() {
+    clearInsight();
     generation += 1; controller?.abort(); controller = null; ownerId = ''; fleetId = ''; review = { status: 'idle' };
     if (panel && report) render({ available: false, reason: 'Protected report unavailable. Sign in and refresh protected data before printing.' });
   }
