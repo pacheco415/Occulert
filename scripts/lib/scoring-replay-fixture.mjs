@@ -1,5 +1,6 @@
 // Test fixture executes actual composed driver adapters and the actual helper.
 import vm from 'node:vm';
+import * as scoringCore from '../../src/scoring-core.js';
 import { readFileSync } from 'node:fs';
 import { buildDriverArtifact } from './driver-build.mjs';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +20,7 @@ export function recordScoringFixture({ fps = 7, clockStepMs = 0, frames = synthe
     const snapshot = () => Object.fromEntries(fields.map(key => [key,context[key]]));
     const noop = () => {};
     const controller = models.createController({ read:() => ({...snapshot(),running:context.running,localSessionId:'scoring-fixture'}),
-        write:value => Object.assign(context,value),scoringState:snapshot,scoringSettings:() => ({sensitivity,minimumSamples}),
+        scoringCore, write:value => Object.assign(context,value),scoringState:snapshot,scoringSettings:() => ({sensitivity,minimumSamples}),
         now:() => time,wallNow:phase => context.scoringReadWallClock(phase),calibrationMs:3200,
         dimensions:() => ({width:360,height:480}),applySensitivity:() => context.applySensitivity(sensitivity),
         ...(tasksSample ? {

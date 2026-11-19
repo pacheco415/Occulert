@@ -93,7 +93,7 @@ node benchmark/run-event-benchmark.mjs \
   --comparison path/to/derived-inputs/comparison.csv --split test
 ```
 
-The adapter cannot fabricate labels or Tasks alerts. It validates bounds, unique frames, signal types, exact owned pins, and separately supplied train/test identity. The existing event runner checks participant leakage and scores legacy alert observations against independent labels. Timing/paired support is reported by detector version; **Tasks event recall, false-alert rate and delay remain unavailable/null** until a frozen validated Tasks decision replay exists. Retained trace intervals do not extrapolate over omitted frames or camera gaps.
+The adapter validates frame bounds, signal types, asset provenance and the participant split. Supply observer labels independently. The event runner scores the onset file selected with `--alerts`. For supported v4 Tasks sessions, pass `tasks-alerts.csv` to score the parked candidates; `alerts.csv` scores the legacy onsets. The timing summary itself reports paired support and leaves event metrics null. Retained intervals exclude omitted frames and camera gaps.
 
 `benchmark/prepare-dataset.mjs` also accepts `earGeometry.mode: "pixel_landmarks"` with mapped landmark/video-width/video-height columns. It calls the exact same pixel geometry helper and fingerprints its source. Obtain dataset rights independently; no new external face imagery was downloaded for these checks.
 
@@ -215,9 +215,9 @@ physical alert perception or support changing the default pattern.
 
 ## Offline scoring replay
 
-New observer/Tasks exports use trace version 3 with bounded explicit scoring inputs,
+Observer exports use trace version 3 and Tasks exports use version 4 with bounded explicit scoring inputs,
 initial state, phase clocks and actual accepted-yawn events. The measurement/episode
-adapter accepts versions 1, 2 and 3 under its existing exact owned-source provenance
+adapter accepts versions 1 through 4 under its existing exact owned-source provenance
 checks. Version 1 lacks scoring inputs, and version 2 lacks accepted-yawn history;
 both are explicitly unavailable for scoring replay. Each variant applies the
 recorded accepted event after frame scoring and before alert eligibility. This
@@ -225,3 +225,33 @@ fixed observed event does not reconstruct MAR or detector decisions under
 counterfactual calibration rules.
 See [SCORING_REPLAY.md](SCORING_REPLAY.md) for commands, variant outputs, unsupported
 capabilities, timing limits and synthetic parity evidence.
+
+## Parked Tasks decision observations
+
+With `?detector=tasks`, the local export includes the unvalidated
+`tasks-blink-v1` comparison. An independent state reads the recorded frame
+clocks and accepted yawns and uses the driver's pure scoring functions. Its
+outputs exist only in the stopped-session export. Observer labeling stays
+blind to the decisions. For supported normalized geometry, capture paired,
+face-qualified bilateral eye measurements during parked setup. Recalibration
+starts a fresh baseline.
+
+Tasks captures with scoring inputs use trace version 4. Their comparison CSV
+appends four columns to the existing columns.
+
+| Column | Recorded value |
+| --- | --- |
+| `tasks_closed` | 1 for closed, 0 for open, empty without a usable calibrated measurement. |
+| `tasks_perclos` | Percentage of closed observations in the supported trailing eye window. Empty when unavailable. |
+| `tasks_fatigue` | Independent rule score from 0 to 100, including setup when supported. |
+| `tasks_alert_candidate` | 1 when a candidate clears the cooldown, 0 for an evaluated frame without a candidate, empty for unavailable decisions. |
+
+For a complete supported session the parked adapter writes `tasks-alerts.csv`
+with `session_id,at_ms`. The time is the recorded trigger-phase time where
+available and the scoring-frame time otherwise. Use this file as the event
+benchmark's `--alerts` input alongside independent observer labels.
+`alerts.csv` continues to hold the legacy onsets. A supported capture with
+zero candidates produces a header-only file. Missing calibration, insufficient
+Tasks evidence, dropped scoring history, and unsupported pixel/pitch geometry
+give an unavailable result. Versions 1–3 retain their original comparison
+columns. Use the matching source revision for each capture's asset pins.

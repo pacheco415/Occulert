@@ -52,7 +52,10 @@ test('actual export button downloads scalar JSON only after a parked session sto
  await page.goto('/app.html'+query+'&detector=tasks');await ready(page);
  await softwareFrames(page,{tasks:true});const downloadPromise=page.waitForEvent('download');await page.locator('#exportDetectionTrace').click();const download=await downloadPromise;
  expect(download.suggestedFilename()).toBe('occulert-parked-detection.json');const stream=await download.createReadStream();let content='';for await(const chunk of stream)content+=chunk;
- const data=JSON.parse(content);const adapted=adaptTrace(data,{participant:'BrowserFixture',split:'test',episodes:[]});expect(adapted.summary.tasksEventRecall).toBeNull();expect(data.schema).toBe('occulert.parked-detection-trace');expect(data.samples.length).toBeGreaterThan(40);expect(data.session.tasksEventMetricsAvailable).toBe(false);
+ const data=JSON.parse(content);expect(data.version).toBe(4);
+ expect(data.session.tasksDecisionsAvailable).toBe(false);
+ expect(data.samples.every(row=>row.tasksClosed===null&&row.tasksAlertCandidate===null)).toBe(true);
+ const adapted=adaptTrace(data,{participant:'BrowserFixture',split:'test',episodes:[]});expect(adapted.summary.tasksEventRecall).toBeNull();expect(data.schema).toBe('occulert.parked-detection-trace');expect(data.samples.length).toBeGreaterThan(40);expect(data.session.tasksEventMetricsAvailable).toBe(false);
  expect(data.samples.every(row=>row.eyeBlinkLeft===null&&row.tasksUsable===false)).toBe(true);
  for(const field of ['rawLandmarks','coordinates','email','token','route','location','media'])expect(content).not.toContain('"'+field+'"');
 });
