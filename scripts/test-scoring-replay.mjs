@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { recordScoringFixture } from './lib/scoring-replay-fixture.mjs';
 import { replayScoring, writeScoringReplay } from '../benchmark/replay-scoring.mjs';
-import { adaptTrace } from '../benchmark/parked-detection-trace.mjs';
+import { adaptTrace, comparisonColumns, decisionColumns } from '../benchmark/parked-detection-trace.mjs';
 import { createReleasedScoringOracle, initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../benchmark/released-scoring-oracle.mjs';
 import { parseFile } from '../benchmark/run-event-benchmark.mjs';
 
@@ -31,7 +31,7 @@ test('paired blink measurements in the parked setup window have no Tasks scoring
     assert.ok(comparison.every(row => row.eye_blink_left === .1 && row.eye_blink_right === .2));
 });
 
-function blinkTrace(endMs, coefficients, recalibrateAt = -1) {
+function blinkTrace(endMs, coefficients, recalibrateAt = -1, clockStepMs = 0) {
     const frames = Array.from({length: endMs / 100 + 1}, (_, i) => ({
         atMs: i * 100, hasFace: true, ear: .3, turned: false, recalibrate: i * 100 === recalibrateAt,
     }));
@@ -46,7 +46,7 @@ function blinkTrace(endMs, coefficients, recalibrateAt = -1) {
             ]}],
         }};
     };
-    return recordScoringFixture({frames, query: '?observer=1&detector=tasks', tasksSample}).trace;
+    return recordScoringFixture({frames, clockStepMs, query: '?observer=1&detector=tasks', tasksSample}).trace;
 }
 
 const blinkVariant = result => result.variants.find(row => row.name === 'tasks-blink-v1');
@@ -71,11 +71,47 @@ test('frozen Tasks baseline, bilateral cutoff, cooldown and exported alerts feed
         const derived = join(parent, 'inputs');
         execFileSync(process.execPath, ['benchmark/parked-detection-trace.mjs', '--trace', join(parent,'trace.json'),
             '--episodes', join(parent,'labels.csv'), '--participant','SyntheticBlink','--split','test','--out',derived]);
+        assert.deepEqual(readFileSync(join(derived,'tasks-alerts.csv')),readFileSync(alerts));
         const output = execFileSync(process.execPath, ['benchmark/run-event-benchmark.mjs', '--sessions',join(derived,'sessions.csv'),
             '--tracking',join(derived,'tracking.csv'),'--episodes',join(derived,'episodes.csv'),'--alerts',alerts,
             '--split','test','--dataset','scoring-replay-tasks-blink-v1'], {encoding:'utf8'});
         assert.equal(JSON.parse(output).provenance.dataset, 'scoring-replay-tasks-blink-v1');
     } finally { rmSync(parent, {recursive:true, force:true}); }
+});
+
+test('live decisions follow replay through missing observations, cooldown and recalibration', () => {
+    const trace = blinkTrace(30000, at => at >= 6700 && at <= 7100 ? null :
+        at <= 3200 || at >= 18000 && at <= 21200 ? [.1,.1] : [.9,.9], 18000);
+    const input = {participant:'SyntheticParity',split:'train',episodes:[]};
+    const current = adaptTrace(trace,input);
+    const replay = blinkVariant(replayScoring(trace));
+    assert.equal(trace.version,4);
+    assert.equal(replay.status,'available');
+    assert.ok(replay.alerts.length >= 2);
+    assert.deepEqual(current.tasksAlerts.map(item => item.at_ms), replay.alerts.map(item => item.at_ms));
+    assert.deepEqual(current.comparison.map(row => row.tasks_fatigue),replay.samples.map(row => row.fatigue));
+    assert.ok(current.comparison.filter(row => row.at_ms >= 6700 && row.at_ms <= 7100).every(row => row.tasks_closed === null));
+    assert.equal(trace.legacyAlerts.length,0);
+    const older = adaptTrace({...trace,version:3},input);
+    for (let i = 0; i < current.comparison.length; i++) {
+        const row = current.comparison[i];
+        assert.deepEqual(Object.keys(row),[...comparisonColumns,...decisionColumns]);
+        assert.deepEqual(Object.fromEntries(comparisonColumns.map(key => [key,row[key]])),older.comparison[i]);
+    }
+    assert.equal(older.tasksAlerts,null);
+    const corrupt = structuredClone(trace);
+    corrupt.samples.find(row => row.tasksAlertCandidate === 1).tasksAlertAtMs += 1;
+    assert.throws(() => adaptTrace(corrupt,input),/timestamp/);
+    const unsupported = blinkTrace(4200, () => null);
+    assert.equal(adaptTrace(unsupported,input).tasksAlerts,null);
+});
+
+test('phase-clock offsets preserve candidate timestamp parity on the parked trace', () => {
+    const trace = blinkTrace(18000, at => at <= 3200 ? [.1,.1] : [.9,.9], -1, 1);
+    const {tasksAlerts} = adaptTrace(trace,{participant:'ClockOffsets',split:'train',episodes:[]});
+    const replay = blinkVariant(replayScoring(trace));
+    assert.ok(tasksAlerts.length >= 2);
+    assert.deepEqual(tasksAlerts.map(row=>row.at_ms),replay.alerts.map(row=>row.at_ms));
 });
 
 test('unsupported Tasks observations break closure continuity without adding PERCLOS samples', () => {
