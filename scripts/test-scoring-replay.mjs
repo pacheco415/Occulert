@@ -51,6 +51,75 @@ function blinkTrace(endMs, coefficients, recalibrateAt = -1, clockStepMs = 0) {
 
 const blinkVariant = result => result.variants.find(row => row.name === 'tasks-blink-v1');
 
+test('offline model CLI uses causal windows, threshold equality, streak and cooldown, preserving other outputs', async t => {
+    const root = mkdtempSync(join(tmpdir(), 'occulert-model-replay-'));
+    t.after(() => rmSync(root, {recursive: true, force: true}));
+    const trace = blinkTrace(100000, at => at === 61000 ? [.75, .75] : [.25, .25]);
+    const tracePath = join(root, 'trace.json'), modelPath = join(root, 'model.json');
+    const model = JSON.parse(readFileSync(new URL('../benchmark/fixtures/fatigue-model-synthetic.json', import.meta.url)));
+    model.weights.fill(0);
+    model.means.fill(0);
+    model.stds.fill(1);
+    const peak = model.features.indexOf('tasks_blink_max_30s');
+    assert.notEqual(peak, -1);
+    model.weights[peak] = 1;
+    model.means[peak] = .75;
+    model.bias = 0;
+    model.threshold = .5;
+    model.consecutiveWindows = 3;
+    const bytes = JSON.stringify(model, null, 2) + '\n';
+    writeFileSync(modelPath, bytes);
+    writeFileSync(tracePath, JSON.stringify(trace));
+    const run = (out, args) => JSON.parse(execFileSync(process.execPath, ['benchmark/replay-scoring.mjs',
+        '--trace', tracePath, '--out', join(root, out), ...args], {encoding: 'utf8'}));
+    const name = 'model-fatigue-windows-v1';
+    const without = run('without', []).variants.find(v => v.name === name);
+    assert.equal(without.status, 'unavailable');
+    assert.match(without.reason, /No model/);
+    assert.equal(existsSync(join(root, 'without', name)), false);
+    run('with', ['--model', modelPath]);
+    const manifest = JSON.parse(readFileSync(join(root, 'with', 'replay-manifest.json')));
+    const entry = manifest.variants.find(v => v.name === name);
+    assert.equal(entry.modelSha256, createHash('sha256').update(bytes).digest('hex'));
+    assert.equal(entry.validated, false);
+    assert.equal(entry.windows.included, 41);
+    assert.equal(entry.alerts, 3);
+    const alerts = parseFile(readFileSync(join(root, 'with', name, 'alerts.csv'), 'utf8'), 'alerts');
+    assert.deepEqual(alerts.map(row => row.at_ms), [64000, 76000, 88000]);
+    for (const variant of manifest.variants.filter(v => v.status === 'available' && v.name !== name)) {
+        for (const file of ['alerts.csv', 'scoring.csv']) {
+            assert.deepEqual(readFileSync(join(root, 'with', variant.name, file)),
+                readFileSync(join(root, 'without', variant.name, file)), variant.name + '/' + file);
+        }
+    }
+});
+
+test('model replay distinguishes insufficient evidence from a scored session with zero alerts', () => {
+    const model = JSON.parse(readFileSync(new URL('../benchmark/fixtures/fatigue-model-synthetic.json', import.meta.url)));
+    model.weights.fill(0);
+    model.bias = -9;
+    model.threshold = .5;
+    const variant = trace => replayScoring(trace, JSON.stringify(model)).variants.at(-1);
+    assert.match(variant(blinkTrace(4000, () => [.25, .25])).reason, /No feature window/);
+    const trace = recordScoringFixture({fps: 3}).trace;
+    const scored = variant(trace);
+    assert.equal(scored.status, 'available');
+    assert.deepEqual(scored.alerts, []);
+    assert.ok(scored.windows.included > 0);
+    for (const version of [1, 2]) {
+        const legacy = { ...trace, version };
+        delete legacy.scoringReplay;
+        const result = replayScoring(legacy, JSON.stringify(model));
+        assert.equal(result.variants.find(row => row.name === 'released').status, 'unavailable');
+        assert.deepEqual(result.variants.at(-1).windows, scored.windows);
+        assert.deepEqual(result.variants.at(-1).alerts, []);
+    }
+    trace.session.droppedFrames = 1;
+    assert.match(variant(trace).reason, /frame history/);
+    model.features.reverse();
+    assert.throws(() => variant(trace), /incompatible fatigue model/);
+});
+
 test('frozen Tasks baseline, bilateral cutoff, cooldown and exported alerts feed the event CLI', async () => {
     // Setup mean .25 gives cutoff .60. Mean .50 stays open, then mean .60 is closed.
     const trace = blinkTrace(18000, at => at <= 3200 ? [.2,.3] : at < 4000 ? [.4,.6] : [.5,.7]);

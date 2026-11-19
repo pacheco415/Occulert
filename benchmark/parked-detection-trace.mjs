@@ -56,17 +56,13 @@ function readDecision(sample, row, durationMs, scoringFrame) {
  return at;
 }
 
-export function adaptTrace(trace,{participant,split,episodes}={}){
- if(!/^[A-Za-z0-9_-]{1,64}$/.test(participant||''))throw Error('Supply a pseudonymous participant identifier');
- if(split!=='train'&&split!=='test')throw Error('Supply an explicit participant-level train/test split');
- if(!Array.isArray(episodes))throw Error('Supply independently labeled episodes (an explicit empty list is permitted)');
+export function readParkedMeasurements(trace){
  const s=trace?.session;
  if(trace?.schema!=='occulert.parked-detection-trace'||![1,2,3,4].includes(trace.version)||!s||s.platform!=='web'||
    typeof s.sessionId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(s.sessionId)||typeof s.detectorVersion!=='string'||!s.detectorVersion||
    !finite(s.durationMs)||s.durationMs<=0||!Array.isArray(trace.samples)||trace.samples.length>20000||!Array.isArray(trace.legacyAlerts)||trace.legacyAlerts.length>4096)throw Error('Invalid parked trace');
  validateProvenance(s);
- const runtimePins=s.runtimePins;
- const session_id=s.sessionId,sessions=[{session_id,participant,platform:'web',detector_version:s.detectorVersion,duration_ms:s.durationMs,split}];
+ const session_id=s.sessionId;
  let lastId=0,lastAt=-1,lastMedia=null,previous=null;
  const tracking=[],comparison=[],tasksAlerts=[];
  const decisions = trace.version === 4;
@@ -102,13 +98,22 @@ export function adaptTrace(trace,{participant,split,episodes}={}){
   }
   comparison.push(row);previous=sample;lastId=sample.frameId;lastAt=sample.atMs;lastMedia=finite(sample.mediaTime)?sample.mediaTime:null;
  }
+ if (available && (!comparison.some(row => row.tasks_closed !== null) || comparison.some(row => row.tasks_fatigue === null)))
+  throw Error('Tasks decision evidence is missing');
+ return {comparison, tracking, tasksAlerts: available ? tasksAlerts : null};
+}
+
+export function adaptTrace(trace,{participant,split,episodes}={}){
+ if(!/^[A-Za-z0-9_-]{1,64}$/.test(participant||''))throw Error('Supply a pseudonymous participant identifier');
+ if(split!=='train'&&split!=='test')throw Error('Supply an explicit participant-level train/test split');
+ if(!Array.isArray(episodes))throw Error('Supply independently labeled episodes (an explicit empty list is permitted)');
+ const {comparison,tracking,tasksAlerts}=readParkedMeasurements(trace);
+ const s=trace.session, session_id=s.sessionId, runtimePins=s.runtimePins;
+ const sessions=[{session_id,participant,platform:'web',detector_version:s.detectorVersion,duration_ms:s.durationMs,split}];
+ const available=tasksAlerts!==null;
  const alerts=trace.legacyAlerts.map(alert=>{if(!finite(alert.atMs)||alert.atMs<0||alert.atMs>s.durationMs)throw Error('Invalid legacy alert time');return {session_id,at_ms:alert.atMs}});
  const input={sessions,tracking,episodes,alerts};validateInput(input);
- if (available) {
-  if (!comparison.some(row => row.tasks_closed !== null) || comparison.some(row => row.tasks_fatigue === null))
-   throw Error('Tasks decision evidence is missing');
-  validateInput({...input, alerts:tasksAlerts});
- }
+ if (available) validateInput({...input, alerts:tasksAlerts});
  return {...input,comparison,tasksAlerts:available ? tasksAlerts : null,summary:{retainedFrames:comparison.length,totalFrames:s.totalFrames??null,droppedFrames:s.droppedFrames??null,droppedAlerts:s.droppedAlerts??null,
    trackingConvention:'both usable endpoints; previous-state interval; gaps above 1000ms unknown; retained trace only',
    experimentFlags:s.experimentFlags,geometryUnits:s.geometryUnits,helperIntegrity:s.helperIntegrity,runtimeVersion:s.runtimeVersion,runtimePins:runtimePins.map(({url,integrity})=>({url,integrity})),modelIntegrity:s.modelIntegrity,
