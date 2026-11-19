@@ -1,5 +1,7 @@
-const { json, reportCountFields, ownerPeriodRequest, fetchPeriodReport, periodReportError } = require('../fleet-period');
-const { remainingProviderMs, withProviderBudget } = require('../provider-budget');
+const { json, reportCountFields, ownerPeriodRequest, validReport, periodReportError } = require('../fleet-period');
+const { pgFetch } = require('../supabase');
+const { supabaseErrorStatus } = require('../supabase-errors');
+const { REQUEST_PROVIDER_BUDGET_MS, remainingProviderMs, withProviderBudget } = require('../provider-budget');
 
 const SYSTEM_PROMPT = [
   'Write three to five short plain-text sentences for a fleet manager, using only the supplied period and aggregate counts.',
@@ -65,6 +67,20 @@ async function requestSummary(report, model, apiKey) {
   }
 }
 
+function storedSummary(response, row) {
+  if (!row) return json(response, 403, { ok: false, error: 'fleet_not_found' });
+  if (row.summary !== null) {
+    return json(response, 200, { ok: true, summary: row.summary, model: row.model, days: row.days,
+      window_start: row.window_start, window_end: row.window_end,
+      generated_at: new Date(row.finished_at).toISOString(), ai_generated: true });
+  }
+  if (!row.finished_at && Date.now() - Date.parse(row.created_at) <= REQUEST_PROVIDER_BUDGET_MS) {
+    response.setHeader('Retry-After', '2');
+    return json(response, 202, { ok: false, error: 'insights_pending' });
+  }
+  return json(response, 502, { ok: false, error: 'insights_unavailable' });
+}
+
 module.exports = withProviderBudget(async function handler(request, response) {
   if (request.method !== 'GET') {
     response.setHeader('Allow', 'GET');
@@ -74,21 +90,41 @@ module.exports = withProviderBudget(async function handler(request, response) {
   if (process.env.OCCULERT_FLEET_INSIGHTS_ENABLED !== '1' || !apiKey) {
     return json(response, 501, { ok: false, error: 'insights_not_configured' });
   }
-  let report;
+  let owner;
   try {
-    const owner = await ownerPeriodRequest(request, response);
+    owner = await ownerPeriodRequest(request, response);
     if (!owner) return;
-    report = await fetchPeriodReport(owner.actorId, owner.fleet.id, owner.days);
   } catch (error) {
     return periodReportError(response, error);
   }
+  const identity = { p_actor_id: owner.actorId, p_fleet_id: owner.fleet.id, p_days: owner.days };
   const model = process.env.OCCULERT_INSIGHTS_MODEL?.trim() || 'claude-haiku-5-5';
   try {
-    const summary = await requestSummary(report, model, apiKey);
-    return json(response, 200, { ok: true, summary, model, days: report.days,
-      window_start: report.window_start, window_end: report.window_end,
-      generated_at: new Date().toISOString(), ai_generated: true });
+    const claim = await pgFetch('rpc/claim_fleet_insight_summary', {
+      method: 'POST', body: { ...identity, p_model: model },
+    });
+    if (!claim) return storedSummary(response, null);
+    if (claim.claimed === false) return storedSummary(response, claim.entry);
+    if (claim.claimed !== true || !validReport(claim.report, owner.days) ||
+        new Date(claim.report.window_end).toISOString().slice(0, 10) !== claim.report_day) {
+      throw new Error('invalid_report');
+    }
+    const finish = (summary) => pgFetch('rpc/finish_fleet_insight_summary', {
+      method: 'POST', body: { ...identity, p_report_day: claim.report_day, p_summary: summary,
+        p_window_start: summary ? claim.report.window_start : null,
+        p_window_end: summary ? claim.report.window_end : null },
+    });
+    let summary;
+    try {
+      summary = await requestSummary(claim.report, model, apiKey);
+    } catch (error) {
+      // If the deadline also prevents this write, the reservation still blocks a second charge.
+      await finish(null).catch(() => {});
+      throw error;
+    }
+    return storedSummary(response, await finish(summary));
   } catch (error) {
-    return json(response, error?.status === 504 ? 504 : 502, { ok: false, error: 'insights_unavailable' });
+    const missing = ['42883', 'PGRST202', 'PGRST205'].includes(error?.details?.code);
+    return json(response, missing ? 503 : supabaseErrorStatus(error), { ok: false, error: 'insights_unavailable' });
   }
 });
