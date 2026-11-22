@@ -1,13 +1,227 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { recordScoringFixture } from './lib/scoring-replay-fixture.mjs';
 import { replayScoring, writeScoringReplay } from '../benchmark/replay-scoring.mjs';
-import { adaptTrace } from '../benchmark/parked-detection-trace.mjs';
+import { adaptTrace, comparisonColumns, decisionColumns } from '../benchmark/parked-detection-trace.mjs';
 import { createReleasedScoringOracle, initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../benchmark/released-scoring-oracle.mjs';
 import { parseFile } from '../benchmark/run-event-benchmark.mjs';
+
+test('paired blink measurements in the parked setup window have no Tasks scoring support', () => {
+    const frames = [0, 1600, 3200, 3300].map(atMs => ({atMs, hasFace:true, ear:.3, turned:false}));
+    const tasksSample = () => ({
+        inferenceMs: 1,
+        result: {
+            faceLandmarks: [[{x:.5, y:.5, z:0}]],
+            faceBlendshapes: [{categories: [
+                {categoryName:'eyeBlinkLeft', score:.1},
+                {categoryName:'eyeBlinkRight', score:.2},
+            ]}],
+        },
+    });
+    const {trace} = recordScoringFixture({frames, query:'?detector=tasks', tasksSample});
+    const {comparison} = adaptTrace(trace, {participant:'SyntheticSetup', split:'train', episodes:[]});
+    assert.deepEqual(comparison.map(row => [row.at_ms, row.calibrating, row.tasks_usable]), [
+        [0, 1, 0], [1600, 1, 0], [3200, 1, 0], [3300, 0, 1],
+    ]);
+    assert.ok(comparison.every(row => row.eye_blink_left === .1 && row.eye_blink_right === .2));
+});
+
+function blinkTrace(endMs, coefficients, recalibrateAt = -1, clockStepMs = 0) {
+    const frames = Array.from({length: endMs / 100 + 1}, (_, i) => ({
+        atMs: i * 100, hasFace: true, ear: .3, turned: false, recalibrate: i * 100 === recalibrateAt,
+    }));
+    const tasksSample = (_image, at) => {
+        const pair = coefficients(at);
+        if (!pair) return null;
+        return {inferenceMs: 1, result: {
+            faceLandmarks: [[{x:.5, y:.5, z:0}]],
+            faceBlendshapes: [{categories: [
+                {categoryName: 'eyeBlinkLeft', score: pair[0]},
+                {categoryName: 'eyeBlinkRight', score: pair[1]},
+            ]}],
+        }};
+    };
+    return recordScoringFixture({frames, clockStepMs, query: '?observer=1&detector=tasks', tasksSample}).trace;
+}
+
+const blinkVariant = result => result.variants.find(row => row.name === 'tasks-blink-v1');
+
+test('offline model CLI uses causal windows, threshold equality, streak and cooldown, preserving other outputs', async t => {
+    const root = mkdtempSync(join(tmpdir(), 'occulert-model-replay-'));
+    t.after(() => rmSync(root, {recursive: true, force: true}));
+    const trace = blinkTrace(100000, at => at === 61000 ? [.75, .75] : [.25, .25]);
+    const tracePath = join(root, 'trace.json'), modelPath = join(root, 'model.json');
+    const model = JSON.parse(readFileSync(new URL('../benchmark/fixtures/fatigue-model-synthetic.json', import.meta.url)));
+    model.weights.fill(0);
+    model.means.fill(0);
+    model.stds.fill(1);
+    const peak = model.features.indexOf('tasks_blink_max_30s');
+    assert.notEqual(peak, -1);
+    model.weights[peak] = 1;
+    model.means[peak] = .75;
+    model.bias = 0;
+    model.threshold = .5;
+    model.consecutiveWindows = 3;
+    const bytes = JSON.stringify(model, null, 2) + '\n';
+    writeFileSync(modelPath, bytes);
+    writeFileSync(tracePath, JSON.stringify(trace));
+    const run = (out, args) => JSON.parse(execFileSync(process.execPath, ['benchmark/replay-scoring.mjs',
+        '--trace', tracePath, '--out', join(root, out), ...args], {encoding: 'utf8'}));
+    const name = 'model-fatigue-windows-v1';
+    const without = run('without', []).variants.find(v => v.name === name);
+    assert.equal(without.status, 'unavailable');
+    assert.match(without.reason, /No model/);
+    assert.equal(existsSync(join(root, 'without', name)), false);
+    run('with', ['--model', modelPath]);
+    const manifest = JSON.parse(readFileSync(join(root, 'with', 'replay-manifest.json')));
+    const entry = manifest.variants.find(v => v.name === name);
+    assert.equal(entry.modelSha256, createHash('sha256').update(bytes).digest('hex'));
+    assert.equal(entry.validated, false);
+    assert.equal(entry.windows.included, 41);
+    assert.equal(entry.alerts, 3);
+    const alerts = parseFile(readFileSync(join(root, 'with', name, 'alerts.csv'), 'utf8'), 'alerts');
+    assert.deepEqual(alerts.map(row => row.at_ms), [64000, 76000, 88000]);
+    for (const variant of manifest.variants.filter(v => v.status === 'available' && v.name !== name)) {
+        for (const file of ['alerts.csv', 'scoring.csv']) {
+            assert.deepEqual(readFileSync(join(root, 'with', variant.name, file)),
+                readFileSync(join(root, 'without', variant.name, file)), variant.name + '/' + file);
+        }
+    }
+});
+
+test('model replay distinguishes insufficient evidence from a scored session with zero alerts', () => {
+    const model = JSON.parse(readFileSync(new URL('../benchmark/fixtures/fatigue-model-synthetic.json', import.meta.url)));
+    model.weights.fill(0);
+    model.bias = -9;
+    model.threshold = .5;
+    const variant = trace => replayScoring(trace, JSON.stringify(model)).variants.at(-1);
+    assert.match(variant(blinkTrace(4000, () => [.25, .25])).reason, /No feature window/);
+    const trace = recordScoringFixture({fps: 3}).trace;
+    const scored = variant(trace);
+    assert.equal(scored.status, 'available');
+    assert.deepEqual(scored.alerts, []);
+    assert.ok(scored.windows.included > 0);
+    for (const version of [1, 2]) {
+        const legacy = { ...trace, version };
+        delete legacy.scoringReplay;
+        const result = replayScoring(legacy, JSON.stringify(model));
+        assert.equal(result.variants.find(row => row.name === 'released').status, 'unavailable');
+        assert.deepEqual(result.variants.at(-1).windows, scored.windows);
+        assert.deepEqual(result.variants.at(-1).alerts, []);
+    }
+    trace.session.droppedFrames = 1;
+    assert.match(variant(trace).reason, /frame history/);
+    model.features.reverse();
+    assert.throws(() => variant(trace), /incompatible fatigue model/);
+});
+
+test('frozen Tasks baseline, bilateral cutoff, cooldown and exported alerts feed the event CLI', async () => {
+    // Setup mean .25 gives cutoff .60. Mean .50 stays open, then mean .60 is closed.
+    const trace = blinkTrace(18000, at => at <= 3200 ? [.2,.3] : at < 4000 ? [.4,.6] : [.5,.7]);
+    const parent = mkdtempSync(join(tmpdir(), 'occulert-blink-'));
+    try {
+        const directory = join(parent, 'replay');
+        const manifest = await writeScoringReplay(trace, directory);
+        const policy = blinkVariant(manifest);
+        assert.equal(policy.status, 'available');
+        assert.equal(policy.validated, false);
+        assert.deepEqual({...policy.tasksBlinkConfig}, {method:'tasks-blink-v1', minimumClosure:.45,
+            baselineOffset:.35, validated:false, changesStatusOrAlerts:false});
+        const alerts = join(directory, policy.name, 'alerts.csv');
+        assert.equal(readFileSync(alerts, 'utf8'), 'session_id,at_ms\nscoring-fixture,4700\nscoring-fixture,16700\n');
+        assert.equal(readFileSync(join(directory, 'released', 'alerts.csv'), 'utf8'), 'session_id,at_ms\n');
+        writeFileSync(join(parent, 'trace.json'), JSON.stringify(trace));
+        writeFileSync(join(parent, 'labels.csv'), 'session_id,start_ms,end_ms,label\n');
+        const derived = join(parent, 'inputs');
+        execFileSync(process.execPath, ['benchmark/parked-detection-trace.mjs', '--trace', join(parent,'trace.json'),
+            '--episodes', join(parent,'labels.csv'), '--participant','SyntheticBlink','--split','test','--out',derived]);
+        assert.deepEqual(readFileSync(join(derived,'tasks-alerts.csv')),readFileSync(alerts));
+        const output = execFileSync(process.execPath, ['benchmark/run-event-benchmark.mjs', '--sessions',join(derived,'sessions.csv'),
+            '--tracking',join(derived,'tracking.csv'),'--episodes',join(derived,'episodes.csv'),'--alerts',alerts,
+            '--split','test','--dataset','scoring-replay-tasks-blink-v1'], {encoding:'utf8'});
+        assert.equal(JSON.parse(output).provenance.dataset, 'scoring-replay-tasks-blink-v1');
+    } finally { rmSync(parent, {recursive:true, force:true}); }
+});
+
+test('live decisions follow replay through missing observations, cooldown and recalibration', () => {
+    const trace = blinkTrace(30000, at => at >= 6700 && at <= 7100 ? null :
+        at <= 3200 || at >= 18000 && at <= 21200 ? [.1,.1] : [.9,.9], 18000);
+    const input = {participant:'SyntheticParity',split:'train',episodes:[]};
+    const current = adaptTrace(trace,input);
+    const replay = blinkVariant(replayScoring(trace));
+    assert.equal(trace.version,4);
+    assert.equal(replay.status,'available');
+    assert.ok(replay.alerts.length >= 2);
+    assert.deepEqual(current.tasksAlerts.map(item => item.at_ms), replay.alerts.map(item => item.at_ms));
+    assert.deepEqual(current.comparison.map(row => row.tasks_fatigue),replay.samples.map(row => row.fatigue));
+    assert.ok(current.comparison.filter(row => row.at_ms >= 6700 && row.at_ms <= 7100).every(row => row.tasks_closed === null));
+    assert.equal(trace.legacyAlerts.length,0);
+    const older = adaptTrace({...trace,version:3},input);
+    for (let i = 0; i < current.comparison.length; i++) {
+        const row = current.comparison[i];
+        assert.deepEqual(Object.keys(row),[...comparisonColumns,...decisionColumns]);
+        assert.deepEqual(Object.fromEntries(comparisonColumns.map(key => [key,row[key]])),older.comparison[i]);
+    }
+    assert.equal(older.tasksAlerts,null);
+    const corrupt = structuredClone(trace);
+    corrupt.samples.find(row => row.tasksAlertCandidate === 1).tasksAlertAtMs += 1;
+    assert.throws(() => adaptTrace(corrupt,input),/timestamp/);
+    const unsupported = blinkTrace(4200, () => null);
+    assert.equal(adaptTrace(unsupported,input).tasksAlerts,null);
+});
+
+test('phase-clock offsets preserve candidate timestamp parity on the parked trace', () => {
+    const trace = blinkTrace(18000, at => at <= 3200 ? [.1,.1] : [.9,.9], -1, 1);
+    const {tasksAlerts} = adaptTrace(trace,{participant:'ClockOffsets',split:'train',episodes:[]});
+    const replay = blinkVariant(replayScoring(trace));
+    assert.ok(tasksAlerts.length >= 2);
+    assert.deepEqual(tasksAlerts.map(row=>row.at_ms),replay.alerts.map(row=>row.at_ms));
+});
+
+test('unsupported Tasks observations break closure continuity without adding PERCLOS samples', () => {
+    // The absolute .45 floor applies with a zero baseline.
+    const trace = blinkTrace(6400, at => at <= 3200 ? [0,0] : at < 4000 ? [.44,.44] : [.45,.45]);
+    for (const row of trace.samples.filter(row => row.atMs >= 4600 && row.atMs <= 6000)) row.tasksUsable = false;
+    const result = blinkVariant(replayScoring(trace));
+    assert.equal(result.status, 'available');
+    const before = result.samples.find(row => row.at_ms === 4500).perclos_samples;
+    assert.ok(result.samples.filter(row => row.at_ms >= 4600 && row.at_ms <= 6000).every(row => row.perclos_samples === before));
+    assert.equal(result.finalState.perclosWindow.filter(row => row.closed).length, 10);
+    assert.equal(result.finalState.microsleeps, 0);
+    assert.equal(result.finalState.eyesClosedSince, SCORING_EPOCH + 6100);
+});
+
+test('unavailable Tasks observations and missing setup never write an empty alert CSV', async () => {
+    const parent = mkdtempSync(join(tmpdir(), 'occulert-blink-unavailable-'));
+    const cases = [
+        [recordScoringFixture({fps:3}).trace, /did not capture Tasks/],
+        [blinkTrace(4000, at => at <= 3200 ? null : [1,1]), /baseline/],
+        [blinkTrace(4000, at => at <= 3200 ? [.2,.2] : null), /No usable Tasks/],
+        [blinkTrace(10000, at => at < 5000 || at > 8200 ? [.2,.2] : null, 5000), /baseline/],
+    ];
+    try {
+        for (const [index, [trace, reason]] of cases.entries()) {
+            const output = join(parent, String(index));
+            const result = await writeScoringReplay(trace, output);
+            assert.equal(blinkVariant(result).status, 'unavailable');
+            assert.match(blinkVariant(result).reason, reason);
+            assert.equal(existsSync(join(output,'tasks-blink-v1','alerts.csv')), false);
+        }
+        // Pre-A1 bytes on 6c7a95f, including every diagnostic frame and actual released alert.
+        for (const [name, expected] of Object.entries({
+            alerts: 'dd5a1bdf1b00ef442c7ed521d061d50b33bb82c225ef15853374e54f5628a3b8',
+            scoring: '076d4c5cb9efdbaef70be289b02711519365bc3a939663ecd3d7d917873980e6',
+        })) {
+            const bytes = readFileSync(join(parent,'0','released',name+'.csv'));
+            assert.equal(createHash('sha256').update(bytes).digest('hex'), expected);
+        }
+    } finally { rmSync(parent, {recursive:true, force:true}); }
+});
 
 for (const fps of [3,7,15]) for (const clockStepMs of [0,1]) test(`actual live v3 export replays released decisions and score state at ${fps}fps/${clockStepMs}ms clock steps`, () => {
     const captured = recordScoringFixture({fps,clockStepMs});
@@ -15,7 +229,7 @@ for (const fps of [3,7,15]) for (const clockStepMs of [0,1]) test(`actual live v
     assert.equal(captured.trace.scoringReplay.version,2);
     assert.ok(captured.trace.scoringReplay.frames.every(row => row.yawn === false));
     const replay = replayScoring(captured.trace), released = replay.variants.find(row => row.name === 'released');
-    assert.ok(replay.variants.every(row => row.status === 'available'));
+    assert.ok(replay.variants.filter(row => !row.replayOnly).every(row => row.status === 'available'));
     assert.deepEqual(released.samples.map(row => [row.at_ms,row.fatigue,row.confidence,row.calibrated]),
         captured.recorded.map(row => [row.frame_id,row.fatigue,row.confidence,row.calibrated]));
     assert.deepEqual(released.alerts.map(row => row.at_ms),captured.trace.legacyAlerts.map(row => row.atMs));
@@ -73,7 +287,7 @@ test('real accepted yawns replay after scoring and before same-frame alerts with
     assert.equal(released.finalState.fatigueSampleCount,4);
     assert.deepEqual(released.clockFallbacks,{});
     assert.match(result.acceptedYawnPolicy,/do not reconstruct MAR/);
-    for(const variant of result.variants){
+    for(const variant of result.variants.filter(row => !row.replayOnly)){
         const live=recordScoringFixture({frames,state,query:variant.query,minimumSamples:variant.minimumSamples??1});
         assert.equal(live.yawnCount,1,variant.name);
         assert.deepEqual(variant.finalState,live.finalState,variant.name);
@@ -129,7 +343,7 @@ test('primary calibration accepts its existing detector events and variants reus
 
 test('all replay variants match their actual live helper/results paths on the same raw observations', () => {
     const captured=recordScoringFixture({fps:3}),result=replayScoring(captured.trace);
-    for (const variant of result.variants) {
+    for (const variant of result.variants.filter(row => !row.replayOnly)) {
         const reference=recordScoringFixture({fps:3,query:variant.query,minimumSamples:variant.minimumSamples??1});
         assert.deepEqual(variant.samples.map(row => [row.at_ms,row.fatigue,row.confidence,row.calibrated]),
             reference.recorded.map(row => [row.frame_id,row.fatigue,row.confidence,row.calibrated]),variant.name);
@@ -201,7 +415,7 @@ test('variant replay preserves real recalibration, sensitivity changes and unkno
         sensitivity:row.atMs===30000?'high':row.atMs===60000?'low':undefined}));
     const captured=recordScoringFixture({frames}),result=replayScoring(captured.trace);
     assert.equal(captured.trace.scoringReplay.controls.length,1);
-    for(const variant of result.variants){
+    for(const variant of result.variants.filter(row => !row.replayOnly)){
         const reference=recordScoringFixture({frames,query:variant.query,minimumSamples:variant.minimumSamples??1});
         assert.deepEqual(variant.samples.map(row=>[row.at_ms,row.fatigue,row.confidence,row.calibrated]),
             reference.recorded.map(row=>[row.frame_id,row.fatigue,row.confidence,row.calibrated]),variant.name);

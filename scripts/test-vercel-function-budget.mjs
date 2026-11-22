@@ -6,7 +6,7 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const routed = [
   'billing-checkout', 'billing-portal', 'billing-status', 'billing-webhook',
-  'fleet-period-report', 'fleet-session-history', 'parked-alert-checks',
+  'fleet-insights', 'fleet-period-report', 'fleet-session-history', 'parked-alert-checks',
 ];
 
 test('API fits the Vercel Hobby twelve-function deployment limit', () => {
@@ -87,6 +87,7 @@ test('fleet query validators accept Vercel path metadata but reject caller endpo
       return [];
     },
   } };
+  delete require.cache[require.resolve('../api/_lib/fleet-period.js')];
   for (const route of ['fleet-period-report', 'fleet-session-history', 'parked-alert-checks']) {
     delete require.cache[require.resolve(`../api/_lib/routes/${route}.js`)];
   }
