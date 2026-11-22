@@ -9,7 +9,7 @@ const accounts = {
   missing: '99999999-9999-4999-8999-999999999999',
 };
 const signature = 'public.reserve_account_write(uuid,text)';
-const limits = { profile: 60, fleet: 10 };
+const limits = { profile: 60, fleet: 10, fleet_ask: 20 };
 
 for (const supabaseDefaults of [false, true]) {
   test(`account write quotas replay the canonical chain with ${supabaseDefaults ? 'historical Supabase' : 'strict'} grants`, async t => {
@@ -140,7 +140,7 @@ for (const supabaseDefaults of [false, true]) {
           }
           assert.equal((await bucket(accounts.first, operation)).write_count, limit);
         }
-        assert.equal((await buckets()).length, 2, 'each operation retains one bounded row');
+        assert.equal((await buckets()).length, Object.keys(limits).length, 'each operation retains one bounded row');
         const full = await buckets();
         for (const operation of Object.keys(limits)) {
           denied(await reserve(accounts.first, operation), accounts.first, operation);
@@ -148,6 +148,15 @@ for (const supabaseDefaults of [false, true]) {
         assert.deepEqual(await buckets(), full, 'denial must not increment counters or move their fixed windows');
         assert.deepEqual(await reserve(accounts.second), admitted(accounts.second));
         assert.equal((await bucket(accounts.second)).write_count, 1, 'another account has an independent budget');
+      });
+
+      await t.test('a full fleet question bucket leaves all ten fleet edits available', async () => {
+        await reset();
+        for (let i = 0; i < 20; i++) assert.deepEqual(await reserve(accounts.first, 'fleet_ask'), admitted(accounts.first, 'fleet_ask'));
+        denied(await reserve(accounts.first, 'fleet_ask'), accounts.first, 'fleet_ask');
+        for (let i = 0; i < 10; i++) assert.deepEqual(await reserve(accounts.first, 'fleet'), admitted(accounts.first, 'fleet'));
+        denied(await reserve(accounts.first, 'fleet'), accounts.first, 'fleet');
+        assert.equal((await bucket(accounts.first, 'fleet_ask')).write_count, 20);
       });
 
       await t.test('accepted calls retain their window and queued rollover callers cannot overspend the next window', async () => {
@@ -214,7 +223,7 @@ for (const supabaseDefaults of [false, true]) {
         await reset();
         const insert = (user, operation, count) => db.query(`insert into public.account_write_rate_limits
           (user_id,operation,window_started_at,write_count) values ($1,$2,clock_timestamp(),$3)`, [user, operation, count]);
-        for (const [operation, count] of [['profile', -1], ['profile', 61], ['fleet', -1], ['fleet', 11], ['other', 0]]) {
+        for (const [operation, count] of [['profile', -1], ['profile', 61], ['fleet', -1], ['fleet', 11], ['fleet_ask', -1], ['fleet_ask', 21], ['other', 0]]) {
           await assert.rejects(insert(accounts.first, operation, count), error => error.code === '23514');
         }
         await assert.rejects(insert(accounts.first, 'profile', null), error => error.code === '23502');

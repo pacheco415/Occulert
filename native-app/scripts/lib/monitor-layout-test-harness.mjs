@@ -17,7 +17,7 @@ export function flattenStyle(value) {
 }
 
 /** The layout's actual TSX and React run here; native rendering/measurements are separate device evidence. */
-export function createMonitorLayoutFixture() {
+export function createMonitorLayoutFixture(catalog) {
   let dimensions = { width: 390, height: 844, fontScale: 1, scale: 3 };
   let insets = { top: 47, bottom: 34, left: 0, right: 0 };
   const scrolls = [];
@@ -75,15 +75,16 @@ export function createMonitorLayoutFixture() {
     // The current monitor top bar: 44-point controls, 10-point vertical padding,
     // and a 6-point top margin. Device measurement remains a separate gate.
     header: React.createElement('View', { style: { marginTop: 6, paddingVertical: 10 } },
-      React.createElement('Text', { style: { minHeight: 44, fontSize: 15 } }, 'Monitor navigation')),
+      React.createElement('Text', { style: { minHeight: 44, fontSize: 15 } }, catalog?.navigation.monitoring ?? 'Monitor navigation')),
     primaryAction: React.createElement('TouchableOpacity', {
       testID: 'fixture-stop',
       style: { minHeight: 56, paddingVertical: 14, paddingHorizontal: 12 },
-      accessibilityLabel: props.running ? 'Stop monitoring and save this drive' : 'Start fatigue monitoring',
+      accessibilityLabel: props.running ? (catalog?.monitor.controls.stopAccessibilityLabel ?? 'Stop monitoring and save this drive')
+        : (catalog?.monitor.controls.startAccessibilityLabel ?? 'Start fatigue monitoring'),
       accessibilityState: { disabled: props.preparing },
       disabled: props.preparing,
       onPress: () => { if (!props.preparing) events[props.running ? 'stops' : 'starts']++; },
-    }, React.createElement('Text', { style: { fontSize: 18, textAlign: 'center' } }, props.running ? 'STOP MONITORING' : 'START MONITORING')),
+    }, React.createElement('Text', { style: { fontSize: 18, textAlign: 'center' } }, props.running ? (catalog?.monitor.controls.stop ?? 'STOP MONITORING') : (catalog?.monitor.controls.start ?? 'START MONITORING'))),
     attentionKey: props.attentionKey,
     reduceMotion: props.reduceMotion,
   }, React.createElement('Text', { testID: 'fixture-detail' }, props.detail));
