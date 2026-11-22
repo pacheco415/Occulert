@@ -1,0 +1,26 @@
+plugins {
+    id 'com.android.application' version '9.2.1'
+}
+
+android {
+    namespace 'com.occulert.wearprobe'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.occulert.wearprobe'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1'
+    }
+    flavorDimensions += 'device'
+    productFlavors {
+        handheld { dimension 'device' }
+        wear { dimension 'device' }
+    }
+}
+
+dependencies {
+    implementation 'com.google.android.gms:play-services-wearable:20.0.1'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+}

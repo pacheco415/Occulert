@@ -433,15 +433,16 @@ can be verified. See `CRITICAL_ALERTS_READINESS.md`.
 
 ### Android (Wear OS)
 
-A Wear OS companion is future work. Android source excludes the iOS Watch stub
-from autolinking; no Android/Watch release is claimed. Current iOS
+The [Wear OS feasibility spike](wear-os-spike/README.md) pairs a parked Android
+test sender with a wrist receiver. The production Android app still excludes the
+iOS Watch stub from autolinking. Current iOS
 `UIBackgroundModes` contains only `audio`; headphone-motion observation requires
 the foreground and does not use a Bluetooth-central background service.
 
 ### Message contract
 
 Each alert sends: `{ type: 'occulert-alert', level, perclos, at }` where
-`level` is one of `none | watch | alert | critical`.
+`level` is one of `none | tracking | watch | alert | critical`.
 
 ### Android camera compatibility
 
