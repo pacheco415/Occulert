@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { recordScoringFixture } from './lib/scoring-replay-fixture.mjs';
 import { replayScoring, writeScoringReplay } from '../benchmark/replay-scoring.mjs';
-import { adaptTrace } from '../benchmark/parked-detection-trace.mjs';
+import { adaptTrace, comparisonColumns, decisionColumns } from '../benchmark/parked-detection-trace.mjs';
 import { createReleasedScoringOracle, initialScoringState, syntheticScoringTrace, SCORING_EPOCH } from '../benchmark/released-scoring-oracle.mjs';
 import { parseFile } from '../benchmark/run-event-benchmark.mjs';
 
@@ -31,7 +31,7 @@ test('paired blink measurements in the parked setup window have no Tasks scoring
     assert.ok(comparison.every(row => row.eye_blink_left === .1 && row.eye_blink_right === .2));
 });
 
-function blinkTrace(endMs, coefficients, recalibrateAt = -1) {
+function blinkTrace(endMs, coefficients, recalibrateAt = -1, clockStepMs = 0) {
     const frames = Array.from({length: endMs / 100 + 1}, (_, i) => ({
         atMs: i * 100, hasFace: true, ear: .3, turned: false, recalibrate: i * 100 === recalibrateAt,
     }));
@@ -46,10 +46,79 @@ function blinkTrace(endMs, coefficients, recalibrateAt = -1) {
             ]}],
         }};
     };
-    return recordScoringFixture({frames, query: '?observer=1&detector=tasks', tasksSample}).trace;
+    return recordScoringFixture({frames, clockStepMs, query: '?observer=1&detector=tasks', tasksSample}).trace;
 }
 
 const blinkVariant = result => result.variants.find(row => row.name === 'tasks-blink-v1');
+
+test('offline model CLI uses causal windows, threshold equality, streak and cooldown, preserving other outputs', async t => {
+    const root = mkdtempSync(join(tmpdir(), 'occulert-model-replay-'));
+    t.after(() => rmSync(root, {recursive: true, force: true}));
+    const trace = blinkTrace(100000, at => at === 61000 ? [.75, .75] : [.25, .25]);
+    const tracePath = join(root, 'trace.json'), modelPath = join(root, 'model.json');
+    const model = JSON.parse(readFileSync(new URL('../benchmark/fixtures/fatigue-model-synthetic.json', import.meta.url)));
+    model.weights.fill(0);
+    model.means.fill(0);
+    model.stds.fill(1);
+    const peak = model.features.indexOf('tasks_blink_max_30s');
+    assert.notEqual(peak, -1);
+    model.weights[peak] = 1;
+    model.means[peak] = .75;
+    model.bias = 0;
+    model.threshold = .5;
+    model.consecutiveWindows = 3;
+    const bytes = JSON.stringify(model, null, 2) + '\n';
+    writeFileSync(modelPath, bytes);
+    writeFileSync(tracePath, JSON.stringify(trace));
+    const run = (out, args) => JSON.parse(execFileSync(process.execPath, ['benchmark/replay-scoring.mjs',
+        '--trace', tracePath, '--out', join(root, out), ...args], {encoding: 'utf8'}));
+    const name = 'model-fatigue-windows-v1';
+    const without = run('without', []).variants.find(v => v.name === name);
+    assert.equal(without.status, 'unavailable');
+    assert.match(without.reason, /No model/);
+    assert.equal(existsSync(join(root, 'without', name)), false);
+    run('with', ['--model', modelPath]);
+    const manifest = JSON.parse(readFileSync(join(root, 'with', 'replay-manifest.json')));
+    const entry = manifest.variants.find(v => v.name === name);
+    assert.equal(entry.modelSha256, createHash('sha256').update(bytes).digest('hex'));
+    assert.equal(entry.validated, false);
+    assert.equal(entry.windows.included, 41);
+    assert.equal(entry.alerts, 3);
+    const alerts = parseFile(readFileSync(join(root, 'with', name, 'alerts.csv'), 'utf8'), 'alerts');
+    assert.deepEqual(alerts.map(row => row.at_ms), [64000, 76000, 88000]);
+    for (const variant of manifest.variants.filter(v => v.status === 'available' && v.name !== name)) {
+        for (const file of ['alerts.csv', 'scoring.csv']) {
+            assert.deepEqual(readFileSync(join(root, 'with', variant.name, file)),
+                readFileSync(join(root, 'without', variant.name, file)), variant.name + '/' + file);
+        }
+    }
+});
+
+test('model replay distinguishes insufficient evidence from a scored session with zero alerts', () => {
+    const model = JSON.parse(readFileSync(new URL('../benchmark/fixtures/fatigue-model-synthetic.json', import.meta.url)));
+    model.weights.fill(0);
+    model.bias = -9;
+    model.threshold = .5;
+    const variant = trace => replayScoring(trace, JSON.stringify(model)).variants.at(-1);
+    assert.match(variant(blinkTrace(4000, () => [.25, .25])).reason, /No feature window/);
+    const trace = recordScoringFixture({fps: 3}).trace;
+    const scored = variant(trace);
+    assert.equal(scored.status, 'available');
+    assert.deepEqual(scored.alerts, []);
+    assert.ok(scored.windows.included > 0);
+    for (const version of [1, 2]) {
+        const legacy = { ...trace, version };
+        delete legacy.scoringReplay;
+        const result = replayScoring(legacy, JSON.stringify(model));
+        assert.equal(result.variants.find(row => row.name === 'released').status, 'unavailable');
+        assert.deepEqual(result.variants.at(-1).windows, scored.windows);
+        assert.deepEqual(result.variants.at(-1).alerts, []);
+    }
+    trace.session.droppedFrames = 1;
+    assert.match(variant(trace).reason, /frame history/);
+    model.features.reverse();
+    assert.throws(() => variant(trace), /incompatible fatigue model/);
+});
 
 test('frozen Tasks baseline, bilateral cutoff, cooldown and exported alerts feed the event CLI', async () => {
     // Setup mean .25 gives cutoff .60. Mean .50 stays open, then mean .60 is closed.
@@ -71,11 +140,47 @@ test('frozen Tasks baseline, bilateral cutoff, cooldown and exported alerts feed
         const derived = join(parent, 'inputs');
         execFileSync(process.execPath, ['benchmark/parked-detection-trace.mjs', '--trace', join(parent,'trace.json'),
             '--episodes', join(parent,'labels.csv'), '--participant','SyntheticBlink','--split','test','--out',derived]);
+        assert.deepEqual(readFileSync(join(derived,'tasks-alerts.csv')),readFileSync(alerts));
         const output = execFileSync(process.execPath, ['benchmark/run-event-benchmark.mjs', '--sessions',join(derived,'sessions.csv'),
             '--tracking',join(derived,'tracking.csv'),'--episodes',join(derived,'episodes.csv'),'--alerts',alerts,
             '--split','test','--dataset','scoring-replay-tasks-blink-v1'], {encoding:'utf8'});
         assert.equal(JSON.parse(output).provenance.dataset, 'scoring-replay-tasks-blink-v1');
     } finally { rmSync(parent, {recursive:true, force:true}); }
+});
+
+test('live decisions follow replay through missing observations, cooldown and recalibration', () => {
+    const trace = blinkTrace(30000, at => at >= 6700 && at <= 7100 ? null :
+        at <= 3200 || at >= 18000 && at <= 21200 ? [.1,.1] : [.9,.9], 18000);
+    const input = {participant:'SyntheticParity',split:'train',episodes:[]};
+    const current = adaptTrace(trace,input);
+    const replay = blinkVariant(replayScoring(trace));
+    assert.equal(trace.version,4);
+    assert.equal(replay.status,'available');
+    assert.ok(replay.alerts.length >= 2);
+    assert.deepEqual(current.tasksAlerts.map(item => item.at_ms), replay.alerts.map(item => item.at_ms));
+    assert.deepEqual(current.comparison.map(row => row.tasks_fatigue),replay.samples.map(row => row.fatigue));
+    assert.ok(current.comparison.filter(row => row.at_ms >= 6700 && row.at_ms <= 7100).every(row => row.tasks_closed === null));
+    assert.equal(trace.legacyAlerts.length,0);
+    const older = adaptTrace({...trace,version:3},input);
+    for (let i = 0; i < current.comparison.length; i++) {
+        const row = current.comparison[i];
+        assert.deepEqual(Object.keys(row),[...comparisonColumns,...decisionColumns]);
+        assert.deepEqual(Object.fromEntries(comparisonColumns.map(key => [key,row[key]])),older.comparison[i]);
+    }
+    assert.equal(older.tasksAlerts,null);
+    const corrupt = structuredClone(trace);
+    corrupt.samples.find(row => row.tasksAlertCandidate === 1).tasksAlertAtMs += 1;
+    assert.throws(() => adaptTrace(corrupt,input),/timestamp/);
+    const unsupported = blinkTrace(4200, () => null);
+    assert.equal(adaptTrace(unsupported,input).tasksAlerts,null);
+});
+
+test('phase-clock offsets preserve candidate timestamp parity on the parked trace', () => {
+    const trace = blinkTrace(18000, at => at <= 3200 ? [.1,.1] : [.9,.9], -1, 1);
+    const {tasksAlerts} = adaptTrace(trace,{participant:'ClockOffsets',split:'train',episodes:[]});
+    const replay = blinkVariant(replayScoring(trace));
+    assert.ok(tasksAlerts.length >= 2);
+    assert.deepEqual(tasksAlerts.map(row=>row.at_ms),replay.alerts.map(row=>row.at_ms));
 });
 
 test('unsupported Tasks observations break closure continuity without adding PERCLOS samples', () => {

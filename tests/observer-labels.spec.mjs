@@ -89,6 +89,24 @@ test('observer hides detector cues while retaining decisions and visible lifecyc
   await expect(page.locator('#driveHint')).toContainText('Camera stopped');
 });
 
+test('combined observer and Tasks mode keeps shadow decisions off the labeling screen', async ({ page }) => {
+  await page.goto('/app.html?observer=1&detector=tasks');
+  await ready(page);
+  await expect(page.locator('#driveState')).toHaveText('NOT MONITORING');
+  await begin(page);
+  await frame(page, 100);
+  await expect(page.locator('#driveState')).toHaveText('PARKED OBSERVER SESSION');
+  await expect(page.locator('#observerLabels')).toBeVisible();
+  await expect(page.locator('#observerDrowsy')).toBeEnabled();
+  for (const id of ['fatigue', 'perclos', 'risk', 'alerts', 'alertScreen']) await expect(page.locator('#' + id)).toBeHidden();
+  await expect(page.locator('body')).not.toContainText(/tasks_closed|tasks_perclos|tasks_fatigue|tasks_alert_candidate/);
+  await page.locator('#startBtn').click();
+  const trace = JSON.parse(await downloadText(page, '#exportDetectionTrace'));
+  expect(trace.session.secondary).toBe('tasks-blink-v1');
+  expect(trace.samples).toHaveLength(1);
+  expect(trace.samples[0]).toMatchObject({ atMs: 100, frameId: 1, tasksAlertCandidate: null });
+});
+
 test('observer shortcuts preserve text entry and the keyboard Stop action', async ({ page }) => {
   await page.goto('/app.html?observer=1&perclos=time'); await ready(page); await begin(page);
   await page.evaluate(() => {

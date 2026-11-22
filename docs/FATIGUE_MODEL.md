@@ -30,3 +30,48 @@ The fixed closure threshold, 500 ms blink limit and minimum coverage are feature
 A row receives label 1 if its end falls at or after the start and strictly before the end of an independently annotated `drowsy` or `high_fatigue` episode in that session. Other included rows receive 0. The extractor rejects overlapping episodes, duplicate session IDs and participants represented in both splits. The split and participant come directly from each session metadata file.
 
 Both windows must cover their complete nominal span and have usable fractions of at least 0.50. For example, a session lasting 63 seconds offers four candidate rows ending at 60, 61, 62 and 63 seconds. A low-coverage row is counted exactly once even when both windows fail. Synthetic fixtures exercise software behavior. The extractor has no role in live alerts and makes no accuracy estimate.
+
+## Train the offline baseline
+
+Run the feature-window extractor over the sessions for both splits. Keep the
+participant assignments fixed. Train and evaluate with one command.
+
+```sh
+node benchmark/train-fatigue-model.mjs fresh-windows --target-false-alerts-per-hour 1 --out fresh-model
+```
+
+The destination must be new. The trainer checks session and participant
+identities against the window manifest, rejects cross-split participants and
+duplicate ticks, and sorts sessions and ticks before fitting. At least two
+training participants are required, with both labels remaining in each
+leave-one-participant-out fit.
+
+Each training fold estimates column means and population standard deviations
+from its observed values. An empty measurement contributes zero after
+standardization (mean imputation). Constant columns use a divisor of one.
+Entirely missing columns have mean zero and weight zero. Full-batch logistic
+regression starts from zero, takes 200 fixed steps of 0.1 and applies L2 to
+the weights only. The penalty with the lowest pooled held-out window log loss
+wins among 0.001, 0.01, 0.1 and 1; the first wins exact ties.
+
+The same out-of-fold training predictions select a threshold and consecutive
+window count. Candidate thresholds are 0.25, 0.35, 0.45, 0.5, 0.6, 0.7, 0.8,
+0.9, 0.95, 0.99 and 1, with streak lengths 1, 2, 3 and 5. Each retained
+one-second tick contributes one scored second to the false-alert denominator.
+A missing tick breaks the streak and the contiguous positive-label run.
+Cooldown is 12 elapsed seconds within a session. Among policies at or below
+the requested false-alert rate, maximize positive runs with a candidate, then
+minimize false candidates, then prefer the shorter streak and lower threshold.
+The training rate measures scored-window time; the separate event benchmark
+uses tracked hours and independently annotated whole episodes.
+
+The final fit uses all training rows. `model.json` stores the feature contract,
+coefficients, cutoff, streak, training-only input hashes and fit counts, and
+`validated: false`. Each hash covers one training session's input digests and
+canonical window rows. The pure `fatigueModelScore` function consumes numeric
+features with explicit nulls. `test-metrics.json` records a single evaluation
+of the frozen model on the held-out split, including window AUC (half credit
+for ties), precision, recall and sample counts. Undefined metrics are null.
+Keep participant models outside the repo. The checked-in
+`benchmark/fixtures/fatigue-model-synthetic.json` is reproduced from generated
+scalars by `npm run test:fatigue-model`.

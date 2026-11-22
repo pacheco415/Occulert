@@ -35,6 +35,68 @@
     return Object.freeze({ reset, addSetup, closed, threshold });
   }
 
+  // Runs on an isolated copy of the recorded initial state. Every phase below
+  // is a pure function from the loaded driver's scoring core.
+  function createTasksObservation(initialState, core, epoch) {
+    const blink = createTasksBlinkPolicy();
+    let state = { ...initialState, noseYHistory: [...initialState.noseYHistory], perclosWindow: [...initialState.perclosWindow] };
+    let lastId = 0, setupFinished = false, usableFrames = 0, failed = false;
+    function recalibrate() {
+      blink.reset();
+      setupFinished = false;
+      state.eyesClosedSince = 0;
+      state.earHistory = [];
+    }
+    function observe(sample, row) {
+      if (!row || row.frameId !== ++lastId ||
+          (row.hasFace ? !finite(row.rawEar) || row.rawEar <= 0 || row.rawEar > 1 || !finite(row.noseY) : !row.faceMissing)) failed = true;
+      if (failed) return null;
+      const phase = name => row.clocks[name] ?? row;
+      const wall = name => epoch + phase(name).wallMs;
+      const now = epoch + row.wallMs;
+      state.calibrating = sample.calibrating;
+      if (sample.calibrating) {
+        if (setupFinished) { failed = true; return null; }
+        blink.addSetup(sample);
+        state.eyesClosedSince = 0;
+      } else if (blink.threshold() === null) {
+        failed = true;
+        return null;
+      } else setupFinished = true;
+      state.calibrated = !state.calibrating && blink.threshold() !== null;
+      const closed = blink.closed(sample);
+      let perclos = null;
+      if (!row.hasFace) {
+        state = core.scoringNoFace(core.scoringResetContinuity(state), now);
+      } else {
+        state.noFaceSince = 0;
+        state.lastFaceSeen = now;
+        if (state.calibrating) state = core.scoringCalibrationFrame(state);
+        else {
+          if (closed !== null) usableFrames++;
+          state.noseYHistory = core.scoringNodHistory(state.noseYHistory, row.noseY, wall('nodSample'));
+          const nodTime = state.noseYHistory.length >= 8 ? wall('nodDecision') : now;
+          const nod = core.scoringNodDetected(state.noseYHistory, state.lastNod, nodTime);
+          if (nod) { state.lastNod = nodTime; state.headNods++; }
+          state.confidence = core.scoringConfidence(state, row.turned);
+          const eyes = core.scoringObservedEyeMetrics(state, closed, row.turned, wall('eye'));
+          if (eyes.state.perclosWindow.length) perclos = eyes.perclos;
+          const eyePoints = closed === null ? 0 : closed ? 6 : -3;
+          state = core.scoringTrackedFrame(eyes.state, { turned: row.turned, nod,
+            perclos: closed === null ? null : eyes.perclos }, now, false, eyePoints);
+        }
+      }
+      if (row.yawn) state = core.scoringYawn(state);
+      const reason = row.hasFace && core.scoringAlertCandidate(state);
+      const candidate = !!reason && (reason !== 'Distraction' || core.scoringDistractionMatured(state, wall('eligibility')))
+        && core.scoringTriggerEligible(state, wall('trigger'));
+      if (candidate) state.lastAlert = wall('trigger');
+      return { tasksClosed: closed === null ? null : Number(closed), tasksPerclos: perclos, tasksFatigue: state.fatigue,
+        tasksAlertCandidate: Number(candidate), tasksAlertAtMs: candidate ? phase('trigger').atMs : null };
+    }
+    return { observe, recalibrate, available: () => !failed && usableFrames > 0 && blink.threshold() !== null };
+  }
+
   function parseFlags(search = '') {
     const query = new URLSearchParams(search);
     const matches = (key, value) => query.getAll(key).length === 1 && query.get(key) === value;
@@ -85,6 +147,24 @@
       'blinks_per_usable_minute', 'closure_mean_ms', 'closure_max_ms', 'tasks_blink_mean',
       'tasks_blink_max', 'yawn_count', 'pitch_down_fraction']),
   });
+
+  // A null feature is mean-imputed, so its standardized contribution is zero.
+  function fatigueModelScore(model, row) {
+    const { features, means, stds, weights, bias } = model;
+    if (model.schemaVersion !== 1 || model.kind !== 'fatigue-logreg' ||
+        model.featureVersion !== fatigueFeatureConfig.version || !Array.isArray(features) ||
+        !features.length || ![means, stds, weights].every(values => Array.isArray(values) && values.length === features.length) ||
+        !finite(bias)) throw Error('Invalid fatigue model');
+    let logit = bias;
+    for (let i = 0; i < features.length; i++) {
+      const value = row[features[i]];
+      if (!finite(means[i]) || !finite(stds[i]) || stds[i] <= 0 || !finite(weights[i]) ||
+          (value !== null && !finite(value))) throw Error('Invalid fatigue feature or coefficient');
+      if (value !== null && weights[i] !== 0) logit += weights[i] * ((value - means[i]) / stds[i]);
+    }
+    if (!finite(logit)) throw Error('Non-finite fatigue model score');
+    return 1 / (1 + Math.exp(-logit));
+  }
 
   // A session-local feature extractor. Call at(endMs) before adding a frame
   // at or beyond that boundary. The final interval is never extrapolated.
@@ -419,10 +499,12 @@
     'tasksInferenceMs', 'combinedFrameMs', 'perclos', 'observedMs', 'closedMs', 'fatigue',
     'confidence', 'legacyUsable', 'tasksUsable', 'calibrating', 'pitchDown']);
   const BOOLEAN_FIELDS = new Set(['legacyUsable', 'tasksUsable', 'calibrating', 'pitchDown']);
-  function createTraceStore({ capacity = 2400, alertCapacity = 256, eyeVisibility = false } = {}) {
+  function createTraceStore({ capacity = 2400, alertCapacity = 256, eyeVisibility = false, tasks = false } = {}) {
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 20000 ||
         !Number.isInteger(alertCapacity) || alertCapacity < 1 || alertCapacity > 4096) throw new Error('Invalid trace bounds');
-    const fields = eyeVisibility ? [...TRACE_FIELDS, 'eyeVisibilitySamples', 'eyeVisibilityWindowMs', 'eyeVisibilityVariance', 'eyeVisibilityCandidate'] : TRACE_FIELDS;
+    const fields = [...TRACE_FIELDS];
+    if (eyeVisibility) fields.push('eyeVisibilitySamples', 'eyeVisibilityWindowMs', 'eyeVisibilityVariance', 'eyeVisibilityCandidate');
+    if (tasks) fields.push('tasksClosed', 'tasksPerclos', 'tasksFatigue', 'tasksAlertCandidate', 'tasksAlertAtMs');
     const data = new Float64Array(capacity * fields.length), alertTimes = new Float64Array(alertCapacity), alertKinds = new Uint8Array(alertCapacity);
     let head = 0, size = 0, total = 0, validLegacy = 0, validTasks = 0, droppedFrames = 0;
     let alertHead = 0, alertSize = 0, droppedAlerts = 0, lastFrame = 0, lastAt = -1, lastMediaTime = null;
@@ -480,10 +562,10 @@
     return Object.freeze({ add, recordAlert, samples, alerts, summary });
   }
 
-  const api = Object.freeze({ parseFlags, eyeEAR, createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline,
+  const api = Object.freeze({ fatigueModelScore, parseFlags, eyeEAR, createTimePerclos, createElapsedRate, pitchRatio, createParkedBaseline,
     createNoFaceEvidence, matrixPose, parseTasksResult, createTraceStore, createObserverEpisodes, createEyeVisibility, eyeVisibilityConfig,
     createFatigueFeatureWindow, fatigueFeatureConfig,
-    createTasksBlinkPolicy, tasksBlinkConfig });
+    createTasksBlinkPolicy, tasksBlinkConfig, createTasksObservation });
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.OcculertDetectionExperiments = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -500,6 +582,7 @@
     let pitchDown = false, pitchUnknownLast = false, lossEpisode = null, lossRequested = false, calibrationDeadline = null;
     let distractionAt = null, previousDistracted = false, frame = null, frameSequence = 0, collector = null;
     let trace = models.createTraceStore(), lastTrace = null, invalidatedFrames = 0, skippedRepeatedFrames = 0;
+    let tasksObservation = null;
     let scoringReplay = null, scoringWallStart = 0, scoringOrder = 0;
     const observer = flags.observer ? models.createObserverEpisodes() : null;
     const visibility = flags.eyeVisibility ? models.createEyeVisibility() : null;
@@ -561,18 +644,21 @@
     function begin() {
       stop(); active = true; generation++; startedAt = now(); geometry = '';
       previousFrameAt = null; frameSequence = invalidatedFrames = skippedRepeatedFrames = 0;
-      trace = models.createTraceStore({ eyeVisibility: flags.eyeVisibility }); lastTrace = null; calibrationRevision = 0;
+      trace = models.createTraceStore({ eyeVisibility: flags.eyeVisibility, tasks: flags.tasks }); lastTrace = null; calibrationRevision = 0;
       observer?.reset(); lastObserverCsv = null;
       visibility?.reset();
       perclos.reset(); rates.reset(); baseline.reset(); evidence.reset();
       pitchBaseline = calibration = null; pitchDown = pitchUnknownLast = false; calibrationDeadline = null;
       previousNose = distractionAt = null; previousDistracted = false; lossEpisode = null; lossRequested = false;
       if (flags.pixels || flags.pitch) resetCalibration();
-      scoringReplay = null; scoringOrder = 0;
+      scoringReplay = null; tasksObservation = null; scoringOrder = 0;
       if ((flags.tasks || flags.observer || flags.eyeVisibility) && typeof b.scoringState === 'function' && typeof b.scoringSettings === 'function') {
         scoringWallStart = b.wallNow();
         scoringReplay = { version: 2, epochMs: 1700000000000, initialState: scoringSnapshot(),
           initialSettings: { ...b.scoringSettings() }, frames: [], controls: [], droppedFrames: 0, droppedControls: 0 };
+      }
+      if (flags.tasks && !flags.pixels && !flags.pitch && scoringReplay && b.scoringCore) {
+        tasksObservation = models.createTasksObservation(scoringReplay.initialState, b.scoringCore, scoringReplay.epochMs);
       }
       observeGeometry();
       b.ui.observer?.();
@@ -770,13 +856,15 @@
       const eyeVisibility = visibility?.add(frame.at, rawEar,
         !!res.multiFaceLandmarks?.[0] && !frame.calibrating && !s.calibrating && !turned && !pitchDown &&
         (!flags.pitch || pitchBaseline === null || models.pitchRatio(res.multiFaceLandmarks?.[0]) !== null));
-      trace.add({ frameId: frame.frameId, atMs: frame.at - startedAt, mediaTime: frame.mediaTime,
+      const sample = { frameId: frame.frameId, atMs: frame.at - startedAt, mediaTime: frame.mediaTime,
         rawEar, smoothedEar, ...parsed, ...eyeVisibility, legacyUsable: (frame.paired || (flags.observer || flags.eyeVisibility) && !flags.tasks) && Number.isFinite(rawEar) && !frame.calibrating && !s.calibrating && !turned && !pitchDown && (!flags.pitch || pitchBaseline === null || models.pitchRatio(res.multiFaceLandmarks?.[0]) !== null),
         tasksUsable: frame.paired && parsed.tasksUsable && !frame.calibrating && !s.calibrating,
         legacyInferenceMs: frame.legacyEndedAt === null ? null : Math.max(0, frame.legacyEndedAt - frame.inferenceStartedAt), tasksInferenceMs: tasksMs,
         combinedFrameMs: Math.max(0, end - frame.at), perclos: support?.perclos ?? null,
         observedMs: support?.observedMs ?? null, closedMs: support?.closedMs ?? null,
-        fatigue: s.fatigue, confidence: s.confidence, calibrating: frame.calibrating || s.calibrating, pitchDown });
+        fatigue: s.fatigue, confidence: s.confidence, calibrating: frame.calibrating || s.calibrating, pitchDown };
+      if (tasksObservation) Object.assign(sample, tasksObservation.observe(sample, frame.scoringInput));
+      trace.add(sample);
       if (scoringReplay && frame.scoringInput) {
         if (scoringReplay.frames.length === 2400) { scoringReplay.frames.shift(); scoringReplay.droppedFrames++; }
         scoringReplay.frames.push(frame.scoringInput);
@@ -785,6 +873,7 @@
     }
     function recalibrate() {
       if (!active) return;
+      tasksObservation?.recalibrate();
       visibility?.reset();
       if (flags.pixels || flags.pitch) resetCalibration(); else { resetContinuity(); perclos.reset(); calibrationRevision++; }
       if (scoringReplay) {
@@ -807,7 +896,7 @@
       return lastObserverCsv;
     }
     function summary() {
-      return { version: 1, experimentFlags: flags.names, primary: 'legacy-ear', secondary: flags.tasks ? 'tasks-measurement-only' : null,
+      return { version: 1, experimentFlags: flags.names, primary: 'legacy-ear', secondary: flags.tasks ? 'tasks-blink-v1' : null,
         alertsChangedByTasks: false, requestedDelegate: flags.tasks ? flags.delegate : null,
         usableDelegate: collector?.status?.() === 'ready' ? flags.delegate : null, comparisonStatus: collector?.status?.() ?? 'off',
         calibration, geometryUnits: flags.pixels ? 'pixels-reference-3x4' : 'normalized',
@@ -830,13 +919,15 @@
             ? 'session_id,start_ms,end_ms,label\n' + observer.entries().map(row =>
               [s.localSessionId, row.start_ms, row.end_ms, row.label].join(',')).join('\n') + '\n' : null;
         }
-        lastTrace = { schema: 'occulert.parked-detection-trace', version: scoringReplay ? 3 : 1,
+        lastTrace = { schema: 'occulert.parked-detection-trace', version: scoringReplay ? (flags.tasks ? 4 : 3) : 1,
           session: { sessionId: s.localSessionId, durationMs, platform: 'web',
-            detectorVersion: b.detectorVersion(), ...b.provenance(), ...summary() },
+            detectorVersion: b.detectorVersion(), ...b.provenance(), ...summary(),
+            ...(flags.tasks && scoringReplay ? { tasksDecisionsAvailable: !!tasksObservation?.available() &&
+              !invalidatedFrames && !scoringReplay.droppedFrames && !scoringReplay.droppedControls && !trace.summary().droppedFrames } : {}) },
           samples: trace.samples(), legacyAlerts: trace.alerts(),
           ...(scoringReplay ? { scoringReplay: { ...scoringReplay, invalidatedFrames } } : {}) };
       }
-      active = false; generation++; frame = null; pitchDown = pitchUnknownLast = false; lossEpisode = null; lossRequested = false;
+      active = false; generation++; frame = null; tasksObservation = null; pitchDown = pitchUnknownLast = false; lossEpisode = null; lossRequested = false;
       b.ui.observer?.();
       if (collector) { collector.stop(); collector = null; }
       rates.reset(); baseline.reset(); evidence.reset(); previousNose = null;
@@ -907,6 +998,7 @@ if(typeof module==='object'&&module.exports)module.exports=api;else root.Occuler
 })(typeof globalThis!=='undefined'?globalThis:this);
 
 // The mounted helper shares these reviewed classic-script driver bindings.
+/* global scoringNoFace, scoringResetContinuity, scoringCalibrationFrame, scoringNodHistory, scoringNodDetected, scoringConfidence, scoringObservedEyeMetrics, scoringTrackedFrame, scoringYawn, scoringAlertCandidate, scoringDistractionMatured, scoringTriggerEligible */
 /* global running, starting, localSessionId, CALIBRATION_MS, LEFT, RIGHT,
   EXPERIMENT_HELPER_INTEGRITY, WEB_APP_VERSION, video, canvas, ctx, cloudConsent, calHint,
   faceStateEl, perclosEl, microsleepsEl, distractionEl, calibrationEl, calibrationFill,
@@ -925,6 +1017,7 @@ if(typeof module==='object'&&module.exports)module.exports=api;else root.Occuler
 function createMountedController(flags){
  const api=window.OcculertDetectionExperiments;let capturedCanvas=null;
  const controller=api.createController({
+ scoringCore:{scoringNoFace,scoringResetContinuity,scoringCalibrationFrame,scoringNodHistory,scoringNodDetected,scoringConfidence,scoringObservedEyeMetrics,scoringTrackedFrame,scoringYawn,scoringAlertCandidate,scoringDistractionMatured,scoringTriggerEligible},
  scoringState:()=>({...scoringMetricState(),lastAlert,calibrationUntil,calibrationSamples,baselineEAR,baseClosedThreshold,baseWatchThreshold}),
  scoringSettings:()=>({sensitivity:sensitivityLevel,minimumSamples:calibrationMinimumSamples}),
  read:()=>({running,localSessionId,calibrating,calibrated,calibrationUntil,calibrationSamples,baselineEAR,baseClosedThreshold,baseWatchThreshold,eyeClosedThreshold,eyeWatchThreshold,fatigue,maxFatigue,confidence,fatigueSampleSum,fatigueSampleCount,noFaceSince,lastFaceSeen,perclosWindow,eyesClosedSince,lastMicro,microsleeps,turnedSince,totalDistractionMs}),
