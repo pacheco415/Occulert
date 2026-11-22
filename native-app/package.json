@@ -27,7 +27,7 @@
     "test:capture-load": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-capture-load.mjs",
     "test:camera-interruptions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-camera-interruptions.mjs",
     "test:event-outbox": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-event-outbox.mjs scripts/test-event-retry-status.mjs",
-    "test:packaging": "node --test scripts/test-native-packaging.mjs",
+    "test:packaging": "node --test scripts/test-native-packaging.mjs scripts/test-wear-os-spike.mjs",
     "test:simulator-trace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-simulator-trace.mjs",
     "test:monitor-hooks": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-monitor-hook-interactions.mjs scripts/test-monitor-models.mjs scripts/test-monitor-presentation.mjs",
     "test:unanswered-alerts": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test ../scripts/test-unanswered-alert-policy.mjs ../scripts/test-unanswered-alert-observation.mjs",

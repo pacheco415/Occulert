@@ -19,7 +19,7 @@ import {
 import { CloudSyncCard } from '../components/CloudSyncCard';
 import { EmergencyReadinessCard } from '../components/EmergencyReadinessCard';
 import { AmbientBackground } from '../components/GlassSurface';
-import { colors, radii } from '../constants/theme';
+import { colors, radii, navigationIconStyle, trailingTextAlign } from '../constants/theme';
 import { currentAppBuildInfo, formatAppBuildLabel } from '../lib/appBuildInfo';
 import { createSettingPersister } from '../lib/settingPersistence';
 import { createSingleFlightActionRunner } from '../lib/singleFlightAction';
@@ -606,6 +606,7 @@ export default function SettingsScreen() {
               })}
             </View>
             <Text style={s.soundNote}>{strings.settings.alerts.soundLimits}</Text>
+            <Text style={s.soundNote}>{strings.settings.alerts.spokenLanguage}</Text>
           </View>
           <View style={s.alertSafetyNote}>
             <Ionicons name="shield-checkmark-outline" size={15} color={colors.amber} />
@@ -816,7 +817,7 @@ export default function SettingsScreen() {
               <Text style={s.localDataReviewTitle}>{strings.settings.localData.review.title}</Text>
               <Text style={s.localDataActionDetail}>{strings.settings.localData.review.detail}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={17} color="#4a7a8a" />
+            <Ionicons name="chevron-forward" style={navigationIconStyle} size={17} color="#4a7a8a" />
           </TouchableOpacity>
           <View style={s.div} />
           <TouchableOpacity
@@ -876,7 +877,7 @@ export default function SettingsScreen() {
             onPress={sendFeedback}
           >
             <View style={s.rowL}><Ionicons name="chatbubble-ellipses-outline" size={18} color="#60a5fa" /><View style={s.rowCopy}><Text style={s.label}>{feedbackBusy ? strings.settings.feedback.preparing : strings.settings.feedback.action}</Text><Text style={s.sub}>{strings.settings.feedback.detail}</Text></View></View>
-            <Ionicons name="chevron-forward" size={18} color="#4a7a8a" />
+            <Ionicons name="chevron-forward" style={navigationIconStyle} size={18} color="#4a7a8a" />
           </TouchableOpacity>
           <View style={s.privNote}><Ionicons name="lock-closed-outline" size={13} color="#4a7a8a" /><Text style={s.privTxt}>{strings.settings.feedback.privacyDetail}</Text></View>
         </View>
@@ -903,7 +904,7 @@ const s = StyleSheet.create({
   rowL:{minWidth:0,flexDirection:'row',alignItems:'center',gap:12,flex:1},
   rowCopy:{minWidth:0,flex:1},
   label:{color:colors.text,fontSize:14,fontWeight:'700'}, sub:{color:colors.textMuted,fontSize:11,lineHeight:16,marginTop:2},
-  status:{flexShrink:1,color:colors.cyan,fontSize:10,fontWeight:'900',letterSpacing:0.6,textAlign:'right'},
+  status:{flexShrink:1,color:colors.cyan,fontSize:10,fontWeight:'900',letterSpacing:0.6,textAlign: trailingTextAlign},
   deviceSummary:{flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:16,paddingTop:14,paddingBottom:10,backgroundColor:'rgba(48,209,88,0.05)'},
   deviceSummaryIcon:{width:34,height:34,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(48,209,88,0.1)'},
   deviceSummaryCopy:{flex:1},
@@ -942,7 +943,7 @@ const s = StyleSheet.create({
   localDataStatus:{gap:4,paddingHorizontal:16,paddingVertical:12,borderTopWidth:1,borderColor:colors.glassBorder},
   localDataStatusText:{color:colors.textSecondary,fontSize:11,lineHeight:16},
   localDataStatusError:{color:'#f8d98b',fontSize:11,lineHeight:16,marginTop:5},
-  localDataRetry:{alignSelf:'flex-start',minHeight:44,flexDirection:'row',alignItems:'center',gap:7,paddingRight:16},
+  localDataRetry:{alignSelf:'flex-start',minHeight:44,flexDirection:'row',alignItems:'center',gap:7,paddingEnd:16},
   localDataRetryText:{color:colors.cyan,fontSize:11,fontWeight:'900',letterSpacing:0.55},
   localDataAction:{minHeight:64,flexDirection:'row',alignItems:'flex-start',gap:11,paddingHorizontal:16,paddingVertical:14},
   localDataActionDisabled:{opacity:0.4},

@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii } from '../../constants/theme';
+import { colors, radii, trailingTextAlign } from '../../constants/theme';
 
 export const historyStyles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.background },
@@ -11,7 +11,7 @@ export const historyStyles = StyleSheet.create({
   loadErrorCopy: { minWidth: 0, flex: 1 },
   loadErrorTitle: { color: '#fde68a', fontSize: 13, fontWeight: '900' },
   loadErrorDetail: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 3 },
-  loadRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 18 },
+  loadRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingEnd: 18 },
   loadRetryText: { color: '#93c5fd', fontSize: 12, fontWeight: '900' },
   refreshButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 16, paddingHorizontal: 12, borderWidth: 1, borderColor: '#1a3a4a', borderRadius: 10 },
   refreshText: { flexShrink: 1, color: '#93c5fd', fontSize: 12, fontWeight: '800' },
@@ -84,7 +84,7 @@ export const historyStyles = StyleSheet.create({
   clearFilterText: { color: '#93c5fd', fontSize: 12, fontWeight: '800' },
   dateGroupHeader: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 8, paddingHorizontal: 4 },
   dateGroupTitle: { flex: 1, color: '#bae6fd', fontSize: 12, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase' },
-  dateGroupCount: { flexShrink: 0, minWidth: 28, color: '#6592a5', fontSize: 11, fontWeight: '900', textAlign: 'right' },
+  dateGroupCount: { flexShrink: 0, minWidth: 28, color: '#6592a5', fontSize: 11, fontWeight: '900', textAlign: trailingTextAlign },
   card: { backgroundColor: colors.material, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radii.large, padding: 18, marginBottom: 12 },
   cardNeedsReview: { borderColor: 'rgba(251,191,36,0.35)' },
   cardRecovered: { borderColor: 'rgba(74,222,128,0.35)' },
