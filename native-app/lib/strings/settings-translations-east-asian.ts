@@ -404,6 +404,7 @@ const rows: Record<string, readonly [string, string]> = {
   'preDrive.devices.roadCamera.unknownDetail': ['后置摄像头可用，但未确认 Apple 同时多摄像头支持。', '背面カメラは利用できますが、Apple の複数カメラ同時使用への対応は確認されていません。'],
   'preDrive.devices.roadCamera.costDetail': [' 硬件 {hardwarePercent}%；负载 {pressurePercent}%。', ' ハードウェア {hardwarePercent}%、負荷 {pressurePercent}%。'],
   'preDrive.devices.roadCamera.passedDetail': ['Apple 已接受资源预算范围内的前后摄像头配置。{costDetail}道路监测仍处于计划阶段，尚未启用。', 'Apple はリソース上限内の前後カメラ構成を受け入れました。{costDetail}道路モニタリングは引き続き計画段階で、有効化されていません。'],
+  'preDrive.devices.roadCamera.androidCapableDetail': ["Android 报告前置和后置摄像头可以同时工作。道路监测未启用。", "Android では前面カメラと背面カメラを同時に使用できます。道路の監視は作動していません。"],
   'preDrive.devices.roadCamera.hardwareCapableOne': ['报告了 {count} 种后置摄像头类型。尚无停车负载测试结果；道路监测未启用。', '背面カメラの種類が {count} 件報告されました。駐車中の負荷結果はまだなく、道路モニタリングは動作していません。'],
   'preDrive.devices.roadCamera.hardwareCapableMany': ['报告了 {count} 种后置摄像头类型。尚无停车负载测试结果；道路监测未启用。', '背面カメラの種類が {count} 件報告されました。駐車中の負荷結果はまだなく、道路モニタリングは動作していません。'],
   'preDrive.devices.outputs.unconfirmed': ['无法读取已保存的提醒设置。开始前请检查设置。', '保存済みのアラート設定を読み取れませんでした。開始前に設定を確認してください。'],

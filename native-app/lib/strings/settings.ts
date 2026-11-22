@@ -557,6 +557,7 @@ export const preDriveStrings = {
       unknownDetail: "A rear camera is available, but simultaneous Apple multi-camera support was not confirmed.",
       costDetail: " Hardware {hardwarePercent}%; pressure {pressurePercent}%.",
       passedDetail: "Apple accepted a front-and-rear configuration within its resource budgets.{costDetail} Road monitoring is still planned and was not activated.",
+      androidCapableDetail: "Android reports that a front and rear camera can operate together. Road monitoring is inactive.",
       hardwareCapableOne: "{count} rear camera type reported. A parked load result is not available yet; road monitoring is not active.",
       hardwareCapableMany: "{count} rear camera types reported. A parked load result is not available yet; road monitoring is not active."
     },

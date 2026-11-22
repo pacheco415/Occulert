@@ -26,8 +26,8 @@ covered by the string tests.
 | Monitor | 136 | `lib/strings/monitor.ts` |
 | History | 349 | `lib/strings/history.ts` |
 | Settings | 293 | `lib/strings/settings.ts` |
-| Pre-drive | 144 | `lib/strings/settings.ts` |
-| Total | 962 | Typed `StringCatalog` shape |
+| Pre-drive | 145 | `lib/strings/settings.ts` |
+| Total | 963 | Typed `StringCatalog` shape |
 
 `lib/strings/format.ts` provides typed named placeholders. Missing, extra or
 unsupported values throw rather than rendering a partially formatted message.
@@ -39,7 +39,7 @@ existing fallback behavior.
 `lib/strings/locales.ts` combines explicit draft entries for the same language
 codes as `src/driver-i18n.js`: English, Spanish, French, Portuguese, German,
 Arabic, Chinese and Japanese (`en`, `es`, `fr`, `pt`, `de`, `ar`, `zh`, `ja`).
-Every non-English draft explicitly covers all 962 paths, for 6,734 entries in
+Every non-English draft explicitly covers all 963 paths, for 6,741 entries in
 total. Draft assembly has no English fallback for missing keys. Brand names,
 technical tokens, some units and natural cognates can intentionally match
 English; `nativeCatalogCoverage()` lists these identical entries for review.
