@@ -39,4 +39,4 @@ function withProviderBudget(handler) {
   };
   return Object.assign(wrapped, handler);
 }
-module.exports = { remainingProviderMs, withProviderBudget };
+module.exports = { REQUEST_PROVIDER_BUDGET_MS, remainingProviderMs, withProviderBudget };

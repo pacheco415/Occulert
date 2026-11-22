@@ -110,6 +110,7 @@ function loadRoute(path,b,{supabase={},env=fixtureEnv,fetch=async()=>{throw Erro
   setTimeout:timer,clearTimeout:clear,fetch,require(name){
    if(name.endsWith('/provider-budget'))return b.lib;
    if(name.endsWith('/supabase'))return supabase;
+   if(name.endsWith('/fleet-period'))return loadRoute('api/_lib/fleet-period.js',b,dependencies);
    if(name.startsWith('./_lib/routes/'))return loadRoute('api/'+name.slice(2)+'.js',b,dependencies);
    return routeRequire(name);
   }});

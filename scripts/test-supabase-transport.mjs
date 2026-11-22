@@ -194,7 +194,7 @@ function loadRoute(filename, b) {
   const routeRequire = createRequire(file), module = { exports: {} };
   vm.runInNewContext(readFileSync(file, 'utf8'), { ...b.context, module, require(name) {
     if (name.endsWith('/supabase')) return b.lib;
-    if (name.endsWith('/billing-test') || name.endsWith('/stripe-test')) {
+    if (name.endsWith('/fleet-period') || name.endsWith('/billing-test') || name.endsWith('/stripe-test')) {
       return loadRoute(new URL(name + '.js', file), b);
     }
     return routeRequire(name);
