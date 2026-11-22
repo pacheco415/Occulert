@@ -7,7 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '../constants/theme';
 import { SIMULATOR_TRACE } from '../lib/simulatorTrace';
 import { SimulatorTraceBanner } from '../components/SimulatorTraceBanner';
-import { strings } from '../lib/strings';
+import { nativeDirection, strings } from '../lib/strings';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function RootLayout() {
           headerTintColor: colors.text,
           headerTitleStyle: { fontWeight: '700' },
           headerShadowVisible: false,
-          contentStyle: { backgroundColor: colors.background },
+          contentStyle: { backgroundColor: colors.background, direction: nativeDirection },
         }}
       >
         <Stack.Screen name="index" options={{ title: strings.navigation.app, headerShown: false }} />
@@ -46,7 +46,7 @@ export default function RootLayout() {
     </Stack>
   );
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider style={{ direction: nativeDirection }}>
       <StatusBar style="light" />
       {SIMULATOR_TRACE ? <View style={{ flex: 1 }}><SimulatorTraceBanner />{navigation}</View> : navigation}
     </SafeAreaProvider>

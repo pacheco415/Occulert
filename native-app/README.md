@@ -173,9 +173,10 @@ numeric/date formatting and History export output.
 
 The seven other web-driver languages (`es`, `fr`, `pt`, `de`, `ar`, `zh`, `ja`)
 each have a complete **unreviewed native translation draft**. They are hidden:
-the released catalog imports none of these drafts, only English is available,
-and unknown or unreviewed locale requests resolve to English. There is no
-language selector, automatic system-locale selection or RTL activation.
+the app checks the device language at launch and uses English for unknown
+or unreviewed languages. A reviewed catalog must pass validation before its
+copy and layout direction can be used. Arabic selects right-to-left layout
+when reviewed. Settings identifies the spoken cues as English.
 
 `npm run test:strings` checks migrated files for hard-coded JSX, copy properties,
 alert configurations and confirmation text. It also checks every draft key,
@@ -433,15 +434,16 @@ can be verified. See `CRITICAL_ALERTS_READINESS.md`.
 
 ### Android (Wear OS)
 
-A Wear OS companion is future work. Android source excludes the iOS Watch stub
-from autolinking; no Android/Watch release is claimed. Current iOS
+The [Wear OS feasibility spike](wear-os-spike/README.md) pairs a parked Android
+test sender with a wrist receiver. The production Android app still excludes the
+iOS Watch stub from autolinking. Current iOS
 `UIBackgroundModes` contains only `audio`; headphone-motion observation requires
 the foreground and does not use a Bluetooth-central background service.
 
 ### Message contract
 
 Each alert sends: `{ type: 'occulert-alert', level, perclos, at }` where
-`level` is one of `none | watch | alert | critical`.
+`level` is one of `none | tracking | watch | alert | critical`.
 
 ### Android camera compatibility
 

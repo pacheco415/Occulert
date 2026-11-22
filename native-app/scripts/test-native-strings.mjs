@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 import { catalogKeyPaths, compareCatalogKeys, en, strings, formatString, templatePlaceholders } from '../lib/strings.ts';
@@ -7,8 +7,8 @@ import { availableNativeLocales, nativeCatalogs, nativeCatalogCoverage, nativeLo
   nativeLocaleReviews, nativeTranslationDrafts, resolveNativeCatalog, validateNativeCatalog } from '../lib/strings/locales.ts';
 import { hardCodedCopy } from './lib/hard-coded-copy.mjs';
 
-// Screens whose user-facing copy lives in lib/strings.ts. Add a screen or
-// component here when its copy moves; the guard then keeps it migrated.
+// These existing copy owners must continue importing the catalog. The copy
+// guard also scans every app and component source, including future screens.
 const MIGRATED_FILES = [
   'app/index.tsx', 'app/_layout.tsx', 'app/monitor.tsx', 'app/history.tsx', 'app/settings.tsx', 'app/pre-drive.tsx',
   'components/SimulatorTraceBanner.tsx', 'components/AlertSystem.tsx', 'components/CameraSetupGuide.tsx',
@@ -27,6 +27,10 @@ const MIGRATED_FILES = [
   'lib/monitorPresentationModel.ts', 'lib/pilotInsights.ts', 'lib/safeStopLinks.ts', 'lib/sessionAlertCount.ts',
   'lib/sessionReviewProgress.ts', 'lib/sessionSummaryValues.ts',
 ];
+const UI_FILES = globSync(['app/**/*.{ts,tsx,js,jsx}', 'components/**/*.{ts,tsx,js,jsx}'], {
+  cwd: new URL('../', import.meta.url),
+});
+const GUARDED_FILES = new Set([...MIGRATED_FILES, ...UI_FILES]);
 const leaf = (catalog, path) => path.split('.').reduce((node, key) => node?.[key], catalog);
 // These released sentence fragments include a joiner intentionally. Trimming
 // them would change existing output; all other English leaves remain trimmed.
@@ -57,10 +61,22 @@ test('the guard detects hard-coded JSX text, copy props, ternary copy and Alert 
     ['安全提示', 'تنبيه']);
 });
 
-test('migrated screens read every user-facing string from the catalog', () => {
-  for (const file of MIGRATED_FILES) {
+test('nested JSX and alerts inside callbacks are checked without treating handler arguments as labels', () => {
+  const sample = `
+    <View>{items.map(item => <Text>{item.ok ? copy.ok : 'Check setup'}</Text>)}</View>;
+    <Button onPress={() => { router.push('/history'); Alert.alert(copy.title, busy ? copy.wait : 'Try later',
+      [{ text: copy.cancel }, { text: busy ? 'Wait here' : copy.stop }]); }} />;
+    <Screen options={{ title: 'Safety check' }} />;`;
+  assert.deepEqual(hardCodedCopy('callbacks.tsx', sample).map(entry => entry.text),
+    ['Check setup', 'Try later', 'Wait here', 'Safety check']);
+});
+
+test('all app and component sources and migrated helpers keep user-facing copy in the catalog', () => {
+  for (const file of GUARDED_FILES) {
     const code = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
-    assert.match(code, /from ['"](?:\.\.\/|\.\/)+(?:lib\/)?strings(?:\.ts)?['"]/, `${file} must import the string catalog`);
+    if (MIGRATED_FILES.includes(file)) {
+      assert.match(code, /from ['"](?:\.\.\/|\.\/)+(?:lib\/)?strings(?:\.ts)?['"]/, `${file} must import the string catalog`);
+    }
     assert.deepEqual(hardCodedCopy(file, code), [], `${file} still hard-codes user-facing copy`);
   }
 });
@@ -148,7 +164,7 @@ test('unreviewed or unknown languages stay hidden and cannot change released Eng
   assert.deepEqual(availableNativeLocales, ['en']);
   assert.equal(resolveNativeCatalog('en'), en);
   for (const locale of nativeLocaleCodes.filter(code => code !== 'en')) {
-    assert.equal(nativeLocaleReviews[locale].status, 'unreviewed');
+    assert.equal(nativeLocaleReviews[locale].reviewed, false);
     assert.equal(nativeLocaleReviews[locale].reviewedBy, null);
     assert.equal(nativeLocaleReviews[locale].reviewedAt, null);
     assert.equal(resolveNativeCatalog(locale), en);
@@ -160,10 +176,55 @@ test('unreviewed or unknown languages stay hidden and cannot change released Eng
   assert.equal(strings, en);
   const entry = readFileSync(new URL('../lib/strings.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(entry, /from ['"][^'"]*(?:locales|translations)/);
-  for (const file of MIGRATED_FILES) {
+  for (const file of GUARDED_FILES) {
     const code = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     assert.doesNotMatch(code, /(?:I18nManager\.(?:forceRTL|allowRTL)|getLocales\(|resolveNativeCatalog\(|strings\/locales)/, file);
   }
+});
+
+test('native language follows the preferred iOS language and Android app configuration', async () => {
+  const { nativeLanguagePreference } = await import('../lib/strings/language.ts');
+  assert.equal(nativeLanguagePreference({
+    Platform: { OS: 'ios' }, Settings: { get(key) {
+      assert.equal(key, 'AppleLanguages');
+      return ['ar-EG', 'en-US'];
+    } },
+  }), 'ar-EG');
+  const android = localeIdentifier => ({
+    Platform: { OS: 'android' }, I18nManager: { getConstants: () => ({ localeIdentifier }) },
+  });
+  assert.equal(nativeLanguagePreference(android('zh_CN_#Hans')), 'zh');
+  assert.equal(nativeLanguagePreference(android('pt-BR')), 'pt');
+  assert.equal(nativeLanguagePreference(android(undefined)), undefined);
+  assert.equal(nativeLanguagePreference({ Platform: { OS: 'ios' }, Settings: { get: () => null } }), undefined);
+});
+
+test('device language and layout use only a complete catalog with a fluent review', async t => {
+  const { selectNativeLocale } = await import('../lib/strings/language.ts');
+  const review = nativeLocaleReviews.ar;
+  t.mock.method(Intl.DateTimeFormat.prototype, 'resolvedOptions', () => ({ locale: 'ar-EG' }));
+  // The normal release on an Arabic device uses English with LTR layout.
+  const pending = await import('../lib/strings.ts?device-pending');
+  assert.equal(pending.strings, pending.en);
+  assert.equal(pending.nativeDirection, 'ltr');
+  const original = { ...review };
+  try {
+    Object.assign(review, { reviewed: true, reviewedBy: null, reviewedAt: null });
+    assert.equal(selectNativeLocale('ar-EG'), 'en');
+    Object.assign(review, { reviewedBy: 'test reviewer', reviewedAt: '2026-11-01' });
+    assert.equal(selectNativeLocale('aR-EG'), 'ar');
+    assert.equal(selectNativeLocale('ar-!'), 'en');
+    assert.equal(selectNativeLocale({ language: 'ar' }), 'en');
+    assert.equal(selectNativeLocale('es-MX'), 'en');
+    const approved = await import('../lib/strings.ts?device-reviewed');
+    assert.deepEqual(approved.strings, nativeCatalogs.ar);
+    assert.equal(approved.nativeDirection, 'rtl');
+    assert.equal(approved.strings.settings.alerts.spokenLanguage, nativeCatalogs.ar.settings.alerts.spokenLanguage);
+    const root = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
+    assert.match(root, /SafeAreaProvider style=\{\{ direction: nativeDirection \}\}/);
+    assert.match(root, /contentStyle: \{[^}]*direction: nativeDirection/);
+    assert.match(readFileSync(new URL('../app/settings.tsx', import.meta.url), 'utf8'), /\{strings.settings.alerts.spokenLanguage\}/);
+  } finally { Object.assign(review, original); }
 });
 
 test('Monitor alerts, cloud consent, recovery and all pre-drive acknowledgments retain released wording', () => {

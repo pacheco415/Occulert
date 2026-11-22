@@ -1,5 +1,8 @@
 {
-  "platforms": ["apple"],
+  "platforms": ["apple", "android"],
+  "android": {
+    "modules": ["expo.modules.occulert.devicecondition.OcculertConcurrentCameraModule"]
+  },
   "apple": {
     "modules": ["OcculertDeviceConditionModule"]
   }
