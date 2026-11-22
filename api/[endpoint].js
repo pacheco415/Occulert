@@ -8,6 +8,7 @@ const handlers = Object.freeze({
   "/api/billing-webhook": require("./_lib/routes/billing-webhook"),
   "/api/fleet-digest-preferences": require("./_lib/routes/fleet-digest-preferences"),
   "/api/fleet-digest-unsubscribe": require("./_lib/routes/fleet-digest-unsubscribe"),
+  "/api/fleet-insights": require("./_lib/routes/fleet-insights"),
   "/api/fleet-period-report": require("./_lib/routes/fleet-period-report"),
   "/api/fleet-session-history": require("./_lib/routes/fleet-session-history"),
   "/api/parked-alert-checks": require("./_lib/routes/parked-alert-checks"),

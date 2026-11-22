@@ -35,6 +35,7 @@ function harness({ user = { id: OWNER }, fleets = [{ id: FLEET, company_name: 'P
       throw new Error('Unexpected table');
     },
   } };
+  delete require.cache[require.resolve('../api/_lib/fleet-period.js')];
   delete require.cache[endpointPath];
   const handler = require(endpointPath);
   async function invoke(url = '/api/fleet-period-report?days=30', method = 'GET') {

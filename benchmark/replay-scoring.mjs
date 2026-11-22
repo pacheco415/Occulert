@@ -5,8 +5,11 @@ import { createHash } from 'node:crypto';
 import vm from 'node:vm';
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
 import { toCsv } from './prepare-dataset.mjs';
-import { validateProvenance } from './parked-detection-trace.mjs';
+import { acceptedYawnFrames, readParkedMeasurements, validateProvenance } from './parked-detection-trace.mjs';
+import { features as featureNames, visitFeatureWindows } from './feature-windows.mjs';
+import { createFatigueAlertPolicy } from './fatigue-alert-policy.mjs';
 import { sourceSnapshot, contentSha256 } from './provenance.mjs';
 import { scoringSmooth, scoringNodHistory, scoringNodDetected, scoringResetContinuity, scoringSensitivityThresholds,
     scoringEyeMetrics, scoringYawn, scoringAlertCandidate, scoringDistractionMatured, scoringTriggerEligible } from '../src/scoring-core.js';
@@ -22,6 +25,7 @@ export const scoringVariants = Object.freeze([
     { name: 'distraction-confidence-stable', query: '?distraction-confidence=stable' },
     { name: 'turn-fatigue-hold', query: '?turn-fatigue=hold' },
     { name: 'perclos-turn-exclude', query: '?perclos-turn=exclude' },
+    { name: 'tasks-blink-v1', replayOnly: true },
 ].map(Object.freeze));
 const stateKeys = ['fatigue','confidence','maxFatigue','fatigueSampleSum','fatigueSampleCount','perclosWindow','eyesClosedSince','microsleeps','lastMicro','turnedSince','totalDistractionMs','noFaceSince','lastFaceSeen','calibrating','calibrated','calibrationUntil','calibrationSamples','baselineEAR','baseClosedThreshold','baseWatchThreshold','eyeClosedThreshold','eyeWatchThreshold','lastAlert','earHistory','noseYHistory','lastNod','headNods'];
 const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -48,7 +52,7 @@ function stateValid(state) {
 }
 function capability(trace) {
     const session = trace?.session;
-    if (trace?.schema !== 'occulert.parked-detection-trace' || ![1,2,3].includes(trace.version)
+    if (trace?.schema !== 'occulert.parked-detection-trace' || ![1,2,3,4].includes(trace.version)
         || session?.platform !== 'web' || !/^[A-Za-z0-9_-]{1,128}$/.test(session.sessionId ?? '')
         || !finite(session.durationMs) || session.durationMs <= 0 || !Array.isArray(trace.samples) || trace.samples.length > 20000) throw Error('Invalid parked trace header');
     validateProvenance(session);
@@ -103,9 +107,12 @@ function loadModels() {
     vm.runInNewContext(bytes.toString('utf8'), sandbox);
     return { models: sandbox.module.exports, path: name, sha256: contentSha256(bytes) };
 }
-function runVariant(initial, initialSettings, timeline, variant, models) {
+function runVariant(initial, initialSettings, timeline, variant, models, tasksSamples) {
     let state = structuredClone(initial), mono = 0, wall = REPLAY_EPOCH_MS, sensitivity = initialSettings.sensitivity, currentRow = null;
     const flags = models.parseFlags(variant.query), alerts = [], samples = [], minimumSamples = variant.minimumSamples ?? 1;
+    const blink = tasksSamples ? models.createTasksBlinkPolicy() : null;
+    const noBaseline = { status: 'unavailable', reason: 'No paired bilateral Tasks baseline was captured in the parked setup window.' };
+    let usableBlinkFrames = 0, setupComplete = false;
     const clockFallbacks = {};
     const point = phase => {
         const captured = currentRow?.clocks?.[phase];
@@ -134,6 +141,7 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
         currentRow = row;
         mono = row.atMs; wall = REPLAY_EPOCH_MS + row.wallMs;
         if (row.kind === 'recalibrate') {
+            if (blink) { blink.reset(); setupComplete = false; state.eyesClosedSince = 0; }
             sensitivity = row.settings.sensitivity;
             for (const key of ['calibrating','calibrated','calibrationUntil','calibrationSamples','baselineEAR','baseClosedThreshold','baseWatchThreshold']) state[key] = structuredClone(row.state[key]);
             state.earHistory = []; applySensitivity();
@@ -141,11 +149,35 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
             if (flags.any) controller.recalibrate();
             continue;
         }
+        let eyeClosed;
+        if (blink) {
+            const sample = tasksSamples[row.frameId - 1];
+            if (typeof sample.calibrating !== 'boolean' || typeof sample.tasksUsable !== 'boolean' ||
+                (sample.calibrating && sample.tasksUsable)) {
+                return { status: 'unavailable', reason: 'Invalid Tasks calibration or usability markers.' };
+            }
+            state.calibrating = sample.calibrating;
+            if (state.calibrating) {
+                if (setupComplete) return { status: 'unavailable', reason: 'Tasks setup resumed without a recorded recalibration.' };
+                blink.addSetup(sample);
+                state.eyesClosedSince = 0;
+            } else if (blink.threshold() === null) {
+                return noBaseline;
+            } else setupComplete = true;
+            state.calibrated = !state.calibrating && blink.threshold() !== null;
+            eyeClosed = blink.closed(sample);
+            if (sample.tasksUsable && eyeClosed === null) {
+                return { status: 'unavailable', reason: 'Usable Tasks frame lacks paired bilateral blink measurements.' };
+            }
+            if (row.hasFace && eyeClosed !== null) usableBlinkFrames++;
+        }
         if (sensitivity !== row.sensitivity) { sensitivity = row.sensitivity; applySensitivity(); }
         if (flags.primary) controller.prepareObservation(mono,row.hasFace,row.faceMissing);
-        let ear = 0, nod = false;
+        let ear = blink ? null : 0, nod = false;
         if (row.hasFace) {
-            const smooth = scoringSmooth(state.earHistory,row.rawEar); state.earHistory = smooth.samples; ear = smooth.ear;
+            if (!blink) {
+                const smooth = scoringSmooth(state.earHistory,row.rawEar); state.earHistory = smooth.samples; ear = smooth.ear;
+            }
             if (!state.calibrating) {
                 state.noseYHistory = scoringNodHistory(state.noseYHistory,row.noseY,point('nodSample').wall);
                 const nodTime = state.noseYHistory.length >= 8 ? point('nodDecision').wall : wall;
@@ -154,10 +186,10 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
             }
         }
         if (flags.primary) controller.score(ear,row.turned,nod,row.hasFace,null,row.noseY,row.faceMissing,true);
-        else state = scoringReplayFrame(state,{ear,turned:row.turned,nod,hasFace:row.hasFace,
+        else state = scoringReplayFrame(state,{ear,eyeClosed,turned:row.turned,nod,hasFace:row.hasFace,
             ...(row.hasFace && state.calibrating ? { calibrationNowMs: point('calibration').wall } : {}),
             ...(row.hasFace && !state.calibrating ? { eyeNowMs: point('eye').wall } : {})},wall,
-            { minimumSamples, sensitivityOffset: offset(sensitivity), stableDistraction: flags.distractionConfidence, holdTurnFatigue: flags.turnFatigue, excludeTurned: flags.perclosTurn });
+            { minimumSamples, sensitivityOffset: offset(sensitivity), stableDistraction: flags.distractionConfidence, holdTurnFatigue: flags.turnFatigue, excludeTurned: flags.perclosTurn, tasksBlink: !!blink });
         if (row.yawn) state = scoringYawn(state);
         const candidate = row.hasFace && scoringAlertCandidate(state);
         const reason = candidate === 'Distraction' ? scoringDistractionMatured(state,point('eligibility').wall) && candidate : candidate;
@@ -165,25 +197,63 @@ function runVariant(initial, initialSettings, timeline, variant, models) {
         samples.push({ frame_id: row.frameId, at_ms: mono, fatigue: state.fatigue, confidence: state.confidence,
             calibrated: state.calibrated, perclos_samples: state.perclosWindow.length });
     }
+    if (blink && blink.threshold() === null) return noBaseline;
+    if (blink && !usableBlinkFrames) return { status: 'unavailable', reason: 'No usable Tasks closure observations after setup.' };
     return { alerts, samples, finalState: state, clockFallbacks };
 }
 
-export function replayScoring(trace) {
+function replayFatigueModel(trace, modelBytes, models) {
+    const config = models.fatigueFeatureConfig;
+    const entry = { name: 'model-' + config.version, replayOnly: true, validated: false };
+    if (modelBytes == null) return { ...entry, status: 'unavailable', reason: 'No model supplied. Pass --model with a trainer model.json.' };
+    const model = JSON.parse(modelBytes.toString());
+    if (model?.kind !== 'fatigue-logreg' || model.schemaVersion !== 1 || model.featureVersion !== config.version ||
+        model.validated !== false || JSON.stringify(model.features) !== JSON.stringify(featureNames) || !finite(model.bias) ||
+        ![model.means, model.stds, model.weights].every(values => Array.isArray(values) &&
+            values.length === featureNames.length && values.every(finite)) || model.stds.some(value => value <= 0)) {
+        throw Error('Invalid or incompatible fatigue model');
+    }
+    const isAlert = createFatigueAlertPolicy(model.threshold, model.consecutiveWindows, config.stepMs);
+    const policy = { ...entry, modelSha256: contentSha256(modelBytes), threshold: model.threshold,
+        consecutiveWindows: model.consecutiveWindows };
+    if (trace.session.droppedFrames || trace.scoringReplay?.invalidatedFrames || trace.scoringReplay?.droppedFrames ||
+        (trace.samples.length && trace.samples[0].frameId !== 1)) {
+        return { ...policy, status: 'unavailable', reason: 'The complete captured frame history was not retained.' };
+    }
+    const { comparison } = readParkedMeasurements(trace);
+    const yawns = acceptedYawnFrames(trace);
+    const frames = comparison.map((row, index) => ({ ...row, accepted_yawn: yawns[index].accepted_yawn }));
+    const alerts = [];
+    const windows = visitFeatureWindows(frames, trace.session.durationMs, trace.session, (end, values) => {
+        if (isAlert(end, models.fatigueModelScore(model, values))) alerts.push({ at_ms: end });
+    });
+    if (!windows.included) return { ...policy, windows, status: 'unavailable', reason: 'No feature window met the duration and coverage requirements.' };
+    return { ...policy, windows, status: 'available', alerts };
+}
+
+export function replayScoring(trace, modelBytes = null) {
     const support = capability(trace);
     const source = loadModels();
-    const variants = scoringVariants.map(variant => support.reason
-        ? { ...variant, status: 'unavailable', reason: support.reason }
-        : { ...variant, status: 'available', ...runVariant(support.replay.initialState,support.replay.initialSettings,support.timeline,variant,source.models) });
+    const variants = scoringVariants.map(variant => {
+        const tasks = variant.name === source.models.tasksBlinkConfig.method;
+        const entry = tasks ? { ...variant, tasksBlinkConfig: source.models.tasksBlinkConfig, validated: false } : variant;
+        if (support.reason) return { ...entry, status: 'unavailable', reason: support.reason };
+        if (tasks && !trace.session.experimentFlags.includes('tasks'))
+            return { ...entry, status: 'unavailable', reason: 'The trace did not capture Tasks measurements.' };
+        return { ...entry, status: 'available', ...runVariant(support.replay.initialState, support.replay.initialSettings,
+            support.timeline, variant, source.models, tasks ? trace.samples : null) };
+    });
+    variants.push(replayFatigueModel(trace, modelBytes, source.models));
     return { schema: 'occulert.scoring-replay', version: 1, sessionId: trace.session.sessionId,
         decisionClock: 'recorded named phase clocks where observed; monotonic at_ms, normalized nonzero wall-clock epoch with zero sentinels preserved',
         counterfactualTimingLimit: 'A phase absent under the recording rules uses that observation clock and is counted in clockFallbacks. Exact sub-frame timing is not known for those counterfactual decisions.',
-        acceptedYawnPolicy: 'Apply each recorded accepted-yawn event after frame scoring and before alert eligibility in every variant, even when counterfactual calibration differs. These inputs preserve observed detector decisions; they do not reconstruct MAR, smoothing, hold time or cooldown under alternative rules.',
-        signalPolicy: 'raw normalized EAR and nose/turn observations; per-variant six-frame smoothing, nod history and continuity; no interpolation',
+        acceptedYawnPolicy: 'Apply each recorded accepted-yawn event after frame scoring and before alert eligibility in each frame-scoring variant, even when counterfactual calibration differs. These inputs preserve observed detector decisions; they do not reconstruct MAR, smoothing, hold time or cooldown under alternative rules.',
+        signalPolicy: 'EAR variants use normalized EAR and six-frame smoothing. Tasks uses calibrated bilateral blink on supported observations. Both use recorded nose/turn observations, nod history and continuity without interpolation.',
         labelsGenerated: false, promotion: 'none', helper: { path: source.path, sha256: source.sha256 }, variants };
 }
 
-export async function writeScoringReplay(trace, directory, traceBytes = JSON.stringify(trace)) {
-    const result = replayScoring(trace);
+export async function writeScoringReplay(trace, directory, traceBytes = JSON.stringify(trace), modelBytes = null) {
+    const result = replayScoring(trace, modelBytes);
     // Never leave older alerts next to a new unavailable manifest.
     await mkdir(dirname(directory),{recursive:true});
     await mkdir(directory);
@@ -191,21 +261,24 @@ export async function writeScoringReplay(trace, directory, traceBytes = JSON.str
         if (variant.status !== 'available') continue;
         const output = join(directory,variant.name); await mkdir(output,{recursive:true});
         await writeFile(join(output,'alerts.csv'),toCsv(['session_id','at_ms'],variant.alerts.map(row => ({session_id:result.sessionId,at_ms:row.at_ms})))+'\n');
-        await writeFile(join(output,'scoring.csv'),toCsv(['frame_id','at_ms','fatigue','confidence','calibrated','perclos_samples'],variant.samples)+'\n');
+        if (variant.samples) await writeFile(join(output,'scoring.csv'),toCsv(['frame_id','at_ms','fatigue','confidence','calibrated','perclos_samples'],variant.samples)+'\n');
     }
     const source = readFileSync(new URL('../src/scoring-core.js',import.meta.url));
     const manifest = { ...result, variants: result.variants.map(({alerts,samples,finalState,...variant}) => ({...variant,
-        ...(alerts ? { alerts: alerts.length, frames: samples.length } : {})})), traceSha256:contentSha256(traceBytes),
-        scoringCoreSha256:createHash('sha256').update(source).digest('hex'), ...sourceSnapshot(['replay-scoring.mjs','scoring-step.mjs','parked-detection-trace.mjs']) };
+        ...(alerts ? { alerts: alerts.length } : {}), ...(samples ? { frames: samples.length } : {})})), traceSha256:contentSha256(traceBytes),
+        scoringCoreSha256:createHash('sha256').update(source).digest('hex'), ...sourceSnapshot(['replay-scoring.mjs','scoring-step.mjs','parked-detection-trace.mjs',
+            'feature-windows.mjs','fatigue-alert-policy.mjs']) };
     await writeFile(join(directory,'replay-manifest.json'),JSON.stringify(manifest,null,2)+'\n');
     return manifest;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-    const args = process.argv.slice(2);
-    if (args.length !== 4 || args[0] !== '--trace' || args[2] !== '--out') throw Error('Usage: --trace local.json --out fresh-directory');
-    const bytes = await readFile(args[1]);
+    const { values, tokens } = parseArgs({ options: { trace: { type: 'string' }, out: { type: 'string' }, model: { type: 'string' } }, tokens: true });
+    if (!values.trace || !values.out || values.model === '' || tokens.length !== Object.keys(values).length)
+        throw Error('Usage: --trace local.json --out fresh-directory [--model model.json]');
+    const bytes = await readFile(values.trace);
     if (bytes.byteLength > 20_000_000) throw Error('Trace exceeds the local replay input bound');
-    const result = await writeScoringReplay(JSON.parse(bytes),args[3],bytes);
+    const modelBytes = values.model ? await readFile(values.model) : null;
+    const result = await writeScoringReplay(JSON.parse(bytes), values.out, bytes, modelBytes);
     console.log(JSON.stringify({ sessionId:result.sessionId,variants:result.variants },null,2));
 }
