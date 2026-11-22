@@ -36,7 +36,7 @@ export const monitorStyles = StyleSheet.create({
   sensorFault: { backgroundColor: 'rgba(69,10,10,0.96)', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 14, padding: 14 },
   sensorFaultTitle: { color: '#fecaca', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
   sensorFaultText: { color: '#fff1f2', fontSize: 12, lineHeight: 18, marginTop: 4 },
-  recoveryHomeButton: { alignSelf: 'flex-start', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, paddingRight: 14 },
+  recoveryHomeButton: { alignSelf: 'flex-start', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, paddingEnd: 14 },
   recoveryHomeButtonText: { flexShrink: 1, color: '#fee2e2', fontSize: 11, fontWeight: '900', letterSpacing: 0.45 },
   startBtn: {
     flexDirection: 'row',

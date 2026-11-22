@@ -1,3 +1,4 @@
+import { navigationIconStyle } from '../../constants/theme';
 import { strings, formatString } from '../../lib/strings';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
@@ -70,7 +71,7 @@ export function HistoryFilters({ model, sessionCount, historyPeriod, historyFilt
                 style={[s.continueReviewButton, sessionOperationsBusy && s.operationDisabled]}
               >
                 <View style={s.continueReviewIcon}>
-                  <Ionicons name="arrow-forward" size={17} color="#dbeafe" />
+                  <Ionicons name="arrow-forward" style={navigationIconStyle} size={17} color="#dbeafe" />
                 </View>
                 <View style={s.continueReviewCopy}>
                   <Text style={s.continueReviewTitle}>{strings.history.filters.continueReview}</Text>

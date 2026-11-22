@@ -1,3 +1,4 @@
+import { navigationIconStyle } from '../../constants/theme';
 import { strings, formatString } from '../../lib/strings';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
@@ -53,7 +54,7 @@ export function HistorySessionCard({ item, index: i, sessionOperations, expanded
           >
             {reviewQueueMessage?.key === sessionKey && (
               <View accessibilityRole="alert" style={s.reviewQueueMessage}>
-                <Ionicons name="arrow-forward-circle-outline" size={17} color="#93c5fd" />
+                <Ionicons name="arrow-forward-circle-outline" style={navigationIconStyle} size={17} color="#93c5fd" />
                 <Text style={s.reviewQueueMessageText}>{reviewQueueMessage.text}</Text>
               </View>
             )}

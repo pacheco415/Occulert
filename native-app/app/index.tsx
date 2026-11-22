@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { AmbientBackground, GlassSurface } from '../components/GlassSurface';
-import { colors, radii } from '../constants/theme';
+import { colors, radii, navigationIconStyle } from '../constants/theme';
 import { updateSessionHistory } from '../lib/sessionHistory';
 import { clearActiveSessionCheckpoint, loadActiveSessionCheckpoint } from '../lib/sessionRecovery';
 import { ActiveSessionCheckpointUnreadableError } from '../lib/sessionRecoveryModel';
@@ -50,7 +50,7 @@ function QuickLink({ icon, label, detail, href }: QuickLinkProps) {
           <Text style={styles.linkLabel}>{label}</Text>
           <Text style={styles.linkDetail}>{detail}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        <Ionicons name="chevron-forward" style={navigationIconStyle} size={16} color={colors.textMuted} />
       </TouchableOpacity>
     </GlassSurface>
   );
@@ -155,7 +155,7 @@ export default function HomeScreen() {
               <Text style={styles.recoveryTitle}>{copy.recoveryRecovered.title}</Text>
               <Text style={styles.recoveryDetail}>{copy.recoveryRecovered.detail}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            <Ionicons name="chevron-forward" style={navigationIconStyle} size={16} color={colors.textMuted} />
           </TouchableOpacity>
         )}
 
@@ -219,7 +219,7 @@ export default function HomeScreen() {
               <Text style={styles.startLabel}>{recoveryState === 'checking' ? copy.start.checkingLabel : recoveryState === 'error' ? copy.start.errorLabel : copy.start.readyLabel}</Text>
               <Text style={styles.startDetail}>{recoveryBlocksStart ? copy.start.blockedDetail : copy.start.readyDetail}</Text>
             </View>
-            <Ionicons name="arrow-forward" size={20} color={colors.text} />
+            <Ionicons name="arrow-forward" style={navigationIconStyle} size={20} color={colors.text} />
           </TouchableOpacity>
         </GlassSurface>
 
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 214, 10, 0.1)',
   },
   recoveryErrorTitle: { color: '#ffe895', fontSize: 13, fontWeight: '800' },
-  recoveryRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: 5, paddingRight: 16 },
+  recoveryRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: 5, paddingEnd: 16 },
   recoveryRetryText: { color: colors.cyan, fontSize: 12, fontWeight: '800' },
   startSurface: {
     borderRadius: radii.large,
