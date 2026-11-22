@@ -182,6 +182,23 @@ test('unreviewed or unknown languages stay hidden and cannot change released Eng
   }
 });
 
+test('native language follows the preferred iOS language and Android app configuration', async () => {
+  const { nativeLanguagePreference } = await import('../lib/strings/language.ts');
+  assert.equal(nativeLanguagePreference({
+    Platform: { OS: 'ios' }, Settings: { get(key) {
+      assert.equal(key, 'AppleLanguages');
+      return ['ar-EG', 'en-US'];
+    } },
+  }), 'ar-EG');
+  const android = localeIdentifier => ({
+    Platform: { OS: 'android' }, I18nManager: { getConstants: () => ({ localeIdentifier }) },
+  });
+  assert.equal(nativeLanguagePreference(android('zh_CN_#Hans')), 'zh');
+  assert.equal(nativeLanguagePreference(android('pt-BR')), 'pt');
+  assert.equal(nativeLanguagePreference(android(undefined)), undefined);
+  assert.equal(nativeLanguagePreference({ Platform: { OS: 'ios' }, Settings: { get: () => null } }), undefined);
+});
+
 test('device language and layout use only a complete catalog with a fluent review', async t => {
   const { selectNativeLocale } = await import('../lib/strings/language.ts');
   const review = nativeLocaleReviews.ar;

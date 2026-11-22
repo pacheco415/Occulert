@@ -34,7 +34,28 @@ export function selectNativeLocale(tag: unknown, reviews = nativeLocaleReviews):
   }
 }
 
+type LanguageSettings = Pick<typeof import('react-native'), 'Platform' | 'Settings' | 'I18nManager'>;
+
+export function nativeLanguagePreference(native: LanguageSettings): string | undefined {
+  if (native.Platform.OS === 'ios') {
+    const languages = native.Settings.get('AppleLanguages');
+    return Array.isArray(languages) && typeof languages[0] === 'string' ? languages[0] : undefined;
+  }
+  if (native.Platform.OS === 'android') {
+    // Android Locale.toString() can include "_#Script". All current catalogs
+    // are keyed by primary language, so neither region nor script is needed.
+    return native.I18nManager.getConstants().localeIdentifier?.split(/[-_]/)[0];
+  }
+  return undefined;
+}
+
 export function deviceLanguageTag(): string | undefined {
+  try {
+    if (globalThis.navigator?.product === 'ReactNative') {
+      const preference = nativeLanguagePreference(require('react-native'));
+      if (preference) return preference;
+    }
+  } catch { /* Use the system formatting locale if native settings are unavailable. */ }
   try { return Intl.DateTimeFormat().resolvedOptions().locale; }
   catch { return undefined; }
 }

@@ -57,8 +57,9 @@ unreviewed language request. Completeness and placeholder checks cannot approve
 a language; availability also requires an explicit reviewed flag, reviewer
 and date.
 
-The app reads the system language through `Intl.DateTimeFormat` at startup and
-normalizes the language tag, including regional tags such as `es-MX`. An
+The app reads the first preferred iOS language or the Android app configuration
+locale at startup. If native settings are unavailable, it uses the system
+formatting locale. Regional tags such as `es-MX` select a primary language. An
 unreviewed preference uses English and left-to-right layout. The English path
 does not initialize the draft dictionaries. For a reviewed language the
 loader validates the selected catalog against English. Invalid catalogs fall
