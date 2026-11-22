@@ -8,6 +8,7 @@ import {
   createFrontCameraObservation, normalizeFrontCameraIdentity,
   normalizeFrontPhysicalCameras, unknownFrontCameraIdentity,
 } from '../lib/frontCameraIdentity.ts';
+import { describeDeviceReadiness } from '../lib/deviceReadiness.ts';
 import * as model from '../lib/frontCameraIdentity.ts';
 import * as interruptions from '../lib/cameraInterruptions.ts';
 
@@ -157,6 +158,7 @@ test('public wrappers support a missing optional module and native readiness rep
   assert.equal(await wrapper.isMultitaskingCameraAccessSupported(), true);
   assert.equal((await wrapper.getCameraInterruptionState('virtual-front')).reason, 'multitasking');
   const sources = loadModule('../lib/deviceReadinessSources.ts', {
+    'react-native': { Platform: { OS: 'ios' } }, './androidCameraCapability': {},
     '@react-native-async-storage/async-storage': {},
     'react-native-vision-camera': { Camera: { getAvailableCameraDevices: () => [{ position: 'front', physicalDevices: ['wide-angle-camera'] }], getCameraPermissionStatus: () => 'granted' } },
     './alertPreferenceStore': {}, './watchPreferences': {}, './watchBridge': {}, './headphoneMotion': {},
@@ -177,4 +179,63 @@ test('older SDK compilation excludes new camera constants and native observation
   assert.match(observer, /self\.revision == boundRevision/);
   assert.match(observer, /guard self\.owner == owner/);
   assert.doesNotMatch(observer, /AVCaptureDeviceInput|startRunning|requestAccess|CMSampleBuffer|Timer/);
+});
+
+test('Android readiness classifies only cameras advertised in the same concurrent set', async () => {
+  const results = [
+    [[['front', 'back']], true, true, 'Hardware capable'],
+    [[['back', 'external'], ['front', 'external']], true, false, 'Not supported'],
+    [[], false, false, 'Not supported'],
+    [[['back', 'unknown']], true, null, 'Support unknown'],
+    [[['external', 'unknown']], true, false, 'Not supported'],
+    [[['unknown', 'unknown']], true, null, 'Support unknown'],
+    [[['back', 'unknown'], ['front', 'back']], true, true, 'Hardware capable'],
+    [null, null, null, 'Support unknown'],
+    [undefined, null, null, 'Support unknown'],
+    [new Error('camera service unavailable'), null, null, 'Support unknown'],
+  ];
+  for (const [groups, multiCam, frontBack, status] of results) {
+    const wrapper = loadModule('../lib/androidCameraCapability.ts', {
+      'expo-modules-core': { requireOptionalNativeModule(name) {
+        assert.equal(name, 'OcculertConcurrentCamera');
+        if (groups === undefined) return null;
+        return { async getConcurrentLensFacings() {
+          if (groups instanceof Error) throw groups;
+          return groups;
+        } };
+      } },
+    });
+    const { deviceReadinessSources } = loadModule('../lib/deviceReadinessSources.ts', {
+      'react-native': { Platform: { OS: 'android' } }, './androidCameraCapability': wrapper,
+      '@react-native-async-storage/async-storage': {},
+      'react-native-vision-camera': { Camera: {
+        getAvailableCameraDevices: () => ['front', 'back'].map(position => ({ position, physicalDevices: [] })),
+        getCameraPermissionStatus: () => 'granted',
+      } },
+      './deviceCondition': {}, './alertPreferenceStore': {}, './watchPreferences': {},
+      './watchBridge': {}, './headphoneMotion': {},
+    });
+    const camera = await deviceReadinessSources.camera();
+    assert.equal(camera.multiCamSupported, multiCam);
+    assert.equal(camera.frontBackMultiCamSupported, frontBack);
+    assert.equal(camera.multiCamProbe.state, 'notAvailable');
+    const road = describeDeviceReadiness({ camera, checkedAt: 0 }, 0).find(row => row.id === 'roadCamera');
+    assert.equal(road.status, status);
+    assert.doesNotMatch(road.detail, /Apple|iPhone|load check/i);
+  }
+});
+
+test('the registered Android camera module only reads capability metadata on API 30+', () => {
+  const moduleRoot = new URL('../modules/occulert-device-condition/', import.meta.url);
+  const registration = JSON.parse(readFileSync(new URL('expo-module.config.json', moduleRoot), 'utf8'));
+  assert.ok(registration.platforms.includes('android'));
+  const [className] = registration.android.modules;
+  const kotlin = readFileSync(new URL('android/src/main/java/' + className.replaceAll('.', '/') + '.kt', moduleRoot), 'utf8');
+  assert.match(kotlin, /Name\("OcculertConcurrentCamera"\)/);
+  assert.match(kotlin, /AsyncFunction\("getConcurrentLensFacings"\)/);
+  assert.ok(kotlin.indexOf('Build.VERSION.SDK_INT < Build.VERSION_CODES.R') >= 0);
+  assert.ok(kotlin.indexOf('Build.VERSION.SDK_INT') < kotlin.indexOf('manager.concurrentCameraIds'));
+  assert.match(kotlin, /CameraCharacteristics\.LENS_FACING/);
+  assert.doesNotMatch(kotlin, /openCamera|createCapture|requestPermissions/);
+  assert.doesNotMatch(readFileSync(new URL('android/src/main/AndroidManifest.xml', moduleRoot), 'utf8'), /uses-permission/);
 });

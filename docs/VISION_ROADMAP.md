@@ -309,7 +309,7 @@ Pricing hypothesis for owner review: retain standalone monitoring and existing s
 
 ### Task 6.1 — Native localization
 
-- **State:** Home screen copy is in the English catalog `native-app/lib/strings.ts`, guarded by `npm run test:strings` in native verify. Other screens and components still hard-code copy; no translation exists.
+- **State:** Home, Monitor, History, Settings and Pre-drive use the typed native catalog. English is the released language. Seven complete draft catalogs await fluent review and physical accessibility acceptance. Native verification checks catalog coverage and renders the Arabic large-text layout with a simulated review.
 - **Branch:** `codex/native-localization`
 - **Change:** extract native UI strings into a typed catalog and add the web app's languages (`en es fr pt de ar zh ja`), including right-to-left layout for Arabic. Record spoken cues per language or keep English with a visible note.
 - **Tests:** a missing-key check and the existing monitor layout fixtures at large text in Arabic. Preserve alert meaning and consent text; fluent human review and physical accessibility acceptance remain required for translated release copy.

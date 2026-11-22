@@ -203,6 +203,7 @@ export const settingsStrings = {
     audioHint: "Controls alert sounds from the iPhone's current audio output",
     soundTitle: "Alert sound",
     soundDetail: "Choose the tone profile used for phone alerts",
+    spokenLanguage: "Spoken cues are in English.",
     soundLimits: "This changes the tone profile only. Alert timing, severity, and centered critical delivery stay the same.",
     safetyLimits: "A continuous closed-eye reading reaches the prominent alert at about 0.6 seconds and, after the startup warmup, the stronger stage at 1.2 seconds. Standard alerts repeat twice and critical alerts repeat three times on each enabled output. Audio and haptic choices also control the foreground-loss warning; keep at least one enabled. Alerts cannot make drowsy driving safe—pull over and rest.",
     soundAccessibility: "{sound} alert sound"
@@ -556,6 +557,7 @@ export const preDriveStrings = {
       unknownDetail: "A rear camera is available, but simultaneous Apple multi-camera support was not confirmed.",
       costDetail: " Hardware {hardwarePercent}%; pressure {pressurePercent}%.",
       passedDetail: "Apple accepted a front-and-rear configuration within its resource budgets.{costDetail} Road monitoring is still planned and was not activated.",
+      androidCapableDetail: "Android reports that a front and rear camera can operate together. Road monitoring is inactive.",
       hardwareCapableOne: "{count} rear camera type reported. A parked load result is not available yet; road monitoring is not active.",
       hardwareCapableMany: "{count} rear camera types reported. A parked load result is not available yet; road monitoring is not active."
     },

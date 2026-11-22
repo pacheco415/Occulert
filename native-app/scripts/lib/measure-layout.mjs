@@ -13,7 +13,7 @@ const edges = {
  * This tests flex allocation and clipping; native text/occlusion/pose acceptance
  * still requires the actual app on a supported device.
  */
-export function measureLayout(tree, { width, height, fontScale = 1, scale = 3 }) {
+export function measureLayout(tree, { width, height, fontScale = 1, scale = 3 }, direction = 'ltr') {
   const config = Yoga.Config.create();
   config.setPointScaleFactor(scale);
   const entries = [];
@@ -80,7 +80,7 @@ export function measureLayout(tree, { width, height, fontScale = 1, scale = 3 })
   const root = build(tree);
   root.node.setWidth(width);
   root.node.setHeight(height);
-  root.node.calculateLayout(width, height, Yoga.DIRECTION_LTR);
+  root.node.calculateLayout(width, height, direction === 'rtl' ? Yoga.DIRECTION_RTL : Yoga.DIRECTION_LTR);
   const frames = new Map();
   const absolute = entry => {
     const layout = entry.node.getComputedLayout();
