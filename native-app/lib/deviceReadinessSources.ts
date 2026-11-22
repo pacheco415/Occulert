@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import { getAndroidCameraCapability } from './androidCameraCapability';
 import { Camera } from 'react-native-vision-camera';
 import { AUDIO_ALERT_PREFERENCE_KEY, HAPTIC_ALERT_PREFERENCE_KEY } from './alertPreferenceStore';
 import { WATCH_ALERTS_PREFERENCE_KEY } from './watchPreferences';
@@ -12,9 +14,13 @@ import { getDeviceCondition, getFrontPhysicalCameras, probeMultiCamConfiguration
 export const deviceReadinessSources: ReadinessSources = {
   async camera() {
     const devices = Camera.getAvailableCameraDevices();
-    const [condition, frontPhysicalDevices] = await Promise.all([getDeviceCondition(), getFrontPhysicalCameras()]);
+    const android = Platform.OS === 'android';
+    const [condition, frontPhysicalDevices] = await Promise.all([
+      android ? getAndroidCameraCapability() : getDeviceCondition(),
+      android ? [] : getFrontPhysicalCameras(),
+    ]);
     const backDevices = devices.filter(device => device.position === 'back');
-    const multiCamProbe = Camera.getCameraPermissionStatus() === 'granted'
+    const multiCamProbe = !android && Camera.getCameraPermissionStatus() === 'granted'
       && condition.frontBackMultiCamSupported
       ? await probeMultiCamConfiguration()
       : {
@@ -25,6 +31,7 @@ export const deviceReadinessSources: ReadinessSources = {
           backDeviceType: null,
         } as const;
     return {
+      android,
       permission: Camera.getCameraPermissionStatus(),
       frontAvailable: devices.some(device => device.position === 'front'),
       backAvailable: backDevices.length > 0,

@@ -7,6 +7,7 @@ export const READINESS_MAX_AGE_MS = 30_000;
 export const READINESS_TIMEOUT_MS = 3_000;
 
 export interface CameraReadiness {
+  android: boolean;
   permission: string;
   frontAvailable: boolean;
   backAvailable: boolean;
@@ -110,8 +111,17 @@ export function describeDeviceReadiness(snapshot: DeviceReadinessSnapshot, now: 
     && camera.multiCamProbe.systemPressureCost != null
     ? formatString(strings.preDrive.devices.roadCamera.costDetail, { hardwarePercent: String(Math.round(camera.multiCamProbe.hardwareCost * 100)), pressurePercent: String(Math.round(camera.multiCamProbe.systemPressureCost * 100)) })
     : '';
+  const androidRoadCameraRow = (camera: CameraReadiness) => {
+    const copy = strings.preDrive.devices.roadCamera;
+    if (camera.frontBackMultiCamSupported === true) return row('roadCamera', copy.hardwareCapableStatus, copy.androidCapableDetail);
+    if (camera.frontBackMultiCamSupported === null) return row('roadCamera', copy.unknownStatus, copy.unconfirmed);
+    if (!camera.backAvailable) return row('roadCamera', strings.preDrive.devices.status.unavailable, copy.unavailable);
+    const unsupported = strings.preDrive.readiness.stability;
+    return row('roadCamera', unsupported.unsupportedStatus, unsupported.unsupportedDetail);
+  };
   const roadCameraRow = !camera
     ? row('roadCamera', strings.preDrive.devices.status.unconfirmed, strings.preDrive.devices.roadCamera.unconfirmed)
+    : camera.android ? androidRoadCameraRow(camera)
     : !camera.backAvailable
       ? row('roadCamera', strings.preDrive.devices.status.unavailable, strings.preDrive.devices.roadCamera.unavailable)
       : camera.frontBackMultiCamSupported === true
