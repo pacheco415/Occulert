@@ -1,3 +1,5 @@
+import { nativeDirection } from '../lib/strings.ts';
+
 export const colors = {
   background: '#07090e',
   backgroundRaised: '#10141c',
@@ -23,3 +25,6 @@ export const radii = {
   large: 26,
   pill: 999,
 } as const;
+
+export const navigationIconStyle = nativeDirection === 'rtl' ? { transform: [{ scaleX: -1 }] } : {};
+export const trailingTextAlign = nativeDirection === 'rtl' ? 'left' : 'right';

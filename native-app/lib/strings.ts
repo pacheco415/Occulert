@@ -1,5 +1,7 @@
-// Released native copy remains English. Additional catalogs are hidden drafts
-// until fluent review; safety, alert, consent and recovery wording stays exact.
+// Choose one reviewed catalog and layout direction together at app startup.
+import { deviceLanguageTag, nativeLocaleReviews, selectNativeLocale } from './strings/language.ts';
+import { loadDraft } from './strings/load-draft.cjs';
+export { catalogKeyPaths, compareCatalogKeys } from './strings/catalog-shape.ts';
 import { monitorStrings } from './strings/monitor.ts';
 import { historyStrings } from './strings/history.ts';
 import { settingsStrings, preDriveStrings } from './strings/settings.ts';
@@ -61,27 +63,15 @@ type Widen<T> = { readonly [K in keyof T]: T[K] extends string ? string : Widen<
 /** The shape every additional language must match, key for key. */
 export type StringCatalog = Widen<typeof en>;
 
-export const strings = en;
-
-/** Dotted paths of every string leaf, for key-parity checks between catalogs. */
-export function catalogKeyPaths(catalog: unknown, prefix = ''): string[] {
-  if (!catalog || typeof catalog !== 'object' || Array.isArray(catalog)) return [];
-  return Object.entries(catalog).flatMap(([key, value]) => {
-    const path = prefix ? `${prefix}.${key}` : key;
-    return typeof value === 'string' ? [path] : catalogKeyPaths(value as object, path);
-  });
+function selectDeviceCatalog() {
+  const locale = selectNativeLocale(deviceLanguageTag());
+  if (locale !== 'en') {
+    try { return { locale, catalog: loadDraft(locale, en) }; }
+    catch { /* A stale or incomplete reviewed catalog falls back as one unit. */ }
+  }
+  return { locale: 'en' as const, catalog: en };
 }
 
-/** Keys present in `reference` but missing (or not a string) in `candidate`, and extra keys. */
-export function compareCatalogKeys(reference: object, candidate: unknown): { missing: string[]; extra: string[] } {
-  const expected = new Set(catalogKeyPaths(reference)), actual = new Set(catalogKeyPaths(candidate));
-  const candidateLeaves = (value: unknown, prefix = ''): string[] => {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return prefix ? [prefix] : [];
-    if (Object.keys(value).length === 0) return prefix ? [prefix] : [];
-    return Object.entries(value).flatMap(([key, child]) => candidateLeaves(child, prefix ? `${prefix}.${key}` : key));
-  };
-  return {
-    missing: [...expected].filter(path => !actual.has(path)),
-    extra: candidateLeaves(candidate).filter(path => !expected.has(path)),
-  };
-}
+const selected = selectDeviceCatalog();
+export const nativeDirection = nativeLocaleReviews[selected.locale].direction;
+export const strings: StringCatalog = selected.catalog;

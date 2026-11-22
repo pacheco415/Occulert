@@ -126,3 +126,28 @@ test('Duo display, rotation and half-width fixtures keep Stop reachable and the 
   } finally { await f.unmount(); }
   assert.equal(f.events.cameraUnmounts, 1);
 });
+
+test('Arabic draft at large text preserves the stop control and scrolling guidance on each Duo window', async () => {
+  const { nativeCatalogs, nativeLocaleReviews } = await import('../lib/strings/locales.ts');
+  const ar = nativeCatalogs.ar;
+  const direction = nativeLocaleReviews.ar.direction;
+  const f = createMonitorLayoutFixture(ar);
+  await f.mount();
+  try {
+    const camera = f.cameraIdentity;
+    for (const fixture of duoWindows) {
+      await f.update({ ...fixture, window: { ...fixture.window, fontScale: 2 }, running: true, detail: ar.monitor.alerts.critical.detail });
+      const frames = measureLayout(f.tree, f.window, direction);
+      const stop = f.host('fixture-stop');
+      assert.equal(stop.props.accessibilityLabel, ar.monitor.controls.stopAccessibilityLabel);
+      assert.equal(stop.findByType('Text').children.join(''), ar.monitor.controls.stop);
+      assertVisible(frames.get('fixture-stop'), fixture.name + ' RTL stop');
+      assertVisible(frames.get('camera'), fixture.name + ' RTL camera');
+      assert.ok(frames.get('monitor-details').height > 0);
+      assert.equal(f.host('fixture-detail').children.join(''), ar.monitor.alerts.critical.detail);
+      assert.equal(f.cameraIdentity, camera);
+      await f.pressPrimary();
+    }
+    assert.equal(f.events.stops, duoWindows.length);
+  } finally { await f.unmount(); }
+});

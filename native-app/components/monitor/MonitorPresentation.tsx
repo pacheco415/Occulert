@@ -1,3 +1,4 @@
+import { navigationIconStyle } from '../../constants/theme';
 import { strings, formatString } from '../../lib/strings.ts';
 import React from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -140,7 +141,7 @@ export function MonitorPresentation({
                       <Text style={s.safeStopOptionTitle}>{option.label}</Text>
                       <Text style={s.safeStopOptionDetail}>{option.detail}</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="#4a7a8a" />
+                    <Ionicons name="chevron-forward" style={navigationIconStyle} size={20} color="#4a7a8a" />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -200,7 +201,7 @@ export function MonitorPresentation({
               style={s.backBtn}
               onPress={onHome}
             >
-              <Ionicons name="chevron-back" size={20} color="#c8e8f0" />
+              <Ionicons name="chevron-back" style={navigationIconStyle} size={20} color="#c8e8f0" />
               <Text style={s.backLbl}>{strings.monitor.controls.home}</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -288,7 +289,7 @@ export function MonitorPresentation({
                 onPress={onRecoveryHome}
                 style={s.recoveryHomeButton}
               >
-                <Ionicons name="arrow-back" size={16} color="#fee2e2" />
+                <Ionicons name="arrow-back" style={navigationIconStyle} size={16} color="#fee2e2" />
                 <Text style={s.recoveryHomeButtonText}>{strings.monitor.controls.recoveryHome}</Text>
               </TouchableOpacity>
             )}

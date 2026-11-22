@@ -173,9 +173,10 @@ numeric/date formatting and History export output.
 
 The seven other web-driver languages (`es`, `fr`, `pt`, `de`, `ar`, `zh`, `ja`)
 each have a complete **unreviewed native translation draft**. They are hidden:
-the released catalog imports none of these drafts, only English is available,
-and unknown or unreviewed locale requests resolve to English. There is no
-language selector, automatic system-locale selection or RTL activation.
+the app checks the device language at launch and uses English for unknown
+or unreviewed languages. A reviewed catalog must pass validation before its
+copy and layout direction can be used. Arabic selects right-to-left layout
+when reviewed. Settings identifies the spoken cues as English.
 
 `npm run test:strings` checks migrated files for hard-coded JSX, copy properties,
 alert configurations and confirmation text. It also checks every draft key,

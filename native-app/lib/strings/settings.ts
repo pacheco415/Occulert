@@ -203,6 +203,7 @@ export const settingsStrings = {
     audioHint: "Controls alert sounds from the iPhone's current audio output",
     soundTitle: "Alert sound",
     soundDetail: "Choose the tone profile used for phone alerts",
+    spokenLanguage: "Spoken cues are in English.",
     soundLimits: "This changes the tone profile only. Alert timing, severity, and centered critical delivery stay the same.",
     safetyLimits: "A continuous closed-eye reading reaches the prominent alert at about 0.6 seconds and, after the startup warmup, the stronger stage at 1.2 seconds. Standard alerts repeat twice and critical alerts repeat three times on each enabled output. Audio and haptic choices also control the foreground-loss warning; keep at least one enabled. Alerts cannot make drowsy driving safe—pull over and rest.",
     soundAccessibility: "{sound} alert sound"
