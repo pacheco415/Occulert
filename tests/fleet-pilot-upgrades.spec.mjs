@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const day = 86_400_000;
 const ago = days => new Date(Date.now() - days * day).toISOString();
@@ -53,6 +54,7 @@ test('TV separates in-progress and unfinished records across windows while retai
   });
   await page.goto('/fleet-display.html');
   await expect(page.locator('#displayContent')).toBeVisible();
+  await expect(page.locator('#fleetInsightCard')).toHaveCount(0);
   await expect(page.locator('#recentSessions')).toHaveText('4');
   await expect(page.locator('#activeSessions')).toHaveText('1');
   await expect(page.locator('#unfinishedSessions')).toHaveText('2');
@@ -159,6 +161,93 @@ test('manager print uses protected aggregates and clears on sign-out', async ({ 
 test('signed-out demo data cannot produce a protected manager report', async ({ page }) => {
   await page.goto('/fleet-dashboard.html');
   await page.getByRole('button', { name: 'Load Demo Data' }).click();
+  await expect(page.locator('#fleetInsightCard')).toBeHidden();
   await expect(page.locator('#pilotReportPrint')).toBeDisabled();
   await expect(page.locator('#qualityCompleted')).not.toHaveText('0');
+});
+
+async function summaryDashboard(page, respond) {
+  await ownerSession(page);
+  await page.route('**/api/fleet-summary*', route => route.fulfill({ json: protectedSummary([]) }));
+  await page.route('**/api/fleet-period-report*', route => {
+    const days = Number(new URL(route.request().url()).searchParams.get('days'));
+    return route.fulfill({ json: { ...protectedSummary([]), report: completePeriodReport(days) } });
+  });
+  const requests = [];
+  await page.route('**/api/fleet-insights*', route => {
+    const days = Number(new URL(route.request().url()).searchParams.get('days'));
+    expect(route.request().headers().authorization).toBe('Bearer manager-token');
+    requests.push(days);
+    return respond(route, days, requests.length);
+  });
+  await page.goto('/fleet-dashboard.html');
+  await expect(page.getByRole('button', { name: 'Write summary' })).toBeVisible();
+  expect(requests).toEqual([]);
+  return requests;
+}
+
+test('summary is owner-requested, renders model output as text, and clears when the period changes', async ({ page }) => {
+  const text = '<img src=x alt="example"> Two sessions lacked an end time.';
+  const requests = await summaryDashboard(page, (route, days) => route.fulfill({ json: {
+    ok: true, ai_generated: true, days, model: 'example-model', summary: text,
+    generated_at: ago(0), window_start: ago(days), window_end: ago(0),
+  } }));
+  await page.getByRole('button', { name: 'Write summary' }).click();
+  await expect(page.locator('#fleetInsightText')).toHaveText(text);
+  await expect(page.locator('#fleetInsightText img')).toHaveCount(0);
+  await expect(page.locator('#fleetInsightDetails')).toContainText('example-model · Written');
+  await expect(page.locator('#fleetInsightDetails')).toContainText('Report ending');
+  const accessibility = await new AxeBuilder({ page }).include('#fleetInsightCard')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(accessibility.violations.map(violation => violation.id)).toEqual([]);
+  await page.locator('#pilotRange').selectOption('7');
+  await expect(page.locator('#fleetInsightText')).toBeEmpty();
+  await page.getByRole('button', { name: 'Write summary' }).click();
+  await expect(page.locator('#fleetInsightText')).toHaveText(text);
+  expect(requests).toEqual([30, 7]);
+});
+
+test('unconfigured summaries hide the card and leave the report usable', async ({ page }) => {
+  const requests = await summaryDashboard(page, route => route.fulfill({ status: 501, json: { ok: false } }));
+  await page.getByRole('button', { name: 'Write summary' }).click();
+  await expect(page.locator('#fleetInsightCard')).toBeHidden();
+  await expect(page.locator('#pilotReportPrint')).toBeEnabled();
+  await page.locator('#pilotRange').selectOption('7');
+  await expect(page.locator('#qualityCompleted')).toHaveText('2');
+  await expect(page.locator('#fleetInsightCard')).toBeHidden();
+  expect(requests).toEqual([30]);
+});
+
+test('pending and failed summaries give a manager an explicit retry', async ({ page }) => {
+  const requests = await summaryDashboard(page, (route, days, count) => route.fulfill({
+    status: count === 1 ? 202 : 502, json: { ok: false },
+  }));
+  await page.getByRole('button', { name: 'Write summary' }).click();
+  await expect(page.locator('#fleetInsightText')).toContainText('being written');
+  await page.getByRole('button', { name: 'Check summary' }).click();
+  await expect(page.locator('#fleetInsightText')).toContainText('Summary unavailable');
+  await expect(page.getByRole('button', { name: 'Write summary' })).toBeEnabled();
+  expect(requests).toEqual([30, 30]);
+});
+
+test('sign-out while a summary is loading clears the card and discards the late result', async ({ page }) => {
+  const started = Promise.withResolvers(), release = Promise.withResolvers();
+  await summaryDashboard(page, async (route, days) => {
+    started.resolve();
+    await release.promise;
+    await route.fulfill({ json: { ok: true, ai_generated: true, days, model: 'fixture', summary: 'Previous fleet.',
+      generated_at: ago(0), window_start: ago(days), window_end: ago(0) } });
+  });
+  try {
+    await page.getByRole('button', { name: 'Write summary' }).click();
+    await started.promise;
+    await expect(page.locator('#fleetInsightText')).toHaveText('Loading summary…');
+    await expect(page.locator('#writeFleetInsight')).toBeDisabled();
+    await page.evaluate(() => {
+      localStorage.removeItem('occulert-auth');
+      window.dispatchEvent(new StorageEvent('storage', { key: 'occulert-auth', newValue: null }));
+    });
+    await expect(page.locator('#fleetInsightCard')).toBeHidden();
+  } finally { release.resolve(); }
+  await expect(page.locator('#fleetInsightText')).toBeEmpty();
 });
