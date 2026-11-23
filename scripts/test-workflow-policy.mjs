@@ -83,7 +83,10 @@ test('browser container is immutable and matches the locked Playwright version',
   for (const name of ['playwright', 'playwright-core']) {
     assert.equal(lock.packages[`node_modules/${name}`].version, image[1], `${name} must match the browser image`);
   }
-  assert.ok(workflow.includes(`assert.equal(require('@playwright/test/package.json').version, '${image[1]}')`));
+  const [matrixJob, repeatJob] = workflow.split('  offline-runtime-repeat:\n');
+  for (const job of [matrixJob, repeatJob]) {
+    assert.ok(job.includes(`assert.equal(require('@playwright/test/package.json').version, '${image[1]}')`));
+  }
   assert.ok(workflow.includes('for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK)'));
   assert.ok(workflow.includes('run: node scripts/run-browser-check.mjs onboarding'));
   assert.match(workflow, /run: node scripts\/run-browser-check\.mjs \$\{\{ matrix\.browser \}\}\s*\n/);
@@ -211,6 +214,5 @@ test('repeated offline browser experiment is isolated, bounded and failure prese
   assert.match(repeated, /name: verification-browser-webkit-offline-repeat-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}/);
   const guard = repeated.indexOf('test -z "$entries"');
   assert.ok(guard >= 0 && guard < repeated.indexOf('- uses: actions/checkout'));
-  assert.ok(repeated.includes("assert.equal(require('@playwright/test/package.json').version, '1.65.0')"));
   assert.doesNotMatch(repeated, /continue-on-error|secrets\.|DATABASE_URL|supabase db|needs:|--timeout=/);
 });
