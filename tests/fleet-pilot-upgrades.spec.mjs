@@ -287,16 +287,96 @@ test('unconfigured summaries hide the card and leave the report usable', async (
   expect(requests).toEqual([30]);
 });
 
-test('pending and failed summaries give a manager an explicit retry', async ({ page }) => {
+async function pauseSummaryClock(page) {
+  const now = Date.now();
+  await page.clock.install({ time: new Date(now) });
+  const pausedAt = new Date(now + 1000);
+  await page.clock.pauseAt(pausedAt);
+  return pausedAt.getTime();
+}
+
+test('one click checks a pending summary again and displays the finished answer', async ({ page }) => {
   const requests = await summaryDashboard(page, (route, days, count) => route.fulfill({
-    status: count === 1 ? 202 : 502, json: { ok: false },
+    status: count === 1 ? 202 : 200, headers: { 'Retry-After': '0' },
+    json: count === 1 ? { ok: false } : { ok: true, ai_generated: true, days, model: 'fixture',
+      summary: 'Two records need review.', generated_at: ago(0), window_end: ago(0) },
   }));
+  await pauseSummaryClock(page);
   await page.getByRole('button', { name: 'Write summary' }).click();
-  await expect(page.locator('#fleetInsightText')).toContainText('being written');
+  await expect(page.locator('#fleetInsightText')).toContainText('Checking again automatically');
+  await expect(page.locator('#writeFleetInsight')).toBeDisabled();
+  await page.clock.runFor(999);
+  expect(requests).toEqual([30]);
+  await page.clock.runFor(1);
+  await expect(page.locator('#fleetInsightText')).toHaveText('Two records need review.');
+  expect(requests).toEqual([30, 30]);
+});
+
+test('three pending replies restore manual checking and respect the default and maximum delay', async ({ page }) => {
+  const requests = await summaryDashboard(page, (route, days, count) => route.fulfill({
+    status: count <= 3 ? 202 : 502, headers: count === 2 ? { 'Retry-After': '99' } : {}, json: { ok: false },
+  }));
+  await pauseSummaryClock(page);
+  await page.getByRole('button', { name: 'Write summary' }).click();
+  for (const [index, delay] of [2000, 10000].entries()) {
+    await expect.poll(() => requests.length).toBe(index + 1);
+    await expect(page.locator('#fleetInsightText')).toContainText('Checking again automatically');
+    await page.clock.runFor(delay - 1);
+    expect(requests.length).toBe(index + 1);
+    await page.clock.runFor(1);
+  }
+  await expect(page.getByRole('button', { name: 'Check summary' })).toBeEnabled();
+  await page.clock.runFor(12000);
+  expect(requests).toEqual([30, 30, 30]);
   await page.getByRole('button', { name: 'Check summary' }).click();
   await expect(page.locator('#fleetInsightText')).toContainText('Summary unavailable');
   await expect(page.getByRole('button', { name: 'Write summary' })).toBeEnabled();
-  expect(requests).toEqual([30, 30]);
+  expect(requests).toEqual([30, 30, 30, 30]);
+});
+
+for (const change of ['period', 'sign-out']) test('a pending check is canceled on ' + change, async ({ page }) => {
+  const requests = await summaryDashboard(page, route => route.fulfill({ status: 202, json: { ok: false } }));
+  await pauseSummaryClock(page);
+  await page.getByRole('button', { name: 'Write summary' }).click();
+  await expect(page.locator('#fleetInsightText')).toContainText('Checking again automatically');
+  if (change === 'period') {
+    await page.locator('#pilotRange').selectOption('7');
+    await expect(page.getByRole('button', { name: 'Write summary' })).toBeEnabled();
+  } else {
+    await page.evaluate(() => {
+      localStorage.removeItem('occulert-auth');
+      window.dispatchEvent(new StorageEvent('storage', { key: 'occulert-auth', newValue: null }));
+    });
+    await expect(page.locator('#fleetInsightCard')).toBeHidden();
+  }
+  await page.clock.runFor(10001);
+  await expect(page.locator('#fleetInsightText')).toBeEmpty();
+  expect(requests).toEqual([30]);
+});
+
+test('a spent attempt shows the local retry time and locks only that period until it expires', async ({ page }) => {
+  let retryAt;
+  const requests = await summaryDashboard(page, route => route.fulfill({
+    status: 502, json: { ok: false, error: 'insights_unavailable', retry_after: retryAt },
+  }));
+  const now = await pauseSummaryClock(page);
+  retryAt = new Date(now + 20000).toISOString();
+  const localTime = await page.evaluate(value => new Date(value).toLocaleString(), retryAt);
+  const button = page.getByRole('button', { name: 'Write summary' });
+  const message = "Today's summary couldn't be written. You can try again after " + localTime + '.';
+  await button.click();
+  await expect(page.locator('#fleetInsightText')).toHaveText(message);
+  await expect(button).toBeDisabled();
+  await page.locator('#pilotRange').selectOption('7');
+  await expect(button).toBeEnabled();
+  await page.locator('#pilotRange').selectOption('30');
+  await expect(page.locator('#fleetInsightText')).toHaveText(message);
+  await page.clock.runFor(19999);
+  await expect(button).toBeDisabled();
+  await page.clock.runFor(1);
+  await expect(button).toBeEnabled();
+  await expect(page.locator('#fleetInsightText')).toBeEmpty();
+  expect(requests).toEqual([30]);
 });
 
 test('sign-out while a summary is loading clears the card and discards the late result', async ({ page }) => {
