@@ -728,7 +728,17 @@ assertIncludes(`${assetByStem('driver-app.js')}`, "async function handleVisibili
 assertIncludes(`${assetByStem('driver-app.js')}`, "Monitoring stopped because Occulert left the foreground", "web monitoring must visibly stop after foreground loss");
 
 
+const allowedPermissionFeatures = new Set([
+  'camera', 'microphone', 'geolocation', 'payment', 'usb',
+  'publickey-credentials-create', 'publickey-credentials-get',
+]);
 for (const rule of JSON.parse(read('vercel.json')).headers) for (const header of rule.headers) {
+ if (header.key.toLowerCase() === 'permissions-policy') {
+   for (const directive of header.value.split(',')) {
+     const feature = directive.split('=', 1)[0].trim();
+     if (!allowedPermissionFeatures.has(feature)) fail(`Unknown Permissions-Policy feature "${feature}" on ${rule.source}`);
+   }
+ }
  if (header.key === 'Content-Security-Policy') for (const message of auditCspPolicy(header.value)) fail(message);
  if (header.key.toLowerCase() === 'x-xss-protection') fail('Deprecated X-XSS-Protection header must remain absent');
 }

@@ -1,55 +1,35 @@
 {
-  "observedAt": "2026-11-14T21:16:57Z",
+  "observedAt": "2026-11-24T00:23:25.412Z",
   "complete": true,
   "pullRequests": [
     {
-      "number": 438,
-      "headRefName": "codex/status-refresh-2026-11",
+      "number": 484,
+      "headRefName": "codex/playwright-1-65-1",
       "isDraft": false
     },
     {
-      "number": 437,
-      "headRefName": "codex/profile-write-quota",
+      "number": 483,
+      "headRefName": "codex/retire-assets-2026-11-23",
       "isDraft": false
     },
     {
-      "number": 433,
-      "headRefName": "codex/cached-identity-review",
-      "isDraft": true
-    },
-    {
-      "number": 430,
-      "headRefName": "dependabot/npm_and_yarn/electric-sql/pglite-0.5.16",
+      "number": 481,
+      "headRefName": "codex/fleet-ai-summary-docs",
       "isDraft": false
     },
     {
-      "number": 429,
-      "headRefName": "dependabot/npm_and_yarn/parse5-8.1.1",
+      "number": 480,
+      "headRefName": "codex/fleet-time-of-day",
       "isDraft": false
     },
     {
-      "number": 427,
-      "headRefName": "codex/fleet-entitlements",
+      "number": 479,
+      "headRefName": "dependabot/npm_and_yarn/playwright/test-1.65.1",
       "isDraft": false
     },
     {
-      "number": 424,
-      "headRefName": "codex/browser-library-evidence",
-      "isDraft": true
-    },
-    {
-      "number": 414,
-      "headRefName": "codex/parked-check-pilot-step",
-      "isDraft": true
-    },
-    {
-      "number": 413,
-      "headRefName": "codex/perclos-turn-experiment",
-      "isDraft": false
-    },
-    {
-      "number": 409,
-      "headRefName": "codex/turn-fatigue-experiment",
+      "number": 471,
+      "headRefName": "codex/fleet-digest-preferences",
       "isDraft": false
     }
   ]

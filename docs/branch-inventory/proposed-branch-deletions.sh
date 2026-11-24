@@ -1,8 +1,8 @@
 #!/bin/sh
 # REVIEW ONLY: every command is commented; running this file does nothing.
 # Repository: pacheco415/Occulert
-# Observed: 2026-10-31T20:17:28.344Z
-# Captured main: dc44d3edcaed24baf72d517f28ba773010b4235e
+# Observed: 2026-11-24T00:23:35.079Z
+# Captured main: 4a734292c071b6d95b47a9e49cf066c9d5b448c4
 # No branches have been deleted by this generator or this proposal.
 # Before any manual deletion: fetch, refresh all open PRs, rerun inventory,
 # and inspect the branch. A lease alone does not protect a newly opened PR.
@@ -15,4 +15,5 @@
 # git push '--force-with-lease=refs/heads/codex/dynamic-asset-tests-20260929:2e100a27ac15f575abbfb314a8bb07cc0789ca3c' origin ':refs/heads/codex/dynamic-asset-tests-20260929'
 # git push '--force-with-lease=refs/heads/codex/release-process-guide:5dd7a39422745f563726a0852e2dc39a5c2d0aca' origin ':refs/heads/codex/release-process-guide'
 # git push '--force-with-lease=refs/heads/codex/retire-stale-assets-2026-09-29:d3063c1ce87af1aa022c5a5c823def3199f7bc64' origin ':refs/heads/codex/retire-stale-assets-2026-09-29'
+# git push '--force-with-lease=refs/heads/codex/tasks-blink-replay-prepared:9ebf994135062dd3d507049e250d3b2fc164ea49' origin ':refs/heads/codex/tasks-blink-replay-prepared'
 # git push '--force-with-lease=refs/heads/codex/unskippable-ci-2026-09-29:d73ddaae81efb283ee88688b58b06bafafe537bf' origin ':refs/heads/codex/unskippable-ci-2026-09-29'
