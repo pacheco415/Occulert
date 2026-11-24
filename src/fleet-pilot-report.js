@@ -117,6 +117,10 @@
   var insightDays = 0, insightRequest = null, insightsDisabled = false;
   var insightPollTimer = null, insightUnlockTimer = null;
   var insightRetryTimes = new Map();
+  var askCard = document.getElementById('fleetAskCard'), askForm = document.getElementById('fleetAskForm');
+  var askFields = document.getElementById('fleetAskFields'), askQuestion = document.getElementById('fleetAskQuestion');
+  var askResult = document.getElementById('fleetAskResult');
+  var askDays = 0, askRequest = null, askUnavailable = false;
   var chartPanel = document.getElementById('fleetTimeOfDay'), chartContent = document.getElementById('fleetTimeContent');
   var chartReview = null, chartRequest = null;
 
@@ -298,6 +302,83 @@
     }
   }
   insightButton?.addEventListener('click', function () { void writeInsight(1); });
+
+  function clearAnswer() {
+    askResult.hidden = true;
+    setText('fleetAskStatus', ''); setText('fleetAskAnswer', ''); setText('fleetAskDetails', '');
+  }
+  function showAskCard(summary) {
+    if (!askCard) return;
+    var days = summary.available && !askUnavailable ? summary.days : 0;
+    if (days !== askDays) {
+      askRequest?.abort(); askRequest = null;
+      askFields.disabled = false; askQuestion.value = ''; clearAnswer();
+    }
+    askDays = days; askCard.hidden = !days;
+  }
+  askForm?.querySelectorAll('button[type="button"]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      clearAnswer(); askQuestion.value = button.textContent; askQuestion.focus();
+    });
+  });
+  askQuestion?.addEventListener('input', clearAnswer);
+  askForm?.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    var input = snapshot(), summary = summarize(input, review), question = askQuestion.value.trim();
+    if (!summary.available || askUnavailable || askRequest || askDays !== summary.days) return;
+    clearAnswer();
+    if (question.length < 3 || question.length > 300) {
+      setText('fleetAskStatus', 'Enter a question between 3 and 300 characters.'); askQuestion.focus(); return;
+    }
+    var days = summary.days, version = generation, abort = new AbortController();
+    function matchesReport() {
+      var current = snapshot();
+      return askRequest === abort && version === generation && current.userId === input.userId &&
+        current.fleetId === input.fleetId && Number(current.days) === days && summarize(current, review).available;
+    }
+    askRequest = abort; askFields.disabled = true;
+    setText('fleetAskStatus', 'Getting your answer…');
+    var timer = setTimeout(function () {
+      if (askRequest !== abort) return;
+      if (matchesReport()) setText('fleetAskStatus', 'The question timed out. Try again.');
+      abort.abort(); askRequest = null; askFields.disabled = false;
+    }, 8000);
+    try {
+      var auth = await window.OcculertBackend.getSession();
+      if (!matchesReport()) return;
+      if (auth?.user?.id !== input.userId || !auth.access_token) throw new Error();
+      var response = await fetch('/api/fleet-ask', { method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        signal: abort.signal, headers: { Authorization: 'Bearer ' + auth.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: days, question: question }) });
+      if (!matchesReport()) return;
+      if (response.status === 501) {
+        askUnavailable = true; showAskCard(summary); document.getElementById('pilotReviewRefresh').focus(); return;
+      }
+      if (response.status === 429) {
+        var seconds = Number(response.headers.get('Retry-After'));
+        var wait = Number.isInteger(seconds) && seconds >= 1 && seconds <= 3600
+          ? 'Try again in ' + seconds + (seconds === 1 ? ' second.' : ' seconds.') : 'Try again once the limit resets.';
+        setText('fleetAskStatus', 'You reached the hourly question limit. ' + wait); return;
+      }
+      if (response.status === 504) { setText('fleetAskStatus', 'The question timed out. Try again.'); return; }
+      var data = await response.json();
+      if (!matchesReport()) return;
+      if (response.status === 400 && data?.error === 'question_has_personal_details') {
+        setText('fleetAskStatus', 'Your question includes personal details. Remove them and ask again.'); return;
+      }
+      if (!response.ok || data?.ok !== true || data.days !== days || data.ai_generated !== true ||
+          typeof data.answer !== 'string' || !data.answer.trim() || data.answer.length > 700 ||
+          typeof data.model !== 'string' || !data.model.trim() || time(data.generated_at) === null) throw new Error();
+      setText('fleetAskStatus', ''); setText('fleetAskAnswer', data.answer);
+      setText('fleetAskDetails', data.model + ' · Written ' + new Date(data.generated_at).toLocaleString());
+      askResult.hidden = false;
+    } catch (_) {
+      if (matchesReport()) setText('fleetAskStatus', 'Fleet questions are unavailable. Try again later.');
+    } finally {
+      clearTimeout(timer);
+      if (askRequest === abort) { askRequest = null; askFields.disabled = false; }
+    }
+  });
   function currentUserId() { return window.OcculertBackend?.currentUser()?.id || ''; }
   function snapshot() {
     var input = typeof window.getProtectedPilotSnapshot === 'function' ? window.getProtectedPilotSnapshot() : {};
@@ -331,6 +412,7 @@
     document.getElementById('pilotReviewRefresh').disabled = !!sourceAccess(snapshot(), Date.now()) || review.status === 'loading';
     renderReport(summary);
     showInsightCard(summary);
+    showAskCard(summary);
     void syncTimeOfDay(summary);
   }
   function reset() {
