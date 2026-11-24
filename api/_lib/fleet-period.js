@@ -54,13 +54,13 @@ function validReport(report, days) {
     report.reviewed + report.without_reviewed_followup === report.sessions;
 }
 
-async function ownerPeriodRequest(request, response) {
+async function ownerPeriodRequest(request, response, bodyDays) {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     json(response, 501, { ok: false, error: 'backend_not_configured' });
     return null;
   }
-  const days = requestedDays(request);
-  if (!days) {
+  const days = bodyDays === undefined ? requestedDays(request) : bodyDays;
+  if (days !== 7 && days !== 30) {
     json(response, 400, { ok: false, error: 'invalid_period' });
     return null;
   }
