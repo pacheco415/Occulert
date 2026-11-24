@@ -395,3 +395,13 @@ test('a thrown request still restores the button', async () => {
   assert.match(el('status').textContent, /could not be updated/);
   assert.equal(el('passwordBtn').disabled, false);
 });
+
+test('temporary Apple revocation failures retain the account and explain when to retry', async () => {
+  const { context, el, store } = await boot({ user: { id: 'u1' },
+    deleteAccount: async () => ({ ok: false, status: 503, body: { error: 'apple_revocation_unavailable' } }) });
+  store.set('occulert-sessions', 'keep');
+  el('deleteConfirmation').value = 'DELETE';
+  await context.deleteAccount({ preventDefault });
+  assert.match(el('deleteStatus').textContent, /disconnect Sign in with Apple.*again in a minute/);
+  assert.equal(store.get('occulert-sessions'), 'keep');
+});
