@@ -68,6 +68,7 @@
     "test:fleet-digest-preferences": "node --test scripts/test-fleet-digest-preferences.mjs",
     "test:fleet-digest-db": "node --test scripts/test-fleet-digest-db.mjs",
     "test:fleet-insights": "node --test scripts/test-fleet-insights.mjs scripts/test-fleet-insights-db.mjs",
+    "test:fleet-time-of-day": "node --test scripts/test-fleet-time-of-day.mjs scripts/test-fleet-time-of-day-db.mjs",
     "test:fleet-period-report": "node --test scripts/test-fleet-period-report.mjs scripts/test-fleet-period-report-db.mjs",
     "test:fleet-history-filters": "node --test scripts/test-fleet-history-filters.mjs scripts/test-fleet-history-page-filters.mjs",
     "test:driver-parked-check": "node --test scripts/test-driver-parked-check.mjs",
@@ -139,7 +140,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
     "@electric-sql/pglite": "0.5.16",
-    "@playwright/test": "1.65.0",
+    "@playwright/test": "1.65.1",
     "acorn": "8.19.0",
     "esbuild": "0.28.2",
     "eslint": "10.15.0",
