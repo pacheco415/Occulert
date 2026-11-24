@@ -45,6 +45,7 @@
     "test:fleet-digest-db",
     "test:fleet-period-report",
     "test:fleet-time-of-day",
+    "test:fleet-ask",
     "test:fleet-insights",
     "test:fleet-history-filters",
     "test:driver-parked-check",

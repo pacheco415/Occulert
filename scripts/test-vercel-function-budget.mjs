@@ -6,7 +6,7 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const routed = [
   'billing-checkout', 'billing-portal', 'billing-status', 'billing-webhook',
-  'fleet-digest-preferences', 'fleet-digest-unsubscribe', 'fleet-insights',
+  'fleet-ask', 'fleet-digest-preferences', 'fleet-digest-unsubscribe', 'fleet-insights',
   'fleet-period-report', 'fleet-session-history', 'fleet-time-of-day', 'parked-alert-checks',
 ];
 

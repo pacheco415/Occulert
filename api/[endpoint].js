@@ -6,6 +6,7 @@ const handlers = Object.freeze({
   "/api/billing-portal": require("./_lib/routes/billing-portal"),
   "/api/billing-status": require("./_lib/routes/billing-status"),
   "/api/billing-webhook": require("./_lib/routes/billing-webhook"),
+  "/api/fleet-ask": require("./_lib/routes/fleet-ask"),
   "/api/fleet-digest-preferences": require("./_lib/routes/fleet-digest-preferences"),
   "/api/fleet-digest-unsubscribe": require("./_lib/routes/fleet-digest-unsubscribe"),
   "/api/fleet-insights": require("./_lib/routes/fleet-insights"),

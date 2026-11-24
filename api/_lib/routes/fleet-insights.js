@@ -3,13 +3,15 @@ const { pgFetch } = require('../supabase');
 const { supabaseErrorStatus } = require('../supabase-errors');
 const { REQUEST_PROVIDER_BUDGET_MS, remainingProviderMs, withProviderBudget } = require('../provider-budget');
 
+const { requestText } = require('../anthropic-text');
+
 const SYSTEM_PROMPT = [
   'Write three to five short plain-text sentences for a fleet manager, using only the supplied period and aggregate counts.',
   'Use the supplied values for unscored sessions, sessions with no recorded end, and missing alert records. Mention all three, including zeros.',
   'Make no medical claims, judgments about fitness to drive, or comments about individual drivers. Do not infer reasons for missing data.',
 ].join(' ');
 const MAX_SUMMARY_LENGTH = 1200;
-const MAX_RESPONSE_BYTES = 32 * 1024;
+
 const FINISH_RESERVE_MS = 2500;
 const MIN_PROVIDER_MS = 4000;
 
@@ -39,56 +41,7 @@ async function requestSummary(report, model, apiKey) {
   for (const field of reportCountFields) input[field] = report[field];
 
   const timeoutMs = remainingInsightMs() - FINISH_RESERVE_MS;
-  if (timeoutMs <= 0) throw Object.assign(new Error('insights_timeout'), { status: 504 });
-  const controller = new AbortController();
-  let timer;
-  const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      const timeout = new Error('insights_timeout');
-      timeout.status = 504;
-      reject(timeout);
-      controller.abort();
-    }, timeoutMs);
-  });
-
-  async function readMessage() {
-    const result = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', redirect: 'error', signal: controller.signal,
-      headers: { 'content-type': 'application/json', 'anthropic-version': '2023-06-01', 'x-api-key': apiKey },
-      body: JSON.stringify({
-        model, max_tokens: 400, system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: JSON.stringify(input) }],
-      }),
-    });
-    if (!result.ok || controller.signal.aborted) {
-      const failure = new Error('insights_unavailable');
-      if (result.status === 504) failure.status = 504;
-      throw failure;
-    }
-    const chunks = [];
-    let bytes = 0;
-    for await (const chunk of result.body) {
-      bytes += chunk.byteLength;
-      if (bytes > MAX_RESPONSE_BYTES || controller.signal.aborted) throw new Error('insights_unavailable');
-      chunks.push(chunk);
-    }
-    const message = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    if (message.stop_reason !== 'end_turn' || !Array.isArray(message.content) ||
-        !message.content.every(block => block?.type === 'text' && typeof block.text === 'string')) {
-      throw new Error('insights_unavailable');
-    }
-    const summary = message.content.map(block => block.text).join('\n').trim();
-    if (!summary || summary.length > MAX_SUMMARY_LENGTH || summary.includes(apiKey)) {
-      throw new Error('insights_unavailable');
-    }
-    return summary;
-  }
-  try {
-    return await Promise.race([deadline, readMessage()]);
-  } finally {
-    clearTimeout(timer);
-    controller.abort();
-  }
+  return requestText({ model, apiKey, systemPrompt: SYSTEM_PROMPT, input, maxLength: MAX_SUMMARY_LENGTH, timeoutMs });
 }
 
 function storedSummary(response, row) {
