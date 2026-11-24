@@ -1,6 +1,6 @@
 # Fleet AI summaries
 
-A signed-in fleet owner selects **Write summary** on the 7- or 30-day dashboard report. The server verifies the bearer token and looks up the owner's fleet before reading the cache or reserving a new summary. Opening the dashboard does not request a summary. The demo and TV views do not offer this action.
+A signed-in fleet owner selects **Write summary** on the 7- or 30-day dashboard report. The server verifies the bearer token and looks up the owner's fleet and checks the fleet’s current paid Stripe subscription before reading the cache or reserving a new summary. Opening the dashboard does not request a summary. The demo and TV views do not offer this action.
 
 ## What goes to Anthropic
 
@@ -33,6 +33,8 @@ Use `GET /api/fleet-insights?days=7` or `?days=30`. Responses carry `Cache-Contr
 | 202 | `insights_pending` | Another request owns the reservation. A later read can retrieve the result. The response supplies `Retry-After: 2`. |
 | 400 / 405 | `invalid_period` / `method_not_allowed` | Use a single allowed period and GET. |
 | 401 / 403 | `unauthorized` / `fleet_not_found` | The token is missing or invalid, or the requester does not own the fleet. |
+| 403 | `paid_plan_required` | The fleet has no qualifying paid subscription. |
+| 501 | `paid_access_not_configured` | The Stripe read key or eligible live price IDs are missing. |
 | 501 | `insights_not_configured` / `backend_not_configured` | The flag, provider key or required backend configuration is missing. The dashboard hides the summary card after this response. |
 | 502 | `insights_unavailable` / `period_report_unavailable` | Generation, cached data or the owner lookup could not produce a usable result. |
 | 503 | `insights_unavailable`, `period_report_not_enabled` or `period_report_unavailable` | A required database function is missing or the backend is unavailable. |

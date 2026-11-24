@@ -191,7 +191,7 @@ Fleet summaries and questions are off by default. Configure these server-side Ve
 | `OCCULERT_FLEET_INSIGHTS_ENABLED` | Set to exactly `1` to enable summaries. |
 | `OCCULERT_FLEET_ASK_ENABLED` | Set to exactly `1` to enable questions. This flag is independent of the summary flag. |
 | `STRIPE_FLEET_ACCESS_READ_KEY` | Live restricted Stripe key for subscription, invoice and charge reads. Grant read access only. Use a separate key from test checkout. |
-| `OCCULERT_FLEET_ASK_PRICE_IDS` | Comma-separated live Stripe recurring price IDs for Occulert plans that include fleet questions. |
+| `OCCULERT_FLEET_ASK_PRICE_IDS` | Comma-separated live Stripe recurring price IDs for Occulert plans that include fleet summaries and questions. |
 | `ANTHROPIC_API_KEY` | Both routes use the same key. Keep it in server environment settings. |
 | `OCCULERT_INSIGHTS_MODEL` | Optional model ID shared by both routes. The default is `claude-haiku-5-5`. Confirm the selected model is available to the configured account. |
 
