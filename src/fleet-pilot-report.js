@@ -115,6 +115,73 @@
   if (!panel || !report) return;
   var insightCard = document.getElementById('fleetInsightCard'), insightButton = document.getElementById('writeFleetInsight');
   var insightDays = 0, insightRequest = null, insightsDisabled = false;
+  var chartPanel = document.getElementById('fleetTimeOfDay'), chartContent = document.getElementById('fleetTimeContent');
+  var chartReview = null, chartRequest = null;
+
+  function drawTimeBlocks(data) {
+    var bars = node('div'), table = node('table'), head = node('thead'), heading = node('tr'), body = node('tbody');
+    bars.className = 'fleet-time-bars';
+    bars.setAttribute('aria-hidden', 'true');
+    table.className = 'fleet-time-table';
+    table.appendChild(node('caption', 'Drowsy alerts per monitored hour in ' + data.timezone));
+    ['Time block', 'Drowsy alerts per monitored hour'].forEach(function (label) {
+      var th = node('th', label); th.scope = 'col'; heading.appendChild(th);
+    });
+    head.appendChild(heading); table.append(head, body);
+    var maxRate = Math.max.apply(null, data.blocks.map(function (block) { return block.drowsy_alerts_per_hour || 0; })) || 1;
+    data.blocks.forEach(function (block) {
+      var label = String(block.start_hour).padStart(2, '0') + ':00–' + String(block.start_hour + 4).padStart(2, '0') + ':00';
+      var value = block.rate_available ? String(block.drowsy_alerts_per_hour) : 'Not enough driving';
+      var barRow = node('div'), row = node('tr'), timeCell = node('th', label);
+      barRow.appendChild(node('span', label));
+      if (block.rate_available) {
+        var bar = node('meter'); bar.max = maxRate; bar.value = block.drowsy_alerts_per_hour; barRow.appendChild(bar);
+      }
+      barRow.appendChild(node('span', value)); bars.appendChild(barRow);
+      timeCell.scope = 'row'; row.append(timeCell, node('td', value)); body.appendChild(row);
+    });
+    chartContent.replaceChildren(node('p', 'Drowsy alerts per monitored hour · Last ' + data.days + ' days · ' + data.timezone), bars, table);
+    chartPanel.hidden = false;
+  }
+
+  async function syncTimeOfDay(summary) {
+    if (!chartPanel) return;
+    var target = summary.available ? review : null;
+    if (target === chartReview) return;
+    chartReview = target;
+    chartRequest?.abort(); chartRequest = null;
+    chartPanel.hidden = true; chartContent.replaceChildren();
+    if (!target) return;
+    var abort = new AbortController();
+    chartRequest = abort;
+    var timer = setTimeout(function () { abort.abort(); }, 8000);
+    function current() {
+      var input = snapshot();
+      return !abort.signal.aborted && chartReview === target && review === target &&
+        target.ownerId === input.currentUserId && target.fleetId === input.fleetId &&
+        Number(input.days) === target.days && !sourceAccess(input, Date.now());
+    }
+    try {
+      var auth = await window.OcculertBackend.getSession();
+      if (!current() || auth?.user?.id !== target.ownerId || !auth.access_token) return;
+      var response = await fetch('/api/fleet-time-of-day?days=' + target.days, { credentials: 'same-origin', cache: 'no-store',
+        signal: abort.signal, headers: { Authorization: 'Bearer ' + auth.access_token } });
+      if (!response.ok || !current()) return;
+      var data = await response.json(), result = data.report;
+      if (!current() || data.ok !== true || data.telemetry_trust !== 'unverified_client_report' ||
+          result?.version !== 1 || result.days !== target.days || typeof result.timezone !== 'string' || !result.timezone.trim() ||
+          !Array.isArray(result.blocks) || result.blocks.length !== 6 || !result.blocks.every(function (block, i) {
+            return block?.start_hour === i * 4 && (block.rate_available === false ? block.drowsy_alerts_per_hour === null :
+              block.rate_available === true && Number.isFinite(block.drowsy_alerts_per_hour) && block.drowsy_alerts_per_hour >= 0);
+          })) return;
+      drawTimeBlocks(result);
+    } catch (_) {
+      // The chart is optional. The complete-period report stays usable if the chart is unavailable.
+    } finally {
+      clearTimeout(timer);
+      if (chartRequest === abort) chartRequest = null;
+    }
+  }
 
   function clearInsight() {
     insightRequest?.abort(); insightRequest = null; insightDays = 0;
@@ -222,6 +289,7 @@
     document.getElementById('pilotReviewRefresh').disabled = !!sourceAccess(snapshot(), Date.now()) || review.status === 'loading';
     renderReport(summary);
     showInsightCard(summary);
+    void syncTimeOfDay(summary);
   }
   function reset() {
     clearInsight();
@@ -232,6 +300,9 @@
     if (!panel || !report) return;
     var input = snapshot(), nextOwner = input.userId && input.currentUserId === input.userId ? input.userId : '';
     if (nextOwner !== ownerId || input.fleetId !== fleetId) { reset(); ownerId = nextOwner; fleetId = input.fleetId || ''; }
+    if (review.status === 'loading' && review.days !== Number(input.days)) {
+      generation += 1; controller?.abort(); controller = null; review = { status: 'idle' };
+    }
     var summary = summarize(input, review);
     render(summary);
     if (!document.hidden && !options?.skipReviewLoad && !sourceAccess(input, Date.now()) && review.status !== 'loading' &&
@@ -243,7 +314,7 @@
     if (sourceAccess(input, Date.now()) || review.status === 'loading' || document.hidden) return;
     var days = Number(input.days) === 7 ? 7 : 30;
     var expectedOwner = input.userId, expectedFleet = input.fleetId, version = generation, abort = new AbortController(), timer;
-    controller = abort; review = { status: 'loading' }; update({ skipReviewLoad: true });
+    controller = abort; review = { status: 'loading', days: days }; update({ skipReviewLoad: true });
     try {
       var result = await Promise.race([
         (async function () {
