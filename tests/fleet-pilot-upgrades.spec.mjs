@@ -55,6 +55,7 @@ test('TV separates in-progress and unfinished records across windows while retai
   await page.goto('/fleet-display.html');
   await expect(page.locator('#displayContent')).toBeVisible();
   await expect(page.locator('#fleetInsightCard')).toHaveCount(0);
+  await expect(page.locator('#fleetTimeOfDay')).toHaveCount(0);
   await expect(page.locator('#recentSessions')).toHaveText('4');
   await expect(page.locator('#activeSessions')).toHaveText('1');
   await expect(page.locator('#unfinishedSessions')).toHaveText('2');
@@ -159,9 +160,13 @@ test('manager print uses protected aggregates and clears on sign-out', async ({ 
 });
 
 test('signed-out demo data cannot produce a protected manager report', async ({ page }) => {
+  const chartRequests = [];
+  page.on('request', request => { if (request.url().includes('/api/fleet-time-of-day')) chartRequests.push(request.url()); });
   await page.goto('/fleet-dashboard.html');
   await page.getByRole('button', { name: 'Load Demo Data' }).click();
   await expect(page.locator('#fleetInsightCard')).toBeHidden();
+  await expect(page.locator('#fleetTimeOfDay')).toBeHidden();
+  expect(chartRequests).toEqual([]);
   await expect(page.locator('#pilotReportPrint')).toBeDisabled();
   await expect(page.locator('#qualityCompleted')).not.toHaveText('0');
 });
@@ -185,6 +190,70 @@ async function summaryDashboard(page, respond) {
   expect(requests).toEqual([]);
   return requests;
 }
+
+function timeReport(days) {
+  return { ok: true, telemetry_trust: 'unverified_client_report', report: {
+    version: 1, days, window_start: ago(days), window_end: ago(0), timezone: 'Europe/London',
+    blocks: [0, 1, 2, 3, 4, null].map((rate, index) => ({
+      start_hour: index * 4, monitored_minutes: rate === null ? 90 : 120, drowsy_alerts: (rate || 0) * 2,
+      distracted_alerts: 7, rate_available: rate !== null, drowsy_alerts_per_hour: rate,
+    })),
+  } };
+}
+
+test('owner chart and accessible table show the selected period, timezone, zero and thin blocks', async ({ page }) => {
+  const daysRequested = [];
+  await page.route('**/api/fleet-time-of-day?*', route => {
+    expect(route.request().headers().authorization).toBe('Bearer manager-token');
+    const days = Number(new URL(route.request().url()).searchParams.get('days'));
+    daysRequested.push(days);
+    return route.fulfill({ json: timeReport(days) });
+  });
+  await summaryDashboard(page, () => { throw Error('Unexpected summary request'); });
+  const chart = page.getByRole('region', { name: 'When alerts happen' });
+  await expect(chart).toContainText('Last 30 days · Europe/London');
+  const labels = ['00:00–04:00', '04:00–08:00', '08:00–12:00', '12:00–16:00', '16:00–20:00', '20:00–24:00'];
+  const values = ['0', '1', '2', '3', '4', 'Not enough driving'];
+  const bars = chart.locator('.fleet-time-bars > div');
+  await expect(bars).toHaveCount(6);
+  await expect(bars.locator('span:first-child')).toHaveText(labels);
+  await expect(bars.locator('span:last-child')).toHaveText(values);
+  await expect(bars.locator('meter')).toHaveCount(5);
+  expect(await bars.locator('meter').evaluateAll(items => items.map(item => [item.value, item.max])))
+    .toEqual([[0, 4], [1, 4], [2, 4], [3, 4], [4, 4]]);
+  const table = chart.getByRole('table', { name: 'Drowsy alerts per monitored hour in Europe/London' });
+  await expect(table.getByRole('rowheader')).toHaveText(labels);
+  await expect(table.getByRole('cell')).toHaveText(values);
+  const accessibility = await new AxeBuilder({ page }).include('#fleetTimeOfDay')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(accessibility.violations.map(violation => violation.id)).toEqual([]);
+  await page.locator('#pilotRange').selectOption('7');
+  await expect(chart).toContainText('Last 7 days · Europe/London');
+  expect(daysRequested).toEqual([30, 7]);
+  await page.evaluate(() => {
+    localStorage.removeItem('occulert-auth');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'occulert-auth', newValue: null }));
+  });
+  await expect(chart).toHaveCount(0);
+  await expect(page.locator('#fleetTimeContent')).toBeEmpty();
+});
+
+test('unavailable chart responses leave the rest of each period report usable', async ({ page }) => {
+  const completed = [];
+  await page.route('**/api/fleet-time-of-day?*', route => route.fulfill({
+    status: route.request().url().endsWith('days=30') ? 501 : 503, json: { ok: false },
+  }));
+  page.on('response', response => {
+    if (response.url().includes('/api/fleet-time-of-day?')) completed.push(response.status());
+  });
+  await summaryDashboard(page, () => { throw Error('Unexpected summary request'); });
+  for (const [days, status] of [[30, 501], [7, 503]]) {
+    await page.locator('#pilotRange').selectOption(String(days));
+    await expect.poll(() => completed.includes(status)).toBe(true);
+    await expect(page.locator('#fleetTimeOfDay')).toBeHidden();
+    await expect(page.locator('#pilotReportPrint')).toBeEnabled();
+  }
+});
 
 test('summary is owner-requested, renders model output as text, and clears when the period changes', async ({ page }) => {
   const text = '<img src=x alt="example"> Two sessions lacked an end time.';

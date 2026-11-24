@@ -95,6 +95,15 @@ const test = base.extend({
         return json({ ok: true, fleet, report: periodReport(Number(url.searchParams.get('days'))),
           telemetry_trust: 'unverified_client_report', privacy });
       }
+      if (local && method === 'GET' && url.pathname === '/api/fleet-time-of-day') {
+        expect(request.headers().authorization).toBe('Bearer ' + session.access_token);
+        const days = Number(url.searchParams.get('days'));
+        const blocks = Array.from({ length: 6 }, (_, i) => ({ start_hour: i * 4, monitored_minutes: 120,
+          drowsy_alerts: i, distracted_alerts: 0, rate_available: true, drowsy_alerts_per_hour: i / 2 }));
+        return json({ ok: true, telemetry_trust: 'unverified_client_report', report: {
+          version: 1, days, window_start: ago(days * 24 * 60), window_end: ago(0), timezone: 'America/Los_Angeles', blocks,
+        } });
+      }
       if (auth && method === 'OPTIONS' && url.pathname.startsWith('/auth/v1/')) {
         return route.fulfill({ status: 204, headers: cors });
       }
@@ -176,6 +185,7 @@ test('fleet-dashboard.html loads protected data and opens driver sessions withou
   await expect(page.locator('#cloudStatus')).toContainText('Protected connection active');
   await expect(page.locator('#drivers')).toContainText(driver.name);
   await expect(page.locator('#pilotReportPrint')).toBeEnabled();
+  await expect(page.locator('#fleetTimeOfDay meter')).toHaveCount(6);
   expect(policyFixture.calls.some(call => call.path === '/api/parked-alert-checks' && call.method === 'GET')).toBe(true);
   await page.locator('[data-driver-detail]').click();
   await expect(page.locator('#driverDetailTitle')).toHaveText(`Recent sessions: ${driver.name}`);
