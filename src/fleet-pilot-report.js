@@ -271,7 +271,7 @@
         }, delay * 1000);
         return;
       }
-      if (response.status === 502) {
+      if (response.status === 502 || response.status === 504) {
         var failure = await response.json();
         if (!matchesReport()) return;
         var retryAt = time(failure?.retry_after);
