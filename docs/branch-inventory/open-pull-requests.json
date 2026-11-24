@@ -1,45 +1,63 @@
 {
   "schemaVersion": 1,
   "repository": "pacheco415/Occulert",
-  "capturedAt": "2026-10-31T20:14:38.909Z",
-  "source": "GitHub connector REST open pull requests, all pages",
+  "capturedAt": "2026-11-24T00:23:25.412Z",
+  "source": "GitHub REST open pull requests, complete pagination",
   "complete": true,
   "pullRequests": [
     {
-      "number": 356,
-      "title": "Bound offline installation transfers and preserve usable caches",
+      "number": 484,
+      "title": "Match the browser test container to Playwright 1.65.1",
       "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/356",
-      "headRefName": "codex/offline-startup-reliability",
+      "url": "https://github.com/pacheco415/Occulert/pull/484",
+      "headRefName": "codex/playwright-1-65-1",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "7933f973d91a3b6aff005a5cd851b5f098e2033e"
+      "headSha": "8243824a08f982dca9de06e18f3fbd0d90e7b9e1"
     },
     {
-      "number": 324,
-      "title": "Coordinate Playwright 1.64.1 runtime and repeated offline validation",
+      "number": 483,
+      "title": "Retire six superseded driver assets before the November 29 deadline",
       "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/324",
-      "headRefName": "codex/playwright-runtime-upgrade",
+      "url": "https://github.com/pacheco415/Occulert/pull/483",
+      "headRefName": "codex/retire-assets-2026-11-23",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "4c01c327bf00c0b1f7c99d5e36512b48909471d8"
+      "headSha": "0e2d419d1544da96d065501a528afb3afa64782a"
     },
     {
-      "number": 273,
-      "title": "Bump @playwright/test from 1.63.0 to 1.64.1",
+      "number": 481,
+      "title": "Document fleet summary setup, daily limits and privacy disclosure",
       "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/273",
-      "headRefName": "dependabot/npm_and_yarn/playwright/test-1.64.1",
+      "url": "https://github.com/pacheco415/Occulert/pull/481",
+      "headRefName": "codex/fleet-ai-summary-docs",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "a0ae7b17048465ea265e5c8e09650afa85579eed"
+      "headSha": "d43a7b15a96471aa74cea477965c95495cc36dc4"
     },
     {
-      "number": 206,
-      "title": "Refresh gated fleet offboarding and serialize session starts",
+      "number": 480,
+      "title": "Report fleet drowsiness alerts per monitored hour by Pacific time block",
       "state": "open",
-      "url": "https://github.com/pacheco415/Occulert/pull/206",
-      "headRefName": "codex/fleet-offboarding",
+      "url": "https://github.com/pacheco415/Occulert/pull/480",
+      "headRefName": "codex/fleet-time-of-day",
       "headRepository": "pacheco415/Occulert",
-      "headSha": "cabb047e3de9db23c1ce6ecd6182a49e989f5021"
+      "headSha": "c28e113d39e9cda74bde94d6b0ccf22125f53ceb"
+    },
+    {
+      "number": 479,
+      "title": "Bump @playwright/test from 1.65.0 to 1.65.1",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/479",
+      "headRefName": "dependabot/npm_and_yarn/playwright/test-1.65.1",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "812987733c5315e12f94150c5a361c85a1dd88de"
+    },
+    {
+      "number": 471,
+      "title": "Add owner-controlled weekly fleet digest preferences",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/471",
+      "headRefName": "codex/fleet-digest-preferences",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "601af54ea6a847aaeae87b4b1f01a7b3e2c5ee14"
     }
   ]
 }
