@@ -3,10 +3,18 @@ const { createHash } = require('node:crypto');
 const db = require('./supabase');
 const { isUuid } = require('./validation');
 
+function previewTestEntitlement() {
+  return process.env.VERCEL_ENV === 'preview' && process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT === '1';
+}
+
+if (previewTestEntitlement()) {
+  console.warn('Occulert preview test entitlement is enabled. Active Stripe test subscriptions can access paid fleet AI.');
+}
+
 function paidAccessConfig() {
   const key = process.env.STRIPE_FLEET_ACCESS_READ_KEY || '';
   const prices = (process.env.OCCULERT_FLEET_ASK_PRICE_IDS || '').split(',').map(id => id.trim());
-  if (!/^rk_live_[A-Za-z0-9_]+$/.test(key) || !prices.every(id => /^price_[A-Za-z0-9]+$/.test(id))) return null;
+  if (!/^rk_live_[A-Za-z0-9_]+$/.test(key) || !prices.every(id => /^price_[A-Za-z0-9]+$/.test(id))) return previewTestEntitlement() ? { previewOnly: true } : null;
   return { key, prices };
 }
 
@@ -59,6 +67,13 @@ async function verifyWithStripe({ fleet, actorId }, { key, prices }) {
 async function hasPaidFleetAccess(owner, config) {
   const { fleet, actorId } = owner;
   if (!isUuid(fleet.id) || !isUuid(actorId)) throw new Error('invalid_fleet_owner');
+  if (previewTestEntitlement()) {
+    const [row] = await db.pgFetch('fleet_billing_test', { params: {
+      fleet_id: 'eq.' + fleet.id, status: 'eq.active', select: 'fleet_id,status,stripe_subscription_id', limit: '1',
+    } });
+    if (row?.fleet_id === fleet.id && row.status === 'active' && /^sub_[A-Za-z0-9]+$/.test(row.stripe_subscription_id)) return true;
+  }
+  if (config.previewOnly) return false;
   const tag = createHash('sha256').update(JSON.stringify([config.key, config.prices])).digest('hex');
   const params = { fleet_id: 'eq.' + fleet.id, owner_id: 'eq.' + actorId, policy_tag: 'eq.' + tag,
     select: 'paid,valid_until', limit: '1' };
