@@ -102,3 +102,35 @@ site-audit tests continue to exercise the real English catalog.
 
 Automated checks establish source and runtime contracts. They do not establish
 fluent review, physical-device acceptance or store-release readiness.
+
+## Translation review packet
+
+Start with Spanish. From `native-app` on Node 24, install the locked development
+dependencies and export to a new directory whose parent exists.
+
+```sh
+npm ci --include=dev
+node scripts/export-review-packet.mjs es ../spanish-review
+```
+
+Give the reviewer `review.csv` and `review.html`. The HTML page prints in
+landscape with a space for handwritten corrections. The CSV contains the
+locale, key, screen, English text and current draft. The priority column flags
+alert, consent, recovery and pre-drive wording. Review every row, including
+entries whose English and draft match.
+
+Open the UTF-8 CSV with all columns set to text. Edit only **correction**. Enter
+the entire replacement, including named placeholders, intentional spaces and
+line breaks. Leave the cell empty to keep the draft. Save the complete CSV,
+preserving its columns. Import the corrections in the same checkout.
+
+```sh
+node scripts/import-review-corrections.mjs es ../spanish-review/review.csv
+npm run test:strings
+```
+
+The importer checks all rows against the current locale, English and draft
+text and validates every placeholder before editing draft sources. If the
+source has changed, export to a new directory and reconcile the affected
+rows. Review the Git diff. The original reviewer and device checks above
+still apply before enabling the language.
