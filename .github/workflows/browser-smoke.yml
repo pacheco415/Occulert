@@ -23,7 +23,7 @@ jobs:
         browser: [chromium, webkit]
     # Match package-lock.json; preinstalled browsers avoid slow apt mirrors.
     container:
-      image: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d
+      image: mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
     steps:
       - name: Align fresh workspace ownership with the container user
         run: |
@@ -49,7 +49,7 @@ jobs:
           const assert = require('node:assert/strict');
           const { accessSync, constants } = require('node:fs');
           const { chromium, webkit } = require('@playwright/test');
-          assert.equal(require('@playwright/test/package.json').version, '1.65.0');
+          assert.equal(require('@playwright/test/package.json').version, '1.65.1');
           for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK);
           NODE
       - name: Check native form controls on Linux WebKit
@@ -113,7 +113,7 @@ jobs:
     timeout-minutes: 20
     # Match package-lock.json; preinstalled browsers avoid slow apt mirrors.
     container:
-      image: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d
+      image: mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
     steps:
       - name: Align fresh workspace ownership with the container user
         run: |
@@ -139,7 +139,7 @@ jobs:
           const assert = require('node:assert/strict');
           const { accessSync, constants } = require('node:fs');
           const { chromium, webkit } = require('@playwright/test');
-          assert.equal(require('@playwright/test/package.json').version, '1.65.0');
+          assert.equal(require('@playwright/test/package.json').version, '1.65.1');
           for (const browser of [chromium, webkit]) accessSync(browser.executablePath(), constants.X_OK);
           NODE
       - name: Repeat synthetic offline startup without retries
