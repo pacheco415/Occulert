@@ -56,6 +56,7 @@ test('TV separates in-progress and unfinished records across windows while retai
   await expect(page.locator('#displayContent')).toBeVisible();
   await expect(page.locator('#fleetInsightCard')).toHaveCount(0);
   await expect(page.locator('#fleetTimeOfDay')).toHaveCount(0);
+  await expect(page.locator('#fleetAskCard')).toHaveCount(0);
   await expect(page.locator('#recentSessions')).toHaveText('4');
   await expect(page.locator('#activeSessions')).toHaveText('1');
   await expect(page.locator('#unfinishedSessions')).toHaveText('2');
@@ -166,6 +167,7 @@ test('signed-out demo data cannot produce a protected manager report', async ({ 
   await page.getByRole('button', { name: 'Load Demo Data' }).click();
   await expect(page.locator('#fleetInsightCard')).toBeHidden();
   await expect(page.locator('#fleetTimeOfDay')).toBeHidden();
+  await expect(page.locator('#fleetAskCard')).toBeHidden();
   expect(chartRequests).toEqual([]);
   await expect(page.locator('#pilotReportPrint')).toBeDisabled();
   await expect(page.locator('#qualityCompleted')).not.toHaveText('0');
@@ -399,4 +401,111 @@ test('sign-out while a summary is loading clears the card and discards the late 
     await expect(page.locator('#fleetInsightCard')).toBeHidden();
   } finally { release.resolve(); }
   await expect(page.locator('#fleetInsightText')).toBeEmpty();
+});
+
+async function askDashboard(page, respond) {
+  const requests = [];
+  await page.route('**/api/fleet-ask', route => {
+    const request = route.request();
+    expect(request.method()).toBe('POST');
+    expect(request.headers().authorization).toBe('Bearer manager-token');
+    expect(request.headers()['content-type']).toBe('application/json');
+    requests.push(request.postDataJSON());
+    return respond(route, requests.length);
+  });
+  await summaryDashboard(page, () => { throw Error('Unexpected summary request'); });
+  const card = page.getByRole('region', { name: 'Ask about your fleet' });
+  await expect(card).toBeVisible();
+  expect(requests).toEqual([]);
+  return { card, field: card.getByRole('textbox', { name: 'Your question' }),
+    ask: card.getByRole('button', { name: 'Ask', exact: true }), requests };
+}
+
+test('suggestions fill the question without sending, and answers use only text and the selected period', async ({ page }) => {
+  const answer = '<img src=x onerror=alert(1)> Two sessions need review.';
+  const generated = new Date().toISOString();
+  const { card, field, ask, requests } = await askDashboard(page, route => route.fulfill({ json: {
+    ok: true, ai_generated: true, answer, model: 'fixture-model', days: 7, generated_at: generated,
+    window_start: ago(7), window_end: ago(0),
+  } }));
+  await page.locator('#pilotRange').selectOption('7');
+  await expect(page.locator('#qualityCompleted')).toHaveText('2');
+  await expect(field).toHaveAttribute('maxlength', '300');
+  const storageBefore = await page.evaluate(() => JSON.stringify(localStorage));
+  for (const suggestion of ['When do alerts happen most?', 'Are alerts up or down this week?',
+    'How many sessions still need review?', 'How much of our data is incomplete?']) {
+    await card.getByRole('button', { name: suggestion, exact: true }).click();
+    await expect(field).toHaveValue(suggestion);
+  }
+  await field.fill('How many sessions need review?');
+  expect(requests).toEqual([]);
+  await field.press('Enter');
+  await expect(card.locator('#fleetAskAnswer')).toHaveText(answer);
+  await expect(card.locator('#fleetAskAnswer img')).toHaveCount(0);
+  await expect(card.getByText("AI-written from your fleet's totals. Check the numbers above before acting.")).toBeVisible();
+  const localTime = await page.evaluate(value => new Date(value).toLocaleString(), generated);
+  await expect(card.locator('#fleetAskDetails')).toHaveText('fixture-model · Written ' + localTime);
+  await expect(ask).toBeEnabled();
+  expect(requests).toEqual([{ days: 7, question: 'How many sessions need review?' }]);
+  expect(await page.evaluate(() => JSON.stringify(localStorage))).toBe(storageBefore);
+  const accessibility = await new AxeBuilder({ page }).include('#fleetAskCard')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(accessibility.violations.map(violation => violation.id)).toEqual([]);
+  await page.locator('#pilotRange').selectOption('30');
+  await expect(field).toHaveValue('');
+  await expect(card.locator('#fleetAskAnswer')).toBeEmpty();
+});
+
+test('the question box explains private detail, quota, timeout and unavailable responses and hides on 501', async ({ page }) => {
+  const replies = [
+    { status: 400, json: { error: 'question_has_personal_details' } },
+    { status: 429, headers: { 'Retry-After': '32' }, json: { error: 'account_write_rate_limited' } },
+    { status: 504, json: { error: 'ask_unavailable' } },
+    { status: 502, json: { error: 'untrusted upstream detail' } },
+    { status: 501, json: { error: 'ask_not_configured' } },
+  ];
+  const { card, field, ask, requests } = await askDashboard(page, (route, count) => route.fulfill(replies[count - 1]));
+  await field.fill('How many sessions need review?');
+  for (const message of ['Your question includes personal details. Remove them and ask again.',
+    'You reached the hourly question limit. Try again in 32 seconds.', 'The question timed out. Try again.',
+    'Fleet questions are unavailable. Try again later.']) {
+    await ask.click();
+    await expect(card.getByRole('status')).toContainText(message);
+    await expect(card.locator('#fleetAskAnswer')).toBeEmpty();
+  }
+  await ask.click();
+  await expect(card).toHaveCount(0);
+  await expect(page.locator('#pilotReviewRefresh')).toBeFocused();
+  await page.locator('#pilotRange').selectOption('7');
+  await expect(page.locator('#qualityCompleted')).toHaveText('2');
+  await expect(page.locator('#fleetAskCard')).toBeHidden();
+  expect(requests).toHaveLength(5);
+});
+
+for (const change of ['period', 'sign-out']) test('a late fleet answer is discarded after ' + change, async ({ page }) => {
+  const started = Promise.withResolvers(), done = Promise.withResolvers();
+  const { card, field, ask, requests } = await askDashboard(page, async route => {
+    started.resolve(); await done.promise;
+    await route.fulfill({ json: { ok: true, ai_generated: true, days: 30, model: 'fixture',
+      generated_at: ago(0), window_start: ago(30), window_end: ago(0), answer: 'Obsolete fleet answer.' } });
+  });
+  try {
+    await field.fill('How are we doing?');
+    await ask.click();
+    await started.promise;
+    await expect(ask).toBeDisabled();
+    if (change === 'period') {
+      await page.locator('#pilotRange').selectOption('7');
+      await expect(ask).toBeEnabled();
+      await expect(field).toHaveValue('');
+    } else {
+      await page.evaluate(() => {
+        localStorage.removeItem('occulert-auth');
+        window.dispatchEvent(new StorageEvent('storage', { key: 'occulert-auth', newValue: null }));
+      });
+      await expect(card).toHaveCount(0);
+    }
+  } finally { done.resolve(); }
+  await expect(page.locator('#fleetAskAnswer')).toBeEmpty();
+  expect(requests).toHaveLength(1);
 });
