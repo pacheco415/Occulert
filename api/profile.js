@@ -16,6 +16,14 @@ function clean(value, max) {
   return storableText(value, max);
 }
 
+function profileDefault(user, email) {
+  const sharedName = clean(user.user_metadata?.full_name, 160) || clean(user.user_metadata?.name, 160);
+  const relay = email.endsWith('@privaterelay.appleid.com');
+  const defaultName = sharedName || (relay ? '' : email.split('@')[0]) || 'Occulert Driver';
+  const apple = relay || user.identities?.some(identity => identity.provider === 'apple');
+  return { defaultName, needsName: !!apple && !sharedName };
+}
+
 module.exports = async function handler(request, response) {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return json(response, 501, { ok: false, error: "backend_not_configured" });
@@ -30,15 +38,18 @@ module.exports = async function handler(request, response) {
   try {
     user = await verifyAccessToken(bearerToken(request), { freshUser: true });
     if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
+    const email = clean(user.email, 240).toLowerCase();
+    const { defaultName, needsName } = profileDefault(user, email);
     if (request.method === "GET") {
       const rows = await pgFetch("drivers", { params: { select: "user_id,name,vehicle_id", user_id: "eq." + user.id, limit: "1" } });
-      return json(response, 200, { ok: true, driver: rows[0] || null });
+      const driver = rows[0] || null;
+      return json(response, 200, { ok: true, driver, suggest_name: needsName &&
+        !!driver && (driver.name === defaultName || driver.name === email.split('@')[0]) });
     }
     if (!validJsonBody(request, 2048)) return json(response, 415, { ok: false, error: "invalid_json_body" });
 
     const body = request.body || {};
-    const email = clean(user.email, 240).toLowerCase();
-    const name = clean(body.name, 160) || email.split("@")[0] || "Occulert Driver";
+    const name = clean(body.name, 160) || defaultName;
     const vehicleId = clean(body.vehicle, 120) || null;
     // Empty onboarding requests refresh identity without erasing display fields.
     const updates = { email: email || null };
@@ -54,11 +65,25 @@ module.exports = async function handler(request, response) {
     let rows;
 
     if (existing.length) {
+      const params = { id: "eq." + existing[0].id, user_id: "eq." + user.id };
+      // Upgrade profiles created before relay-aware defaults. The conditional
+      // write preserves an explicit name saved after the lookup.
+      const legacyRelay = !updates.name && email.endsWith('@privaterelay.appleid.com') &&
+        existing[0].email === email && existing[0].name === email.split('@')[0];
+      if (legacyRelay) {
+        params.name = 'eq.' + existing[0].name;
+        updates.name = defaultName;
+      }
       rows = await pgFetch("drivers", {
         method: "PATCH",
-        params: { id: "eq." + existing[0].id, user_id: "eq." + user.id },
+        params,
         body: updates,
       });
+      if (legacyRelay && !rows.length) {
+        delete updates.name;
+        delete params.name;
+        rows = await pgFetch("drivers", { method: "PATCH", params, body: updates });
+      }
     } else {
       try {
         rows = await pgFetch("drivers", {
