@@ -121,6 +121,9 @@
   var askFields = document.getElementById('fleetAskFields'), askQuestion = document.getElementById('fleetAskQuestion');
   var askResult = document.getElementById('fleetAskResult');
   var askDays = 0, askRequest = null, askUnavailable = false;
+  // Outlast the server's 12 s request budget. Abandoning sooner would discard an
+  // answer the server already reserved quota and called the model for.
+  var ASK_TIMEOUT_MS = 15000;
   var chartPanel = document.getElementById('fleetTimeOfDay'), chartContent = document.getElementById('fleetTimeContent');
   var chartReview = null, chartRequest = null;
 
@@ -342,7 +345,7 @@
       if (askRequest !== abort) return;
       if (matchesReport()) setText('fleetAskStatus', 'The question timed out. Try again.');
       abort.abort(); askRequest = null; askFields.disabled = false;
-    }, 8000);
+    }, ASK_TIMEOUT_MS);
     try {
       var auth = await window.OcculertBackend.getSession();
       if (!matchesReport()) return;

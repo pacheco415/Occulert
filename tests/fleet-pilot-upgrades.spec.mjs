@@ -484,6 +484,42 @@ test('the question box explains private detail, quota, timeout and unavailable r
   expect(requests).toHaveLength(6);
 });
 
+test('the question box waits out the server request budget before reporting a timeout', async ({ page }) => {
+  const releases = [];
+  const generated = new Date().toISOString();
+  const { card, field, ask, requests } = await askDashboard(page, async route => {
+    await new Promise(resolve => releases.push(resolve));
+    await route.fulfill({ json: { ok: true, ai_generated: true, answer: 'Two sessions need review.',
+      model: 'fixture-model', days: 30, generated_at: generated, window_start: ago(30), window_end: ago(0) } })
+      .catch(() => {});
+  });
+  await pauseSummaryClock(page);
+  const status = card.locator('#fleetAskStatus');
+  await field.fill('How many sessions need review?');
+  await ask.click();
+  await expect(status).toHaveText('Getting your answer…');
+  // The server may use its whole 12 s budget (sign-in, paid-plan check, reports, model).
+  await page.clock.runFor(12000);
+  await expect(status).toHaveText('Getting your answer…');
+  await expect.poll(() => releases.length).toBe(1);
+  releases[0]();
+  await expect(card.locator('#fleetAskAnswer')).toHaveText('Two sessions need review.');
+  await expect(ask).toBeEnabled();
+
+  await ask.click();
+  await expect(status).toHaveText('Getting your answer…');
+  await page.clock.runFor(14999);
+  await expect(status).toHaveText('Getting your answer…');
+  await expect(ask).toBeDisabled();
+  await page.clock.runFor(1);
+  await expect(status).toHaveText('The question timed out. Try again.');
+  await expect(ask).toBeEnabled();
+  await expect.poll(() => releases.length).toBe(2);
+  releases[1]();
+  await expect(card.locator('#fleetAskAnswer')).toBeEmpty();
+  expect(requests).toHaveLength(2);
+});
+
 for (const change of ['period', 'sign-out']) test('a late fleet answer is discarded after ' + change, async ({ page }) => {
   const started = Promise.withResolvers(), done = Promise.withResolvers();
   const { card, field, ask, requests } = await askDashboard(page, async route => {
