@@ -182,6 +182,22 @@ The new period route reports `period_report_not_enabled` when its SQL function
 is absent. Do not present a bounded recent-session snapshot as a complete
 period report in that case.
 
+## Fleet AI summaries
+
+The feature is off by default. Configure these server-side Vercel variables only in the intended environment.
+
+| Variable | Behavior |
+| --- | --- |
+| `OCCULERT_FLEET_INSIGHTS_ENABLED` | Only the exact value `1` enables the route. Unset it to turn the feature off. |
+| `ANTHROPIC_API_KEY` | Required for generation. Keep the key in server environment settings. |
+| `OCCULERT_INSIGHTS_MODEL` | Optional model ID. The route defaults to `claude-haiku-5-5`. Confirm the selected model is available to the configured account. |
+
+Before enabling, verify the period-report function and the daily cache migration
+`supabase/migrations/20261119034729_fleet_insight_summaries.sql`, approve the
+public privacy wording and pilot access terms, and set the provider spending limit.
+Redeploy after changing the environment. For fields, limits and responses,
+see [Fleet AI summaries](docs/FLEET_INSIGHTS.md).
+
 The signed-in Account Settings page uses `DELETE /api/account` for permanent
 account deletion. Apply `supabase/migrations/20260912170153_atomic_account_deletion.sql`
 before deploying the route. The route verifies the bearer token and deletes only
