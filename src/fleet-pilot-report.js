@@ -115,6 +115,8 @@
   if (!panel || !report) return;
   var insightCard = document.getElementById('fleetInsightCard'), insightButton = document.getElementById('writeFleetInsight');
   var insightDays = 0, insightRequest = null, insightsDisabled = false;
+  var insightPollTimer = null, insightUnlockTimer = null;
+  var insightRetryTimes = new Map();
   var chartPanel = document.getElementById('fleetTimeOfDay'), chartContent = document.getElementById('fleetTimeContent');
   var chartReview = null, chartRequest = null;
 
@@ -184,6 +186,8 @@
   }
 
   function clearInsight() {
+    clearTimeout(insightPollTimer); insightPollTimer = null;
+    clearTimeout(insightUnlockTimer); insightUnlockTimer = null;
     insightRequest?.abort(); insightRequest = null; insightDays = 0;
     if (!insightCard) return;
     insightCard.hidden = true;
@@ -196,10 +200,24 @@
     if (!summary.available || insightsDisabled) return;
     insightDays = summary.days;
     insightCard.hidden = false;
+    var retryAt = insightRetryTimes.get(summary.days);
+    if (retryAt > Date.now()) {
+      insightButton.disabled = true;
+      if (insightUnlockTimer === null) {
+        setText('fleetInsightText', "Today's summary couldn't be written. You can try again after " + new Date(retryAt).toLocaleString() + '.');
+        insightUnlockTimer = setTimeout(function () {
+          insightUnlockTimer = null;
+          update({ skipReviewLoad: true });
+        }, Math.min(86400000, retryAt - Date.now()));
+      }
+    } else {
+      if (insightRetryTimes.delete(summary.days)) setText('fleetInsightText', '');
+      insightButton.disabled = !!insightRequest;
+    }
   }
-  async function writeInsight() {
+  async function writeInsight(attempt) {
     var input = snapshot(), summary = summarize(input, review);
-    if (!summary.available || insightsDisabled || insightRequest) return;
+    if (!summary.available || insightsDisabled || insightRequest || insightRetryTimes.get(summary.days) > Date.now()) return;
     var days = summary.days, version = generation, abort = new AbortController();
     var matchesReport = function () {
       var current = snapshot();
@@ -228,9 +246,33 @@
         return;
       }
       if (response.status === 202) {
-        setText('fleetInsightText', 'Your summary is being written. Check again in a moment.');
         insightButton.textContent = 'Check summary';
+        if (attempt >= 3 || document.hidden) {
+          setText('fleetInsightText', 'Your summary is still being written. Select Check summary to check again.');
+          return;
+        }
+        var header = response.headers.get('Retry-After');
+        var seconds = header?.trim() ? Number(header) : NaN;
+        var delay = Number.isFinite(seconds) ? Math.min(10, Math.max(1, seconds)) : 2;
+        setText('fleetInsightText', 'Your summary is being written. Checking again automatically…');
+        insightPollTimer = setTimeout(function () {
+          insightPollTimer = null;
+          var canCheck = matchesReport() && !document.hidden;
+          if (insightRequest === abort) insightRequest = null;
+          if (canCheck) void writeInsight(attempt + 1);
+          else update({ skipReviewLoad: true });
+        }, delay * 1000);
         return;
+      }
+      if (response.status === 502) {
+        var failure = await response.json();
+        if (!matchesReport()) return;
+        var retryAt = time(failure?.retry_after);
+        if (retryAt > Date.now()) {
+          insightRetryTimes.set(days, retryAt);
+          insightButton.textContent = 'Write summary';
+          return;
+        }
       }
       if (!response.ok) throw new Error();
       var data = await response.json();
@@ -249,13 +291,13 @@
       }
     } finally {
       clearTimeout(timer);
-      if (insightRequest === abort) {
+      if (insightRequest === abort && insightPollTimer === null) {
         insightRequest = null; insightButton.disabled = false;
         update({ skipReviewLoad: true });
       }
     }
   }
-  insightButton?.addEventListener('click', writeInsight);
+  insightButton?.addEventListener('click', function () { void writeInsight(1); });
   function currentUserId() { return window.OcculertBackend?.currentUser()?.id || ''; }
   function snapshot() {
     var input = typeof window.getProtectedPilotSnapshot === 'function' ? window.getProtectedPilotSnapshot() : {};
@@ -293,6 +335,7 @@
   }
   function reset() {
     clearInsight();
+    insightRetryTimes?.clear();
     generation += 1; controller?.abort(); controller = null; ownerId = ''; fleetId = ''; review = { status: 'idle' };
     if (panel && report) render({ available: false, reason: 'Protected report unavailable. Sign in and refresh protected data before printing.' });
   }
@@ -375,7 +418,13 @@
   });
   window.addEventListener('storage', function (event) { if (event.key === 'occulert-auth' || event.key === null) { reset(); update({ skipReviewLoad: true }); } });
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) return;
+    if (document.hidden) {
+      if (insightPollTimer !== null) {
+        clearInsight();
+        update({ skipReviewLoad: true });
+      }
+      return;
+    }
     var summary = update();
     if (!summary?.available && review.status === 'ready' && Date.now() - review.loadedAt >= REVIEW_REFRESH_MS) void loadReviews();
   });
