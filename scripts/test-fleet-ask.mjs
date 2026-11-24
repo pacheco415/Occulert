@@ -32,7 +32,7 @@ function paidSubscription() {
         captured: true, amount_captured: 1000, amount_refunded: 0, refunded: false, disputed: false } } };
 }
 
-function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
+function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], releaseFails = false, owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
   provider = async () => providerReply('Three sessions need review.') } = {}) {
   // A question spends quota and a model call, so only a fresh Supabase Auth check
   // (which rejects signed-out sessions) may authorize it; a cached JWT check may not.
@@ -49,10 +49,15 @@ function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_
       if (params.id) { assert.equal(params.id, 'gt.' + roster.at(-1).id); return []; }
       return roster;
     }
+    if (path === 'rpc/release_fleet_question') {
+      assert.deepEqual(body, { p_actor_id: ownerId, p_fleet_id: fleetId, p_month_start: '2026-11-01' });
+      if (releaseFails) throw new Error('release unavailable');
+      return remaining + 1;
+    }
     if (path === 'rpc/reserve_fleet_question') {
       assert.deepEqual(body, { p_actor_id: ownerId, p_fleet_id: fleetId });
       return { user_id: ownerId, fleet_id: fleetId, allowed,
-        ...(allowed ? { monthly_remaining: remaining } : { error: quotaError, retry_after: quotaError === 'fleet_question_monthly_limit' ? 86400 : 32 }) };
+        ...(allowed ? { monthly_remaining: remaining, month_start: '2026-11-01' } : { error: quotaError, retry_after: quotaError === 'fleet_question_monthly_limit' ? 86400 : 32 }) };
     }
     const days = body.p_days;
     assert.deepEqual(body, { p_days: days, p_actor_id: ownerId, p_fleet_id: fleetId });
@@ -266,11 +271,11 @@ for (const days of [7, 30]) test('allowlisted request and answer for ' + days + 
 test('provider failures, key echoes and invalid answers are private and never retried', async t => {
   const app = setup(t);
   const cases = [[504, new Response(secret, { status: 504 })], [502, new Response(secret, { status: 500 })],
-    [502, providerReply(secret)], [502, providerReply('')], [502, providerReply('x'.repeat(701))]];
+    [502, new Response('', { status: 529 })], [502, providerReply(secret)], [502, providerReply('')], [502, providerReply('x'.repeat(701))]];
   for (const [status, response] of cases) {
     app.send.mock.mockImplementationOnce(async () => response);
     const result = await app.invoke();
-    assert.equal(result.status, status); assert.deepEqual(result.body, { ok: false, error: 'ask_unavailable' });
+    assert.equal(result.status, status); assert.deepEqual(result.body, { ok: false, error: 'ask_unavailable', attempt_released: true, monthly_remaining: 50 });
   }
   assert.equal(app.send.mock.callCount(), cases.length);
   const logs = JSON.stringify(app.logs.mock.calls.map(item => item.arguments));
@@ -289,7 +294,16 @@ test('the shared request deadline cancels a slow model call without logging its 
   t.mock.timers.tick(12000);
   const result = await pending;
   assert.equal(signal.aborted, true);
+  assert.equal(result.body.monthly_remaining, 50);
   assert.equal(result.status, 504);
   assert.equal(app.send.mock.callCount(), 1);
   assert.ok(!JSON.stringify(app.logs.mock.calls.map(call => call.arguments)).includes(question));
+});
+
+test('a failed credit keeps its original error and never promises a restored slot', async t => {
+  const app = setup(t, { releaseFails: true, provider: async () => new Response('', { status: 504 }) });
+  const result = await app.invoke();
+  assert.equal(result.status, 504);
+  assert.deepEqual(result.body, { ok: false, error: 'ask_unavailable' });
+  assert.equal(app.db.mock.calls.filter(call => call.arguments[0] === 'rpc/release_fleet_question').length, 1);
 });

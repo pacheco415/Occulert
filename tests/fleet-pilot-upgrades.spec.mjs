@@ -462,7 +462,7 @@ test('the question box explains private detail, quota, timeout and unavailable r
     { status: 403, json: { error: 'paid_plan_required' } },
     { status: 429, headers: { 'Retry-After': '32' }, json: { error: 'account_write_rate_limited' } },
     { status: 429, headers: { 'Retry-After': '86400' }, json: { error: 'fleet_question_monthly_limit' } },
-    { status: 504, json: { error: 'ask_unavailable' } },
+    { status: 504, json: { error: 'ask_unavailable', attempt_released: true } },
     { status: 502, json: { error: 'untrusted upstream detail' } },
     { status: 501, json: { error: 'ask_not_configured' } },
   ];
@@ -472,7 +472,7 @@ test('the question box explains private detail, quota, timeout and unavailable r
     'Fleet questions require an active paid Occulert fleet plan.',
     'You reached the hourly question limit. Try again in 32 seconds.',
     'Your fleet has used its 50 questions this month. The allowance resets on the first of the month at 00:00 UTC.',
-    'The question timed out. Try again.',
+    'The question timed out. This attempt did not count toward your monthly allowance. Try again.',
     'Fleet questions are unavailable. Try again later.']) {
     await ask.click();
     await expect(card.getByRole('status')).toContainText(message);

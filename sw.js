@@ -1,4 +1,4 @@
-const CACHE = 'occulert-v239';
+const CACHE = 'occulert-v240';
 // Keep integrity pins for both variants, but install only the supported one.
 const RUNTIME_ASSETS = [
   {
