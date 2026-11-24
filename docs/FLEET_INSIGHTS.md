@@ -70,3 +70,5 @@ Occulert does not log or persist question or answer text. The dashboard holds it
 | 501 | `ask_not_configured`, `backend_not_configured`, `paid_access_not_configured` | The feature, backend or live billing verification is unconfigured. The dashboard hides the question box for the rest of the visit. |
 | 502 | `ask_unavailable` | The request failed, the model returned an unusable answer, or the server could not confirm the quota reservation. |
 | 503 / 504 | `ask_unavailable` | The backend is unavailable or the request timed out. |
+
+The paid-plan decision is cached server-side per fleet, owner and billing configuration. Positive results expire within five minutes or at the end of verified invoice coverage, whichever comes first. Negative results expire after one minute. Provider failures are never cached. When live checkout and its verified webhook are introduced, delete the matching cache row on subscription, payment, refund and dispute changes.

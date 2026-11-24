@@ -137,7 +137,7 @@ async function pgFetch(table, options) {
 
   const { response, text } = await fetchTextWithDeadline(url, {
     method: method,
-    headers: Object.assign({}, serviceHeaders(), { Prefer: "return=representation" }),
+    headers: Object.assign({}, serviceHeaders(), { Prefer: opts.mergeDuplicates === true && method === "POST" ? "resolution=merge-duplicates,return=representation" : "return=representation" }),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   }, MAX_REST_RESPONSE_BYTES);
 

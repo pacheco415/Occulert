@@ -23,22 +23,30 @@ function paidSubscription() {
   const now = Math.floor(Date.now() / 1000);
   return { object: 'subscription', id: 'sub_Fixture', customer: 'cus_Fixture', livemode: true, status: 'active',
     metadata: { fleet_id: fleetId, owner_user_id: ownerId }, pause_collection: null,
-    current_period_start: now - 60, current_period_end: now + 60,
+    current_period_start: now - 60, current_period_end: now + 600,
     items: { has_more: false, data: [{ price: { ...price }, quantity: 1 }] },
     latest_invoice: { object: 'invoice', livemode: true, customer: 'cus_Fixture', subscription: 'sub_Fixture',
       status: 'paid', amount_paid: 1000, lines: { data: [{ type: 'subscription', subscription: 'sub_Fixture', price, amount: 1000,
-        period: { start: now - 60, end: now + 60 } }] },
+        period: { start: now - 60, end: now + 600 } }] },
       charge: { object: 'charge', livemode: true, customer: 'cus_Fixture', status: 'succeeded', paid: true,
         captured: true, amount_captured: 1000, amount_refunded: 0, refunded: false, disputed: false } } };
 }
 
-function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], releaseFails = false, owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
+function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], cacheEnabled = false, releaseFails = false, owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
   provider = async () => providerReply('Three sessions need review.') } = {}) {
   // A question spends quota and a model call, so only a fresh Supabase Auth check
   // (which rejects signed-out sessions) may authorize it; a cached JWT check may not.
   t.mock.method(transport, 'verifyAccessToken', async (token, options) =>
     token === 'owner' && options?.freshUser === true && options.cachedIdentity !== true ? { id: ownerId } : null);
-  const db = t.mock.method(transport, 'pgFetch', async (path, { params, body }) => {
+  let cache;
+  const db = t.mock.method(transport, 'pgFetch', async (path, { params, body, mergeDuplicates }) => {
+    if (path === 'fleet_paid_access_cache') {
+      if (!body) return cacheEnabled && cache && params.policy_tag === 'eq.' + cache.policy_tag ? [cache] : [];
+      assert.equal(mergeDuplicates, true);
+      assert.equal(body.fleet_id, fleetId);
+      assert.equal(body.owner_id, ownerId);
+      cache = body; return [body];
+    }
     if (path === 'fleets') {
       assert.equal(params.owner_user_id, 'eq.' + ownerId);
       return owned ? [{ id: fleetId, company_name: 'Private Transit' }] : [];
@@ -306,4 +314,55 @@ test('a failed credit keeps its original error and never promises a restored slo
   assert.equal(result.status, 504);
   assert.deepEqual(result.body, { ok: false, error: 'ask_unavailable' });
   assert.equal(app.db.mock.calls.filter(call => call.arguments[0] === 'rpc/release_fleet_question').length, 1);
+});
+
+test('cached paid and unpaid decisions expire and protect roster reads', async t => {
+  for (const paid of [true, false]) await t.test(paid ? 'paid' : 'unpaid', async child => {
+    child.mock.timers.enable({ apis: ['Date'] });
+    const app = setup(child, { cacheEnabled: true, results: paid ? 1 : 0 });
+    const status = paid ? 200 : 403;
+    assert.equal((await app.invoke()).status, status);
+    assert.equal((await app.invoke()).status, status);
+    const searches = () => app.stripe.mock.calls.filter(call => call.arguments[0].pathname.endsWith('/search')).length;
+    assert.equal(searches(), 1);
+    child.mock.timers.tick(paid ? 299999 : 59999);
+    assert.equal((await app.invoke()).status, status);
+    assert.equal(searches(), 1);
+    child.mock.timers.tick(1);
+    assert.equal((await app.invoke()).status, status);
+    assert.equal(searches(), 2);
+    if (!paid) assert.ok(!app.db.mock.calls.some(call => call.arguments[0] === 'drivers'));
+  });
+});
+
+test('positive cache ends with paid invoice coverage even inside the five-minute TTL', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 10, 24) });
+  const paid = paidSubscription();
+  paid.latest_invoice.lines.data[0].period.end = Math.floor(Date.now() / 1000) + 30;
+  const app = setup(t, { cacheEnabled: true, subscription: () => paid });
+  assert.equal((await app.invoke()).status, 200);
+  t.mock.timers.tick(29000);
+  assert.equal((await app.invoke()).status, 200);
+  t.mock.timers.tick(1000);
+  assert.equal((await app.invoke()).status, 403);
+  assert.equal(app.stripe.mock.calls.filter(call => call.arguments[0].pathname.endsWith('/search')).length, 2);
+});
+
+test('entitlement cache allows only server role access and cascades with its owners', async t => {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { initializeTestSchema } = await import('./lib/test-schema.mjs');
+  const db = new PGlite(); t.after(() => db.close());
+  await initializeTestSchema(db, { supabaseDefaults: true });
+  assert.equal((await db.query("select relrowsecurity from pg_class where oid='public.fleet_paid_access_cache'::regclass")).rows[0].relrowsecurity, true);
+  for (const role of ['anon', 'authenticated', 'service_role']) {
+    for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+      const r = await db.query("select has_table_privilege($1,'public.fleet_paid_access_cache',$2) as allowed", [role, privilege]);
+      assert.equal(r.rows[0].allowed, role === 'service_role');
+    }
+  }
+  await db.query('insert into auth.users(id) values ($1)', [ownerId]);
+  await db.query("insert into fleets(id,owner_user_id,company_name) values ($1,$2,'fixture')", [fleetId, ownerId]);
+  await db.query("insert into fleet_paid_access_cache values ($1,$2,'fixture',true,now())", [fleetId, ownerId]);
+  await db.query('delete from auth.users where id=$1', [ownerId]);
+  assert.deepEqual((await db.query('select * from fleet_paid_access_cache')).rows, []);
 });
