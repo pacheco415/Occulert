@@ -459,6 +459,7 @@ test('suggestions fill the question without sending, and answers use only text a
 test('the question box explains private detail, quota, timeout and unavailable responses and hides on 501', async ({ page }) => {
   const replies = [
     { status: 400, json: { error: 'question_has_personal_details' } },
+    { status: 403, json: { error: 'paid_plan_required' } },
     { status: 429, headers: { 'Retry-After': '32' }, json: { error: 'account_write_rate_limited' } },
     { status: 504, json: { error: 'ask_unavailable' } },
     { status: 502, json: { error: 'untrusted upstream detail' } },
@@ -467,6 +468,7 @@ test('the question box explains private detail, quota, timeout and unavailable r
   const { card, field, ask, requests } = await askDashboard(page, (route, count) => route.fulfill(replies[count - 1]));
   await field.fill('How many sessions need review?');
   for (const message of ['Your question includes personal details. Remove them and ask again.',
+    'Fleet questions require an active paid Occulert fleet plan.',
     'You reached the hourly question limit. Try again in 32 seconds.', 'The question timed out. Try again.',
     'Fleet questions are unavailable. Try again later.']) {
     await ask.click();
@@ -479,7 +481,7 @@ test('the question box explains private detail, quota, timeout and unavailable r
   await page.locator('#pilotRange').selectOption('7');
   await expect(page.locator('#qualityCompleted')).toHaveText('2');
   await expect(page.locator('#fleetAskCard')).toBeHidden();
-  expect(requests).toHaveLength(5);
+  expect(requests).toHaveLength(6);
 });
 
 for (const change of ['period', 'sign-out']) test('a late fleet answer is discarded after ' + change, async ({ page }) => {

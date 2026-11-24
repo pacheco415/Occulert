@@ -2,6 +2,7 @@ const { json, reportCountFields, ownerPeriodRequest, fetchPeriodReport } = requi
 const { fetchTimeOfDayReport } = require('../fleet-time-of-day');
 const { allowAccountWrite } = require('../account-write-quota');
 const { requestText } = require('../anthropic-text');
+const paidAccess = require('../fleet-paid-access');
 const { REQUEST_PROVIDER_BUDGET_MS, remainingProviderMs, withProviderBudget } = require('../provider-budget');
 const { pgFetch } = require('../supabase');
 const { supabaseErrorStatus } = require('../supabase-errors');
@@ -75,12 +76,17 @@ module.exports = withProviderBudget(async function handler(request, response) {
   try {
     const owner = await ownerPeriodRequest(request, response, days);
     if (!owner) return;
+    const billingConfig = paidAccess.paidAccessConfig();
+    if (!billingConfig) return json(response, 501, { ok: false, error: 'paid_access_not_configured' });
     const normalized = question.normalize('NFKC');
     if (/[^\s@]+@[^\s@]+/u.test(normalized) || /\p{Nd}(?:[\s().+-]*\p{Nd}){6}/u.test(normalized) ||
         /\b[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\b/i.test(normalized) ||
         /[-+]?\d{1,2}\.\d+\s*[,;]\s*[-+]?\d{1,3}\.\d+/u.test(normalized) ||
         containsLabel(normalized, owner.fleet.company_name) || await mentionsRoster(normalized, owner.fleet.id)) {
       return json(response, 400, { ok: false, error: 'question_has_personal_details' });
+    }
+    if (!await paidAccess.hasPaidFleetAccess(owner, billingConfig)) {
+      return json(response, 403, { ok: false, error: 'paid_plan_required' });
     }
     if (!await allowAccountWrite(pgFetch, response, owner.actorId, 'fleet_ask')) return;
     const [week, month, timeReport] = await Promise.all([

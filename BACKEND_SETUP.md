@@ -190,12 +190,17 @@ Fleet summaries and questions are off by default. Configure these server-side Ve
 | --- | --- |
 | `OCCULERT_FLEET_INSIGHTS_ENABLED` | Set to exactly `1` to enable summaries. |
 | `OCCULERT_FLEET_ASK_ENABLED` | Set to exactly `1` to enable questions. This flag is independent of the summary flag. |
+| `STRIPE_FLEET_ACCESS_READ_KEY` | Live restricted Stripe key for subscription, invoice and charge reads. Grant read access only. Use a separate key from test checkout. |
+| `OCCULERT_FLEET_ASK_PRICE_IDS` | Comma-separated live Stripe recurring price IDs for Occulert plans that include fleet questions. |
 | `ANTHROPIC_API_KEY` | Both routes use the same key. Keep it in server environment settings. |
 | `OCCULERT_INSIGHTS_MODEL` | Optional model ID shared by both routes. The default is `claude-haiku-5-5`. Confirm the selected model is available to the configured account. |
 
 Before enabling either feature, verify the period-report function, approve the public privacy wording and pilot access terms, and set the provider's [monthly spend limit](https://platform.claude.com/settings/spend-limits).
 For summaries, also verify the daily cache migration `supabase/migrations/20261119034729_fleet_insight_summaries.sql`.
 For questions, verify the quota migration `supabase/migrations/20261118003200_fleet_ask_quota.sql` and the time-of-day report migration `supabase/migrations/20261122163338_fleet_time_of_day.sql`.
+Link each eligible live subscription to the verified Occulert fleet by setting its Stripe subscription metadata `fleet_id` and `owner_user_id` from trusted billing administration. Customer-entered fields must never set these values. Verify the matching paid price and invoice in Stripe. The checkout and account-deletion integration currently handles test customers only. Before onboarding live subscriptions, connect the live customer cancellation and deletion process described on the privacy page.
+
+Before turning questions on, check a paying owner and a free-trial owner in an authorized rollout. The paying owner should receive an answer. The free-trial owner should receive HTTP 403 (`paid_plan_required`) without consuming quota or calling Anthropic. An unavailable Stripe read must produce an error before generation. [Stripe restricted keys](https://docs.stripe.com/keys)
 
 Redeploy the intended environment after changing a flag. To check questions without making a model call, send the following request without credentials. With the flag off or the provider key missing, expect HTTP 501 (`ask_not_configured`). With the flag, key and backend configured, expect HTTP 401 (`unauthorized`).
 

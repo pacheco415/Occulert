@@ -90,10 +90,10 @@ test('Supabase header/body deadlines shrink after earlier provider work and igno
 
 for(const phase of ['headers','body'])test(`Stripe deadline bounds ${phase} even when the provider ignores abort`,async()=>{
  const b=boot(),timers=new Map(),late=deferred(),calls=[],module={exports:{}};let next=0,bodyCalls=0;
- vm.runInNewContext(fs.readFileSync('api/_lib/stripe-test.js','utf8'),{module,require:name=>name==='./provider-budget'?b.lib:{},process:{env:{STRIPE_TEST_SECRET_KEY:'sk_test_fixture',STRIPE_TEST_WEBHOOK_SECRET:'whsec_fixture',STRIPE_TEST_PRICE_STARTER:'price_start',STRIPE_TEST_PRICE_GROWTH:'price_growth'}},Buffer,URL,URLSearchParams,AbortController,
+ vm.runInNewContext(fs.readFileSync('api/_lib/stripe-transport.js','utf8'),{module,require:name=>name==='./provider-budget'?b.lib:{},Buffer,URL,URLSearchParams,AbortController,
  setTimeout(fn,ms){const id=++next;timers.set(id,{fn,ms});return id},clearTimeout:id=>timers.delete(id),
  fetch:async(url,options)=>{calls.push({url,options});return phase==='headers'?late.promise:{ok:true,text:()=>{bodyCalls++;return late.promise}}}});
- const pending=b.lib.withProviderBudget(async()=>{b.set(7000);await assert.rejects(module.exports.stripeRequest('/v1/customers',{method:'POST'}),error=>error.status===504&&error.message==='stripe_timeout')})({},b.response());
+ const pending=b.lib.withProviderBudget(async()=>{b.set(7000);await assert.rejects(module.exports.requestStripeJson('/v1/customers','fixture',{method:'POST'}),error=>error.status===504&&error.message==='stripe_timeout')})({},b.response());
  while(!calls.length||(phase==='body'&&!bodyCalls))await new Promise(resolve=>setImmediate(resolve));assert.equal([...timers.values()][0].ms,5000);
  for(const timer of [...timers.values()])timer.fn();await pending;assert.equal(calls[0].options.signal.aborted,true);assert.equal(calls.length,1);
  late.resolve(phase==='headers'?{ok:true,text:async()=>{bodyCalls++;return '{"livemode":false}'}}:'{"livemode":false}');await new Promise(resolve=>setImmediate(resolve));assert.equal(timers.size,0);assert.equal(calls.length,1);
