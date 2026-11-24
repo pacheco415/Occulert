@@ -4,6 +4,7 @@ import { performance } from 'node:perf_hooks';
 import test from 'node:test';
 
 const require = createRequire(import.meta.url);
+const paidAccess = require('../api/_lib/fleet-paid-access');
 const transport = require('../api/_lib/supabase');
 const { remainingProviderMs } = require('../api/_lib/provider-budget');
 const ownerId = '11111111-1111-4111-8111-111111111111';
@@ -29,15 +30,23 @@ function fakeClock(t, now = Date.parse(end)) {
   return ms => t.mock.timers.tick(ms);
 }
 function setup(t, { user = { id: ownerId }, fleets = [{ id: fleetId, company_name: 'Private Fleet' }],
-  result = report, provider = async () => reply(), onDatabaseCall = () => {}, cachedEntry } = {}) {
+  result = report, provider = async () => reply(), onDatabaseCall = () => {}, cachedEntry, paid = true, configured = true } = {}) {
   for (const [key, value] of Object.entries({ SUPABASE_URL: 'https://fixture.invalid', SUPABASE_SERVICE_ROLE_KEY: 'fixture',
     OCCULERT_FLEET_INSIGHTS_ENABLED: '1', ANTHROPIC_API_KEY: apiKey, OCCULERT_INSIGHTS_MODEL: '' })) {
     const original = process.env[key];
     process.env[key] = value;
     t.after(() => { if (original === undefined) delete process.env[key]; else process.env[key] = original; });
   }
+  const billing = { key: 'fixture', prices: ['price_fixture'] };
+  t.mock.method(paidAccess, 'paidAccessConfig', () => configured ? billing : null);
+  t.mock.method(paidAccess, 'hasPaidFleetAccess', async (owner, config) => {
+    assert.equal(owner.actorId, ownerId);
+    assert.equal(owner.fleet.id, fleetId);
+    assert.equal(config, billing);
+    return paid;
+  });
   const auth = t.mock.method(transport, 'verifyAccessToken', async (token, options) => {
-    assert.deepEqual(options, { cachedIdentity: true });
+    assert.deepEqual(options, { freshUser: true });
     return token === 'owner-token' ? user : null;
   });
   const database = t.mock.method(transport, 'pgFetch', async (path, options) => {
@@ -101,6 +110,14 @@ test('method, period and owner checks run before any provider call', async t => 
   assert.equal(app.database.mock.callCount(), 0);
   assert.equal((await app.invoke()).status, 403);
   assert.equal(app.database.mock.callCount(), 1);
+  assert.equal(app.fetch.mock.callCount(), 0);
+});
+
+for (const configured of [false, true]) test('no summary claim or cached read without paid access: ' + configured, async t => {
+  const app = setup(t, { configured, paid: false, cachedEntry: { summary: 'previously paid' } });
+  assert.deepEqual(await app.invoke(), { status: configured ? 403 : 501,
+    body: { ok: false, error: configured ? 'paid_plan_required' : 'paid_access_not_configured' } });
+  assert.deepEqual(app.database.mock.calls.map(call => call.arguments[0]), ['fleets']);
   assert.equal(app.fetch.mock.callCount(), 0);
 });
 

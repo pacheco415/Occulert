@@ -3,6 +3,7 @@ const { pgFetch } = require('../supabase');
 const { supabaseErrorStatus } = require('../supabase-errors');
 const { REQUEST_PROVIDER_BUDGET_MS, remainingProviderMs, withProviderBudget } = require('../provider-budget');
 
+const paidAccess = require('../fleet-paid-access');
 const { requestText } = require('../anthropic-text');
 
 const SYSTEM_PROMPT = [
@@ -69,7 +70,7 @@ module.exports = withProviderBudget(async function handler(request, response) {
   }
   let owner;
   try {
-    owner = await ownerPeriodRequest(request, response);
+    owner = await ownerPeriodRequest(request, response, undefined, { freshIdentity: true });
     if (!owner) return;
   } catch (error) {
     if (error.status === 504 && remainingInsightMs() === 0) return insufficientClaimBudget(response);
@@ -78,6 +79,12 @@ module.exports = withProviderBudget(async function handler(request, response) {
   const identity = { p_actor_id: owner.actorId, p_fleet_id: owner.fleet.id, p_days: owner.days };
   const model = process.env.OCCULERT_INSIGHTS_MODEL?.trim() || 'claude-haiku-5-5';
   try {
+    if (remainingInsightMs() < FINISH_RESERVE_MS + MIN_PROVIDER_MS) return insufficientClaimBudget(response);
+    const billing = paidAccess.paidAccessConfig();
+    if (!billing) return json(response, 501, { ok: false, error: 'paid_access_not_configured' });
+    if (!await paidAccess.hasPaidFleetAccess(owner, billing)) {
+      return json(response, 403, { ok: false, error: 'paid_plan_required' });
+    }
     if (remainingInsightMs() < FINISH_RESERVE_MS + MIN_PROVIDER_MS) return insufficientClaimBudget(response);
     const claim = await pgFetch('rpc/claim_fleet_insight_summary', {
       method: 'POST', body: { ...identity, p_model: model },
