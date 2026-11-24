@@ -34,7 +34,10 @@ function paidSubscription() {
 
 function setup(t, { owned = true, allowed = true, subscription = paidSubscription, results = 1,
   provider = async () => providerReply('Three sessions need review.') } = {}) {
-  t.mock.method(transport, 'verifyAccessToken', async token => token === 'owner' ? { id: ownerId } : null);
+  // A question spends quota and a model call, so only a fresh Supabase Auth check
+  // (which rejects signed-out sessions) may authorize it; a cached JWT check may not.
+  t.mock.method(transport, 'verifyAccessToken', async (token, options) =>
+    token === 'owner' && options?.freshUser === true && options.cachedIdentity !== true ? { id: ownerId } : null);
   const db = t.mock.method(transport, 'pgFetch', async (path, { params, body }) => {
     if (path === 'fleets') {
       assert.equal(params.owner_user_id, 'eq.' + ownerId);

@@ -74,7 +74,7 @@ module.exports = withProviderBudget(async function handler(request, response) {
   const question = storableText(request.body.question, 301);
   if (question.length < 3 || question.length > 300) return json(response, 400, { ok: false, error: 'invalid_question' });
   try {
-    const owner = await ownerPeriodRequest(request, response, days);
+    const owner = await ownerPeriodRequest(request, response, days, { freshIdentity: true });
     if (!owner) return;
     const billingConfig = paidAccess.paidAccessConfig();
     if (!billingConfig) return json(response, 501, { ok: false, error: 'paid_access_not_configured' });
