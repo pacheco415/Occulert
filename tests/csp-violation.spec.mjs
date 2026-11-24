@@ -75,7 +75,7 @@ const test = base.extend({
         return json({ ok: true, supabase: { configured: true, url: AUTH_ORIGIN, anonKey: 'public-csp-fixture-key' } });
       }
       if (local && method === 'GET' && url.pathname === '/api/fleets') return json({ ok: true, fleet });
-      if (local && method === 'POST' && url.pathname === '/api/profile') return json({ ok: true, driver });
+      if (local && ['GET', 'POST'].includes(method) && url.pathname === '/api/profile') return json({ ok: true, driver });
       if (local && method === 'GET' && url.pathname === '/api/fleet-summary') {
         return json({ ok: true, fleet, drivers: [driver], sessions: [recordedSession], events: [],
           monthly_activity: null, telemetry_trust: 'unverified_client_report', privacy });
@@ -161,7 +161,7 @@ test('login.html signs in through the configured auth host without CSP violation
   expect(policyFixture.calls.some(call => call.path === '/api/profile' && call.method === 'POST')).toBe(true);
 });
 
-test('account.html loads the signed-in account and saves its local profile without CSP violations', async ({ page, policyFixture }) => {
+test('account.html loads the signed-in account and saves its account profile without CSP violations', async ({ page, policyFixture }) => {
   await seedAccount(page, policyFixture.session);
   await openPage(page, '/account.html');
   await expect(page.locator('#securityForms')).toBeVisible();

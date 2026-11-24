@@ -70,6 +70,7 @@ module.exports = async function handler(request, response) {
     const user = await verifyAccessToken(accessToken, { freshUser: true });
     if (!user || !user.id) return json(response, 401, { ok: false, error: "unauthorized" });
     if (!hasRecentAuthentication(accessToken, user)) return json(response, 401, { ok: false, error: "reauth_required" });
+    await require("./_lib/apple-account").revokeForDeletion(user);
     await deleteBillingCustomer(user.id);
     // Database foreign keys perform cleanup in the Auth deletion transaction.
     // Never pre-delete rows: any constraint/storage failure must roll back all data.

@@ -669,7 +669,7 @@ assertIncludes(assetByStem('login-page-1.js'), "focusSignInContinuation()", "int
 assertIncludes(assetByStem('login-page-1.js'), "focusSignInForm()", "account switching must return focus to the sign-in form");
 assertIncludes(assetByStem('login-page-1.js'), "setSignedInLayout(Boolean(user)&&authMode==='signin'", "signed-in continuation must depend on an active authenticated user");
 assertIncludes(assetByStem('login-page-1.js'), "href=\"/account.html\">Account</a>", "signed-in users must receive a direct Account action");
-assertIncludes(assetByStem('login-page-1.js'), "Use another account", "signed-in users must receive an explicit account-switch action");
+assertIncludes(assetByStem('login-page-1.js'), "Sign out", "signed-in users must receive an explicit account-switch action");
 assertNotIncludes("login.html", "Account Setup →", "passkey guidance must use the current Account label");
 assertIncludes(`${assetByStem('account-page-2.js')}`, "await backend.getFleet()", "account access must verify server-owned fleet access");
 assertIncludes(`${assetByStem('account-page-2.js')}`, "Verified role", "account summaries must label the server-authoritative role");

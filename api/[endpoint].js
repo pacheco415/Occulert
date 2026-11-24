@@ -2,6 +2,7 @@
 // deployment limit. Dispatch from the actual path, never a query parameter.
 const { json } = require("./_lib/responses");
 const handlers = Object.freeze({
+  "/api/apple-session": require("./_lib/routes/apple-session"),
   "/api/billing-checkout": require("./_lib/routes/billing-checkout"),
   "/api/billing-portal": require("./_lib/routes/billing-portal"),
   "/api/billing-status": require("./_lib/routes/billing-status"),

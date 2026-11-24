@@ -258,7 +258,7 @@ test("sign-in continuation and account switching preserve keyboard focus", async
   await expect(page.locator("#authCard")).toBeHidden();
   await expect(page.locator("#profileStateLabel")).toBeFocused();
 
-  await page.getByRole("button", { name: "Use another account" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.locator("#authCard")).toBeVisible();
   await expect(page.locator("#email")).toBeFocused();
 });
@@ -353,7 +353,7 @@ test("login shows server-verified fleet ownership instead of the saved driver ro
   await expect(page.locator("#authCard")).toBeHidden();
   await expect(page.locator("#profileActions")).toContainText("Account");
   await expect(page.locator("#profileActions")).toContainText("Fleet setup");
-  await expect(page.locator("#profileActions")).toContainText("Use another account");
+  await expect(page.locator("#profileActions")).toContainText("Sign out");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
