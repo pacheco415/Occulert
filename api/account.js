@@ -71,6 +71,9 @@ module.exports = async function handler(request, response) {
     if (!user || !user.id) return json(response, 401, { ok: false, error: "unauthorized" });
     if (!hasRecentAuthentication(accessToken, user)) return json(response, 401, { ok: false, error: "reauth_required" });
     await require("./_lib/apple-account").revokeForDeletion(user);
+    try {
+      await require('./_lib/live-subscription-cleanup').cancelLiveSubscriptions(user.id);
+    } catch { throw billingCleanupUnavailable(); }
     await deleteBillingCustomer(user.id);
     // Database foreign keys perform cleanup in the Auth deletion transaction.
     // Never pre-delete rows: any constraint/storage failure must roll back all data.
