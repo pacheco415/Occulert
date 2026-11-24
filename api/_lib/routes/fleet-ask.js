@@ -124,11 +124,14 @@ module.exports = withProviderBudget(async function handler(request, response) {
     if (/[^\s@]+@[^\s@]+/u.test(normalized) || mentionsPhone(normalized) ||
         /\b[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\b/i.test(normalized) ||
         /[-+]?\d{1,2}\.\d+\s*[,;]\s*[-+]?\d{1,3}\.\d+/u.test(normalized) ||
-        containsLabel(normalized, owner.fleet.company_name) || await mentionsRoster(normalized, owner.fleet.id)) {
+        containsLabel(normalized, owner.fleet.company_name)) {
       return json(response, 400, { ok: false, error: 'question_has_personal_details' });
     }
     if (!await paidAccess.hasPaidFleetAccess(owner, billingConfig)) {
       return json(response, 403, { ok: false, error: 'paid_plan_required' });
+    }
+    if (await mentionsRoster(normalized, owner.fleet.id)) {
+      return json(response, 400, { ok: false, error: 'question_has_personal_details' });
     }
     const reservation = await reserveQuestion(owner, response);
     if (!reservation) return;
