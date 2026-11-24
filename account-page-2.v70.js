@@ -46,7 +46,6 @@ function declineRecoveryPrompt(){
   show('That reset link was not used. Nothing changed on this browser.','good');
 }
 function clearAccountView(){
-  const hint = document.getElementById('appleNameHint'); if (hint) hint.hidden = true;
   profileSaveRevision++;document.getElementById('saveProfileBtn').disabled=false;
   dismissRecoveryPrompt();
   deletionReauthOwner=null;deletionReauthBusy=false;const reauthSection=document.getElementById("deleteReauthSection");if(reauthSection)reauthSection.hidden=true;
@@ -98,20 +97,13 @@ async function loadCloudFields(context) {
     const response = await accountBackend().fetchWithDeadline('/api/profile', { method: 'GET', redirect: 'error',
       headers: { Authorization: 'Bearer ' + context.auth.access_token } });
     if (!response.ok) return;
-    const { driver, suggest_name } = await response.json();
+    const { driver } = await response.json();
     if (!accountViewCurrent(context) || profileSaveRevision !== revision || !driver ||
         driver.user_id !== context.auth.user.id || name.value !== before[0] || vehicle.value !== before[1]) return;
     const profile = accountProfile(signedInUser());
     Object.assign(profile, { uid: driver.user_id, name: driver.name || '', vehicle: driver.vehicle_id || '' });
     name.value = profile.name; vehicle.value = profile.vehicle;
     setProfile(profile); render(profile);
-    const hint = document.getElementById('appleNameHint');
-    const seenKey = 'occulert-apple-name-prompt-' + driver.user_id;
-    if (hint && suggest_name === true && !localStorage.getItem(seenKey)) {
-      hint.hidden = false;
-      name.setAttribute('aria-describedby', 'appleNameHint');
-      localStorage.setItem(seenKey, '1');
-    }
   } catch {}
 }
 async function saveProfile(e) {
@@ -163,6 +155,8 @@ async function deleteAccount(e){
     const result=await window.OcculertBackend.deleteAccount();
     if(!accountRequireView(context))return;
     if(result.status===401&&result.body?.error==='reauth_required'){deletionReauthOwner=signedInUser()?.id||null;const section=document.getElementById('deleteReauthSection');if(section)section.hidden=false;const passkey=document.getElementById('deleteReauthPasskeyBtn');if(passkey)passkey.disabled=!passkeySupported();document.getElementById('deleteReauthPassword')?.focus?.();return showDelete('Sign in again before deleting your account. No data was deleted.','bad')}
+    if(result.status===503 && result.body?.error==='apple_revocation_unavailable')
+      return showDelete('Your account is still active. Occulert could not disconnect Sign in with Apple. Try deleting your account again in a minute.','bad');
     if(!result.ok)return showDelete('Deletion was not confirmed. Try signing in again to check your account, or contact support.','bad');
     let cleanup;try{cleanup=window.OcculertAuth?window.OcculertAuth.signOut():accountBackend().signOut()}catch(err){}
     const cleared=accountBackend().captureAuthContext();

@@ -39,7 +39,7 @@ Supabase migration directory.
 
 Use the Occulert Apple Services ID as the first client ID in Supabase's Apple provider. Register the project's HTTPS Auth callback with Apple and allow the production login page and its Apple state query in Supabase's redirect configuration. Keep previews separate.
 
-Set server-only Vercel production variables `APPLE_WEB_CLIENT_ID`, `APPLE_WEB_CLIENT_SECRET` (the same signed client secret used by Supabase), and `APPLE_GRANT_KEY` (a dedicated 32-byte random key in hexadecimal). Renew the Apple client secret in both services before its expiration. Preserve the encryption key for existing grants. The browser receives only a readiness flag. The server validates each Apple grant, encrypts its refresh token for revocation, and revokes it on account deletion. Sign in from the production domain, edit a disposable profile, sign out, then sign back in before verifying account deletion.
+Set server-only Vercel production variables `APPLE_WEB_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (the PEM contents of the Sign in with Apple .p8 signing key), and `APPLE_GRANT_KEY` (a dedicated 32-byte random key in hexadecimal). Configure the signing variables before deploying. Occulert signs a five-minute ES256 client secret for each Apple token request. Supabase's Apple provider still holds a separately generated client secret that needs renewal before expiry. Preserve the encryption key for existing grants. The browser receives only a readiness flag. The server validates each Apple grant, encrypts its refresh token for revocation, and revokes it on account deletion. Sign in from the production domain, edit a disposable profile, sign out, then sign back in before verifying account deletion.
 
 ### Passkey authentication (experimental)
 
@@ -373,3 +373,7 @@ informational: no route refuses a request because of it. Leave
 controls. A failed billing read is reported as null and shown as unavailable,
 and a database without the test-billing migration reports a trial. See
 [the plan and usage summary](docs/BILLING_INTEGRATION.md#plan-and-usage-summary-test-mode).
+
+### Live subscription cleanup on account deletion
+
+Configure the server-only `STRIPE_LIVE_SUBSCRIPTION_CANCEL_KEY` alongside `STRIPE_FLEET_ACCESS_READ_KEY`. Use a separate live restricted key with write access to Subscriptions only. Every manually provisioned Occulert subscription needs the authenticated owner's UUID in `metadata.owner_user_id`. Deletion searches for that owner across statuses and pages, verifies each current subscription, and cancels renewable subscriptions before deleting Auth. A missing key or an unconfirmed cancellation keeps the account available for retry. A paginated subscription-list reconciliation also finds manually provisioned subscriptions awaiting Stripe search indexing. If the request budget expires before reconciliation finishes, the account is kept. Before enabling live Checkout, record subscription IDs durably as part of provisioning and reconcile them during deletion.

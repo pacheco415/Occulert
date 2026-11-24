@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { generateKeyPairSync, verify } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { PGlite } from '@electric-sql/pglite';
 import { initializeTestSchema } from './lib/test-schema.mjs';
@@ -28,7 +29,9 @@ test('Apple grants are isolated from clients and cascade on Auth deletion', asyn
 });
 
 test('server exchanges PKCE, validates the Apple subject, seals the grant and revokes on deletion', async t => {
-  const env = { APPLE_GRANT_KEY: '56'.repeat(32), APPLE_WEB_CLIENT_ID: 'my.web', APPLE_WEB_CLIENT_SECRET: 'fixture-client',
+  const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  const env = { APPLE_GRANT_KEY: '56'.repeat(32), APPLE_WEB_CLIENT_ID: 'my.web', APPLE_TEAM_ID: 'TESTTEAMID', APPLE_KEY_ID: 'TESTKEY123',
+    APPLE_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
     SUPABASE_URL: 'https://fixture.supabase.co', SUPABASE_ANON_KEY: 'fixture-publishable', SUPABASE_SERVICE_ROLE_KEY: 'fixture-service' };
   for (const [key, value] of Object.entries(env)) {
     const previous = process.env[key]; process.env[key] = value;
@@ -37,6 +40,17 @@ test('server exchanges PKCE, validates the Apple subject, seals the grant and re
   let subject = 'somebody-else', sealed, revoked;
   t.mock.method(db, 'fetchTextWithDeadline', async (url, options) => {
     let result;
+    if (url.startsWith('https://appleid.apple.com/')) {
+      const [header, body, signature] = options.body.get('client_secret').split('.');
+      const decode = text => JSON.parse(Buffer.from(text, 'base64url'));
+      assert.deepEqual(decode(header), { alg: 'ES256', kid: 'TESTKEY123' });
+      const claims = decode(body);
+      assert.ok(Math.abs(Math.floor(Date.now() / 1000) - claims.iat) <= 2);
+      assert.deepEqual(claims, { iss: 'TESTTEAMID', iat: claims.iat, exp: claims.iat + 300,
+        aud: 'https://appleid.apple.com', sub: 'my.web' });
+      assert.equal(verify('sha256', Buffer.from(header + '.' + body), { key: publicKey, dsaEncoding: 'ieee-p1363' },
+        Buffer.from(signature, 'base64url')), true);
+    }
     if (url.startsWith(env.SUPABASE_URL)) {
       assert.deepEqual(JSON.parse(options.body), { auth_code: 'code', code_verifier: 'verifier' });
       result = { user, access_token: 'session', refresh_token: 'refresh', provider_refresh_token: 'apple-private',
@@ -64,4 +78,20 @@ test('server exchanges PKCE, validates the Apple subject, seals the grant and re
   assert.ok(sealed && !sealed.includes('apple-private'));
   await apple.revokeForDeletion(user);
   assert.equal(revoked, 'apple-private');
+
+  const claims = { sub: owner, role: 'authenticated', session_id: owner,
+    amr: [{ method: 'oauth', timestamp: Math.floor(Date.now() / 1000) }] };
+  const token = 'header.' + Buffer.from(JSON.stringify(claims)).toString('base64url') + '.signature';
+  t.mock.method(db, 'verifyAccessToken', async () => user);
+  const remove = t.mock.method(db, 'deleteAuthUser', async () => {});
+  db.fetchTextWithDeadline.mock.mockImplementationOnce(async () => ({ response: { ok: false, status: 400 }, text: '{}' }));
+  delete require.cache[require.resolve('../api/account')];
+  const handler = require('../api/account');
+  const response = { headers: {}, setHeader(k,v) { this.headers[k]=v; }, end(raw) { this.body=JSON.parse(raw); } };
+  await handler({ method: 'DELETE', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+    body: { confirm: 'DELETE' } }, response);
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.error, 'apple_revocation_unavailable');
+  assert.equal(response.headers['Retry-After'], '60');
+  assert.equal(remove.mock.callCount(), 0);
 });

@@ -19,7 +19,7 @@ Fleet and driver identities, company names, raw scores, individual sessions, med
 
 ## Cost and caching
 
-The service-role database functions reserve at most one provider attempt for each fleet, period and UTC date. A fleet requesting both periods can generate at most two provider calls that UTC day. A second click, page reload or concurrent request reuses the reservation. A saved response retains its original report window even if new sessions have since arrived. Failed and abandoned attempts consume the reservation for that day. Deleting the fleet removes its cached summaries.
+Each fleet can generate one saved summary per period and UTC day. Failed or abandoned generations can be retried after two minutes, up to three claims in total. Concurrent requests share the claim. An older worker cannot complete a later attempt. The dashboard shows the next available time in the manager’s time zone. A saved summary retains its original report window. Deleting the fleet removes its cached summaries.
 
 The 12-second request budget covers database and provider work together. The service makes one generation request. It rejects incomplete responses, non-text content, payloads over 32 KiB, and empty or oversized summaries. Accepted text is limited to 1,200 characters. Set an account spending limit separately to bound costs across all fleets. [Server configuration](../BACKEND_SETUP.md#fleet-ai-summaries)
 

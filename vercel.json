@@ -205,15 +205,6 @@
       ]
     },
     {
-      "source": "/(.*)\\.v77\\.(js|css)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
       "source": "/vendor/supabase-2.112.3.js",
       "headers": [
         {
@@ -817,7 +808,7 @@
       ]
     },
     {
-      "source": "/(.*)\\.v70\\.(js|css)",
+      "source": "/(.*)\\.v69\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -827,15 +818,6 @@
     },
     {
       "source": "/(.*)\\.v57\\.(js|css)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)\\.v71\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -925,7 +907,25 @@
       ]
     },
     {
-      "source": "/(.*)\\.v69\\.(js|css)",
+      "source": "/(.*)\\.v77\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v70\\.(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.v71\\.(js|css)",
       "headers": [
         {
           "key": "Cache-Control",
