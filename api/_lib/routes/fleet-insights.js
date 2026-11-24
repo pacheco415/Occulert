@@ -10,12 +10,36 @@ const SYSTEM_PROMPT = [
 ].join(' ');
 const MAX_SUMMARY_LENGTH = 1200;
 const MAX_RESPONSE_BYTES = 32 * 1024;
+const FINISH_RESERVE_MS = 2500;
+const MIN_PROVIDER_MS = 4000;
+
+function remainingInsightMs() {
+  try { return remainingProviderMs(REQUEST_PROVIDER_BUDGET_MS); }
+  catch (error) {
+    if (error.status === 504) return 0;
+    throw error;
+  }
+}
+
+function insufficientClaimBudget(response) {
+  response.setHeader('Retry-After', '5');
+  return json(response, 503, { ok: false, error: 'insights_unavailable' });
+}
+
+function spentAttempt(response, reportDay) {
+  const retryAt = new Date(reportDay);
+  retryAt.setUTCHours(24, 0, 0, 0);
+  const seconds = Math.max(0, Math.ceil((retryAt.getTime() - Date.now()) / 1000));
+  response.setHeader('Retry-After', String(seconds));
+  return json(response, 502, { ok: false, error: 'insights_unavailable', retry_after: retryAt.toISOString() });
+}
 
 async function requestSummary(report, model, apiKey) {
   const input = { days: report.days, window_start: report.window_start, window_end: report.window_end };
   for (const field of reportCountFields) input[field] = report[field];
 
-  const timeoutMs = remainingProviderMs(12000);
+  const timeoutMs = remainingInsightMs() - FINISH_RESERVE_MS;
+  if (timeoutMs <= 0) throw Object.assign(new Error('insights_timeout'), { status: 504 });
   const controller = new AbortController();
   let timer;
   const deadline = new Promise((_, reject) => {
@@ -78,7 +102,7 @@ function storedSummary(response, row) {
     response.setHeader('Retry-After', '2');
     return json(response, 202, { ok: false, error: 'insights_pending' });
   }
-  return json(response, 502, { ok: false, error: 'insights_unavailable' });
+  return spentAttempt(response, row.report_day);
 }
 
 module.exports = withProviderBudget(async function handler(request, response) {
@@ -95,11 +119,13 @@ module.exports = withProviderBudget(async function handler(request, response) {
     owner = await ownerPeriodRequest(request, response);
     if (!owner) return;
   } catch (error) {
+    if (error.status === 504 && remainingInsightMs() === 0) return insufficientClaimBudget(response);
     return periodReportError(response, error);
   }
   const identity = { p_actor_id: owner.actorId, p_fleet_id: owner.fleet.id, p_days: owner.days };
   const model = process.env.OCCULERT_INSIGHTS_MODEL?.trim() || 'claude-haiku-5-5';
   try {
+    if (remainingInsightMs() < FINISH_RESERVE_MS + MIN_PROVIDER_MS) return insufficientClaimBudget(response);
     const claim = await pgFetch('rpc/claim_fleet_insight_summary', {
       method: 'POST', body: { ...identity, p_model: model },
     });
@@ -118,8 +144,9 @@ module.exports = withProviderBudget(async function handler(request, response) {
     try {
       summary = await requestSummary(claim.report, model, apiKey);
     } catch (error) {
-      // If the deadline also prevents this write, the reservation still blocks a second charge.
+      // The reservation blocks a second charge even if recording the failure is unsuccessful.
       await finish(null).catch(() => {});
+      if (supabaseErrorStatus(error) === 502) return spentAttempt(response, claim.report_day);
       throw error;
     }
     return storedSummary(response, await finish(summary));
