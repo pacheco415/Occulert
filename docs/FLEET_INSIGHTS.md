@@ -37,3 +37,31 @@ Use `GET /api/fleet-insights?days=7` or `?days=30`. Responses carry `Cache-Contr
 | 502 | `insights_unavailable` / `period_report_unavailable` | Generation, cached data or the owner lookup could not produce a usable result. |
 | 503 | `insights_unavailable`, `period_report_not_enabled` or `period_report_unavailable` | A required database function is missing or the backend is unavailable. |
 | 504 | `insights_unavailable` / `period_report_unavailable` | The request timed out. A reserved generation still counts toward the daily limit. |
+
+## Questions
+
+When enabled, **Ask about your fleet** lets a signed-in owner ask about the 7- or 30-day report. Selecting a suggestion fills the field. Submitting the form sends `POST /api/fleet-ask` with a bearer token and a JSON body containing exactly `question` (3–300 characters after trimming) and `days` (the number `7` or `30`). Query parameters are rejected.
+
+Before reserving quota or contacting Anthropic, Occulert checks the question against the owner's fleet and driver roster. It rejects matches for driver names, vehicle labels and the company name, as well as text resembling an email address, phone number, UUID or coordinate pair. Ask about fleet totals and leave personal details out of the question.
+
+Anthropic receives a fixed instruction and one message containing the following fields.
+
+| Message field | Contents |
+| --- | --- |
+| `question`, `days` | The manager's screened question and selected reporting period. |
+| `week`, `month` | Both the 7-day and 30-day aggregates. Each includes `days` and the roster, session, score coverage, alert coverage and review counts listed above. Calculated ratios are `alerts_per_day`, `alerts_per_session` and `share_reviewed`. A zero denominator yields `null`. |
+| `timezone`, `blocks` | The selected period's reporting timezone and six four-hour blocks. Each block contains `start_hour`, `monitored_minutes`, `drowsy_alerts`, `distracted_alerts`, `rate_available` and `drowsy_alerts_per_hour`. The hourly rate is `null` below 120 monitored minutes. |
+
+Occulert does not log or persist question or answer text. The dashboard holds it in memory and clears it on a period change or sign-out. Responses use `Cache-Control: no-store` and `Vary: Authorization`. The database tracks a separate quota of **20 attempts per account per hour**. A timeout or provider failure after reservation uses one attempt. The server makes at most one model call per submission.
+
+| HTTP | Result | Meaning |
+| --- | --- | --- |
+| 200 | `ok: true` | Returns a plain-text answer of up to 700 characters, model, selected period, report window, generation timestamp and `ai_generated: true`. |
+| 400 | `invalid_query`, `invalid_body`, `invalid_period`, `invalid_question` | Check the request URL, JSON fields, period and question length. |
+| 400 | `question_has_personal_details` | Remove the detected details and ask again. This uses no quota. |
+| 401 / 403 | `unauthorized` / `fleet_not_found` | Sign in with a valid account that owns the fleet. |
+| 405 | `method_not_allowed` | Use POST. |
+| 429 | `account_write_rate_limited` | Wait the number of seconds in `Retry-After` before submitting again. |
+| 501 | `ask_not_configured` / `backend_not_configured` | The questions flag, provider key or backend settings are missing. The dashboard hides the question box for the rest of the visit. |
+| 502 | `ask_unavailable` / `write_quota_unavailable` | The request failed, the model returned an unusable answer, or the server could not confirm the quota reservation. |
+| 503 / 504 | `ask_unavailable` | The backend is unavailable or the request timed out. |
