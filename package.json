@@ -33,7 +33,7 @@
     "test:fleet-driver-detail": "node --test scripts/test-fleet-driver-detail.mjs",
     "test:pilot-launch": "node --test scripts/test-pilot-launch-checklist.mjs scripts/test-pilot-guide.mjs",
     "test:pilot-report": "node --test scripts/test-fleet-pilot-report.mjs",
-    "test:login": "node --test scripts/test-login-auth.mjs",
+    "test:login": "node --test scripts/test-login-auth.mjs scripts/test-apple-account.mjs",
     "test:supabase-loader": "node --test scripts/test-supabase-loader.mjs",
     "test:passkeys": "node --test scripts/test-passkey-auth.mjs",
     "test:account": "node --test scripts/test-account-credentials.mjs",

@@ -35,7 +35,7 @@ module.exports = function handler(request, response) {
   return json(response, 200, {
     ok: true,
     capabilities,
-    supabase: configured ? { configured: true, url, anonKey } : { configured: false },
+    supabase: configured ? { configured: true, url, anonKey, ...(require("./_lib/apple-account").configured() ? { appleSignIn: true } : {}) } : { configured: false },
   });
 };
 

@@ -35,6 +35,12 @@ ledger entries. [db/README.md](db/README.md) explains fresh installation and
 separately authorized baseline adoption. Put future SQL only in the canonical
 Supabase migration directory.
 
+### Sign in with Apple on the web
+
+Use the Occulert Apple Services ID as the first client ID in Supabase's Apple provider. Register the project's HTTPS Auth callback with Apple and allow the production login page and its Apple state query in Supabase's redirect configuration. Keep previews separate.
+
+Set server-only Vercel production variables `APPLE_WEB_CLIENT_ID`, `APPLE_WEB_CLIENT_SECRET` (the same signed client secret used by Supabase), and `APPLE_GRANT_KEY` (a dedicated 32-byte random key in hexadecimal). Renew the Apple client secret in both services before its expiration. Preserve the encryption key for existing grants. The browser receives only a readiness flag. The server validates each Apple grant, encrypts its refresh token for revocation, and revokes it on account deletion. Sign in from the production domain, edit a disposable profile, sign out, then sign back in before verifying account deletion.
+
 ### Passkey authentication (experimental)
 
 Supabase passkey support is experimental and requires a separate production

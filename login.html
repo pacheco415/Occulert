@@ -22,11 +22,12 @@
       <div class="card auth-card" id="authCard">
         <p class="eyebrow" id="authEyebrow">Welcome back</p>
         <h1 id="authHeading">Sign in to Occulert</h1>
-        <p class="portal-intro" id="authIntro">Use the email and password for your existing Occulert account.</p>
+        <p class="portal-intro" id="authIntro">Choose how to sign in to Occulert.</p>
         <div class="auth-tabs" aria-label="Account action">
           <button class="btn active" id="signInModeBtn" type="button" aria-pressed="true" data-page-action="showAuthMode-signin">Sign In</button>
           <button class="btn" id="signUpModeBtn" type="button" aria-pressed="false" data-page-action="showAuthMode-signup">Create Account</button>
         </div>
+        <button class="btn hidden" id="appleSignInBtn" type="button" style="background:#000;color:#fff;border:1px solid #888;min-height:44px">Continue with Apple</button>
         <div class="passkey-entry" id="passkeyEntry">
           <button class="btn passkey" id="passkeySignInBtn" type="button" data-page-action="signInPasskey">Sign in with a passkey</button>
           <p class="tiny" id="passkeyHelp">Use Face ID, Touch ID, a device PIN, or a security key. New here? Choose Create Account to set up a passkey without a password.</p>
@@ -88,6 +89,6 @@
     </section>
   </main>
 <script src="/passwordless-auth.v62.js"></script>
-<script src="/login-page-1.v63.js"></script>
+<script src="/login-page-1.v64.js"></script>
 </body>
 </html>

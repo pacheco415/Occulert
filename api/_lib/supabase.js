@@ -202,4 +202,4 @@ function bearerToken(request) {
   return match ? match[1] : null;
 }
 
-module.exports = { pgFetch: pgFetch, verifyAccessToken: verifyAccessToken, deleteAuthUser: deleteAuthUser, bearerToken: bearerToken, serverStorageConfigured: serverStorageConfigured };
+module.exports = { fetchTextWithDeadline, pgFetch: pgFetch, verifyAccessToken: verifyAccessToken, deleteAuthUser: deleteAuthUser, bearerToken: bearerToken, serverStorageConfigured: serverStorageConfigured };

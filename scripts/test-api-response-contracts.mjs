@@ -113,7 +113,7 @@ const direct = [
   ['events', 'POST', 'POST', { session_id: SESSION, type: 'drowsy' }],
   ['fleet-followups', 'GET', 'GET, POST'], ['fleet-invitations', 'GET', 'GET, POST, DELETE'],
   ['fleet-summary', 'GET', 'GET'], ['fleets', 'GET', 'GET, POST'],
-  ['pilot-leads', 'POST', 'POST'], ['profile', 'POST', 'POST', {}],
+  ['pilot-leads', 'POST', 'POST'], ['profile', 'POST', 'GET, POST', {}],
   ['public-config', 'GET', 'GET'], ['sessions', 'GET', 'GET, POST, PATCH'],
 ];
 function directRequest(name, method, body) {

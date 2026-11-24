@@ -21,8 +21,8 @@ module.exports = async function handler(request, response) {
     return json(response, 501, { ok: false, error: "backend_not_configured" });
   }
 
-  if (request.method !== "POST") {
-    response.setHeader("Allow", "POST");
+  if (request.method !== "POST" && request.method !== "GET") {
+    response.setHeader("Allow", "GET, POST");
     return json(response, 405, { ok: false, error: "method_not_allowed" });
   }
 
@@ -30,6 +30,10 @@ module.exports = async function handler(request, response) {
   try {
     user = await verifyAccessToken(bearerToken(request), { freshUser: true });
     if (!user) return json(response, 401, { ok: false, error: "unauthorized" });
+    if (request.method === "GET") {
+      const rows = await pgFetch("drivers", { params: { select: "user_id,name,vehicle_id", user_id: "eq." + user.id, limit: "1" } });
+      return json(response, 200, { ok: true, driver: rows[0] || null });
+    }
     if (!validJsonBody(request, 2048)) return json(response, 415, { ok: false, error: "invalid_json_body" });
 
     const body = request.body || {};
