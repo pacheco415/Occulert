@@ -76,6 +76,9 @@ module.exports = async function handler(request, response) {
       response.setHeader("Retry-After", "60");
       return json(response, 503, { ok: false, error: "apple_revocation_unavailable" });
     }
+    try {
+      await require('./_lib/live-subscription-cleanup').cancelLiveSubscriptions(user.id);
+    } catch { throw billingCleanupUnavailable(); }
     await deleteBillingCustomer(user.id);
     // Database foreign keys perform cleanup in the Auth deletion transaction.
     // Never pre-delete rows: any constraint/storage failure must roll back all data.

@@ -58,11 +58,11 @@ function setup(t, { user = { id: ownerId }, fleets = [{ id: fleetId, company_nam
     }
     const { p_actor_id, p_fleet_id, p_days } = options.body;
     assert.deepEqual([options.method, p_actor_id, p_fleet_id, p_days], ['POST', ownerId, fleetId, result.days]);
-    if (path === 'rpc/claim_fleet_insight_summary') {
+    if (path === 'rpc/claim_fleet_insight_attempt') {
       if (cachedEntry) return { claimed: false, entry: cachedEntry };
-      return { claimed: true, report_day: end.slice(0, 10), report: result };
+      return { claimed: true, attempt_count: 1, next_allowed_at: new Date(Date.now() + 120000).toISOString(), report_day: end.slice(0, 10), report: result };
     }
-    assert.equal(path, 'rpc/finish_fleet_insight_summary');
+    assert.equal(path, 'rpc/finish_fleet_insight_attempt');
     assert.equal(options.body.p_report_day, end.slice(0, 10));
     return { summary: options.body.p_summary, days: p_days,
       model: process.env.OCCULERT_INSIGHTS_MODEL || 'claude-haiku-5-5',
@@ -155,8 +155,8 @@ test('inconsistent aggregates stop before disclosure', async t => {
 test('empty, excessive, truncated and malformed replies and upstream failures return only generic errors', async t => {
   fakeClock(t);
   const app = setup(t);
-  const failed = { status: 502, retryAfter: '86400', body: {
-    ok: false, error: 'insights_unavailable', retry_after: '2026-11-09T00:00:00.000Z',
+  const failed = { status: 502, retryAfter: '120', body: {
+    ok: false, error: 'insights_unavailable', retry_after: '2026-11-08T00:02:00.000Z',
   } };
   for (const response of [reply(' '), reply('a'.repeat(1201)), reply(apiKey), reply('a'.repeat(40000)),
     Response.json({ stop_reason: 'max_tokens', content: [{ type: 'text', text: 'cut off' }] }),
@@ -167,7 +167,7 @@ test('empty, excessive, truncated and malformed replies and upstream failures re
   app.fetch.mock.mockImplementationOnce(async () => { throw new Error(apiKey); });
   assert.deepEqual(await app.invoke(), failed);
   app.fetch.mock.mockImplementationOnce(async () => new Response(apiKey, { status: 504 }));
-  assert.deepEqual(await app.invoke(), { status: 504, body: { ok: false, error: 'insights_unavailable' } });
+  assert.deepEqual(await app.invoke(), { ...failed, status: 504 });
   assert.equal(app.fetch.mock.callCount(), 9);
   const logs = JSON.stringify(app.logs.mock.calls.map(call => call.arguments));
   assert.equal(logs.includes(apiKey), false);
@@ -179,7 +179,7 @@ test('a slow provider result is saved and the request can finish at 11.8 seconds
   const app = setup(t, {
     provider: async () => { tick(9499); return reply(); },
     onDatabaseCall(path, budget) {
-      if (path === 'rpc/finish_fleet_insight_summary') {
+      if (path === 'rpc/finish_fleet_insight_attempt') {
         assert.equal(budget, 2501);
         tick(2301);
       }
@@ -203,11 +203,11 @@ test('a slow claim with only the save reserve left records failure without start
   const tick = fakeClock(t);
   const app = setup(t, { onDatabaseCall(path) {
     if (path === 'fleets') tick(5500);
-    if (path === 'rpc/claim_fleet_insight_summary') tick(4000);
+    if (path === 'rpc/claim_fleet_insight_attempt') tick(4000);
   } });
   assert.equal((await app.invoke()).status, 504);
   const [path, options] = app.database.mock.calls.at(-1).arguments;
-  assert.equal(path, 'rpc/finish_fleet_insight_summary');
+  assert.equal(path, 'rpc/finish_fleet_insight_attempt');
   assert.equal(options.body.p_summary, null);
   assert.equal(app.fetch.mock.callCount(), 0);
 });
@@ -228,14 +228,17 @@ test('a provider body arriving at 11.8 seconds times out once and leaves time to
       },
     })),
     onDatabaseCall(path, budget) {
-      if (path === 'rpc/claim_fleet_insight_summary') tick(300);
-      if (path === 'rpc/finish_fleet_insight_summary') finishBudgets.push(budget);
+      if (path === 'rpc/claim_fleet_insight_attempt') tick(300);
+      if (path === 'rpc/finish_fleet_insight_attempt') finishBudgets.push(budget);
     },
   });
   const pending = app.invoke();
   await started.promise;
   tick(9200);
-  assert.deepEqual(await pending, { status: 504, body: { ok: false, error: 'insights_unavailable' } });
+  const timedOut = await pending;
+  assert.equal(timedOut.status, 504);
+  assert.ok(Number(timedOut.retryAfter) > 0 && Number(timedOut.retryAfter) <= 120);
+  assert.equal(timedOut.body.error, 'insights_unavailable');
   assert.deepEqual(finishBudgets, [2500]);
   assert.equal(app.database.mock.calls.at(-1).arguments[1].body.p_summary, null);
   tick(2300);
@@ -245,7 +248,7 @@ test('a provider body arriving at 11.8 seconds times out once and leaves time to
 
 for (const finished of [true, false]) test('a spent ' + (finished ? 'finished' : 'abandoned') + ' reservation advertises UTC midnight', async t => {
   fakeClock(t, Date.parse('2026-11-08T23:59:58.050Z'));
-  const app = setup(t, { cachedEntry: { summary: null, report_day: '2026-11-08', created_at: end, finished_at: finished ? end : null } });
+  const app = setup(t, { cachedEntry: { summary: null, attempt_count: 3, report_day: '2026-11-08', created_at: end, finished_at: finished ? end : null } });
   assert.deepEqual(await app.invoke(), { status: 502, retryAfter: '2', body: {
     ok: false, error: 'insights_unavailable', retry_after: '2026-11-09T00:00:00.000Z',
   } });

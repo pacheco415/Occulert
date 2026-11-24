@@ -7,7 +7,7 @@ process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
 
 const calls = [];
-const makeToken = claims => 'header.' + Buffer.from(JSON.stringify({ sub: 'user-1', role: 'authenticated', session_id: '11111111-1111-4111-8111-111111111111', ...claims })).toString('base64url') + '.signature';
+const makeToken = claims => 'header.' + Buffer.from(JSON.stringify({ sub: '11111111-1111-4111-8111-111111111119', role: 'authenticated', session_id: '11111111-1111-4111-8111-111111111111', ...claims })).toString('base64url') + '.signature';
 let validToken = makeToken({ amr: [{ method: 'password', timestamp: Math.floor(Date.now() / 1000) }] });
 let deletedUser = null;
 let authFailure = false;
@@ -34,7 +34,7 @@ require.cache[libPath] = {
     bearerToken: (request) => String(request.headers.authorization || "").replace(/^Bearer\s+/i, ""),
     verifyAccessToken: async (token) => {
       if (authFailure) throw new Error("auth unavailable");
-      return token === validToken ? { id: "user-1", email: "driver@example.com", last_sign_in_at: new Date().toISOString() } : null;
+      return token === validToken ? { id: "11111111-1111-4111-8111-111111111119", email: "driver@example.com", last_sign_in_at: new Date().toISOString() } : null;
     },
     deleteAuthUser: async (id) => {
       if (deleteFailure) throw new Error("database or Storage constraint");
@@ -71,8 +71,8 @@ assert.equal(calls.length, 0);
 result = await invoke(request({ confirm: "DELETE", user_id: "someone-else" }));
 assert.equal(result.statusCode, 200);
 assert.equal(result.body.deleted, true);
-assert.equal(deletedUser, "user-1");
-assert.deepEqual(calls, [["auth", "user-1"]], "Only the verified identity may be deleted, in one transaction");
+assert.equal(deletedUser, "11111111-1111-4111-8111-111111111119");
+assert.deepEqual(calls, [["auth", "11111111-1111-4111-8111-111111111119"]], "Only the verified identity may be deleted, in one transaction");
 
 result = await invoke(request({ confirm: "DELETE" }, "bad-token"));
 assert.equal(result.statusCode, 401);
@@ -129,7 +129,7 @@ assert.deepEqual(calls.map(call => call[0]), ['stripe', 'auth'], 'Stripe cleanup
 assert.deepEqual(reads, ['fleets', 'fleet_billing_test'], 'cleanup only reads the owned fleet and its billing row');
 stripeResponse = { status: 404, body: { error: { code: 'resource_missing', message: 'No such customer' } } };
 result = await deletion();
-assert.equal(result.statusCode, 200, 'an already-deleted customer does not block account deletion'); assert.equal(deletedUser, 'user-1');
+assert.equal(result.statusCode, 200, 'an already-deleted customer does not block account deletion'); assert.equal(deletedUser, '11111111-1111-4111-8111-111111111119');
 for (const failure of [{ status: 500, body: { error: { code: 'api_error' } } }, { status: 200, body: { id: 'cus_Other', object: 'customer', deleted: true } }, { status: 200, body: { id: 'cus_Fixture1', object: 'customer', deleted: false, livemode: false } }]) {
   stripeResponse = failure;
   result = await deletion();
@@ -156,6 +156,48 @@ billingReadFailure = null; ownedFleet = null;
 console.log("Occulert account deletion tests passed.");
 
 const { hasRecentAuthentication } = require('../api/_lib/recent-auth.js');
-assert.equal(hasRecentAuthentication(makeToken({ amr: [{ method: 'password', timestamp: 1000 }] }), { id: 'user-1' }, 1600), true);
-assert.equal(hasRecentAuthentication(makeToken({ amr: [{ method: 'password', timestamp: 1000 }] }), { id: 'user-1' }, 1601), false);
-assert.equal(hasRecentAuthentication('malformed', { id: 'user-1' }), false);
+assert.equal(hasRecentAuthentication(makeToken({ amr: [{ method: 'password', timestamp: 1000 }] }), { id: '11111111-1111-4111-8111-111111111119' }, 1600), true);
+assert.equal(hasRecentAuthentication(makeToken({ amr: [{ method: 'password', timestamp: 1000 }] }), { id: '11111111-1111-4111-8111-111111111119' }, 1601), false);
+assert.equal(hasRecentAuthentication('malformed', { id: '11111111-1111-4111-8111-111111111119' }), false);
+
+// Live cancellation must succeed before Auth deletion, including owners who have no test customer.
+billingReadFailure = null; ownedFleet = null; billingCustomer = null;
+const liveOwner = '11111111-1111-4111-8111-111111111119';
+process.env.STRIPE_FLEET_ACCESS_READ_KEY = 'rk_live_ReadOnly';
+delete process.env.STRIPE_LIVE_SUBSCRIPTION_CANCEL_KEY;
+assert.equal((await deletion()).body.error, 'billing_cleanup_unavailable');
+assert.equal(deletedUser, null);
+process.env.STRIPE_LIVE_SUBSCRIPTION_CANCEL_KEY = 'rk_live_CancelOnly';
+const sub = { object: 'subscription', id: 'sub_Live', status: 'trialing', livemode: true, metadata: { owner_user_id: liveOwner } };
+let mode = 'none';
+globalThis.fetch = async (input, options) => {
+  const url = new URL(input);
+  assert.equal(url.origin, 'https://api.stripe.com');
+  assert.equal(options.headers.Authorization, 'Bearer rk_live_CancelOnly');
+  if (url.pathname.endsWith('/search')) {
+    assert.equal(url.searchParams.get('query'), `metadata['owner_user_id']:'${liveOwner}'`);
+    return Response.json({ object: 'search_result', has_more: false, data: mode === 'none' || mode === 'unindexed' ? [] : [sub] });
+  }
+  if (url.pathname === '/v1/subscriptions') {
+    const foreign = { ...sub, id: 'sub_Other', metadata: { owner_user_id: 'another-user' } };
+    return Response.json({ object: 'list', has_more: false, data: mode === 'none' ? [foreign] : [foreign, sub] });
+  }
+  assert.equal(url.pathname, '/v1/subscriptions/sub_Live');
+  if (options.method === 'GET') return Response.json(mode === 'foreign' ? { ...sub, metadata: {} } : sub);
+  calls.push(['cancel', sub.id]);
+  assert.equal(options.method, 'DELETE');
+  return mode === 'down' ? new Response('', { status: 503 }) : Response.json({ ...sub, status: 'canceled' });
+};
+assert.equal((await deletion()).statusCode, 200);
+mode = 'active'; sub.status = 'active';
+assert.equal((await deletion()).statusCode, 200);
+assert.deepEqual(calls.map(c => c[0]), ['cancel', 'auth']);
+mode = 'unindexed';
+assert.equal((await deletion()).statusCode, 200);
+assert.deepEqual(calls.map(c => c[0]), ['cancel', 'auth']);
+for (mode of ['down', 'foreign']) {
+  const failure = await deletion();
+  assert.equal(failure.statusCode, 503);
+  assert.equal(failure.body.error, 'billing_cleanup_unavailable');
+  assert.equal(deletedUser, null);
+}

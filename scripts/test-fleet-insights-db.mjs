@@ -86,12 +86,12 @@ test('overlapping route requests reserve once, reuse the stored report, and isol
     }
     const b = options.body;
     const args = [b.p_actor_id, b.p_fleet_id, b.p_days];
-    if (path === 'rpc/claim_fleet_insight_summary') {
-      return (await db.query(`select ${claim}($1,$2,$3,$4) as value`, [...args, b.p_model])).rows[0].value;
+    if (path === 'rpc/claim_fleet_insight_attempt') {
+      return (await db.query(`select public.claim_fleet_insight_attempt($1,$2,$3,$4) as value`, [...args, b.p_model])).rows[0].value;
     }
-    assert.equal(path, 'rpc/finish_fleet_insight_summary');
-    return (await db.query(`select ${finish}($1,$2,$3,$4,$5,$6,$7) as value`, [
-      ...args, b.p_report_day, b.p_summary, b.p_window_start, b.p_window_end,
+    assert.equal(path, 'rpc/finish_fleet_insight_attempt');
+    return (await db.query(`select public.finish_fleet_insight_attempt($1,$2,$3,$4,$5,$6,$7,$8) as value`, [
+      ...args, b.p_report_day, b.p_attempt_count, b.p_summary, b.p_window_start, b.p_window_end,
     ])).rows[0].value;
   });
   const started = Promise.withResolvers(), release = Promise.withResolvers();
@@ -135,4 +135,30 @@ test('overlapping route requests reserve once, reuse the stored report, and isol
   assert.equal((await invoke(7)).statusCode, 502);
   assert.equal(provider.mock.callCount(), 3);
   assert.equal((await db.query('select count(*)::int as n from ' + table)).rows[0].n, 3);
+  // Move only the failed row outside its backoff. Two callers still share one provider call.
+  await db.exec(`update ${table} set next_allowed_at=now() where days=7 and summary is null`);
+  const retry = await Promise.all([invoke(7), invoke(7)]);
+  assert.ok(retry.some(r => r.statusCode === 200 && r.body.summary === 'Saved report.'));
+  assert.equal(provider.mock.callCount(), 4);
+
+});
+
+test('three claims maximum with backoff and stale-completion fencing', async t => {
+  const db = await database(t);
+  const tryClaim = async () => (await db.query("select public.claim_fleet_insight_attempt($1,$2,7,'fixture') as r", [owner, fleet])).rows[0].r;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const won = await tryClaim();
+    assert.equal(won.claimed, true);
+    assert.equal(won.attempt_count, attempt);
+    assert.equal((await tryClaim()).claimed, false);
+    const timing = await db.query("select next_allowed_at - created_at >= interval '2 minutes' as ok from " + table);
+    assert.equal(timing.rows[0].ok, true);
+    if (attempt > 1) {
+      const late = await db.query('select public.finish_fleet_insight_attempt($1,$2,7,$3,$4,null,null,null) as r',
+        [owner, fleet, won.report_day, attempt - 1]);
+      assert.equal(late.rows[0].r, null);
+    }
+    await db.exec('update ' + table + ' set next_allowed_at=now()');
+  }
+  assert.equal((await tryClaim()).claimed, false);
 });
