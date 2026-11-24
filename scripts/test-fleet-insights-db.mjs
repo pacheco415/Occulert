@@ -73,6 +73,9 @@ test('overlapping route requests reserve once, reuse the stored report, and isol
     t.after(() => { if (previous === undefined) delete process.env[name]; else process.env[name] = previous; });
   }
 
+  const paidAccess = require('../api/_lib/fleet-paid-access');
+  t.mock.method(paidAccess, 'paidAccessConfig', () => ({ prices: ['fixture'] }));
+  t.mock.method(paidAccess, 'hasPaidFleetAccess', async identity => identity.actorId === owner);
   const transport = require('../api/_lib/supabase');
   t.mock.method(transport, 'verifyAccessToken', async token => ({ id: token === 'owner' ? owner : other }));
   t.mock.method(transport, 'pgFetch', async (path, options) => {
