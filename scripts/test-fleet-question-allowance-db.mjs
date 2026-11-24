@@ -13,18 +13,27 @@ test('monthly allowance resets in UTC and shares one atomic admission with the h
   await db.query('insert into auth.users (id) values ($1), ($2)', [owner, other]);
   await db.query("insert into public.fleets (id, owner_user_id, company_name) values ($1,$2,'Fixture')", [fleet, owner]);
   const reserve = async actor => (await db.query('select public.reserve_fleet_question($1,$2) as r', [actor, fleet])).rows[0].r;
+  const release = async actor => (await db.query('select public.release_fleet_question($1,$2) as r', [actor, fleet])).rows[0].r;
   const count = async sql => (await db.query(sql)).rows[0].n;
   const monthly = () => count('select attempts as n from public.fleet_question_monthly_usage');
   const hourly = () => count("select write_count as n from public.account_write_rate_limits where operation='fleet_ask'");
   for (const role of ['anon', 'authenticated']) {
     await db.exec('set role ' + role);
     await assert.rejects(reserve(owner), /permission denied/);
+    await assert.rejects(release(owner), /permission denied/);
     await assert.rejects(db.exec('select * from public.fleet_question_monthly_usage'), /permission denied/);
     await db.exec('reset role');
   }
   await db.exec("set time zone 'Pacific/Kiritimati'; set role service_role");
   assert.equal((await reserve(other)).error, 'fleet_not_found');
   assert.equal((await db.query('select * from public.fleet_question_monthly_usage')).rows.length, 0);
+  assert.equal((await reserve(owner)).monthly_remaining, 49);
+  assert.equal(await release(other), null);
+  assert.equal(await release(owner), 50);
+  assert.equal(await release(owner), null);
+  assert.equal((await reserve(owner)).monthly_remaining, 49);
+  assert.equal(await hourly(), 2);
+  await db.exec('reset role; delete from public.fleet_question_monthly_usage; delete from public.account_write_rate_limits; set role service_role');
   for (let n = 1; n <= 20; n++) assert.equal((await reserve(owner)).monthly_remaining, 50 - n);
   assert.equal((await reserve(owner)).error, 'account_write_rate_limited');
   assert.equal(await monthly(), 20);

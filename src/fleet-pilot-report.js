@@ -368,9 +368,13 @@
           ? 'Try again in ' + seconds + (seconds === 1 ? ' second.' : ' seconds.') : 'Try again once the limit resets.';
         setText('fleetAskStatus', 'You reached the hourly question limit. ' + wait); return;
       }
-      if (response.status === 504) { setText('fleetAskStatus', 'The question timed out. Try again.'); return; }
       var data = await response.json();
       if (!matchesReport()) return;
+      if (response.status === 504 || (!response.ok && data?.attempt_released === true)) {
+        var problem = response.status === 504 ? 'The question timed out.' : 'The answer is unavailable.';
+        var credit = data?.attempt_released === true ? ' This attempt did not count toward your monthly allowance.' : '';
+        setText('fleetAskStatus', problem + credit + ' Try again.'); return;
+      }
       if (response.status === 403 && data?.error === 'paid_plan_required') {
         setText('fleetAskStatus', 'Fleet questions require an active paid Occulert fleet plan.'); return;
       }
