@@ -54,7 +54,10 @@ function validReport(report, days) {
     report.reviewed + report.without_reviewed_followup === report.sessions;
 }
 
-async function ownerPeriodRequest(request, response, bodyDays) {
+// Reads accept a locally verified JWT. Pass { freshIdentity: true } for requests
+// that spend quota or call a paid provider, so Supabase Auth rejects a session
+// that was signed out before the token expired.
+async function ownerPeriodRequest(request, response, bodyDays, { freshIdentity = false } = {}) {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     json(response, 501, { ok: false, error: 'backend_not_configured' });
     return null;
@@ -64,7 +67,7 @@ async function ownerPeriodRequest(request, response, bodyDays) {
     json(response, 400, { ok: false, error: 'invalid_period' });
     return null;
   }
-  const user = await verifyAccessToken(bearerToken(request), { cachedIdentity: true });
+  const user = await verifyAccessToken(bearerToken(request), freshIdentity ? { freshUser: true } : { cachedIdentity: true });
   if (!user) {
     json(response, 401, { ok: false, error: 'unauthorized' });
     return null;
