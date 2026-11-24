@@ -32,7 +32,7 @@ function paidSubscription() {
         captured: true, amount_captured: 1000, amount_refunded: 0, refunded: false, disputed: false } } };
 }
 
-function setup(t, { owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
+function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
   provider = async () => providerReply('Three sessions need review.') } = {}) {
   // A question spends quota and a model call, so only a fresh Supabase Auth check
   // (which rejects signed-out sessions) may authorize it; a cached JWT check may not.
@@ -46,8 +46,8 @@ function setup(t, { owned = true, allowed = true, quotaError = 'account_write_ra
     if (path === 'drivers') {
       assert.equal(params.fleet_id, 'eq.' + fleetId);
       assert.equal(params.select, 'id,name,vehicle_id');
-      if (params.id) { assert.equal(params.id, 'gt.' + driverId); return []; }
-      return [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }];
+      if (params.id) { assert.equal(params.id, 'gt.' + roster.at(-1).id); return []; }
+      return roster;
     }
     if (path === 'rpc/reserve_fleet_question') {
       assert.deepEqual(body, { p_actor_id: ownerId, p_fleet_id: fleetId });
@@ -138,6 +138,22 @@ test('personal details never consume a slot or reach the provider', async t => {
   }
   assert.equal(app.send.mock.callCount(), 0);
   assert.ok(!app.db.mock.calls.some(call => call.arguments[0].includes('reserve')));
+});
+
+test('aggregate questions can mention dates, durations and ordinary roster words', async t => {
+  const app = setup(t, { roster: [
+    { id: driverId, name: 'Will Day', vehicle_id: '30' },
+    { id: fleetId.replace('22222222', '44444444'), name: 'June', vehicle_id: '7' },
+  ] });
+  for (const question of ['How many alerts since 2026-11-01?', 'How did we do in the last 30 days?',
+    'Which hour had the most alerts in the last 7 days?', 'What were alerts per day this month?',
+    'Will alerts go down next month?', 'Since 11/01/2026?', 'Since 11-01-2026?', 'Since June 12, 2026?']) {
+    assert.equal((await app.invoke({ body: { days: 30, question } })).status, 200, question);
+  }
+  for (const question of ['Check Will Day', 'Check truck 30', 'Check #7', 'Call 415-2026-11-01',
+    'Since 2026-11-01, call 415-555-0100']) {
+    assert.equal((await app.invoke({ body: { days: 30, question } })).body.error, 'question_has_personal_details', question);
+  }
 });
 
 function assertNoPaidWork(app) {

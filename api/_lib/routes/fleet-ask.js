@@ -18,6 +18,28 @@ function words(text) {
   return text.normalize('NFKC').toLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || [];
 }
 
+const commonNameWords = new Set(['will', 'day', 'may', 'june', 'mark', 'rich', 'chase', 'grant', 'hope', 'night', 'week']);
+
+// Exempt a complete numeric date only. A longer dial string containing a
+// date-shaped substring must still be screened as a phone number.
+function mentionsPhone(question) {
+  const candidates = question.match(/\p{Nd}(?:[\s().+-]*\p{Nd}){6,}/gu) || [];
+  return candidates.some(value => {
+    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const local = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+    if (!iso && !local) return true;
+    const [, year, month, day] = iso || [null, local[3], local[1], local[2]];
+    const date = new Date(year + '-' + month + '-' + day + 'T00:00:00Z');
+    return !Number.isFinite(date.getTime()) || date.getUTCDate() !== Number(day);
+  });
+}
+
+function mentionsVehicle(question, id) {
+  const label = id.normalize('NFKC').trim();
+  if (!/^\d{1,2}$/.test(label)) return containsLabel(question, label);
+  return new RegExp('(?:\\b(?:vehicle|truck|van|unit|bus)[\\s:#-]*|#\\s*)' + label + '(?![\\p{L}\\p{N}])', 'iu').test(question);
+}
+
 async function mentionsRoster(question, fleetId) {
   const questionWords = new Set(words(question));
   let after;
@@ -32,9 +54,9 @@ async function mentionsRoster(question, fleetId) {
           (driver.vehicle_id != null && typeof driver.vehicle_id !== 'string')) throw new Error('invalid_roster');
       after = driver.id;
       const nameParts = words(driver.name);
-      if (nameParts.some(word => word.length >= 3 && questionWords.has(word)) ||
-          (nameParts.join('').length >= 3 && containsLabel(question, driver.name))) return true;
-      if (driver.vehicle_id && containsLabel(question, driver.vehicle_id)) return true;
+      if (nameParts.some(word => word.length >= 4 && !commonNameWords.has(word) && questionWords.has(word)) ||
+          (nameParts.length > 1 && nameParts.join('').length >= 3 && containsLabel(question, driver.name))) return true;
+      if (driver.vehicle_id && mentionsVehicle(question, driver.vehicle_id)) return true;
     }
   }
 }
@@ -98,7 +120,7 @@ module.exports = withProviderBudget(async function handler(request, response) {
     const billingConfig = paidAccess.paidAccessConfig();
     if (!billingConfig) return json(response, 501, { ok: false, error: 'paid_access_not_configured' });
     const normalized = question.normalize('NFKC');
-    if (/[^\s@]+@[^\s@]+/u.test(normalized) || /\p{Nd}(?:[\s().+-]*\p{Nd}){6}/u.test(normalized) ||
+    if (/[^\s@]+@[^\s@]+/u.test(normalized) || mentionsPhone(normalized) ||
         /\b[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\b/i.test(normalized) ||
         /[-+]?\d{1,2}\.\d+\s*[,;]\s*[-+]?\d{1,3}\.\d+/u.test(normalized) ||
         containsLabel(normalized, owner.fleet.company_name) || await mentionsRoster(normalized, owner.fleet.id)) {
