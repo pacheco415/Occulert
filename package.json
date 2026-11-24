@@ -65,6 +65,8 @@
     "test:native-history-alert-count": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/test-native-history-alert-count.mjs",
     "test:billing-test-mode": "node scripts/test-billing-test-mode.mjs && node scripts/test-billing-test-mode-db.mjs",
     "test:vercel-function-budget": "node --test scripts/test-vercel-function-budget.mjs",
+    "test:fleet-digest-preferences": "node --test scripts/test-fleet-digest-preferences.mjs",
+    "test:fleet-digest-db": "node --test scripts/test-fleet-digest-db.mjs",
     "test:fleet-insights": "node --test scripts/test-fleet-insights.mjs scripts/test-fleet-insights-db.mjs",
     "test:fleet-time-of-day": "node --test scripts/test-fleet-time-of-day.mjs scripts/test-fleet-time-of-day-db.mjs",
     "test:fleet-period-report": "node --test scripts/test-fleet-period-report.mjs scripts/test-fleet-period-report-db.mjs",

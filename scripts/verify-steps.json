@@ -41,6 +41,8 @@
     "test:benchmark",
     "test:event-benchmark",
     "test:billing-test-mode",
+    "test:fleet-digest-preferences",
+    "test:fleet-digest-db",
     "test:fleet-period-report",
     "test:fleet-time-of-day",
     "test:fleet-insights",

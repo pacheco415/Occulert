@@ -6,7 +6,8 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const routed = [
   'billing-checkout', 'billing-portal', 'billing-status', 'billing-webhook',
-  'fleet-insights', 'fleet-period-report', 'fleet-session-history', 'fleet-time-of-day', 'parked-alert-checks',
+  'fleet-digest-preferences', 'fleet-digest-unsubscribe', 'fleet-insights',
+  'fleet-period-report', 'fleet-session-history', 'fleet-time-of-day', 'parked-alert-checks',
 ];
 
 test('API fits the Vercel Hobby twelve-function deployment limit', () => {
