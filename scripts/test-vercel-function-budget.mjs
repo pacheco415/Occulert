@@ -6,7 +6,8 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const routed = [
   'billing-checkout', 'billing-portal', 'billing-status', 'billing-webhook',
-  'fleet-insights', 'fleet-period-report', 'fleet-session-history', 'parked-alert-checks',
+  'fleet-digest-preferences', 'fleet-digest-unsubscribe', 'fleet-insights',
+  'fleet-period-report', 'fleet-session-history', 'fleet-time-of-day', 'parked-alert-checks',
 ];
 
 test('API fits the Vercel Hobby twelve-function deployment limit', () => {
@@ -88,7 +89,7 @@ test('fleet query validators accept Vercel path metadata but reject caller endpo
     },
   } };
   delete require.cache[require.resolve('../api/_lib/fleet-period.js')];
-  for (const route of ['fleet-period-report', 'fleet-session-history', 'parked-alert-checks']) {
+  for (const route of ['fleet-period-report', 'fleet-session-history', 'fleet-time-of-day', 'parked-alert-checks']) {
     delete require.cache[require.resolve(`../api/_lib/routes/${route}.js`)];
   }
   const dispatcherPath = require.resolve('../api/[endpoint].js');
@@ -107,6 +108,7 @@ test('fleet query validators accept Vercel path metadata but reject caller endpo
     return response;
   }
   assert.equal((await invoke('fleet-period-report', '?days=7', { days: '7' })).statusCode, 403);
+  assert.equal((await invoke('fleet-time-of-day', '?days=7', { days: '7' })).statusCode, 403);
   assert.equal((await invoke('fleet-session-history')).statusCode, 403);
   assert.equal((await invoke('parked-alert-checks')).statusCode, 403);
   assert.equal((await invoke('fleet-period-report', '?days=7&endpoint=fleet-period-report',
