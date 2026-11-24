@@ -472,6 +472,21 @@ await invoke(profile, request("POST", { name: "  José\u0000 🚚  ", vehicle: "
 assert.equal(insertedProfile.name, "José 🚚");
 assert.equal(insertedProfile.vehicle_id, "Camión 7");
 
+for (const [email, metadata, expected] of [
+  ['x7k2abc9de@privaterelay.appleid.com', {}, 'Occulert Driver'],
+  ['x7k2abc9de@privaterelay.appleid.com', { full_name: 'Ana Rivera' }, 'Ana Rivera'],
+  ['x7k2abc9de@privaterelay.appleid.com', { name: 'Ana' }, 'Ana'],
+  ['regular@example.com', {}, 'regular'],
+]) {
+  const onboarding = loadHandler('../api/profile.js', async (table, options = {}) => {
+    if (table === 'rpc/reserve_account_write') return accountWriteReply(options, 'profile');
+    if (!options.method) return [];
+    assert.equal(options.body.name, expected);
+    return [{ id: 'driver-1', ...options.body }];
+  }, { ...verifiedUser, email, user_metadata: metadata });
+  assert.equal((await invoke(onboarding, request('POST', {}))).status, 200);
+}
+
 // Invalid input is an omitted update, including the concurrent-insert fallback.
 for (const race of [false, true]) {
   for (const field of ["name", "vehicle"]) {
