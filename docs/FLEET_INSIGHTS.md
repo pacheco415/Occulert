@@ -40,6 +40,8 @@ Use `GET /api/fleet-insights?days=7` or `?days=30`. Responses carry `Cache-Contr
 
 ## Questions
 
+Fleet questions are reserved for owners of paid Occulert fleets. After screening a question, Occulert looks up the verified fleet and owner IDs in Stripe. The search locates the subscription. A separate read verifies current ownership, an active subscription at a configured live price, and a paid invoice covering that price for the current period. A scheduled cancellation preserves access through the paid period. Trials, expired periods, fully refunded or disputed charges, and test subscriptions do not qualify. A positive invoice recorded in live Stripe as paid out of band also qualifies. Occulert sends neither the question nor report data to Stripe.
+
 When enabled, **Ask about your fleet** lets a signed-in owner ask about the 7- or 30-day report. Selecting a suggestion fills the field. Submitting the form sends `POST /api/fleet-ask` with a bearer token and a JSON body containing exactly `question` (3–300 characters after trimming) and `days` (the number `7` or `30`). Query parameters are rejected.
 
 Before reserving quota or contacting Anthropic, Occulert checks the question against the owner's fleet and driver roster. It rejects matches for driver names, vehicle labels and the company name, as well as text resembling an email address, phone number, UUID or coordinate pair. Ask about fleet totals and leave personal details out of the question.
@@ -60,8 +62,9 @@ Occulert does not log or persist question or answer text. The dashboard holds it
 | 400 | `invalid_query`, `invalid_body`, `invalid_period`, `invalid_question` | Check the request URL, JSON fields, period and question length. |
 | 400 | `question_has_personal_details` | Remove the detected details and ask again. This uses no quota. |
 | 401 / 403 | `unauthorized` / `fleet_not_found` | Sign in with a valid account that owns the fleet. |
+| 403 | `paid_plan_required` | This fleet has no verified current paid coverage. No question quota is consumed. |
 | 405 | `method_not_allowed` | Use POST. |
 | 429 | `account_write_rate_limited` | Wait the number of seconds in `Retry-After` before submitting again. |
-| 501 | `ask_not_configured` / `backend_not_configured` | The questions flag, provider key or backend settings are missing. The dashboard hides the question box for the rest of the visit. |
+| 501 | `ask_not_configured`, `backend_not_configured`, `paid_access_not_configured` | The feature, backend or live billing verification is unconfigured. The dashboard hides the question box for the rest of the visit. |
 | 502 | `ask_unavailable` / `write_quota_unavailable` | The request failed, the model returned an unusable answer, or the server could not confirm the quota reservation. |
 | 503 / 504 | `ask_unavailable` | The backend is unavailable or the request timed out. |

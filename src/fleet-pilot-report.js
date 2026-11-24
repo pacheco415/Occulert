@@ -363,6 +363,9 @@
       if (response.status === 504) { setText('fleetAskStatus', 'The question timed out. Try again.'); return; }
       var data = await response.json();
       if (!matchesReport()) return;
+      if (response.status === 403 && data?.error === 'paid_plan_required') {
+        setText('fleetAskStatus', 'Fleet questions require an active paid Occulert fleet plan.'); return;
+      }
       if (response.status === 400 && data?.error === 'question_has_personal_details') {
         setText('fleetAskStatus', 'Your question includes personal details. Remove them and ask again.'); return;
       }

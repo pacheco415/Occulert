@@ -4,18 +4,16 @@ import { createRequire } from 'node:module';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const require = createRequire(new URL('../api/_lib/stripe-test.js', import.meta.url));
-const source = readFileSync(new URL('../api/_lib/stripe-test.js', import.meta.url), 'utf8');
+const require = createRequire(new URL('../api/_lib/stripe-transport.js', import.meta.url));
+const source = readFileSync(new URL('../api/_lib/stripe-transport.js', import.meta.url), 'utf8');
 const LIMIT = 256 * 1024;
 function fixture(response) {
   const calls = [], module = { exports: {} };
   vm.runInNewContext(source, {
     module, require, Buffer, URL, URLSearchParams, AbortController, setTimeout, clearTimeout,
-    process: { env: { STRIPE_TEST_SECRET_KEY: 'sk_test_fixture', STRIPE_TEST_WEBHOOK_SECRET: 'whsec_fixture',
-      STRIPE_TEST_PRICE_STARTER: 'price_start', STRIPE_TEST_PRICE_GROWTH: 'price_grow' } },
     fetch: async (url, options) => { calls.push({ url, options }); return response; },
   });
-  return { request: () => module.exports.stripeRequest('/v1/prices/price_start'), calls };
+  return { request: () => module.exports.requestStripeJson('/v1/prices/price_start', 'fixture'), calls };
 }
 
 function streamed(chunks, headers = {}) {
