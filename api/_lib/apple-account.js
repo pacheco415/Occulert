@@ -1,10 +1,31 @@
-const { createCipheriv, createDecipheriv, randomBytes } = require('node:crypto');
+const { createCipheriv, createDecipheriv, createPrivateKey, randomBytes, sign } = require('node:crypto');
 const db = require('./supabase');
 const { isUuid } = require('./validation');
 
+function signingKey() {
+  const pem = process.env.APPLE_PRIVATE_KEY;
+  if (!pem) return null;
+  try {
+    const key = createPrivateKey(pem.replace(/\\n/g, '\n'));
+    return key.asymmetricKeyDetails?.namedCurve === 'prime256v1' ? key : null;
+  } catch { return null; }
+}
+
+function clientSecret() {
+  const key = signingKey();
+  if (!key) throw new Error('apple_signing_unavailable');
+  const iat = Math.floor(Date.now() / 1000);
+  const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const header = { alg: 'ES256', kid: process.env.APPLE_KEY_ID };
+  const claims = { iss: process.env.APPLE_TEAM_ID, iat, exp: iat + 300,
+    aud: 'https://appleid.apple.com', sub: process.env.APPLE_WEB_CLIENT_ID };
+  const payload = encode(header) + '.' + encode(claims);
+  return payload + '.' + sign('sha256', Buffer.from(payload), { key, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+}
+
 function configured() {
   return Boolean(db.serverStorageConfigured() && process.env.SUPABASE_ANON_KEY &&
-    process.env.APPLE_WEB_CLIENT_ID && process.env.APPLE_WEB_CLIENT_SECRET &&
+    process.env.APPLE_WEB_CLIENT_ID && process.env.APPLE_TEAM_ID && process.env.APPLE_KEY_ID && signingKey() &&
     /^[0-9a-f]{64}$/i.test(process.env.APPLE_GRANT_KEY || ''));
 }
 
@@ -26,7 +47,7 @@ function unseal(value, owner) {
 
 async function appleRequest(path, fields) {
   const body = new URLSearchParams({ client_id: process.env.APPLE_WEB_CLIENT_ID,
-    client_secret: process.env.APPLE_WEB_CLIENT_SECRET, ...fields });
+    client_secret: clientSecret(), ...fields });
   return db.fetchTextWithDeadline('https://appleid.apple.com/auth/' + path, {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body,
   }, 65536);
