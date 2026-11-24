@@ -355,6 +355,11 @@
         askUnavailable = true; showAskCard(summary); document.getElementById('pilotReviewRefresh').focus(); return;
       }
       if (response.status === 429) {
+        var quota = await response.json();
+        if (!matchesReport()) return;
+        if (quota?.error === 'fleet_question_monthly_limit') {
+          setText('fleetAskStatus', 'Your fleet has used its 50 questions this month. The allowance resets on the first of the month at 00:00 UTC.'); return;
+        }
         var seconds = Number(response.headers.get('Retry-After'));
         var wait = Number.isInteger(seconds) && seconds >= 1 && seconds <= 3600
           ? 'Try again in ' + seconds + (seconds === 1 ? ' second.' : ' seconds.') : 'Try again once the limit resets.';
@@ -373,7 +378,10 @@
           typeof data.answer !== 'string' || !data.answer.trim() || data.answer.length > 700 ||
           typeof data.model !== 'string' || !data.model.trim() || time(data.generated_at) === null) throw new Error();
       setText('fleetAskStatus', ''); setText('fleetAskAnswer', data.answer);
-      setText('fleetAskDetails', data.model + ' · Written ' + new Date(data.generated_at).toLocaleString());
+      var remaining = data.monthly_remaining;
+      var allowance = Number.isInteger(remaining) && remaining >= 0 && remaining < 50
+        ? ' · ' + remaining + (remaining === 1 ? ' question left' : ' questions left') + ' this month' : '';
+      setText('fleetAskDetails', data.model + ' · Written ' + new Date(data.generated_at).toLocaleString() + allowance);
       askResult.hidden = false;
     } catch (_) {
       if (matchesReport()) setText('fleetAskStatus', 'Fleet questions are unavailable. Try again later.');

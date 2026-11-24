@@ -54,7 +54,7 @@ Anthropic receives a fixed instruction and one message containing the following 
 | `week`, `month` | Both the 7-day and 30-day aggregates. Each includes `days` and the roster, session, score coverage, alert coverage and review counts listed above. Calculated ratios are `alerts_per_day`, `alerts_per_session` and `share_reviewed`. A zero denominator yields `null`. |
 | `timezone`, `blocks` | The selected period's reporting timezone and six four-hour blocks. Each block contains `start_hour`, `monitored_minutes`, `drowsy_alerts`, `distracted_alerts`, `rate_available` and `drowsy_alerts_per_hour`. The hourly rate is `null` below 120 monitored minutes. |
 
-Occulert does not log or persist question or answer text. The dashboard holds it in memory and clears it on a period change or sign-out. Responses use `Cache-Control: no-store` and `Vary: Authorization`. The database tracks a separate quota of **20 attempts per account per hour**. A timeout or provider failure after reservation uses one attempt. The server makes at most one model call per submission.
+Occulert does not log or persist question or answer text. The dashboard holds it in memory and clears it on a period change or sign-out. Responses use `Cache-Control: no-store` and `Vary: Authorization`. Each paid fleet includes **50 question submissions per UTC calendar month**, with a separate limit of **20 per account per hour**. A single database transaction reserves both limits. Requests refused by either limit consume neither allowance. An admitted submission uses one of the 50 even if later report retrieval or generation fails. A successful answer includes `monthly_remaining` for the fleet. New submissions above the allowance are blocked without overage charges. The fleet allowance starts fresh at 00:00 UTC on the first of the next month. The server makes at most one model call per submission.
 
 | HTTP | Result | Meaning |
 | --- | --- | --- |
@@ -64,7 +64,7 @@ Occulert does not log or persist question or answer text. The dashboard holds it
 | 401 / 403 | `unauthorized` / `fleet_not_found` | Sign in with a valid account that owns the fleet. |
 | 403 | `paid_plan_required` | This fleet has no verified current paid coverage. No question quota is consumed. |
 | 405 | `method_not_allowed` | Use POST. |
-| 429 | `account_write_rate_limited` | Wait the number of seconds in `Retry-After` before submitting again. |
+| 429 | `account_write_rate_limited` / `fleet_question_monthly_limit` | The hourly or monthly allowance is exhausted. `Retry-After` gives the wait in seconds. |
 | 501 | `ask_not_configured`, `backend_not_configured`, `paid_access_not_configured` | The feature, backend or live billing verification is unconfigured. The dashboard hides the question box for the rest of the visit. |
-| 502 | `ask_unavailable` / `write_quota_unavailable` | The request failed, the model returned an unusable answer, or the server could not confirm the quota reservation. |
+| 502 | `ask_unavailable` | The request failed, the model returned an unusable answer, or the server could not confirm the quota reservation. |
 | 503 / 504 | `ask_unavailable` | The backend is unavailable or the request timed out. |
