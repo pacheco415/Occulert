@@ -29,12 +29,13 @@ function insufficientClaimBudget(response) {
   return json(response, 503, { ok: false, error: 'insights_unavailable' });
 }
 
-function spentAttempt(response, reportDay) {
-  const retryAt = new Date(reportDay);
-  retryAt.setUTCHours(24, 0, 0, 0);
+function retryResponse(response, entry, status = 502) {
+  const nextDay = new Date(entry.report_day);
+  nextDay.setUTCHours(24, 0, 0, 0);
+  const retryAt = entry.attempt_count < 3 ? new Date(Math.min(nextDay.getTime(), Date.parse(entry.next_allowed_at))) : nextDay;
   const seconds = Math.max(0, Math.ceil((retryAt.getTime() - Date.now()) / 1000));
   response.setHeader('Retry-After', String(seconds));
-  return json(response, 502, { ok: false, error: 'insights_unavailable', retry_after: retryAt.toISOString() });
+  return json(response, status, { ok: false, error: 'insights_unavailable', retry_after: retryAt.toISOString() });
 }
 
 async function requestSummary(report, model, apiKey) {
@@ -56,7 +57,7 @@ function storedSummary(response, row) {
     response.setHeader('Retry-After', '2');
     return json(response, 202, { ok: false, error: 'insights_pending' });
   }
-  return spentAttempt(response, row.report_day);
+  return retryResponse(response, row);
 }
 
 module.exports = withProviderBudget(async function handler(request, response) {
@@ -86,17 +87,17 @@ module.exports = withProviderBudget(async function handler(request, response) {
       return json(response, 403, { ok: false, error: 'paid_plan_required' });
     }
     if (remainingInsightMs() < FINISH_RESERVE_MS + MIN_PROVIDER_MS) return insufficientClaimBudget(response);
-    const claim = await pgFetch('rpc/claim_fleet_insight_summary', {
+    const claim = await pgFetch('rpc/claim_fleet_insight_attempt', {
       method: 'POST', body: { ...identity, p_model: model },
     });
     if (!claim) return storedSummary(response, null);
     if (claim.claimed === false) return storedSummary(response, claim.entry);
-    if (claim.claimed !== true || !validReport(claim.report, owner.days) ||
+    if (claim.claimed !== true || ![1, 2, 3].includes(claim.attempt_count) || !Number.isFinite(Date.parse(claim.next_allowed_at)) || !validReport(claim.report, owner.days) ||
         new Date(claim.report.window_end).toISOString().slice(0, 10) !== claim.report_day) {
       throw new Error('invalid_report');
     }
-    const finish = (summary) => pgFetch('rpc/finish_fleet_insight_summary', {
-      method: 'POST', body: { ...identity, p_report_day: claim.report_day, p_summary: summary,
+    const finish = (summary) => pgFetch('rpc/finish_fleet_insight_attempt', {
+      method: 'POST', body: { ...identity, p_report_day: claim.report_day, p_attempt_count: claim.attempt_count, p_summary: summary,
         p_window_start: summary ? claim.report.window_start : null,
         p_window_end: summary ? claim.report.window_end : null },
     });
@@ -104,10 +105,9 @@ module.exports = withProviderBudget(async function handler(request, response) {
     try {
       summary = await requestSummary(claim.report, model, apiKey);
     } catch (error) {
-      // The reservation blocks a second charge even if recording the failure is unsuccessful.
+      // The claim already persisted the next allowed attempt, even if finish fails.
       await finish(null).catch(() => {});
-      if (supabaseErrorStatus(error) === 502) return spentAttempt(response, claim.report_day);
-      throw error;
+      return retryResponse(response, claim, supabaseErrorStatus(error));
     }
     return storedSummary(response, await finish(summary));
   } catch (error) {
