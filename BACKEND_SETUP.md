@@ -184,19 +184,28 @@ period report in that case.
 
 ## Fleet AI summaries
 
-The feature is off by default. Configure these server-side Vercel variables only in the intended environment.
+Fleet summaries and questions are off by default. Configure these server-side Vercel variables only in the intended environment.
 
 | Variable | Behavior |
 | --- | --- |
-| `OCCULERT_FLEET_INSIGHTS_ENABLED` | Only the exact value `1` enables the route. Unset it to turn the feature off. |
-| `ANTHROPIC_API_KEY` | Required for generation. Keep the key in server environment settings. |
-| `OCCULERT_INSIGHTS_MODEL` | Optional model ID. The route defaults to `claude-haiku-5-5`. Confirm the selected model is available to the configured account. |
+| `OCCULERT_FLEET_INSIGHTS_ENABLED` | Set to exactly `1` to enable summaries. |
+| `OCCULERT_FLEET_ASK_ENABLED` | Set to exactly `1` to enable questions. This flag is independent of the summary flag. |
+| `ANTHROPIC_API_KEY` | Both routes use the same key. Keep it in server environment settings. |
+| `OCCULERT_INSIGHTS_MODEL` | Optional model ID shared by both routes. The default is `claude-haiku-5-5`. Confirm the selected model is available to the configured account. |
 
-Before enabling, verify the period-report function and the daily cache migration
-`supabase/migrations/20261119034729_fleet_insight_summaries.sql`, approve the
-public privacy wording and pilot access terms, and set the provider spending limit.
-Redeploy after changing the environment. For fields, limits and responses,
-see [Fleet AI summaries](docs/FLEET_INSIGHTS.md).
+Before enabling either feature, verify the period-report function, approve the public privacy wording and pilot access terms, and set the provider's [monthly spend limit](https://platform.claude.com/settings/spend-limits).
+For summaries, also verify the daily cache migration `supabase/migrations/20261119034729_fleet_insight_summaries.sql`.
+For questions, verify the quota migration `supabase/migrations/20261118003200_fleet_ask_quota.sql` and the time-of-day report migration `supabase/migrations/20261122163338_fleet_time_of_day.sql`.
+
+Redeploy the intended environment after changing a flag. To check questions without making a model call, send the following request without credentials. With the flag off or the provider key missing, expect HTTP 501 (`ask_not_configured`). With the flag, key and backend configured, expect HTTP 401 (`unauthorized`).
+
+```sh
+curl -i -X POST https://www.occulert.com/api/fleet-ask \
+  -H 'Content-Type: application/json' \
+  --data '{"days":7,"question":"How many sessions were reviewed?"}'
+```
+
+To turn questions off, unset `OCCULERT_FLEET_ASK_ENABLED`, redeploy and repeat the check for HTTP 501. The summary flag and shared key can stay in place. See [Fleet AI summaries and questions](docs/FLEET_INSIGHTS.md).
 
 The signed-in Account Settings page uses `DELETE /api/account` for permanent
 account deletion. Apply `supabase/migrations/20260912170153_atomic_account_deletion.sql`
