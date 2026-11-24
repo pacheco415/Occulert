@@ -426,7 +426,7 @@ test('suggestions fill the question without sending, and answers use only text a
   const generated = new Date().toISOString();
   const { card, field, ask, requests } = await askDashboard(page, route => route.fulfill({ json: {
     ok: true, ai_generated: true, answer, model: 'fixture-model', days: 7, generated_at: generated,
-    window_start: ago(7), window_end: ago(0),
+    window_start: ago(7), window_end: ago(0), monthly_remaining: 49,
   } }));
   await page.locator('#pilotRange').selectOption('7');
   await expect(page.locator('#qualityCompleted')).toHaveText('2');
@@ -444,7 +444,7 @@ test('suggestions fill the question without sending, and answers use only text a
   await expect(card.locator('#fleetAskAnswer img')).toHaveCount(0);
   await expect(card.getByText("AI-written from your fleet's totals. Check the numbers above before acting.")).toBeVisible();
   const localTime = await page.evaluate(value => new Date(value).toLocaleString(), generated);
-  await expect(card.locator('#fleetAskDetails')).toHaveText('fixture-model · Written ' + localTime);
+  await expect(card.locator('#fleetAskDetails')).toHaveText('fixture-model · Written ' + localTime + ' · 49 questions left this month');
   await expect(ask).toBeEnabled();
   expect(requests).toEqual([{ days: 7, question: 'How many sessions need review?' }]);
   expect(await page.evaluate(() => JSON.stringify(localStorage))).toBe(storageBefore);
@@ -461,6 +461,7 @@ test('the question box explains private detail, quota, timeout and unavailable r
     { status: 400, json: { error: 'question_has_personal_details' } },
     { status: 403, json: { error: 'paid_plan_required' } },
     { status: 429, headers: { 'Retry-After': '32' }, json: { error: 'account_write_rate_limited' } },
+    { status: 429, headers: { 'Retry-After': '86400' }, json: { error: 'fleet_question_monthly_limit' } },
     { status: 504, json: { error: 'ask_unavailable' } },
     { status: 502, json: { error: 'untrusted upstream detail' } },
     { status: 501, json: { error: 'ask_not_configured' } },
@@ -469,7 +470,9 @@ test('the question box explains private detail, quota, timeout and unavailable r
   await field.fill('How many sessions need review?');
   for (const message of ['Your question includes personal details. Remove them and ask again.',
     'Fleet questions require an active paid Occulert fleet plan.',
-    'You reached the hourly question limit. Try again in 32 seconds.', 'The question timed out. Try again.',
+    'You reached the hourly question limit. Try again in 32 seconds.',
+    'Your fleet has used its 50 questions this month. The allowance resets on the first of the month at 00:00 UTC.',
+    'The question timed out. Try again.',
     'Fleet questions are unavailable. Try again later.']) {
     await ask.click();
     await expect(card.getByRole('status')).toContainText(message);
@@ -481,7 +484,7 @@ test('the question box explains private detail, quota, timeout and unavailable r
   await page.locator('#pilotRange').selectOption('7');
   await expect(page.locator('#qualityCompleted')).toHaveText('2');
   await expect(page.locator('#fleetAskCard')).toBeHidden();
-  expect(requests).toHaveLength(6);
+  expect(requests).toHaveLength(7);
 });
 
 for (const change of ['period', 'sign-out']) test('a late fleet answer is discarded after ' + change, async ({ page }) => {

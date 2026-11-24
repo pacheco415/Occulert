@@ -1,6 +1,5 @@
 const { json, reportCountFields, ownerPeriodRequest, fetchPeriodReport } = require('../fleet-period');
 const { fetchTimeOfDayReport } = require('../fleet-time-of-day');
-const { allowAccountWrite } = require('../account-write-quota');
 const { requestText } = require('../anthropic-text');
 const paidAccess = require('../fleet-paid-access');
 const { REQUEST_PROVIDER_BUDGET_MS, remainingProviderMs, withProviderBudget } = require('../provider-budget');
@@ -52,6 +51,26 @@ function periodCounts(report) {
     alerts_per_session: ratio(counts.alerts, counts.sessions), share_reviewed: ratio(counts.reviewed, counts.sessions) };
 }
 
+async function reserveQuestion(owner, response) {
+  const result = await pgFetch('rpc/reserve_fleet_question', {
+    method: 'POST', body: { p_actor_id: owner.actorId, p_fleet_id: owner.fleet.id },
+  });
+  if (result?.user_id !== owner.actorId || result?.fleet_id !== owner.fleet.id) throw new Error('invalid_question_quota');
+  if (result.allowed === true && Number.isInteger(result.monthly_remaining) &&
+      result.monthly_remaining >= 0 && result.monthly_remaining < 50) return result.monthly_remaining;
+  if (result.allowed !== false) throw new Error('invalid_question_quota');
+  if (result.error === 'unauthorized' || result.error === 'fleet_not_found') {
+    json(response, result.error === 'unauthorized' ? 401 : 403, { ok: false, error: result.error });
+    return null;
+  }
+  const monthly = result.error === 'fleet_question_monthly_limit';
+  if ((!monthly && result.error !== 'account_write_rate_limited') || !Number.isInteger(result.retry_after) ||
+      result.retry_after < 1 || result.retry_after > (monthly ? 31 * 86400 : 3600)) throw new Error('invalid_question_quota');
+  response.setHeader('Retry-After', String(result.retry_after));
+  json(response, 429, { ok: false, error: result.error });
+  return null;
+}
+
 module.exports = withProviderBudget(async function handler(request, response) {
   response.setHeader('Vary', 'Authorization');
   if (request.method !== 'POST') {
@@ -88,7 +107,8 @@ module.exports = withProviderBudget(async function handler(request, response) {
     if (!await paidAccess.hasPaidFleetAccess(owner, billingConfig)) {
       return json(response, 403, { ok: false, error: 'paid_plan_required' });
     }
-    if (!await allowAccountWrite(pgFetch, response, owner.actorId, 'fleet_ask')) return;
+    const monthlyRemaining = await reserveQuestion(owner, response);
+    if (monthlyRemaining === null) return;
     const [week, month, timeReport] = await Promise.all([
       fetchPeriodReport(owner.actorId, owner.fleet.id, 7), fetchPeriodReport(owner.actorId, owner.fleet.id, 30),
       fetchTimeOfDayReport(pgFetch, owner.actorId, owner.fleet.id, days),
@@ -100,7 +120,7 @@ module.exports = withProviderBudget(async function handler(request, response) {
     const answer = await requestText({ model, apiKey, input, systemPrompt: SYSTEM_PROMPT, maxLength: 700,
       timeoutMs: remainingProviderMs(REQUEST_PROVIDER_BUDGET_MS) });
     const selected = days === 7 ? week : month;
-    return json(response, 200, { ok: true, answer, model, days, window_start: selected.window_start,
+    return json(response, 200, { ok: true, answer, model, days, monthly_remaining: monthlyRemaining, window_start: selected.window_start,
       window_end: selected.window_end, generated_at: new Date().toISOString(), ai_generated: true });
   } catch (error) {
     return json(response, supabaseErrorStatus(error), { ok: false, error: 'ask_unavailable' });

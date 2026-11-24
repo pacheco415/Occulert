@@ -32,7 +32,7 @@ function paidSubscription() {
         captured: true, amount_captured: 1000, amount_refunded: 0, refunded: false, disputed: false } } };
 }
 
-function setup(t, { owned = true, allowed = true, subscription = paidSubscription, results = 1,
+function setup(t, { owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
   provider = async () => providerReply('Three sessions need review.') } = {}) {
   t.mock.method(transport, 'verifyAccessToken', async token => token === 'owner' ? { id: ownerId } : null);
   const db = t.mock.method(transport, 'pgFetch', async (path, { params, body }) => {
@@ -46,10 +46,10 @@ function setup(t, { owned = true, allowed = true, subscription = paidSubscriptio
       if (params.id) { assert.equal(params.id, 'gt.' + driverId); return []; }
       return [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }];
     }
-    if (path === 'rpc/reserve_account_write') {
-      assert.deepEqual(body, { p_user_id: ownerId, p_operation: 'fleet_ask' });
-      return { user_id: ownerId, operation: 'fleet_ask', allowed,
-        ...(!allowed && { error: 'account_write_rate_limited', retry_after: 32 }) };
+    if (path === 'rpc/reserve_fleet_question') {
+      assert.deepEqual(body, { p_actor_id: ownerId, p_fleet_id: fleetId });
+      return { user_id: ownerId, fleet_id: fleetId, allowed,
+        ...(allowed ? { monthly_remaining: remaining } : { error: quotaError, retry_after: quotaError === 'fleet_question_monthly_limit' ? 86400 : 32 }) };
     }
     const days = body.p_days;
     assert.deepEqual(body, { p_days: days, p_actor_id: ownerId, p_fleet_id: fleetId });
@@ -206,7 +206,23 @@ test('hourly limit returns the wait time and skips reports and model', async t =
   const result = await app.invoke();
   assert.equal(result.status, 429); assert.equal(result.headers['Retry-After'], '32');
   assert.equal(app.send.mock.callCount(), 0);
-  assert.equal(app.db.mock.calls.at(-1).arguments[0], 'rpc/reserve_account_write');
+  assert.equal(app.db.mock.calls.at(-1).arguments[0], 'rpc/reserve_fleet_question');
+});
+
+test('exhausted monthly allowance skips report reads and the model', async t => {
+  const app = setup(t, { allowed: false, quotaError: 'fleet_question_monthly_limit' });
+  const result = await app.invoke();
+  assert.equal(result.status, 429);
+  assert.equal(result.body.error, 'fleet_question_monthly_limit');
+  assert.equal(result.headers['Retry-After'], '86400');
+  assert.equal(app.send.mock.callCount(), 0);
+  assert.equal(app.db.mock.calls.at(-1).arguments[0], 'rpc/reserve_fleet_question');
+});
+
+test('a malformed remaining count never authorizes a model call', async t => {
+  const app = setup(t, { remaining: 50 });
+  assert.equal((await app.invoke()).status, 502);
+  assert.equal(app.send.mock.callCount(), 0);
 });
 
 for (const days of [7, 30]) test('allowlisted request and answer for ' + days + ' days', async t => {
@@ -215,7 +231,7 @@ for (const days of [7, 30]) test('allowlisted request and answer for ' + days + 
   assert.equal(result.status, 200);
   const { generated_at } = result.body;
   assert.equal(new Date(generated_at).toISOString(), generated_at);
-  assert.deepEqual(result.body, { ok: true, answer: 'Three sessions need review.', model: 'fixture-model', days,
+  assert.deepEqual(result.body, { ok: true, answer: 'Three sessions need review.', model: 'fixture-model', days, monthly_remaining: 49,
     window_start: start(days), window_end: end, generated_at, ai_generated: true });
   const [url, options] = app.send.mock.calls[0].arguments;
   assert.equal(url, 'https://api.anthropic.com/v1/messages');

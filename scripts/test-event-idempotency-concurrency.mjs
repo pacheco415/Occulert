@@ -111,6 +111,18 @@ try{
  assert.equal(scenarios.length,12);
  await runAccountWriteQuotaConcurrency({admin,worker,connect,waitFor,pass});
  assert.equal(scenarios.length,19);
+ await admin.query(read('../supabase/migrations/20261118003200_fleet_ask_quota.sql'));
+ await admin.query(read('../supabase/migrations/20261124055212_fleet_question_monthly_allowance.sql'));
+ await reset();
+ const fleetId = '77777777-7777-4777-8777-777777777777';
+ await admin.query("insert into fleets(id,owner_user_id,company_name) values ($1,$2,'Allowance fixture')", [fleetId,owner]);
+ await admin.query("insert into fleet_question_monthly_usage values ($1,date_trunc('month', now() at time zone 'UTC')::date,49)", [fleetId]);
+ const admissions = await Promise.all(worker.map(async client =>
+   (await client.query('select reserve_fleet_question($1,$2) as r',[owner,fleetId])).rows[0].r));
+ assert.equal(admissions.filter(r => r.allowed && r.monthly_remaining === 0).length,1);
+ assert.equal(admissions.filter(r => !r.allowed && r.error === 'fleet_question_monthly_limit').length,worker.length-1);
+ assert.equal((await admin.query("select write_count from account_write_rate_limits where user_id=$1 and operation='fleet_ask'",[owner])).rows[0].write_count,1);
+ pass('Only one simultaneous submission can take the last included fleet question.');
  console.log('Local PostgreSQL version:',serverVersion);
 }catch(error){
  try{console.error(readFileSync(join(root,'postgres.log'),'utf8'));}catch{}
