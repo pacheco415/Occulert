@@ -174,6 +174,29 @@ test('aggregate questions can mention dates, durations and ordinary roster words
   }
 });
 
+for (const [name, question] of [
+  ['Kevin Long', 'How long were sessions this week?'],
+  ['Miles Davis', 'How many miles did the fleet cover?'],
+  ['Tyler Best', 'What was the best time of day?'],
+  ['Sam Most', 'When did we have the most alerts?'],
+  ['Grace Hall', 'What was the grace period?'],
+]) test('ordinary words in aggregate questions with ' + name + ' on the roster', async t => {
+  const app = setup(t, { roster: [{ id: driverId, name, vehicle_id: 'Van-7' }] });
+  assert.equal((await app.invoke({ body: { days: 7, question } })).status, 200);
+  for (const personal of [`How did ${name.toLowerCase()} do?`, 'Check Van-7']) {
+    const reply = await app.invoke({ body: { days: 7, question: personal } });
+    assert.equal(reply.body.error, 'question_has_personal_details', personal);
+  }
+  assert.equal(app.send.mock.callCount(), 1);
+});
+
+test('clear first names still stop individual questions', async t => {
+  const app = setup(t, { roster: [{ id: driverId, name: 'Kevin Long' }] });
+  assert.equal((await app.invoke({ body: { days: 7, question: 'How many alerts did Kevin have?' } })).body.error,
+    'question_has_personal_details');
+  assert.equal(app.send.mock.callCount(), 0);
+});
+
 function assertNoPaidWork(app) {
   assert.equal(app.send.mock.callCount(), 0);
   assert.ok(app.db.mock.calls.every(call => !call.arguments[0].startsWith('rpc/')));
