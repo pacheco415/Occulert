@@ -1,5 +1,56 @@
 {
-  "observedAt": "2026-11-25T00:43:56.020Z",
+  "observedAt": "2026-11-25T00:54:42.962Z",
   "complete": true,
-  "pullRequests": []
+  "pullRequests": [
+    {
+      "number": 519,
+      "headRefName": "codex/social-share-card",
+      "isDraft": false
+    },
+    {
+      "number": 518,
+      "headRefName": "codex/branch-review-nov24",
+      "isDraft": false
+    },
+    {
+      "number": 517,
+      "headRefName": "codex/asset-build-proposal",
+      "isDraft": false
+    },
+    {
+      "number": 516,
+      "headRefName": "codex/testflight-candidate-nov24",
+      "isDraft": false
+    },
+    {
+      "number": 515,
+      "headRefName": "codex/status-nov24",
+      "isDraft": false
+    },
+    {
+      "number": 514,
+      "headRefName": "codex/fleet-plan-messages",
+      "isDraft": false
+    },
+    {
+      "number": 513,
+      "headRefName": "codex/preview-fleet-allowlist",
+      "isDraft": false
+    },
+    {
+      "number": 512,
+      "headRefName": "codex/fleet-answer-length",
+      "isDraft": false
+    },
+    {
+      "number": 511,
+      "headRefName": "codex/fleet-ask-date-ranges",
+      "isDraft": false
+    },
+    {
+      "number": 510,
+      "headRefName": "codex/fleet-ask-name-words",
+      "isDraft": false
+    }
+  ]
 }

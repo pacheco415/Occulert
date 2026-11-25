@@ -20,7 +20,7 @@ These are dated snapshots. Source, deployment, build availability and device tes
   - native-app/components/history/HistorySessionCard.tsx
   - 49 more; inspect the source comparison before preparing a binary.
 
-- Open PRs (2026-11-25T00:43:56.020Z): 0 total; 0 Codex, 0 Dependabot, 0 other; 0 draft.
+- Open PRs (2026-11-25T00:54:42.962Z): 10 total; 10 Codex, 0 Dependabot, 0 other; 0 draft.
 - Production migrations: Operational receipts are kept private; no ledger or access-control details are published here.
 
 Next steps:
