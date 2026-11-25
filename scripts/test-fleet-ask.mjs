@@ -177,14 +177,15 @@ test('aggregate questions can mention dates, durations and ordinary roster words
 test('calendar ranges are allowed while spaced dial strings remain private', async t => {
   const app = setup(t);
   for (const question of ['How many alerts from 2026-11-01 - 2026-11-24?', 'Compare alerts in 2025 2026',
-    'Compare 11-01-2026 and 11-24-2026']) {
+    'Compare 11-01-2026 and 11-24-2026', 'Compare 2026-11-01–2026-11-24',
+    'Compare 2026-11-01-2026-11-24', 'Compare 2025-2026']) {
     assert.equal((await app.invoke({ body: { question, days: 30 } })).status, 200, question);
   }
-  for (const question of ['Call 415 555 1234', 'Call 415 555 2026', 'Compare 2025 2026, call 415 555 1234',
+  for (const question of ['Call 415 555 1234', 'Call 415 555 2026', 'Dial 2025 2026', 'Compare 2025 2026, call 415 555 1234',
     'Look at 2026-02-30 - 2026-03-01']) {
     assert.equal((await app.invoke({ body: { question, days: 30 } })).body.error, 'question_has_personal_details', question);
   }
-  assert.equal(app.send.mock.callCount(), 3);
+  assert.equal(app.send.mock.callCount(), 6);
 });
 
 function assertNoPaidWork(app) {

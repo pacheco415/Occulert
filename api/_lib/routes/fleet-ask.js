@@ -31,13 +31,19 @@ function validCalendarToken(value) {
 }
 
 function mentionsPhone(question) {
-  const candidates = question.match(/\p{Nd}(?:[\s().+-]*\p{Nd}){6,}/gu) || [];
-  return candidates.some(candidate => {
-    // Keep dial groups together unless the entire run consists of calendar
-    // tokens. Removing just a year could hide the last four digits of a phone.
-    const tokens = candidate.split(/\s+-\s*|\s*-\s+|\s+/u);
-    return !tokens.every(validCalendarToken);
-  });
+  const runs = question.matchAll(/\p{Nd}(?:[\s().+-]*\p{Nd}){6,}/gu);
+  for (const { 0: run, index } of runs) {
+    // A telephone label disambiguates even a number formatted like two years.
+    if (/\b(?:call|dial|phone|tel)\s*[:.]?\s*$/iu.test(question.slice(0, index))) return true;
+    // Parse whole calendar tokens. A phone ending in a four-digit year still
+    // has unconsumed dial groups and must never qualify for the exemption.
+    const calendar = /(?:^|[\s-]+)(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}|\d{4})(?=$|[\s-])/gy;
+    let end = 0;
+    let part;
+    while ((part = calendar.exec(run)) && validCalendarToken(part[1])) end = calendar.lastIndex;
+    if (end !== run.length) return true;
+  }
+  return false;
 }
 
 function mentionsVehicle(question, id) {
