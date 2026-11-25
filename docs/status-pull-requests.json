@@ -1,36 +1,5 @@
 {
-  "observedAt": "2026-11-24T00:23:25.412Z",
+  "observedAt": "2026-11-25T00:43:56.020Z",
   "complete": true,
-  "pullRequests": [
-    {
-      "number": 484,
-      "headRefName": "codex/playwright-1-65-1",
-      "isDraft": false
-    },
-    {
-      "number": 483,
-      "headRefName": "codex/retire-assets-2026-11-23",
-      "isDraft": false
-    },
-    {
-      "number": 481,
-      "headRefName": "codex/fleet-ai-summary-docs",
-      "isDraft": false
-    },
-    {
-      "number": 480,
-      "headRefName": "codex/fleet-time-of-day",
-      "isDraft": false
-    },
-    {
-      "number": 479,
-      "headRefName": "dependabot/npm_and_yarn/playwright/test-1.65.1",
-      "isDraft": false
-    },
-    {
-      "number": 471,
-      "headRefName": "codex/fleet-digest-preferences",
-      "isDraft": false
-    }
-  ]
+  "pullRequests": []
 }
