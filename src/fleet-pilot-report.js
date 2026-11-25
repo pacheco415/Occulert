@@ -192,6 +192,15 @@
     }
   }
 
+  function showPlanMessage(id, feature) {
+    var pricing = node('a', 'View fleet plans');
+    pricing.href = '/fleet-pricing.html';
+    var email = node('a', 'fleet@occulert.com');
+    email.href = 'mailto:fleet@occulert.com';
+    document.getElementById(id).replaceChildren(feature + ' require an active paid Occulert fleet plan. ',
+      pricing, ' or contact ', email, '.');
+  }
+
   function clearInsight() {
     clearTimeout(insightPollTimer); insightPollTimer = null;
     clearTimeout(insightUnlockTimer); insightUnlockTimer = null;
@@ -269,6 +278,14 @@
           if (canCheck) void writeInsight(attempt + 1);
           else update({ skipReviewLoad: true });
         }, delay * 1000);
+        return;
+      }
+      if (response.status === 403) {
+        var denial = await response.json();
+        if (!matchesReport()) return;
+        if (denial?.error !== 'paid_plan_required') throw new Error();
+        showPlanMessage('fleetInsightText', 'AI summaries');
+        insightButton.textContent = 'Write summary';
         return;
       }
       if (response.status === 502 || response.status === 504) {
@@ -376,7 +393,7 @@
         setText('fleetAskStatus', problem + credit + ' Try again.'); return;
       }
       if (response.status === 403 && data?.error === 'paid_plan_required') {
-        setText('fleetAskStatus', 'Fleet questions require an active paid Occulert fleet plan.'); return;
+        showPlanMessage('fleetAskStatus', 'Fleet questions'); return;
       }
       if (response.status === 400 && data?.error === 'question_has_personal_details') {
         setText('fleetAskStatus', 'Your question includes personal details. Remove them and ask again.'); return;
