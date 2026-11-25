@@ -32,7 +32,7 @@ function paidSubscription() {
         captured: true, amount_captured: 1000, amount_refunded: 0, refunded: false, disputed: false } } };
 }
 
-function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], cacheEnabled = false, releaseFails = false, owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
+function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], activeTestSubscription = false, cacheEnabled = false, releaseFails = false, owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
   provider = async () => providerReply('Three sessions need review.') } = {}) {
   // A question spends quota and a model call, so only a fresh Supabase Auth check
   // (which rejects signed-out sessions) may authorize it; a cached JWT check may not.
@@ -40,6 +40,11 @@ function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_
     token === 'owner' && options?.freshUser === true && options.cachedIdentity !== true ? { id: ownerId } : null);
   let cache;
   const db = t.mock.method(transport, 'pgFetch', async (path, { params, body, mergeDuplicates }) => {
+    if (path === 'fleet_billing_test') {
+      assert.equal(params.fleet_id, 'eq.' + fleetId);
+      assert.equal(params.status, 'eq.active');
+      return activeTestSubscription ? [{ fleet_id: fleetId, status: 'active', stripe_subscription_id: 'sub_Test' }] : [];
+    }
     if (path === 'fleet_paid_access_cache') {
       if (!body) return cacheEnabled && cache && params.policy_tag === 'eq.' + cache.policy_tag ? [cache] : [];
       assert.equal(mergeDuplicates, true);
@@ -365,4 +370,64 @@ test('entitlement cache allows only server role access and cascades with its own
   await db.query("insert into fleet_paid_access_cache values ($1,$2,'fixture',true,now())", [fleetId, ownerId]);
   await db.query('delete from auth.users where id=$1', [ownerId]);
   assert.deepEqual((await db.query('select * from fleet_paid_access_cache')).rows, []);
+});
+
+test('only an explicitly enabled Vercel preview can use test billing for paid AI', async t => {
+  for (const [deployment, flag, active, status] of [
+    ['preview', '1', true, 200], ['preview', '1', false, 403], ['preview', '0', true, 501],
+    ['production', '1', true, 501], ['development', '1', true, 501], ['', '1', true, 501],
+  ]) await t.test([deployment, flag, active].join('/'), async child => {
+    const previous = [process.env.VERCEL_ENV, process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT];
+    child.after(() => ['VERCEL_ENV','OCCULERT_PREVIEW_TEST_ENTITLEMENT'].forEach((key,i) => {
+      if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i];
+    }));
+    process.env.VERCEL_ENV = deployment;
+    process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT = flag;
+    const app = setup(child, { activeTestSubscription: active });
+    delete process.env.STRIPE_FLEET_ACCESS_READ_KEY;
+    assert.equal((await app.invoke()).status, status);
+    assert.equal(app.stripe.mock.callCount(), 0);
+    const reads = app.db.mock.calls.map(call => call.arguments[0]);
+    assert.equal(reads.includes('fleet_billing_test'), deployment === 'preview' && flag === '1');
+    assert.ok(!reads.includes('fleet_paid_access_cache'));
+  });
+});
+
+test('production verifies live billing even when the preview flag and an active test row are present', async t => {
+  const saved = [process.env.VERCEL_ENV, process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT];
+  t.after(() => ['VERCEL_ENV', 'OCCULERT_PREVIEW_TEST_ENTITLEMENT'].forEach((key, i) => {
+    if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i];
+  }));
+  process.env.VERCEL_ENV = 'production';
+  process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT = '1';
+  const app = setup(t, { activeTestSubscription: true, results: 0 });
+  assert.equal((await app.invoke()).status, 403);
+  assert.equal(app.stripe.mock.callCount(), 1);
+  assert.ok(!app.db.mock.calls.some(call => call.arguments[0] === 'fleet_billing_test'));
+});
+
+test('preview entitlement announces itself at startup only when enabled on a preview', () => {
+  const id = require.resolve('../api/_lib/fleet-paid-access');
+  const saved = require.cache[id];
+  const previous = [process.env.VERCEL_ENV, process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT];
+  const warnings = [];
+  const original = console.warn;
+  try {
+    console.warn = message => warnings.push(message);
+    for (const [environment, flag, count] of [['production', '1', 0], ['preview', '0', 0], ['preview', '1', 1]]) {
+      process.env.VERCEL_ENV = environment;
+      process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT = flag;
+      delete require.cache[id];
+      require(id);
+      assert.equal(warnings.length, count);
+    }
+    assert.match(warnings[0], /preview test entitlement is enabled/i);
+  } finally {
+    console.warn = original;
+    if (saved) require.cache[id] = saved;
+    else delete require.cache[id];
+    for (const [i, key] of ['VERCEL_ENV', 'OCCULERT_PREVIEW_TEST_ENTITLEMENT'].entries()) {
+      if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i];
+    }
+  }
 });

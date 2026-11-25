@@ -377,3 +377,7 @@ and a database without the test-billing migration reports a trial. See
 ### Live subscription cleanup on account deletion
 
 Configure the server-only `STRIPE_LIVE_SUBSCRIPTION_CANCEL_KEY` alongside `STRIPE_FLEET_ACCESS_READ_KEY`. Use a separate live restricted key with write access to Subscriptions only. Every manually provisioned Occulert subscription needs the authenticated owner's UUID in `metadata.owner_user_id`. Deletion searches for that owner across statuses and pages, verifies each current subscription, and cancels renewable subscriptions before deleting Auth. A missing key or an unconfirmed cancellation keeps the account available for retry. A paginated subscription-list reconciliation also finds manually provisioned subscriptions awaiting Stripe search indexing. If the request budget expires before reconciliation finishes, the account is kept. Before enabling live Checkout, record subscription IDs durably as part of provisioning and reconcile them during deletion.
+
+### Demo paid fleet AI on a preview
+
+Set `OCCULERT_PREVIEW_TEST_ENTITLEMENT=1` on the intended Vercel preview, enable the desired fleet AI feature and configure its provider. Use the preview's test billing setup and an active test subscription for the signed-in fleet. The service logs a startup notice when this path is enabled. Test entitlements bypass the live cache. Production, local development and deployments without a Vercel preview environment use the normal live entitlement checks.
