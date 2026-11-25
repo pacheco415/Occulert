@@ -174,6 +174,20 @@ test('aggregate questions can mention dates, durations and ordinary roster words
   }
 });
 
+test('size rejections identify the feature and reason without logging content', async t => {
+  const app = setup(t);
+  const warn = t.mock.method(console, 'warn', () => {});
+  for (const [reason, reply] of [
+    ['character_limit', providerReply('x'.repeat(701))],
+    ['max_tokens', Response.json({ stop_reason: 'max_tokens', content: [{ type: 'text', text: 'private reply' }] })],
+  ]) {
+    app.send.mock.mockImplementationOnce(async () => reply);
+    assert.equal((await app.invoke()).body.attempt_released, true);
+    assert.deepEqual(warn.mock.calls.at(-1).arguments, ['fleet_ai_output_rejected', { feature: 'fleet_ask', reason }]);
+  }
+  assert.equal(warn.mock.callCount(), 2);
+});
+
 function assertNoPaidWork(app) {
   assert.equal(app.send.mock.callCount(), 0);
   assert.ok(app.db.mock.calls.every(call => !call.arguments[0].startsWith('rpc/')));
@@ -273,6 +287,7 @@ for (const days of [7, 30]) test('allowlisted request and answer for ' + days + 
   const [url, options] = app.send.mock.calls[0].arguments;
   assert.equal(url, 'https://api.anthropic.com/v1/messages');
   const outbound = JSON.parse(options.body);
+  assert.match(outbound.system, /under 600 characters/);
   assert.match(outbound.system, /emergency services now/);
   const period = n => ({ days: n, ...counts, alerts_per_day: n === 7 ? 1 : 0.2333, alerts_per_session: 1.75, share_reviewed: 0.25 });
   assert.deepEqual(JSON.parse(outbound.messages[0].content), { days, question, week: period(7), month: period(30),
