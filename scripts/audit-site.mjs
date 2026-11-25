@@ -149,6 +149,15 @@ assertIncludes("index.html", "class=\"journey-frame journey-frame-enter\"", "hom
 assertNotIncludes("index.html", "class=\"car-shell\"", "homepage must not render the retired flat CSS car");
 assertIncludes("index.html", `<script src=\"/${assetByStem('homepage.js')}\" defer></script>`, "homepage must load its external behavior script");
 assertNotIncludes("index.html", "<style>", "homepage must keep its styles out of the HTML document");
+const shareImage = 'https://www.occulert.com/occulert-share-1200x630.jpg';
+if (!statSync(join(root, new URL(shareImage).pathname.slice(1))).isFile()) fail('Social share image is missing');
+for (const [, url] of read('sitemap.xml').matchAll(/<loc>([^<]+)<\/loc>/g)) {
+  const path = new URL(url).pathname.slice(1) || 'index.html';
+  assertIncludes(path, `property="og:image" content="${shareImage}"`, 'sitemap page must expose the landscape share image');
+  assertIncludes(path, `name="twitter:image" content="${shareImage}"`, 'large Twitter cards must use the landscape share image');
+  assertIncludes(path, 'name="twitter:card" content="summary_large_image"', 'public pages must request a large share preview');
+}
+
 const homepageInlineScripts = scriptMarkupPolicy(read("index.html")).inlineScripts.length;
 if (homepageInlineScripts !== 0) fail(`homepage must contain no inline scripts (found ${homepageInlineScripts})`);
 if(!read("index.html").includes(`src="/${assetByStem("homepage-bootstrap.js")}"`))fail("homepage must load its early external password-recovery handoff");
