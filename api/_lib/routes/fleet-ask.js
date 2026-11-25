@@ -20,17 +20,23 @@ function words(text) {
 
 const commonNameWords = new Set(['will', 'day', 'may', 'june', 'mark', 'rich', 'chase', 'grant', 'hope', 'night', 'week']);
 
-// Exempt a complete numeric date only. A longer dial string containing a
-// date-shaped substring must still be screened as a phone number.
+function validCalendarToken(value) {
+  if (/^(?:19|20)\d{2}$/.test(value)) return true;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const local = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+  if (!iso && !local) return false;
+  const [, year, month, day] = iso || [null, local[3], local[1], local[2]];
+  const date = new Date(year + '-' + month + '-' + day + 'T00:00:00Z');
+  return Number.isFinite(date.getTime()) && date.getUTCDate() === Number(day);
+}
+
 function mentionsPhone(question) {
   const candidates = question.match(/\p{Nd}(?:[\s().+-]*\p{Nd}){6,}/gu) || [];
-  return candidates.some(value => {
-    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    const local = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
-    if (!iso && !local) return true;
-    const [, year, month, day] = iso || [null, local[3], local[1], local[2]];
-    const date = new Date(year + '-' + month + '-' + day + 'T00:00:00Z');
-    return !Number.isFinite(date.getTime()) || date.getUTCDate() !== Number(day);
+  return candidates.some(candidate => {
+    // Keep dial groups together unless the entire run consists of calendar
+    // tokens. Removing just a year could hide the last four digits of a phone.
+    const tokens = candidate.split(/\s+-\s*|\s*-\s+|\s+/u);
+    return !tokens.every(validCalendarToken);
   });
 }
 
