@@ -172,6 +172,7 @@ test('empty, excessive, truncated and malformed replies and upstream failures re
   assert.deepEqual(await app.invoke(), { ...failed, status: 504 });
   assert.deepEqual(warn.mock.calls.map(call => call.arguments), [
     ['fleet_ai_output_rejected', { feature: 'fleet_insights', reason: 'character_limit' }],
+    ['fleet_ai_output_rejected', { feature: 'fleet_insights', reason: 'response_byte_limit' }],
     ['fleet_ai_output_rejected', { feature: 'fleet_insights', reason: 'max_tokens' }],
   ]);
   assert.equal(app.fetch.mock.callCount(), 9);

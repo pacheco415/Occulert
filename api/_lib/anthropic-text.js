@@ -31,7 +31,11 @@ async function requestText({ feature, model, apiKey, systemPrompt, input, maxLen
     let bytes = 0;
     for await (const chunk of result.body) {
       bytes += chunk.byteLength;
-      if (bytes > MAX_RESPONSE_BYTES || controller.signal.aborted) throw new Error('insights_unavailable');
+      if (controller.signal.aborted) throw new Error('insights_unavailable');
+      if (bytes > MAX_RESPONSE_BYTES) {
+        console.warn('fleet_ai_output_rejected', { feature, reason: 'response_byte_limit' });
+        throw new Error('insights_unavailable');
+      }
       chunks.push(chunk);
     }
     const message = JSON.parse(Buffer.concat(chunks).toString('utf8'));
