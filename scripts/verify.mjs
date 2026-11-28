@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
-import { readFileSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 
@@ -23,7 +24,12 @@ export function validatePlan(manifest, scripts) {
     seen.add(name);
     return name;
   }
-  const steps = manifest.steps.map(include);
+  const batches = manifest.steps.map(entry => {
+    if (!Array.isArray(entry)) return [include(entry)];
+    if (entry.length !== 2) throw new Error('A parallel verification pair needs exactly two scripts.');
+    return entry.map(include);
+  });
+  const steps = batches.flat();
   const additionalChecks = manifest.additionalChecks.map(include);
   for (const entry of manifest.excluded) {
     if (!entry || typeof entry.reason !== 'string' || !entry.reason.trim()) {
@@ -33,7 +39,7 @@ export function validatePlan(manifest, scripts) {
   }
   const uncovered = Object.keys(scripts).filter(name => /^(?:test|audit):/.test(name) && !seen.has(name));
   if (uncovered.length) throw new Error(`Verification scripts need a manifest entry or exclusion reason: ${uncovered.join(', ')}`);
-  return { steps, additionalChecks };
+  return { steps, batches, additionalChecks };
 }
 
 export function runNpmScript(name, { cwd = projectRoot, stdio = 'inherit', env = process.env } = {}) {
@@ -58,18 +64,28 @@ export async function runVerification({ manifest, scripts, runStep = runNpmScrip
   const plan = validatePlan(manifest, scripts);
   write(`Verification: ${plan.steps.length} existing steps + ${plan.additionalChecks.length} runner self-checks.`);
   const results = [];
-  for (const [kind, names] of [['step', plan.steps], ['self-check', plan.additionalChecks]]) {
-    for (const name of names) {
-      write(`\n[${results.length + 1}/${plan.steps.length + plan.additionalChecks.length}] ${name}${kind === 'self-check' ? ' (runner self-check)' : ''}`);
-      const started = clock();
-      let outcome;
-      try { outcome = await runStep(name); }
-      catch (error) { outcome = { code: null, error: error.message }; }
-      const durationMs = Math.max(0, clock() - started);
-      const passed = outcome?.code === 0 && !outcome.signal && !outcome.error;
-      results.push({ name, kind, passed, durationMs, ...outcome });
+  let startedCount = 0;
+  async function execute(name, kind, isolated) {
+    write(`\n[${++startedCount}/${plan.steps.length + plan.additionalChecks.length}] ${name}${kind === 'self-check' ? ' (runner self-check)' : ''}`);
+    const started = clock();
+    let outcome, temp;
+    try {
+      if (isolated) temp = mkdtempSync(join(tmpdir(), 'occulert-verify-'));
+      const options = temp ? { env: { ...process.env, TMPDIR: temp, TMP: temp, TEMP: temp, PORT: '0' } } : {};
+      outcome = await runStep(name, options);
+    } catch (error) {
+      outcome = { code: null, error: error.message };
+    } finally {
+      if (temp) rmSync(temp, { recursive: true, force: true });
     }
+    const durationMs = Math.max(0, clock() - started);
+    const passed = outcome?.code === 0 && !outcome.signal && !outcome.error;
+    return { name, kind, passed, durationMs, ...outcome };
   }
+  for (const batch of plan.batches) {
+    results.push(...await Promise.all(batch.map(name => execute(name, 'step', batch.length > 1))));
+  }
+  for (const name of plan.additionalChecks) results.push(await execute(name, 'self-check', false));
   write('\nVerification results:');
   write('| Result | Script | Duration |');
   write('| --- | --- | ---: |');
