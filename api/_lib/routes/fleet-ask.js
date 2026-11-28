@@ -18,7 +18,8 @@ function words(text) {
   return text.normalize('NFKC').toLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || [];
 }
 
-const commonNameWords = new Set(['will', 'day', 'may', 'june', 'mark', 'rich', 'chase', 'grant', 'hope', 'night', 'week']);
+const commonNameWords = new Set(['will', 'day', 'may', 'june', 'mark', 'rich', 'chase', 'grant', 'hope', 'night', 'week',
+  'long', 'miles', 'best', 'most', 'grace', 'bill', 'park', 'lane', 'west', 'east', 'north', 'south']);
 
 // Exempt a complete numeric date only. A longer dial string containing a
 // date-shaped substring must still be screened as a phone number.
@@ -40,6 +41,14 @@ function mentionsVehicle(question, id) {
   return new RegExp('(?:\\b(?:vehicle|truck|van|unit|bus)[\\s:#-]*|#\\s*)' + label + '(?![\\p{L}\\p{N}])', 'iu').test(question);
 }
 
+function refersToDriver(question, word) {
+  // Tokenization limits word to Unicode letters, marks and numbers. Match
+  // an individual in a subject or possessive phrase, including short names.
+  const possessive = "(?<![\\p{L}\\p{M}\\p{N}])" + word + "[’']s\\b";
+  const subject = '\\b(?:did|does)\\s+' + word + '\\s+(?:have|drive|report|log|do)\\b';
+  return new RegExp(possessive + '|' + subject, 'iu').test(question);
+}
+
 async function mentionsRoster(question, fleetId) {
   const questionWords = new Set(words(question));
   let after;
@@ -54,7 +63,8 @@ async function mentionsRoster(question, fleetId) {
           (driver.vehicle_id != null && typeof driver.vehicle_id !== 'string')) throw new Error('invalid_roster');
       after = driver.id;
       const nameParts = words(driver.name);
-      if (nameParts.some(word => word.length >= 4 && !commonNameWords.has(word) && questionWords.has(word)) ||
+      if (nameParts.some(word => questionWords.has(word) &&
+          ((word.length >= 4 && !commonNameWords.has(word)) || (word.length >= 2 && refersToDriver(question, word)))) ||
           (nameParts.length > 1 && nameParts.join('').length >= 3 && containsLabel(question, driver.name))) return true;
       if (driver.vehicle_id && mentionsVehicle(question, driver.vehicle_id)) return true;
     }

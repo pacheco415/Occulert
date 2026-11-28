@@ -48,11 +48,16 @@ async function requestText({ feature, model, apiKey, systemPrompt, input, maxLen
       throw new Error('insights_unavailable');
     }
     const text = message.content.map(block => block.text).join('\n').trim();
+    if (!text || text.includes(apiKey)) throw new Error('insights_unavailable');
     if (text.length > maxLength) {
       console.warn('fleet_ai_output_rejected', { feature, reason: 'character_limit' });
-      throw new Error('insights_unavailable');
-    }
-    if (!text || text.includes(apiKey)) {
+      let end = 0;
+      for (const match of text.matchAll(/[.!?。！？]+[”’"')\]]*(?=\s|$)/gu)) {
+        const boundary = match.index + match[0].length;
+        if (boundary > maxLength) break;
+        end = boundary;
+      }
+      if (end >= maxLength * 0.4) return text.slice(0, end);
       throw new Error('insights_unavailable');
     }
     return text;

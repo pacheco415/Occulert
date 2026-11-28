@@ -174,6 +174,20 @@ test('aggregate questions can mention dates, durations and ordinary roster words
   }
 });
 
+test('slightly long answers keep complete sentences and the counter', async t => {
+  const app = setup(t);
+  const warn = t.mock.method(console, 'warn', () => {});
+  const sentence = 'The fleet logged 3.5 alerts per monitored hour.';
+  const prefix = Array(12).fill(sentence).join(' ');
+  app.send.mock.mockImplementationOnce(async () => providerReply(prefix + ' ' + 'Detail '.repeat(27) + 'continues.'));
+  assert.equal((await app.invoke()).body.answer, prefix);
+  assert.deepEqual(warn.mock.calls[0].arguments, ['fleet_ai_output_rejected', { feature: 'fleet_ask', reason: 'character_limit' }]);
+  for (const rejected of ['Too short. ' + 'x'.repeat(700), prefix + ' ' + 'x'.repeat(700) + secret]) {
+    app.send.mock.mockImplementationOnce(async () => providerReply(rejected));
+    assert.equal((await app.invoke()).body.attempt_released, true);
+  }
+});
+
 test('size rejections identify the feature and reason without logging content', async t => {
   const app = setup(t);
   const warn = t.mock.method(console, 'warn', () => {});
@@ -186,6 +200,31 @@ test('size rejections identify the feature and reason without logging content', 
     assert.deepEqual(warn.mock.calls.at(-1).arguments, ['fleet_ai_output_rejected', { feature: 'fleet_ask', reason }]);
   }
   assert.equal(warn.mock.callCount(), 2);
+});
+
+for (const [name, question] of [
+  ['Kevin Long', 'How long were sessions this week?'],
+  ['Miles Davis', 'How many miles did the fleet cover?'],
+  ['Miles Davis', 'How many miles have we logged?'],
+  ['Tyler Best', 'What was the best time of day?'],
+  ['Sam Most', 'When did we have the most alerts?'],
+  ['Sam Most', 'When did most alerts occur?'],
+  ['Grace Hall', 'What was the grace period?'],
+]) test('ordinary words in aggregate questions with ' + name + ' on the roster', async t => {
+  const app = setup(t, { roster: [{ id: driverId, name, vehicle_id: 'Van-7' }] });
+  assert.equal((await app.invoke({ body: { days: 7, question } })).status, 200);
+  for (const personal of [`How did ${name.toLowerCase()} do?`, `How many alerts did ${name.split(' ')[0]} have?`, 'Check Van-7']) {
+    const reply = await app.invoke({ body: { days: 7, question: personal } });
+    assert.equal(reply.body.error, 'question_has_personal_details', personal);
+  }
+  assert.equal(app.send.mock.callCount(), 1);
+});
+
+test('clear first names still stop individual questions', async t => {
+  const app = setup(t, { roster: [{ id: driverId, name: 'Kevin Long' }] });
+  assert.equal((await app.invoke({ body: { days: 7, question: 'How many alerts did Kevin have?' } })).body.error,
+    'question_has_personal_details');
+  assert.equal(app.send.mock.callCount(), 0);
 });
 
 function assertNoPaidWork(app) {

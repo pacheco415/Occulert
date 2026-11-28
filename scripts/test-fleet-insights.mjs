@@ -147,6 +147,14 @@ for (const days of [7, 30]) test('only validated allowlisted counts and dates le
   assert.equal(app.logs.mock.callCount(), 0);
 });
 
+test('summaries keep the last complete sentence within the summary cap', async t => {
+  const app = setup(t);
+  t.mock.method(console, 'warn', () => {});
+  const prefix = Array(22).fill('The fleet recorded 2.5 alerts per session.').join(' ');
+  app.fetch.mock.mockImplementationOnce(async () => reply(prefix + ' ' + 'Detail '.repeat(51) + 'continues.'));
+  assert.equal((await app.invoke()).body.summary, prefix);
+});
+
 test('inconsistent aggregates stop before disclosure', async t => {
   const app = setup(t, { result: { ...report, sessions: 300 } });
   assert.equal((await app.invoke()).status, 502);
