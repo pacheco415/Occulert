@@ -14,15 +14,20 @@ while read -r branch expected pr; do
     ancestor=$(gh api "repos/$repo/compare/$expected...main?per_page=1" --jq '.merge_base_commit.sha')
     [ "$ancestor" = "$expected" ] || continue
   else
-    proof=$(gh api "repos/$repo/pulls/$pr" --jq '[.merged, .base.ref, .head.repo.full_name, .head.ref, .head.sha] | @tsv')
+    proof=$(gh api "repos/$repo/pulls/$pr" --jq '[.merged, .base.ref, .head.repo.full_name, .head.ref, .head.sha, .merge_commit_sha] | @tsv')
     expected_proof=$(printf 'true\tmain\t%s\t%s\t%s' "$repo" "$branch" "$expected")
-    [ "$proof" = "$expected_proof" ] || continue
+    merged_commit=${proof##*[[:space:]]}
+    [ "$proof" = "$(printf '%s\t%s' "$expected_proof" "$merged_commit")" ] || continue
+    merged_base=$(gh api "repos/$repo/compare/$merged_commit...main?per_page=1" --jq '.merge_base_commit.sha')
+    [ "$merged_base" = "$merged_commit" ] || continue
   fi
   escaped=$(printf '%s' "$branch" | sed 's#/#%2F#g')
   protected=$(gh api "repos/$repo/branches/$escaped" --jq '.protected')
   [ "$protected" = false ] || continue
   open=$(gh api --method GET "repos/$repo/pulls" -f state=open -f head="$owner:$branch" -F per_page=1 --jq 'length')
   [ "$open" = 0 ] || continue
+  open_base=$(gh api --method GET "repos/$repo/pulls" -f state=open -f base="$branch" -F per_page=1 --jq 'length')
+  [ "$open_base" = 0 ] || continue
   if [ "${1-}" = --delete ]; then
     git push --force-with-lease="refs/heads/$branch:$expected" "$url" ":refs/heads/$branch"
   else
@@ -123,7 +128,6 @@ codex/version-native-history 59540e61cabdf9ce803a9efc23e623e0745b8278 225
 codex/watch-alert-ios-fleet-20260825 70bd960054d846ce2ad4491600d3a6a7d7ce70b0 103
 codex/web-detector-release-20260914 e335eb40f90945f6630881ecb54de669358dec18 118
 codex/web-fleet-affordability-20260830 829b3665df05511caabf96f6c77b59d40320aaf4 109
-development-readiness-2026-10-03 1dd2a2b403d58e26148d8e0a0e972975ec7aa19d 162
 development/fleet-history-export 40ecf21dc016c1474110564d96836c0f4ef7104b 150
 development/fleet-history-filters 2f7891d367628c498a778689ff33a43f2bc16076 149
 development/history-alert-feedback 432f1c7940d6e7511861ee8d79d9acb7dc9864b2 151
@@ -132,6 +136,7 @@ development/independent-feature-work 0e2876315d4f77fed6efac0c4a194aa525801667 14
 development/native-release-readiness f16730b985b2cc1eedea4b1fed00297fc658476f 145
 development/pilot-readiness d647586fe84ea31af9a5289d4963289c64dc01d7 146
 development/support-and-release-preparation 753dea7bdedc9c356bb2b5d072bbab0419668528 148
+development-readiness-2026-10-03 1dd2a2b403d58e26148d8e0a0e972975ec7aa19d 162
 feat/driver-startup-recovery 030391b02ff73402360e5f35695f4897e12562c3 143
 feat/fleet-follow-up-outcomes 61e7c4a15da1221eb3a92e170ef0b48d9a8b25de 125
 feat/fleet-query-indexes a4ff3d19233f8f1ffb1dc551fc27688c1cb0f0a8 126
