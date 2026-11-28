@@ -67,6 +67,7 @@
       sourceCount: report.sessions, completePeriod: true, sessions: report.sessions,
       completed: report.completed, noEnd: report.no_recorded_end, invalidEnds: report.invalid_recorded_end,
       interrupted: null, unscored: report.unscored, scored: report.scored, average: report.average_safety_score,
+      comparison: comparisonText(report),
       monitoredHours: report.monitored_hours, alertsPerMonitoredHour: report.alerts_per_monitored_hour,
       alerts: report.alerts, missingAlerts: report.missing_alert_records, validAlertRecords: report.valid_alert_records,
       rosterTotal: report.roster_total, activeDrivers: report.active_drivers,
@@ -77,10 +78,20 @@
         message: report.reviewed + ' saved Reviewed · ' + report.without_reviewed_followup +
           ' without a saved Reviewed follow-up. A manager marker does not prove a tester review or validate telemetry.' } };
   }
+  function comparisonText(report) {
+    var previous = report.previous_period, changes = report.period_deltas;
+    if (!previous) return 'Previous-period comparison unavailable.';
+    if (previous.sessions === 0) return 'No sessions in the previous ' + report.days + ' days.';
+    if (!changes || !Number.isSafeInteger(changes.sessions) || !Number.isSafeInteger(changes.alerts)) return 'Previous-period comparison unavailable.';
+    function signed(value) { return value > 0 ? '+' + value : String(value); }
+    return 'Compared with the previous ' + report.days + ' days: sessions ' + signed(changes.sessions) +
+      ' (previously ' + previous.sessions + '), alerts ' + signed(changes.alerts) + ' (previously ' + previous.alerts + ').';
+  }
   function reportRows(summary) {
     return [
       ['Monitored hours (up to 16 per completed session)', summary.monitoredHours.toLocaleString(undefined, { maximumFractionDigits: 2 })],
       ['Recorded alerts per monitored hour', summary.alertsPerMonitoredHour === null ? 'No monitored time' : String(summary.alertsPerMonitoredHour)],
+      ['Previous reporting period', summary.comparison],
       ['Sessions started in window', String(summary.sessions)],
       ['Completed records (valid recorded end time)', String(summary.completed)],
       ['No recorded end time (state unknown)', String(summary.noEnd)],
@@ -431,6 +442,7 @@
     if (!panel || !report) return;
     setText('pilotQualityStatus', summary.available ? 'Complete last ' + summary.days + ' days · ' + summary.sessions +
       ' stored sessions · refreshed ' + new Date(summary.generatedAt).toLocaleString() : summary.reason);
+    setText('qualityComparison', summary.available ? summary.comparison : '');
     setText('qualityMonitoredHours', summary.available ? summary.monitoredHours.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—');
     setText('qualityHourlyRate', summary.available && summary.alertsPerMonitoredHour !== null ? summary.alertsPerMonitoredHour : '—');
     setText('qualityCompleted', summary.available ? summary.completed : '—');

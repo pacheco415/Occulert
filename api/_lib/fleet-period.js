@@ -32,7 +32,7 @@ function requestedDays(request) {
   return value === '7' ? 7 : value === '30' ? 30 : null;
 }
 
-function validReport(report, days) {
+function validWindow(report, days) {
   if (!report || typeof report !== 'object' || Array.isArray(report) || report.version !== 1 ||
       report.days !== days || report.complete_period !== true ||
       report.interruption_reasons_available !== false || report.unrecorded_sessions_detectable !== false ||
@@ -56,6 +56,20 @@ function validReport(report, days) {
     report.scored + report.unscored === report.sessions &&
     report.valid_alert_records + report.missing_alert_records === report.sessions &&
     report.reviewed + report.without_reviewed_followup === report.sessions;
+}
+
+const deltaFields = Object.freeze([...reportCountFields.filter(key => key !== 'roster_total' && key !== 'active_drivers'),
+  'monitored_hours', 'alerts_per_monitored_hour']);
+
+function validReport(report, days) {
+  if (!validWindow(report, days)) return false;
+  if (!Object.hasOwn(report, 'previous_period')) return !Object.hasOwn(report, 'period_deltas');
+  const prior = report.previous_period;
+  if (!validWindow(prior, days) || Date.parse(prior.window_end) !== Date.parse(report.window_start)) return false;
+  const deltas = report.period_deltas;
+  if (!prior.sessions) return deltas === null;
+  return Boolean(deltas && Object.keys(deltas).length === deltaFields.length && deltaFields.every(key =>
+    prior[key] === null || report[key] === null ? deltas[key] === null : Number.isFinite(deltas[key])));
 }
 
 // Reads accept a locally verified JWT. Pass { freshIdentity: true } for requests
@@ -105,4 +119,4 @@ function periodReportError(response, error) {
   return json(response, supabaseErrorStatus(error), { ok: false, error: 'period_report_unavailable' });
 }
 
-module.exports = { json, validReport, reportCountFields, ownerPeriodRequest, fetchPeriodReport, periodReportError };
+module.exports = { json, validReport, deltaFields, reportCountFields, ownerPeriodRequest, fetchPeriodReport, periodReportError };

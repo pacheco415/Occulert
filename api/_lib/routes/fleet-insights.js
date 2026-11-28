@@ -1,4 +1,4 @@
-const { json, reportCountFields, ownerPeriodRequest, validReport, periodReportError } = require('../fleet-period');
+const { json, deltaFields, reportCountFields, ownerPeriodRequest, validReport, periodReportError } = require('../fleet-period');
 const { pgFetch } = require('../supabase');
 const { supabaseErrorStatus } = require('../supabase-errors');
 const { REQUEST_PROVIDER_BUDGET_MS, remainingProviderMs, withProviderBudget } = require('../provider-budget');
@@ -9,6 +9,7 @@ const { requestText } = require('../anthropic-text');
 const SYSTEM_PROMPT = [
   'Write three to five short plain-text sentences for a fleet manager, using only the supplied period and aggregate counts.',
   'Use the supplied values for unscored sessions, sessions with no recorded end, and missing alert records. Mention all three, including zeros.',
+  'Use the supplied deltas to state the change versus the previous period. If comparison is unavailable or there were no previous sessions, say so. Do not calculate changes yourself.',
   'Make no medical claims, judgments about fitness to drive, or comments about individual drivers. Do not infer reasons for missing data.',
 ].join(' ');
 const MAX_SUMMARY_LENGTH = 1200;
@@ -44,6 +45,13 @@ async function requestSummary(report, model, apiKey) {
 
   input.monitored_hours = report.monitored_hours;
   input.alerts_per_monitored_hour = report.alerts_per_monitored_hour;
+  const prior = report.previous_period;
+  input.comparison = !prior ? { status: 'unavailable' } : {
+    status: prior.sessions ? 'available' : 'no_previous_sessions',
+    window_start: prior.window_start, window_end: prior.window_end,
+    previous: Object.fromEntries(deltaFields.map(key => [key, prior[key]])),
+    changes: report.period_deltas,
+  };
   const timeoutMs = remainingInsightMs() - FINISH_RESERVE_MS;
   return requestText({ model, apiKey, systemPrompt: SYSTEM_PROMPT, input, maxLength: MAX_SUMMARY_LENGTH, timeoutMs });
 }
