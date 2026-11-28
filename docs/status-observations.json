@@ -5,16 +5,16 @@
   },
   "testFlight": {
     "receiptType": "dashboard_observation",
-    "sourceCommit": "21ab21cd02666a7c825ba6b037f543133481eb3a",
+    "sourceCommit": "bf7abe0bce2db34947b2f59f4989c3f1457266e8",
     "version": "1.0.0",
-    "buildNumber": "60",
-    "completedAt": "2026-11-04T05:05:40.475Z",
-    "observedAt": "2026-11-11T02:46:45Z",
-    "dashboardState": "Ready to Submit",
+    "buildNumber": "62",
+    "observedAt": "2026-11-14",
+    "dashboardState": "Testing",
     "uploadState": "Complete",
     "internalGroupAssigned": true,
     "internalAvailabilityObserved": true,
-    "physicalAcceptance": "not_recorded"
+    "physicalAcceptance": "not_recorded",
+    "uploadedAt": "2026-11-14"
   },
   "migrations": {
     "visibility": "private"

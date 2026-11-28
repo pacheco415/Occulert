@@ -62,6 +62,20 @@ test('a saved dashboard receipt reports dated internal availability without inve
   assert.ok(output.trimEnd().split('\n').length <= 60);
 });
 
+test('internal group Testing reports the dated upload observation separately from physical acceptance', () => {
+  const b = dashboardReceipt('a'.repeat(40));
+  delete b.completedAt;
+  Object.assign(b, { dashboardState: 'Testing', buildNumber: '62', uploadedAt: '2026-11-14', observedAt: '2026-11-14' });
+  const observations = { schemaVersion: 1, testFlight: b };
+  const output = renderStatus({ git: { ref: 'origin/main', sourceCommit: b.sourceCommit, committedAt: at,
+    native: { state: 'unchanged' } }, observations });
+  assert.match(output, /1\.0\.0 \(62\) showed Testing/);
+  assert.match(output, /Upload marked Complete on 2026-11-14/);
+  assert.match(output, /Physical acceptance for build 62: Not recorded/);
+  delete b.uploadedAt;
+  assert.throws(() => validateObservations(observations));
+});
+
 test('dashboard receipts require exact observed labels and reject mixed API states, private identifiers and incomplete evidence', () => {
   const original = { schemaVersion: 1, testFlight: dashboardReceipt('a'.repeat(40)) };
   assert.equal(validateObservations(original), original);
