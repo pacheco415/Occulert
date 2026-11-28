@@ -51,3 +51,7 @@ jobs:
           path: dependency-reports/
           if-no-files-found: error
           retention-days: 14
+      - name: Check for changed Expo SDK recommendations
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: npm run check:dependencies
+        working-directory: native-app
