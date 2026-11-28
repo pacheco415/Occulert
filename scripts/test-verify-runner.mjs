@@ -113,3 +113,21 @@ test('the command-line runner exits nonzero after reporting all remaining steps'
     rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
+
+test('an independent pair overlaps in separate directories and preserves both outcomes in plan order', async () => {
+  const paths = [];
+  let release;
+  const ready = new Promise(resolve => { release = resolve; });
+  const result = await runVerification({ manifest: plan([['left', 'right'], 'last']),
+    scripts: { left: 'a', right: 'b', last: 'c' }, write() {},
+    runStep: async (name, options) => {
+      if (name === 'last') return { code: 0 };
+      paths.push(options.env.TMPDIR);
+      if (name === 'right') release();
+      await ready;
+      return { code: name === 'left' ? 7 : 0 };
+    } });
+  assert.equal(new Set(paths).size, 2);
+  assert.deepEqual(result.results.map(record => [record.name, record.code]), [['left', 7], ['right', 0], ['last', 0]]);
+  assert.equal(result.exitCode, 1);
+});
