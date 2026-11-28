@@ -381,3 +381,7 @@ Configure the server-only `STRIPE_LIVE_SUBSCRIPTION_CANCEL_KEY` alongside `STRIP
 ### Demo paid fleet AI on a preview
 
 Set `OCCULERT_PREVIEW_TEST_ENTITLEMENT=1` on the intended Vercel preview, enable the desired fleet AI feature and configure its provider. Use the preview's test billing setup and an active test subscription for the signed-in fleet. The service logs a startup notice when this path is enabled. Test entitlements bypass the live cache. Production, local development and deployments without a Vercel preview environment use the normal live entitlement checks.
+
+### Owner-approved fleet AI pilots
+
+Apply the fleet pilot grants migration before setting the server-only `OCCULERT_FLEET_PILOT_ENTITLEMENTS=1` flag. An administrator records the approved fleet, granting administrator UUID, expiration, monthly cap (1–50), and note in `public.fleet_pilot_grants` using SQL. Deleting the row revokes access. The service role can read grants, while writes remain restricted to database administrators. A valid pilot takes precedence over subscription access. The paid subscription path continues to apply when a grant expires or is revoked. The fleet's usual hourly limit and existing monthly usage both still apply.
