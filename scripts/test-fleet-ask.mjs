@@ -32,7 +32,7 @@ function paidSubscription() {
         captured: true, amount_captured: 1000, amount_refunded: 0, refunded: false, disputed: false } } };
 }
 
-function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], activeTestSubscription = false, cacheEnabled = false, releaseFails = false, owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
+function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], activeTestSubscription = false, testOwner = ownerId, cacheEnabled = false, releaseFails = false, owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
   provider = async () => providerReply('Three sessions need review.') } = {}) {
   // A question spends quota and a model call, so only a fresh Supabase Auth check
   // (which rejects signed-out sessions) may authorize it; a cached JWT check may not.
@@ -43,7 +43,8 @@ function setup(t, { roster = [{ id: driverId, name: 'María O’Brien', vehicle_
     if (path === 'fleet_billing_test') {
       assert.equal(params.fleet_id, 'eq.' + fleetId);
       assert.equal(params.status, 'eq.active');
-      return activeTestSubscription ? [{ fleet_id: fleetId, status: 'active', stripe_subscription_id: 'sub_Test' }] : [];
+      assert.equal(params.owner_user_id, 'eq.' + ownerId);
+      return activeTestSubscription ? [{ fleet_id: fleetId, owner_user_id: testOwner, status: 'active', stripe_subscription_id: 'sub_Test' }] : [];
     }
     if (path === 'fleet_paid_access_cache') {
       if (!body) return cacheEnabled && cache && params.policy_tag === 'eq.' + cache.policy_tag ? [cache] : [];
@@ -445,10 +446,11 @@ test('only an explicitly enabled Vercel preview can use test billing for paid AI
     ['preview', '1', true, 200], ['preview', '1', false, 403], ['preview', '0', true, 501],
     ['production', '1', true, 501], ['development', '1', true, 501], ['', '1', true, 501],
   ]) await t.test([deployment, flag, active].join('/'), async child => {
-    const previous = [process.env.VERCEL_ENV, process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT];
-    child.after(() => ['VERCEL_ENV','OCCULERT_PREVIEW_TEST_ENTITLEMENT'].forEach((key,i) => {
+    const previous = [process.env.VERCEL_ENV, process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT, process.env.OCCULERT_PREVIEW_FLEET_IDS];
+    child.after(() => ['VERCEL_ENV','OCCULERT_PREVIEW_TEST_ENTITLEMENT', 'OCCULERT_PREVIEW_FLEET_IDS'].forEach((key,i) => {
       if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i];
     }));
+    process.env.OCCULERT_PREVIEW_FLEET_IDS = fleetId;
     process.env.VERCEL_ENV = deployment;
     process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT = flag;
     const app = setup(child, { activeTestSubscription: active });
@@ -461,11 +463,31 @@ test('only an explicitly enabled Vercel preview can use test billing for paid AI
   });
 });
 
+test('preview billing requires both an allowlisted fleet and its verified subscription owner', async t => {
+  for (const [list, testOwner, status] of [
+    ['', ownerId, 501], ['*', ownerId, 501], [fleetId + ',broken', ownerId, 501],
+    [driverId, ownerId, 403], [fleetId, driverId, 403], [fleetId, null, 403],
+    [driverId + ', ' + fleetId, ownerId, 200],
+  ]) await t.test([list, testOwner, status].join('/'), async child => {
+    const app = setup(child, { activeTestSubscription: true, testOwner });
+    const settings = { VERCEL_ENV: 'preview', OCCULERT_PREVIEW_TEST_ENTITLEMENT: '1',
+      OCCULERT_PREVIEW_FLEET_IDS: list, STRIPE_FLEET_ACCESS_READ_KEY: '' };
+    for (const [key, value] of Object.entries(settings)) {
+      const old = process.env[key];
+      process.env[key] = value;
+      child.after(() => { if (old === undefined) delete process.env[key]; else process.env[key] = old; });
+    }
+    assert.equal((await app.invoke()).status, status);
+    if (status !== 200) assertNoPaidWork(app);
+  });
+});
+
 test('production verifies live billing even when the preview flag and an active test row are present', async t => {
-  const saved = [process.env.VERCEL_ENV, process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT];
-  t.after(() => ['VERCEL_ENV', 'OCCULERT_PREVIEW_TEST_ENTITLEMENT'].forEach((key, i) => {
+  const saved = [process.env.VERCEL_ENV, process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT, process.env.OCCULERT_PREVIEW_FLEET_IDS];
+  t.after(() => ['VERCEL_ENV', 'OCCULERT_PREVIEW_TEST_ENTITLEMENT', 'OCCULERT_PREVIEW_FLEET_IDS'].forEach((key, i) => {
     if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i];
   }));
+  process.env.OCCULERT_PREVIEW_FLEET_IDS = fleetId;
   process.env.VERCEL_ENV = 'production';
   process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT = '1';
   const app = setup(t, { activeTestSubscription: true, results: 0 });
@@ -477,10 +499,11 @@ test('production verifies live billing even when the preview flag and an active 
 test('preview entitlement announces itself at startup only when enabled on a preview', () => {
   const id = require.resolve('../api/_lib/fleet-paid-access');
   const saved = require.cache[id];
-  const previous = [process.env.VERCEL_ENV, process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT];
+  const previous = [process.env.VERCEL_ENV, process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT, process.env.OCCULERT_PREVIEW_FLEET_IDS];
   const warnings = [];
   const original = console.warn;
   try {
+    process.env.OCCULERT_PREVIEW_FLEET_IDS = fleetId;
     console.warn = message => warnings.push(message);
     for (const [environment, flag, count] of [['production', '1', 0], ['preview', '0', 0], ['preview', '1', 1]]) {
       process.env.VERCEL_ENV = environment;
@@ -494,7 +517,7 @@ test('preview entitlement announces itself at startup only when enabled on a pre
     console.warn = original;
     if (saved) require.cache[id] = saved;
     else delete require.cache[id];
-    for (const [i, key] of ['VERCEL_ENV', 'OCCULERT_PREVIEW_TEST_ENTITLEMENT'].entries()) {
+    for (const [i, key] of ['VERCEL_ENV', 'OCCULERT_PREVIEW_TEST_ENTITLEMENT', 'OCCULERT_PREVIEW_FLEET_IDS'].entries()) {
       if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i];
     }
   }

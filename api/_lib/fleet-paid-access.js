@@ -3,18 +3,20 @@ const { createHash } = require('node:crypto');
 const db = require('./supabase');
 const { isUuid } = require('./validation');
 
-function previewTestEntitlement() {
-  return process.env.VERCEL_ENV === 'preview' && process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT === '1';
+function previewFleetIds() {
+  if (process.env.VERCEL_ENV !== 'preview' || process.env.OCCULERT_PREVIEW_TEST_ENTITLEMENT !== '1') return [];
+  const ids = (process.env.OCCULERT_PREVIEW_FLEET_IDS || '').split(',').map(id => id.trim().toLowerCase());
+  return ids.every(isUuid) ? ids : [];
 }
 
-if (previewTestEntitlement()) {
-  console.warn('Occulert preview test entitlement is enabled. Active Stripe test subscriptions can access paid fleet AI.');
+if (previewFleetIds().length) {
+  console.warn('Occulert preview test entitlement is enabled for allowlisted fleets.');
 }
 
 function paidAccessConfig() {
   const key = process.env.STRIPE_FLEET_ACCESS_READ_KEY || '';
   const prices = (process.env.OCCULERT_FLEET_ASK_PRICE_IDS || '').split(',').map(id => id.trim());
-  if (!/^rk_live_[A-Za-z0-9_]+$/.test(key) || !prices.every(id => /^price_[A-Za-z0-9]+$/.test(id))) return previewTestEntitlement() ? { previewOnly: true } : null;
+  if (!/^rk_live_[A-Za-z0-9_]+$/.test(key) || !prices.every(id => /^price_[A-Za-z0-9]+$/.test(id))) return previewFleetIds().length ? { previewOnly: true } : null;
   return { key, prices };
 }
 
@@ -67,11 +69,12 @@ async function verifyWithStripe({ fleet, actorId }, { key, prices }) {
 async function hasPaidFleetAccess(owner, config) {
   const { fleet, actorId } = owner;
   if (!isUuid(fleet.id) || !isUuid(actorId)) throw new Error('invalid_fleet_owner');
-  if (previewTestEntitlement()) {
+  if (previewFleetIds().includes(fleet.id.toLowerCase())) {
     const [row] = await db.pgFetch('fleet_billing_test', { params: {
-      fleet_id: 'eq.' + fleet.id, status: 'eq.active', select: 'fleet_id,status,stripe_subscription_id', limit: '1',
+      fleet_id: 'eq.' + fleet.id, owner_user_id: 'eq.' + actorId, status: 'eq.active',
+      select: 'fleet_id,owner_user_id,status,stripe_subscription_id', limit: '1',
     } });
-    if (row?.fleet_id === fleet.id && row.status === 'active' && /^sub_[A-Za-z0-9]+$/.test(row.stripe_subscription_id)) return true;
+    if (row?.fleet_id === fleet.id && row.owner_user_id === actorId && row.status === 'active' && /^sub_[A-Za-z0-9]+$/.test(row.stripe_subscription_id)) return true;
   }
   if (config.previewOnly) return false;
   const tag = createHash('sha256').update(JSON.stringify([config.key, config.prices])).digest('hex');
