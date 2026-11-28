@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "repository": "pacheco415/Occulert",
+  "capturedAt": "2026-11-28T06:59:32.691Z",
+  "source": "GitHub REST open pull requests, complete pagination",
+  "complete": true,
+  "pullRequests": [
+    {
+      "number": 527,
+      "title": "Support owner-approved fleet AI pilots with an expiring grant and monthly cap",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/527",
+      "headRefName": "codex/fleet-pilot-grants",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "18af10e45565004347bd1c77b6fea1a857b919ed"
+    },
+    {
+      "number": 526,
+      "title": "Compare each fleet reporting period with the previous period",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/526",
+      "headRefName": "codex/fleet-period-comparison",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "53cc6641ccc7fa6de35f3ee0c0f78984b74918e3"
+    },
+    {
+      "number": 524,
+      "title": "Show fleet monitoring hours and recorded alerts per hour",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/524",
+      "headRefName": "codex/fleet-monitored-hours",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "c4286316fa1e7cd5b345c7c2228cea0a774d7d7c"
+    },
+    {
+      "number": 518,
+      "title": "Inventory remote branch tips and reconcile the October pull requests",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/518",
+      "headRefName": "codex/branch-review-nov24",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "6f580087187804354da9e4e995f0bdb790b6e3c2"
+    },
+    {
+      "number": 517,
+      "title": "Propose deploy-time content-hashed assets with installed PWA retention",
+      "state": "open",
+      "url": "https://github.com/pacheco415/Occulert/pull/517",
+      "headRefName": "codex/asset-build-proposal",
+      "headRepository": "pacheco415/Occulert",
+      "headSha": "6816edca70c8a7c6dfab12a6dd6bbfd7b01b5414"
+    }
+  ]
+}
