@@ -28,14 +28,7 @@ test('generated iOS HealthKit declarations include both Apple-required purpose s
 test('Expo 58, React Native and the React renderer use matching supported versions', async () => {
   const expo = require('expo/package.json');
   const expoRequire = createRequire(require.resolve('expo/package.json'));
-  const cliRoot = dirname(expoRequire.resolve('@expo/cli/package.json'));
-  const { getCombinedKnownVersionsAsync } = expoRequire(join(cliRoot, 'build/src/start/doctor/dependencies/getVersionedPackages.js'));
-  // Use the same compatibility source as expo install --check: Expo's online
-  // overrides can deliberately supersede the bundled dependency map.
-  const supported = await getCombinedKnownVersionsAsync({
-    projectRoot: fileURLToPath(new URL('../', import.meta.url)),
-    sdkVersion: `${expo.version.split('.')[0]}.0.0`, skipCache: true,
-  });
+  const supported = require('expo/bundledNativeModules.json');
   const { satisfies } = expoRequire('semver');
   const react = require('react/package.json').version;
   assert.match(expo.version, /^58\./);
@@ -48,7 +41,7 @@ test('Expo 58, React Native and the React renderer use matching supported versio
 test('Expo compatibility overrides supersede the bundle and unavailable overrides preserve its fallback', () => {
   const projectRoot = fileURLToPath(new URL('../', import.meta.url));
   // Isolate the API fixtures in a child so the installed resolver, its bundle
-  // fallback and SDK normalization run without changing the online check above.
+  // fallback and SDK normalization run without network access.
   execFileSync(process.execPath, ['-e', `
     const assert = require('node:assert/strict');
     const { createRequire } = require('node:module');
