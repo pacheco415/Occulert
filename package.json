@@ -139,7 +139,7 @@
     "test:parked-alert-checks": "node --test scripts/test-parked-alert-checks-api.mjs scripts/test-parked-alert-checks-db.mjs scripts/test-parked-alert-checks-client.mjs"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.14.0",
+    "@axe-core/playwright": "4.14.1",
     "@electric-sql/pglite": "0.6.0",
     "@playwright/test": "1.65.1",
     "acorn": "8.19.0",
