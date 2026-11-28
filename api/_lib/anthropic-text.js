@@ -1,6 +1,6 @@
 const MAX_RESPONSE_BYTES = 32 * 1024;
 
-async function requestText({ model, apiKey, systemPrompt, input, maxLength, timeoutMs }) {
+async function requestText({ feature, model, apiKey, systemPrompt, input, maxLength, timeoutMs }) {
   if (timeoutMs <= 0) throw Object.assign(new Error('insights_timeout'), { status: 504 });
   const controller = new AbortController();
   let timer;
@@ -31,16 +31,33 @@ async function requestText({ model, apiKey, systemPrompt, input, maxLength, time
     let bytes = 0;
     for await (const chunk of result.body) {
       bytes += chunk.byteLength;
-      if (bytes > MAX_RESPONSE_BYTES || controller.signal.aborted) throw new Error('insights_unavailable');
+      if (controller.signal.aborted) throw new Error('insights_unavailable');
+      if (bytes > MAX_RESPONSE_BYTES) {
+        console.warn('fleet_ai_output_rejected', { feature, reason: 'response_byte_limit' });
+        throw new Error('insights_unavailable');
+      }
       chunks.push(chunk);
     }
     const message = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    if (message.stop_reason === 'max_tokens') {
+      console.warn('fleet_ai_output_rejected', { feature, reason: 'max_tokens' });
+      throw new Error('insights_unavailable');
+    }
     if (message.stop_reason !== 'end_turn' || !Array.isArray(message.content) ||
         !message.content.every(block => block?.type === 'text' && typeof block.text === 'string')) {
       throw new Error('insights_unavailable');
     }
     const text = message.content.map(block => block.text).join('\n').trim();
-    if (!text || text.length > maxLength || text.includes(apiKey)) {
+    if (!text || text.includes(apiKey)) throw new Error('insights_unavailable');
+    if (text.length > maxLength) {
+      console.warn('fleet_ai_output_rejected', { feature, reason: 'character_limit' });
+      let end = 0;
+      for (const match of text.matchAll(/[.!?。！？]+[”’"')\]]*(?=\s|$)/gu)) {
+        const boundary = match.index + match[0].length;
+        if (boundary > maxLength) break;
+        end = boundary;
+      }
+      if (end >= maxLength * 0.4) return text.slice(0, end);
       throw new Error('insights_unavailable');
     }
     return text;
