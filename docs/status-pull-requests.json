@@ -1,7 +1,37 @@
 {
-  "observedAt": "2026-11-25T00:54:42.962Z",
+  "observedAt": "2026-11-28T05:26:51Z",
   "complete": true,
   "pullRequests": [
+    {
+      "number": 527,
+      "headRefName": "codex/fleet-pilot-grants",
+      "isDraft": false
+    },
+    {
+      "number": 526,
+      "headRefName": "codex/fleet-period-comparison",
+      "isDraft": false
+    },
+    {
+      "number": 525,
+      "headRefName": "codex/faster-release-tests",
+      "isDraft": false
+    },
+    {
+      "number": 524,
+      "headRefName": "codex/fleet-monitored-hours",
+      "isDraft": false
+    },
+    {
+      "number": 523,
+      "headRefName": "codex/fleet-question-privacy",
+      "isDraft": false
+    },
+    {
+      "number": 520,
+      "headRefName": "codex/retire-assets-nov27",
+      "isDraft": false
+    },
     {
       "number": 519,
       "headRefName": "codex/social-share-card",
@@ -45,11 +75,6 @@
     {
       "number": 511,
       "headRefName": "codex/fleet-ask-date-ranges",
-      "isDraft": false
-    },
-    {
-      "number": 510,
-      "headRefName": "codex/fleet-ask-name-words",
       "isDraft": false
     }
   ]

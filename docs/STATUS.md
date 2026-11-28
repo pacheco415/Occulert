@@ -2,8 +2,8 @@
 
 These are dated snapshots. Source, deployment, build availability and device tests are separate.
 
-- Inspected source (origin/main): `1ceb40c8ae320e54b560a1f07cabe1cbc1ddce9f`.
-- Source commit date: 2026-11-24T16:40:34-08:00.
+- Inspected source (origin/main): `4108714d8d053eb0f0ec6e8a6dff81d90bd89688`.
+- Source commit date: 2026-11-27T21:13:17-08:00.
 
 - Production website: Deployment receipts are kept private; no current receipt is published here.
 
@@ -20,7 +20,7 @@ These are dated snapshots. Source, deployment, build availability and device tes
   - native-app/components/history/HistorySessionCard.tsx
   - 49 more; inspect the source comparison before preparing a binary.
 
-- Open PRs (2026-11-25T00:54:42.962Z): 10 total; 10 Codex, 0 Dependabot, 0 other; 0 draft.
+- Open PRs (2026-11-28T05:26:51Z): 15 total; 15 Codex, 0 Dependabot, 0 other; 0 draft.
 - Production migrations: Operational receipts are kept private; no ledger or access-control details are published here.
 
 Next steps:
