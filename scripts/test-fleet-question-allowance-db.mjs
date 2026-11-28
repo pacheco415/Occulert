@@ -56,3 +56,41 @@ test('monthly allowance resets in UTC and shares one atomic admission with the h
   await db.query('delete from public.fleets where id=$1', [fleet]);
   assert.equal(await count('select count(*)::int as n from public.fleet_question_monthly_usage'), 0);
 });
+
+test('pilot access expires, can be revoked, follows the verified owner and enforces the grant cap', async t => {
+  const db = new PGlite();
+  t.after(() => db.close());
+  await initializeTestSchema(db, { supabaseDefaults: true });
+  const owner = '11111111-1111-4111-8111-111111111111';
+  const other = '22222222-2222-4222-8222-222222222222';
+  const fleet = '33333333-3333-4333-8333-333333333333';
+  await db.query('insert into auth.users(id) values ($1), ($2)', [owner, other]);
+  await db.query("insert into public.fleets(id,owner_user_id,company_name) values ($1,$2,'Fixture')", [fleet, owner]);
+  const grant = () => db.query("insert into public.fleet_pilot_grants(fleet_id,granted_by,expires_at,monthly_question_cap) values ($1,$2,now()+interval '1 day',1)", [fleet, other]);
+  const read = async actor => (await db.query('select public.fleet_active_pilot($1,$2) as r', [actor, fleet])).rows[0].r;
+  const reserve = async actor => (await db.query('select public.reserve_fleet_pilot_question($1,$2) as r', [actor, fleet])).rows[0].r;
+  await grant();
+  for (const role of ['anon', 'authenticated']) {
+    await db.exec('set role ' + role);
+    await assert.rejects(read(owner), /permission denied/);
+    await assert.rejects(grant(), /permission denied/);
+    await db.exec('reset role');
+  }
+  await db.exec('set role service_role');
+  await assert.rejects(grant(), /permission denied/);
+  assert.equal(await read(other), null);
+  assert.equal((await reserve(other)).error, 'fleet_not_found');
+  assert.equal((await read(owner)).monthly_question_cap, 1);
+  assert.equal((await reserve(owner)).monthly_remaining, 0);
+  assert.equal((await reserve(owner)).error, 'fleet_question_monthly_limit');
+  await db.exec("reset role; update public.fleet_pilot_grants set expires_at=now()-interval '1 minute'");
+  assert.equal(await read(owner), null);
+  assert.equal((await reserve(owner)).error, 'paid_plan_required');
+  await db.exec('delete from public.fleet_pilot_grants');
+  assert.equal(await read(owner), null);
+  assert.equal((await reserve(owner)).error, 'paid_plan_required');
+  await grant();
+  await db.query('delete from public.fleets where id=$1', [fleet]);
+  assert.equal(await read(owner), null);
+  assert.equal((await db.query('select count(*)::int as n from public.fleet_pilot_grants')).rows[0].n, 0);
+});

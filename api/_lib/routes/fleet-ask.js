@@ -111,15 +111,16 @@ function periodCounts(report) {
     alerts_per_session: ratio(counts.alerts, counts.sessions), share_reviewed: ratio(counts.reviewed, counts.sessions) };
 }
 
-async function reserveQuestion(owner, response) {
-  const result = await pgFetch('rpc/reserve_fleet_question', {
+async function reserveQuestion(owner, response, mode) {
+  const rpc = mode === 'pilot' ? 'rpc/reserve_fleet_pilot_question' : 'rpc/reserve_fleet_question';
+  const result = await pgFetch(rpc, {
     method: 'POST', body: { p_actor_id: owner.actorId, p_fleet_id: owner.fleet.id },
   });
   if (result?.user_id !== owner.actorId || result?.fleet_id !== owner.fleet.id) throw new Error('invalid_question_quota');
   if (result.allowed === true && Number.isInteger(result.monthly_remaining) &&
       result.monthly_remaining >= 0 && result.monthly_remaining < 50 && /^\d{4}-\d{2}-01$/.test(result.month_start)) return result;
   if (result.allowed !== false) throw new Error('invalid_question_quota');
-  if (result.error === 'unauthorized' || result.error === 'fleet_not_found') {
+  if (result.error === 'unauthorized' || result.error === 'fleet_not_found' || result.error === 'paid_plan_required') {
     json(response, result.error === 'unauthorized' ? 401 : 403, { ok: false, error: result.error });
     return null;
   }
@@ -152,7 +153,7 @@ module.exports = withProviderBudget(async function handler(request, response) {
   if (days !== 7 && days !== 30) return json(response, 400, { ok: false, error: 'invalid_period' });
   const question = storableText(request.body.question, 301);
   if (question.length < 3 || question.length > 300) return json(response, 400, { ok: false, error: 'invalid_question' });
-  let releaseBody;
+  let releaseBody, accessMode;
   try {
     const owner = await ownerPeriodRequest(request, response, days, { freshIdentity: true });
     if (!owner) return;
@@ -162,13 +163,14 @@ module.exports = withProviderBudget(async function handler(request, response) {
     const reason = privateDetailReason(normalized);
     if (reason) return json(response, 400, { ok: false, error: 'question_has_personal_details', reason });
     const aggregateQuestion = redactCompany(normalized, owner.fleet.company_name);
-    if (!await paidAccess.hasPaidFleetAccess(owner, billingConfig)) {
+    accessMode = await paidAccess.fleetAccessMode(owner, billingConfig);
+    if (!accessMode) {
       return json(response, 403, { ok: false, error: 'paid_plan_required' });
     }
     if (await mentionsRoster(aggregateQuestion, owner.fleet.id)) {
       return json(response, 400, { ok: false, error: 'question_has_personal_details', reason: 'driver_or_vehicle' });
     }
-    const reservation = await reserveQuestion(owner, response);
+    const reservation = await reserveQuestion(owner, response, accessMode);
     if (!reservation) return;
     releaseBody = { p_actor_id: owner.actorId, p_fleet_id: owner.fleet.id, p_month_start: reservation.month_start };
     const [week, month, timeReport] = await Promise.all([
@@ -194,7 +196,7 @@ module.exports = withProviderBudget(async function handler(request, response) {
         const remaining = await pgFetch('rpc/release_fleet_question', { method: 'POST', body: releaseBody });
         if (Number.isInteger(remaining) && remaining >= 1 && remaining <= 50) {
           failure.attempt_released = true;
-          failure.monthly_remaining = remaining;
+          if (accessMode !== 'pilot') failure.monthly_remaining = remaining;
         }
       } catch { /* Never retry an uncertain write or claim an unconfirmed credit. */ }
     }

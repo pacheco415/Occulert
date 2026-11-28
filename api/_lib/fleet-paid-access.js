@@ -16,7 +16,7 @@ if (previewFleetIds().length) {
 function paidAccessConfig() {
   const key = process.env.STRIPE_FLEET_ACCESS_READ_KEY || '';
   const prices = (process.env.OCCULERT_FLEET_ASK_PRICE_IDS || '').split(',').map(id => id.trim());
-  if (!/^rk_live_[A-Za-z0-9_]+$/.test(key) || !prices.every(id => /^price_[A-Za-z0-9]+$/.test(id))) return previewFleetIds().length ? { previewOnly: true } : null;
+  if (!/^rk_live_[A-Za-z0-9_]+$/.test(key) || !prices.every(id => /^price_[A-Za-z0-9]+$/.test(id))) return previewFleetIds().length || pilotEnabled() ? { previewOnly: true } : null;
   return { key, prices };
 }
 
@@ -66,7 +66,31 @@ async function verifyWithStripe({ fleet, actorId }, { key, prices }) {
   return paidThrough(current, prices, Math.floor(Date.now() / 1000));
 }
 
+function pilotEnabled() {
+  return process.env.OCCULERT_FLEET_PILOT_ENTITLEMENTS === '1';
+}
+
+async function activePilot(owner) {
+  if (!pilotEnabled()) return null;
+  if (!isUuid(owner.fleet.id) || !isUuid(owner.actorId)) throw new Error('invalid_fleet_owner');
+  const row = await db.pgFetch('rpc/fleet_active_pilot', { method: 'POST',
+    body: { p_actor_id: owner.actorId, p_fleet_id: owner.fleet.id } });
+  if (row === null) return null;
+  if (!row || !Number.isFinite(Date.parse(row.expires_at)) || !Number.isInteger(row.monthly_question_cap) ||
+      row.monthly_question_cap < 1 || row.monthly_question_cap > 50) throw new Error('invalid_pilot_grant');
+  return Date.parse(row.expires_at) > Date.now() ? row : null;
+}
+
+async function fleetAccessMode(owner, config) {
+  if (await activePilot(owner)) return 'pilot';
+  return await hasSubscriptionAccess(owner, config) ? 'subscription' : null;
+}
+
 async function hasPaidFleetAccess(owner, config) {
+  return Boolean(await fleetAccessMode(owner, config));
+}
+
+async function hasSubscriptionAccess(owner, config) {
   const { fleet, actorId } = owner;
   if (!isUuid(fleet.id) || !isUuid(actorId)) throw new Error('invalid_fleet_owner');
   if (previewFleetIds().includes(fleet.id.toLowerCase())) {
@@ -92,4 +116,4 @@ async function hasPaidFleetAccess(owner, config) {
   return paid;
 }
 
-module.exports = { paidAccessConfig, hasPaidFleetAccess };
+module.exports = { paidAccessConfig, hasPaidFleetAccess, fleetAccessMode, activePilot };

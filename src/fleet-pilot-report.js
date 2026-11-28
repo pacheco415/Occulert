@@ -68,6 +68,7 @@
       completed: report.completed, noEnd: report.no_recorded_end, invalidEnds: report.invalid_recorded_end,
       interrupted: null, unscored: report.unscored, scored: report.scored, average: report.average_safety_score,
       comparison: comparisonText(report),
+      pilotExpiresAt: report.pilotExpiresAt,
       monitoredHours: report.monitored_hours, alertsPerMonitoredHour: report.alerts_per_monitored_hour,
       alerts: report.alerts, missingAlerts: report.missing_alert_records, validAlertRecords: report.valid_alert_records,
       rosterTotal: report.roster_total, activeDrivers: report.active_drivers,
@@ -459,6 +460,8 @@
     if (!panel || !report) return;
     setText('pilotQualityStatus', summary.available ? 'Complete last ' + summary.days + ' days · ' + summary.sessions +
       ' stored sessions · refreshed ' + new Date(summary.generatedAt).toLocaleString() : summary.reason);
+    setText('qualityPilotAccess', summary.available && summary.pilotExpiresAt > Date.now() ?
+      'Pilot access until ' + new Date(summary.pilotExpiresAt).toLocaleDateString() : '');
     setText('qualityComparison', summary.available ? summary.comparison : '');
     setText('qualityMonitoredHours', summary.available ? summary.monitoredHours.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—');
     setText('qualityHourlyRate', summary.available && summary.alertsPerMonitoredHour !== null ? summary.alertsPerMonitoredHour : '—');
@@ -516,7 +519,7 @@
               !data.privacy || data.privacy.includes_location !== false || data.privacy.includes_personal_media !== false ||
               data.privacy.includes_raw_motion !== false || !validPeriodReport(data.report, days))
             throw new Error('Complete-period response could not be verified. Refresh the report.');
-          return data.report;
+          return Object.assign({}, data.report, { pilotExpiresAt: time(data.pilot_expires_at) });
         })(),
         new Promise(function (_, reject) { timer = setTimeout(function () { abort.abort(); reject(new Error('Complete-period report timed out. Refresh the report.')); }, 8000); }),
       ]);

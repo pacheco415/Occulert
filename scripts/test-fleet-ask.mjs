@@ -34,7 +34,7 @@ function paidSubscription() {
         captured: true, amount_captured: 1000, amount_refunded: 0, refunded: false, disputed: false } } };
 }
 
-function setup(t, { companyName = 'Private Transit', roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], activeTestSubscription = false, testOwner = ownerId, cacheEnabled = false, releaseFails = false, owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
+function setup(t, { pilotGrant = null, pilotFlag = '', companyName = 'Private Transit', roster = [{ id: driverId, name: 'María O’Brien', vehicle_id: 'Van-K4' }], activeTestSubscription = false, testOwner = ownerId, cacheEnabled = false, releaseFails = false, owned = true, allowed = true, quotaError = 'account_write_rate_limited', remaining = 49, subscription = paidSubscription, results = 1,
   provider = async () => providerReply('Three sessions need review.') } = {}) {
   // A question spends quota and a model call, so only a fresh Supabase Auth check
   // (which rejects signed-out sessions) may authorize it; a cached JWT check may not.
@@ -42,6 +42,10 @@ function setup(t, { companyName = 'Private Transit', roster = [{ id: driverId, n
     token === 'owner' && options?.freshUser === true && options.cachedIdentity !== true ? { id: ownerId } : null);
   let cache;
   const db = t.mock.method(transport, 'pgFetch', async (path, { params, body, mergeDuplicates }) => {
+    if (path === 'rpc/fleet_active_pilot') {
+      assert.deepEqual(body, { p_actor_id: ownerId, p_fleet_id: fleetId });
+      return pilotGrant;
+    }
     if (path === 'fleet_billing_test') {
       assert.equal(params.fleet_id, 'eq.' + fleetId);
       assert.equal(params.status, 'eq.active');
@@ -71,7 +75,7 @@ function setup(t, { companyName = 'Private Transit', roster = [{ id: driverId, n
       if (releaseFails) throw new Error('release unavailable');
       return remaining + 1;
     }
-    if (path === 'rpc/reserve_fleet_question') {
+    if (path === 'rpc/reserve_fleet_question' || path === 'rpc/reserve_fleet_pilot_question') {
       assert.deepEqual(body, { p_actor_id: ownerId, p_fleet_id: fleetId });
       return { user_id: ownerId, fleet_id: fleetId, allowed,
         ...(allowed ? { monthly_remaining: remaining, month_start: '2026-11-01' } : { error: quotaError, retry_after: quotaError === 'fleet_question_monthly_limit' ? 86400 : 32 }) };
@@ -110,7 +114,7 @@ function setup(t, { companyName = 'Private Transit', roster = [{ id: driverId, n
   const logs = t.mock.method(console, 'error', () => {});
   for (const [key, value] of Object.entries({ SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_ROLE_KEY: 'fixture',
     ANTHROPIC_API_KEY: secret, OCCULERT_FLEET_ASK_ENABLED: '1', OCCULERT_INSIGHTS_MODEL: 'fixture-model',
-    STRIPE_FLEET_ACCESS_READ_KEY: readKey, OCCULERT_FLEET_ASK_PRICE_IDS: 'price_Start,price_Growth' })) {
+    OCCULERT_FLEET_PILOT_ENTITLEMENTS: pilotFlag, STRIPE_FLEET_ACCESS_READ_KEY: readKey, OCCULERT_FLEET_ASK_PRICE_IDS: 'price_Start,price_Growth' })) {
     const old = process.env[key]; process.env[key] = value;
     t.after(() => { if (old === undefined) delete process.env[key]; else process.env[key] = old; });
   }
@@ -599,4 +603,20 @@ test('personal details beyond the first thousand roster entries still block disc
   assert.equal(reply.body.reason, 'driver_or_vehicle');
   assert.equal(app.db.mock.calls.filter(call => call.arguments[0] === 'drivers').length, 2);
   assert.equal(app.send.mock.callCount(), 0);
+});
+
+test('production pilot access precedes Stripe only for a current, enabled grant', async t => {
+  for (const [label, flag, offset, expected, billingCalls] of [
+    ['enabled', '1', 60000, 200, 0], ['expired', '1', -60000, 403, 1], ['flag off', '', 60000, 403, 1],
+  ]) await t.test(label, async child => {
+    const grant = { expires_at: new Date(Date.now() + offset).toISOString(), monthly_question_cap: 3 };
+    const app = setup(child, { pilotFlag: flag, pilotGrant: grant, results: 0, remaining: 2 });
+    if (label === 'enabled') delete process.env.STRIPE_FLEET_ACCESS_READ_KEY;
+    const result = await app.invoke();
+    assert.equal(result.status, expected);
+    assert.equal(app.stripe.mock.callCount(), billingCalls);
+    assert.equal(app.db.mock.calls.some(call => call.arguments[0] === 'rpc/reserve_fleet_pilot_question'), expected === 200);
+    assert.equal(app.db.mock.calls.some(call => call.arguments[0] === 'rpc/fleet_active_pilot'), flag === '1');
+    if (expected === 200) assert.equal(result.body.monthly_remaining, 2);
+  });
 });
