@@ -7,6 +7,7 @@ const db = new PGlite();
 const migrations = [
   "20260927030000_stripe_test_billing.sql",
   "20260929010000_billing_ignored_webhook_events.sql",
+  "20261125003800_preview_billing_owner.sql",
 ].map(name => readFileSync(new URL("../supabase/migrations/" + name, import.meta.url), "utf8"));
 const fleet = "11111111-1111-4111-8111-111111111111";
 const owner = "22222222-2222-4222-8222-222222222222";
@@ -42,6 +43,9 @@ async function apply(eventId, overrides = {}) {
 
 try {
   await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+    create schema auth;
+    create table auth.users(id uuid primary key);
+    insert into auth.users values ('${owner}'), ('${other}');
     create table public.fleets(id uuid primary key, owner_user_id uuid not null);
     grant usage on schema public to anon, authenticated, service_role;
     grant select on public.fleets to service_role;
@@ -128,7 +132,11 @@ try {
   assert.deepEqual(rows[0].result, { released: false });
   await db.query("select public.release_test_billing_sync($1::text,$2::uuid)", [subscription, secondToken]);
 
+  const billingOwner = async () => (await db.query(
+    'select owner_user_id from public.fleet_billing_test where fleet_id = $1', [fleet])).rows[0].owner_user_id;
+  assert.equal(await billingOwner(), null);
   assert.deepEqual(await apply("evt_TestFirst"), { applied: true, duplicate: false });
+  assert.equal(await billingOwner(), owner);
   assert.deepEqual(await apply("evt_TestFirst", { status: "canceled" }),
     { applied: false, duplicate: true }, "duplicate event IDs must be harmless");
   rows = (await db.query("select status, plan from public.fleet_billing_test where fleet_id=$1", [fleet])).rows;
@@ -144,6 +152,7 @@ try {
   assert.deepEqual(await apply("evt_BadCustomer"),
     { ignored: true, reason: "test_customer_mismatch" },
     "an ignored event ID must retain its original reason");
+  assert.equal(await billingOwner(), owner);
   await assert.rejects(apply("evt_SecondSub", { subscription: "sub_AnotherSubscription" }),
     /multiple_test_subscriptions_conflict/);
   rows = (await db.query("select count(*)::integer as n from public.billing_test_webhook_events")).rows;
