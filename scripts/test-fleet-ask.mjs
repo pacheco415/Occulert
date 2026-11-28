@@ -188,6 +188,34 @@ test('calendar ranges are allowed while spaced dial strings remain private', asy
   assert.equal(app.send.mock.callCount(), 6);
 });
 
+test('slightly long answers keep complete sentences and the counter', async t => {
+  const app = setup(t);
+  const warn = t.mock.method(console, 'warn', () => {});
+  const sentence = 'The fleet logged 3.5 alerts per monitored hour.';
+  const prefix = Array(12).fill(sentence).join(' ');
+  app.send.mock.mockImplementationOnce(async () => providerReply(prefix + ' ' + 'Detail '.repeat(27) + 'continues.'));
+  assert.equal((await app.invoke()).body.answer, prefix);
+  assert.deepEqual(warn.mock.calls[0].arguments, ['fleet_ai_output_rejected', { feature: 'fleet_ask', reason: 'character_limit' }]);
+  for (const rejected of ['Too short. ' + 'x'.repeat(700), prefix + ' ' + 'x'.repeat(700) + secret]) {
+    app.send.mock.mockImplementationOnce(async () => providerReply(rejected));
+    assert.equal((await app.invoke()).body.attempt_released, true);
+  }
+});
+
+test('size rejections identify the feature and reason without logging content', async t => {
+  const app = setup(t);
+  const warn = t.mock.method(console, 'warn', () => {});
+  for (const [reason, reply] of [
+    ['character_limit', providerReply('x'.repeat(701))],
+    ['max_tokens', Response.json({ stop_reason: 'max_tokens', content: [{ type: 'text', text: 'private reply' }] })],
+  ]) {
+    app.send.mock.mockImplementationOnce(async () => reply);
+    assert.equal((await app.invoke()).body.attempt_released, true);
+    assert.deepEqual(warn.mock.calls.at(-1).arguments, ['fleet_ai_output_rejected', { feature: 'fleet_ask', reason }]);
+  }
+  assert.equal(warn.mock.callCount(), 2);
+});
+
 for (const [name, question] of [
   ['Kevin Long', 'How long were sessions this week?'],
   ['Miles Davis', 'How many miles did the fleet cover?'],
@@ -312,6 +340,7 @@ for (const days of [7, 30]) test('allowlisted request and answer for ' + days + 
   const [url, options] = app.send.mock.calls[0].arguments;
   assert.equal(url, 'https://api.anthropic.com/v1/messages');
   const outbound = JSON.parse(options.body);
+  assert.match(outbound.system, /under 600 characters/);
   assert.match(outbound.system, /emergency services now/);
   const period = n => ({ days: n, ...counts, alerts_per_day: n === 7 ? 1 : 0.2333, alerts_per_session: 1.75, share_reviewed: 0.25 });
   assert.deepEqual(JSON.parse(outbound.messages[0].content), { days, question, week: period(7), month: period(30),

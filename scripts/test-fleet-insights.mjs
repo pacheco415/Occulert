@@ -141,9 +141,18 @@ for (const days of [7, 30]) test('only validated allowlisted counts and dates le
   assert.deepEqual(Object.keys(body).sort(), ['max_tokens', 'messages', 'model', 'system']);
   assert.equal(body.model, model);
   assert.equal(body.max_tokens, 400);
+  assert.match(body.system, /under 1,000 characters/);
   assert.match(body.system, /missing alert records/);
   assert.deepEqual(body.messages, [{ role: 'user', content: JSON.stringify({ days, window_start: start, window_end: end, ...counts }) }]);
   assert.equal(app.logs.mock.callCount(), 0);
+});
+
+test('summaries keep the last complete sentence within the summary cap', async t => {
+  const app = setup(t);
+  t.mock.method(console, 'warn', () => {});
+  const prefix = Array(22).fill('The fleet recorded 2.5 alerts per session.').join(' ');
+  app.fetch.mock.mockImplementationOnce(async () => reply(prefix + ' ' + 'Detail '.repeat(51) + 'continues.'));
+  assert.equal((await app.invoke()).body.summary, prefix);
 });
 
 test('inconsistent aggregates stop before disclosure', async t => {
@@ -155,6 +164,7 @@ test('inconsistent aggregates stop before disclosure', async t => {
 test('empty, excessive, truncated and malformed replies and upstream failures return only generic errors', async t => {
   fakeClock(t);
   const app = setup(t);
+  const warn = t.mock.method(console, 'warn', () => {});
   const failed = { status: 502, retryAfter: '120', body: {
     ok: false, error: 'insights_unavailable', retry_after: '2026-11-08T00:02:00.000Z',
   } };
@@ -168,6 +178,11 @@ test('empty, excessive, truncated and malformed replies and upstream failures re
   assert.deepEqual(await app.invoke(), failed);
   app.fetch.mock.mockImplementationOnce(async () => new Response(apiKey, { status: 504 }));
   assert.deepEqual(await app.invoke(), { ...failed, status: 504 });
+  assert.deepEqual(warn.mock.calls.map(call => call.arguments), [
+    ['fleet_ai_output_rejected', { feature: 'fleet_insights', reason: 'character_limit' }],
+    ['fleet_ai_output_rejected', { feature: 'fleet_insights', reason: 'response_byte_limit' }],
+    ['fleet_ai_output_rejected', { feature: 'fleet_insights', reason: 'max_tokens' }],
+  ]);
   assert.equal(app.fetch.mock.callCount(), 9);
   const logs = JSON.stringify(app.logs.mock.calls.map(call => call.arguments));
   assert.equal(logs.includes(apiKey), false);
