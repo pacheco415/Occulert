@@ -30,6 +30,7 @@ function bearer() {
 function report() {
   return { version: 1, days: 30, window_start: '2026-09-01T00:00:00Z', window_end: '2026-10-01T00:00:00Z',
     complete_period: true, interruption_reasons_available: false, unrecorded_sessions_detectable: false,
+    monitored_hours: 0, alerts_per_monitored_hour: null,
     roster_total: 0, active_drivers: 0, reporting_active_drivers: 0, sessions: 0, completed: 0,
     no_recorded_end: 0, invalid_recorded_end: 0, scored: 0, unscored: 0, average_safety_score: null,
     valid_alert_records: 0, missing_alert_records: 0, alerts: 0, reviewed: 0, without_reviewed_followup: 0,
