@@ -508,7 +508,7 @@ test('owner questions and privacy reasons against a fleet with word-like surname
       'Review Maria Shift', 'Show Sam Morning', 'How did Ann Weekend do?', 'Check Lee Fleet', 'How did Kevin Long do?',
       'How did Will Rich do?', 'Show June Day', 'Show Alex Price', 'Compare Casey Young and Miles Davis',
       'How many alerts did Kevin have?', 'Did Miles drive today?', "What are Driver’s totals?", "How was Early's week?",
-      'What did Rest report?', 'Did Shift log any alerts?', 'Did Day drive today?', 'Please review Van-0', 'Check van-12'],
+      'How did Long perform?', 'Did Early finish the shift?', 'Show Tom', 'Check Ann', 'What did Rest report?', 'Did Shift log any alerts?', 'Did Day drive today?', 'Please review Van-0', 'Check van-12'],
     identifier: ['What happened on ' + driverId + '?', 'Look at ' + ownerId, 'Review ' + fleetId],
     contact: ['Email help@example.org', 'Can I call (415) 555-0123?', 'Contact 510 555 0199', 'Call 4155550100'],
     location: ['What happened near 37.77, -122.42?', 'Compare alerts at 40.1; -73.2', 'How about +37.5, -122.1?']

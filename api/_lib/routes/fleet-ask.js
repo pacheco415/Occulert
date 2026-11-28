@@ -55,7 +55,7 @@ function refersToDriver(question, word) {
   // Tokenization limits word to Unicode letters, marks and numbers. Match
   // an individual in a subject or possessive phrase, including short names.
   const possessive = "(?<![\\p{L}\\p{M}\\p{N}])" + word + "[’']s\\b";
-  const subject = '\\b(?:did|does)\\s+' + word + '\\s+(?:have|drive|report|log|do)\\b';
+  const subject = '\\b(?:did|does)\\s+' + word + '\\s+(?:have|drive|report|log|do|perform|start|end|finish|stop|record|receive|trigger|complete|work|take|rest)\\b';
   return new RegExp(possessive + '|' + subject, 'iu').test(question);
 }
 
@@ -74,7 +74,7 @@ async function mentionsRoster(question, fleetId) {
       after = driver.id;
       const nameParts = words(driver.name);
       if (nameParts.some(word => questionWords.has(word) &&
-          ((word.length >= 4 && !fleetQuestionWords.has(word)) || (word.length >= 2 && refersToDriver(question, word)))) ||
+          ((word.length >= 3 && !fleetQuestionWords.has(word)) || (word.length >= 2 && refersToDriver(question, word)))) ||
           (nameParts.length > 1 && nameParts.join('').length >= 3 && containsLabel(question, driver.name))) return true;
       if (driver.vehicle_id && mentionsVehicle(question, driver.vehicle_id)) return true;
     }
