@@ -80,6 +80,8 @@ jobs:
         run: |
           npm install --global npm@10.9.8 eas-cli@27.10.0
           npm ci --include=dev --prefix "$RUNNER_TEMP/occulert-testflight-control/source/native-app"
+      - name: Check the release candidate against current Expo recommendations
+        run: npm --prefix "$RUNNER_TEMP/occulert-testflight-control/source/native-app" run check:dependencies
       - name: Read-only Expo preflight and complete source archive comparison
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

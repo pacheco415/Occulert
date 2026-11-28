@@ -38,6 +38,9 @@
         report.scored + report.unscored !== report.sessions ||
         report.valid_alert_records + report.missing_alert_records !== report.sessions ||
         report.reviewed + report.without_reviewed_followup !== report.sessions) return false;
+    if (!Number.isFinite(report.monitored_hours) || report.monitored_hours < 0 || report.monitored_hours > 16 * report.completed ||
+        (report.monitored_hours === 0 ? report.alerts_per_monitored_hour !== null :
+          !Number.isFinite(report.alerts_per_monitored_hour) || report.alerts_per_monitored_hour < 0)) return false;
     var pipelines = report.detector_pipelines;
     var pipelineKeys = ['web_mediapipe_ear', 'ios_mlkit_eye_probability', 'android_mlkit_eye_probability', 'unknown'];
     if (!pipelines || typeof pipelines !== 'object' || Array.isArray(pipelines) ||
@@ -64,6 +67,7 @@
       sourceCount: report.sessions, completePeriod: true, sessions: report.sessions,
       completed: report.completed, noEnd: report.no_recorded_end, invalidEnds: report.invalid_recorded_end,
       interrupted: null, unscored: report.unscored, scored: report.scored, average: report.average_safety_score,
+      monitoredHours: report.monitored_hours, alertsPerMonitoredHour: report.alerts_per_monitored_hour,
       alerts: report.alerts, missingAlerts: report.missing_alert_records, validAlertRecords: report.valid_alert_records,
       rosterTotal: report.roster_total, activeDrivers: report.active_drivers,
       detectorPipelines: report.detector_pipelines,
@@ -75,6 +79,8 @@
   }
   function reportRows(summary) {
     return [
+      ['Monitored hours (up to 16 per completed session)', summary.monitoredHours.toLocaleString(undefined, { maximumFractionDigits: 2 })],
+      ['Recorded alerts per monitored hour', summary.alertsPerMonitoredHour === null ? 'No monitored time' : String(summary.alertsPerMonitoredHour)],
       ['Sessions started in window', String(summary.sessions)],
       ['Completed records (valid recorded end time)', String(summary.completed)],
       ['No recorded end time (state unknown)', String(summary.noEnd)],
@@ -192,6 +198,15 @@
     }
   }
 
+  function showPlanMessage(id, feature) {
+    var pricing = node('a', 'View fleet plans');
+    pricing.href = '/fleet-pricing.html';
+    var email = node('a', 'fleet@occulert.com');
+    email.href = 'mailto:fleet@occulert.com';
+    document.getElementById(id).replaceChildren(feature + ' require an active paid Occulert fleet plan. ',
+      pricing, ' or contact ', email, '.');
+  }
+
   function clearInsight() {
     clearTimeout(insightPollTimer); insightPollTimer = null;
     clearTimeout(insightUnlockTimer); insightUnlockTimer = null;
@@ -269,6 +284,14 @@
           if (canCheck) void writeInsight(attempt + 1);
           else update({ skipReviewLoad: true });
         }, delay * 1000);
+        return;
+      }
+      if (response.status === 403) {
+        var denial = await response.json();
+        if (!matchesReport()) return;
+        if (denial?.error !== 'paid_plan_required') throw new Error();
+        showPlanMessage('fleetInsightText', 'AI summaries');
+        insightButton.textContent = 'Write summary';
         return;
       }
       if (response.status === 502 || response.status === 504) {
@@ -376,7 +399,7 @@
         setText('fleetAskStatus', problem + credit + ' Try again.'); return;
       }
       if (response.status === 403 && data?.error === 'paid_plan_required') {
-        setText('fleetAskStatus', 'Fleet questions require an active paid Occulert fleet plan.'); return;
+        showPlanMessage('fleetAskStatus', 'Fleet questions'); return;
       }
       if (response.status === 400 && data?.error === 'question_has_personal_details') {
         var messages = {
@@ -425,6 +448,8 @@
     if (!panel || !report) return;
     setText('pilotQualityStatus', summary.available ? 'Complete last ' + summary.days + ' days · ' + summary.sessions +
       ' stored sessions · refreshed ' + new Date(summary.generatedAt).toLocaleString() : summary.reason);
+    setText('qualityMonitoredHours', summary.available ? summary.monitoredHours.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—');
+    setText('qualityHourlyRate', summary.available && summary.alertsPerMonitoredHour !== null ? summary.alertsPerMonitoredHour : '—');
     setText('qualityCompleted', summary.available ? summary.completed : '—');
     setText('qualityInterrupted', 'Unavailable');
     setText('qualityUnscored', summary.available ? summary.unscored : '—');
