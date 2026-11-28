@@ -21,18 +21,30 @@ function words(text) {
 const commonNameWords = new Set(['will', 'day', 'may', 'june', 'mark', 'rich', 'chase', 'grant', 'hope', 'night', 'week',
   'long', 'miles', 'best', 'most', 'grace', 'bill', 'park', 'lane', 'west', 'east', 'north', 'south']);
 
-// Exempt a complete numeric date only. A longer dial string containing a
-// date-shaped substring must still be screened as a phone number.
+function validCalendarToken(value) {
+  if (/^(?:19|20)\d{2}$/.test(value)) return true;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const local = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+  if (!iso && !local) return false;
+  const [, year, month, day] = iso || [null, local[3], local[1], local[2]];
+  const date = new Date(year + '-' + month + '-' + day + 'T00:00:00Z');
+  return Number.isFinite(date.getTime()) && date.getUTCDate() === Number(day);
+}
+
 function mentionsPhone(question) {
-  const candidates = question.match(/\p{Nd}(?:[\s().+-]*\p{Nd}){6,}/gu) || [];
-  return candidates.some(value => {
-    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    const local = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
-    if (!iso && !local) return true;
-    const [, year, month, day] = iso || [null, local[3], local[1], local[2]];
-    const date = new Date(year + '-' + month + '-' + day + 'T00:00:00Z');
-    return !Number.isFinite(date.getTime()) || date.getUTCDate() !== Number(day);
-  });
+  const runs = question.matchAll(/\p{Nd}(?:[\s().+-]*\p{Nd}){6,}/gu);
+  for (const { 0: run, index } of runs) {
+    // A telephone label disambiguates even a number formatted like two years.
+    if (/\b(?:call|dial|phone|tel)\s*[:.]?\s*$/iu.test(question.slice(0, index))) return true;
+    // Parse whole calendar tokens. A phone ending in a four-digit year still
+    // has unconsumed dial groups and must never qualify for the exemption.
+    const calendar = /(?:^|[\s-]+)(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}|\d{4})(?=$|[\s-])/gy;
+    let end = 0;
+    let part;
+    while ((part = calendar.exec(run)) && validCalendarToken(part[1])) end = calendar.lastIndex;
+    if (end !== run.length) return true;
+  }
+  return false;
 }
 
 function mentionsVehicle(question, id) {
