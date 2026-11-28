@@ -12,8 +12,10 @@ const question = 'How many sessions need review?';
 const counts = { roster_total: 3, active_drivers: 2, reporting_active_drivers: 1, sessions: 4, completed: 3,
   no_recorded_end: 1, invalid_recorded_end: 0, scored: 1, unscored: 3, valid_alert_records: 3,
   missing_alert_records: 1, alerts: 7, reviewed: 1, without_reviewed_followup: 3 };
-const end = '2026-11-23T00:00:00.000Z';
-const start = days => new Date(Date.parse(end) - days * 86400000).toISOString();
+const timeOfDayEnd = '2026-11-23T02:00:00.000Z';
+function reportWindow(days, end = days === 7 ? '2026-11-23T00:00:00.000Z' : '2026-11-23T01:00:00.000Z') {
+  return { window_start: new Date(Date.parse(end) - days * 86400000).toISOString(), window_end: end };
+}
 const blocks = Array.from({ length: 6 }, (_, i) => ({ start_hour: i * 4, monitored_minutes: 120,
   drowsy_alerts: i, distracted_alerts: 2, rate_available: true, drowsy_alerts_per_hour: i / 2 }));
 const providerReply = text => Response.json({ stop_reason: 'end_turn', content: [{ type: 'text', text }] });
@@ -76,10 +78,9 @@ function setup(t, { companyName = 'Private Transit', roster = [{ id: driverId, n
     }
     const days = body.p_days;
     assert.deepEqual(body, { p_days: days, p_actor_id: ownerId, p_fleet_id: fleetId });
-    const period = { version: 1, days, window_start: start(days), window_end: end };
-    if (path === 'rpc/fleet_time_of_day_report') return { ...period, timezone: 'America/Los_Angeles', blocks };
+    if (path === 'rpc/fleet_time_of_day_report') return { version: 1, days, ...reportWindow(days, timeOfDayEnd), timezone: 'America/Los_Angeles', blocks };
     assert.equal(path, 'rpc/fleet_period_report');
-    return { ...period, ...counts, complete_period: true, average_safety_score: null,
+    return { version: 1, days, ...reportWindow(days), ...counts, complete_period: true, average_safety_score: null,
       interruption_reasons_available: false, unrecorded_sessions_detectable: false,
       detector_pipelines: { web_mediapipe_ear: 4, ios_mlkit_eye_probability: 0, android_mlkit_eye_probability: 0, unknown: 0 },
       private_future_field: { driverId, company: 'Private Transit' } };
@@ -338,15 +339,16 @@ for (const days of [7, 30]) test('allowlisted request and answer for ' + days + 
   const { generated_at } = result.body;
   assert.equal(new Date(generated_at).toISOString(), generated_at);
   assert.deepEqual(result.body, { ok: true, answer: 'Three sessions need review.', model: 'fixture-model', days, monthly_remaining: 49,
-    window_start: start(days), window_end: end, generated_at, ai_generated: true });
+    ...reportWindow(days), generated_at, ai_generated: true });
   const [url, options] = app.send.mock.calls[0].arguments;
   assert.equal(url, 'https://api.anthropic.com/v1/messages');
   const outbound = JSON.parse(options.body);
   assert.match(outbound.system, /under 600 characters/);
   assert.match(outbound.system, /emergency services now/);
-  const period = n => ({ days: n, ...counts, alerts_per_day: n === 7 ? 1 : 0.2333, alerts_per_session: 1.75, share_reviewed: 0.25 });
+  assert.match(outbound.system, /exact total is unavailable/i);
+  const period = n => ({ days: n, ...reportWindow(n), ...counts, alerts_per_day: n === 7 ? 1 : 0.2333, alerts_per_session: 1.75, share_reviewed: 0.25 });
   assert.deepEqual(JSON.parse(outbound.messages[0].content), { days, question, week: period(7), month: period(30),
-    timezone: 'America/Los_Angeles', blocks });
+    time_of_day: { days, ...reportWindow(days, timeOfDayEnd), timezone: 'America/Los_Angeles', blocks } });
   assert.doesNotMatch(options.body, /Private Transit|María|Van-K4|private_future_field|private-fixture-credential/);
   assert.equal(app.logs.mock.callCount(), 0);
 });
