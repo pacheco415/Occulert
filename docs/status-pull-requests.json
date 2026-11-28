@@ -1,35 +1,40 @@
 {
-  "observedAt": "2026-11-24T00:23:25.412Z",
+  "observedAt": "2026-11-28T06:36:18Z",
   "complete": true,
   "pullRequests": [
     {
-      "number": 484,
-      "headRefName": "codex/playwright-1-65-1",
+      "number": 527,
+      "headRefName": "codex/fleet-pilot-grants",
       "isDraft": false
     },
     {
-      "number": 483,
-      "headRefName": "codex/retire-assets-2026-11-23",
+      "number": 526,
+      "headRefName": "codex/fleet-period-comparison",
       "isDraft": false
     },
     {
-      "number": 481,
-      "headRefName": "codex/fleet-ai-summary-docs",
+      "number": 524,
+      "headRefName": "codex/fleet-monitored-hours",
       "isDraft": false
     },
     {
-      "number": 480,
-      "headRefName": "codex/fleet-time-of-day",
+      "number": 518,
+      "headRefName": "codex/branch-review-nov24",
       "isDraft": false
     },
     {
-      "number": 479,
-      "headRefName": "dependabot/npm_and_yarn/playwright/test-1.65.1",
+      "number": 517,
+      "headRefName": "codex/asset-build-proposal",
       "isDraft": false
     },
     {
-      "number": 471,
-      "headRefName": "codex/fleet-digest-preferences",
+      "number": 516,
+      "headRefName": "codex/testflight-candidate-nov24",
+      "isDraft": false
+    },
+    {
+      "number": 515,
+      "headRefName": "codex/status-nov24",
       "isDraft": false
     }
   ]

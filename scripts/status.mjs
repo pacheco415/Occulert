@@ -55,14 +55,16 @@ export function validateObservations(input) {
   if (facts.testFlight) {
     const b = object(facts.testFlight, 'TestFlight observation');
     commit(b.sourceCommit, 'TestFlight source');
-    date(b.completedAt, 'Native build completion date');
+    const internalTesting = b.receiptType === 'dashboard_observation' && b.dashboardState === 'Testing';
+    if (internalTesting) date(b.uploadedAt, 'TestFlight upload date');
+    else date(b.completedAt, 'Native build completion date');
     date(b.observedAt, 'TestFlight observation date');
     if (!/^\d+\.\d+\.\d+$/.test(b.version) || !/^\d+$/.test(b.buildNumber)) throw new Error('TestFlight version and build number must be explicit strings.');
     if (b.receiptType === 'dashboard_observation') {
-      const publicFields = new Set(['receiptType', 'sourceCommit', 'version', 'buildNumber', 'completedAt', 'observedAt', 'dashboardState', 'uploadState', 'internalGroupAssigned', 'internalAvailabilityObserved', 'physicalAcceptance']);
+      const publicFields = new Set(['receiptType', 'sourceCommit', 'version', 'buildNumber', internalTesting ? 'uploadedAt' : 'completedAt', 'observedAt', 'dashboardState', 'uploadState', 'internalGroupAssigned', 'internalAvailabilityObserved', 'physicalAcceptance']);
       if (Object.keys(b).some(key => !publicFields.has(key))) throw new Error('A dashboard TestFlight receipt may contain only its explicit public observation fields, without API states or operational identifiers.');
-      if (b.dashboardState !== 'Ready to Submit' || b.uploadState !== 'Complete' || b.internalGroupAssigned !== true || b.internalAvailabilityObserved !== true) {
-        throw new Error('A dashboard TestFlight receipt requires observed Ready to Submit, Complete, internal group assignment and explicit internal availability.');
+      if ((!internalTesting && b.dashboardState !== 'Ready to Submit') || b.uploadState !== 'Complete' || b.internalGroupAssigned !== true || b.internalAvailabilityObserved !== true) {
+        throw new Error('A dashboard TestFlight receipt requires an observed dashboard state, completed upload, internal group assignment and explicit internal availability.');
       }
     } else {
       if (b.receiptType !== undefined) throw new Error('Unsupported TestFlight receiptType.');
@@ -140,7 +142,10 @@ export function renderStatus({ git, observations = { schemaVersion: 1 }, pullReq
   lines.push('');
   if (facts.testFlight) {
     const b = facts.testFlight;
-    if (b.receiptType === 'dashboard_observation') {
+    if (b.receiptType === 'dashboard_observation' && b.dashboardState === 'Testing') {
+      lines.push(`- Internal TestFlight dashboard: ${b.version} (${b.buildNumber}) showed Testing in the assigned group on ${b.observedAt} (Pacific).`,
+        `- TestFlight source: \`${b.sourceCommit}\`.`, `- Upload marked Complete on ${b.uploadedAt} (Pacific). [Delivery handoff](RELEASE_2026-11-23.md)`);
+    } else if (b.receiptType === 'dashboard_observation') {
       lines.push(`- Historical TestFlight dashboard receipt: ${b.version} (${b.buildNumber}); observed Ready to Submit, upload Complete; internal group assigned.`, `- TestFlight source: \`${b.sourceCommit}\`.`, `- Build completed: ${b.completedAt}; saved dashboard receipt records internal availability as of ${b.observedAt}.`);
     } else {
       lines.push(`- Historical TestFlight receipt: ${b.version} (${b.buildNumber}); observed Apple VALID, internal IN_BETA_TESTING.`, `- TestFlight source: \`${b.sourceCommit}\`.`, `- Build completed: ${b.completedAt}; availability observed ${b.observedAt}.`);
@@ -163,10 +168,10 @@ export function renderStatus({ git, observations = { schemaVersion: 1 }, pullReq
     if (m.state === 'pending') lines.push(`- Recorded pending versions: ${m.pendingVersions.join(', ')}.`);
   } else lines.push('- Production migrations: Unknown; Git files do not establish a deployed schema.');
   lines.push('', 'Next steps:', '',
-    '1. Finish current-source checks for the remaining reviewed PRs and compose them against current main.',
+    '1. Verify candidate changes against current main before release.',
     '2. Review the native release intent and exact-build device checklist for the inspected source; a build remains a separate action.',
     '3. Record parked iPhone Silent-mode Safari/PWA alerts, Watch delivery and exact-build device checks.',
-    '4. Keep production receipts private; review deployment prerequisites and the separate #206 decision before enabling dependent features.',
+    '4. Keep production receipts private; verify deployment prerequisites before enabling dependent features.',
     '5. Review remaining security and consent changes, then benchmark parked detector flags before changing released alerts.', '',
     'Refresh the Git facts with `npm run status -- --write` in a current full-history checkout.',
     'Supply only approved public snapshots in `docs/status-observations.json` and a complete PR snapshot in',
