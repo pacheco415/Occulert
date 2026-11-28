@@ -396,7 +396,14 @@
         showPlanMessage('fleetAskStatus', 'Fleet questions'); return;
       }
       if (response.status === 400 && data?.error === 'question_has_personal_details') {
-        setText('fleetAskStatus', 'Your question includes personal details. Remove them and ask again.'); return;
+        var messages = {
+          driver_or_vehicle: 'Fleet questions answer about the whole fleet, not individual drivers. Remove the driver or vehicle name and ask again.',
+          contact: 'Remove the email address or phone number and ask again.',
+          identifier: 'Remove the record identifier and ask again.',
+          location: 'Remove the coordinates and ask again.'
+        };
+        setText('fleetAskStatus', Object.hasOwn(messages, data.reason) ? messages[data.reason] :
+          'Your question includes personal details. Remove them and ask again.'); return;
       }
       if (!response.ok || data?.ok !== true || data.days !== days || data.ai_generated !== true ||
           typeof data.answer !== 'string' || !data.answer.trim() || data.answer.length > 700 ||

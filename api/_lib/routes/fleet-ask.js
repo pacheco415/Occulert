@@ -1,3 +1,4 @@
+const { fleetQuestionWords } = require('../fleet-question-vocabulary');
 const { json, reportCountFields, ownerPeriodRequest, fetchPeriodReport } = require('../fleet-period');
 const { fetchTimeOfDayReport } = require('../fleet-time-of-day');
 const { requestText } = require('../anthropic-text');
@@ -17,9 +18,6 @@ const SYSTEM_PROMPT = [
 function words(text) {
   return text.normalize('NFKC').toLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || [];
 }
-
-const commonNameWords = new Set(['will', 'day', 'may', 'june', 'mark', 'rich', 'chase', 'grant', 'hope', 'night', 'week',
-  'long', 'miles', 'best', 'most', 'grace', 'bill', 'park', 'lane', 'west', 'east', 'north', 'south']);
 
 function validCalendarToken(value) {
   if (/^(?:19|20)\d{2}$/.test(value)) return true;
@@ -57,7 +55,7 @@ function refersToDriver(question, word) {
   // Tokenization limits word to Unicode letters, marks and numbers. Match
   // an individual in a subject or possessive phrase, including short names.
   const possessive = "(?<![\\p{L}\\p{M}\\p{N}])" + word + "[’']s\\b";
-  const subject = '\\b(?:did|does)\\s+' + word + '\\s+(?:have|drive|report|log|do)\\b';
+  const subject = '\\b(?:did|does)\\s+' + word + '\\s+(?:have|drive|report|log|do|perform|start|end|finish|stop|record|receive|trigger|complete|work|take|rest)\\b';
   return new RegExp(possessive + '|' + subject, 'iu').test(question);
 }
 
@@ -65,27 +63,43 @@ async function mentionsRoster(question, fleetId) {
   const questionWords = new Set(words(question));
   let after;
   for (;;) {
-    const params = { select: 'id,name,vehicle_id', fleet_id: 'eq.' + fleetId, order: 'id.asc', limit: '100' };
+    const params = { select: 'id,name,vehicle_id', fleet_id: 'eq.' + fleetId, order: 'id.asc', limit: '1000' };
     if (after) params.id = 'gt.' + after;
-    const page = await pgFetch('drivers', { params });
-    if (!Array.isArray(page)) throw new Error('invalid_roster');
-    if (!page.length) return false;
+    const { rows: page, total } = await pgFetch('drivers', { params, exactCount: true });
+    if (!Array.isArray(page) || !Number.isSafeInteger(total) || total < page.length ||
+        (!page.length && total !== 0)) throw new Error('invalid_roster');
     for (const driver of page) {
       if (!isUuid(driver?.id) || (after && driver.id <= after) || typeof driver.name !== 'string' ||
           (driver.vehicle_id != null && typeof driver.vehicle_id !== 'string')) throw new Error('invalid_roster');
       after = driver.id;
       const nameParts = words(driver.name);
       if (nameParts.some(word => questionWords.has(word) &&
-          ((word.length >= 4 && !commonNameWords.has(word)) || (word.length >= 2 && refersToDriver(question, word)))) ||
+          ((word.length >= 3 && !fleetQuestionWords.has(word)) || (word.length >= 2 && refersToDriver(question, word)))) ||
           (nameParts.length > 1 && nameParts.join('').length >= 3 && containsLabel(question, driver.name))) return true;
       if (driver.vehicle_id && mentionsVehicle(question, driver.vehicle_id)) return true;
     }
+    if (total === page.length) return false;
   }
 }
 
 function containsLabel(question, label) {
   const normalized = words(label).join(' ');
   return normalized.length > 0 && (' ' + words(question).join(' ') + ' ').includes(' ' + normalized + ' ');
+}
+
+function redactCompany(question, company) {
+  const parts = words(company);
+  if (!parts.length) return question;
+  const token = String.raw`[\p{L}\p{M}\p{N}]`;
+  const name = parts.join(String.raw`[^\p{L}\p{M}\p{N}]+`);
+  return question.replace(new RegExp(`(?<!${token})${name}(?!${token})`, 'giu'), 'the fleet');
+}
+
+function privateDetailReason(text) {
+  if (/\b[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\b/i.test(text)) return 'identifier';
+  if (/[-+]?\d{1,2}\.\d+\s*[,;]\s*[-+]?\d{1,3}\.\d+/u.test(text)) return 'location';
+  if (/[^\s@]+@[^\s@]+/u.test(text) || mentionsPhone(text)) return 'contact';
+  return null;
 }
 
 function periodCounts(report) {
@@ -143,17 +157,14 @@ module.exports = withProviderBudget(async function handler(request, response) {
     const billingConfig = paidAccess.paidAccessConfig();
     if (!billingConfig) return json(response, 501, { ok: false, error: 'paid_access_not_configured' });
     const normalized = question.normalize('NFKC');
-    if (/[^\s@]+@[^\s@]+/u.test(normalized) || mentionsPhone(normalized) ||
-        /\b[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\b/i.test(normalized) ||
-        /[-+]?\d{1,2}\.\d+\s*[,;]\s*[-+]?\d{1,3}\.\d+/u.test(normalized) ||
-        containsLabel(normalized, owner.fleet.company_name)) {
-      return json(response, 400, { ok: false, error: 'question_has_personal_details' });
-    }
+    const reason = privateDetailReason(normalized);
+    if (reason) return json(response, 400, { ok: false, error: 'question_has_personal_details', reason });
+    const aggregateQuestion = redactCompany(normalized, owner.fleet.company_name);
     if (!await paidAccess.hasPaidFleetAccess(owner, billingConfig)) {
       return json(response, 403, { ok: false, error: 'paid_plan_required' });
     }
-    if (await mentionsRoster(normalized, owner.fleet.id)) {
-      return json(response, 400, { ok: false, error: 'question_has_personal_details' });
+    if (await mentionsRoster(aggregateQuestion, owner.fleet.id)) {
+      return json(response, 400, { ok: false, error: 'question_has_personal_details', reason: 'driver_or_vehicle' });
     }
     const reservation = await reserveQuestion(owner, response);
     if (!reservation) return;
@@ -164,7 +175,7 @@ module.exports = withProviderBudget(async function handler(request, response) {
     ]);
     const model = process.env.OCCULERT_INSIGHTS_MODEL?.trim() || 'claude-haiku-5-5';
     if (model.includes(apiKey) || question.includes(apiKey)) throw new Error('invalid_input');
-    const input = { question, days, week: periodCounts(week), month: periodCounts(month),
+    const input = { question: aggregateQuestion, days, week: periodCounts(week), month: periodCounts(month),
       timezone: timeReport.timezone, blocks: timeReport.blocks };
     const answer = await requestText({ feature: 'fleet_ask', model, apiKey, input, systemPrompt: SYSTEM_PROMPT, maxLength: 700,
       // Keep time in the shared request budget for the release RPC on timeout.
