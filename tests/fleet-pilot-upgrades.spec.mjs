@@ -314,6 +314,25 @@ test('one click checks a pending summary again and displays the finished answer'
   expect(requests).toEqual([30, 30]);
 });
 
+async function expectPlanLinks(status) {
+  await expect(status.getByRole('link', { name: 'View fleet plans' })).toHaveAttribute('href', '/fleet-pricing.html');
+  await expect(status.getByRole('link', { name: 'fleet@occulert.com' })).toHaveAttribute('href', 'mailto:fleet@occulert.com');
+}
+
+test('the summary card explains a plan denial and only offers pricing for that denial', async ({ page }) => {
+  await summaryDashboard(page, (route, days, count) => route.fulfill({
+    status: 403, json: { error: count === 1 ? 'paid_plan_required' : 'fleet_not_found' },
+  }));
+  const button = page.getByRole('button', { name: 'Write summary' });
+  const status = page.locator('#fleetInsightText');
+  await button.click();
+  await expect(status).toContainText('AI summaries require an active paid Occulert fleet plan.');
+  await expectPlanLinks(status);
+  await button.click();
+  await expect(status).toHaveText('Summary unavailable. Try again later.');
+  await expect(status.getByRole('link')).toHaveCount(0);
+});
+
 test('three pending replies restore manual checking and respect the default and maximum delay', async ({ page }) => {
   const requests = await summaryDashboard(page, (route, days, count) => route.fulfill({
     status: count <= 3 ? 202 : 502, headers: count === 2 ? { 'Retry-After': '99' } : {}, json: { ok: false },
@@ -475,7 +494,10 @@ test('the question box explains private detail, quota, timeout and unavailable r
     'The question timed out. This attempt did not count toward your monthly allowance. Try again.',
     'Fleet questions are unavailable. Try again later.']) {
     await ask.click();
-    await expect(card.getByRole('status')).toContainText(message);
+    const status = card.getByRole('status');
+    await expect(status).toContainText(message);
+    if (message.startsWith('Fleet questions require')) await expectPlanLinks(status);
+    else await expect(status.getByRole('link')).toHaveCount(0);
     await expect(card.locator('#fleetAskAnswer')).toBeEmpty();
   }
   await ask.click();

@@ -38,9 +38,6 @@
         report.scored + report.unscored !== report.sessions ||
         report.valid_alert_records + report.missing_alert_records !== report.sessions ||
         report.reviewed + report.without_reviewed_followup !== report.sessions) return false;
-    if (!Number.isFinite(report.monitored_hours) || report.monitored_hours < 0 || report.monitored_hours > 16 * report.completed ||
-        (report.monitored_hours === 0 ? report.alerts_per_monitored_hour !== null :
-          !Number.isFinite(report.alerts_per_monitored_hour) || report.alerts_per_monitored_hour < 0)) return false;
     var pipelines = report.detector_pipelines;
     var pipelineKeys = ['web_mediapipe_ear', 'ios_mlkit_eye_probability', 'android_mlkit_eye_probability', 'unknown'];
     if (!pipelines || typeof pipelines !== 'object' || Array.isArray(pipelines) ||
@@ -67,9 +64,6 @@
       sourceCount: report.sessions, completePeriod: true, sessions: report.sessions,
       completed: report.completed, noEnd: report.no_recorded_end, invalidEnds: report.invalid_recorded_end,
       interrupted: null, unscored: report.unscored, scored: report.scored, average: report.average_safety_score,
-      comparison: comparisonText(report),
-      pilotExpiresAt: report.pilotExpiresAt,
-      monitoredHours: report.monitored_hours, alertsPerMonitoredHour: report.alerts_per_monitored_hour,
       alerts: report.alerts, missingAlerts: report.missing_alert_records, validAlertRecords: report.valid_alert_records,
       rosterTotal: report.roster_total, activeDrivers: report.active_drivers,
       detectorPipelines: report.detector_pipelines,
@@ -79,20 +73,8 @@
         message: report.reviewed + ' saved Reviewed · ' + report.without_reviewed_followup +
           ' without a saved Reviewed follow-up. A manager marker does not prove a tester review or validate telemetry.' } };
   }
-  function comparisonText(report) {
-    var previous = report.previous_period, changes = report.period_deltas;
-    if (!previous) return 'Previous-period comparison unavailable.';
-    if (previous.sessions === 0) return 'No sessions in the previous ' + report.days + ' days.';
-    if (!changes || !Number.isSafeInteger(changes.sessions) || !Number.isSafeInteger(changes.alerts)) return 'Previous-period comparison unavailable.';
-    function signed(value) { return value > 0 ? '+' + value : String(value); }
-    return 'Compared with the previous ' + report.days + ' days: sessions ' + signed(changes.sessions) +
-      ' (previously ' + previous.sessions + '), alerts ' + signed(changes.alerts) + ' (previously ' + previous.alerts + ').';
-  }
   function reportRows(summary) {
     return [
-      ['Monitored hours (up to 16 per completed session)', summary.monitoredHours.toLocaleString(undefined, { maximumFractionDigits: 2 })],
-      ['Recorded alerts per monitored hour', summary.alertsPerMonitoredHour === null ? 'No monitored time' : String(summary.alertsPerMonitoredHour)],
-      ['Previous reporting period', summary.comparison],
       ['Sessions started in window', String(summary.sessions)],
       ['Completed records (valid recorded end time)', String(summary.completed)],
       ['No recorded end time (state unknown)', String(summary.noEnd)],
@@ -210,6 +192,15 @@
     }
   }
 
+  function showPlanMessage(id, feature) {
+    var pricing = node('a', 'View fleet plans');
+    pricing.href = '/fleet-pricing.html';
+    var email = node('a', 'fleet@occulert.com');
+    email.href = 'mailto:fleet@occulert.com';
+    document.getElementById(id).replaceChildren(feature + ' require an active paid Occulert fleet plan. ',
+      pricing, ' or contact ', email, '.');
+  }
+
   function clearInsight() {
     clearTimeout(insightPollTimer); insightPollTimer = null;
     clearTimeout(insightUnlockTimer); insightUnlockTimer = null;
@@ -287,6 +278,14 @@
           if (canCheck) void writeInsight(attempt + 1);
           else update({ skipReviewLoad: true });
         }, delay * 1000);
+        return;
+      }
+      if (response.status === 403) {
+        var denial = await response.json();
+        if (!matchesReport()) return;
+        if (denial?.error !== 'paid_plan_required') throw new Error();
+        showPlanMessage('fleetInsightText', 'AI summaries');
+        insightButton.textContent = 'Write summary';
         return;
       }
       if (response.status === 502 || response.status === 504) {
@@ -394,7 +393,7 @@
         setText('fleetAskStatus', problem + credit + ' Try again.'); return;
       }
       if (response.status === 403 && data?.error === 'paid_plan_required') {
-        setText('fleetAskStatus', 'Fleet questions require an active paid Occulert fleet plan.'); return;
+        showPlanMessage('fleetAskStatus', 'Fleet questions'); return;
       }
       if (response.status === 400 && data?.error === 'question_has_personal_details') {
         var messages = {
@@ -443,11 +442,6 @@
     if (!panel || !report) return;
     setText('pilotQualityStatus', summary.available ? 'Complete last ' + summary.days + ' days · ' + summary.sessions +
       ' stored sessions · refreshed ' + new Date(summary.generatedAt).toLocaleString() : summary.reason);
-    setText('qualityPilotAccess', summary.available && summary.pilotExpiresAt > Date.now() ?
-      'Pilot access until ' + new Date(summary.pilotExpiresAt).toLocaleDateString() : '');
-    setText('qualityComparison', summary.available ? summary.comparison : '');
-    setText('qualityMonitoredHours', summary.available ? summary.monitoredHours.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—');
-    setText('qualityHourlyRate', summary.available && summary.alertsPerMonitoredHour !== null ? summary.alertsPerMonitoredHour : '—');
     setText('qualityCompleted', summary.available ? summary.completed : '—');
     setText('qualityInterrupted', 'Unavailable');
     setText('qualityUnscored', summary.available ? summary.unscored : '—');
@@ -502,7 +496,7 @@
               !data.privacy || data.privacy.includes_location !== false || data.privacy.includes_personal_media !== false ||
               data.privacy.includes_raw_motion !== false || !validPeriodReport(data.report, days))
             throw new Error('Complete-period response could not be verified. Refresh the report.');
-          return Object.assign({}, data.report, { pilotExpiresAt: time(data.pilot_expires_at) });
+          return data.report;
         })(),
         new Promise(function (_, reject) { timer = setTimeout(function () { abort.abort(); reject(new Error('Complete-period report timed out. Refresh the report.')); }, 8000); }),
       ]);
