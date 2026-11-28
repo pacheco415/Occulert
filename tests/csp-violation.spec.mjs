@@ -28,7 +28,7 @@ function fixtureSession() {
 
 function periodReport(days) {
   return {
-    version: 1, days, window_start: ago(days * 24 * 60), window_end: ago(0), complete_period: true,
+    version: 1, days, window_start: ago(days * 24 * 60), window_end: ago(0), complete_period: true, monitored_hours: 2, alerts_per_monitored_hour: 1.5,
     roster_total: 1, active_drivers: 1, reporting_active_drivers: 1,
     sessions: 1, completed: 1, no_recorded_end: 0, invalid_recorded_end: 0,
     scored: 1, unscored: 0, average_safety_score: 90,

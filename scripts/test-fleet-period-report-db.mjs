@@ -7,7 +7,7 @@ const OWNER = '11111111-1111-4111-8111-111111111111';
 const OTHER = '99999999-9999-4999-8999-999999999999';
 const FLEET = '22222222-2222-4222-8222-222222222222';
 const DRIVER = '33333333-3333-4333-8333-333333333333';
-const sql = readFileSync(new URL('../supabase/migrations/20260927010000_fleet_period_report.sql', import.meta.url), 'utf8');
+const sql = readFileSync(new URL('../supabase/migrations/20261128020000_fleet_period_exposure.sql', import.meta.url), 'utf8');
 
 test('database aggregate counts 150 records without exposing rows across owners', async () => {
   const db = new PGlite();
@@ -39,6 +39,8 @@ test('database aggregate counts 150 records without exposing rows across owners'
       select id,'reviewed',1 from public.sessions order by started_at desc limit 25`);
     const value = await db.query('select public.fleet_period_report($1::uuid,$2::uuid,30) as report', [OWNER, FLEET]);
     const report = value.rows[0].report;
+    assert.equal(report.monitored_hours, 25);
+    assert.equal(report.alerts_per_monitored_hour, 1.8);
     assert.equal(report.sessions, 150);
     assert.equal(report.completed, 50);
     assert.equal(report.no_recorded_end, 50);
@@ -54,6 +56,17 @@ test('database aggregate counts 150 records without exposing rows across owners'
     assert.equal(report.detector_pipelines.ios_mlkit_eye_probability, 75);
     assert.equal(report.reporting_active_drivers, 1);
     assert.equal(Object.hasOwn(report, 'driver_id'), false);
+    await db.exec('delete from public.sessions');
+    const exposure = async () => (await db.query('select public.fleet_period_report($1,$2,7) as r', [OWNER, FLEET])).rows[0].r;
+    const empty = await exposure();
+    assert.equal(empty.monitored_hours, 0);
+    assert.equal(empty.alerts_per_monitored_hour, null);
+    await db.query(`insert into public.sessions(id, driver_id, fleet_id, started_at, ended_at, alert_count)
+      values (gen_random_uuid(), $2, $1, now() - interval '40 hours', now() - interval '10 hours', 8),
+             (gen_random_uuid(), $2, $1, now() - interval '40 hours', now() + interval '1 hour', 80)`, [FLEET, DRIVER]);
+    const capped = await exposure();
+    assert.equal(capped.monitored_hours, 16);
+    assert.equal(capped.alerts_per_monitored_hour, 0.5);
     const denied = await db.query('select public.fleet_period_report($1::uuid,$2::uuid,30) as report', [OTHER, FLEET]);
     assert.equal(denied.rows[0].report, null);
   } finally { await db.close(); }

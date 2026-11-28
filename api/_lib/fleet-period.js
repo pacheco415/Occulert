@@ -38,6 +38,9 @@ function validReport(report, days) {
       report.interruption_reasons_available !== false || report.unrecorded_sessions_detectable !== false ||
       !validTimestamp(report.window_start) || !validTimestamp(report.window_end) ||
       Date.parse(report.window_start) >= Date.parse(report.window_end)) return false;
+  const hours = report.monitored_hours, rate = report.alerts_per_monitored_hour;
+  if (!Number.isFinite(hours) || hours < 0 || hours > report.completed * 16) return false;
+  if (hours === 0 ? rate !== null : !Number.isFinite(rate) || rate < 0) return false;
   if (reportCountFields.some(key => !Number.isSafeInteger(report[key]) || report[key] < 0)) return false;
   if (report.average_safety_score !== null && (!Number.isSafeInteger(report.average_safety_score) ||
       report.average_safety_score < 0 || report.average_safety_score > 100)) return false;

@@ -80,7 +80,7 @@ function setup(t, { companyName = 'Private Transit', roster = [{ id: driverId, n
     assert.deepEqual(body, { p_days: days, p_actor_id: ownerId, p_fleet_id: fleetId });
     if (path === 'rpc/fleet_time_of_day_report') return { version: 1, days, ...reportWindow(days, timeOfDayEnd), timezone: 'America/Los_Angeles', blocks };
     assert.equal(path, 'rpc/fleet_period_report');
-    return { version: 1, days, ...reportWindow(days), ...counts, complete_period: true, average_safety_score: null,
+    return { version: 1, days, ...reportWindow(days), ...counts, complete_period: true, monitored_hours: 2, alerts_per_monitored_hour: 1.5, average_safety_score: null,
       interruption_reasons_available: false, unrecorded_sessions_detectable: false,
       detector_pipelines: { web_mediapipe_ear: 4, ios_mlkit_eye_probability: 0, android_mlkit_eye_probability: 0, unknown: 0 },
       private_future_field: { driverId, company: 'Private Transit' } };
