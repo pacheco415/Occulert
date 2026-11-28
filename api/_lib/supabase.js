@@ -135,15 +135,22 @@ async function pgFetch(table, options) {
     url.searchParams.set(key, params[key]);
   }
 
+  const prefer = opts.exactCount ? 'count=exact,return=representation' :
+    opts.mergeDuplicates === true && method === "POST" ? "resolution=merge-duplicates,return=representation" : "return=representation";
   const { response, text } = await fetchTextWithDeadline(url, {
     method: method,
-    headers: Object.assign({}, serviceHeaders(), { Prefer: opts.mergeDuplicates === true && method === "POST" ? "resolution=merge-duplicates,return=representation" : "return=representation" }),
+    headers: Object.assign({}, serviceHeaders(), { Prefer: prefer }),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   }, MAX_REST_RESPONSE_BYTES);
 
   const data = parseResponseJson(text, response, 'supabase_invalid_response');
   if (!response.ok) {
     throw supabaseError('supabase_request_failed', response.status, data);
+  }
+  if (opts.exactCount) {
+    const range = /^(?:\d+-\d+|\*)\/(\d+)$/.exec(response.headers.get('content-range') || '');
+    if (!range) throw supabaseError('supabase_invalid_response', 502);
+    return { rows: data, total: Number(range[1]) };
   }
   return data;
 }
