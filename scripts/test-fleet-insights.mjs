@@ -16,7 +16,7 @@ const counts = { roster_total: 4, active_drivers: 3, reporting_active_drivers: 2
 const start = '2026-11-01T00:00:00Z';
 const end = '2026-11-08T00:00:00Z';
 const report = { ...counts, version: 1, days: 7, window_start: start, window_end: end,
-  complete_period: true, interruption_reasons_available: false, unrecorded_sessions_detectable: false,
+  complete_period: true, monitored_hours: 2, alerts_per_monitored_hour: 1.5, interruption_reasons_available: false, unrecorded_sessions_detectable: false,
   average_safety_score: 63, detector_pipelines: { web_mediapipe_ear: 3, ios_mlkit_eye_probability: 3,
     android_mlkit_eye_probability: 0, unknown: 0 },
   company_name: 'Private Fleet', driver: { name: 'Private Driver', coordinates: [1, 2] }, secret_future_field: 45 };
@@ -142,7 +142,7 @@ for (const days of [7, 30]) test('only validated allowlisted counts and dates le
   assert.equal(body.model, model);
   assert.equal(body.max_tokens, 400);
   assert.match(body.system, /missing alert records/);
-  assert.deepEqual(body.messages, [{ role: 'user', content: JSON.stringify({ days, window_start: start, window_end: end, ...counts }) }]);
+  assert.deepEqual(body.messages, [{ role: 'user', content: JSON.stringify({ days, window_start: start, window_end: end, ...counts, monitored_hours: 2, alerts_per_monitored_hour: 1.5 }) }]);
   assert.equal(app.logs.mock.callCount(), 0);
 });
 

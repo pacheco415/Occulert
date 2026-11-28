@@ -78,7 +78,7 @@ function setup(t, { companyName = 'Private Transit', roster = [{ id: driverId, n
     const period = { version: 1, days, window_start: start(days), window_end: end };
     if (path === 'rpc/fleet_time_of_day_report') return { ...period, timezone: 'America/Los_Angeles', blocks };
     assert.equal(path, 'rpc/fleet_period_report');
-    return { ...period, ...counts, complete_period: true, average_safety_score: null,
+    return { ...period, ...counts, complete_period: true, monitored_hours: 2, alerts_per_monitored_hour: 1.5, average_safety_score: null,
       interruption_reasons_available: false, unrecorded_sessions_detectable: false,
       detector_pipelines: { web_mediapipe_ear: 4, ios_mlkit_eye_probability: 0, android_mlkit_eye_probability: 0, unknown: 0 },
       private_future_field: { driverId, company: 'Private Transit' } };

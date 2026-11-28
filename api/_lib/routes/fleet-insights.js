@@ -42,6 +42,8 @@ async function requestSummary(report, model, apiKey) {
   const input = { days: report.days, window_start: report.window_start, window_end: report.window_end };
   for (const field of reportCountFields) input[field] = report[field];
 
+  input.monitored_hours = report.monitored_hours;
+  input.alerts_per_monitored_hour = report.alerts_per_monitored_hour;
   const timeoutMs = remainingInsightMs() - FINISH_RESERVE_MS;
   return requestText({ model, apiKey, systemPrompt: SYSTEM_PROMPT, input, maxLength: MAX_SUMMARY_LENGTH, timeoutMs });
 }

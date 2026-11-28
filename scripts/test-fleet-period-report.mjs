@@ -12,7 +12,7 @@ process.env.SUPABASE_URL = 'https://example.invalid';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-only';
 function report(overrides = {}) {
   return { version: 1, days: 30, window_start: '2026-08-28T12:00:00.000Z',
-    window_end: '2026-09-27T12:00:00.000Z', complete_period: true,
+    window_end: '2026-09-27T12:00:00.000Z', complete_period: true, monitored_hours: 2, alerts_per_monitored_hour: 1.5,
     roster_total: 6, active_drivers: 5, reporting_active_drivers: 4,
     sessions: 150, completed: 100, no_recorded_end: 40, invalid_recorded_end: 10,
     scored: 120, unscored: 30, average_safety_score: 78,

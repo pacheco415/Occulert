@@ -24,7 +24,7 @@ function session(id, days, score = 80) {
 function completePeriodReport(days) {
   const count = days === 7 ? 2 : 3;
   return {
-    version: 1, days, window_start: ago(days), window_end: new Date().toISOString(), complete_period: true,
+    version: 1, days, window_start: ago(days), window_end: new Date().toISOString(), complete_period: true, monitored_hours: 2, alerts_per_monitored_hour: 1.5,
     roster_total: 1, active_drivers: 1, reporting_active_drivers: 1,
     sessions: count, completed: count, no_recorded_end: 0, invalid_recorded_end: 0,
     scored: count - 1, unscored: 1, average_safety_score: 80,
