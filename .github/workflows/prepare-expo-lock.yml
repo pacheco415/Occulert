@@ -24,6 +24,10 @@ jobs:
       - run: npm ci --include=dev
       - run: npx --no-install expo install --fix
       - run: npm ci --include=dev && npm run verify
+      - name: Record the reviewed manifest patch
+        run: |
+          git diff --no-ext-diff -- package.json package-lock.json
+          git hash-object package.json package-lock.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: verified-expo-manifests
