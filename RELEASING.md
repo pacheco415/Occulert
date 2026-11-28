@@ -266,3 +266,7 @@ affected file's exact day-21 audit deadline. `--fail-within-days` accepts an
 integer from 1 through 21 and requires `--check`.
 Review protected references separately; the scheduled check never deletes
 files, rewrites references, or creates a cleanup release.
+
+### Native dependency compatibility
+
+Pull requests verify the installed lockfile, including Expo's bundled React and React Native versions. The weekly Dependency Audit Reports workflow also runs `npm run check:dependencies` against Expo's current recommendations. Run that workflow manually to check between weekly runs. The TestFlight workflow requires the same online check on the exact candidate before its authenticated preflight.
