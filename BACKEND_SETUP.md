@@ -380,7 +380,9 @@ Configure the server-only `STRIPE_LIVE_SUBSCRIPTION_CANCEL_KEY` alongside `STRIP
 
 ### Demo paid fleet AI on a preview
 
-Set `OCCULERT_PREVIEW_TEST_ENTITLEMENT=1` on the intended Vercel preview, enable the desired fleet AI feature and configure its provider. Use the preview's test billing setup and an active test subscription for the signed-in fleet. The service logs a startup notice when this path is enabled. Test entitlements bypass the live cache. Production, local development and deployments without a Vercel preview environment use the normal live entitlement checks.
+Apply `20261125003800_preview_billing_owner.sql` on the test database before enabling preview AI. A newly verified Stripe test subscription event records the owner on the billing row. Older rows become eligible only after a fresh event confirms the signed-in owner and fleet.
+
+Enable [Vercel Deployment Protection](https://vercel.com/docs/deployment-protection) for the preview and verify that an unauthenticated visitor is challenged. Scope both `OCCULERT_PREVIEW_TEST_ENTITLEMENT=1` and `OCCULERT_PREVIEW_FLEET_IDS` to **one named preview branch**. Supply comma-separated test fleet UUIDs and redeploy that preview. Empty or malformed lists disable the test entitlement. Enable the desired fleet AI feature and configure its provider only for the intended environment. Preview AI calls consume provider credits. Remove the opt-in when testing ends and retire previews that still have the old configuration. Production uses live billing.
 
 ### Owner-approved fleet AI pilots
 
