@@ -7,7 +7,7 @@ const paidAccess = require('../fleet-paid-access');
 const { requestText } = require('../anthropic-text');
 
 const SYSTEM_PROMPT = [
-  'Write three to five short plain-text sentences for a fleet manager, using only the supplied period and aggregate counts.',
+  'Write three to five short plain-text sentences totaling under 1,000 characters for a fleet manager, using only the supplied period and aggregate counts.',
   'Use the supplied values for unscored sessions, sessions with no recorded end, and missing alert records. Mention all three, including zeros.',
   'Use the supplied deltas to state the change versus the previous period. If comparison is unavailable or there were no previous sessions, say so. Do not calculate changes yourself.',
   'Make no medical claims, judgments about fitness to drive, or comments about individual drivers. Do not infer reasons for missing data.',
@@ -53,7 +53,7 @@ async function requestSummary(report, model, apiKey) {
     changes: report.period_deltas,
   };
   const timeoutMs = remainingInsightMs() - FINISH_RESERVE_MS;
-  return requestText({ model, apiKey, systemPrompt: SYSTEM_PROMPT, input, maxLength: MAX_SUMMARY_LENGTH, timeoutMs });
+  return requestText({ feature: 'fleet_insights', model, apiKey, systemPrompt: SYSTEM_PROMPT, input, maxLength: MAX_SUMMARY_LENGTH, timeoutMs });
 }
 
 function storedSummary(response, row) {
