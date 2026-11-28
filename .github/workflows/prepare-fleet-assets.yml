@@ -22,7 +22,8 @@ jobs:
           set -euo pipefail
           git remote set-branches origin '*'
           git fetch --quiet origin '+refs/heads/*:refs/remotes/origin/*' '+refs/pull/*/head:refs/remotes/pr/*'
-          git checkout --quiet --detach e7d4a43d222722eb72df76c1a9076572e63b2f6c
+          git merge-base --is-ancestor f770081cdf0116d13c29882903605c53f77ae3d4 refs/remotes/origin/main
+          git checkout --quiet --detach refs/remotes/origin/main
           git config user.name "Occulert release preparation"
           git config user.email "release-prep@users.noreply.github.com"
           npm ci
