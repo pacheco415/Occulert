@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-11-28T05:26:51Z",
+  "observedAt": "2026-11-28T06:36:18Z",
   "complete": true,
   "pullRequests": [
     {
@@ -13,28 +13,8 @@
       "isDraft": false
     },
     {
-      "number": 525,
-      "headRefName": "codex/faster-release-tests",
-      "isDraft": false
-    },
-    {
       "number": 524,
       "headRefName": "codex/fleet-monitored-hours",
-      "isDraft": false
-    },
-    {
-      "number": 523,
-      "headRefName": "codex/fleet-question-privacy",
-      "isDraft": false
-    },
-    {
-      "number": 520,
-      "headRefName": "codex/retire-assets-nov27",
-      "isDraft": false
-    },
-    {
-      "number": 519,
-      "headRefName": "codex/social-share-card",
       "isDraft": false
     },
     {
@@ -55,26 +35,6 @@
     {
       "number": 515,
       "headRefName": "codex/status-nov24",
-      "isDraft": false
-    },
-    {
-      "number": 514,
-      "headRefName": "codex/fleet-plan-messages",
-      "isDraft": false
-    },
-    {
-      "number": 513,
-      "headRefName": "codex/preview-fleet-allowlist",
-      "isDraft": false
-    },
-    {
-      "number": 512,
-      "headRefName": "codex/fleet-answer-length",
-      "isDraft": false
-    },
-    {
-      "number": 511,
-      "headRefName": "codex/fleet-ask-date-ranges",
       "isDraft": false
     }
   ]
