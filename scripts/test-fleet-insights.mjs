@@ -143,7 +143,7 @@ for (const days of [7, 30]) test('only validated allowlisted counts and dates le
   assert.equal(body.max_tokens, 400);
   assert.match(body.system, /under 1,000 characters/);
   assert.match(body.system, /missing alert records/);
-  assert.deepEqual(body.messages, [{ role: 'user', content: JSON.stringify({ days, window_start: start, window_end: end, ...counts, monitored_hours: 2, alerts_per_monitored_hour: 1.5 }) }]);
+  assert.deepEqual(body.messages, [{ role: 'user', content: JSON.stringify({ days, window_start: start, window_end: end, ...counts, monitored_hours: 2, alerts_per_monitored_hour: 1.5, comparison: { status: 'unavailable' } }) }]);
   assert.equal(app.logs.mock.callCount(), 0);
 });
 

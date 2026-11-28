@@ -7,7 +7,7 @@ const OWNER = '11111111-1111-4111-8111-111111111111';
 const OTHER = '99999999-9999-4999-8999-999999999999';
 const FLEET = '22222222-2222-4222-8222-222222222222';
 const DRIVER = '33333333-3333-4333-8333-333333333333';
-const sql = readFileSync(new URL('../supabase/migrations/20261128020000_fleet_period_exposure.sql', import.meta.url), 'utf8');
+const sql = readFileSync(new URL('../supabase/migrations/20261128020100_fleet_period_comparison.sql', import.meta.url), 'utf8');
 
 test('database aggregate counts 150 records without exposing rows across owners', async () => {
   const db = new PGlite();
@@ -41,6 +41,9 @@ test('database aggregate counts 150 records without exposing rows across owners'
     const report = value.rows[0].report;
     assert.equal(report.monitored_hours, 25);
     assert.equal(report.alerts_per_monitored_hour, 1.8);
+    assert.equal(report.previous_period.sessions, 0);
+    assert.equal(report.previous_period.window_end, report.window_start);
+    assert.equal(report.period_deltas, null);
     assert.equal(report.sessions, 150);
     assert.equal(report.completed, 50);
     assert.equal(report.no_recorded_end, 50);
@@ -67,6 +70,18 @@ test('database aggregate counts 150 records without exposing rows across owners'
     const capped = await exposure();
     assert.equal(capped.monitored_hours, 16);
     assert.equal(capped.alerts_per_monitored_hour, 0.5);
+    await db.exec('begin');
+    await db.query(`insert into public.sessions(id, driver_id, fleet_id, started_at, ended_at, alert_count)
+      values (gen_random_uuid(), $2, $1, now() - interval '8 days', now() - interval '8 days' + interval '1 hour', 3),
+             (gen_random_uuid(), $2, $1, now() - interval '7 days', now() - interval '7 days' + interval '1 hour', 1)`, [FLEET, DRIVER]);
+    const compared = await exposure();
+    assert.equal(compared.previous_period.sessions, 1);
+    assert.equal(compared.previous_period.alerts, 3);
+    assert.equal(compared.sessions, 3);
+    assert.equal(compared.period_deltas.sessions, 2);
+    assert.equal(compared.period_deltas.alerts, compared.alerts - 3);
+    assert.equal(compared.period_deltas.monitored_hours, 16);
+    await db.exec('commit');
     const denied = await db.query('select public.fleet_period_report($1::uuid,$2::uuid,30) as report', [OTHER, FLEET]);
     assert.equal(denied.rows[0].report, null);
   } finally { await db.close(); }
